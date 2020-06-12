@@ -33,6 +33,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -41,7 +43,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
@@ -136,7 +137,7 @@ type registerRequest struct {
 	DeviceID           *string `json:"device_id"`
 
 	// Prevent this user from logging in
-	InhibitLogin internal.WeakBoolean `json:"inhibit_login"`
+	InhibitLogin eventutil.WeakBoolean `json:"inhibit_login"`
 
 	// Application Services place Type in the root of their registration
 	// request, whereas clients place it in the authDict struct.
@@ -811,7 +812,7 @@ func completeRegistration(
 	accountDB accounts.Database,
 	deviceDB devices.Database,
 	username, password, appserviceID string,
-	inhibitLogin internal.WeakBoolean,
+	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
 ) util.JSONResponse {
 	if username == "" {
@@ -830,7 +831,7 @@ func completeRegistration(
 
 	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
 	if err != nil {
-		if errors.Is(err, internal.ErrUserExists) { // user already exists
+		if errors.Is(err, sqlutil.ErrUserExists) { // user already exists
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.UserInUse("Desired user ID is already taken."),

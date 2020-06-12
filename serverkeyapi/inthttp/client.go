@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	internalHTTP "github.com/matrix-org/dendrite/internal/http"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
@@ -116,7 +116,7 @@ func (h *httpServerKeyInternalAPI) InputPublicKeys(
 	defer span.Finish()
 
 	apiURL := h.serverKeyAPIURL + ServerKeyInputPublicKeyPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpServerKeyInternalAPI) QueryPublicKeys(
@@ -128,5 +128,5 @@ func (h *httpServerKeyInternalAPI) QueryPublicKeys(
 	defer span.Finish()
 
 	apiURL := h.serverKeyAPIURL + ServerKeyQueryPublicKeyPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

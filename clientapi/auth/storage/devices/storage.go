@@ -21,13 +21,13 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices/postgres"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices/sqlite3"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
 // and sets postgres connection parameters
-func NewDatabase(dataSourceName string, dbProperties internal.DbProperties, serverName gomatrixserverlib.ServerName) (Database, error) {
+func NewDatabase(dataSourceName string, dbProperties sqlutil.DbProperties, serverName gomatrixserverlib.ServerName) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return postgres.NewDatabase(dataSourceName, dbProperties, serverName)

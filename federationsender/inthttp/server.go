@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/util"
 )
 
@@ -14,7 +14,7 @@ import (
 func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(
 		FederationSenderQueryJoinedHostServerNamesInRoomPath,
-		internal.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryJoinedHostServerNamesInRoomRequest
 			var response api.QueryJoinedHostServerNamesInRoomResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -27,7 +27,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		}),
 	)
 	internalAPIMux.Handle(FederationSenderPerformJoinRequestPath,
-		internal.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -40,7 +40,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		}),
 	)
 	internalAPIMux.Handle(FederationSenderPerformLeaveRequestPath,
-		internal.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -53,7 +53,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		}),
 	)
 	internalAPIMux.Handle(FederationSenderPerformDirectoryLookupRequestPath,
-		internal.MakeInternalAPI("PerformDirectoryLookupRequest", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("PerformDirectoryLookupRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformDirectoryLookupRequest
 			var response api.PerformDirectoryLookupResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -66,7 +66,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		}),
 	)
 	internalAPIMux.Handle(FederationSenderPerformServersAlivePath,
-		internal.MakeInternalAPI("PerformServersAliveRequest", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("PerformServersAliveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformServersAliveRequest
 			var response api.PerformServersAliveResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

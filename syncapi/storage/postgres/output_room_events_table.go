@@ -21,12 +21,13 @@ import (
 	"encoding/json"
 	"sort"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -158,7 +159,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
-	stmt := internal.TxStmt(txn, s.selectStateInRangeStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(
 		ctx, r.Low(), r.High(),
@@ -239,7 +240,7 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := internal.TxStmt(txn, s.selectMaxEventIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectMaxEventIDStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
@@ -275,7 +276,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return
 	}
 
-	stmt := internal.TxStmt(txn, s.insertEventStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertEventStmt)
 	err = stmt.QueryRowContext(
 		ctx,
 		event.RoomID(),
@@ -303,9 +304,9 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 ) ([]types.StreamEvent, error) {
 	var stmt *sql.Stmt
 	if onlySyncEvents {
-		stmt = internal.TxStmt(txn, s.selectRecentEventsForSyncStmt)
+		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsForSyncStmt)
 	} else {
-		stmt = internal.TxStmt(txn, s.selectRecentEventsStmt)
+		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
 	}
 	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
@@ -333,7 +334,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, r types.Range, limit int,
 ) ([]types.StreamEvent, error) {
-	stmt := internal.TxStmt(txn, s.selectEarlyEventsStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEarlyEventsStmt)
 	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
@@ -357,7 +358,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 func (s *outputRoomEventsStatements) SelectEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
-	stmt := internal.TxStmt(txn, s.selectEventsStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventsStmt)
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err

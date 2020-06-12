@@ -18,7 +18,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
@@ -82,7 +82,7 @@ func (s *threepidStatements) prepare(db *sql.DB) (err error) {
 func (s *threepidStatements) selectLocalpartForThreePID(
 	ctx context.Context, txn *sql.Tx, threepid string, medium string,
 ) (localpart string, err error) {
-	stmt := internal.TxStmt(txn, s.selectLocalpartForThreePIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectLocalpartForThreePIDStmt)
 	err = stmt.QueryRowContext(ctx, threepid, medium).Scan(&localpart)
 	if err == sql.ErrNoRows {
 		return "", nil
@@ -117,7 +117,7 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 func (s *threepidStatements) insertThreePID(
 	ctx context.Context, txn *sql.Tx, threepid, medium, localpart string,
 ) (err error) {
-	stmt := internal.TxStmt(txn, s.insertThreePIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertThreePIDStmt)
 	_, err = stmt.ExecContext(ctx, threepid, medium, localpart)
 	return
 }

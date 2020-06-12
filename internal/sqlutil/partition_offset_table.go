@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package sqlutil
 
 import (
 	"context"
 	"database/sql"
 	"strings"
+
+	"github.com/matrix-org/util"
 )
+
+// A PartitionOffset is the offset into a partition of the input log.
+type PartitionOffset struct {
+	// The ID of the partition.
+	Partition int32
+	// The offset into the partition.
+	Offset int64
+}
 
 const partitionOffsetsSchema = `
 -- The offsets that the server has processed up to.
@@ -90,7 +100,12 @@ func (s *PartitionOffsetStatements) selectPartitionOffsets(
 	if err != nil {
 		return nil, err
 	}
-	defer CloseAndLogIfError(ctx, rows, "selectPartitionOffsets: rows.close() failed")
+	defer func() {
+		err2 := rows.Close()
+		if err2 != nil {
+			util.GetLogger(ctx).WithError(err2).Error("selectPartitionOffsets: rows.close() failed")
+		}
+	}()
 	var results []PartitionOffset
 	for rows.Next() {
 		var offset PartitionOffset

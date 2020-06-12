@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build wasm
+// +build !wasm
 
-package internal
+package sqlutil
 
-// IsUniqueConstraintViolationErr no-ops for this architecture
+import "github.com/lib/pq"
+
+// IsUniqueConstraintViolationErr returns true if the error is a postgresql unique_violation error
 func IsUniqueConstraintViolationErr(err error) bool {
-	return false
+	pqErr, ok := err.(*pq.Error)
+	return ok && pqErr.Code == "23505"
 }

@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )

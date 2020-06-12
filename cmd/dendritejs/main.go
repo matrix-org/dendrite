@@ -26,9 +26,8 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -184,7 +183,7 @@ func main() {
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith", false)
+	base := setup.NewBaseDendrite(cfg, "Monolith", false)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -233,7 +232,7 @@ func main() {
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
-	internal.SetupHTTPAPI(
+	httputil.SetupHTTPAPI(
 		http.DefaultServeMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,

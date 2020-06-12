@@ -22,6 +22,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -165,7 +166,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	userID string,
 	membership string, // nolint: unparam
 ) ([]string, error) {
-	stmt := internal.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
 	rows, err := stmt.QueryContext(ctx, userID, membership)
 	if err != nil {
 		return nil, err
@@ -188,7 +189,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]gomatrixserverlib.HeaderedEvent, error) {
-	stmt := internal.TxStmt(txn, s.selectCurrentStateStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
 		pq.StringArray(stateFilter.Senders),
 		pq.StringArray(stateFilter.NotSenders),
@@ -208,7 +209,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
-	stmt := internal.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
 	_, err := stmt.ExecContext(ctx, eventID)
 	return err
 }
@@ -231,7 +232,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	}
 
 	// upsert state event
-	stmt := internal.TxStmt(txn, s.upsertRoomStateStmt)
+	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
 	_, err = stmt.ExecContext(
 		ctx,
 		event.RoomID(),
@@ -250,7 +251,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
-	stmt := internal.TxStmt(txn, s.selectEventsWithEventIDsStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventsWithEventIDsStmt)
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err

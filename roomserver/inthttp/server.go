@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/util"
 )
@@ -14,7 +14,7 @@ import (
 // nolint: gocyclo
 func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(RoomserverInputRoomEventsPath,
-		internal.MakeInternalAPI("inputRoomEvents", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("inputRoomEvents", func(req *http.Request) util.JSONResponse {
 			var request api.InputRoomEventsRequest
 			var response api.InputRoomEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -27,7 +27,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(RoomserverPerformJoinPath,
-		internal.MakeInternalAPI("performJoin", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("performJoin", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -40,7 +40,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(RoomserverPerformLeavePath,
-		internal.MakeInternalAPI("performLeave", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("performLeave", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -54,7 +54,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryLatestEventsAndStatePath,
-		internal.MakeInternalAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {
 			var request api.QueryLatestEventsAndStateRequest
 			var response api.QueryLatestEventsAndStateResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -68,7 +68,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryStateAfterEventsPath,
-		internal.MakeInternalAPI("queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryStateAfterEvents", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAfterEventsRequest
 			var response api.QueryStateAfterEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -82,7 +82,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryEventsByIDPath,
-		internal.MakeInternalAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
 			var request api.QueryEventsByIDRequest
 			var response api.QueryEventsByIDResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -96,7 +96,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryMembershipForUserPath,
-		internal.MakeInternalAPI("QueryMembershipForUser", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("QueryMembershipForUser", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMembershipForUserRequest
 			var response api.QueryMembershipForUserResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -110,7 +110,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryMembershipsForRoomPath,
-		internal.MakeInternalAPI("queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryMembershipsForRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMembershipsForRoomRequest
 			var response api.QueryMembershipsForRoomResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -124,7 +124,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryServerAllowedToSeeEventPath,
-		internal.MakeInternalAPI("queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryServerAllowedToSeeEvent", func(req *http.Request) util.JSONResponse {
 			var request api.QueryServerAllowedToSeeEventRequest
 			var response api.QueryServerAllowedToSeeEventResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -138,7 +138,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryMissingEventsPath,
-		internal.MakeInternalAPI("queryMissingEvents", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryMissingEvents", func(req *http.Request) util.JSONResponse {
 			var request api.QueryMissingEventsRequest
 			var response api.QueryMissingEventsResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -152,7 +152,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryStateAndAuthChainPath,
-		internal.MakeInternalAPI("queryStateAndAuthChain", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryStateAndAuthChain", func(req *http.Request) util.JSONResponse {
 			var request api.QueryStateAndAuthChainRequest
 			var response api.QueryStateAndAuthChainResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -166,7 +166,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverPerformBackfillPath,
-		internal.MakeInternalAPI("PerformBackfill", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("PerformBackfill", func(req *http.Request) util.JSONResponse {
 			var request api.PerformBackfillRequest
 			var response api.PerformBackfillResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -180,7 +180,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryRoomVersionCapabilitiesPath,
-		internal.MakeInternalAPI("QueryRoomVersionCapabilities", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("QueryRoomVersionCapabilities", func(req *http.Request) util.JSONResponse {
 			var request api.QueryRoomVersionCapabilitiesRequest
 			var response api.QueryRoomVersionCapabilitiesResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -194,7 +194,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverQueryRoomVersionForRoomPath,
-		internal.MakeInternalAPI("QueryRoomVersionForRoom", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("QueryRoomVersionForRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryRoomVersionForRoomRequest
 			var response api.QueryRoomVersionForRoomResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -208,7 +208,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverSetRoomAliasPath,
-		internal.MakeInternalAPI("setRoomAlias", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("setRoomAlias", func(req *http.Request) util.JSONResponse {
 			var request api.SetRoomAliasRequest
 			var response api.SetRoomAliasResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -222,7 +222,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverGetRoomIDForAliasPath,
-		internal.MakeInternalAPI("GetRoomIDForAlias", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("GetRoomIDForAlias", func(req *http.Request) util.JSONResponse {
 			var request api.GetRoomIDForAliasRequest
 			var response api.GetRoomIDForAliasResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -236,7 +236,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverGetCreatorIDForAliasPath,
-		internal.MakeInternalAPI("GetCreatorIDForAlias", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("GetCreatorIDForAlias", func(req *http.Request) util.JSONResponse {
 			var request api.GetCreatorIDForAliasRequest
 			var response api.GetCreatorIDForAliasResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -250,7 +250,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverGetAliasesForRoomIDPath,
-		internal.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
 			var request api.GetAliasesForRoomIDRequest
 			var response api.GetAliasesForRoomIDResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -264,7 +264,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(
 		RoomserverRemoveRoomAliasPath,
-		internal.MakeInternalAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("removeRoomAlias", func(req *http.Request) util.JSONResponse {
 			var request api.RemoveRoomAliasRequest
 			var response api.RemoveRoomAliasResponse
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

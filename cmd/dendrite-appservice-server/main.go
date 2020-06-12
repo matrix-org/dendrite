@@ -16,12 +16,12 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "AppServiceAPI", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "AppServiceAPI", true)
 
 	defer base.Close() // nolint: errcheck
 	accountDB := base.CreateAccountsDB()

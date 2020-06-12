@@ -18,12 +18,10 @@ package postgres
 import (
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 
@@ -32,11 +30,11 @@ import (
 type SyncServerDatasource struct {
 	shared.Database
 	db *sql.DB
-	internal.PartitionOffsetStatements
+	sqlutil.PartitionOffsetStatements
 }
 
 // NewDatabase creates a new sync server database
-func NewDatabase(dbDataSourceName string, dbProperties internal.DbProperties) (*SyncServerDatasource, error) {
+func NewDatabase(dbDataSourceName string, dbProperties sqlutil.DbProperties) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
 	if d.db, err = sqlutil.Open("postgres", dbDataSourceName, dbProperties); err != nil {
@@ -82,7 +80,7 @@ func NewDatabase(dbDataSourceName string, dbProperties internal.DbProperties) (*
 		CurrentRoomState:    currState,
 		BackwardExtremities: backwardExtremities,
 		SendToDevice:        sendToDevice,
-		SendToDeviceWriter:  internal.NewTransactionWriter(),
+		SendToDeviceWriter:  sqlutil.NewTransactionWriter(),
 		EDUCache:            cache.New(),
 	}
 	return &d, nil

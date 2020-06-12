@@ -12,23 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+// +build wasm
 
-import (
-	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/keyserver"
-)
+package sqlutil
 
-func main() {
-	cfg := setup.ParseFlags(false)
-	base := setup.NewBaseDendrite(cfg, "KeyServer", true)
-	defer base.Close() // nolint: errcheck
-
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
-
-	keyserver.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB, accountDB)
-
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.KeyServer), string(base.Cfg.Listen.KeyServer))
-
+// IsUniqueConstraintViolationErr no-ops for this architecture
+func IsUniqueConstraintViolationErr(err error) bool {
+	return false
 }

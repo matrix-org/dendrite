@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -95,8 +95,8 @@ func MakeJoin(
 	queryRes := api.QueryLatestEventsAndStateResponse{
 		RoomVersion: verRes.RoomVersion,
 	}
-	event, err := internal.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), rsAPI, &queryRes)
-	if err == internal.ErrRoomNoExists {
+	event, err := eventutil.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), rsAPI, &queryRes)
+	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
@@ -107,7 +107,7 @@ func MakeJoin(
 			JSON: jsonerror.BadJSON(e.Error()),
 		}
 	} else if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("internal.BuildEvent failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		return jsonerror.InternalServerError()
 	}
 

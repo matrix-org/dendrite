@@ -23,9 +23,8 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/matrix-org/dendrite/internal"
 )
 
 // RoomAliasExistsRequest is a request to an application service
@@ -110,7 +109,7 @@ func RetrieveUserProfile(
 
 	// If no user exists, return
 	if !userResp.UserIDExists {
-		return nil, internal.ErrProfileNoExists
+		return nil, eventutil.ErrProfileNoExists
 	}
 
 	// Try to query the user from the local database again

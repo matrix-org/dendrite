@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -109,7 +110,7 @@ func (s *membershipStatements) InsertMembership(
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	localTarget bool,
 ) error {
-	stmt := internal.TxStmt(txn, s.insertMembershipStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertMembershipStmt)
 	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID, localTarget)
 	return err
 }
@@ -118,7 +119,7 @@ func (s *membershipStatements) SelectMembershipForUpdate(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (membership tables.MembershipState, err error) {
-	stmt := internal.TxStmt(txn, s.selectMembershipForUpdateStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipForUpdateStmt)
 	err = stmt.QueryRowContext(
 		ctx, roomNID, targetUserNID,
 	).Scan(&membership)
@@ -193,7 +194,7 @@ func (s *membershipStatements) UpdateMembership(
 	senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
 	eventNID types.EventNID,
 ) error {
-	stmt := internal.TxStmt(txn, s.updateMembershipStmt)
+	stmt := sqlutil.TxStmt(txn, s.updateMembershipStmt)
 	_, err := stmt.ExecContext(
 		ctx, senderUserNID, membership, eventNID, roomNID, targetUserNID,
 	)

@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const roomSchema = `
@@ -71,7 +71,7 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 func (s *roomStatements) insertRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	_, err := internal.TxStmt(txn, s.insertRoomStmt).ExecContext(ctx, roomID)
+	_, err := sqlutil.TxStmt(txn, s.insertRoomStmt).ExecContext(ctx, roomID)
 	return err
 }
 
@@ -82,7 +82,7 @@ func (s *roomStatements) selectRoomForUpdate(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (string, error) {
 	var lastEventID string
-	stmt := internal.TxStmt(txn, s.selectRoomForUpdateStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomForUpdateStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(&lastEventID)
 	if err != nil {
 		return "", err
@@ -95,7 +95,7 @@ func (s *roomStatements) selectRoomForUpdate(
 func (s *roomStatements) updateRoom(
 	ctx context.Context, txn *sql.Tx, roomID, lastEventID string,
 ) error {
-	stmt := internal.TxStmt(txn, s.updateRoomStmt)
+	stmt := sqlutil.TxStmt(txn, s.updateRoomStmt)
 	_, err := stmt.ExecContext(ctx, roomID, lastEventID)
 	return err
 }

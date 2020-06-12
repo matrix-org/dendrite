@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -152,7 +153,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	userID string,
 	membership string, // nolint: unparam
 ) ([]string, error) {
-	stmt := internal.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
 	rows, err := stmt.QueryContext(ctx, userID, membership)
 	if err != nil {
 		return nil, err
@@ -175,7 +176,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilterPart *gomatrixserverlib.StateFilter,
 ) ([]gomatrixserverlib.HeaderedEvent, error) {
-	stmt := internal.TxStmt(txn, s.selectCurrentStateStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
 		nil, // FIXME: pq.StringArray(stateFilterPart.Senders),
 		nil, // FIXME: pq.StringArray(stateFilterPart.NotSenders),
@@ -195,7 +196,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
-	stmt := internal.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
 	_, err := stmt.ExecContext(ctx, eventID)
 	return err
 }
@@ -218,7 +219,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	}
 
 	// upsert state event
-	stmt := internal.TxStmt(txn, s.upsertRoomStateStmt)
+	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
 	_, err = stmt.ExecContext(
 		ctx,
 		event.RoomID(),
@@ -241,7 +242,7 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", internal.QueryVariadic(len(iEventIDs)), 1)
+	query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
 	rows, err := txn.QueryContext(ctx, query, iEventIDs...)
 	if err != nil {
 		return nil, err
