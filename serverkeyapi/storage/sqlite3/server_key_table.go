@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -90,7 +91,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 		nameAndKeyIDs = append(nameAndKeyIDs, nameAndKeyID(request))
 	}
 
-	query := strings.Replace(bulkSelectServerKeysSQL, "($1)", internal.QueryVariadic(len(nameAndKeyIDs)), 1)
+	query := strings.Replace(bulkSelectServerKeysSQL, "($1)", sqlutil.QueryVariadic(len(nameAndKeyIDs)), 1)
 
 	iKeyIDs := make([]interface{}, len(nameAndKeyIDs))
 	for i, v := range nameAndKeyIDs {

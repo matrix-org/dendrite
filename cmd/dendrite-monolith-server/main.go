@@ -23,9 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -45,7 +44,7 @@ var (
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(true)
+	cfg := setup.ParseFlags(true)
 	if *enableHTTPAPIs {
 		// If the HTTP APIs are enabled then we need to update the Listen
 		// statements in the configuration so that we know where to find
@@ -59,7 +58,7 @@ func main() {
 		cfg.Listen.ServerKeyAPI = addr
 	}
 
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
+	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -135,7 +134,7 @@ func main() {
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
-	internal.SetupHTTPAPI(
+	httputil.SetupHTTPAPI(
 		http.DefaultServeMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
@@ -147,7 +146,7 @@ func main() {
 	go func() {
 		serv := http.Server{
 			Addr:         *httpBindAddr,
-			WriteTimeout: basecomponent.HTTPServerTimeout,
+			WriteTimeout: setup.HTTPServerTimeout,
 		}
 
 		logrus.Info("Listening on ", serv.Addr)
@@ -158,7 +157,7 @@ func main() {
 		go func() {
 			serv := http.Server{
 				Addr:         *httpsBindAddr,
-				WriteTimeout: basecomponent.HTTPServerTimeout,
+				WriteTimeout: setup.HTTPServerTimeout,
 			}
 
 			logrus.Info("Listening on ", serv.Addr)

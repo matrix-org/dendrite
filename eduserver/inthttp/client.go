@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/eduserver/api"
-	internalHTTP "github.com/matrix-org/dendrite/internal/http"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -39,7 +39,7 @@ func (h *httpEDUServerInputAPI) InputTypingEvent(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputTypingEventPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // InputSendToDeviceEvent implements EDUServerInputAPI
@@ -52,5 +52,5 @@ func (h *httpEDUServerInputAPI) InputSendToDeviceEvent(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputSendToDeviceEventPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

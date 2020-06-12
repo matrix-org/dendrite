@@ -19,12 +19,12 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/appservice/storage/sqlite3"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 func NewDatabase(
 	dataSourceName string,
-	dbProperties internal.DbProperties, // nolint:unparam
+	dbProperties sqlutil.DbProperties, // nolint:unparam
 ) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {

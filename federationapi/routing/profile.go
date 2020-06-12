@@ -21,8 +21,8 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -72,11 +72,11 @@ func GetProfile(
 	if field != "" {
 		switch field {
 		case "displayname":
-			res = internal.DisplayName{
+			res = eventutil.DisplayName{
 				DisplayName: profile.DisplayName,
 			}
 		case "avatar_url":
-			res = internal.AvatarURL{
+			res = eventutil.AvatarURL{
 				AvatarURL: profile.AvatarURL,
 			}
 		default:
@@ -84,7 +84,7 @@ func GetProfile(
 			res = jsonerror.InvalidArgumentValue("The request body did not contain an allowed value of argument 'field'. Allowed values are either: 'avatar_url', 'displayname'.")
 		}
 	} else {
-		res = internal.ProfileResponse{
+		res = eventutil.ProfileResponse{
 			AvatarURL:   profile.AvatarURL,
 			DisplayName: profile.DisplayName,
 		}

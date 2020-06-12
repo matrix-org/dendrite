@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	// Import SQLite database driver
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
@@ -41,7 +40,7 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
-	if result.db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil); err != nil {
+	if result.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {

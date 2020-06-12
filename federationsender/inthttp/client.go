@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/federationsender/api"
-	internalHTTP "github.com/matrix-org/dendrite/internal/http"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -44,7 +44,7 @@ func (h *httpFederationSenderInternalAPI) PerformLeave(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformLeaveRequestPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpFederationSenderInternalAPI) PerformServersAlive(
@@ -56,7 +56,7 @@ func (h *httpFederationSenderInternalAPI) PerformServersAlive(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformServersAlivePath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // QueryJoinedHostServerNamesInRoom implements FederationSenderInternalAPI
@@ -69,7 +69,7 @@ func (h *httpFederationSenderInternalAPI) QueryJoinedHostServerNamesInRoom(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderQueryJoinedHostServerNamesInRoomPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // Handle an instruction to make_join & send_join with a remote server.
@@ -82,7 +82,7 @@ func (h *httpFederationSenderInternalAPI) PerformJoin(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformJoinRequestPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // Handle an instruction to make_join & send_join with a remote server.
@@ -95,5 +95,5 @@ func (h *httpFederationSenderInternalAPI) PerformDirectoryLookup(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformDirectoryLookupRequestPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

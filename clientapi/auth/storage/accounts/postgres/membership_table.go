@@ -18,10 +18,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal"
-
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 const membershipSchema = `

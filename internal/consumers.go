@@ -19,20 +19,13 @@ import (
 	"fmt"
 
 	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
-
-// A PartitionOffset is the offset into a partition of the input log.
-type PartitionOffset struct {
-	// The ID of the partition.
-	Partition int32
-	// The offset into the partition.
-	Offset int64
-}
 
 // A PartitionStorer has the storage APIs needed by the consumer.
 type PartitionStorer interface {
 	// PartitionOffsets returns the offsets the consumer has reached for each partition.
-	PartitionOffsets(ctx context.Context, topic string) ([]PartitionOffset, error)
+	PartitionOffsets(ctx context.Context, topic string) ([]sqlutil.PartitionOffset, error)
 	// SetPartitionOffset records where the consumer has reached for a partition.
 	SetPartitionOffset(ctx context.Context, topic string, partition int32, offset int64) error
 }
