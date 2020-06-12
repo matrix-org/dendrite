@@ -491,23 +491,6 @@ func (t *txnReq) lookupStateAfterEventLocally(roomID, eventID string, needed []g
 	}
 }
 
-func (t *txnReq) lookupCurrentState(newEvent *gomatrixserverlib.Event) (*gomatrixserverlib.RespState, error) {
-	// Ask the roomserver for information about this room
-	queryReq := api.QueryLatestEventsAndStateRequest{
-		RoomID:       newEvent.RoomID(),
-		StateToFetch: gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{*newEvent}).Tuples(),
-	}
-	var queryRes api.QueryLatestEventsAndStateResponse
-	if err := t.rsAPI.QueryLatestEventsAndState(t.context, &queryReq, &queryRes); err != nil {
-		return nil, fmt.Errorf("lookupCurrentState rsAPI.QueryLatestEventsAndState: %w", err)
-	}
-	evs := gomatrixserverlib.UnwrapEventHeaders(queryRes.StateEvents)
-	return &gomatrixserverlib.RespState{
-		StateEvents: evs,
-		AuthEvents:  evs,
-	}, nil
-}
-
 // lookuptStateBeforeEvent returns the room state before the event e, which is just /state_ids and/or /state depending on what
 // the server supports.
 func (t *txnReq) lookupStateBeforeEvent(roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (
