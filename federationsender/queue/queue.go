@@ -107,6 +107,9 @@ func (oqs *OutgoingQueues) SendEvent(
 
 	// Remove our own server from the list of destinations.
 	destinations = filterAndDedupeDests(oqs.origin, destinations)
+	if len(destinations) == 0 {
+		return nil
+	}
 
 	log.WithFields(log.Fields{
 		"destinations": destinations, "event": ev.EventID(),

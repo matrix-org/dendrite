@@ -86,12 +86,16 @@ func NewInternalAPI(
 		Cfg: base.Cfg,
 	}
 
-	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
-		rsAPI, workerStates,
-	)
-	if err := consumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
+	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
+	// We can't add ASes at runtime so this is safe to do.
+	if len(workerStates) > 0 {
+		consumer := consumers.NewOutputRoomEventConsumer(
+			base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
+			rsAPI, workerStates,
+		)
+		if err := consumer.Start(); err != nil {
+			logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
+		}
 	}
 
 	// Create application service transaction workers

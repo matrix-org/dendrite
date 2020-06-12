@@ -33,8 +33,6 @@ type QueryLatestEventsAndStateRequest struct {
 // This is used when sending events to set the prev_events, auth_events and depth.
 // It is also used to tell whether the event is allowed by the event auth rules.
 type QueryLatestEventsAndStateResponse struct {
-	// Copy of the request for debugging.
-	QueryLatestEventsAndStateRequest
 	// Does the room exist?
 	// If the room doesn't exist this will be false and LatestEvents will be empty.
 	RoomExists bool `json:"room_exists"`
@@ -66,8 +64,6 @@ type QueryStateAfterEventsRequest struct {
 
 // QueryStateAfterEventsResponse is a response to QueryStateAfterEvents
 type QueryStateAfterEventsResponse struct {
-	// Copy of the request for debugging.
-	QueryStateAfterEventsRequest
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
@@ -89,8 +85,6 @@ type QueryEventsByIDRequest struct {
 
 // QueryEventsByIDResponse is a response to QueryEventsByID
 type QueryEventsByIDResponse struct {
-	// Copy of the request for debugging.
-	QueryEventsByIDRequest
 	// A list of events with the requested IDs.
 	// If the roomserver does not have a copy of a requested event
 	// then it will omit that event from the list.
@@ -187,8 +181,6 @@ type QueryStateAndAuthChainRequest struct {
 
 // QueryStateAndAuthChainResponse is a response to QueryStateAndAuthChain
 type QueryStateAndAuthChainResponse struct {
-	// Copy of the request for debugging.
-	QueryStateAndAuthChainRequest
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`

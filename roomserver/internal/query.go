@@ -45,7 +45,6 @@ func (r *RoomserverInternalAPI) QueryLatestEventsAndState(
 
 	roomState := state.NewStateResolution(r.DB)
 
-	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
 	if err != nil {
 		return err
@@ -105,7 +104,6 @@ func (r *RoomserverInternalAPI) QueryStateAfterEvents(
 
 	roomState := state.NewStateResolution(r.DB)
 
-	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
 	if err != nil {
 		return err
@@ -153,8 +151,6 @@ func (r *RoomserverInternalAPI) QueryEventsByID(
 	request *api.QueryEventsByIDRequest,
 	response *api.QueryEventsByIDResponse,
 ) error {
-	response.QueryEventsByIDRequest = *request
-
 	eventNIDMap, err := r.DB.EventNIDs(ctx, request.EventIDs)
 	if err != nil {
 		return err
@@ -734,7 +730,6 @@ func (r *RoomserverInternalAPI) QueryStateAndAuthChain(
 	request *api.QueryStateAndAuthChainRequest,
 	response *api.QueryStateAndAuthChainResponse,
 ) error {
-	response.QueryStateAndAuthChainRequest = *request
 	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
 	if err != nil {
 		return err
