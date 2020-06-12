@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"net/http"
+	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/eduserver"
@@ -28,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/serverkeyapi"
 
 	"github.com/sirupsen/logrus"
@@ -39,6 +41,7 @@ var (
 	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
 	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
 	enableHTTPAPIs = flag.Bool("api", false, "Use HTTP APIs instead of short-circuiting (warning: exposes API endpoints!)")
+	traceInternal  = os.Getenv("DENDRITE_TRACE_INTERNAL") == "1"
 )
 
 func main() {
@@ -72,13 +75,17 @@ func main() {
 	}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsComponent := roomserver.NewInternalAPI(
+	rsAPI := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
-	rsAPI := rsComponent
 	if base.UseHTTPAPIs {
 		roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 		rsAPI = base.RoomserverHTTPClient()
+	}
+	if traceInternal {
+		rsAPI = &api.RoomserverInternalAPITrace{
+			Impl: rsAPI,
+		}
 	}
 
 	eduInputAPI := eduserver.NewInternalAPI(
@@ -102,7 +109,7 @@ func main() {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationSenderHTTPClient()
 	}
-	rsComponent.SetFederationSenderAPI(fsAPI)
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
