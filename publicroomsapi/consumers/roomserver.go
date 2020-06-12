@@ -78,18 +78,19 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	remQueryReq := api.QueryEventsByIDRequest{EventIDs: output.NewRoomEvent.RemovesStateEventIDs}
 	var remQueryRes api.QueryEventsByIDResponse
-	if err := s.rsAPI.QueryEventsByID(context.TODO(), &remQueryReq, &remQueryRes); err != nil {
-		log.Warn(err)
-		return err
+	if len(output.NewRoomEvent.RemovesStateEventIDs) > 0 {
+		remQueryReq := api.QueryEventsByIDRequest{EventIDs: output.NewRoomEvent.RemovesStateEventIDs}
+		if err := s.rsAPI.QueryEventsByID(context.TODO(), &remQueryReq, &remQueryRes); err != nil {
+			log.Warn(err)
+			return err
+		}
 	}
 
 	var addQueryEvents, remQueryEvents []gomatrixserverlib.Event
 	for _, headeredEvent := range output.NewRoomEvent.AddsState() {
 		addQueryEvents = append(addQueryEvents, headeredEvent.Event)
 	}
-	addQueryEvents = append(addQueryEvents, output.NewRoomEvent.Event.Unwrap())
 	for _, headeredEvent := range remQueryRes.Events {
 		remQueryEvents = append(remQueryEvents, headeredEvent.Event)
 	}
