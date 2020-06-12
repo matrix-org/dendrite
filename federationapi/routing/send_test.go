@@ -128,7 +128,6 @@ func (t *testRoomserverAPI) QueryLatestEventsAndState(
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
 	r := t.queryLatestEventsAndState(request)
-	response.QueryLatestEventsAndStateRequest = *request
 	response.RoomExists = r.RoomExists
 	response.RoomVersion = testRoomVersion
 	response.LatestEvents = r.LatestEvents
@@ -144,7 +143,6 @@ func (t *testRoomserverAPI) QueryStateAfterEvents(
 	response *api.QueryStateAfterEventsResponse,
 ) error {
 	response.RoomVersion = testRoomVersion
-	response.QueryStateAfterEventsRequest = *request
 	res := t.queryStateAfterEvents(request)
 	response.PrevEventsExist = res.PrevEventsExist
 	response.RoomExists = res.RoomExists
@@ -612,7 +610,6 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 					}
 				}
 			}
-			res.QueryEventsByIDRequest = *req
 			return res
 		},
 	}
