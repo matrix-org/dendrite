@@ -22,7 +22,7 @@ func (s *ServerKeyAPI) KeyRing() *gomatrixserverlib.KeyRing {
 	// and keeping the cache up-to-date.
 	return &gomatrixserverlib.KeyRing{
 		KeyDatabase: s,
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{s},
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{},
 	}
 }
 
@@ -45,15 +45,17 @@ func (s *ServerKeyAPI) FetchKeys(
 	// because the caller gives up waiting.
 	ctx := context.Background()
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
+	now := gomatrixserverlib.AsTimestamp(time.Now())
 	// First consult our local database and see if we have the requested
 	// keys. These might come from a cache, depending on the database
 	// implementation used.
-	now := gomatrixserverlib.AsTimestamp(time.Now())
 	if dbResults, err := s.OurKeyRing.KeyDatabase.FetchKeys(ctx, requests); err == nil {
 		// We successfully got some keys. Add them to the results and
 		// remove them from the request list.
 		for req, res := range dbResults {
-			if now > res.ValidUntilTS && res.ExpiredTS == gomatrixserverlib.PublicKeyNotExpired {
+			if !res.WasValidAt(now, true) {
+				// We appear to be past the key validity. Don't return this
+				// key with the results.
 				continue
 			}
 			results[req] = res
@@ -71,6 +73,11 @@ func (s *ServerKeyAPI) FetchKeys(
 			// We successfully got some keys. Add them to the results and
 			// remove them from the request list.
 			for req, res := range fetcherResults {
+				if !res.WasValidAt(now, true) {
+					// We appear to be past the key validity. Don't return this
+					// key with the results.
+					continue
+				}
 				results[req] = res
 				delete(requests, req)
 			}
