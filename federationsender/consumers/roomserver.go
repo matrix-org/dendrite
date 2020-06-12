@@ -86,11 +86,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
 		ev := &output.NewRoomEvent.Event
-		log.WithFields(log.Fields{
-			"event_id":       ev.EventID(),
-			"room_id":        ev.RoomID(),
-			"send_as_server": output.NewRoomEvent.SendAsServer,
-		}).Info("received room event from roomserver")
 
 		if err := s.processMessage(*output.NewRoomEvent); err != nil {
 			// panic rather than continue with an inconsistent database
