@@ -12,4 +12,5 @@ type Caches struct {
 type Cache interface {
 	Get(key string) (value interface{}, ok bool)
 	Set(key string, value interface{})
+	Unset(key string)
 }

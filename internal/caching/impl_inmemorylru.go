@@ -68,6 +68,13 @@ func (c *InMemoryLRUCachePartition) Set(key string, value interface{}) {
 	c.lru.Add(key, value)
 }
 
+func (c *InMemoryLRUCachePartition) Unset(key string) {
+	if !c.mutable {
+		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %q", key))
+	}
+	c.lru.Remove(key)
+}
+
 func (c *InMemoryLRUCachePartition) Get(key string) (value interface{}, ok bool) {
 	return c.lru.Get(key)
 }
