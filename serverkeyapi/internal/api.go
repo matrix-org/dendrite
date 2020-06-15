@@ -173,9 +173,18 @@ func (s *ServerKeyAPI) FetchKeys(
 			}
 		}
 	}
-	// If we failed to fetch any keys then we should report an error.
-	if len(requests) > 0 {
-		return results, fmt.Errorf("server key API failed to fetch %d keys", len(requests))
+	// Check that we've actually satisfied all of the key requests that we
+	// were given. We should report an error if we didn't.
+	for req := range requests {
+		if _, ok := results[req]; !ok {
+			// The results don't contain anything for this specific request, so
+			// we've failed to satisfy it from local keys, database keys or from
+			// all of the fetchers. Report an error.
+			return results, fmt.Errorf(
+				"server key API failed to satisfy key request for server %q key ID %q",
+				req.ServerName, req.KeyID,
+			)
+		}
 	}
 	// Return the keys.
 	return results, nil

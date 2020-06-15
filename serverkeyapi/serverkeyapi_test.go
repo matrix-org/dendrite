@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -25,6 +26,11 @@ type server struct {
 	fedclient *gomatrixserverlib.FederationClient
 	cache     *caching.Caches
 	api       api.ServerKeyInternalAPI
+}
+
+func (s *server) renew() {
+	s.validity = time.Hour
+	s.config.Matrix.KeyValidityPeriod = s.validity
 }
 
 var (
@@ -70,7 +76,7 @@ func TestMain(m *testing.M) {
 		s.api = NewInternalAPI(s.config, s.fedclient, s.cache)
 	}
 
-	//os.Exit(m.Run())
+	os.Exit(m.Run())
 }
 
 type MockRoundTripper struct{}
@@ -91,8 +97,6 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("Round-tripper says:", string(body))
 
 	res = &http.Response{
 		StatusCode: 200,
@@ -124,11 +128,11 @@ func TestServersRequestOwnKeys(t *testing.T) {
 		if _, ok := res[req]; !ok {
 			t.Fatalf("server didn't return its own key in the results")
 		}
-		fmt.Printf("%s's key expires at %d\n", name, res[req].ValidUntilTS)
+		t.Logf("%s's key expires at %s\n", name, res[req].ValidUntilTS.Time())
 	}
 }
 
-func TestServerARequestsServerBKey(t *testing.T) {
+func TestCachingBehaviour(t *testing.T) {
 	/*
 		Server A will request Server B's key, which has a validity
 		period of an hour from now. We should retrieve the key and
@@ -139,11 +143,12 @@ func TestServerARequestsServerBKey(t *testing.T) {
 		ServerName: serverB.name,
 		KeyID:      serverKeyID,
 	}
+	ts := gomatrixserverlib.AsTimestamp(time.Now())
 
 	res, err := serverA.api.FetchKeys(
 		context.Background(),
 		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{
-			req: gomatrixserverlib.AsTimestamp(time.Now()),
+			req: ts,
 		},
 	)
 	if err != nil {
@@ -163,7 +168,7 @@ func TestServerARequestsServerBKey(t *testing.T) {
 		the cache implementation.
 	*/
 
-	cres, ok := serverA.cache.GetServerKey(req)
+	cres, ok := serverA.cache.GetServerKey(req, ts)
 	if !ok {
 		t.Fatalf("server B key should be in cache but isn't")
 	}
@@ -172,27 +177,38 @@ func TestServerARequestsServerBKey(t *testing.T) {
 	}
 
 	/*
-		Server A will then request Server B's key for an event that
-		happened two hours ago, which *should* pass since the key was
-		valid then too and it's already in the cache.
+		If we ask the cache for the server key + 30 minutes, then
+		it should still be valid, as server B's validity period is
+		an hour.
 	*/
 
-	_, err = serverA.api.FetchKeys(
-		context.Background(),
-		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{
-			req: gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Hour * 2)),
-		},
+	_, ok = serverA.cache.GetServerKey(
+		req,
+		gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute*30)),
 	)
-	if err != nil {
-		t.Fatalf("server A failed to retrieve server B key: %s", err)
+	if !ok {
+		t.Fatalf("server B key isn't in cache when it should be (+30 minutes)")
+	}
+
+	/*
+		If we ask the cache for the server key + 90 minutes, then
+		it will have passed the validity by that point, so we should
+		expect to get no response.
+	*/
+
+	_, ok = serverA.cache.GetServerKey(
+		req,
+		gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute*90)),
+	)
+	if ok {
+		t.Fatalf("server B key is in cache when it shouldn't be (+90 minutes)")
 	}
 }
 
-func TestServerARequestsServerCKey(t *testing.T) {
+func TestRenewalBehaviour(t *testing.T) {
 	/*
-		Server A will request Server C's key for an event that came
-		in just now, but their validity period is an hour in the
-		past. This *should* fail since the key isn't valid now.
+		Server A will request Server C's key but their validity period
+		is an hour in the past. We'll retrieve the key.
 	*/
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{
@@ -219,18 +235,72 @@ func TestServerARequestsServerCKey(t *testing.T) {
 	t.Log("server C's key expires at", res[req].ValidUntilTS.Time())
 
 	/*
-		Server A will then request Server C's key for an event that
-		happened two hours ago, which *should* pass since the key was
-		valid then.
+		If we ask the cache for the server key - 90 minutes, then
+		it should be valid as the key hadn't expired by that point.
 	*/
 
-	_, err = serverA.api.FetchKeys(
+	oldcached, ok := serverA.cache.GetServerKey(
+		req,
+		gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Minute*90)),
+	)
+	if !ok {
+		t.Fatalf("server C key isn't in cache when it should be (-90 minutes)")
+	}
+
+	/*
+		If we ask the cache for the server key - 30 minutes, then
+		it will have passed the validity by that point, so we should
+		expect to get no response.
+	*/
+
+	_, ok = serverA.cache.GetServerKey(
+		req,
+		gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Minute*30)),
+	)
+	if ok {
+		t.Fatalf("server B key is in cache when it shouldn't be (-30 minutes)")
+	}
+
+	/*
+		We're now going to kick server C into renewing its key.
+		Since we've asserted by this point that the key isn't going
+		to be returned by the cache, then we should really spot that
+		the key needs to be renewed and then do so.
+	*/
+
+	serverC.renew()
+
+	res, err = serverA.api.FetchKeys(
 		context.Background(),
 		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{
-			req: gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Hour)),
+			req: gomatrixserverlib.AsTimestamp(time.Now()),
 		},
 	)
 	if err != nil {
-		t.Fatalf("serverKeyAPI.FetchKeys: %s", err)
+		t.Fatalf("server A failed to retrieve server C key: %s", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("server C should have returned one key but instead returned %d keys", len(res))
+	}
+	if _, ok = res[req]; !ok {
+		t.Fatalf("server C isn't included in the key fetch response")
+	}
+
+	/*
+		We're now going to ask the cache what the new key validity
+		is. If it is still the same as the previous validity then we've
+		failed to retrieve the renewed key.
+	*/
+
+	newcached, ok := serverA.cache.GetServerKey(
+		req,
+		gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Minute*30)),
+	)
+	if !ok {
+		t.Fatalf("server B key isn't in cache when it shouldn't be (post-renewal)")
+	}
+
+	if oldcached.ValidUntilTS == newcached.ValidUntilTS {
+		t.Fatalf("the server B key should have been renewed but wasn't")
 	}
 }
