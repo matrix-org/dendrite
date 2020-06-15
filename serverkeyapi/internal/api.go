@@ -83,6 +83,7 @@ func (s *ServerKeyAPI) FetchKeys(
 		origRequests[k] = v
 	}
 	now := gomatrixserverlib.AsTimestamp(time.Now())
+
 	// First, check if any of these key checks are for our own keys. If
 	// they are then we will satisfy them directly.
 	for req := range requests {
@@ -91,12 +92,14 @@ func (s *ServerKeyAPI) FetchKeys(
 			// keys. Remove it from the request list so we don't hit the
 			// database or the fetchers for it.
 			delete(requests, req)
+
 			// Look up our own keys.
 			request := &api.QueryLocalKeysRequest{}
 			response := &api.QueryLocalKeysResponse{}
 			if err := s.QueryLocalKeys(ctx, request, response); err != nil {
 				return nil, err
 			}
+
 			// Depending on whether the key is expired or not, we'll need
 			// to write slightly different
 			if verifyKeys, ok := response.ServerKeys.VerifyKeys[req.KeyID]; ok {
@@ -134,9 +137,21 @@ func (s *ServerKeyAPI) FetchKeys(
 	// For any key requests that we still have outstanding, next try to
 	// fetch them directly. We'll go through each of the key fetchers to
 	// ask for the remaining keys.
+	var fetcherCtx context.Context
+	var fetcherCancel context.CancelFunc
+	defer func() {
+		if fetcherCancel != nil {
+			fetcherCancel()
+		}
+	}
 	for _, fetcher := range s.OurKeyRing.KeyFetchers {
-		fetcherCtx, fetcherCancel := context.WithTimeout(ctx, time.Second*10)
-		defer fetcherCancel()
+		// If there's a context active from a previous fetcher then cancel
+		// it. Set up a new context that lmits how long we will wait.
+		if fetcherCancel != nil {
+			fetcherCancel()
+		}
+		fetcherCtx, fetcherCancel = context.WithTimeout(ctx, time.Second*20)
+
 		// If there are no more keys to look up then stop.
 		if len(requests) == 0 {
 			break
@@ -144,11 +159,13 @@ func (s *ServerKeyAPI) FetchKeys(
 		logrus.WithFields(logrus.Fields{
 			"fetcher_name": fetcher.FetcherName(),
 		}).Infof("Fetching %d key(s)", len(requests))
+
 		if fetcherResults, err := fetcher.FetchKeys(fetcherCtx, requests); err == nil {
 			// Build a map of the results that we want to commit to the
 			// database. We do this in a separate map because otherwise we
 			// might end up trying to rewrite database entries.
 			storeResults := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
+
 			// Now let's look at the results that we got from this fetcher.
 			for req, res := range fetcherResults {
 				if prev, ok := results[req]; ok {
@@ -172,6 +189,7 @@ func (s *ServerKeyAPI) FetchKeys(
 				// Update the results map with this new result. If nothing
 				// else, we can try verifying against this key.
 				results[req] = res
+
 				// If the key is valid right now then we can remove it from the
 				// request list as we won't need to re-fetch it.
 				if res.WasValidAt(now, true) {
@@ -186,15 +204,20 @@ func (s *ServerKeyAPI) FetchKeys(
 				}).Errorf("Failed to store keys in the database")
 				return nil, fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 			}
-			logrus.WithFields(logrus.Fields{
-				"fetcher_name": fetcher.FetcherName(),
-			}).Infof("Updated %d of %d key(s) in database", len(storeResults), len(results))
+
+			// Debugging output.
+			if len(storeResults) > 0 {
+				logrus.WithFields(logrus.Fields{
+					"fetcher_name": fetcher.FetcherName(),
+				}).Infof("Updated %d of %d key(s) in database", len(storeResults), len(results))
+			}
 		} else {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"fetcher_name": fetcher.FetcherName(),
 			}).Errorf("Failed to retrieve %d key(s)", len(requests))
 		}
 	}
+
 	// Check that we've actually satisfied all of the key requests that we
 	// were given. We should report an error if we didn't.
 	for req := range origRequests {
@@ -209,8 +232,8 @@ func (s *ServerKeyAPI) FetchKeys(
 			)
 		}
 	}
+
 	// Return the keys.
-	logrus.Infof("Retrieved %d key(s) for %d request(s)", len(results), len(origRequests))
 	return results, nil
 }
 
