@@ -10,18 +10,18 @@ Note in Monolith mode these are actually direct function calls and are not seria
 
 ```
    Tier 1            Sync        PublicRooms      FederationAPI      ClientAPI    MediaAPI
-Public Facing        | .-----1------`              | | |     |         | | | |
-                     2 | .-------3-----------------` | |     |         | | | |
-                     | | | .--------4----------------------------------` | | |
-                     | | | |         .---5-----------` |     |           | | |
-                     | | | |         |  .---6----------------------------` | |
-                     | | | |         |  |              |  .-----7----------` |
-                     | | | |         |  |              8  |  |               10
-                     | | | |         |  |              |  |  `---9----.      |
-                     V V V V         V  V              V  V           V      V
+Public Facing        | .-----1------`              | | |    | |        | | | |
+                     2 | .-------3-----------------` | |    | `--------|-|-|-|--11--------------------.
+                     | | | .--------4----------------------------------` | | |                        |
+                     | | | |         .---5-----------` |    |            | | |                        |
+                     | | | |         |  .---6----------------------------` | |                        |
+                     | | | |         |  |              |  .-----7----------` |                        |
+                     | | | |         |  |              8  | |                10                       |
+                     | | | |         |  |              |  | `---9----.       |                        |
+                     V V V V         V  V              V  V          V       V                        V
    Tier 2           Roomserver     EDUServer         FedSender       AppService    KeyServer   ServerKeyAPI
-Internal only
-
+Internal only               |                               `------------------------12----------^   ^
+                            `------------------------------------------------------------13----------`
 
  Client ---> Server
 ```
@@ -32,9 +32,12 @@ Internal only
 - 5 (FedAPI -> EDUServer): Sending typing/send-to-device events
 - 6 (ClientAPI -> EDUServer): Sending typing/send-to-device events
 - 7 (ClientAPI -> FedSender): Handling directory lookups
-- 8 (FedAPI -> FedSender): Resetting backoffs when receiving traffic from a server. Querying joined hosts when handling alias lookup requests.
-- 9 (FedAPI -> AppService): Working out if the client is an appservice user. 
-- 10 (ClientAPI -> AppService): Working out if the client is an appservice user.
+- 8 (FedAPI -> FedSender): Resetting backoffs when receiving traffic from a server. Querying joined hosts when handling alias lookup requests
+- 9 (FedAPI -> AppService): Working out if the client is an appservice user
+- 10 (ClientAPI -> AppService): Working out if the client is an appservice user
+- 11 (FedAPI -> ServerKeyAPI): Verifying incoming event signatures
+- 12 (FedSender -> ServerKeyAPI): Verifying event signatures of responses (e.g from send_join)
+- 13 (Roomserver -> ServerKeyAPI): Verifying event signatures of backfilled events
 
 ## Kafka logs
 
