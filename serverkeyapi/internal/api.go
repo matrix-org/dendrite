@@ -78,6 +78,10 @@ func (s *ServerKeyAPI) FetchKeys(
 	// because the caller gives up waiting.
 	ctx := context.Background()
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
+	origRequests := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
+	for k, v := range requests {
+		origRequests[k] = v
+	}
 	now := gomatrixserverlib.AsTimestamp(time.Now())
 	// First, check if any of these key checks are for our own keys. If
 	// they are then we will satisfy them directly.
@@ -182,7 +186,7 @@ func (s *ServerKeyAPI) FetchKeys(
 			}
 			logrus.WithFields(logrus.Fields{
 				"fetcher_name": fetcher.FetcherName(),
-			}).Infof("Retrieved %d key(s) and stored %d key(s)", len(results), len(storeResults))
+			}).Infof("Updated %d of %d key(s) in database", len(storeResults), len(results))
 		} else {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"fetcher_name": fetcher.FetcherName(),
@@ -191,7 +195,7 @@ func (s *ServerKeyAPI) FetchKeys(
 	}
 	// Check that we've actually satisfied all of the key requests that we
 	// were given. We should report an error if we didn't.
-	for req := range requests {
+	for req := range origRequests {
 		if _, ok := results[req]; !ok {
 			// The results don't contain anything for this specific request, so
 			// we've failed to satisfy it from local keys, database keys or from
@@ -204,6 +208,7 @@ func (s *ServerKeyAPI) FetchKeys(
 		}
 	}
 	// Return the keys.
+	logrus.Infof("Retrieved %d key(s)", len(origRequests))
 	return results, nil
 }
 
