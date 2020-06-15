@@ -15,8 +15,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// matrix://localhost:8802/_matrix/federation/v2/invite/%21bOuDVHU76mL0twoV:localhost:8800/$brf2KOWwYhnZxgr%2F2M%2F%2FLWZyLORwA+neIDbS83y8XSU
-
 // Tests that event IDs with '/' in them (escaped as %2F) are correctly passed to the right handler and don't 404.
 // Relevant for v3 rooms and a cause of flakey sytests as the IDs are randomly generated.
 func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
