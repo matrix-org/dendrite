@@ -131,9 +131,13 @@ func (s *ServerKeyAPI) FetchKeys(
 	// fetch them directly. We'll go through each of the key fetchers to
 	// ask for the remaining keys.
 	for _, fetcher := range s.OurKeyRing.KeyFetchers {
+		// If there are no more keys to look up then stop.
+		if len(requests) == 0 {
+			break
+		}
 		logrus.WithFields(logrus.Fields{
 			"fetcher_name": fetcher.FetcherName(),
-		}).Infof("fetching %d key(s)", len(requests))
+		}).Infof("Fetching %d key(s)", len(requests))
 		if fetcherResults, err := fetcher.FetchKeys(ctx, requests); err == nil {
 			// Build a map of the results that we want to commit to the
 			// database. We do this in a separate map because otherwise we
@@ -170,19 +174,19 @@ func (s *ServerKeyAPI) FetchKeys(
 			}
 			// Store the keys from our store map.
 			if err = s.OurKeyRing.KeyDatabase.StoreKeys(ctx, storeResults); err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"fetcher_name":  fetcher.FetcherName(),
+					"database_name": s.OurKeyRing.KeyDatabase.FetcherName(),
+				}).Errorf("Failed to store keys in the database")
 				return nil, fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 			}
+			logrus.WithFields(logrus.Fields{
+				"fetcher_name": fetcher.FetcherName(),
+			}).Infof("Retrieved %d key(s) and stored %d key(s)", len(results), len(storeResults))
 		} else {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"fetcher_name": fetcher.FetcherName(),
-			}).Warnf("failed to retrieve %d key(s)", len(requests))
-		}
-		// If there are no more keys to look up then stop.
-		if len(requests) == 0 {
-			logrus.WithFields(logrus.Fields{
-				"fetcher_name": fetcher.FetcherName(),
-			}).Infof("all keys are up-to-date")
-			break
+			}).Errorf("Failed to retrieve %d key(s)", len(requests))
 		}
 	}
 	// Check that we've actually satisfied all of the key requests that we
@@ -192,6 +196,7 @@ func (s *ServerKeyAPI) FetchKeys(
 			// The results don't contain anything for this specific request, so
 			// we've failed to satisfy it from local keys, database keys or from
 			// all of the fetchers. Report an error.
+			logrus.Warnf("Failed to retrieve key %q for server %q", req.KeyID, req.ServerName)
 			return results, fmt.Errorf(
 				"server key API failed to satisfy key request for server %q key ID %q",
 				req.ServerName, req.KeyID,
