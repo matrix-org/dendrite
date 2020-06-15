@@ -2,7 +2,6 @@ package caching
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -25,7 +24,6 @@ func (c Caches) GetServerKey(
 	timestamp gomatrixserverlib.Timestamp,
 ) (gomatrixserverlib.PublicKeyLookupResult, bool) {
 	key := fmt.Sprintf("%s/%s", request.ServerName, request.KeyID)
-	now := gomatrixserverlib.AsTimestamp(time.Now())
 	val, found := c.ServerKeys.Get(key)
 	if found && val != nil {
 		if keyLookupResult, ok := val.(gomatrixserverlib.PublicKeyLookupResult); ok {

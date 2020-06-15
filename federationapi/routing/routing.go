@@ -66,7 +66,7 @@ func Setup(
 		FsAPI: fsAPI,
 	}
 
-	localKeys := internal.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
+	localKeys := httputil.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
 		request := &serverkeyAPI.QueryLocalKeysRequest{}
 		response := &serverkeyAPI.QueryLocalKeysResponse{}
 		if err := skAPI.QueryLocalKeys(req.Context(), request, response); err != nil {

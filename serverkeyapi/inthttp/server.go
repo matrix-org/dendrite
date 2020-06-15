@@ -13,7 +13,7 @@ import (
 
 func AddRoutes(s api.ServerKeyInternalAPI, internalAPIMux *mux.Router, cache caching.ServerKeyCache) {
 	internalAPIMux.Handle(ServerKeyQueryLocalKeysPath,
-		internal.MakeInternalAPI("queryLocalKeys", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryLocalKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryLocalKeysRequest{}
 			response := api.QueryLocalKeysResponse{}
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

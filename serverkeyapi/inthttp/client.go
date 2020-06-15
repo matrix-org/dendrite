@@ -141,5 +141,5 @@ func (h *httpServerKeyInternalAPI) QueryLocalKeys(
 	defer span.Finish()
 
 	apiURL := h.serverKeyAPIURL + ServerKeyQueryLocalKeysPath
-	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

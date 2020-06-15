@@ -29,6 +29,10 @@ type server struct {
 }
 
 func (s *server) renew() {
+	// This updates the validity period to be an hour in the
+	// future, which is particularly useful in server A and
+	// server C's cases which have validity either as now or
+	// in the past.
 	s.validity = time.Hour
 	s.config.Matrix.KeyValidityPeriod = s.validity
 }
@@ -47,17 +51,23 @@ var servers = map[string]*server{
 }
 
 func TestMain(m *testing.M) {
+	// Set up the server key API for each "server" that we
+	// will use in our tests.
 	for _, s := range servers {
+		// Generate a new key.
 		_, testPriv, err := ed25519.GenerateKey(nil)
 		if err != nil {
 			panic("can't generate identity key: " + err.Error())
 		}
 
+		// Create a new cache but don't enable prometheus!
 		s.cache, err = caching.NewInMemoryLRUCache(false)
 		if err != nil {
 			panic("can't create cache: " + err.Error())
 		}
 
+		// Draw up just enough Dendrite config for the server key
+		// API to work.
 		s.config = &config.Dendrite{}
 		s.config.SetDefaults()
 		s.config.Matrix.KeyValidityPeriod = s.validity
@@ -66,38 +76,51 @@ func TestMain(m *testing.M) {
 		s.config.Matrix.KeyID = serverKeyID
 		s.config.Database.ServerKey = config.DataSource("file::memory:")
 
+		// Create a transport which redirects federation requests to
+		// the mock round tripper. Since we're not *really* listening for
+		// federation requests then this will return the key instead.
 		transport := &http.Transport{}
 		transport.RegisterProtocol("matrix", &MockRoundTripper{})
 
+		// Create the federation client.
 		s.fedclient = gomatrixserverlib.NewFederationClientWithTransport(
 			s.config.Matrix.ServerName, serverKeyID, testPriv, transport,
 		)
 
+		// Finally, build the server key APIs.
 		s.api = NewInternalAPI(s.config, s.fedclient, s.cache)
 	}
 
+	// Now that we have built our server key APIs, start the
+	// rest of the tests.
 	os.Exit(m.Run())
 }
 
 type MockRoundTripper struct{}
 
 func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err error) {
+	// Check if the request is looking for keys from a server that
+	// we know about in the test. The only reason this should go wrong
+	// is if the test is broken.
 	s, ok := servers[req.Host]
 	if !ok {
 		return nil, fmt.Errorf("server not known: %s", req.Host)
 	}
 
+	// Query the local keys for the server in question.
 	request := &api.QueryLocalKeysRequest{}
 	response := &api.QueryLocalKeysResponse{}
 	if err = s.api.QueryLocalKeys(context.Background(), request, response); err != nil {
 		return nil, err
 	}
 
+	// Make a nice JSON response out of it.
 	body, err := json.MarshalIndent(response.ServerKeys, "", "  ")
 	if err != nil {
 		return nil, err
 	}
 
+	// And respond.
 	res = &http.Response{
 		StatusCode: 200,
 		Body:       ioutil.NopCloser(bytes.NewReader(body)),
@@ -106,10 +129,8 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 }
 
 func TestServersRequestOwnKeys(t *testing.T) {
-	/*
-		Each server will request its own keys. There's no reason
-		for this to fail as each server should know its own keys.
-	*/
+	// Each server will request its own keys. There's no reason
+	// for this to fail as each server should know its own keys.
 
 	for name, s := range servers {
 		req := gomatrixserverlib.PublicKeyLookupRequest{
@@ -133,11 +154,9 @@ func TestServersRequestOwnKeys(t *testing.T) {
 }
 
 func TestCachingBehaviour(t *testing.T) {
-	/*
-		Server A will request Server B's key, which has a validity
-		period of an hour from now. We should retrieve the key and
-		it should make it into the cache automatically.
-	*/
+	// Server A will request Server B's key, which has a validity
+	// period of an hour from now. We should retrieve the key and
+	// it should make it into the cache automatically.
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{
 		ServerName: serverB.name,
@@ -161,12 +180,10 @@ func TestCachingBehaviour(t *testing.T) {
 		t.Fatalf("server B isn't included in the key fetch response")
 	}
 
-	/*
-		At this point, if the previous key request was a success,
-		then the cache should now contain the key. Check if that's
-		the case - if it isn't then there's something wrong with
-		the cache implementation.
-	*/
+	// At this point, if the previous key request was a success,
+	// then the cache should now contain the key. Check if that's
+	// the case - if it isn't then there's something wrong with
+	// the cache implementation or we failed to get the key.
 
 	cres, ok := serverA.cache.GetServerKey(req, ts)
 	if !ok {
@@ -176,11 +193,9 @@ func TestCachingBehaviour(t *testing.T) {
 		t.Fatalf("the cached result from server B wasn't what server B gave us")
 	}
 
-	/*
-		If we ask the cache for the server key + 30 minutes, then
-		it should still be valid, as server B's validity period is
-		an hour.
-	*/
+	// If we ask the cache for the same key but this time for an event
+	// that happened in +30 minutes. Since the validity period is for
+	// another hour, then we should get a response back from the cache.
 
 	_, ok = serverA.cache.GetServerKey(
 		req,
@@ -190,11 +205,10 @@ func TestCachingBehaviour(t *testing.T) {
 		t.Fatalf("server B key isn't in cache when it should be (+30 minutes)")
 	}
 
-	/*
-		If we ask the cache for the server key + 90 minutes, then
-		it will have passed the validity by that point, so we should
-		expect to get no response.
-	*/
+	// If we ask the cache for the same key but this time for an event
+	// that happened in +90 minutes then we should expect to get no
+	// cache result. This is because the cache shouldn't return a result
+	// that is obviously past the validity of the event.
 
 	_, ok = serverA.cache.GetServerKey(
 		req,
@@ -206,10 +220,9 @@ func TestCachingBehaviour(t *testing.T) {
 }
 
 func TestRenewalBehaviour(t *testing.T) {
-	/*
-		Server A will request Server C's key but their validity period
-		is an hour in the past. We'll retrieve the key.
-	*/
+	// Server A will request Server C's key but their validity period
+	// is an hour in the past. We'll retrieve the key as, even though it's
+	// past its validity, it will be able to verify past events.
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{
 		ServerName: serverC.name,
@@ -232,12 +245,11 @@ func TestRenewalBehaviour(t *testing.T) {
 		t.Fatalf("server C isn't included in the key fetch response")
 	}
 
-	t.Log("server C's key expires at", res[req].ValidUntilTS.Time())
-
-	/*
-		If we ask the cache for the server key - 90 minutes, then
-		it should be valid as the key hadn't expired by that point.
-	*/
+	// If we ask the cache for the server key for an event that happened
+	// 90 minutes ago then we should get a cache result, as the key hadn't
+	// passed its validity by that point. The fact that the key is now in
+	// the cache is, in itself, proof that we successfully retrieved the
+	// key before.
 
 	oldcached, ok := serverA.cache.GetServerKey(
 		req,
@@ -247,11 +259,10 @@ func TestRenewalBehaviour(t *testing.T) {
 		t.Fatalf("server C key isn't in cache when it should be (-90 minutes)")
 	}
 
-	/*
-		If we ask the cache for the server key - 30 minutes, then
-		it will have passed the validity by that point, so we should
-		expect to get no response.
-	*/
+	// If we now ask the cache for the same key but this time for an event
+	// that only happened 30 minutes ago then we shouldn't get a cached
+	// result, as the event happened after the key validity expired. This
+	// is really just for sanity checking.
 
 	_, ok = serverA.cache.GetServerKey(
 		req,
@@ -261,12 +272,10 @@ func TestRenewalBehaviour(t *testing.T) {
 		t.Fatalf("server B key is in cache when it shouldn't be (-30 minutes)")
 	}
 
-	/*
-		We're now going to kick server C into renewing its key.
-		Since we've asserted by this point that the key isn't going
-		to be returned by the cache, then we should really spot that
-		the key needs to be renewed and then do so.
-	*/
+	// We're now going to kick server C into renewing its key. Since we're
+	// happy at this point that the key that we already have is from the past
+	// then repeating a key fetch should cause us to try and renew the key.
+	// If so, then the new key will end up in our cache.
 
 	serverC.renew()
 
@@ -286,11 +295,10 @@ func TestRenewalBehaviour(t *testing.T) {
 		t.Fatalf("server C isn't included in the key fetch response")
 	}
 
-	/*
-		We're now going to ask the cache what the new key validity
-		is. If it is still the same as the previous validity then we've
-		failed to retrieve the renewed key.
-	*/
+	// We're now going to ask the cache what the new key validity is. If
+	// it is still the same as the previous validity then we've failed to
+	// retrieve the renewed key. If it's newer then we've successfully got
+	// the renewed key.
 
 	newcached, ok := serverA.cache.GetServerKey(
 		req,
@@ -299,8 +307,7 @@ func TestRenewalBehaviour(t *testing.T) {
 	if !ok {
 		t.Fatalf("server B key isn't in cache when it shouldn't be (post-renewal)")
 	}
-
-	if oldcached.ValidUntilTS == newcached.ValidUntilTS {
+	if oldcached.ValidUntilTS >= newcached.ValidUntilTS {
 		t.Fatalf("the server B key should have been renewed but wasn't")
 	}
 }
