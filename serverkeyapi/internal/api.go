@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 type ServerKeyAPI struct {
@@ -130,9 +131,9 @@ func (s *ServerKeyAPI) FetchKeys(
 	// fetch them directly. We'll go through each of the key fetchers to
 	// ask for the remaining keys.
 	for _, fetcher := range s.OurKeyRing.KeyFetchers {
-		if len(requests) == 0 {
-			break
-		}
+		logrus.WithFields(logrus.Fields{
+			"fetcher_name": fetcher.FetcherName(),
+		}).Infof("fetching %d key(s)", len(requests))
 		if fetcherResults, err := fetcher.FetchKeys(ctx, requests); err == nil {
 			// Build a map of the results that we want to commit to the
 			// database. We do this in a separate map because otherwise we
@@ -171,6 +172,17 @@ func (s *ServerKeyAPI) FetchKeys(
 			if err = s.OurKeyRing.KeyDatabase.StoreKeys(ctx, storeResults); err != nil {
 				return nil, fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 			}
+		} else {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"fetcher_name": fetcher.FetcherName(),
+			}).Warnf("failed to retrieve %d key(s)", len(requests))
+		}
+		// If there are no more keys to look up then stop.
+		if len(requests) == 0 {
+			logrus.WithFields(logrus.Fields{
+				"fetcher_name": fetcher.FetcherName(),
+			}).Infof("all keys are up-to-date")
+			break
 		}
 	}
 	// Check that we've actually satisfied all of the key requests that we
