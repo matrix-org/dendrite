@@ -21,15 +21,18 @@ type ServerKeyAPI struct {
 }
 
 func (s *ServerKeyAPI) QueryLocalKeys(ctx context.Context, request *api.QueryLocalKeysRequest, response *api.QueryLocalKeysResponse) error {
-	response.ServerKeys.ServerName = s.Cfg.Matrix.ServerName
-
 	publicKey := s.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
+
+	response.ServerKeys.ServerName = s.Cfg.Matrix.ServerName
 	response.ServerKeys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
 		s.Cfg.Matrix.KeyID: {
 			Key: gomatrixserverlib.Base64Bytes(publicKey),
 		},
 	}
 	response.ServerKeys.TLSFingerprints = s.Cfg.Matrix.TLSFingerPrints
+	// TODO: Handle old expired keys. We should probably have a configuration section
+	// for these, as it's really counter-intuitive for people to have to rake through
+	// the database to find their own past keys.
 	response.ServerKeys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
 	response.ServerKeys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(s.Cfg.Matrix.KeyValidityPeriod))
 
@@ -65,6 +68,7 @@ func (s *ServerKeyAPI) StoreKeys(
 	return s.OurKeyRing.KeyDatabase.StoreKeys(ctx, results)
 }
 
+// nolint:gocyclo
 func (s *ServerKeyAPI) FetchKeys(
 	_ context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
@@ -74,7 +78,40 @@ func (s *ServerKeyAPI) FetchKeys(
 	ctx := context.Background()
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	now := gomatrixserverlib.AsTimestamp(time.Now())
-	// First consult our local database and see if we have the requested
+	// First, check if any of these key checks are for our own keys. If
+	// they are then we will satisfy them directly.
+	for req := range requests {
+		if req.ServerName == s.Cfg.Matrix.ServerName {
+			// We found a key request that is supposed to be for our own
+			// keys. Remove it from the request list so we don't hit the
+			// database or the fetchers for it.
+			delete(requests, req)
+			// Look up our own keys.
+			request := &api.QueryLocalKeysRequest{}
+			response := &api.QueryLocalKeysResponse{}
+			if err := s.QueryLocalKeys(ctx, request, response); err != nil {
+				return nil, err
+			}
+			// Depending on whether the key is expired or not, we'll need
+			// to write slightly different
+			if verifyKeys, ok := response.ServerKeys.VerifyKeys[req.KeyID]; ok {
+				// The key is current.
+				results[req] = gomatrixserverlib.PublicKeyLookupResult{
+					VerifyKey:    verifyKeys,
+					ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
+					ValidUntilTS: response.ServerKeys.ValidUntilTS,
+				}
+			} else if verifyKeys, ok := response.ServerKeys.OldVerifyKeys[req.KeyID]; ok {
+				// The key is expired.
+				results[req] = gomatrixserverlib.PublicKeyLookupResult{
+					VerifyKey:    verifyKeys.VerifyKey,
+					ExpiredTS:    verifyKeys.ExpiredTS,
+					ValidUntilTS: gomatrixserverlib.PublicKeyNotValid,
+				}
+			}
+		}
+	}
+	// Then consult our local database and see if we have the requested
 	// keys. These might come from a cache, depending on the database
 	// implementation used.
 	if dbResults, err := s.OurKeyRing.KeyDatabase.FetchKeys(ctx, requests); err == nil {
