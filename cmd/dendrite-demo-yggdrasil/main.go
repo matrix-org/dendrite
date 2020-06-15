@@ -94,18 +94,6 @@ func createFederationClient(
 func main() {
 	flag.Parse()
 
-	// Build both ends of a HTTP multiplex.
-	httpServer := &http.Server{
-		Addr:         ":0",
-		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 45 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		BaseContext: func(_ net.Listener) context.Context {
-			return context.Background()
-		},
-	}
-
 	ygg, err := yggconn.Setup(*instanceName, *instancePeer)
 	if err != nil {
 		panic(err)
@@ -188,12 +176,25 @@ func main() {
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
 		base.UseHTTPAPIs,
 	)
+
+	// Build both ends of a HTTP multiplex.
+	httpServer := &http.Server{
+		Addr:         ":0",
+		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 45 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		BaseContext: func(_ net.Listener) context.Context {
+			return context.Background()
+		},
+		Handler: base.BaseMux,
+	}
 
 	go func() {
 		logrus.Info("Listening on ", ygg.DerivedServerName())
@@ -202,7 +203,7 @@ func main() {
 	go func() {
 		httpBindAddr := fmt.Sprintf("localhost:%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.BaseMux))
 	}()
 
 	select {}

@@ -35,7 +35,7 @@ func AddPublicRoutes(
 	accountsDB accounts.Database,
 	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing *gomatrixserverlib.KeyRing,
+	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
@@ -44,7 +44,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		router, cfg, rsAPI, asAPI,
-		eduAPI, federationSenderAPI, *keyRing,
+		eduAPI, federationSenderAPI, keyRing,
 		federation, accountsDB, deviceDB,
 	)
 }

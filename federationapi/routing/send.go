@@ -37,7 +37,7 @@ func Send(
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
-	keys gomatrixserverlib.KeyRing,
+	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	t := txnReq{
