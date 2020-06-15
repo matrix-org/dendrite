@@ -78,7 +78,7 @@ func (s *ServerKeyAPI) FetchKeys(
 	// because the caller gives up waiting.
 	ctx := context.Background()
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
-	origRequests := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
+	origRequests := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{}
 	for k, v := range requests {
 		origRequests[k] = v
 	}
