@@ -147,7 +147,7 @@ func ListenAndServe(t *testing.T, router http.Handler, useTLS bool) (apiURL stri
 		secure = "s"
 	}
 	return fmt.Sprintf("http%s://localhost:%d", secure, port), func() {
-		srv.Shutdown(context.Background())
+		_ = srv.Shutdown(context.Background())
 		wg.Wait()
 	}
 }
