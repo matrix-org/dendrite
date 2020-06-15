@@ -21,7 +21,6 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -34,7 +33,7 @@ type Database struct {
 }
 
 // Open opens a postgres database.
-func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database, error) {
+func Open(dataSourceName string, dbProperties sqlutil.DbProperties) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {

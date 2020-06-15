@@ -97,6 +97,11 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 	if err != nil {
 		return err
 	}
+	logrus.WithFields(logrus.Fields{
+		"room_id": ite.RoomID,
+		"user_id": ite.UserID,
+		"typing":  ite.Typing,
+	}).Infof("Producing to topic '%s'", t.OutputTypingEventTopic)
 
 	m := &sarama.ProducerMessage{
 		Topic: string(t.OutputTypingEventTopic),
@@ -132,18 +137,17 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 		devices = append(devices, ise.DeviceID)
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"user_id":     ise.UserID,
+		"num_devices": len(devices),
+		"type":        ise.Type,
+	}).Infof("Producing to topic '%s'", t.OutputSendToDeviceEventTopic)
 	for _, device := range devices {
 		ote := &api.OutputSendToDeviceEvent{
 			UserID:            ise.UserID,
 			DeviceID:          device,
 			SendToDeviceEvent: ise.SendToDeviceEvent,
 		}
-
-		logrus.WithFields(logrus.Fields{
-			"user_id":    ise.UserID,
-			"device_id":  ise.DeviceID,
-			"event_type": ise.Type,
-		}).Info("handling send-to-device message")
 
 		eventJSON, err := json.Marshal(ote)
 		if err != nil {

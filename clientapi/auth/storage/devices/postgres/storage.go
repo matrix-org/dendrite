@@ -21,7 +21,6 @@ import (
 	"encoding/base64"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -36,7 +35,7 @@ type Database struct {
 }
 
 // NewDatabase creates a new device database
-func NewDatabase(dataSourceName string, dbProperties internal.DbProperties, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(dataSourceName string, dbProperties sqlutil.DbProperties, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var db *sql.DB
 	var err error
 	if db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
@@ -83,7 +82,7 @@ func (d *Database) CreateDevice(
 	displayName *string,
 ) (dev *authtypes.Device, returnErr error) {
 	if deviceID != nil {
-		returnErr = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+		returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 			var err error
 			// Revoke existing tokens for this device
 			if err = d.devices.deleteDevice(ctx, txn, *deviceID, localpart); err != nil {
@@ -103,7 +102,7 @@ func (d *Database) CreateDevice(
 				return
 			}
 
-			returnErr = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+			returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 				var err error
 				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName)
 				return err
@@ -133,7 +132,7 @@ func generateDeviceID() (string, error) {
 func (d *Database) UpdateDevice(
 	ctx context.Context, localpart, deviceID string, displayName *string,
 ) error {
-	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		return d.devices.updateDeviceName(ctx, txn, localpart, deviceID, displayName)
 	})
 }
@@ -145,7 +144,7 @@ func (d *Database) UpdateDevice(
 func (d *Database) RemoveDevice(
 	ctx context.Context, deviceID, localpart string,
 ) error {
-	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if err := d.devices.deleteDevice(ctx, txn, deviceID, localpart); err != sql.ErrNoRows {
 			return err
 		}
@@ -160,7 +159,7 @@ func (d *Database) RemoveDevice(
 func (d *Database) RemoveDevices(
 	ctx context.Context, localpart string, devices []string,
 ) error {
-	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if err := d.devices.deleteDevices(ctx, txn, localpart, devices); err != sql.ErrNoRows {
 			return err
 		}
@@ -174,7 +173,7 @@ func (d *Database) RemoveDevices(
 func (d *Database) RemoveAllDevices(
 	ctx context.Context, localpart string,
 ) error {
-	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if err := d.devices.deleteDevicesByLocalpart(ctx, txn, localpart); err != sql.ErrNoRows {
 			return err
 		}

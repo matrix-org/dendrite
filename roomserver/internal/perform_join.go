@@ -7,7 +7,7 @@ import (
 	"time"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -159,7 +159,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
 	buildRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := internal.BuildEvent(
+	event, err := eventutil.BuildEvent(
 		ctx,        // the request context
 		&eb,        // the template join event
 		r.Cfg,      // the server configuration
@@ -202,7 +202,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 			}
 		}
 
-	case internal.ErrRoomNoExists:
+	case eventutil.ErrRoomNoExists:
 		// The room doesn't exist. First of all check if the room is a local
 		// room. If it is then there's nothing more to do - the room just
 		// hasn't been created yet.

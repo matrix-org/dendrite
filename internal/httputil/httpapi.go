@@ -1,4 +1,18 @@
-package internal
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package httputil
 
 import (
 	"context"
@@ -16,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/httpapis"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -227,9 +240,9 @@ func SetupHTTPAPI(servMux *http.ServeMux, publicApiMux *mux.Router, internalApiM
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
 	if enableHTTPAPIs {
-		servMux.Handle(httpapis.InternalPathPrefix, internalApiMux)
+		servMux.Handle(InternalPathPrefix, internalApiMux)
 	}
-	servMux.Handle(httpapis.PublicPathPrefix, WrapHandlerInCORS(publicApiMux))
+	servMux.Handle(PublicPathPrefix, WrapHandlerInCORS(publicApiMux))
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics

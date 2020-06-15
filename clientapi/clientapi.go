@@ -41,7 +41,6 @@ func AddPublicRoutes(
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing *gomatrixserverlib.KeyRing,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -62,7 +61,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		router, cfg, eduInputAPI, rsAPI, asAPI,
-		accountsDB, deviceDB, federation, *keyRing,
+		accountsDB, deviceDB, federation,
 		syncProducer, transactionsCache, fsAPI,
 	)
 }

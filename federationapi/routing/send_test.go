@@ -128,7 +128,6 @@ func (t *testRoomserverAPI) QueryLatestEventsAndState(
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
 	r := t.queryLatestEventsAndState(request)
-	response.QueryLatestEventsAndStateRequest = *request
 	response.RoomExists = r.RoomExists
 	response.RoomVersion = testRoomVersion
 	response.LatestEvents = r.LatestEvents
@@ -144,7 +143,6 @@ func (t *testRoomserverAPI) QueryStateAfterEvents(
 	response *api.QueryStateAfterEventsResponse,
 ) error {
 	response.RoomVersion = testRoomVersion
-	response.QueryStateAfterEventsRequest = *request
 	res := t.queryStateAfterEvents(request)
 	response.PrevEventsExist = res.PrevEventsExist
 	response.RoomExists = res.RoomExists
@@ -181,15 +179,6 @@ func (t *testRoomserverAPI) QueryMembershipsForRoom(
 	return fmt.Errorf("not implemented")
 }
 
-// Query a list of invite event senders for a user in a room.
-func (t *testRoomserverAPI) QueryInvitesForUser(
-	ctx context.Context,
-	request *api.QueryInvitesForUserRequest,
-	response *api.QueryInvitesForUserResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
 // Query whether a server is allowed to see an event
 func (t *testRoomserverAPI) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
@@ -220,10 +209,10 @@ func (t *testRoomserverAPI) QueryStateAndAuthChain(
 }
 
 // Query a given amount (or less) of events prior to a given set of events.
-func (t *testRoomserverAPI) QueryBackfill(
+func (t *testRoomserverAPI) PerformBackfill(
 	ctx context.Context,
-	request *api.QueryBackfillRequest,
-	response *api.QueryBackfillResponse,
+	request *api.PerformBackfillRequest,
+	response *api.PerformBackfillResponse,
 ) error {
 	return fmt.Errorf("not implemented")
 }
@@ -621,7 +610,6 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 					}
 				}
 			}
-			res.QueryEventsByIDRequest = *req
 			return res
 		},
 	}

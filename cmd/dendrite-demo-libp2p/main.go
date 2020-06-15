@@ -32,8 +32,8 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-libp2p/storage"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/serverkeyapi"
@@ -172,7 +172,7 @@ func main() {
 	}
 	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)
 
-	internal.SetupHTTPAPI(
+	httputil.SetupHTTPAPI(
 		http.DefaultServeMux,
 		base.Base.PublicAPIMux,
 		base.Base.InternalAPIMux,

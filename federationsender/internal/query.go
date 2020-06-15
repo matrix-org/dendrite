@@ -7,16 +7,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// QueryJoinedHostsInRoom implements api.FederationSenderInternalAPI
-func (f *FederationSenderInternalAPI) QueryJoinedHostsInRoom(
-	ctx context.Context,
-	request *api.QueryJoinedHostsInRoomRequest,
-	response *api.QueryJoinedHostsInRoomResponse,
-) (err error) {
-	response.JoinedHosts, err = f.db.GetJoinedHosts(ctx, request.RoomID)
-	return
-}
-
 // QueryJoinedHostServerNamesInRoom implements api.FederationSenderInternalAPI
 func (f *FederationSenderInternalAPI) QueryJoinedHostServerNamesInRoom(
 	ctx context.Context,

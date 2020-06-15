@@ -22,8 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/util"
 )
 
@@ -49,7 +49,7 @@ func Setup(
 	}
 
 	r0mux.Handle("/keys/query",
-		internal.MakeAuthAPI("queryKeys", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("queryKeys", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
 			return QueryKeys(req)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)

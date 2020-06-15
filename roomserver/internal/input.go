@@ -21,6 +21,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	log "github.com/sirupsen/logrus"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 )
@@ -40,6 +41,21 @@ func (r *RoomserverInternalAPI) WriteOutputEvents(roomID string, updates []api.O
 		if err != nil {
 			return err
 		}
+		logger := log.WithFields(log.Fields{
+			"room_id": roomID,
+			"type":    updates[i].Type,
+		})
+		if updates[i].NewRoomEvent != nil {
+			logger = logger.WithFields(log.Fields{
+				"event_type":     updates[i].NewRoomEvent.Event.Type(),
+				"event_id":       updates[i].NewRoomEvent.Event.EventID(),
+				"adds_state":     len(updates[i].NewRoomEvent.AddsStateEventIDs),
+				"removes_state":  len(updates[i].NewRoomEvent.RemovesStateEventIDs),
+				"send_as_server": updates[i].NewRoomEvent.SendAsServer,
+				"sender":         updates[i].NewRoomEvent.Event.Sender(),
+			})
+		}
+		logger.Infof("Producing to topic '%s'", r.OutputRoomEventTopic)
 		messages[i] = &sarama.ProducerMessage{
 			Topic: r.OutputRoomEventTopic,
 			Key:   sarama.StringEncoder(roomID),

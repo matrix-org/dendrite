@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
@@ -68,7 +68,7 @@ func (s *transactionStatements) InsertTransaction(
 	userID string,
 	eventID string,
 ) (err error) {
-	stmt := internal.TxStmt(txn, s.insertTransactionStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertTransactionStmt)
 	_, err = stmt.ExecContext(
 		ctx, transactionID, sessionID, userID, eventID,
 	)

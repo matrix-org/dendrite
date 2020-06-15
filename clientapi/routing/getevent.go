@@ -32,7 +32,6 @@ type getEventRequest struct {
 	eventID        string
 	cfg            *config.Dendrite
 	federation     *gomatrixserverlib.FederationClient
-	keyRing        gomatrixserverlib.KeyRing
 	requestedEvent gomatrixserverlib.Event
 }
 
@@ -46,7 +45,6 @@ func GetEvent(
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
 	eventsReq := api.QueryEventsByIDRequest{
 		EventIDs: []string{eventID},
@@ -75,7 +73,6 @@ func GetEvent(
 		eventID:        eventID,
 		cfg:            cfg,
 		federation:     federation,
-		keyRing:        keyRing,
 		requestedEvent: requestedEvent,
 	}
 

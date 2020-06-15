@@ -128,6 +128,10 @@ func (n *Node) DerivedServerName() string {
 	return hex.EncodeToString(n.SigningPublicKey())
 }
 
+func (n *Node) DerivedSessionName() string {
+	return hex.EncodeToString(n.EncryptionPublicKey())
+}
+
 func (n *Node) EncryptionPublicKey() []byte {
 	edkey := n.SigningPublicKey()
 	return convert.Ed25519PublicKeyToCurve25519(edkey)

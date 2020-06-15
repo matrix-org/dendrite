@@ -65,13 +65,6 @@ type RoomserverInternalAPI interface {
 		response *QueryMembershipsForRoomResponse,
 	) error
 
-	// Query a list of invite event senders for a user in a room.
-	QueryInvitesForUser(
-		ctx context.Context,
-		request *QueryInvitesForUserRequest,
-		response *QueryInvitesForUserResponse,
-	) error
-
 	// Query whether a server is allowed to see an event
 	QueryServerAllowedToSeeEvent(
 		ctx context.Context,
@@ -96,10 +89,10 @@ type RoomserverInternalAPI interface {
 	) error
 
 	// Query a given amount (or less) of events prior to a given set of events.
-	QueryBackfill(
+	PerformBackfill(
 		ctx context.Context,
-		request *QueryBackfillRequest,
-		response *QueryBackfillResponse,
+		request *PerformBackfillRequest,
+		response *PerformBackfillResponse,
 	) error
 
 	// Asks for the default room version as preferred by the server.

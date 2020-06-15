@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/util"
 )
@@ -26,7 +26,7 @@ func AddRoutes(s api.ServerKeyInternalAPI, internalAPIMux *mux.Router, cache cac
 		}),
 	)
 	internalAPIMux.Handle(ServerKeyQueryPublicKeyPath,
-		internal.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryPublicKeysRequest{}
 			response := api.QueryPublicKeysResponse{}
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -41,7 +41,7 @@ func AddRoutes(s api.ServerKeyInternalAPI, internalAPIMux *mux.Router, cache cac
 		}),
 	)
 	internalAPIMux.Handle(ServerKeyInputPublicKeyPath,
-		internal.MakeInternalAPI("inputPublicKeys", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("inputPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.InputPublicKeysRequest{}
 			response := api.InputPublicKeysResponse{}
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {

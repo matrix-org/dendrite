@@ -1,4 +1,4 @@
-// Copyright 2017 New Vector Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package basecomponent
+package setup
 
 import (
 	"database/sql"
@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/httpapis"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
@@ -127,8 +127,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		Caches:         cache,
-		PublicAPIMux:   httpmux.PathPrefix(httpapis.PublicPathPrefix).Subrouter().UseEncodedPath(),
-		InternalAPIMux: httpmux.PathPrefix(httpapis.InternalPathPrefix).Subrouter().UseEncodedPath(),
+		PublicAPIMux:   httpmux.PathPrefix(httputil.PublicPathPrefix).Subrouter().UseEncodedPath(),
+		InternalAPIMux: httpmux.PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		httpClient:     &client,
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,
@@ -237,7 +237,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		WriteTimeout: HTTPServerTimeout,
 	}
 
-	internal.SetupHTTPAPI(
+	httputil.SetupHTTPAPI(
 		http.DefaultServeMux,
 		b.PublicAPIMux,
 		b.InternalAPIMux,
@@ -282,7 +282,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to parse naffka database file URI")
 		}
-		db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil)
+		db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}

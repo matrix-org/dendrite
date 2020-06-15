@@ -21,6 +21,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -94,7 +95,7 @@ func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := internal.TxStmt(txn, s.insertEventStateKeyNIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
@@ -103,7 +104,7 @@ func (s *eventStateKeyStatements) SelectEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := internal.TxStmt(txn, s.selectEventStateKeyNIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }

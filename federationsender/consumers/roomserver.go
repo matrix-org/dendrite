@@ -86,11 +86,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
 		ev := &output.NewRoomEvent.Event
-		log.WithFields(log.Fields{
-			"event_id":       ev.EventID(),
-			"room_id":        ev.RoomID(),
-			"send_as_server": output.NewRoomEvent.SendAsServer,
-		}).Info("received room event from roomserver")
 
 		if err := s.processMessage(*output.NewRoomEvent); err != nil {
 			// panic rather than continue with an inconsistent database
@@ -131,11 +126,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
 func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
-	addsStateEvents, err := s.lookupStateEvents(ore.AddsStateEventIDs, ore.Event.Event)
-	if err != nil {
-		return err
-	}
-	addsJoinedHosts, err := joinedHostsFromEvents(addsStateEvents)
+	addsJoinedHosts, err := joinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(ore.AddsState()))
 	if err != nil {
 		return err
 	}

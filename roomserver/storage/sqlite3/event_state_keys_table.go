@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -90,7 +91,7 @@ func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	var eventStateKeyNID int64
 	var err error
 	var res sql.Result
-	insertStmt := internal.TxStmt(txn, s.insertEventStateKeyNIDStmt)
+	insertStmt := sqlutil.TxStmt(txn, s.insertEventStateKeyNIDStmt)
 	if res, err = insertStmt.ExecContext(ctx, eventStateKey); err == nil {
 		eventStateKeyNID, err = res.LastInsertId()
 	}
@@ -101,7 +102,7 @@ func (s *eventStateKeyStatements) SelectEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := internal.TxStmt(txn, s.selectEventStateKeyNIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
@@ -113,7 +114,7 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 	for k, v := range eventStateKeys {
 		iEventStateKeys[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", internal.QueryVariadic(len(eventStateKeys)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", sqlutil.QueryVariadic(len(eventStateKeys)), 1)
 
 	rows, err := s.db.QueryContext(ctx, selectOrig, iEventStateKeys...)
 	if err != nil {
@@ -139,7 +140,7 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKey(
 	for k, v := range eventStateKeyNIDs {
 		iEventStateKeyNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", internal.QueryVariadic(len(eventStateKeyNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", sqlutil.QueryVariadic(len(eventStateKeyNIDs)), 1)
 
 	rows, err := s.db.QueryContext(ctx, selectOrig, iEventStateKeyNIDs...)
 	if err != nil {

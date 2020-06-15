@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -69,7 +70,7 @@ func NewSqliteEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
 func (s *eventJSONStatements) InsertEventJSON(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, eventJSON []byte,
 ) error {
-	_, err := internal.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
+	_, err := sqlutil.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
 	return err
 }
 
@@ -80,7 +81,7 @@ func (s *eventJSONStatements) BulkSelectEventJSON(
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", internal.QueryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
 
 	rows, err := s.db.QueryContext(ctx, selectOrig, iEventNIDs...)
 	if err != nil {

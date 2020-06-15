@@ -37,7 +37,7 @@ func Backfill(
 	roomID string,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-	var res api.QueryBackfillResponse
+	var res api.PerformBackfillResponse
 	var eIDs []string
 	var limit string
 	var exists bool
@@ -68,7 +68,7 @@ func Backfill(
 	}
 
 	// Populate the request.
-	req := api.QueryBackfillRequest{
+	req := api.PerformBackfillRequest{
 		RoomID: roomID,
 		// we don't know who the successors are for these events, which won't
 		// be a problem because we don't use that information when servicing /backfill requests,
@@ -87,8 +87,8 @@ func Backfill(
 	}
 
 	// Query the roomserver.
-	if err = rsAPI.QueryBackfill(httpReq.Context(), &req, &res); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryBackfill failed")
+	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
 		return jsonerror.InternalServerError()
 	}
 

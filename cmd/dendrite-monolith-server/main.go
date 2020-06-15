@@ -17,17 +17,18 @@ package main
 import (
 	"flag"
 	"net/http"
+	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/serverkeyapi"
 
 	"github.com/sirupsen/logrus"
@@ -39,10 +40,11 @@ var (
 	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
 	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
 	enableHTTPAPIs = flag.Bool("api", false, "Use HTTP APIs instead of short-circuiting (warning: exposes API endpoints!)")
+	traceInternal  = os.Getenv("DENDRITE_TRACE_INTERNAL") == "1"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(true)
+	cfg := setup.ParseFlags(true)
 	if *enableHTTPAPIs {
 		// If the HTTP APIs are enabled then we need to update the Listen
 		// statements in the configuration so that we know where to find
@@ -56,7 +58,7 @@ func main() {
 		cfg.Listen.ServerKeyAPI = addr
 	}
 
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
+	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -72,13 +74,17 @@ func main() {
 	}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsComponent := roomserver.NewInternalAPI(
+	rsAPI := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
-	rsAPI := rsComponent
 	if base.UseHTTPAPIs {
 		roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 		rsAPI = base.RoomserverHTTPClient()
+	}
+	if traceInternal {
+		rsAPI = &api.RoomserverInternalAPITrace{
+			Impl: rsAPI,
+		}
 	}
 
 	eduInputAPI := eduserver.NewInternalAPI(
@@ -102,7 +108,7 @@ func main() {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationSenderHTTPClient()
 	}
-	rsComponent.SetFederationSenderAPI(fsAPI)
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
@@ -128,7 +134,7 @@ func main() {
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
-	internal.SetupHTTPAPI(
+	httputil.SetupHTTPAPI(
 		http.DefaultServeMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
@@ -140,7 +146,7 @@ func main() {
 	go func() {
 		serv := http.Server{
 			Addr:         *httpBindAddr,
-			WriteTimeout: basecomponent.HTTPServerTimeout,
+			WriteTimeout: setup.HTTPServerTimeout,
 		}
 
 		logrus.Info("Listening on ", serv.Addr)
@@ -151,7 +157,7 @@ func main() {
 		go func() {
 			serv := http.Server{
 				Addr:         *httpsBindAddr,
-				WriteTimeout: basecomponent.HTTPServerTimeout,
+				WriteTimeout: setup.HTTPServerTimeout,
 			}
 
 			logrus.Info("Listening on ", serv.Addr)

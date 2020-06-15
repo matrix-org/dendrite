@@ -18,13 +18,11 @@ package sqlite3
 import (
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-
 	// Import the sqlite3 package
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 
@@ -33,7 +31,7 @@ import (
 type SyncServerDatasource struct {
 	shared.Database
 	db *sql.DB
-	internal.PartitionOffsetStatements
+	sqlutil.PartitionOffsetStatements
 	streamID streamIDStatements
 }
 
@@ -45,7 +43,7 @@ func NewDatabase(dataSourceName string) (*SyncServerDatasource, error) {
 	if err != nil {
 		return nil, err
 	}
-	if d.db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil); err != nil {
+	if d.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = d.prepare(); err != nil {
@@ -98,7 +96,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		CurrentRoomState:    roomState,
 		Topology:            topology,
 		SendToDevice:        sendToDevice,
-		SendToDeviceWriter:  internal.NewTransactionWriter(),
+		SendToDeviceWriter:  sqlutil.NewTransactionWriter(),
 		EDUCache:            cache.New(),
 	}
 	return nil

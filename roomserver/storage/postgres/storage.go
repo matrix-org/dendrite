@@ -18,7 +18,6 @@ package postgres
 import (
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	// Import the postgres database driver.
@@ -33,7 +32,7 @@ type Database struct {
 
 // Open a postgres database.
 // nolint: gocyclo
-func Open(dataSourceName string, dbProperties internal.DbProperties) (*Database, error) {
+func Open(dataSourceName string, dbProperties sqlutil.DbProperties) (*Database, error) {
 	var d Database
 	var db *sql.DB
 	var err error

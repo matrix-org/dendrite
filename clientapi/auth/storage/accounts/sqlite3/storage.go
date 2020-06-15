@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
@@ -32,7 +31,7 @@ import (
 // Database represents an account database
 type Database struct {
 	db *sql.DB
-	internal.PartitionOffsetStatements
+	sqlutil.PartitionOffsetStatements
 	accounts     accountsStatements
 	profiles     profilesStatements
 	memberships  membershipStatements
@@ -52,10 +51,10 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err != nil {
 		return nil, err
 	}
-	if db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil); err != nil {
+	if db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
-	partitions := internal.PartitionOffsetStatements{}
+	partitions := sqlutil.PartitionOffsetStatements{}
 	if err = partitions.Prepare(db, "account"); err != nil {
 		return nil, err
 	}
@@ -128,7 +127,7 @@ func (d *Database) SetDisplayName(
 // CreateGuestAccount makes a new guest account and creates an empty profile
 // for this account.
 func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		// We need to lock so we sequentially create numeric localparts. If we don't, two calls to
 		// this function will cause the same number to be selected and one will fail with 'database is locked'
 		// when the first txn upgrades to a write txn.
@@ -154,7 +153,7 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Accou
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
 ) (acc *authtypes.Account, err error) {
-	err = internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
 		return err
 	})
@@ -175,7 +174,7 @@ func (d *Database) createAccount(
 	}
 	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		if isConstraintError(err) {
-			return nil, internal.ErrUserExists
+			return nil, sqlutil.ErrUserExists
 		}
 		return nil, err
 	}
@@ -221,7 +220,7 @@ func (d *Database) removeMembershipsByEventIDs(
 func (d *Database) UpdateMemberships(
 	ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string,
 ) error {
-	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		if err := d.removeMembershipsByEventIDs(ctx, txn, idsToRemove); err != nil {
 			return err
 		}
@@ -308,7 +307,7 @@ func (d *Database) newMembership(
 func (d *Database) SaveAccountData(
 	ctx context.Context, localpart, roomID, dataType, content string,
 ) error {
-	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		return d.accountDatas.insertAccountData(ctx, txn, localpart, roomID, dataType, content)
 	})
 }
@@ -359,7 +358,7 @@ var Err3PIDInUse = errors.New("This third-party identifier is already in use")
 func (d *Database) SaveThreePIDAssociation(
 	ctx context.Context, threepid, localpart, medium string,
 ) (err error) {
-	return internal.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		user, err := d.threepids.selectLocalpartForThreePID(
 			ctx, txn, threepid, medium,
 		)

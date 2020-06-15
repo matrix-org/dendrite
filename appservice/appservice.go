@@ -31,9 +31,9 @@ import (
 	"github.com/matrix-org/dendrite/appservice/workers"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/sirupsen/logrus"
 )
@@ -46,7 +46,7 @@ func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQuer
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *basecomponent.BaseDendrite,
+	base *setup.BaseDendrite,
 	accountsDB accounts.Database,
 	deviceDB devices.Database,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
@@ -86,12 +86,16 @@ func NewInternalAPI(
 		Cfg: base.Cfg,
 	}
 
-	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
-		rsAPI, workerStates,
-	)
-	if err := consumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
+	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
+	// We can't add ASes at runtime so this is safe to do.
+	if len(workerStates) > 0 {
+		consumer := consumers.NewOutputRoomEventConsumer(
+			base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
+			rsAPI, workerStates,
+		)
+		if err := consumer.Start(); err != nil {
+			logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
+		}
 	}
 
 	// Create application service transaction workers
@@ -114,7 +118,7 @@ func generateAppServiceAccount(
 	// Create an account for the application service
 	_, err := accountsDB.CreateAccount(ctx, as.SenderLocalpart, "", as.ID)
 	if err != nil {
-		if errors.Is(err, internal.ErrUserExists) { // This account already exists
+		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
 			return nil
 		}
 		return err

@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -97,14 +98,14 @@ func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, content string,
 ) (err error) {
-	_, err = internal.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
+	_, err = sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
 	return
 }
 
 func (s *sendToDeviceStatements) CountSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, userID, deviceID string,
 ) (count int, err error) {
-	row := internal.TxStmt(txn, s.countSendToDeviceMessagesStmt).QueryRowContext(ctx, userID, deviceID)
+	row := sqlutil.TxStmt(txn, s.countSendToDeviceMessagesStmt).QueryRowContext(ctx, userID, deviceID)
 	if err = row.Scan(&count); err != nil {
 		return
 	}
@@ -114,7 +115,7 @@ func (s *sendToDeviceStatements) CountSendToDeviceMessages(
 func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, userID, deviceID string,
 ) (events []types.SendToDeviceEvent, err error) {
-	rows, err := internal.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID)
+	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID)
 	if err != nil {
 		return
 	}
@@ -149,7 +150,7 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, token string, nids []types.SendToDeviceNID,
 ) (err error) {
-	query := strings.Replace(updateSentSendToDeviceMessagesSQL, "($2)", internal.QueryVariadic(1+len(nids)), 1)
+	query := strings.Replace(updateSentSendToDeviceMessagesSQL, "($2)", sqlutil.QueryVariadic(1+len(nids)), 1)
 	params := make([]interface{}, 1+len(nids))
 	params[0] = token
 	for k, v := range nids {
@@ -162,7 +163,7 @@ func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(
 func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, nids []types.SendToDeviceNID,
 ) (err error) {
-	query := strings.Replace(deleteSendToDeviceMessagesSQL, "($1)", internal.QueryVariadic(len(nids)), 1)
+	query := strings.Replace(deleteSendToDeviceMessagesSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
 	params := make([]interface{}, 1+len(nids))
 	for k, v := range nids {
 		params[k] = v

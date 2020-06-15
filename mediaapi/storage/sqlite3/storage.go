@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	// Import the postgres database driver.
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -41,7 +40,7 @@ func Open(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
-	if d.db, err = sqlutil.Open(internal.SQLiteDriverName(), cs, nil); err != nil {
+	if d.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = d.statements.prepare(d.db); err != nil {

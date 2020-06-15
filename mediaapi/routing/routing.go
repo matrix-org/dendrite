@@ -22,8 +22,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -59,7 +59,7 @@ func Setup(
 	}
 
 	// TODO: Add AS support
-	r0mux.Handle("/upload", internal.MakeAuthAPI(
+	r0mux.Handle("/upload", httputil.MakeAuthAPI(
 		"upload", authData,
 		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
 			return Upload(req, cfg, db, activeThumbnailGeneration)
@@ -99,7 +99,7 @@ func makeDownloadAPI(
 		util.SetCORSHeaders(w)
 		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 		w.Header().Set("Content-Type", "application/json")
-		vars, _ := internal.URLDecodeMapValues(mux.Vars(req))
+		vars, _ := httputil.URLDecodeMapValues(mux.Vars(req))
 		Download(
 			w,
 			req,

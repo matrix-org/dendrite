@@ -19,13 +19,13 @@ package storage
 import (
 	"net/url"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
 )
 
 // Open opens a database connection.
-func Open(dataSourceName string, dbProperties internal.DbProperties) (Database, error) {
+func Open(dataSourceName string, dbProperties sqlutil.DbProperties) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return postgres.Open(dataSourceName, dbProperties)
