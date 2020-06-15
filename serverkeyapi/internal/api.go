@@ -147,12 +147,16 @@ func (s *ServerKeyAPI) FetchKeys(
 					if res.ValidUntilTS > prev.ValidUntilTS {
 						// This key is newer than the one we had so let's store
 						// it in the database.
-						storeResults[req] = res
+						if req.ServerName != s.Cfg.Matrix.ServerName {
+							storeResults[req] = res
+						}
 					}
 				} else {
 					// We didn't already have a previous entry for this request
 					// so store it in the database anyway for now.
-					storeResults[req] = res
+					if req.ServerName != s.Cfg.Matrix.ServerName {
+						storeResults[req] = res
+					}
 				}
 				// Update the results map with this new result. If nothing
 				// else, we can try verifying against this key.
