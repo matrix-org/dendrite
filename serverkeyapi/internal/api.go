@@ -65,6 +65,7 @@ func (s *ServerKeyAPI) StoreKeys(
 	// Run in a background context - we don't want to stop this work just
 	// because the caller gives up waiting.
 	ctx := context.Background()
+
 	// Store any keys that we were given in our database.
 	return s.OurKeyRing.KeyDatabase.StoreKeys(ctx, results)
 }
@@ -119,6 +120,7 @@ func (s *ServerKeyAPI) FetchKeys(
 			}
 		}
 	}
+
 	// Then consult our local database and see if we have the requested
 	// keys. These might come from a cache, depending on the database
 	// implementation used.
@@ -126,6 +128,7 @@ func (s *ServerKeyAPI) FetchKeys(
 		// We successfully got some keys. Add them to the results.
 		for req, res := range dbResults {
 			results[req] = res
+
 			// If the key is valid right now then we can also remove it
 			// from the request list as we don't need to fetch it again
 			// in that case.
@@ -134,28 +137,17 @@ func (s *ServerKeyAPI) FetchKeys(
 			}
 		}
 	}
+
 	// For any key requests that we still have outstanding, next try to
 	// fetch them directly. We'll go through each of the key fetchers to
-	// ask for the remaining keys.
-	var fetcherCtx context.Context
-	var fetcherCancel context.CancelFunc
-	defer func() {
-		if fetcherCancel != nil {
-			fetcherCancel()
-		}
-	}()
+	// ask for the remaining keys
 	for _, fetcher := range s.OurKeyRing.KeyFetchers {
-		// If there's a context active from a previous fetcher then cancel
-		// it. Set up a new context that lmits how long we will wait.
-		if fetcherCancel != nil {
-			fetcherCancel()
-		}
-		fetcherCtx, fetcherCancel = context.WithTimeout(ctx, time.Second*20)
-
 		// If there are no more keys to look up then stop.
 		if len(requests) == 0 {
 			break
 		}
+		fetcherCtx, fetcherCancel := context.WithTimeout(ctx, time.Second*30)
+		defer fetcherCancel()
 		logrus.WithFields(logrus.Fields{
 			"fetcher_name": fetcher.FetcherName(),
 		}).Infof("Fetching %d key(s)", len(requests))
@@ -186,6 +178,7 @@ func (s *ServerKeyAPI) FetchKeys(
 						storeResults[req] = res
 					}
 				}
+
 				// Update the results map with this new result. If nothing
 				// else, we can try verifying against this key.
 				results[req] = res
@@ -196,6 +189,7 @@ func (s *ServerKeyAPI) FetchKeys(
 					delete(requests, req)
 				}
 			}
+
 			// Store the keys from our store map.
 			if err = s.OurKeyRing.KeyDatabase.StoreKeys(ctx, storeResults); err != nil {
 				logrus.WithError(err).WithFields(logrus.Fields{
@@ -205,7 +199,6 @@ func (s *ServerKeyAPI) FetchKeys(
 				return nil, fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 			}
 
-			// Debugging output.
 			if len(storeResults) > 0 {
 				logrus.WithFields(logrus.Fields{
 					"fetcher_name": fetcher.FetcherName(),
