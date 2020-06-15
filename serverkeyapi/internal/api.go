@@ -135,6 +135,8 @@ func (s *ServerKeyAPI) FetchKeys(
 	// fetch them directly. We'll go through each of the key fetchers to
 	// ask for the remaining keys.
 	for _, fetcher := range s.OurKeyRing.KeyFetchers {
+		fetcherCtx, fetcherCancel := context.WithTimeout(ctx, time.Second*10)
+		defer fetcherCancel()
 		// If there are no more keys to look up then stop.
 		if len(requests) == 0 {
 			break
@@ -142,7 +144,7 @@ func (s *ServerKeyAPI) FetchKeys(
 		logrus.WithFields(logrus.Fields{
 			"fetcher_name": fetcher.FetcherName(),
 		}).Infof("Fetching %d key(s)", len(requests))
-		if fetcherResults, err := fetcher.FetchKeys(ctx, requests); err == nil {
+		if fetcherResults, err := fetcher.FetchKeys(fetcherCtx, requests); err == nil {
 			// Build a map of the results that we want to commit to the
 			// database. We do this in a separate map because otherwise we
 			// might end up trying to rewrite database entries.
@@ -208,7 +210,7 @@ func (s *ServerKeyAPI) FetchKeys(
 		}
 	}
 	// Return the keys.
-	logrus.Infof("Retrieved %d key(s)", len(origRequests))
+	logrus.Infof("Retrieved %d key(s) for %d request(s)", len(results), len(origRequests))
 	return results, nil
 }
 
