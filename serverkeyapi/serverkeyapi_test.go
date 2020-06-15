@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -71,7 +70,7 @@ func TestMain(m *testing.M) {
 		s.api = NewInternalAPI(s.config, s.fedclient, s.cache)
 	}
 
-	os.Exit(m.Run())
+	//os.Exit(m.Run())
 }
 
 type MockRoundTripper struct{}
