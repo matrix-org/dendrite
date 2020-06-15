@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	serverkeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -51,11 +52,12 @@ func Setup(
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
-	keys gomatrixserverlib.KeyRing,
+	skAPI serverkeyAPI.ServerKeyInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	accountDB accounts.Database,
 	deviceDB devices.Database,
 ) {
+	keys := *skAPI.KeyRing()
 	v2keysmux := publicAPIMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := publicAPIMux.PathPrefix(pathPrefixV1Federation).Subrouter()
 	v2fedmux := publicAPIMux.PathPrefix(pathPrefixV2Federation).Subrouter()
@@ -65,7 +67,15 @@ func Setup(
 	}
 
 	localKeys := internal.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
-		return LocalKeys(cfg)
+		request := &serverkeyAPI.QueryLocalKeysRequest{}
+		response := &serverkeyAPI.QueryLocalKeysResponse{}
+		if err := skAPI.QueryLocalKeys(req.Context(), request, response); err != nil {
+			return util.ErrorResponse(err)
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: response.ServerKeys,
+		}
 	})
 
 	// Ignore the {keyID} argument as we only have a single server key so we always

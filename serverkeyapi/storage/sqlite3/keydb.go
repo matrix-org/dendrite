@@ -17,7 +17,6 @@ package sqlite3
 
 import (
 	"context"
-	"time"
 
 	"golang.org/x/crypto/ed25519"
 
@@ -59,23 +58,25 @@ func NewDatabase(
 	}
 	// Store our own keys so that we don't end up making HTTP requests to find our
 	// own keys
-	index := gomatrixserverlib.PublicKeyLookupRequest{
-		ServerName: serverName,
-		KeyID:      serverKeyID,
-	}
-	value := gomatrixserverlib.PublicKeyLookupResult{
-		VerifyKey: gomatrixserverlib.VerifyKey{
-			Key: gomatrixserverlib.Base64Bytes(serverKey),
-		},
-		ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(100 * 365 * 24 * time.Hour)),
-		ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-	}
-	err = d.StoreKeys(
-		context.Background(),
-		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{
-			index: value,
-		},
-	)
+	/*
+		index := gomatrixserverlib.PublicKeyLookupRequest{
+			ServerName: serverName,
+			KeyID:      serverKeyID,
+		}
+		value := gomatrixserverlib.PublicKeyLookupResult{
+			VerifyKey: gomatrixserverlib.VerifyKey{
+				Key: gomatrixserverlib.Base64Bytes(serverKey),
+			},
+			ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(100 * 365 * 24 * time.Hour)),
+			ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
+		}
+		err = d.StoreKeys(
+			context.Background(),
+			map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{
+				index: value,
+			},
+		)
+	*/
 	if err != nil {
 		return nil, err
 	}

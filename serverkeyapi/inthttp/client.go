@@ -16,6 +16,7 @@ import (
 const (
 	ServerKeyInputPublicKeyPath = "/serverkeyapi/inputPublicKey"
 	ServerKeyQueryPublicKeyPath = "/serverkeyapi/queryPublicKey"
+	ServerKeyQueryLocalKeysPath = "/serverkeyapi/queryLocalKeys"
 )
 
 // NewServerKeyClient creates a ServerKeyInternalAPI implemented by talking to a HTTP POST API.
@@ -128,5 +129,17 @@ func (h *httpServerKeyInternalAPI) QueryPublicKeys(
 	defer span.Finish()
 
 	apiURL := h.serverKeyAPIURL + ServerKeyQueryPublicKeyPath
+	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpServerKeyInternalAPI) QueryLocalKeys(
+	ctx context.Context,
+	request *api.QueryLocalKeysRequest,
+	response *api.QueryLocalKeysResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryLocalKeys")
+	defer span.Finish()
+
+	apiURL := h.serverKeyAPIURL + ServerKeyQueryLocalKeysPath
 	return internalHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
