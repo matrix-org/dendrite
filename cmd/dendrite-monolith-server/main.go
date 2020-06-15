@@ -135,7 +135,7 @@ func main() {
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
@@ -147,6 +147,7 @@ func main() {
 		serv := http.Server{
 			Addr:         *httpBindAddr,
 			WriteTimeout: setup.HTTPServerTimeout,
+			Handler:      base.BaseMux,
 		}
 
 		logrus.Info("Listening on ", serv.Addr)
@@ -158,6 +159,7 @@ func main() {
 			serv := http.Server{
 				Addr:         *httpsBindAddr,
 				WriteTimeout: setup.HTTPServerTimeout,
+				Handler:      base.BaseMux,
 			}
 
 			logrus.Info("Listening on ", serv.Addr)

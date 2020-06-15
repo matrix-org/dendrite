@@ -10,6 +10,7 @@ import (
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -51,15 +52,6 @@ func init() {
 			}] = h
 		}
 	}
-}
-
-type testNopJSONVerifier struct {
-	// this verifier verifies nothing
-}
-
-func (t *testNopJSONVerifier) VerifyJSONs(ctx context.Context, requests []gomatrixserverlib.VerifyJSONRequest) ([]gomatrixserverlib.VerifyJSONResult, error) {
-	result := make([]gomatrixserverlib.VerifyJSONResult, len(requests))
-	return result, nil
 }
 
 type testEDUProducer struct {
@@ -330,7 +322,7 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 		context:    context.Background(),
 		rsAPI:      rsAPI,
 		eduAPI:     &testEDUProducer{},
-		keys:       &testNopJSONVerifier{},
+		keys:       &test.NopJSONVerifier{},
 		federation: fedClient,
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
 		newEvents:  make(map[string]bool),

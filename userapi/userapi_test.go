@@ -3,16 +3,15 @@ package userapi_test
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"reflect"
-	"sync"
 	"testing"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
@@ -99,7 +98,7 @@ func TestQueryProfile(t *testing.T) {
 	t.Run("HTTP API", func(t *testing.T) {
 		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
 		userapi.AddInternalRoutes(router, userAPI)
-		apiURL, cancel := listenAndServe(t, router)
+		apiURL, cancel := test.ListenAndServe(t, router, false)
 		defer cancel()
 		httpAPI, err := inthttp.NewUserAPIClient(apiURL, &http.Client{})
 		if err != nil {
@@ -110,29 +109,4 @@ func TestQueryProfile(t *testing.T) {
 	t.Run("Monolith", func(t *testing.T) {
 		runCases(userAPI)
 	})
-}
-
-func listenAndServe(t *testing.T, router *mux.Router) (apiURL string, cancel func()) {
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatalf("failed to listen: %s", err)
-	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	srv := http.Server{}
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		srv.Handler = router
-		err := srv.Serve(listener)
-		if err != nil && err != http.ErrServerClosed {
-			t.Logf("Listen failed: %s", err)
-		}
-	}()
-
-	return fmt.Sprintf("http://localhost:%d", port), func() {
-		srv.Shutdown(context.Background())
-		wg.Wait()
-	}
 }

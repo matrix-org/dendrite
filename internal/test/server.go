@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,16 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"testing"
 
 	"github.com/matrix-org/dendrite/internal/config"
 )
@@ -102,4 +107,47 @@ func StartProxy(bindAddr string, cfg *config.Dendrite) (*exec.Cmd, chan error) {
 		filepath.Join(filepath.Dir(os.Args[0]), "client-api-proxy"),
 		proxyArgs,
 	)
+}
+
+// ListenAndServe will listen on a random high-numbered port and attach the given router.
+// Returns the base URL to send requests to. Call `cancel` to shutdown the server, which will block until it has closed.
+func ListenAndServe(t *testing.T, router http.Handler, useTLS bool) (apiURL string, cancel func()) {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("failed to listen: %s", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	srv := http.Server{}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		srv.Handler = router
+		var err error
+		if useTLS {
+			certFile := filepath.Join(os.TempDir(), "dendrite.cert")
+			keyFile := filepath.Join(os.TempDir(), "dendrite.key")
+			err = NewTLSKey(keyFile, certFile)
+			if err != nil {
+				t.Logf("failed to generate tls key/cert: %s", err)
+				return
+			}
+			err = srv.ServeTLS(listener, certFile, keyFile)
+		} else {
+			err = srv.Serve(listener)
+		}
+		if err != nil && err != http.ErrServerClosed {
+			t.Logf("Listen failed: %s", err)
+		}
+	}()
+
+	secure := ""
+	if useTLS {
+		secure = "s"
+	}
+	return fmt.Sprintf("http%s://localhost:%d", secure, port), func() {
+		srv.Shutdown(context.Background())
+		wg.Wait()
+	}
 }

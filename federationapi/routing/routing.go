@@ -51,7 +51,7 @@ func Setup(
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
-	keys gomatrixserverlib.KeyRing,
+	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	accountDB accounts.Database,
 	deviceDB devices.Database,
