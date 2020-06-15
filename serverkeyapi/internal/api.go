@@ -143,7 +143,7 @@ func (s *ServerKeyAPI) FetchKeys(
 		if fetcherCancel != nil {
 			fetcherCancel()
 		}
-	}
+	}()
 	for _, fetcher := range s.OurKeyRing.KeyFetchers {
 		// If there's a context active from a previous fetcher then cancel
 		// it. Set up a new context that lmits how long we will wait.
