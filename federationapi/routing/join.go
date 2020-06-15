@@ -143,7 +143,7 @@ func SendJoin(
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
-	keys gomatrixserverlib.KeyRing,
+	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}

@@ -35,7 +35,7 @@ func Invite(
 	eventID string,
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
-	keys gomatrixserverlib.KeyRing,
+	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 	inviteReq := gomatrixserverlib.InviteV2Request{}
 	if err := json.Unmarshal(request.Content(), &inviteReq); err != nil {

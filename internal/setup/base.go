@@ -63,6 +63,7 @@ type BaseDendrite struct {
 	// PublicAPIMux should be used to register new public matrix api endpoints
 	PublicAPIMux   *mux.Router
 	InternalAPIMux *mux.Router
+	BaseMux        *mux.Router // base router which created public/internal subrouters
 	UseHTTPAPIs    bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
@@ -127,6 +128,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		Caches:         cache,
+		BaseMux:        httpmux,
 		PublicAPIMux:   httpmux.PathPrefix(httputil.PublicPathPrefix).Subrouter().UseEncodedPath(),
 		InternalAPIMux: httpmux.PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		httpClient:     &client,
@@ -238,12 +240,13 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 	}
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		b.BaseMux,
 		b.PublicAPIMux,
 		b.InternalAPIMux,
 		b.Cfg,
 		b.UseHTTPAPIs,
 	)
+	serv.Handler = b.BaseMux
 	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 
 	err := serv.ListenAndServe()

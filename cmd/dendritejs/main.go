@@ -19,7 +19,6 @@ package main
 import (
 	"crypto/ed25519"
 	"fmt"
-	"net/http"
 	"syscall/js"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -233,7 +232,7 @@ func main() {
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
@@ -245,7 +244,7 @@ func main() {
 		go func() {
 			logrus.Info("Listening on libp2p-js host ID ", node.Id)
 			s := JSServer{
-				Mux: http.DefaultServeMux,
+				Mux: base.BaseMux,
 			}
 			s.ListenAndServe("p2p")
 		}()
@@ -255,7 +254,7 @@ func main() {
 	go func() {
 		logrus.Info("Listening for service-worker fetch traffic")
 		s := JSServer{
-			Mux: http.DefaultServeMux,
+			Mux: base.BaseMux,
 		}
 		s.ListenAndServe("fetch")
 	}()

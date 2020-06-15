@@ -173,7 +173,7 @@ func main() {
 	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		base.Base.BaseMux,
 		base.Base.PublicAPIMux,
 		base.Base.InternalAPIMux,
 		&cfg,
@@ -184,7 +184,7 @@ func main() {
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.Base.BaseMux))
 	}()
 	// Expose the matrix APIs also via libp2p
 	if base.LibP2P != nil {
@@ -197,7 +197,7 @@ func main() {
 			defer func() {
 				logrus.Fatal(listener.Close())
 			}()
-			logrus.Fatal(http.Serve(listener, nil))
+			logrus.Fatal(http.Serve(listener, base.Base.BaseMux))
 		}()
 	}
 

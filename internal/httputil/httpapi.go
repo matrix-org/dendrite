@@ -185,7 +185,7 @@ func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 func MakeFedAPI(
 	metricsName string,
 	serverName gomatrixserverlib.ServerName,
-	keyRing gomatrixserverlib.KeyRing,
+	keyRing gomatrixserverlib.JSONVerifier,
 	wakeup *FederationWakeups,
 	f func(*http.Request, *gomatrixserverlib.FederationRequest, map[string]string) util.JSONResponse,
 ) http.Handler {
@@ -233,9 +233,8 @@ func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib
 	}
 }
 
-// SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics
-// listener.
-func SetupHTTPAPI(servMux *http.ServeMux, publicApiMux *mux.Router, internalApiMux *mux.Router, cfg *config.Dendrite, enableHTTPAPIs bool) {
+// SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics listener
+func SetupHTTPAPI(servMux, publicApiMux, internalApiMux *mux.Router, cfg *config.Dendrite, enableHTTPAPIs bool) {
 	if cfg.Metrics.Enabled {
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}

@@ -74,11 +74,13 @@ func main() {
 	}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsAPI := roomserver.NewInternalAPI(
+	rsImpl := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
+	// call functions directly on the impl unless running in HTTP mode
+	rsAPI := rsImpl
 	if base.UseHTTPAPIs {
-		roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
+		roomserver.AddInternalRoutes(base.InternalAPIMux, rsImpl)
 		rsAPI = base.RoomserverHTTPClient()
 	}
 	if traceInternal {
@@ -108,7 +110,9 @@ func main() {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationSenderHTTPClient()
 	}
-	rsAPI.SetFederationSenderAPI(fsAPI)
+	// The underlying roomserver implementation needs to be able to call the fedsender.
+	// This is different to rsAPI which can be the http client which doesn't need this dependency
+	rsImpl.SetFederationSenderAPI(fsAPI)
 
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
@@ -135,7 +139,7 @@ func main() {
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
@@ -147,6 +151,7 @@ func main() {
 		serv := http.Server{
 			Addr:         *httpBindAddr,
 			WriteTimeout: setup.HTTPServerTimeout,
+			Handler:      base.BaseMux,
 		}
 
 		logrus.Info("Listening on ", serv.Addr)
@@ -158,6 +163,7 @@ func main() {
 			serv := http.Server{
 				Addr:         *httpsBindAddr,
 				WriteTimeout: setup.HTTPServerTimeout,
+				Handler:      base.BaseMux,
 			}
 
 			logrus.Info("Listening on ", serv.Addr)

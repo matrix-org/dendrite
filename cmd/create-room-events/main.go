@@ -47,6 +47,7 @@ var (
 	userID           = flag.String("user-id", "@userid:$SERVER_NAME", "The user ID to use as the event sender")
 	messageCount     = flag.Int("message-count", 10, "The number of m.room.messsage events to generate")
 	format           = flag.String("Format", "InputRoomEvent", "The output format to use for the messages: InputRoomEvent or Event")
+	ver              = flag.String("version", string(gomatrixserverlib.RoomVersionV1), "Room version to generate events as")
 )
 
 // By default we use a private key of 0.
@@ -109,7 +110,7 @@ func buildAndOutput() gomatrixserverlib.EventReference {
 
 	event, err := b.Build(
 		now, name, key, privateKey,
-		gomatrixserverlib.RoomVersionV1,
+		gomatrixserverlib.RoomVersion(*ver),
 	)
 	if err != nil {
 		panic(err)
@@ -127,7 +128,7 @@ func writeEvent(event gomatrixserverlib.Event) {
 	if *format == "InputRoomEvent" {
 		var ire api.InputRoomEvent
 		ire.Kind = api.KindNew
-		ire.Event = event.Headered(gomatrixserverlib.RoomVersionV1)
+		ire.Event = event.Headered(gomatrixserverlib.RoomVersion(*ver))
 		authEventIDs := []string{}
 		for _, ref := range b.AuthEvents.([]gomatrixserverlib.EventReference) {
 			authEventIDs = append(authEventIDs, ref.EventID)
