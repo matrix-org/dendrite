@@ -55,7 +55,6 @@ func Setup(
 	accountDB accounts.Database,
 	deviceDB devices.Database,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing gomatrixserverlib.KeyRing,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
@@ -154,7 +153,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, federation, keyRing)
+			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

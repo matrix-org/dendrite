@@ -67,7 +67,7 @@ type Monolith struct {
 func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 	clientapi.AddPublicRoutes(
 		publicMux, m.Config, m.KafkaConsumer, m.KafkaProducer, m.DeviceDB, m.AccountDB,
-		m.FedClient, m.KeyRing, m.RoomserverAPI,
+		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationSenderAPI,
 	)
