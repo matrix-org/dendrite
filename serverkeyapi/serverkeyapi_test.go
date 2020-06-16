@@ -21,6 +21,7 @@ import (
 
 type server struct {
 	name      gomatrixserverlib.ServerName
+	validity  time.Duration
 	config    *config.Dendrite
 	fedclient *gomatrixserverlib.FederationClient
 	cache     *caching.Caches
