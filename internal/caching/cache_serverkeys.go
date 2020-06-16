@@ -15,7 +15,12 @@ const (
 // ServerKeyCache contains the subset of functions needed for
 // a server key cache.
 type ServerKeyCache interface {
+	// request -> timestamp is emulating gomatrixserverlib.FetchKeys:
+	// https://github.com/matrix-org/gomatrixserverlib/blob/f69539c86ea55d1e2cc76fd8e944e2d82d30397c/keyring.go#L95
 	GetServerKey(request gomatrixserverlib.PublicKeyLookupRequest, timestamp gomatrixserverlib.Timestamp) (response gomatrixserverlib.PublicKeyLookupResult, ok bool)
+
+	// request -> result is emulating gomatrixserverlib.StoreKeys:
+	// https://github.com/matrix-org/gomatrixserverlib/blob/f69539c86ea55d1e2cc76fd8e944e2d82d30397c/keyring.go#L112
 	StoreServerKey(request gomatrixserverlib.PublicKeyLookupRequest, response gomatrixserverlib.PublicKeyLookupResult)
 }
 
