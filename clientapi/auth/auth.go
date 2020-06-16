@@ -25,7 +25,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
@@ -44,14 +43,6 @@ type DeviceDatabase interface {
 type AccountDatabase interface {
 	// Look up the account matching the given localpart.
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*authtypes.Account, error)
-}
-
-// Data contains information required to authenticate a request.
-type Data struct {
-	AccountDB AccountDatabase
-	DeviceDB  DeviceDatabase
-	// AppServices is the list of all registered AS
-	AppServices []config.ApplicationService
 }
 
 // VerifyUserFromRequest authenticates the HTTP request,
