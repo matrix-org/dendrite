@@ -96,7 +96,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
-	cache, err := caching.NewInMemoryLRUCache()
+	cache, err := caching.NewInMemoryLRUCache(true)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
