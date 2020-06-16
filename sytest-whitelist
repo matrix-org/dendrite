@@ -313,3 +313,4 @@ Invalid JSON integers
 Invalid JSON special values
 Invalid JSON floats
 Outbound federation will ignore a missing event with bad JSON for room version 6
+Can download without a file name over federation
