@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
@@ -72,7 +73,8 @@ func TestMain(m *testing.M) {
 		s.config.SetDefaults()
 		s.config.Matrix.ServerName = gomatrixserverlib.ServerName(s.name)
 		s.config.Matrix.PrivateKey = testPriv
-		s.config.Matrix.KeyID = "ed25519:test"
+		s.config.Matrix.KeyID = serverKeyID
+		s.config.Matrix.KeyValidityPeriod = s.validity
 		s.config.Database.ServerKey = config.DataSource("file::memory:")
 
 		// Create a transport which redirects federation requests to
@@ -83,7 +85,7 @@ func TestMain(m *testing.M) {
 
 		// Create the federation client.
 		s.fedclient = gomatrixserverlib.NewFederationClientWithTransport(
-			s.config.Matrix.ServerName, "ed25519:test", testPriv, transport,
+			s.config.Matrix.ServerName, serverKeyID, testPriv, transport,
 		)
 
 		// Finally, build the server key APIs.
@@ -112,15 +114,9 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 		return nil, fmt.Errorf("unexpected request path: %s", req.URL.Path)
 	}
 
-	// Query the local keys for the server in question.
-	request := &api.QueryLocalKeysRequest{}
-	response := &api.QueryLocalKeysResponse{}
-	if err = s.api.QueryLocalKeys(context.Background(), request, response); err != nil {
-		return nil, err
-	}
-
-	// Make a nice JSON response out of it.
-	body, err := json.MarshalIndent(response.ServerKeys, "", "  ")
+	// Get the keys and JSON-ify them.
+	keys := routing.LocalKeys(s.config)
+	body, err := json.MarshalIndent(keys.JSON, "", "  ")
 	if err != nil {
 		return nil, err
 	}
