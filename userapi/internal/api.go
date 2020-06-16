@@ -58,12 +58,10 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfil
 }
 
 func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAccessTokenRequest, res *api.QueryAccessTokenResponse) error {
-	appServiceDevice, err := a.queryAppServiceToken(ctx, req.AccessToken, req.AppServiceUserID)
-	if err != nil {
-		return err
-	}
-	if appServiceDevice != nil {
+	if req.AppServiceUserID != "" {
+		appServiceDevice, err := a.queryAppServiceToken(ctx, req.AccessToken, req.AppServiceUserID)
 		res.Device = appServiceDevice
+		res.Err = err
 		return nil
 	}
 	device, err := a.DeviceDB.GetDeviceByAccessToken(ctx, req.AccessToken)
@@ -114,7 +112,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 			dev.UserID = appServiceUserID
 			return &dev, nil
 		}
-		return nil, fmt.Errorf("appservice has not registered this user")
+		return nil, &api.ErrorForbidden{Message: "appservice has not registered this user"}
 	}
 
 	// AS is not masquerading as any user, so use AS's sender_localpart

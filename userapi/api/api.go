@@ -25,13 +25,15 @@ type UserInternalAPI interface {
 // QueryAccessTokenRequest is the request for QueryAccessToken
 type QueryAccessTokenRequest struct {
 	AccessToken string
-	// optional user ID, valid only if the token is an appservice
+	// optional user ID, valid only if the token is an appservice.
+	// https://matrix.org/docs/spec/application_service/r0.1.2#using-sync-and-events
 	AppServiceUserID string
 }
 
 // QueryAccessTokenResponse is the response for QueryAccessToken
 type QueryAccessTokenResponse struct {
 	Device *Device
+	Err    error // e.g ErrorForbidden
 }
 
 // QueryProfileRequest is the request for QueryProfile
@@ -63,4 +65,13 @@ type Device struct {
 	SessionID int64
 	// TODO: display name, last used timestamp, keys, etc
 	DisplayName string
+}
+
+// ErrorForbidden is an error indicating that the supplied access token is forbidden
+type ErrorForbidden struct {
+	Message string
+}
+
+func (e *ErrorForbidden) Error() string {
+	return "Forbidden: " + e.Message
 }

@@ -71,6 +71,14 @@ func VerifyUserFromRequest(
 		jsonErr := jsonerror.InternalServerError()
 		return nil, &jsonErr
 	}
+	if res.Err != nil {
+		if forbidden, ok := res.Err.(*api.ErrorForbidden); ok {
+			return nil, &util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden(forbidden.Message),
+			}
+		}
+	}
 	if res.Device == nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
