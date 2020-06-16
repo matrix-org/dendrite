@@ -157,11 +157,17 @@ func (s *ServerKeyAPI) handleDatabaseKeys(
 
 	// We successfully got some keys. Add them to the results.
 	for req, res := range dbResults {
+		// The key we've retrieved from the database/cache might
+		// have passed its validity period, but right now, it's
+		// the best thing we've got, and it might be sufficient to
+		// verify a past event.
 		results[req] = res
 
 		// If the key is valid right now then we can also remove it
 		// from the request list as we don't need to fetch it again
-		// in that case.
+		// in that case. If the key isn't valid right now, then by
+		// leaving it in the 'requests' map, we'll try to update the
+		// key using the fetchers in handleFetcherKeys.
 		if res.WasValidAt(now, true) {
 			delete(requests, req)
 		}
@@ -169,7 +175,7 @@ func (s *ServerKeyAPI) handleDatabaseKeys(
 	return nil
 }
 
-// handleDatabaseKeys handles cases where a fetcher can satisfy
+// handleFetcherKeys handles cases where a fetcher can satisfy
 // the remaining requests.
 func (s *ServerKeyAPI) handleFetcherKeys(
 	ctx context.Context,

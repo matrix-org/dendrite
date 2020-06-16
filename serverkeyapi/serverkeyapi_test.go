@@ -21,12 +21,12 @@ import (
 )
 
 type server struct {
-	name      gomatrixserverlib.ServerName
-	validity  time.Duration
-	config    *config.Dendrite
-	fedclient *gomatrixserverlib.FederationClient
-	cache     *caching.Caches
-	api       api.ServerKeyInternalAPI
+	name      gomatrixserverlib.ServerName        // server name
+	validity  time.Duration                       // key validity duration from now
+	config    *config.Dendrite                    // skeleton config, from TestMain
+	fedclient *gomatrixserverlib.FederationClient // uses MockRoundTripper
+	cache     *caching.Caches                     // server-specific cache
+	api       api.ServerKeyInternalAPI            // server-specific server key API
 }
 
 func (s *server) renew() {
