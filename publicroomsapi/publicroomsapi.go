@@ -17,13 +17,13 @@ package publicroomsapi
 import (
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/publicroomsapi/consumers"
 	"github.com/matrix-org/dendrite/publicroomsapi/routing"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -34,7 +34,7 @@ func AddPublicRoutes(
 	router *mux.Router,
 	cfg *config.Dendrite,
 	consumer sarama.Consumer,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	publicRoomsDB storage.Database,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	fedClient *gomatrixserverlib.FederationClient,
@@ -47,5 +47,5 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panic("failed to start public rooms server consumer")
 	}
 
-	routing.Setup(router, deviceDB, publicRoomsDB, rsAPI, fedClient, extRoomsProvider)
+	routing.Setup(router, userAPI, publicRoomsDB, rsAPI, fedClient, extRoomsProvider)
 }

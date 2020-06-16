@@ -17,15 +17,15 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
 func LeaveRoomByID(
 	req *http.Request,
-	device *authtypes.Device,
+	device *api.Device,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	roomID string,
 ) util.JSONResponse {

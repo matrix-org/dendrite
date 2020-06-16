@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/userapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -211,6 +212,8 @@ func main() {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
+
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
@@ -224,6 +227,7 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fedSenderAPI,
 		RoomserverAPI:       rsAPI,
+		UserAPI:             userAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB:          publicRoomsDB,

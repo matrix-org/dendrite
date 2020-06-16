@@ -20,8 +20,8 @@ import (
 	"database/sql"
 	"encoding/base64"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -52,7 +52,7 @@ func NewDatabase(dataSourceName string, dbProperties sqlutil.DbProperties, serve
 // Returns sql.ErrNoRows if no matching device was found.
 func (d *Database) GetDeviceByAccessToken(
 	ctx context.Context, token string,
-) (*authtypes.Device, error) {
+) (*api.Device, error) {
 	return d.devices.selectDeviceByToken(ctx, token)
 }
 
@@ -60,14 +60,14 @@ func (d *Database) GetDeviceByAccessToken(
 // Returns sql.ErrNoRows if no matching device was found.
 func (d *Database) GetDeviceByID(
 	ctx context.Context, localpart, deviceID string,
-) (*authtypes.Device, error) {
+) (*api.Device, error) {
 	return d.devices.selectDeviceByID(ctx, localpart, deviceID)
 }
 
 // GetDevicesByLocalpart returns the devices matching the given localpart.
 func (d *Database) GetDevicesByLocalpart(
 	ctx context.Context, localpart string,
-) ([]authtypes.Device, error) {
+) ([]api.Device, error) {
 	return d.devices.selectDevicesByLocalpart(ctx, localpart)
 }
 
@@ -80,7 +80,7 @@ func (d *Database) GetDevicesByLocalpart(
 func (d *Database) CreateDevice(
 	ctx context.Context, localpart string, deviceID *string, accessToken string,
 	displayName *string,
-) (dev *authtypes.Device, returnErr error) {
+) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
 		returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 			var err error

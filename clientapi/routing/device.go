@@ -19,9 +19,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -45,7 +45,7 @@ type devicesDeleteJSON struct {
 
 // GetDeviceByID handles /devices/{deviceID}
 func GetDeviceByID(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -77,7 +77,7 @@ func GetDeviceByID(
 
 // GetDevicesByLocalpart handles /devices
 func GetDevicesByLocalpart(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
@@ -110,7 +110,7 @@ func GetDevicesByLocalpart(
 
 // UpdateDeviceByID handles PUT on /devices/{deviceID}
 func UpdateDeviceByID(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -160,7 +160,7 @@ func UpdateDeviceByID(
 
 // DeleteDeviceById handles DELETE requests to /devices/{deviceId}
 func DeleteDeviceById(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -185,7 +185,7 @@ func DeleteDeviceById(
 
 // DeleteDevices handles POST requests to /delete_devices
 func DeleteDevices(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {

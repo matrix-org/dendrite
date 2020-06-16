@@ -18,12 +18,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
@@ -36,20 +33,11 @@ const pathPrefixR0 = "/client/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux *mux.Router, cfg *config.Dendrite,
-	accountDB accounts.Database,
-	deviceDB devices.Database,
+	publicAPIMux *mux.Router, cfg *config.Dendrite, userAPI userapi.UserInternalAPI,
 ) {
 	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
-
-	authData := auth.Data{
-		AccountDB:   accountDB,
-		DeviceDB:    deviceDB,
-		AppServices: cfg.Derived.ApplicationServices,
-	}
-
 	r0mux.Handle("/keys/query",
-		httputil.MakeAuthAPI("queryKeys", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("queryKeys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return QueryKeys(req)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)

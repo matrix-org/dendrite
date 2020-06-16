@@ -26,7 +26,8 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
-	QueryProfilePath = "/userapi/queryProfile"
+	QueryProfilePath     = "/userapi/queryProfile"
+	QueryAccessTokenPath = "/userapi/queryAccessToken"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -58,5 +59,17 @@ func (h *httpUserInternalAPI) QueryProfile(
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryProfilePath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) QueryAccessToken(
+	ctx context.Context,
+	request *api.QueryAccessTokenRequest,
+	response *api.QueryAccessTokenResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryAccessToken")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryAccessTokenPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

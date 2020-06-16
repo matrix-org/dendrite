@@ -34,6 +34,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/syncapi"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -53,6 +54,7 @@ type Monolith struct {
 	FederationSenderAPI federationSenderAPI.FederationSenderInternalAPI
 	RoomserverAPI       roomserverAPI.RoomserverInternalAPI
 	ServerKeyAPI        serverKeyAPI.ServerKeyInternalAPI
+	UserAPI             userapi.UserInternalAPI
 
 	// TODO: can we remove this? It's weird that we are required the database
 	// yet every other component can do that on its own. libp2p-demo uses a custom
@@ -69,21 +71,21 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 		publicMux, m.Config, m.KafkaConsumer, m.KafkaProducer, m.DeviceDB, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
-		m.FederationSenderAPI,
+		m.FederationSenderAPI, m.UserAPI,
 	)
 
-	keyserver.AddPublicRoutes(publicMux, m.Config, m.DeviceDB, m.AccountDB)
+	keyserver.AddPublicRoutes(publicMux, m.Config, m.UserAPI)
 	federationapi.AddPublicRoutes(
 		publicMux, m.Config, m.AccountDB, m.DeviceDB, m.FedClient,
 		m.KeyRing, m.RoomserverAPI, m.AppserviceAPI, m.FederationSenderAPI,
 		m.EDUInternalAPI,
 	)
-	mediaapi.AddPublicRoutes(publicMux, m.Config, m.DeviceDB)
+	mediaapi.AddPublicRoutes(publicMux, m.Config, m.UserAPI)
 	publicroomsapi.AddPublicRoutes(
-		publicMux, m.Config, m.KafkaConsumer, m.DeviceDB, m.PublicRoomsDB, m.RoomserverAPI, m.FedClient,
+		publicMux, m.Config, m.KafkaConsumer, m.UserAPI, m.PublicRoomsDB, m.RoomserverAPI, m.FedClient,
 		m.ExtPublicRoomsProvider,
 	)
 	syncapi.AddPublicRoutes(
-		publicMux, m.KafkaConsumer, m.DeviceDB, m.AccountDB, m.RoomserverAPI, m.FedClient, m.Config,
+		publicMux, m.KafkaConsumer, m.UserAPI, m.AccountDB, m.RoomserverAPI, m.FedClient, m.Config,
 	)
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -46,6 +47,7 @@ func AddPublicRoutes(
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
+	userAPI userapi.UserInternalAPI,
 ) {
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,
@@ -61,7 +63,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		router, cfg, eduInputAPI, rsAPI, asAPI,
-		accountsDB, deviceDB, federation,
+		accountsDB, deviceDB, userAPI, federation,
 		syncProducer, transactionsCache, fsAPI,
 	)
 }

@@ -16,18 +16,18 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
 // SendToDevice handles PUT /_matrix/client/r0/sendToDevice/{eventType}/{txnId}
 // sends the device events to the EDU Server
 func SendToDevice(
-	req *http.Request, device *authtypes.Device,
+	req *http.Request, device *userapi.Device,
 	eduAPI api.EDUServerInputAPI,
 	txnCache *transactions.Cache,
 	eventType string, txnID *string,

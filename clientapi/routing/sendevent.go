@@ -17,13 +17,13 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -41,7 +41,7 @@ type sendEventResponse struct {
 //   /rooms/{roomID}/state/{eventType}/{stateKey}
 func SendEvent(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	roomID, eventType string, txnID, stateKey *string,
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
@@ -110,7 +110,7 @@ func SendEvent(
 
 func generateSendEvent(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,

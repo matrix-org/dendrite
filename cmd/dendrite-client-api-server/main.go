@@ -34,10 +34,11 @@ func main() {
 	rsAPI := base.RoomserverHTTPClient()
 	fsAPI := base.FederationSenderHTTPClient()
 	eduInputAPI := base.EDUServerClient()
+	userAPI := base.UserAPIClient()
 
 	clientapi.AddPublicRoutes(
 		base.PublicAPIMux, base.Cfg, base.KafkaConsumer, base.KafkaProducer, deviceDB, accountDB, federation,
-		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI,
+		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))

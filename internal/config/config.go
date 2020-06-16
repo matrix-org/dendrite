@@ -241,6 +241,7 @@ type Dendrite struct {
 		ServerKeyAPI     Address `yaml:"server_key_api"`
 		AppServiceAPI    Address `yaml:"appservice_api"`
 		SyncAPI          Address `yaml:"sync_api"`
+		UserAPI          Address `yaml:"user_api"`
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
@@ -610,6 +611,7 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "listen.room_server", string(config.Listen.RoomServer))
 	checkNotEmpty(configErrs, "listen.edu_server", string(config.Listen.EDUServer))
 	checkNotEmpty(configErrs, "listen.server_key_api", string(config.Listen.EDUServer))
+	checkNotEmpty(configErrs, "listen.user_api", string(config.Listen.UserAPI))
 }
 
 // checkLogging verifies the parameters logging.* are valid.
@@ -721,6 +723,15 @@ func (config *Dendrite) RoomServerURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return "http://" + string(config.Listen.RoomServer)
+}
+
+// UserAPIURL returns an HTTP URL for where the userapi is listening.
+func (config *Dendrite) UserAPIURL() string {
+	// Hard code the userapi to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.UserAPI)
 }
 
 // EDUServerURL returns an HTTP URL for where the EDU server is listening.

@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -22,7 +22,7 @@ var (
 	testRoomID      = fmt.Sprintf("!hallownest:%s", testOrigin)
 	testUserIDA     = fmt.Sprintf("@hornet:%s", testOrigin)
 	testUserIDB     = fmt.Sprintf("@paleking:%s", testOrigin)
-	testUserDeviceA = authtypes.Device{
+	testUserDeviceA = userapi.Device{
 		UserID:      testUserIDA,
 		ID:          "device_id_A",
 		DisplayName: "Device A",

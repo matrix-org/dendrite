@@ -21,7 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -214,7 +215,7 @@ func (d *Database) UpsertAccountData(
 	return
 }
 
-func (d *Database) StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent {
+func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent {
 	out := make([]gomatrixserverlib.HeaderedEvent, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].HeaderedEvent
@@ -442,7 +443,7 @@ func (d *Database) syncPositionTx(
 // IDs of all rooms the user joined are returned so EDU deltas can be added for them.
 func (d *Database) addPDUDeltaToResponse(
 	ctx context.Context,
-	device authtypes.Device,
+	device userapi.Device,
 	r types.Range,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
@@ -549,7 +550,7 @@ func (d *Database) addEDUDeltaToResponse(
 
 func (d *Database) IncrementalSync(
 	ctx context.Context, res *types.Response,
-	device authtypes.Device,
+	device userapi.Device,
 	fromPos, toPos types.StreamingToken,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
@@ -687,7 +688,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 
 func (d *Database) CompleteSync(
 	ctx context.Context, res *types.Response,
-	device authtypes.Device, numRecentEventsPerRoom int,
+	device userapi.Device, numRecentEventsPerRoom int,
 ) (*types.Response, error) {
 	toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
 		ctx, res, device.UserID, numRecentEventsPerRoom,
@@ -758,7 +759,7 @@ func (d *Database) getBackwardTopologyPos(
 // addRoomDeltaToResponse adds a room state delta to a sync response
 func (d *Database) addRoomDeltaToResponse(
 	ctx context.Context,
-	device *authtypes.Device,
+	device *userapi.Device,
 	txn *sql.Tx,
 	r types.Range,
 	delta stateDelta,
@@ -904,7 +905,7 @@ func (d *Database) fetchMissingStateEvents(
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
 func (d *Database) getStateDeltas(
-	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
+	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
@@ -979,7 +980,7 @@ func (d *Database) getStateDeltas(
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
 func (d *Database) getStateDeltasForFullStateSync(
-	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
+	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
