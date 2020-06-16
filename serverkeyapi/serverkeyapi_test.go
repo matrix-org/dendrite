@@ -107,6 +107,12 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 		return nil, fmt.Errorf("server not known: %s", req.Host)
 	}
 
+	// We're intercepting /matrix/key/v2/server requests here, so check
+	// that the URL supplied in the request is for that.
+	if req.URL.Path != "/_matrix/key/v2/server" {
+		return nil, fmt.Errorf("unexpected request path: %s", req.URL.Path)
+	}
+
 	// Query the local keys for the server in question.
 	request := &api.QueryLocalKeysRequest{}
 	response := &api.QueryLocalKeysResponse{}
