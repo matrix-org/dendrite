@@ -44,9 +44,12 @@ type QueryAccessTokenResponse struct {
 
 // QueryAccountDataRequest is the request for QueryAccountData
 type QueryAccountDataRequest struct {
-	UserID   string // required
-	RoomID   string // optional: if specified only returns room account data
-	DataType string // optional: if specified only returns data matching this type
+	UserID string // required: the user to get account data for.
+	// TODO: This is a terribly confusing API shape :/
+	DataType string // optional: if specified returns only a single event matching this data type.
+	// optional: Only used if DataType is set. If blank returns global account data matching the data type.
+	// If set, returns only room account data matching this data type.
+	RoomID string
 }
 
 // QueryAccountDataResponse is the response for QueryAccountData

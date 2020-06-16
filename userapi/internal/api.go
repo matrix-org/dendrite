@@ -81,14 +81,20 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 	if domain != a.ServerName {
 		return fmt.Errorf("cannot query account data of remote users: got %s want %s", domain, a.ServerName)
 	}
-	if req.DataType != "" && req.RoomID != "" {
+	if req.DataType != "" {
 		var event *gomatrixserverlib.ClientEvent
 		event, err = a.AccountDB.GetAccountDataByType(ctx, local, req.RoomID, req.DataType)
 		if err != nil {
 			return err
 		}
-		res.RoomAccountData = make(map[string][]gomatrixserverlib.ClientEvent)
-		res.RoomAccountData[req.RoomID] = []gomatrixserverlib.ClientEvent{*event}
+		if event != nil {
+			if req.RoomID != "" {
+				res.RoomAccountData = make(map[string][]gomatrixserverlib.ClientEvent)
+				res.RoomAccountData[req.RoomID] = []gomatrixserverlib.ClientEvent{*event}
+			} else {
+				res.GlobalAccountData = append(res.GlobalAccountData, *event)
+			}
+		}
 		return nil
 	}
 	global, rooms, err := a.AccountDB.GetAccountData(ctx, local)

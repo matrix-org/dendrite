@@ -262,6 +262,8 @@ func (rp *RequestPool) appendAccountData(
 			}
 			if len(res.RoomAccountData[roomID]) > 0 {
 				events = append(events, res.RoomAccountData[roomID]...)
+			} else if len(res.GlobalAccountData) > 0 {
+				events = append(events, res.GlobalAccountData...)
 			}
 		}
 
