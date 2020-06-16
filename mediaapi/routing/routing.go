@@ -17,11 +17,9 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
@@ -45,7 +43,7 @@ func Setup(
 	publicAPIMux *mux.Router,
 	cfg *config.Dendrite,
 	db storage.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	client *gomatrixserverlib.Client,
 ) {
 	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
@@ -54,16 +52,9 @@ func Setup(
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
 	}
-	authData := auth.Data{
-		AccountDB:   nil,
-		DeviceDB:    deviceDB,
-		AppServices: nil,
-	}
-
-	// TODO: Add AS support
 	r0mux.Handle("/upload", httputil.MakeAuthAPI(
-		"upload", authData,
-		func(req *http.Request, _ *authtypes.Device) util.JSONResponse {
+		"upload", userAPI,
+		func(req *http.Request, _ *userapi.Device) util.JSONResponse {
 			return Upload(req, cfg, db, activeThumbnailGeneration)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)

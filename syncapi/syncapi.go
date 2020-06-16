@@ -24,9 +24,9 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -38,7 +38,7 @@ import (
 func AddPublicRoutes(
 	router *mux.Router,
 	consumer sarama.Consumer,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	accountsDB accounts.Database,
 	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
@@ -90,5 +90,5 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
-	routing.Setup(router, requestPool, syncDB, deviceDB, federation, rsAPI, cfg)
+	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -157,7 +158,7 @@ func getDevice(
 	deviceDB devices.Database,
 	acc *authtypes.Account,
 	token string,
-) (dev *authtypes.Device, err error) {
+) (dev *api.Device, err error) {
 	dev, err = deviceDB.CreateDevice(
 		ctx, acc.Localpart, r.DeviceID, token, r.InitialDisplayName,
 	)

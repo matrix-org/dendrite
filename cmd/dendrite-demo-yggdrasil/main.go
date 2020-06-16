@@ -35,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
@@ -152,6 +153,7 @@ func main() {
 	}
 
 	embed.Embed(*instancePort, "Yggdrasil Demo")
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -167,6 +169,7 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
+		UserAPI:             userAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB: publicRoomsDB,

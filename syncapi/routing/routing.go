@@ -18,14 +18,12 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -39,24 +37,18 @@ const pathPrefixR0 = "/client/r0"
 // nolint: gocyclo
 func Setup(
 	publicAPIMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
-	deviceDB devices.Database, federation *gomatrixserverlib.FederationClient,
+	userAPI userapi.UserInternalAPI, federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 ) {
 	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
 
-	authData := auth.Data{
-		AccountDB:   nil,
-		DeviceDB:    deviceDB,
-		AppServices: nil,
-	}
-
 	// TODO: Add AS support for all handlers below.
-	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/rooms/{roomID}/messages", httputil.MakeAuthAPI("room_messages", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/rooms/{roomID}/messages", httputil.MakeAuthAPI("room_messages", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)

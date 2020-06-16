@@ -27,9 +27,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -48,11 +48,11 @@ type BasicAuth struct {
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
-	metricsName string, data auth.Data,
-	f func(*http.Request, *authtypes.Device) util.JSONResponse,
+	metricsName string, userAPI userapi.UserInternalAPI,
+	f func(*http.Request, *userapi.Device) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		device, err := auth.VerifyUserFromRequest(req, data)
+		device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
 			return *err
 		}

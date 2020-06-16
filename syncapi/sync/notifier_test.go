@@ -22,9 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -357,7 +356,7 @@ func lockedFetchUserStream(n *Notifier, userID, deviceID string) *UserDeviceStre
 
 func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) syncRequest {
 	return syncRequest{
-		device: authtypes.Device{
+		device: userapi.Device{
 			UserID: userID,
 			ID:     deviceID,
 		},

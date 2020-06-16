@@ -17,17 +17,17 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 type getEventRequest struct {
 	req            *http.Request
-	device         *authtypes.Device
+	device         *userapi.Device
 	roomID         string
 	eventID        string
 	cfg            *config.Dendrite
@@ -39,7 +39,7 @@ type getEventRequest struct {
 // https://matrix.org/docs/spec/client_server/r0.4.0.html#get-matrix-client-r0-rooms-roomid-event-eventid
 func GetEvent(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	roomID string,
 	eventID string,
 	cfg *config.Dendrite,

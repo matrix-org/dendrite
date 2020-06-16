@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -135,14 +135,14 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 func (s *devicesStatements) insertDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
 	displayName *string,
-) (*authtypes.Device, error) {
+) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
 	stmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
 	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName).Scan(&sessionID); err != nil {
 		return nil, err
 	}
-	return &authtypes.Device{
+	return &api.Device{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
@@ -189,8 +189,8 @@ func (s *devicesStatements) updateDeviceName(
 
 func (s *devicesStatements) selectDeviceByToken(
 	ctx context.Context, accessToken string,
-) (*authtypes.Device, error) {
-	var dev authtypes.Device
+) (*api.Device, error) {
+	var dev api.Device
 	var localpart string
 	stmt := s.selectDeviceByTokenStmt
 	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.SessionID, &dev.ID, &localpart)
@@ -205,8 +205,8 @@ func (s *devicesStatements) selectDeviceByToken(
 // localpart and deviceID
 func (s *devicesStatements) selectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
-) (*authtypes.Device, error) {
-	var dev authtypes.Device
+) (*api.Device, error) {
+	var dev api.Device
 	stmt := s.selectDeviceByIDStmt
 	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&dev.DisplayName)
 	if err == nil {
@@ -218,8 +218,8 @@ func (s *devicesStatements) selectDeviceByID(
 
 func (s *devicesStatements) selectDevicesByLocalpart(
 	ctx context.Context, localpart string,
-) ([]authtypes.Device, error) {
-	devices := []authtypes.Device{}
+) ([]api.Device, error) {
+	devices := []api.Device{}
 
 	rows, err := s.selectDevicesByLocalpartStmt.QueryContext(ctx, localpart)
 
@@ -229,7 +229,7 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByLocalpart: rows.close() failed")
 
 	for rows.Next() {
-		var dev authtypes.Device
+		var dev api.Device
 		var id, displayname sql.NullString
 		err = rows.Scan(&id, &displayname)
 		if err != nil {

@@ -16,12 +16,12 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/eduserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
@@ -33,7 +33,7 @@ type typingContentJSON struct {
 // SendTyping handles PUT /rooms/{roomID}/typing/{userID}
 // sends the typing events to client API typingProducer
 func SendTyping(
-	req *http.Request, device *authtypes.Device, roomID string,
+	req *http.Request, device *userapi.Device, roomID string,
 	userID string, accountDB accounts.Database,
 	eduAPI api.EDUServerInputAPI,
 ) util.JSONResponse {
