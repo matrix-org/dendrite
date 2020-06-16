@@ -192,6 +192,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	return
 }
 
+// nolint:gocyclo
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
 	accountDataFilter *gomatrixserverlib.EventFilter,
