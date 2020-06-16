@@ -29,6 +29,7 @@ const (
 	QueryProfilePath     = "/userapi/queryProfile"
 	QueryAccessTokenPath = "/userapi/queryAccessToken"
 	QueryDevicesPath     = "/userapi/queryDevices"
+	QueryAccountDataPath = "/userapi/queryAccountData"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -80,5 +81,13 @@ func (h *httpUserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDe
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryDevicesPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAccountDataRequest, res *api.QueryAccountDataResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryAccountData")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryAccountDataPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

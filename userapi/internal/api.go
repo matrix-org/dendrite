@@ -73,6 +73,32 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 	return nil
 }
 
+func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAccountDataRequest, res *api.QueryAccountDataResponse) error {
+	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot query account data of remote users: got %s want %s", domain, a.ServerName)
+	}
+	if req.DataType != "" && req.RoomID != "" {
+		var event *gomatrixserverlib.ClientEvent
+		event, err = a.AccountDB.GetAccountDataByType(ctx, local, req.RoomID, req.DataType)
+		if err != nil {
+			return err
+		}
+		res.RoomAccountData[req.RoomID] = []gomatrixserverlib.ClientEvent{*event}
+		return nil
+	}
+	global, rooms, err := a.AccountDB.GetAccountData(ctx, local)
+	if err != nil {
+		return err
+	}
+	res.RoomAccountData = rooms
+	res.GlobalAccountData = global
+	return nil
+}
+
 func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAccessTokenRequest, res *api.QueryAccessTokenResponse) error {
 	if req.AppServiceUserID != "" {
 		appServiceDevice, err := a.queryAppServiceToken(ctx, req.AccessToken, req.AppServiceUserID)
