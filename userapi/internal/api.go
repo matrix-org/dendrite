@@ -57,6 +57,22 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfil
 	return nil
 }
 
+func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevicesRequest, res *api.QueryDevicesResponse) error {
+	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot query devices of remote users: got %s want %s", domain, a.ServerName)
+	}
+	devs, err := a.DeviceDB.GetDevicesByLocalpart(ctx, local)
+	if err != nil {
+		return err
+	}
+	res.Devices = devs
+	return nil
+}
+
 func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAccessTokenRequest, res *api.QueryAccessTokenResponse) error {
 	if req.AppServiceUserID != "" {
 		appServiceDevice, err := a.queryAppServiceToken(ctx, req.AccessToken, req.AppServiceUserID)

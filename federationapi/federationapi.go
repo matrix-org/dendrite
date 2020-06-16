@@ -16,13 +16,11 @@ package federationapi
 
 import (
 	"github.com/gorilla/mux"
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -32,19 +30,17 @@ import (
 func AddPublicRoutes(
 	router *mux.Router,
 	cfg *config.Dendrite,
-	accountsDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
 	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 ) {
 
 	routing.Setup(
-		router, cfg, rsAPI, asAPI,
+		router, cfg, rsAPI,
 		eduAPI, federationSenderAPI, keyRing,
-		federation, accountsDB, deviceDB,
+		federation, userAPI,
 	)
 }

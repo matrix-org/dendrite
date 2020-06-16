@@ -20,6 +20,7 @@ import "context"
 type UserInternalAPI interface {
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
+	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 }
 
 // QueryAccessTokenRequest is the request for QueryAccessToken
@@ -34,6 +35,17 @@ type QueryAccessTokenRequest struct {
 type QueryAccessTokenResponse struct {
 	Device *Device
 	Err    error // e.g ErrorForbidden
+}
+
+// QueryDevicesRequest is the request for QueryDevices
+type QueryDevicesRequest struct {
+	UserID string
+}
+
+// QueryDevicesResponse is the response for QueryDevices
+type QueryDevicesResponse struct {
+	UserExists bool
+	Devices    []Device
 }
 
 // QueryProfileRequest is the request for QueryProfile
