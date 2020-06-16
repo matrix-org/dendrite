@@ -87,6 +87,7 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 		if err != nil {
 			return err
 		}
+		res.RoomAccountData = make(map[string][]gomatrixserverlib.ClientEvent)
 		res.RoomAccountData[req.RoomID] = []gomatrixserverlib.ClientEvent{*event}
 		return nil
 	}
