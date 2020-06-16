@@ -90,7 +90,7 @@ func (s *httpServerKeyInternalAPI) FetchKeys(
 		Results: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
 	}
 	for req, ts := range requests {
-		if res, ok := s.cache.GetServerKey(req); ok {
+		if res, ok := s.cache.GetServerKey(req, ts); ok {
 			result[req] = res
 			continue
 		}
