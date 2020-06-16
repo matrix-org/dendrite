@@ -80,6 +80,17 @@ func createFederationClient(
 	)
 }
 
+func createClient(
+	base *P2PDendrite,
+) *gomatrixserverlib.Client {
+	tr := &http.Transport{}
+	tr.RegisterProtocol(
+		"matrix",
+		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
+	)
+	return gomatrixserverlib.NewClientWithTransport(tr)
+}
+
 func main() {
 	instanceName := flag.String("name", "dendrite-p2p", "the name of this P2P demo instance")
 	instancePort := flag.Int("port", 8080, "the port that the client API will listen on")
@@ -102,6 +113,7 @@ func main() {
 	}
 
 	cfg := config.Dendrite{}
+	cfg.SetDefaults()
 	cfg.Matrix.ServerName = "p2p"
 	cfg.Matrix.PrivateKey = privKey
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))
@@ -159,6 +171,7 @@ func main() {
 		Config:        base.Base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        createClient(base),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.Base.KafkaConsumer,

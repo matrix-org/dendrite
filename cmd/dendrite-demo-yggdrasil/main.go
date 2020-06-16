@@ -16,18 +16,14 @@ package main
 
 import (
 	"context"
-	"crypto/ed25519"
 	"crypto/tls"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
@@ -63,32 +59,33 @@ func (y *yggroundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 func createFederationClient(
 	base *setup.BaseDendrite, n *yggconn.Node,
 ) *gomatrixserverlib.FederationClient {
-	yggdialer := func(_, address string) (net.Conn, error) {
-		tokens := strings.Split(address, ":")
-		raw, err := hex.DecodeString(tokens[0])
-		if err != nil {
-			return nil, fmt.Errorf("hex.DecodeString: %w", err)
-		}
-		converted := convert.Ed25519PublicKeyToCurve25519(ed25519.PublicKey(raw))
-		convhex := hex.EncodeToString(converted)
-		return n.Dial("curve25519", convhex)
-	}
-	yggdialerctx := func(ctx context.Context, network, address string) (net.Conn, error) {
-		return yggdialer(network, address)
-	}
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{
 			inner: &http.Transport{
 				ResponseHeaderTimeout: 15 * time.Second,
 				IdleConnTimeout:       60 * time.Second,
-				DialContext:           yggdialerctx,
+				DialContext:           n.DialerContext,
 			},
 		},
 	)
 	return gomatrixserverlib.NewFederationClientWithTransport(
 		base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey, tr,
 	)
+}
+
+func createClient(n *yggconn.Node) *gomatrixserverlib.Client {
+	tr := &http.Transport{}
+	tr.RegisterProtocol(
+		"matrix", &yggroundtripper{
+			inner: &http.Transport{
+				ResponseHeaderTimeout: 15 * time.Second,
+				IdleConnTimeout:       60 * time.Second,
+				DialContext:           n.DialerContext,
+			},
+		},
+	)
+	return gomatrixserverlib.NewClientWithTransport(tr)
 }
 
 // nolint:gocyclo
@@ -162,6 +159,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        createClient(ygg),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,

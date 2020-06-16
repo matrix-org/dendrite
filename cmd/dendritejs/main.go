@@ -145,6 +145,11 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 	return fed
 }
 
+func createClient(node *go_http_js_libp2p.P2pLocalNode) *gomatrixserverlib.Client {
+	tr := go_http_js_libp2p.NewP2pTransport(node)
+	return gomatrixserverlib.NewClientWithTransport(tr)
+}
+
 func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
 	hosted := "/dns4/rendezvous.matrix.org/tcp/8443/wss/p2p-websocket-star/"
 	node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", privKey.Seed(), []string{hosted}, "p2p")
@@ -218,6 +223,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        createClient(node),
 		FedClient:     federation,
 		KeyRing:       &keyRing,
 		KafkaConsumer: base.KafkaConsumer,

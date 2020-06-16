@@ -45,6 +45,7 @@ type Monolith struct {
 	DeviceDB      devices.Database
 	AccountDB     accounts.Database
 	KeyRing       *gomatrixserverlib.KeyRing
+	Client        *gomatrixserverlib.Client
 	FedClient     *gomatrixserverlib.FederationClient
 	KafkaConsumer sarama.Consumer
 	KafkaProducer sarama.SyncProducer
@@ -80,7 +81,7 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 		m.KeyRing, m.RoomserverAPI, m.AppserviceAPI, m.FederationSenderAPI,
 		m.EDUInternalAPI,
 	)
-	mediaapi.AddPublicRoutes(publicMux, m.Config, m.UserAPI)
+	mediaapi.AddPublicRoutes(publicMux, m.Config, m.UserAPI, m.Client)
 	publicroomsapi.AddPublicRoutes(
 		publicMux, m.Config, m.KafkaConsumer, m.UserAPI, m.PublicRoomsDB, m.RoomserverAPI, m.FedClient,
 		m.ExtPublicRoomsProvider,

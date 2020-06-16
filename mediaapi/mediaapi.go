@@ -26,7 +26,9 @@ import (
 
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
-	router *mux.Router, cfg *config.Dendrite, userAPI userapi.UserInternalAPI,
+	router *mux.Router, cfg *config.Dendrite,
+	userAPI userapi.UserInternalAPI,
+	client *gomatrixserverlib.Client,
 ) {
 	mediaDB, err := storage.Open(string(cfg.Database.MediaAPI), cfg.DbProperties())
 	if err != nil {
@@ -34,6 +36,6 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		router, cfg, mediaDB, userAPI, gomatrixserverlib.NewClient(),
+		router, cfg, mediaDB, userAPI, client,
 	)
 }
