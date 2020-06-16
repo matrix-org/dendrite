@@ -27,11 +27,11 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Database.Naffka = "file::memory:"
 	cfg.SetDefaults()
 	base := setup.NewBaseDendrite(cfg, "Test", false)
+	keyRing := &test.NopJSONVerifier{}
 	fsAPI := base.FederationSenderHTTPClient()
-	skAPI := base.ServerKeyAPIClient()
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(base.PublicAPIMux, cfg, nil, nil, nil, skAPI, nil, nil, fsAPI, nil)
+	federationapi.AddPublicRoutes(base.PublicAPIMux, cfg, nil, nil, nil, keyRing, nil, nil, fsAPI, nil)
 	httputil.SetupHTTPAPI(
 		base.BaseMux,
 		base.PublicAPIMux,
