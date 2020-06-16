@@ -16,6 +16,7 @@ package routing
 
 import (
 	"net/http"
+	"strings"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
@@ -94,11 +95,24 @@ func makeDownloadAPI(
 		util.SetCORSHeaders(w)
 		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 		w.Header().Set("Content-Type", "application/json")
+
 		vars, _ := httputil.URLDecodeMapValues(mux.Vars(req))
+		serverName := gomatrixserverlib.ServerName(vars["serverName"])
+
+		// For the purposes of loop avoidance, we will return a 404 if allow_remote is set to
+		// false in the query string and the target server name isn't our own.
+		// https://github.com/matrix-org/matrix-doc/pull/1265
+		if allowRemote := req.URL.Query().Get("allow_remote"); strings.ToLower(allowRemote) == "false" {
+			if serverName != cfg.Matrix.ServerName {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+		}
+
 		Download(
 			w,
 			req,
-			gomatrixserverlib.ServerName(vars["serverName"]),
+			serverName,
 			types.MediaID(vars["mediaId"]),
 			cfg,
 			db,
