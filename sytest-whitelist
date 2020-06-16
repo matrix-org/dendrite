@@ -128,7 +128,7 @@ Outbound federation can send events
 # test for now.
 #Backfill checks the events requested belong to the room
 Can upload without a file name
-Can download without a file name locally
+#Can download without a file name locally
 Can upload with ASCII file name
 Can send image in room message
 AS cannot create users outside its own namespace
@@ -314,3 +314,16 @@ Invalid JSON special values
 Invalid JSON floats
 Outbound federation will ignore a missing event with bad JSON for room version 6
 Can download without a file name over federation
+POST /media/r0/upload can create an upload
+GET /media/r0/download can fetch the value again
+Remote users can join room by alias
+Alias creators can delete alias with no ops
+Alias creators can delete canonical alias with no ops
+Room members can override their displayname on a room-specific basis
+displayname updates affect room member events
+avatar_url updates affect room member events
+Real non-joined users can get individual state for world_readable rooms after leaving
+Can upload with Unicode file name
+POSTed media can be thumbnailed
+Remote media can be thumbnailed
+Can download with Unicode file name locally

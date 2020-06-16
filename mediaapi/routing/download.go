@@ -21,6 +21,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -302,7 +303,14 @@ func (r *downloadRequest) respondFromLocalFile(
 		responseMetadata = r.MediaMetadata
 
 		if len(responseMetadata.UploadName) > 0 {
-			w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename*=utf-8"%s"`, responseMetadata.UploadName))
+			uploadName, err := url.PathUnescape(string(responseMetadata.UploadName))
+			if err != nil {
+				return nil, fmt.Errorf("url.PathUnescape: %w", err)
+			}
+			w.Header().Set("Content-Disposition", fmt.Sprintf(
+				`inline; filename=utf-8"%s"`,
+				strings.ReplaceAll(uploadName, `"`, `\"`), // escape quote marks only, as per RFC6266
+			))
 		}
 	}
 
