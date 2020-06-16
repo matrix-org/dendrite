@@ -46,7 +46,9 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 			case api.ConflictUpdate:
 				break
 			case api.ConflictAbort:
-				return err
+				return &api.ErrorConflict{
+					Message: err.Error(),
+				}
 			}
 		}
 		res.AccountCreated = false
