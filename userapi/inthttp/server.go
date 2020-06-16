@@ -25,6 +25,32 @@ import (
 )
 
 func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
+	internalAPIMux.Handle(PerformAccountCreationPath,
+		httputil.MakeInternalAPI("performAccountCreation", func(req *http.Request) util.JSONResponse {
+			request := api.PerformAccountCreationRequest{}
+			response := api.PerformAccountCreationResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformAccountCreation(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(PerformDeviceCreationPath,
+		httputil.MakeInternalAPI("performDeviceCreation", func(req *http.Request) util.JSONResponse {
+			request := api.PerformDeviceCreationRequest{}
+			response := api.PerformDeviceCreationResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformDeviceCreation(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(QueryProfilePath,
 		httputil.MakeInternalAPI("queryProfile", func(req *http.Request) util.JSONResponse {
 			request := api.QueryProfileRequest{}

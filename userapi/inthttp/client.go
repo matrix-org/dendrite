@@ -26,6 +26,9 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
+	PerformDeviceCreationPath  = "/userapi/performDeviceCreation"
+	PerformAccountCreationPath = "/userapi/performAccountCreation"
+
 	QueryProfilePath     = "/userapi/queryProfile"
 	QueryAccessTokenPath = "/userapi/queryAccessToken"
 	QueryDevicesPath     = "/userapi/queryDevices"
@@ -50,6 +53,30 @@ func NewUserAPIClient(
 type httpUserInternalAPI struct {
 	apiURL     string
 	httpClient *http.Client
+}
+
+func (h *httpUserInternalAPI) PerformAccountCreation(
+	ctx context.Context,
+	request *api.PerformAccountCreationRequest,
+	response *api.PerformAccountCreationResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAccountCreation")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformAccountCreationPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) PerformDeviceCreation(
+	ctx context.Context,
+	request *api.PerformDeviceCreationRequest,
+	response *api.PerformDeviceCreationResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformDeviceCreation")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformDeviceCreationPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpUserInternalAPI) QueryProfile(

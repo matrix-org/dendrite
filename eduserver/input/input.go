@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -39,8 +39,8 @@ type EDUServerInputAPI struct {
 	OutputSendToDeviceEventTopic string
 	// kafka producer
 	Producer sarama.SyncProducer
-	// device database
-	DeviceDB devices.Database
+	// Internal user query API
+	UserAPI userapi.UserInternalAPI
 	// our server name
 	ServerName gomatrixserverlib.ServerName
 }
@@ -115,7 +115,7 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 
 func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) error {
 	devices := []string{}
-	localpart, domain, err := gomatrixserverlib.SplitID('@', ise.UserID)
+	_, domain, err := gomatrixserverlib.SplitID('@', ise.UserID)
 	if err != nil {
 		return err
 	}
@@ -126,11 +126,14 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 	// wildcard as we don't know about the remote devices, so instead we leave it
 	// as-is, so that the federation sender can send it on with the wildcard intact.
 	if domain == t.ServerName && ise.DeviceID == "*" {
-		devs, err := t.DeviceDB.GetDevicesByLocalpart(context.TODO(), localpart)
+		var res userapi.QueryDevicesResponse
+		err = t.UserAPI.QueryDevices(context.TODO(), &userapi.QueryDevicesRequest{
+			UserID: ise.UserID,
+		}, &res)
 		if err != nil {
 			return err
 		}
-		for _, dev := range devs {
+		for _, dev := range res.Devices {
 			devices = append(devices, dev.ID)
 		}
 	} else {

@@ -27,6 +27,7 @@ import (
 
 // Database stores events intended to be later sent to application services
 type Database struct {
+	sqlutil.PartitionOffsetStatements
 	events eventsStatements
 	txnID  txnStatements
 	db     *sql.DB
@@ -44,6 +45,9 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {
+		return nil, err
+	}
+	if err = result.PartitionOffsetStatements.Prepare(result.db, "appservice"); err != nil {
 		return nil, err
 	}
 	return &result, nil
