@@ -326,3 +326,4 @@ Real non-joined users can get individual state for world_readable rooms after le
 Can upload with Unicode file name
 POSTed media can be thumbnailed
 Remote media can be thumbnailed
+Can download with Unicode file name locally
