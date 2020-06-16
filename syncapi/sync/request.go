@@ -21,9 +21,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -42,7 +41,7 @@ type filter struct {
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
 	ctx           context.Context
-	device        authtypes.Device
+	device        userapi.Device
 	limit         int
 	timeout       time.Duration
 	since         *types.StreamingToken // nil means that no since token was supplied
@@ -50,7 +49,7 @@ type syncRequest struct {
 	log           *log.Entry
 }
 
-func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, error) {
+func newSyncRequest(req *http.Request, device userapi.Device) (*syncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"

@@ -18,17 +18,14 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
@@ -39,7 +36,7 @@ var tokenByteLength = 32
 // DeviceDatabase represents a device database.
 type DeviceDatabase interface {
 	// Look up the device matching the given access token.
-	GetDeviceByAccessToken(ctx context.Context, token string) (*authtypes.Device, error)
+	GetDeviceByAccessToken(ctx context.Context, token string) (*api.Device, error)
 }
 
 // AccountDatabase represents an account database.
@@ -48,22 +45,14 @@ type AccountDatabase interface {
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*authtypes.Account, error)
 }
 
-// Data contains information required to authenticate a request.
-type Data struct {
-	AccountDB AccountDatabase
-	DeviceDB  DeviceDatabase
-	// AppServices is the list of all registered AS
-	AppServices []config.ApplicationService
-}
-
 // VerifyUserFromRequest authenticates the HTTP request,
 // on success returns Device of the requester.
 // Finds local user or an application service user.
 // Note: For an AS user, AS dummy device is returned.
 // On failure returns an JSON error response which can be sent to the client.
 func VerifyUserFromRequest(
-	req *http.Request, data Data,
-) (*authtypes.Device, *util.JSONResponse) {
+	req *http.Request, userAPI api.UserInternalAPI,
+) (*api.Device, *util.JSONResponse) {
 	// Try to find the Application Service user
 	token, err := ExtractAccessToken(req)
 	if err != nil {
@@ -72,105 +61,31 @@ func VerifyUserFromRequest(
 			JSON: jsonerror.MissingToken(err.Error()),
 		}
 	}
-
-	// Search for app service with given access_token
-	var appService *config.ApplicationService
-	for _, as := range data.AppServices {
-		if as.ASToken == token {
-			appService = &as
-			break
-		}
+	var res api.QueryAccessTokenResponse
+	err = userAPI.QueryAccessToken(req.Context(), &api.QueryAccessTokenRequest{
+		AccessToken:      token,
+		AppServiceUserID: req.URL.Query().Get("user_id"),
+	}, &res)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccessToken failed")
+		jsonErr := jsonerror.InternalServerError()
+		return nil, &jsonErr
 	}
-
-	if appService != nil {
-		// Create a dummy device for AS user
-		dev := authtypes.Device{
-			// Use AS dummy device ID
-			ID: types.AppServiceDeviceID,
-			// AS dummy device has AS's token.
-			AccessToken: token,
-		}
-
-		userID := req.URL.Query().Get("user_id")
-		localpart, err := userutil.ParseUsernameParam(userID, nil)
-		if err != nil {
-			return nil, &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername(err.Error()),
-			}
-		}
-
-		if localpart != "" { // AS is masquerading as another user
-			// Verify that the user is registered
-			account, err := data.AccountDB.GetAccountByLocalpart(req.Context(), localpart)
-			// Verify that account exists & appServiceID matches
-			if err == nil && account.AppServiceID == appService.ID {
-				// Set the userID of dummy device
-				dev.UserID = userID
-				return &dev, nil
-			}
-
+	if res.Err != nil {
+		if forbidden, ok := res.Err.(*api.ErrorForbidden); ok {
 			return nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("Application service has not registered this user"),
+				JSON: jsonerror.Forbidden(forbidden.Message),
 			}
 		}
-
-		// AS is not masquerading as any user, so use AS's sender_localpart
-		dev.UserID = appService.SenderLocalpart
-		return &dev, nil
 	}
-
-	// Try to find local user from device database
-	dev, devErr := verifyAccessToken(req, data.DeviceDB)
-	if devErr == nil {
-		return dev, verifyUserParameters(req)
-	}
-
-	return nil, &util.JSONResponse{
-		Code: http.StatusUnauthorized,
-		JSON: jsonerror.UnknownToken("Unrecognized access token"), // nolint: misspell
-	}
-}
-
-// verifyUserParameters ensures that a request coming from a regular user is not
-// using any query parameters reserved for an application service
-func verifyUserParameters(req *http.Request) *util.JSONResponse {
-	if req.URL.Query().Get("ts") != "" {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("parameter 'ts' not allowed without valid parameter 'access_token'"),
-		}
-	}
-	return nil
-}
-
-// verifyAccessToken verifies that an access token was supplied in the given HTTP request
-// and returns the device it corresponds to. Returns resErr (an error response which can be
-// sent to the client) if the token is invalid or there was a problem querying the database.
-func verifyAccessToken(req *http.Request, deviceDB DeviceDatabase) (device *authtypes.Device, resErr *util.JSONResponse) {
-	token, err := ExtractAccessToken(req)
-	if err != nil {
-		resErr = &util.JSONResponse{
+	if res.Device == nil {
+		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.MissingToken(err.Error()),
-		}
-		return
-	}
-	device, err = deviceDB.GetDeviceByAccessToken(req.Context(), token)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			resErr = &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.UnknownToken("Unknown token"),
-			}
-		} else {
-			util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDeviceByAccessToken failed")
-			jsonErr := jsonerror.InternalServerError()
-			resErr = &jsonErr
+			JSON: jsonerror.UnknownToken("Unknown token"),
 		}
 	}
-	return
+	return res.Device, nil
 }
 
 // GenerateAccessToken creates a new access token. Returns an error if failed to generate

@@ -17,8 +17,8 @@ package directory
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -59,7 +59,7 @@ func GetVisibility(
 // SetVisibility implements PUT /directory/list/room/{roomID}
 // TODO: Allow admin users to edit the room visibility
 func SetVisibility(
-	req *http.Request, publicRoomsDatabase storage.Database, rsAPI api.RoomserverInternalAPI, dev *authtypes.Device,
+	req *http.Request, publicRoomsDatabase storage.Database, rsAPI api.RoomserverInternalAPI, dev *userapi.Device,
 	roomID string,
 ) util.JSONResponse {
 	queryMembershipReq := api.QueryMembershipForUserRequest{

@@ -140,6 +140,7 @@ listen:
     edu_server: "localhost:7778"
     key_server: "localhost:7779"
     server_key_api: "localhost:7780"
+    user_api: "localhost:7781"
 
 # The configuration for tracing the dendrite components.
 tracing:

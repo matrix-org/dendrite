@@ -24,8 +24,8 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/dendrite/userapi/api"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -135,7 +135,7 @@ type fledglingEvent struct {
 
 // CreateRoom implements /createRoom
 func CreateRoom(
-	req *http.Request, device *authtypes.Device,
+	req *http.Request, device *api.Device,
 	cfg *config.Dendrite,
 	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -149,7 +149,7 @@ func CreateRoom(
 // createRoom implements /createRoom
 // nolint: gocyclo
 func createRoom(
-	req *http.Request, device *authtypes.Device,
+	req *http.Request, device *api.Device,
 	cfg *config.Dendrite, roomID string,
 	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,

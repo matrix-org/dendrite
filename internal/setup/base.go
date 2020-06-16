@@ -46,6 +46,8 @@ import (
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	skinthttp "github.com/matrix-org/dendrite/serverkeyapi/inthttp"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -158,6 +160,15 @@ func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAP
 		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.httpClient)
 	}
 	return rsAPI
+}
+
+// UserAPIClient returns UserInternalAPI for hitting the userapi over HTTP.
+func (b *BaseDendrite) UserAPIClient() userapi.UserInternalAPI {
+	userAPI, err := userapiinthttp.NewUserAPIClient(b.Cfg.UserAPIURL(), b.httpClient)
+	if err != nil {
+		logrus.WithError(err).Panic("UserAPIClient failed", b.httpClient)
+	}
+	return userAPI
 }
 
 // EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP

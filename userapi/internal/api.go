@@ -19,8 +19,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -29,6 +32,8 @@ type UserInternalAPI struct {
 	AccountDB  accounts.Database
 	DeviceDB   devices.Database
 	ServerName gomatrixserverlib.ServerName
+	// AppServices is the list of all registered AS
+	AppServices []config.ApplicationService
 }
 
 func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfileRequest, res *api.QueryProfileResponse) error {
@@ -50,4 +55,67 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfil
 	res.AvatarURL = prof.AvatarURL
 	res.DisplayName = prof.DisplayName
 	return nil
+}
+
+func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAccessTokenRequest, res *api.QueryAccessTokenResponse) error {
+	if req.AppServiceUserID != "" {
+		appServiceDevice, err := a.queryAppServiceToken(ctx, req.AccessToken, req.AppServiceUserID)
+		res.Device = appServiceDevice
+		res.Err = err
+		return nil
+	}
+	device, err := a.DeviceDB.GetDeviceByAccessToken(ctx, req.AccessToken)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return err
+	}
+	res.Device = device
+	return nil
+}
+
+// Return the appservice 'device' or nil if the token is not an appservice. Returns an error if there was a problem
+// creating a 'device'.
+func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appServiceUserID string) (*api.Device, error) {
+	// Search for app service with given access_token
+	var appService *config.ApplicationService
+	for _, as := range a.AppServices {
+		if as.ASToken == token {
+			appService = &as
+			break
+		}
+	}
+	if appService == nil {
+		return nil, nil
+	}
+
+	// Create a dummy device for AS user
+	dev := api.Device{
+		// Use AS dummy device ID
+		ID: types.AppServiceDeviceID,
+		// AS dummy device has AS's token.
+		AccessToken: token,
+	}
+
+	localpart, err := userutil.ParseUsernameParam(appServiceUserID, &a.ServerName)
+	if err != nil {
+		return nil, err
+	}
+
+	if localpart != "" { // AS is masquerading as another user
+		// Verify that the user is registered
+		account, err := a.AccountDB.GetAccountByLocalpart(ctx, localpart)
+		// Verify that account exists & appServiceID matches
+		if err == nil && account.AppServiceID == appService.ID {
+			// Set the userID of dummy device
+			dev.UserID = appServiceUserID
+			return &dev, nil
+		}
+		return nil, &api.ErrorForbidden{Message: "appservice has not registered this user"}
+	}
+
+	// AS is not masquerading as any user, so use AS's sender_localpart
+	dev.UserID = appService.SenderLocalpart
+	return &dev, nil
 }

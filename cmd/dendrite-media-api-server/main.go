@@ -24,9 +24,9 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "MediaAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
 
-	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB)
+	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, userAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.MediaAPI), string(base.Cfg.Listen.MediaAPI))
 

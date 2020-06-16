@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/gomatrix"
@@ -92,7 +93,7 @@ func GetAvatarURL(
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 // nolint:gocyclo
 func SetAvatarURL(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -206,7 +207,7 @@ func GetDisplayName(
 // SetDisplayName implements PUT /profile/{userID}/displayname
 // nolint:gocyclo
 func SetDisplayName(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
