@@ -17,6 +17,9 @@ const (
 type ServerKeyCache interface {
 	// request -> timestamp is emulating gomatrixserverlib.FetchKeys:
 	// https://github.com/matrix-org/gomatrixserverlib/blob/f69539c86ea55d1e2cc76fd8e944e2d82d30397c/keyring.go#L95
+	// The timestamp should be the timestamp of the event that is being
+	// verified. We will not return keys from the cache that are not valid
+	// at this timestamp.
 	GetServerKey(request gomatrixserverlib.PublicKeyLookupRequest, timestamp gomatrixserverlib.Timestamp) (response gomatrixserverlib.PublicKeyLookupResult, ok bool)
 
 	// request -> result is emulating gomatrixserverlib.StoreKeys:
