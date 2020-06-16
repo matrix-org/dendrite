@@ -39,6 +39,8 @@ Internal only               |                               `-------------------
 - 12 (FedSender -> ServerKeyAPI): Verifying event signatures of responses (e.g from send_join)
 - 13 (Roomserver -> ServerKeyAPI): Verifying event signatures of backfilled events
 
+In addition to this, all public facing components (Tier 1) talk to the `UserAPI` to verify access tokens and extract profile information where needed.
+
 ## Kafka logs
 
 ```

@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/appservice/types"
@@ -24,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -34,6 +36,38 @@ type UserInternalAPI struct {
 	ServerName gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
+}
+
+func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
+	acc, err := a.AccountDB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID)
+	if err != nil {
+		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
+			switch req.OnConflict {
+			case api.ConflictUpdate:
+				break
+			case api.ConflictAbort:
+				return &api.ErrorConflict{
+					Message: err.Error(),
+				}
+			}
+		}
+		res.AccountCreated = false
+		res.UserID = fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName)
+		return nil
+	}
+	res.AccountCreated = true
+	res.UserID = acc.UserID
+	return nil
+}
+func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.PerformDeviceCreationRequest, res *api.PerformDeviceCreationResponse) error {
+	dev, err := a.DeviceDB.CreateDevice(ctx, req.Localpart, req.DeviceID, req.AccessToken, req.DeviceDisplayName)
+	if err != nil {
+		return err
+	}
+	res.DeviceCreated = true
+	res.AccessToken = dev.AccessToken
+	res.DeviceID = dev.ID
+	return nil
 }
 
 func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfileRequest, res *api.QueryProfileResponse) error {
@@ -70,6 +104,39 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 		return err
 	}
 	res.Devices = devs
+	return nil
+}
+
+func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAccountDataRequest, res *api.QueryAccountDataResponse) error {
+	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot query account data of remote users: got %s want %s", domain, a.ServerName)
+	}
+	if req.DataType != "" {
+		var event *gomatrixserverlib.ClientEvent
+		event, err = a.AccountDB.GetAccountDataByType(ctx, local, req.RoomID, req.DataType)
+		if err != nil {
+			return err
+		}
+		if event != nil {
+			if req.RoomID != "" {
+				res.RoomAccountData = make(map[string][]gomatrixserverlib.ClientEvent)
+				res.RoomAccountData[req.RoomID] = []gomatrixserverlib.ClientEvent{*event}
+			} else {
+				res.GlobalAccountData = append(res.GlobalAccountData, *event)
+			}
+		}
+		return nil
+	}
+	global, rooms, err := a.AccountDB.GetAccountData(ctx, local)
+	if err != nil {
+		return err
+	}
+	res.RoomAccountData = rooms
+	res.GlobalAccountData = global
 	return nil
 }
 

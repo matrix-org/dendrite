@@ -26,9 +26,13 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
+	PerformDeviceCreationPath  = "/userapi/performDeviceCreation"
+	PerformAccountCreationPath = "/userapi/performAccountCreation"
+
 	QueryProfilePath     = "/userapi/queryProfile"
 	QueryAccessTokenPath = "/userapi/queryAccessToken"
 	QueryDevicesPath     = "/userapi/queryDevices"
+	QueryAccountDataPath = "/userapi/queryAccountData"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -49,6 +53,30 @@ func NewUserAPIClient(
 type httpUserInternalAPI struct {
 	apiURL     string
 	httpClient *http.Client
+}
+
+func (h *httpUserInternalAPI) PerformAccountCreation(
+	ctx context.Context,
+	request *api.PerformAccountCreationRequest,
+	response *api.PerformAccountCreationResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAccountCreation")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformAccountCreationPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) PerformDeviceCreation(
+	ctx context.Context,
+	request *api.PerformDeviceCreationRequest,
+	response *api.PerformDeviceCreationResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformDeviceCreation")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformDeviceCreationPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpUserInternalAPI) QueryProfile(
@@ -80,5 +108,13 @@ func (h *httpUserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDe
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryDevicesPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAccountDataRequest, res *api.QueryAccountDataResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryAccountData")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryAccountDataPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

@@ -25,12 +25,11 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	userAPI := base.UserAPIClient()
-	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
 	rsAPI := base.RoomserverHTTPClient()
 
-	syncapi.AddPublicRoutes(base.PublicAPIMux, base.KafkaConsumer, userAPI, accountDB, rsAPI, federation, cfg)
+	syncapi.AddPublicRoutes(base.PublicAPIMux, base.KafkaConsumer, userAPI, rsAPI, federation, cfg)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
 

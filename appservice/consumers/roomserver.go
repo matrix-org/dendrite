@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -33,7 +32,6 @@ import (
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	roomServerConsumer *internal.ContinualConsumer
-	db                 accounts.Database
 	asDB               storage.Database
 	rsAPI              api.RoomserverInternalAPI
 	serverName         string
@@ -45,7 +43,6 @@ type OutputRoomEventConsumer struct {
 func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
-	store accounts.Database,
 	appserviceDB storage.Database,
 	rsAPI api.RoomserverInternalAPI,
 	workerStates []types.ApplicationServiceWorkerState,
@@ -53,11 +50,10 @@ func NewOutputRoomEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
-		PartitionStore: store,
+		PartitionStore: appserviceDB,
 	}
 	s := &OutputRoomEventConsumer{
 		roomServerConsumer: &consumer,
-		db:                 store,
 		asDB:               appserviceDB,
 		rsAPI:              rsAPI,
 		serverName:         string(cfg.Matrix.ServerName),

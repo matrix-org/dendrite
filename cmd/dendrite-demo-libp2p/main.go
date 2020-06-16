@@ -141,6 +141,7 @@ func main() {
 	accountDB := base.Base.CreateAccountsDB()
 	deviceDB := base.Base.CreateDeviceDB()
 	federation := createFederationClient(base)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
 		base.Base.Cfg, federation, base.Base.Caches,
@@ -154,9 +155,9 @@ func main() {
 		&base.Base, keyRing, federation,
 	)
 	eduInputAPI := eduserver.NewInternalAPI(
-		&base.Base, cache.New(), deviceDB,
+		&base.Base, cache.New(), userAPI,
 	)
-	asAPI := appservice.NewInternalAPI(&base.Base, accountDB, deviceDB, rsAPI)
+	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	fsAPI := federationsender.NewInternalAPI(
 		&base.Base, federation, rsAPI, keyRing,
 	)
@@ -165,7 +166,6 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	monolith := setup.Monolith{
 		Config:        base.Base.Cfg,
