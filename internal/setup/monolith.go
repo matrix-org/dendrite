@@ -87,6 +87,6 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 		m.ExtPublicRoomsProvider,
 	)
 	syncapi.AddPublicRoutes(
-		publicMux, m.KafkaConsumer, m.UserAPI, m.AccountDB, m.RoomserverAPI, m.FedClient, m.Config,
+		publicMux, m.KafkaConsumer, m.UserAPI, m.RoomserverAPI, m.FedClient, m.Config,
 	)
 }

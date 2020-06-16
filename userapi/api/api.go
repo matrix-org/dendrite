@@ -14,13 +14,18 @@
 
 package api
 
-import "context"
+import (
+	"context"
+
+	"github.com/matrix-org/gomatrixserverlib"
+)
 
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
+	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 }
 
 // QueryAccessTokenRequest is the request for QueryAccessToken
@@ -35,6 +40,22 @@ type QueryAccessTokenRequest struct {
 type QueryAccessTokenResponse struct {
 	Device *Device
 	Err    error // e.g ErrorForbidden
+}
+
+// QueryAccountDataRequest is the request for QueryAccountData
+type QueryAccountDataRequest struct {
+	UserID string // required: the user to get account data for.
+	// TODO: This is a terribly confusing API shape :/
+	DataType string // optional: if specified returns only a single event matching this data type.
+	// optional: Only used if DataType is set. If blank returns global account data matching the data type.
+	// If set, returns only room account data matching this data type.
+	RoomID string
+}
+
+// QueryAccountDataResponse is the response for QueryAccountData
+type QueryAccountDataResponse struct {
+	GlobalAccountData []gomatrixserverlib.ClientEvent
+	RoomAccountData   map[string][]gomatrixserverlib.ClientEvent
 }
 
 // QueryDevicesRequest is the request for QueryDevices

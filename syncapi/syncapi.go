@@ -21,7 +21,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -39,7 +38,6 @@ func AddPublicRoutes(
 	router *mux.Router,
 	consumer sarama.Consumer,
 	userAPI userapi.UserInternalAPI,
-	accountsDB accounts.Database,
 	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
@@ -60,7 +58,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, accountsDB)
+	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI)
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		cfg, consumer, notifier, syncDB, rsAPI,
