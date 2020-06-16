@@ -25,10 +25,10 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "MediaAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
 	client := gomatrixserverlib.NewClient()
 
-	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB, client)
+	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, userAPI, client)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.MediaAPI), string(base.Cfg.Listen.MediaAPI))
 
