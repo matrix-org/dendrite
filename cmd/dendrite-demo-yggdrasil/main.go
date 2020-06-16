@@ -130,16 +130,18 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
+
 	rsComponent := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
 	rsAPI := rsComponent
 
 	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), deviceDB,
+		base, cache.New(), userAPI,
 	)
 
-	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, keyRing,
@@ -153,7 +155,6 @@ func main() {
 	}
 
 	embed.Embed(*instancePort, "Yggdrasil Demo")
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,

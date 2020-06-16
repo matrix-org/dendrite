@@ -194,6 +194,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := createFederationClient(cfg, node)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	fetcher := &libp2pKeyFetcher{}
 	keyRing := gomatrixserverlib.KeyRing{
@@ -204,9 +205,9 @@ func main() {
 	}
 
 	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
-	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
+	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
-		base, accountDB, deviceDB, rsAPI,
+		base, userAPI, rsAPI,
 	)
 	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, &keyRing)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
@@ -216,8 +217,6 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,

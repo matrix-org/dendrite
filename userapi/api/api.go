@@ -22,6 +22,8 @@ import (
 
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
+	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
+	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
@@ -85,6 +87,38 @@ type QueryProfileResponse struct {
 	AvatarURL string
 }
 
+// PerformAccountCreationRequest is the request for PerformAccountCreation
+type PerformAccountCreationRequest struct {
+	Localpart    string
+	AppServiceID string
+	Password     string
+	OnConflict   Conflict
+}
+
+// PerformAccountCreationResponse is the response for PerformAccountCreation
+type PerformAccountCreationResponse struct {
+	AccountCreated bool
+	UserID         string
+}
+
+// PerformDeviceCreationRequest is the request for PerformDeviceCreation
+type PerformDeviceCreationRequest struct {
+	Localpart   string
+	AccessToken string // optional: if blank one will be made on your behalf
+	// optional: if nil an ID is generated for you. If set, replaces any existing device session,
+	// which will generate a new access token and invalidate the old one.
+	DeviceID *string
+	// optional: if nil no display name will be associated with this device.
+	DeviceDisplayName *string
+}
+
+// PerformDeviceCreationResponse is the response for PerformDeviceCreation
+type PerformDeviceCreationResponse struct {
+	DeviceCreated bool
+	AccessToken   string
+	DeviceID      string
+}
+
 // Device represents a client's device (mobile, web, etc)
 type Device struct {
 	ID     string
@@ -108,3 +142,22 @@ type ErrorForbidden struct {
 func (e *ErrorForbidden) Error() string {
 	return "Forbidden: " + e.Message
 }
+
+// ErrorConflict is an error indicating that there was a conflict which resulted in the request being aborted.
+type ErrorConflict struct {
+	Message string
+}
+
+func (e *ErrorConflict) Error() string {
+	return "Conflict: " + e.Message
+}
+
+// Conflict is an enum representing what to do when encountering conflicting when creating profiles/devices
+type Conflict int
+
+const (
+	// ConflictUpdate will update matching records returning no error
+	ConflictUpdate Conflict = 1
+	// ConflictAbort will reject the request with ErrorConflict
+	ConflictAbort Conflict = 2
+)
