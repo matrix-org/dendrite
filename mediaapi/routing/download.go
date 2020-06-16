@@ -309,7 +309,7 @@ func (r *downloadRequest) respondFromLocalFile(
 			}
 			w.Header().Set("Content-Disposition", fmt.Sprintf(
 				`inline; filename=utf-8"%s"`,
-				strconv.Quote(uploadName),
+				strings.ReplaceAll(uploadName, `"`, `\"`), // escape quote marks only, as per RFC6266
 			))
 		}
 	}
