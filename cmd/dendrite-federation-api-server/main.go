@@ -24,18 +24,16 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "FederationAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
 	federation := base.CreateFederationClient()
 	serverKeyAPI := base.ServerKeyAPIClient()
 	keyRing := serverKeyAPI.KeyRing()
 	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
-	asAPI := base.AppserviceHTTPClient()
 
 	federationapi.AddPublicRoutes(
-		base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, keyRing,
-		rsAPI, asAPI, fsAPI, base.EDUServerClient(),
+		base.PublicAPIMux, base.Cfg, userAPI, federation, keyRing,
+		rsAPI, fsAPI, base.EDUServerClient(),
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

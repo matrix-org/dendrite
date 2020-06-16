@@ -18,11 +18,10 @@ import (
 	"fmt"
 	"net/http"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -30,9 +29,8 @@ import (
 // GetProfile implements GET /_matrix/federation/v1/query/profile
 func GetProfile(
 	httpReq *http.Request,
-	accountDB accounts.Database,
+	userAPI userapi.UserInternalAPI,
 	cfg *config.Dendrite,
-	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	userID, field := httpReq.FormValue("user_id"), httpReq.FormValue("field")
 
@@ -60,9 +58,12 @@ func GetProfile(
 		}
 	}
 
-	profile, err := appserviceAPI.RetrieveUserProfile(httpReq.Context(), userID, asAPI, accountDB)
+	var profileRes userapi.QueryProfileResponse
+	err = userAPI.QueryProfile(httpReq.Context(), &userapi.QueryProfileRequest{
+		UserID: userID,
+	}, &profileRes)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("userAPI.QueryProfile failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -73,11 +74,11 @@ func GetProfile(
 		switch field {
 		case "displayname":
 			res = eventutil.DisplayName{
-				DisplayName: profile.DisplayName,
+				DisplayName: profileRes.DisplayName,
 			}
 		case "avatar_url":
 			res = eventutil.AvatarURL{
-				AvatarURL: profile.AvatarURL,
+				AvatarURL: profileRes.AvatarURL,
 			}
 		default:
 			code = http.StatusBadRequest
@@ -85,8 +86,8 @@ func GetProfile(
 		}
 	} else {
 		res = eventutil.ProfileResponse{
-			AvatarURL:   profile.AvatarURL,
-			DisplayName: profile.DisplayName,
+			AvatarURL:   profileRes.AvatarURL,
+			DisplayName: profileRes.DisplayName,
 		}
 	}
 

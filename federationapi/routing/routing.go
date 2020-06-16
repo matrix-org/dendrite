@@ -18,14 +18,12 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -48,13 +46,11 @@ func Setup(
 	publicAPIMux *mux.Router,
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
-	accountDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 ) {
 	v2keysmux := publicAPIMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := publicAPIMux.PathPrefix(pathPrefixV1Federation).Subrouter()
@@ -98,7 +94,7 @@ func Setup(
 
 	v1fedmux.Handle("/3pid/onbind", httputil.MakeExternalAPI("3pid_onbind",
 		func(req *http.Request) util.JSONResponse {
-			return CreateInvitesFrom3PIDInvites(req, rsAPI, asAPI, cfg, federation, accountDB)
+			return CreateInvitesFrom3PIDInvites(req, rsAPI, cfg, federation, userAPI)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 
@@ -160,7 +156,7 @@ func Setup(
 		"federation_query_profile", cfg.Matrix.ServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return GetProfile(
-				httpReq, accountDB, cfg, asAPI,
+				httpReq, userAPI, cfg,
 			)
 		},
 	)).Methods(http.MethodGet)
@@ -169,7 +165,7 @@ func Setup(
 		"federation_user_devices", cfg.Matrix.ServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return GetUserDevices(
-				httpReq, deviceDB, vars["userID"],
+				httpReq, userAPI, vars["userID"],
 			)
 		},
 	)).Methods(http.MethodGet)
