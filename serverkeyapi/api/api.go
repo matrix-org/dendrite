@@ -22,12 +22,6 @@ type ServerKeyInternalAPI interface {
 		request *QueryPublicKeysRequest,
 		response *QueryPublicKeysResponse,
 	) error
-
-	QueryLocalKeys(
-		ctx context.Context,
-		request *QueryLocalKeysRequest,
-		response *QueryLocalKeysResponse,
-	) error
 }
 
 type QueryPublicKeysRequest struct {
@@ -43,11 +37,4 @@ type InputPublicKeysRequest struct {
 }
 
 type InputPublicKeysResponse struct {
-}
-
-type QueryLocalKeysRequest struct {
-}
-
-type QueryLocalKeysResponse struct {
-	ServerKeys gomatrixserverlib.ServerKeys `json:"server_keys"`
 }

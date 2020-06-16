@@ -8,12 +8,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
+func NewInMemoryLRUCache() (*Caches, error) {
 	roomVersions, err := NewInMemoryLRUCachePartition(
 		RoomVersionCacheName,
 		RoomVersionCacheMutable,
 		RoomVersionCacheMaxEntries,
-		enablePrometheus,
 	)
 	if err != nil {
 		return nil, err
@@ -22,7 +21,6 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		ServerKeyCacheName,
 		ServerKeyCacheMutable,
 		ServerKeyCacheMaxEntries,
-		enablePrometheus,
 	)
 	if err != nil {
 		return nil, err
@@ -40,7 +38,7 @@ type InMemoryLRUCachePartition struct {
 	lru        *lru.Cache
 }
 
-func NewInMemoryLRUCachePartition(name string, mutable bool, maxEntries int, enablePrometheus bool) (*InMemoryLRUCachePartition, error) {
+func NewInMemoryLRUCachePartition(name string, mutable bool, maxEntries int) (*InMemoryLRUCachePartition, error) {
 	var err error
 	cache := InMemoryLRUCachePartition{
 		name:       name,
@@ -51,15 +49,13 @@ func NewInMemoryLRUCachePartition(name string, mutable bool, maxEntries int, ena
 	if err != nil {
 		return nil, err
 	}
-	if enablePrometheus {
-		promauto.NewGaugeFunc(prometheus.GaugeOpts{
-			Namespace: "dendrite",
-			Subsystem: "caching_in_memory_lru",
-			Name:      name,
-		}, func() float64 {
-			return float64(cache.lru.Len())
-		})
-	}
+	promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "caching_in_memory_lru",
+		Name:      name,
+	}, func() float64 {
+		return float64(cache.lru.Len())
+	})
 	return &cache, nil
 }
 

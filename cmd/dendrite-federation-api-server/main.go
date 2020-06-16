@@ -27,14 +27,15 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
+	serverKeyAPI := base.ServerKeyAPIClient()
+	keyRing := serverKeyAPI.KeyRing()
 	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
 	asAPI := base.AppserviceHTTPClient()
-	skAPI := base.ServerKeyAPIClient()
 
 	federationapi.AddPublicRoutes(
-		base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation,
-		skAPI, rsAPI, asAPI, fsAPI, base.EDUServerClient(),
+		base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, keyRing,
+		rsAPI, asAPI, fsAPI, base.EDUServerClient(),
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

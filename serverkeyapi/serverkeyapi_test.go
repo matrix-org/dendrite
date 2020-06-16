@@ -21,7 +21,6 @@ import (
 
 type server struct {
 	name      gomatrixserverlib.ServerName
-	validity  time.Duration
 	config    *config.Dendrite
 	fedclient *gomatrixserverlib.FederationClient
 	cache     *caching.Caches
@@ -70,10 +69,9 @@ func TestMain(m *testing.M) {
 		// API to work.
 		s.config = &config.Dendrite{}
 		s.config.SetDefaults()
-		s.config.Matrix.KeyValidityPeriod = s.validity
 		s.config.Matrix.ServerName = gomatrixserverlib.ServerName(s.name)
 		s.config.Matrix.PrivateKey = testPriv
-		s.config.Matrix.KeyID = serverKeyID
+		s.config.Matrix.KeyID = "ed25519:test"
 		s.config.Database.ServerKey = config.DataSource("file::memory:")
 
 		// Create a transport which redirects federation requests to
@@ -84,7 +82,7 @@ func TestMain(m *testing.M) {
 
 		// Create the federation client.
 		s.fedclient = gomatrixserverlib.NewFederationClientWithTransport(
-			s.config.Matrix.ServerName, serverKeyID, testPriv, transport,
+			s.config.Matrix.ServerName, "ed25519:test", testPriv, transport,
 		)
 
 		// Finally, build the server key APIs.
@@ -316,4 +314,5 @@ func TestRenewalBehaviour(t *testing.T) {
 	if oldcached.ValidUntilTS >= newcached.ValidUntilTS {
 		t.Fatalf("the server B key should have been renewed but wasn't")
 	}
+	t.Log(res)
 }

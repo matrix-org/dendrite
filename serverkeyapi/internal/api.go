@@ -3,11 +3,9 @@ package internal
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -16,36 +14,13 @@ import (
 type ServerKeyAPI struct {
 	api.ServerKeyInternalAPI
 
-	Cfg        *config.Dendrite
+	ServerName        gomatrixserverlib.ServerName
+	ServerPublicKey   ed25519.PublicKey
+	ServerKeyID       gomatrixserverlib.KeyID
+	ServerKeyValidity time.Duration
+
 	OurKeyRing gomatrixserverlib.KeyRing
 	FedClient  *gomatrixserverlib.FederationClient
-}
-
-func (s *ServerKeyAPI) QueryLocalKeys(ctx context.Context, request *api.QueryLocalKeysRequest, response *api.QueryLocalKeysResponse) error {
-	publicKey := s.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
-
-	response.ServerKeys.ServerName = s.Cfg.Matrix.ServerName
-	response.ServerKeys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
-		s.Cfg.Matrix.KeyID: {
-			Key: gomatrixserverlib.Base64Bytes(publicKey),
-		},
-	}
-	response.ServerKeys.TLSFingerprints = s.Cfg.Matrix.TLSFingerPrints
-	// TODO: Handle old expired keys. We should probably have a configuration section
-	// for these, as it's really counter-intuitive for people to have to rake through
-	// the database to find their own past keys.
-	response.ServerKeys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
-	response.ServerKeys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(s.Cfg.Matrix.KeyValidityPeriod))
-
-	toSign, err := json.Marshal(response.ServerKeys.ServerKeyFields)
-	if err != nil {
-		return err
-	}
-
-	response.ServerKeys.Raw, err = gomatrixserverlib.SignJSON(
-		string(s.Cfg.Matrix.ServerName), s.Cfg.Matrix.KeyID, s.Cfg.Matrix.PrivateKey, toSign,
-	)
-	return err
 }
 
 func (s *ServerKeyAPI) KeyRing() *gomatrixserverlib.KeyRing {
@@ -146,35 +121,19 @@ func (s *ServerKeyAPI) handleLocalKeys(
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
 	for req := range requests {
-		if req.ServerName == s.Cfg.Matrix.ServerName {
+		if req.ServerName == s.ServerName {
 			// We found a key request that is supposed to be for our own
 			// keys. Remove it from the request list so we don't hit the
 			// database or the fetchers for it.
 			delete(requests, req)
 
-			// Look up our own keys.
-			request := &api.QueryLocalKeysRequest{}
-			response := &api.QueryLocalKeysResponse{}
-			if err := s.QueryLocalKeys(ctx, request, response); err != nil {
-				return err
-			}
-
-			// Depending on whether the key is expired or not, we'll need
-			// to write slightly different
-			if verifyKeys, ok := response.ServerKeys.VerifyKeys[req.KeyID]; ok {
-				// The key is current.
-				results[req] = gomatrixserverlib.PublicKeyLookupResult{
-					VerifyKey:    verifyKeys,
-					ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-					ValidUntilTS: response.ServerKeys.ValidUntilTS,
-				}
-			} else if verifyKeys, ok := response.ServerKeys.OldVerifyKeys[req.KeyID]; ok {
-				// The key is expired.
-				results[req] = gomatrixserverlib.PublicKeyLookupResult{
-					VerifyKey:    verifyKeys.VerifyKey,
-					ExpiredTS:    verifyKeys.ExpiredTS,
-					ValidUntilTS: gomatrixserverlib.PublicKeyNotValid,
-				}
+			// Insert our own key into the response.
+			results[req] = gomatrixserverlib.PublicKeyLookupResult{
+				VerifyKey: gomatrixserverlib.VerifyKey{
+					Key: gomatrixserverlib.Base64Bytes(s.ServerPublicKey),
+				},
+				ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
+				ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(s.ServerKeyValidity)),
 			}
 		}
 	}
@@ -247,14 +206,14 @@ func (s *ServerKeyAPI) handleFetcherKeys(
 			if res.ValidUntilTS > prev.ValidUntilTS {
 				// This key is newer than the one we had so let's store
 				// it in the database.
-				if req.ServerName != s.Cfg.Matrix.ServerName {
+				if req.ServerName != s.ServerName {
 					storeResults[req] = res
 				}
 			}
 		} else {
 			// We didn't already have a previous entry for this request
 			// so store it in the database anyway for now.
-			if req.ServerName != s.Cfg.Matrix.ServerName {
+			if req.ServerName != s.ServerName {
 				storeResults[req] = res
 			}
 		}

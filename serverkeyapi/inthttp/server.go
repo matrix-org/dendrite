@@ -12,19 +12,6 @@ import (
 )
 
 func AddRoutes(s api.ServerKeyInternalAPI, internalAPIMux *mux.Router, cache caching.ServerKeyCache) {
-	internalAPIMux.Handle(ServerKeyQueryLocalKeysPath,
-		httputil.MakeInternalAPI("queryLocalKeys", func(req *http.Request) util.JSONResponse {
-			request := api.QueryLocalKeysRequest{}
-			response := api.QueryLocalKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryLocalKeys(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 	internalAPIMux.Handle(ServerKeyQueryPublicKeyPath,
 		httputil.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryPublicKeysRequest{}
