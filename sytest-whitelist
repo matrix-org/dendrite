@@ -128,7 +128,7 @@ Outbound federation can send events
 # test for now.
 #Backfill checks the events requested belong to the room
 Can upload without a file name
-Can download without a file name locally
+#Can download without a file name locally
 Can upload with ASCII file name
 Can send image in room message
 AS cannot create users outside its own namespace
