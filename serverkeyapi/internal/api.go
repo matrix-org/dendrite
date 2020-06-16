@@ -61,9 +61,7 @@ func (s *ServerKeyAPI) FetchKeys(
 
 	// First, check if any of these key checks are for our own keys. If
 	// they are then we will satisfy them directly.
-	if err := s.handleLocalKeys(ctx, requests, results); err != nil {
-		return nil, err
-	}
+	s.handleLocalKeys(ctx, requests, results)
 
 	// Then consult our local database and see if we have the requested
 	// keys. These might come from a cache, depending on the database
@@ -116,10 +114,10 @@ func (s *ServerKeyAPI) FetcherName() string {
 // handleLocalKeys handles cases where the key request contains
 // a request for our own server keys.
 func (s *ServerKeyAPI) handleLocalKeys(
-	ctx context.Context,
+	_ context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
-) error {
+) {
 	for req := range requests {
 		if req.ServerName == s.ServerName {
 			// We found a key request that is supposed to be for our own
@@ -137,8 +135,6 @@ func (s *ServerKeyAPI) handleLocalKeys(
 			}
 		}
 	}
-
-	return nil
 }
 
 // handleDatabaseKeys handles cases where the key requests can be
