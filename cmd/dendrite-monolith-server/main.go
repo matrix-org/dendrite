@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
 )
@@ -123,6 +124,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        gomatrixserverlib.NewClient(),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,

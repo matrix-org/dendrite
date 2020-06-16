@@ -28,6 +28,7 @@ import (
 func AddPublicRoutes(
 	router *mux.Router, cfg *config.Dendrite,
 	deviceDB devices.Database,
+	client *gomatrixserverlib.Client,
 ) {
 	mediaDB, err := storage.Open(string(cfg.Database.MediaAPI), cfg.DbProperties())
 	if err != nil {
@@ -35,6 +36,6 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		router, cfg, mediaDB, deviceDB, gomatrixserverlib.NewClient(),
+		router, cfg, mediaDB, deviceDB, client,
 	)
 }

@@ -34,6 +34,7 @@ import (
 )
 
 const pathPrefixR0 = "/media/r0"
+const pathPrefixV1 = "/media/v1" // TODO: remove when synapse is fixed
 
 // Setup registers the media API HTTP handlers
 //
@@ -48,6 +49,7 @@ func Setup(
 	client *gomatrixserverlib.Client,
 ) {
 	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
+	v1mux := publicAPIMux.PathPrefix(pathPrefixV1).Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
@@ -69,9 +71,11 @@ func Setup(
 	activeRemoteRequests := &types.ActiveRemoteRequests{
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
-	r0mux.Handle("/download/{serverName}/{mediaId}",
-		makeDownloadAPI("download", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
-	).Methods(http.MethodGet, http.MethodOptions)
+
+	downloadHandler := makeDownloadAPI("download", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration)
+	r0mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
+	v1mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions) // TODO: remove when synapse is fixed
+
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
 	).Methods(http.MethodGet, http.MethodOptions)
