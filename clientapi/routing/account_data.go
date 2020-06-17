@@ -51,7 +51,7 @@ func GetAccountData(
 	); err == nil {
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: data,
+			JSON: data.Content,
 		}
 	}
 

@@ -115,6 +115,8 @@ User can invite local user to room with version 1
 Should reject keys claiming to belong to a different user
 Can add account data
 Can add account data to room
+Can get account data without syncing
+Can get room account data without syncing
 #Latest account data appears in v2 /sync
 New account data appears in incremental v2 /sync
 Checking local federation server
