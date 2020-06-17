@@ -203,12 +203,20 @@ func Setup(
 			res := SendJoin(
 				httpReq, request, cfg, rsAPI, keys, roomID, eventID,
 			)
+			// not all responses get wrapped in [code, body]
+			var body interface{}
+			body = []interface{}{
+				res.Code, res.JSON,
+			}
+			jerr, ok := res.JSON.(JoinError)
+			if ok {
+				body = jerr.Error
+			}
+
 			return util.JSONResponse{
 				Headers: res.Headers,
 				Code:    res.Code,
-				JSON: []interface{}{
-					res.Code, res.JSON,
-				},
+				JSON:    body,
 			}
 		},
 	)).Methods(http.MethodPut)

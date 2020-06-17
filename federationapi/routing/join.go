@@ -28,6 +28,10 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type JoinError struct {
+	Error interface{}
+}
+
 // MakeJoin implements the /make_join API
 func MakeJoin(
 	httpReq *http.Request,
@@ -224,7 +228,9 @@ func SendJoin(
 	if verifyResults[0].Error != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Signature check failed: " + verifyResults[0].Error.Error()),
+			JSON: JoinError{
+				Error: jsonerror.Forbidden("Signature check failed: " + verifyResults[0].Error.Error()),
+			},
 		}
 	}
 
