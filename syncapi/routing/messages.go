@@ -247,6 +247,12 @@ func (r *messagesReq) retrieveEvents() (
 	// change the way topological positions are defined (as depth isn't the most
 	// reliable way to define it), it would be easier and less troublesome to
 	// only have to change it in one place, i.e. the database.
+	start, end, err = r.getStartEnd(events)
+
+	return clientEvents, start, end, err
+}
+
+func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	start, err = r.db.EventPositionInTopology(
 		r.ctx, events[0].EventID(),
 	)
@@ -275,8 +281,7 @@ func (r *messagesReq) retrieveEvents() (
 			end.Decrement()
 		}
 	}
-
-	return clientEvents, start, end, err
+	return
 }
 
 // handleEmptyEventsSlice handles the case where the initial request to the

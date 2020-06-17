@@ -82,6 +82,7 @@ func Login(
 	} else if req.Method == http.MethodPost {
 		var r passwordRequest
 		var acc *api.Account
+		var errJSON *util.JSONResponse
 		resErr := httputil.UnmarshalJSONRequest(req, &r)
 		if resErr != nil {
 			return *resErr
@@ -94,47 +95,16 @@ func Login(
 					JSON: jsonerror.BadJSON("'user' must be supplied."),
 				}
 			}
-
-			util.GetLogger(req.Context()).WithField("user", r.Identifier.User).Info("Processing login request")
-
-			localpart, err := userutil.ParseUsernameParam(r.Identifier.User, &cfg.Matrix.ServerName)
-			if err != nil {
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.InvalidUsername(err.Error()),
-				}
-			}
-
-			acc, err = accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
-			if err != nil {
-				// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
-				// but that would leak the existence of the user.
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
-				}
+			acc, errJSON = r.processUsernamePasswordLoginRequest(req, accountDB, cfg, r.Identifier.User)
+			if errJSON != nil {
+				return *errJSON
 			}
 		default:
 			// TODO: The below behaviour is deprecated but without it Riot iOS won't log in
 			if r.User != "" {
-				util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
-
-				localpart, err := userutil.ParseUsernameParam(r.User, &cfg.Matrix.ServerName)
-				if err != nil {
-					return util.JSONResponse{
-						Code: http.StatusBadRequest,
-						JSON: jsonerror.InvalidUsername(err.Error()),
-					}
-				}
-
-				acc, err = accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
-				if err != nil {
-					// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
-					// but that would leak the existence of the user.
-					return util.JSONResponse{
-						Code: http.StatusForbidden,
-						JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
-					}
+				acc, errJSON = r.processUsernamePasswordLoginRequest(req, accountDB, cfg, r.User)
+				if errJSON != nil {
+					return *errJSON
 				}
 			} else {
 				return util.JSONResponse{
@@ -185,5 +155,34 @@ func getDevice(
 	dev, err = deviceDB.CreateDevice(
 		ctx, acc.Localpart, r.DeviceID, token, r.InitialDisplayName,
 	)
+	return
+}
+
+func (r *passwordRequest) processUsernamePasswordLoginRequest(
+	req *http.Request, accountDB accounts.Database,
+	cfg *config.Dendrite, username string,
+) (acc *api.Account, errJSON *util.JSONResponse) {
+	util.GetLogger(req.Context()).WithField("user", username).Info("Processing login request")
+
+	localpart, err := userutil.ParseUsernameParam(username, &cfg.Matrix.ServerName)
+	if err != nil {
+		errJSON = &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername(err.Error()),
+		}
+		return
+	}
+
+	acc, err = accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
+	if err != nil {
+		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+		// but that would leak the existence of the user.
+		errJSON = &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+		}
+		return
+	}
+
 	return
 }
