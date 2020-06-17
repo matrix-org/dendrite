@@ -47,6 +47,7 @@ type loginIdentifier struct {
 
 type passwordRequest struct {
 	Identifier loginIdentifier `json:"identifier"`
+	User       string          `json:"user"` // deprecated in favour of identifier
 	Password   string          `json:"password"`
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
@@ -114,9 +115,32 @@ func Login(
 				}
 			}
 		default:
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("login identifier '" + r.Identifier.Type + "' not supported"),
+			// TODO: The below behaviour is deprecated but without it Riot iOS won't log in
+			if r.User != "" {
+				util.GetLogger(req.Context()).WithField("user", r.User).Info("Processing login request")
+
+				localpart, err := userutil.ParseUsernameParam(r.User, &cfg.Matrix.ServerName)
+				if err != nil {
+					return util.JSONResponse{
+						Code: http.StatusBadRequest,
+						JSON: jsonerror.InvalidUsername(err.Error()),
+					}
+				}
+
+				acc, err = accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
+				if err != nil {
+					// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+					// but that would leak the existence of the user.
+					return util.JSONResponse{
+						Code: http.StatusForbidden,
+						JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+					}
+				}
+			} else {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.BadJSON("login identifier '" + r.Identifier.Type + "' not supported"),
+				}
 			}
 		}
 
