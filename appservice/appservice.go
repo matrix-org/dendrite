@@ -110,6 +110,7 @@ func generateAppServiceAccount(
 ) error {
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(context.Background(), &userapi.PerformAccountCreationRequest{
+		AccountType:  userapi.AccountTypeUser,
 		Localpart:    as.SenderLocalpart,
 		AppServiceID: as.ID,
 		OnConflict:   userapi.ConflictUpdate,

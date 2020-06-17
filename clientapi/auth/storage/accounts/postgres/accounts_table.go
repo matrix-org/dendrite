@@ -19,8 +19,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	log "github.com/sirupsen/logrus"
@@ -92,7 +92,7 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // on success.
 func (s *accountsStatements) insertAccount(
 	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string,
-) (*authtypes.Account, error) {
+) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := txn.Stmt(s.insertAccountStmt)
 
@@ -106,7 +106,7 @@ func (s *accountsStatements) insertAccount(
 		return nil, err
 	}
 
-	return &authtypes.Account{
+	return &api.Account{
 		Localpart:    localpart,
 		UserID:       userutil.MakeUserID(localpart, s.serverName),
 		ServerName:   s.serverName,
@@ -123,9 +123,9 @@ func (s *accountsStatements) selectPasswordHash(
 
 func (s *accountsStatements) selectAccountByLocalpart(
 	ctx context.Context, localpart string,
-) (*authtypes.Account, error) {
+) (*api.Account, error) {
 	var appserviceIDPtr sql.NullString
-	var acc authtypes.Account
+	var acc api.Account
 
 	stmt := s.selectAccountByLocalpartStmt
 	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &appserviceIDPtr)

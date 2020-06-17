@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	// Import the sqlite3 database driver.
@@ -89,7 +90,7 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
 func (d *Database) GetAccountByPassword(
 	ctx context.Context, localpart, plaintextPassword string,
-) (*authtypes.Account, error) {
+) (*api.Account, error) {
 	hash, err := d.accounts.selectPasswordHash(ctx, localpart)
 	if err != nil {
 		return nil, err
@@ -126,7 +127,7 @@ func (d *Database) SetDisplayName(
 
 // CreateGuestAccount makes a new guest account and creates an empty profile
 // for this account.
-func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Account, err error) {
+func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, err error) {
 	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		// We need to lock so we sequentially create numeric localparts. If we don't, two calls to
 		// this function will cause the same number to be selected and one will fail with 'database is locked'
@@ -152,7 +153,7 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *authtypes.Accou
 // account already exists, it will return nil, ErrUserExists.
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
-) (acc *authtypes.Account, err error) {
+) (acc *api.Account, err error) {
 	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
 		return err
@@ -162,7 +163,7 @@ func (d *Database) CreateAccount(
 
 func (d *Database) createAccount(
 	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
-) (*authtypes.Account, error) {
+) (*api.Account, error) {
 	var err error
 	// Generate a password hash if this is not a password-less user
 	hash := ""
@@ -438,6 +439,6 @@ func (d *Database) CheckAccountAvailability(ctx context.Context, localpart strin
 // This function assumes the request is authenticated or the account data is used only internally.
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
 func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string,
-) (*authtypes.Account, error) {
+) (*api.Account, error) {
 	return d.accounts.selectAccountByLocalpart(ctx, localpart)
 }

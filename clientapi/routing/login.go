@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -81,7 +80,7 @@ func Login(
 		}
 	} else if req.Method == http.MethodPost {
 		var r passwordRequest
-		var acc *authtypes.Account
+		var acc *api.Account
 		resErr := httputil.UnmarshalJSONRequest(req, &r)
 		if resErr != nil {
 			return *resErr
@@ -156,7 +155,7 @@ func getDevice(
 	ctx context.Context,
 	r passwordRequest,
 	deviceDB devices.Database,
-	acc *authtypes.Account,
+	acc *api.Account,
 	token string,
 ) (dev *api.Device, err error) {
 	dev, err = deviceDB.CreateDevice(

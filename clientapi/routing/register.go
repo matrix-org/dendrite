@@ -34,15 +34,14 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
@@ -441,8 +440,8 @@ func validateApplicationService(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
+	userAPI userapi.UserInternalAPI,
 	accountDB accounts.Database,
-	deviceDB devices.Database,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var r registerRequest
@@ -451,7 +450,7 @@ func Register(
 		return *resErr
 	}
 	if req.URL.Query().Get("kind") == "guest" {
-		return handleGuestRegistration(req, r, cfg, accountDB, deviceDB)
+		return handleGuestRegistration(req, r, cfg, userAPI)
 	}
 
 	// Retrieve or generate the sessionID
@@ -507,17 +506,19 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, accountDB, deviceDB)
+	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI)
 }
 
 func handleGuestRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.Dendrite,
-	accountDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
-	acc, err := accountDB.CreateGuestAccount(req.Context())
+	var res userapi.PerformAccountCreationResponse
+	err := userAPI.PerformAccountCreation(req.Context(), &userapi.PerformAccountCreationRequest{
+		AccountType: userapi.AccountTypeGuest,
+	}, &res)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -526,8 +527,8 @@ func handleGuestRegistration(
 	}
 	token, err := tokens.GenerateLoginToken(tokens.TokenOptions{
 		ServerPrivateKey: cfg.Matrix.PrivateKey.Seed(),
-		ServerName:       string(acc.ServerName),
-		UserID:           acc.UserID,
+		ServerName:       string(res.Account.ServerName),
+		UserID:           res.Account.UserID,
 	})
 
 	if err != nil {
@@ -537,7 +538,12 @@ func handleGuestRegistration(
 		}
 	}
 	//we don't allow guests to specify their own device_id
-	dev, err := deviceDB.CreateDevice(req.Context(), acc.Localpart, nil, token, r.InitialDisplayName)
+	var devRes userapi.PerformDeviceCreationResponse
+	err = userAPI.PerformDeviceCreation(req.Context(), &userapi.PerformDeviceCreationRequest{
+		Localpart:         res.Account.Localpart,
+		DeviceDisplayName: r.InitialDisplayName,
+		AccessToken:       token,
+	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -547,10 +553,10 @@ func handleGuestRegistration(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: registerResponse{
-			UserID:      dev.UserID,
-			AccessToken: dev.AccessToken,
-			HomeServer:  acc.ServerName,
-			DeviceID:    dev.ID,
+			UserID:      devRes.Device.UserID,
+			AccessToken: devRes.Device.AccessToken,
+			HomeServer:  res.Account.ServerName,
+			DeviceID:    devRes.Device.ID,
 		},
 	}
 }
@@ -563,8 +569,7 @@ func handleRegistrationFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
@@ -615,7 +620,7 @@ func handleRegistrationFlow(
 		// by whether the request contains an access token.
 		if err == nil {
 			return handleApplicationServiceRegistration(
-				accessToken, err, req, r, cfg, accountDB, deviceDB,
+				accessToken, err, req, r, cfg, userAPI,
 			)
 		}
 
@@ -626,7 +631,7 @@ func handleRegistrationFlow(
 		// don't need a condition on that call since the registration is clearly
 		// stated as being AS-related.
 		return handleApplicationServiceRegistration(
-			accessToken, err, req, r, cfg, accountDB, deviceDB,
+			accessToken, err, req, r, cfg, userAPI,
 		)
 
 	case authtypes.LoginTypeDummy:
@@ -645,7 +650,7 @@ func handleRegistrationFlow(
 	// A response with current registration flow and remaining available methods
 	// will be returned if a flow has not been successfully completed yet
 	return checkAndCompleteFlow(sessions.GetCompletedStages(sessionID),
-		req, r, sessionID, cfg, accountDB, deviceDB)
+		req, r, sessionID, cfg, userAPI)
 }
 
 // handleApplicationServiceRegistration handles the registration of an
@@ -662,8 +667,7 @@ func handleApplicationServiceRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.Dendrite,
-	accountDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
@@ -687,7 +691,7 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), accountDB, deviceDB, r.Username, "", appserviceID,
+		req.Context(), userAPI, r.Username, "", appserviceID,
 		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 	)
 }
@@ -701,13 +705,12 @@ func checkAndCompleteFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.Dendrite,
-	accountDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), accountDB, deviceDB, r.Username, r.Password, "",
+			req.Context(), userAPI, r.Username, r.Password, "",
 			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 		)
 	}
@@ -724,8 +727,7 @@ func checkAndCompleteFlow(
 // LegacyRegister process register requests from the legacy v1 API
 func LegacyRegister(
 	req *http.Request,
-	accountDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var r legacyRegisterRequest
@@ -760,10 +762,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil, nil)
+		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", false, nil, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), accountDB, deviceDB, r.Username, r.Password, "", false, nil, nil)
+		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", false, nil, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -809,8 +811,7 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 // not all
 func completeRegistration(
 	ctx context.Context,
-	accountDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	username, password, appserviceID string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
@@ -829,9 +830,16 @@ func completeRegistration(
 		}
 	}
 
-	acc, err := accountDB.CreateAccount(ctx, username, password, appserviceID)
+	var accRes userapi.PerformAccountCreationResponse
+	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
+		AppServiceID: appserviceID,
+		Localpart:    username,
+		Password:     password,
+		AccountType:  userapi.AccountTypeUser,
+		OnConflict:   userapi.ConflictAbort,
+	}, &accRes)
 	if err != nil {
-		if errors.Is(err, sqlutil.ErrUserExists) { // user already exists
+		if _, ok := err.(*userapi.ErrorConflict); ok { // user already exists
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
@@ -852,8 +860,8 @@ func completeRegistration(
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: registerResponse{
-				UserID:     userutil.MakeUserID(username, acc.ServerName),
-				HomeServer: acc.ServerName,
+				UserID:     userutil.MakeUserID(username, accRes.Account.ServerName),
+				HomeServer: accRes.Account.ServerName,
 			},
 		}
 	}
@@ -866,7 +874,13 @@ func completeRegistration(
 		}
 	}
 
-	dev, err := deviceDB.CreateDevice(ctx, username, deviceID, token, displayName)
+	var devRes userapi.PerformDeviceCreationResponse
+	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
+		Localpart:         username,
+		AccessToken:       token,
+		DeviceDisplayName: displayName,
+		DeviceID:          deviceID,
+	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -877,10 +891,10 @@ func completeRegistration(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: registerResponse{
-			UserID:      dev.UserID,
-			AccessToken: dev.AccessToken,
-			HomeServer:  acc.ServerName,
-			DeviceID:    dev.ID,
+			UserID:      devRes.Device.UserID,
+			AccessToken: devRes.Device.AccessToken,
+			HomeServer:  accRes.Account.ServerName,
+			DeviceID:    devRes.Device.ID,
 		},
 	}
 }

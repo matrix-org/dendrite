@@ -20,20 +20,21 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
 	internal.PartitionStorer
-	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*authtypes.Account, error)
+	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
 	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
 	SetDisplayName(ctx context.Context, localpart string, displayName string) error
 	// CreateAccount makes a new account with the given login name and password, and creates an empty profile
 	// for this account. If no password is supplied, the account will be a passwordless account. If the
 	// account already exists, it will return nil, ErrUserExists.
-	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*authtypes.Account, error)
-	CreateGuestAccount(ctx context.Context) (*authtypes.Account, error)
+	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*api.Account, error)
+	CreateGuestAccount(ctx context.Context) (*api.Account, error)
 	UpdateMemberships(ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error
 	GetMembershipInRoomByLocalpart(ctx context.Context, localpart, roomID string) (authtypes.Membership, error)
 	GetRoomIDsByLocalPart(ctx context.Context, localpart string) ([]string, error)
@@ -53,7 +54,7 @@ type Database interface {
 	GetFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
 	PutFilter(ctx context.Context, localpart string, filter *gomatrixserverlib.Filter) (string, error)
 	CheckAccountAvailability(ctx context.Context, localpart string) (bool, error)
-	GetAccountByLocalpart(ctx context.Context, localpart string) (*authtypes.Account, error)
+	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving
