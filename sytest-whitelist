@@ -53,6 +53,8 @@ PUT /rooms/:room_id/send/:event_type/:txn_id deduplicates the same txn id
 GET /rooms/:room_id/state/m.room.power_levels can fetch levels
 PUT /rooms/:room_id/state/m.room.power_levels can set levels
 PUT power_levels should not explode if the old power levels were empty
+GET /rooms/:room_id/state/m.room.member/:user_id?format=event fetches my membership event
+GET /rooms/:room_id/joined_members fetches my membership
 Both GET and PUT work
 POST /rooms/:room_id/read_markers can create read marker
 User signups are forbidden from starting with '_'

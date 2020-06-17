@@ -98,7 +98,8 @@ func OnIncomingStateRequest(ctx context.Context, rsAPI api.RoomserverInternalAPI
 // /rooms/{roomID}/state/{type}/{statekey} request. It will look in current
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
-func OnIncomingStateTypeRequest(ctx context.Context, rsAPI api.RoomserverInternalAPI, roomID string, evType, stateKey string) util.JSONResponse {
+// If eventFormat=true, sends the whole event else just the content.
+func OnIncomingStateTypeRequest(ctx context.Context, rsAPI api.RoomserverInternalAPI, roomID, evType, stateKey string, eventFormat bool) util.JSONResponse {
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 	util.GetLogger(ctx).WithFields(log.Fields{
@@ -134,8 +135,15 @@ func OnIncomingStateTypeRequest(ctx context.Context, rsAPI api.RoomserverInterna
 		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(stateRes.StateEvents[0], gomatrixserverlib.FormatAll),
 	}
 
+	var res interface{}
+	if eventFormat {
+		res = stateEvent
+	} else {
+		res = stateEvent.Content
+	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: stateEvent.Content,
+		JSON: res,
 	}
 }
