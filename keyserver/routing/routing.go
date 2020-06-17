@@ -36,9 +36,19 @@ func Setup(
 	publicAPIMux *mux.Router, cfg *config.Dendrite, userAPI userapi.UserInternalAPI,
 ) {
 	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
+
 	r0mux.Handle("/keys/query",
 		httputil.MakeAuthAPI("queryKeys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return QueryKeys(req)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	r0mux.Handle("/keys/upload/{keyID}",
+		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return util.JSONResponse{
+				Code: 200,
+				JSON: map[string]interface{}{},
+			}
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 }
