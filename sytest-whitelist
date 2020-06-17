@@ -338,3 +338,10 @@ Can download specifying a different Unicode file name
 Inbound /v1/send_join rejects joins from other servers
 Outbound federation can query v1 /send_join
 Inbound /v1/send_join rejects incorrectly-signed joins
+POST /rooms/:room_id/state/m.room.name sets name
+GET /rooms/:room_id/state/m.room.name gets name
+POST /rooms/:room_id/state/m.room.topic sets topic
+GET /rooms/:room_id/state/m.room.topic gets topic
+GET /rooms/:room_id/state fetches entire room state
+Setting room topic reports m.room.topic to myself
+setting 'm.room.name' respects room powerlevel
