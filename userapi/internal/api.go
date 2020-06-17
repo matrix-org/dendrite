@@ -39,6 +39,15 @@ type UserInternalAPI struct {
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
+	if req.AccountType == api.AccountTypeGuest {
+		acc, err := a.AccountDB.CreateGuestAccount(ctx)
+		if err != nil {
+			return err
+		}
+		res.AccountCreated = true
+		res.Account = acc
+		return nil
+	}
 	acc, err := a.AccountDB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
@@ -51,12 +60,18 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 				}
 			}
 		}
+		// account already exists
 		res.AccountCreated = false
-		res.UserID = fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName)
+		res.Account = &api.Account{
+			AppServiceID: req.AppServiceID,
+			Localpart:    req.Localpart,
+			ServerName:   a.ServerName,
+			UserID:       fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+		}
 		return nil
 	}
 	res.AccountCreated = true
-	res.UserID = acc.UserID
+	res.Account = acc
 	return nil
 }
 func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.PerformDeviceCreationRequest, res *api.PerformDeviceCreationResponse) error {
@@ -65,8 +80,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		return err
 	}
 	res.DeviceCreated = true
-	res.AccessToken = dev.AccessToken
-	res.DeviceID = dev.ID
+	res.Device = dev
 	return nil
 }
 

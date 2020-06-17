@@ -89,16 +89,18 @@ type QueryProfileResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformAccountCreationRequest struct {
-	Localpart    string
-	AppServiceID string
-	Password     string
+	AccountType AccountType // Required: whether this is a guest or user account
+	Localpart   string      // Required: The localpart for this account. Ignored if account type is guest.
+
+	AppServiceID string // optional: the application service ID (not user ID) creating this account, if any.
+	Password     string // optional: if missing then this account will be a passwordless account
 	OnConflict   Conflict
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation
 type PerformAccountCreationResponse struct {
 	AccountCreated bool
-	UserID         string
+	Account        *Account
 }
 
 // PerformDeviceCreationRequest is the request for PerformDeviceCreation
@@ -115,8 +117,7 @@ type PerformDeviceCreationRequest struct {
 // PerformDeviceCreationResponse is the response for PerformDeviceCreation
 type PerformDeviceCreationResponse struct {
 	DeviceCreated bool
-	AccessToken   string
-	DeviceID      string
+	Device        *Device
 }
 
 // Device represents a client's device (mobile, web, etc)
@@ -132,6 +133,16 @@ type Device struct {
 	SessionID int64
 	// TODO: display name, last used timestamp, keys, etc
 	DisplayName string
+}
+
+// Account represents a Matrix account on this home server.
+type Account struct {
+	UserID       string
+	Localpart    string
+	ServerName   gomatrixserverlib.ServerName
+	AppServiceID string
+	// TODO: Other flags like IsAdmin, IsGuest
+	// TODO: Associations (e.g. with application services)
 }
 
 // ErrorForbidden is an error indicating that the supplied access token is forbidden
@@ -155,9 +166,17 @@ func (e *ErrorConflict) Error() string {
 // Conflict is an enum representing what to do when encountering conflicting when creating profiles/devices
 type Conflict int
 
+// AccountType is an enum representing the kind of account
+type AccountType int
+
 const (
 	// ConflictUpdate will update matching records returning no error
 	ConflictUpdate Conflict = 1
 	// ConflictAbort will reject the request with ErrorConflict
 	ConflictAbort Conflict = 2
+
+	// AccountTypeUser indicates this is a user account
+	AccountTypeUser AccountType = 1
+	// AccountTypeGuest indicates this is a guest account
+	AccountTypeGuest AccountType = 2
 )

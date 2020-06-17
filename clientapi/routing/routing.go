@@ -203,11 +203,11 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		return Register(req, accountDB, deviceDB, cfg)
+		return Register(req, userAPI, accountDB, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	v1mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		return LegacyRegister(req, accountDB, deviceDB, cfg)
+		return LegacyRegister(req, userAPI, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
