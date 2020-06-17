@@ -128,7 +128,7 @@ Outbound federation can send events
 # test for now.
 #Backfill checks the events requested belong to the room
 Can upload without a file name
-#Can download without a file name locally
+Can download without a file name locally
 Can upload with ASCII file name
 Can send image in room message
 AS cannot create users outside its own namespace
@@ -327,3 +327,7 @@ Can upload with Unicode file name
 POSTed media can be thumbnailed
 Remote media can be thumbnailed
 Can download with Unicode file name locally
+Can download file 'ascii'
+Can download file 'name with spaces'
+Can download file 'name;with;semicolons'
+Can download specifying a different ASCII file name
