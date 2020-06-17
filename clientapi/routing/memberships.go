@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -33,6 +34,16 @@ type getMembershipResponse struct {
 
 type getJoinedRoomsResponse struct {
 	JoinedRooms []string `json:"joined_rooms"`
+}
+
+// https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-rooms-roomid-joined-members
+type getJoinedMembersResponse struct {
+	Joined map[string]joinedMember `json:"joined"`
+}
+
+type joinedMember struct {
+	DisplayName string `json:"display_name"`
+	AvatarURL   string `json:"avatar_url"`
 }
 
 // GetMemberships implements GET /rooms/{roomId}/members
@@ -59,6 +70,22 @@ func GetMemberships(
 		}
 	}
 
+	if joinedOnly {
+		var res getJoinedMembersResponse
+		res.Joined = make(map[string]joinedMember)
+		for _, ev := range queryRes.JoinEvents {
+			var content joinedMember
+			if err := json.Unmarshal(ev.Content, &content); err != nil {
+				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
+				return jsonerror.InternalServerError()
+			}
+			res.Joined[ev.Sender] = content
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: res,
+		}
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: getMembershipResponse{queryRes.JoinEvents},

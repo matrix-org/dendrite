@@ -53,6 +53,8 @@ PUT /rooms/:room_id/send/:event_type/:txn_id deduplicates the same txn id
 GET /rooms/:room_id/state/m.room.power_levels can fetch levels
 PUT /rooms/:room_id/state/m.room.power_levels can set levels
 PUT power_levels should not explode if the old power levels were empty
+GET /rooms/:room_id/state/m.room.member/:user_id?format=event fetches my membership event
+GET /rooms/:room_id/joined_members fetches my membership
 Both GET and PUT work
 POST /rooms/:room_id/read_markers can create read marker
 User signups are forbidden from starting with '_'
@@ -113,6 +115,8 @@ User can invite local user to room with version 1
 Should reject keys claiming to belong to a different user
 Can add account data
 Can add account data to room
+Can get account data without syncing
+Can get room account data without syncing
 #Latest account data appears in v2 /sync
 New account data appears in incremental v2 /sync
 Checking local federation server
@@ -334,3 +338,12 @@ Can download specifying a different ASCII file name
 Can download with Unicode file name over federation
 Can download specifying a different Unicode file name
 Inbound /v1/send_join rejects joins from other servers
+Outbound federation can query v1 /send_join
+Inbound /v1/send_join rejects incorrectly-signed joins
+POST /rooms/:room_id/state/m.room.name sets name
+GET /rooms/:room_id/state/m.room.name gets name
+POST /rooms/:room_id/state/m.room.topic sets topic
+GET /rooms/:room_id/state/m.room.topic gets topic
+GET /rooms/:room_id/state fetches entire room state
+Setting room topic reports m.room.topic to myself
+setting 'm.room.name' respects room powerlevel

@@ -33,6 +33,7 @@ import sys
 
 test_mappings = {
     "nsp": "Non-Spec API",
+    "unk": "Unknown API (no group specified)",
     "f": "Federation", # flag to mark test involves federation
 
     "federation_apis": {
@@ -214,7 +215,8 @@ def main(results_tap_path, verbose):
             # }
         },
         "nonspec": {
-            "nsp": {}
+            "nsp": {},
+            "unk": {}
         },
     }
     with open(results_tap_path, "r") as f:
@@ -225,7 +227,7 @@ def main(results_tap_path, verbose):
             name = test_result["name"]
             group_id = test_name_to_group_id.get(name)
             if not group_id:
-                raise Exception("The test '%s' doesn't have a group" % (name,))
+                summary["nonspec"]["unk"][name] = test_result["ok"]
             if group_id == "nsp":
                 summary["nonspec"]["nsp"][name] = test_result["ok"]
             elif group_id in test_mappings["federation_apis"]:
