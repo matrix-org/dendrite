@@ -47,6 +47,10 @@ const mediaIDCharacters = "A-Za-z0-9_=-"
 // Note: unfortunately regex.MustCompile() cannot be assigned to a const
 var mediaIDRegex = regexp.MustCompile("^[" + mediaIDCharacters + "]+$")
 
+// Regular expressions to help us cope with Content-Disposition parsing
+var rfc2183 = regexp.MustCompile(`filename\=utf-8\"(.*)\"`)
+var rfc6266 = regexp.MustCompile(`filename\*\=utf-8\'\'(.*)`)
+
 // downloadRequest metadata included in or derivable from a download or thumbnail request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-thumbnail-servername-mediaid
@@ -378,8 +382,8 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 	} else {
 		// For UTF-8 filenames, we quote always, as that's the standard
 		w.Header().Set("Content-Disposition", fmt.Sprintf(
-			`inline; filename=utf-8"%s"`,
-			unescaped,
+			`inline; filename*=utf-8''%s`,
+			url.QueryEscape(unescaped),
 		))
 	}
 
@@ -700,9 +704,22 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(contentLength)
 	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
-	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
-	if err == nil && params["filename"] != "" {
-		r.MediaMetadata.UploadName = types.Filename(params["filename"])
+
+	dispositionHeader := resp.Header.Get("Content-Disposition")
+	if _, params, e := mime.ParseMediaType(dispositionHeader); e == nil {
+		if params["filename"] != "" {
+			r.MediaMetadata.UploadName = types.Filename(params["filename"])
+		} else if params["filename*"] != "" {
+			r.MediaMetadata.UploadName = types.Filename(params["filename*"])
+		}
+	} else {
+		if matches := rfc6266.FindStringSubmatch(dispositionHeader); len(matches) > 1 {
+			// Always prefer the RFC6266 UTF-8 name if possible
+			r.MediaMetadata.UploadName = types.Filename(matches[1])
+		} else if matches := rfc2183.FindStringSubmatch(dispositionHeader); len(matches) > 1 {
+			// Otherwise, see if an RFC2183 name was provided (ASCII only)
+			r.MediaMetadata.UploadName = types.Filename(matches[1])
+		}
 	}
 
 	r.Logger.Info("Transferring remote file")
