@@ -336,45 +336,53 @@ func (r *downloadRequest) addDownloadFilenameToHeaders(
 		filename = r.DownloadFilename
 	}
 
-	if len(filename) > 0 {
-		unescaped, err := url.PathUnescape(filename)
-		if err != nil {
-			return fmt.Errorf("url.PathUnescape: %w", err)
+	if len(filename) == 0 {
+		return nil
+	}
+
+	unescaped, err := url.PathUnescape(filename)
+	if err != nil {
+		return fmt.Errorf("url.PathUnescape: %w", err)
+	}
+
+	isASCII := true // Is the string ASCII or UTF-8?
+	quote := ``     // Encloses the string (ASCII only)
+	for i := 0; i < len(unescaped); i++ {
+		if unescaped[i] > unicode.MaxASCII {
+			isASCII = false
 		}
-
-		isASCII := true // Is the string ASCII or UTF-8?
-		quote := ``     // Encloses the string (ASCII only)
-		for i := 0; i < len(unescaped); i++ {
-			if unescaped[i] > unicode.MaxASCII {
-				isASCII = false
-			}
-			if unescaped[i] == 0x20 || unescaped[i] == 0x3B {
-				// If the filename contains a space or a semicolon, which
-				// are special characters in Content-Disposition
-				quote = `"`
-			}
-		}
-
-		unescaped = strings.ReplaceAll(unescaped, `\`, `\\"`)
-		unescaped = strings.ReplaceAll(unescaped, `"`, `\"`)
-
-		if isASCII {
-			// For ASCII filenames, we should only quote the filename if
-			// it needs to be done, e.g. it contains a space or a character
-			// that would otherwise be parsed as a control character in the
-			// Content-Disposition header
-			w.Header().Set("Content-Disposition", fmt.Sprintf(
-				`inline; filename=%s%s%s`,
-				quote, unescaped, quote,
-			))
-		} else {
-			// For UTF-8 filenames, we quote always, as that's the standard
-			w.Header().Set("Content-Disposition", fmt.Sprintf(
-				`inline; filename=utf-8"%s"`,
-				unescaped,
-			))
+		if unescaped[i] == 0x20 || unescaped[i] == 0x3B {
+			// If the filename contains a space or a semicolon, which
+			// are special characters in Content-Disposition
+			quote = `"`
 		}
 	}
+
+	// We don't necessarily want a full escape as the Content-Disposition
+	// can take many of the characters that PathEscape would otherwise and
+	// browser support for encoding is a bit wild, so we'll escape only
+	// the characters that we know will mess up the parsing of the
+	// Content-Disposition header elements themselves
+	unescaped = strings.ReplaceAll(unescaped, `\`, `\\"`)
+	unescaped = strings.ReplaceAll(unescaped, `"`, `\"`)
+
+	if isASCII {
+		// For ASCII filenames, we should only quote the filename if
+		// it needs to be done, e.g. it contains a space or a character
+		// that would otherwise be parsed as a control character in the
+		// Content-Disposition header
+		w.Header().Set("Content-Disposition", fmt.Sprintf(
+			`inline; filename=%s%s%s`,
+			quote, unescaped, quote,
+		))
+	} else {
+		// For UTF-8 filenames, we quote always, as that's the standard
+		w.Header().Set("Content-Disposition", fmt.Sprintf(
+			`inline; filename=utf-8"%s"`,
+			unescaped,
+		))
+	}
+
 	return nil
 }
 
