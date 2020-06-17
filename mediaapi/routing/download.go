@@ -305,52 +305,8 @@ func (r *downloadRequest) respondFromLocalFile(
 		}).Info("Responding with file")
 		responseFile = file
 		responseMetadata = r.MediaMetadata
-
-		// If the requestor supplied a filename to name the download then
-		// use that, otherwise use the filename from the response metadata.
-		filename := string(responseMetadata.UploadName)
-		if r.DownloadFilename != "" {
-			filename = r.DownloadFilename
-		}
-
-		if len(filename) > 0 {
-			unescaped, err := url.PathUnescape(filename)
-			if err != nil {
-				return nil, fmt.Errorf("url.PathUnescape: %w", err)
-			}
-
-			isASCII := true // Is the string ASCII or UTF-8?
-			quote := ``     // Encloses the string (ASCII only)
-			for i := 0; i < len(unescaped); i++ {
-				if unescaped[i] > unicode.MaxASCII {
-					isASCII = false
-				}
-				if unescaped[i] == 0x20 || unescaped[i] == 0x3B {
-					// If the filename contains a space or a semicolon, which
-					// are special characters in Content-Disposition
-					quote = `"`
-				}
-			}
-
-			unescaped = strings.ReplaceAll(unescaped, `\`, `\\"`)
-			unescaped = strings.ReplaceAll(unescaped, `"`, `\"`)
-
-			if isASCII {
-				// For ASCII filenames, we should only quote the filename if
-				// it needs to be done, e.g. it contains a space or a character
-				// that would otherwise be parsed as a control character in the
-				// Content-Disposition header
-				w.Header().Set("Content-Disposition", fmt.Sprintf(
-					`inline; filename=%s%s%s`,
-					quote, unescaped, quote,
-				))
-			} else {
-				// For UTF-8 filenames, we quote always, as that's the standard
-				w.Header().Set("Content-Disposition", fmt.Sprintf(
-					`inline; filename=utf-8"%s"`,
-					unescaped,
-				))
-			}
+		if err := r.addDownloadFilenameToHeaders(w, responseMetadata); err != nil {
+			return nil, err
 		}
 	}
 
@@ -367,6 +323,59 @@ func (r *downloadRequest) respondFromLocalFile(
 		return nil, errors.Wrap(err, "failed to copy from cache")
 	}
 	return responseMetadata, nil
+}
+
+func (r *downloadRequest) addDownloadFilenameToHeaders(
+	w http.ResponseWriter,
+	responseMetadata *types.MediaMetadata,
+) error {
+	// If the requestor supplied a filename to name the download then
+	// use that, otherwise use the filename from the response metadata.
+	filename := string(responseMetadata.UploadName)
+	if r.DownloadFilename != "" {
+		filename = r.DownloadFilename
+	}
+
+	if len(filename) > 0 {
+		unescaped, err := url.PathUnescape(filename)
+		if err != nil {
+			return fmt.Errorf("url.PathUnescape: %w", err)
+		}
+
+		isASCII := true // Is the string ASCII or UTF-8?
+		quote := ``     // Encloses the string (ASCII only)
+		for i := 0; i < len(unescaped); i++ {
+			if unescaped[i] > unicode.MaxASCII {
+				isASCII = false
+			}
+			if unescaped[i] == 0x20 || unescaped[i] == 0x3B {
+				// If the filename contains a space or a semicolon, which
+				// are special characters in Content-Disposition
+				quote = `"`
+			}
+		}
+
+		unescaped = strings.ReplaceAll(unescaped, `\`, `\\"`)
+		unescaped = strings.ReplaceAll(unescaped, `"`, `\"`)
+
+		if isASCII {
+			// For ASCII filenames, we should only quote the filename if
+			// it needs to be done, e.g. it contains a space or a character
+			// that would otherwise be parsed as a control character in the
+			// Content-Disposition header
+			w.Header().Set("Content-Disposition", fmt.Sprintf(
+				`inline; filename=%s%s%s`,
+				quote, unescaped, quote,
+			))
+		} else {
+			// For UTF-8 filenames, we quote always, as that's the standard
+			w.Header().Set("Content-Disposition", fmt.Sprintf(
+				`inline; filename=utf-8"%s"`,
+				unescaped,
+			))
+		}
+	}
+	return nil
 }
 
 // Note: Thumbnail generation may be ongoing asynchronously.
