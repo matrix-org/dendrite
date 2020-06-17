@@ -331,3 +331,6 @@ Can download file 'ascii'
 Can download file 'name with spaces'
 Can download file 'name;with;semicolons'
 Can download specifying a different ASCII file name
+Can download with Unicode file name over federation
+Can download specifying a different Unicode file name
+Inbound /v1/send_join rejects joins from other servers
