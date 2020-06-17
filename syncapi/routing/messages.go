@@ -158,6 +158,7 @@ func OnIncomingMessagesRequest(
 		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
 		return jsonerror.InternalServerError()
 	}
+
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"from":         from.String(),
 		"to":           to.String(),
@@ -253,21 +254,26 @@ func (r *messagesReq) retrieveEvents() (
 		err = fmt.Errorf("EventPositionInTopology: for start event %s: %w", events[0].EventID(), err)
 		return
 	}
-	end, err = r.db.EventPositionInTopology(
-		r.ctx, events[len(events)-1].EventID(),
-	)
-	if err != nil {
-		err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
-		return
-	}
-
-	if r.backwardOrdering {
-		// A stream/topological position is a cursor located between two events.
-		// While they are identified in the code by the event on their right (if
-		// we consider a left to right chronological order), tokens need to refer
-		// to them by the event on their left, therefore we need to decrement the
-		// end position we send in the response if we're going backward.
-		end.Decrement()
+	if r.backwardOrdering && events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
+		// We've hit the beginning of the room so there's really nowhere else
+		// to go. This seems to fix Riot iOS from looping on /messages endlessly.
+		end = types.NewTopologyToken(0, 0)
+	} else {
+		end, err = r.db.EventPositionInTopology(
+			r.ctx, events[len(events)-1].EventID(),
+		)
+		if err != nil {
+			err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
+			return
+		}
+		if r.backwardOrdering {
+			// A stream/topological position is a cursor located between two events.
+			// While they are identified in the code by the event on their right (if
+			// we consider a left to right chronological order), tokens need to refer
+			// to them by the event on their left, therefore we need to decrement the
+			// end position we send in the response if we're going backward.
+			end.Decrement()
+		}
 	}
 
 	return clientEvents, start, end, err
