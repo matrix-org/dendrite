@@ -14,12 +14,12 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -42,18 +42,6 @@ func (m *DendriteMonolith) Start() {
 	m.listener, err = net.Listen("tcp", "localhost:0")
 	if err != nil {
 		panic(err)
-	}
-
-	// Build both ends of a HTTP multiplex.
-	httpServer := &http.Server{
-		Addr:         ":0",
-		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 45 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		BaseContext: func(_ net.Listener) context.Context {
-			return context.Background()
-		},
 	}
 
 	ygg, err := yggconn.Setup("dendrite", "", m.StorageDirectory)
@@ -84,7 +72,7 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith", false)
+	base := setup.NewBaseDendrite(cfg, "Monolith", false)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -94,16 +82,18 @@ func (m *DendriteMonolith) Start() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
+
 	rsComponent := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
 	rsAPI := rsComponent
 
 	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), deviceDB,
+		base, cache.New(), userAPI,
 	)
 
-	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, keyRing,
@@ -118,8 +108,6 @@ func (m *DendriteMonolith) Start() {
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
-		AccountDB:     accountDB,
-		DeviceDB:      deviceDB,
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,
@@ -129,18 +117,32 @@ func (m *DendriteMonolith) Start() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
+		UserAPI:             userAPI,
 
 		PublicRoomsDB: publicRoomsDB,
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
-	internal.SetupHTTPAPI(
-		http.DefaultServeMux,
+	httputil.SetupHTTPAPI(
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
 		base.UseHTTPAPIs,
 	)
+
+	// Build both ends of a HTTP multiplex.
+	httpServer := &http.Server{
+		Addr:         ":0",
+		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 45 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		BaseContext: func(_ net.Listener) context.Context {
+			return context.Background()
+		},
+		Handler: base.BaseMux,
+	}
 
 	go func() {
 		logger.Info("Listening on ", ygg.DerivedServerName())
