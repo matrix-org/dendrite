@@ -117,12 +117,14 @@ func (s *accountDataStatements) selectAccountData(
 func (s *accountDataStatements) selectAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
 ) (data json.RawMessage, err error) {
+	var bytes []byte
 	stmt := s.selectAccountDataByTypeStmt
-	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&data); err != nil {
+	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&bytes); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return
 	}
+	data = json.RawMessage(bytes)
 	return
 }
