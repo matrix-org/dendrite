@@ -230,6 +230,7 @@ func (rp *RequestPool) appendAccountData(
 						Content: gomatrixserverlib.RawJSON(databody),
 					},
 				)
+				data.Rooms.Join[r] = j
 			}
 		}
 		return data, nil
