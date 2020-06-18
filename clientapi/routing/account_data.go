@@ -104,6 +104,11 @@ func SaveAccountData(
 		}
 	}
 
+	if err := syncProducer.SendData(userID, roomID, dataType); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
+		return jsonerror.InternalServerError()
+	}
+
 	dataReq := api.InputAccountDataRequest{
 		UserID:      userID,
 		DataType:    dataType,
