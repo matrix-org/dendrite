@@ -16,6 +16,7 @@ package accounts
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -39,13 +40,13 @@ type Database interface {
 	GetMembershipInRoomByLocalpart(ctx context.Context, localpart, roomID string) (authtypes.Membership, error)
 	GetRoomIDsByLocalPart(ctx context.Context, localpart string) ([]string, error)
 	GetMembershipsByLocalpart(ctx context.Context, localpart string) (memberships []authtypes.Membership, err error)
-	SaveAccountData(ctx context.Context, localpart, roomID, dataType, content string) error
-	GetAccountData(ctx context.Context, localpart string) (global []gomatrixserverlib.ClientEvent, rooms map[string][]gomatrixserverlib.ClientEvent, err error)
+	SaveAccountData(ctx context.Context, localpart, roomID, dataType string, content json.RawMessage) error
+	GetAccountData(ctx context.Context, localpart string) (global map[string]json.RawMessage, rooms map[string]map[string]json.RawMessage, err error)
 	// GetAccountDataByType returns account data matching a given
 	// localpart, room ID and type.
 	// If no account data could be found, returns nil
 	// Returns an error if there was an issue with the retrieval
-	GetAccountDataByType(ctx context.Context, localpart, roomID, dataType string) (data *gomatrixserverlib.ClientEvent, err error)
+	GetAccountDataByType(ctx context.Context, localpart, roomID, dataType string) (data json.RawMessage, err error)
 	GetNewNumericLocalpart(ctx context.Context) (int64, error)
 	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
 	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
