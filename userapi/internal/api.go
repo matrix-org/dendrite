@@ -137,6 +137,8 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 }
 
 func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAccountDataRequest, res *api.QueryAccountDataResponse) error {
+	res.GlobalAccountData = make(map[string]json.RawMessage)
+	res.RoomAccountData = make(map[string]map[string]json.RawMessage)
 	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
 		return err
@@ -153,7 +155,7 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 		if data != nil {
 			if req.RoomID != "" {
 				if _, ok := res.RoomAccountData[req.RoomID]; !ok {
-					res.RoomAccountData[req.RoomID] = map[string]json.RawMessage{}
+					res.RoomAccountData[req.RoomID] = make(map[string]json.RawMessage)
 				}
 				res.RoomAccountData[req.RoomID][req.DataType] = data
 			} else {

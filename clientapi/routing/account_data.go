@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -46,15 +47,26 @@ func GetAccountData(
 	dataRes := api.QueryAccountDataResponse{}
 	if err := userAPI.QueryAccountData(req.Context(), &dataReq, &dataRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
+		return util.ErrorResponse(fmt.Errorf("userAPI.QueryAccountData: %w", err))
+	}
+
+	var data json.RawMessage
+	var ok bool
+	if roomID != "" {
+		data, ok = dataRes.RoomAccountData[roomID][dataType]
+	} else {
+		data, ok = dataRes.GlobalAccountData[dataType]
+	}
+	if ok {
 		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.Forbidden("data not found"),
+			Code: http.StatusOK,
+			JSON: data,
 		}
 	}
 
 	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: dataRes.RoomAccountData,
+		Code: http.StatusNotFound,
+		JSON: jsonerror.Forbidden("data not found"),
 	}
 }
 

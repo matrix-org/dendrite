@@ -221,7 +221,6 @@ func (rp *RequestPool) appendAccountData(
 				},
 			)
 		}
-
 		for r, j := range data.Rooms.Join {
 			for datatype, databody := range res.RoomAccountData[r] {
 				j.AccountData.Events = append(
@@ -233,7 +232,6 @@ func (rp *RequestPool) appendAccountData(
 				)
 			}
 		}
-
 		return data, nil
 	}
 
@@ -264,35 +262,37 @@ func (rp *RequestPool) appendAccountData(
 	for roomID, dataTypes := range dataTypes {
 		// Request the missing data from the database
 		for _, dataType := range dataTypes {
-			var res userapi.QueryAccountDataResponse
-			err = rp.userAPI.QueryAccountData(req.ctx, &userapi.QueryAccountDataRequest{
+			dataReq := userapi.QueryAccountDataRequest{
 				UserID:   userID,
 				RoomID:   roomID,
 				DataType: dataType,
-			}, &res)
+			}
+			dataRes := userapi.QueryAccountDataResponse{}
+			err = rp.userAPI.QueryAccountData(req.ctx, &dataReq, &dataRes)
 			if err != nil {
-				return nil, err
+				continue
 			}
-			for t, d := range res.GlobalAccountData {
-				data.AccountData.Events = append(
-					data.AccountData.Events,
-					gomatrixserverlib.ClientEvent{
-						Type:    t,
-						Content: gomatrixserverlib.RawJSON(d),
-					},
-				)
-			}
-			for r, byRoom := range res.RoomAccountData {
-				for t, d := range byRoom {
-					joinData := data.Rooms.Join[r]
+			if roomID == "" {
+				if globalData, ok := dataRes.GlobalAccountData[dataType]; ok {
+					data.AccountData.Events = append(
+						data.AccountData.Events,
+						gomatrixserverlib.ClientEvent{
+							Type:    dataType,
+							Content: gomatrixserverlib.RawJSON(globalData),
+						},
+					)
+				}
+			} else {
+				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
+					joinData := data.Rooms.Join[roomID]
 					joinData.AccountData.Events = append(
 						joinData.AccountData.Events,
 						gomatrixserverlib.ClientEvent{
-							Type:    t,
-							Content: gomatrixserverlib.RawJSON(d),
+							Type:    dataType,
+							Content: gomatrixserverlib.RawJSON(roomData),
 						},
 					)
-					data.Rooms.Join[r] = joinData
+					data.Rooms.Join[roomID] = joinData
 				}
 			}
 		}
