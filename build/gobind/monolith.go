@@ -37,9 +37,10 @@ func (m *DendriteMonolith) Start() {
 	logger := logrus.Logger{
 		Out: BindLogger{},
 	}
+	logrus.SetOutput(BindLogger{})
 
 	var err error
-	m.listener, err = net.Listen("tcp", "localhost:0")
+	m.listener, err = net.Listen("tcp", "localhost:65432")
 	if err != nil {
 		panic(err)
 	}
@@ -78,17 +79,15 @@ func (m *DendriteMonolith) Start() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	federation := ygg.CreateFederationClient(base)
+	federation := base.CreateFederationClient()
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices)
 
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
-
-	rsComponent := roomserver.NewInternalAPI(
+	rsAPI := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
-	rsAPI := rsComponent
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,
@@ -100,17 +99,20 @@ func (m *DendriteMonolith) Start() {
 		base, federation, rsAPI, keyRing,
 	)
 
-	rsComponent.SetFederationSenderAPI(fsAPI)
+	// The underlying roomserver implementation needs to be able to call the fedsender.
+	// This is different to rsAPI which can be the http client which doesn't need this dependency
+	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
-		logger.WithError(err).Panicf("failed to connect to public rooms db")
+		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        gomatrixserverlib.NewClient(),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,
@@ -121,6 +123,7 @@ func (m *DendriteMonolith) Start() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
+		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB: publicRoomsDB,
 	}

@@ -139,6 +139,9 @@ func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
 		panic(err)
 	}
 
+	n.log.Println("Public curve25519:", n.core.EncryptionPublicKey())
+	n.log.Println("Public ed25519:", n.core.SigningPublicKey())
+
 	go n.listenFromYgg()
 
 	return n, nil
