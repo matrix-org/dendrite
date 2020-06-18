@@ -51,18 +51,6 @@ var (
 func main() {
 	flag.Parse()
 
-	// Build both ends of a HTTP multiplex.
-	httpServer := &http.Server{
-		Addr:         ":0",
-		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 45 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		BaseContext: func(_ net.Listener) context.Context {
-			return context.Background()
-		},
-	}
-
 	ygg, err := yggconn.Setup(*instanceName, *instancePeer, ".")
 	if err != nil {
 		panic(err)
@@ -131,7 +119,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
-		Client:        createClient(ygg),
+		Client:        ygg.CreateClient(base),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,

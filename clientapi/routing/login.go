@@ -15,8 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"context"
@@ -47,7 +45,7 @@ type loginIdentifier struct {
 	User string `json:"user"`
 }
 
-type loginWithPasswordRequest struct {
+type passwordRequest struct {
 	Identifier loginIdentifier `json:"identifier"`
 	User       string          `json:"user"` // deprecated in favour of identifier
 	Password   string          `json:"password"`
@@ -55,11 +53,6 @@ type loginWithPasswordRequest struct {
 	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
 	DeviceID           *string `json:"device_id"`
-}
-
-type loginRequest struct {
-	Type string `json:"type"`
-	loginWithPasswordRequest
 }
 
 type loginResponse struct {
@@ -94,24 +87,12 @@ func Login(
 		if resErr != nil {
 			return *resErr
 		}
-
-		j, _ := json.MarshalIndent(temp, "", "  ")
-		fmt.Println(string(j))
-
-		var r loginRequest
-		json.Unmarshal(j, &r)
-
-		switch r.Type {
-		case "m.login.password":
-			j, _ := json.MarshalIndent(r, "", "  ")
-			fmt.Printf("LOGIN REQUEST: %+v\n", string(j))
-			switch r.Identifier.Type {
-			case "m.id.user":
-				if r.Identifier.User == "" {
-					return util.JSONResponse{
-						Code: http.StatusBadRequest,
-						JSON: jsonerror.BadJSON("'user' must be supplied."),
-					}
+		switch r.Identifier.Type {
+		case "m.id.user":
+			if r.Identifier.User == "" {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.BadJSON("'user' must be supplied."),
 				}
 			}
 			acc, errJSON = r.processUsernamePasswordLoginRequest(req, accountDB, cfg, r.Identifier.User)
@@ -139,7 +120,7 @@ func Login(
 			return jsonerror.InternalServerError()
 		}
 
-		dev, err := getDevice(req.Context(), r.loginWithPasswordRequest, deviceDB, acc, token)
+		dev, err := getDevice(req.Context(), r, deviceDB, acc, token)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -166,7 +147,7 @@ func Login(
 // getDevice returns a new or existing device
 func getDevice(
 	ctx context.Context,
-	r loginWithPasswordRequest,
+	r passwordRequest,
 	deviceDB devices.Database,
 	acc *api.Account,
 	token string,
