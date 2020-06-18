@@ -22,15 +22,13 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
 )
 
 // GetAccountData implements GET /user/{userId}/[rooms/{roomid}/]account_data/{type}
 func GetAccountData(
-	req *http.Request, accountDB accounts.Database, device *api.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 	userID string, roomID string, dataType string,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -40,30 +38,29 @@ func GetAccountData(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+	dataReq := api.QueryAccountDataRequest{
+		UserID:   userID,
+		DataType: dataType,
+		RoomID:   roomID,
 	}
-
-	if data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, dataType,
-	); err == nil {
+	dataRes := api.QueryAccountDataResponse{}
+	if err := userAPI.QueryAccountData(req.Context(), &dataReq, &dataRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
 		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: data.Content,
+			Code: http.StatusNotFound,
+			JSON: jsonerror.Forbidden("data not found"),
 		}
 	}
 
 	return util.JSONResponse{
-		Code: http.StatusNotFound,
-		JSON: jsonerror.Forbidden("data not found"),
+		Code: http.StatusOK,
+		JSON: dataRes.RoomAccountData,
 	}
 }
 
 // SaveAccountData implements PUT /user/{userId}/[rooms/{roomId}/]account_data/{type}
 func SaveAccountData(
-	req *http.Request, accountDB accounts.Database, device *api.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 	userID string, roomID string, dataType string, syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -71,12 +68,6 @@ func SaveAccountData(
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("userID does not match the current user"),
 		}
-	}
-
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
 	}
 
 	defer req.Body.Close() // nolint: errcheck
@@ -101,16 +92,19 @@ func SaveAccountData(
 		}
 	}
 
-	if err := accountDB.SaveAccountData(
-		req.Context(), localpart, roomID, dataType, string(body),
-	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.SaveAccountData failed")
-		return jsonerror.InternalServerError()
+	dataReq := api.InputAccountDataRequest{
+		UserID:      userID,
+		DataType:    dataType,
+		RoomID:      roomID,
+		AccountData: json.RawMessage(body),
 	}
-
-	if err := syncProducer.SendData(userID, roomID, dataType); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
-		return jsonerror.InternalServerError()
+	dataRes := api.InputAccountDataResponse{}
+	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.Forbidden("data not found"),
+		}
 	}
 
 	return util.JSONResponse{

@@ -26,6 +26,8 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
+	InputAccountDataPath = "/userapi/inputAccountData"
+
 	PerformDeviceCreationPath  = "/userapi/performDeviceCreation"
 	PerformAccountCreationPath = "/userapi/performAccountCreation"
 
@@ -53,6 +55,14 @@ func NewUserAPIClient(
 type httpUserInternalAPI struct {
 	apiURL     string
 	httpClient *http.Client
+}
+
+func (h *httpUserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputAccountData")
+	defer span.Finish()
+
+	apiURL := h.apiURL + InputAccountDataPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
 func (h *httpUserInternalAPI) PerformAccountCreation(

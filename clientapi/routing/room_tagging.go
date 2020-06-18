@@ -69,7 +69,7 @@ func GetTags(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: data.Content,
+		JSON: data,
 	}
 }
 
@@ -106,7 +106,7 @@ func PutTag(
 
 	var tagContent gomatrix.TagContent
 	if data != nil {
-		if err = json.Unmarshal(data.Content, &tagContent); err != nil {
+		if err = json.Unmarshal(data, &tagContent); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
 			return jsonerror.InternalServerError()
 		}
@@ -169,7 +169,7 @@ func DeleteTag(
 	}
 
 	var tagContent gomatrix.TagContent
-	err = json.Unmarshal(data.Content, &tagContent)
+	err = json.Unmarshal(data, &tagContent)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
 		return jsonerror.InternalServerError()
@@ -211,7 +211,7 @@ func obtainSavedTags(
 	userID string,
 	roomID string,
 	accountDB accounts.Database,
-) (string, *gomatrixserverlib.ClientEvent, error) {
+) (string, json.RawMessage, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return "", nil, err
@@ -237,5 +237,5 @@ func saveTagData(
 		return err
 	}
 
-	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "m.tag", string(newTagData))
+	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "m.tag", json.RawMessage(newTagData))
 }

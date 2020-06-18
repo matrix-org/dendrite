@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -36,6 +37,20 @@ type UserInternalAPI struct {
 	ServerName gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
+}
+
+func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
+	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot query profile of remote users: got %s want %s", domain, a.ServerName)
+	}
+	if req.DataType == "" {
+		return fmt.Errorf("data type must not be empty")
+	}
+	return a.AccountDB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData)
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
@@ -130,17 +145,19 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 		return fmt.Errorf("cannot query account data of remote users: got %s want %s", domain, a.ServerName)
 	}
 	if req.DataType != "" {
-		var event *gomatrixserverlib.ClientEvent
-		event, err = a.AccountDB.GetAccountDataByType(ctx, local, req.RoomID, req.DataType)
+		var data json.RawMessage
+		data, err = a.AccountDB.GetAccountDataByType(ctx, local, req.RoomID, req.DataType)
 		if err != nil {
 			return err
 		}
-		if event != nil {
+		if data != nil {
 			if req.RoomID != "" {
-				res.RoomAccountData = make(map[string][]gomatrixserverlib.ClientEvent)
-				res.RoomAccountData[req.RoomID] = []gomatrixserverlib.ClientEvent{*event}
+				if _, ok := res.RoomAccountData[req.RoomID]; !ok {
+					res.RoomAccountData[req.RoomID] = map[string]json.RawMessage{}
+				}
+				res.RoomAccountData[req.RoomID][req.DataType] = data
 			} else {
-				res.GlobalAccountData = append(res.GlobalAccountData, *event)
+				res.GlobalAccountData[req.DataType] = data
 			}
 		}
 		return nil

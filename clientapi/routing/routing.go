@@ -476,7 +476,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveAccountData(req, accountDB, device, vars["userID"], "", vars["type"], syncProducer)
+			return SaveAccountData(req, userAPI, device, vars["userID"], "", vars["type"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -486,7 +486,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
+			return SaveAccountData(req, userAPI, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -496,7 +496,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetAccountData(req, accountDB, device, vars["userID"], "", vars["type"])
+			return GetAccountData(req, userAPI, device, vars["userID"], "", vars["type"])
 		}),
 	).Methods(http.MethodGet)
 
@@ -506,7 +506,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"])
+			return GetAccountData(req, userAPI, device, vars["userID"], vars["roomID"], vars["type"])
 		}),
 	).Methods(http.MethodGet)
 

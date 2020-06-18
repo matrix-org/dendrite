@@ -212,12 +212,25 @@ func (rp *RequestPool) appendAccountData(
 		if err != nil {
 			return nil, err
 		}
-		data.AccountData.Events = res.GlobalAccountData
+		for datatype, databody := range res.GlobalAccountData {
+			data.AccountData.Events = append(
+				data.AccountData.Events,
+				gomatrixserverlib.ClientEvent{
+					Type:    datatype,
+					Content: gomatrixserverlib.RawJSON(databody),
+				},
+			)
+		}
 
 		for r, j := range data.Rooms.Join {
-			if len(res.RoomAccountData[r]) > 0 {
-				j.AccountData.Events = res.RoomAccountData[r]
-				data.Rooms.Join[r] = j
+			for datatype, databody := range res.RoomAccountData[r] {
+				j.AccountData.Events = append(
+					j.AccountData.Events,
+					gomatrixserverlib.ClientEvent{
+						Type:    datatype,
+						Content: gomatrixserverlib.RawJSON(databody),
+					},
+				)
 			}
 		}
 
@@ -249,7 +262,6 @@ func (rp *RequestPool) appendAccountData(
 
 	// Iterate over the rooms
 	for roomID, dataTypes := range dataTypes {
-		events := []gomatrixserverlib.ClientEvent{}
 		// Request the missing data from the database
 		for _, dataType := range dataTypes {
 			var res userapi.QueryAccountDataResponse
@@ -261,20 +273,28 @@ func (rp *RequestPool) appendAccountData(
 			if err != nil {
 				return nil, err
 			}
-			if len(res.RoomAccountData[roomID]) > 0 {
-				events = append(events, res.RoomAccountData[roomID]...)
-			} else if len(res.GlobalAccountData) > 0 {
-				events = append(events, res.GlobalAccountData...)
+			for t, d := range res.GlobalAccountData {
+				data.AccountData.Events = append(
+					data.AccountData.Events,
+					gomatrixserverlib.ClientEvent{
+						Type:    t,
+						Content: gomatrixserverlib.RawJSON(d),
+					},
+				)
 			}
-		}
-
-		// Append the data to the response
-		if len(roomID) > 0 {
-			jr := data.Rooms.Join[roomID]
-			jr.AccountData.Events = events
-			data.Rooms.Join[roomID] = jr
-		} else {
-			data.AccountData.Events = events
+			for r, byRoom := range res.RoomAccountData {
+				for t, d := range byRoom {
+					joinData := data.Rooms.Join[r]
+					joinData.AccountData.Events = append(
+						joinData.AccountData.Events,
+						gomatrixserverlib.ClientEvent{
+							Type:    t,
+							Content: gomatrixserverlib.RawJSON(d),
+						},
+					)
+					data.Rooms.Join[r] = joinData
+				}
+			}
 		}
 	}
 
