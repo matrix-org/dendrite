@@ -58,6 +58,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
 	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
+	cfg.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
 	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s/dendrite-account.db", m.StorageDirectory))
 	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s/dendrite-device.db", m.StorageDirectory))
 	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s/dendrite-mediaapi.db", m.StorageDirectory))
@@ -108,6 +109,8 @@ func (m *DendriteMonolith) Start() {
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
+		AccountDB:     accountDB,
+		DeviceDB:      deviceDB,
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,
@@ -150,6 +153,6 @@ func (m *DendriteMonolith) Start() {
 	}()
 	go func() {
 		logger.Info("Listening on ", m.BaseURL())
-		logger.Fatal(http.Serve(m.listener, nil))
+		logger.Fatal(httpServer.Serve(m.listener))
 	}()
 }
