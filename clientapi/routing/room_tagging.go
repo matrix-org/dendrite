@@ -24,23 +24,14 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
-
-// newTag creates and returns a new gomatrix.TagContent
-func newTag() gomatrix.TagContent {
-	return gomatrix.TagContent{
-		Tags: make(map[string]gomatrix.TagProperties),
-	}
-}
 
 // GetTags implements GET /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags
 func GetTags(
 	req *http.Request,
-	accountDB accounts.Database,
+	userAPI api.UserInternalAPI,
 	device *api.Device,
 	userID string,
 	roomID string,
@@ -54,22 +45,15 @@ func GetTags(
 		}
 	}
 
-	_, data, err := obtainSavedTags(req, userID, roomID, accountDB)
+	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
 		return jsonerror.InternalServerError()
 	}
 
-	if data == nil {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: struct{}{},
-		}
-	}
-
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: data,
+		JSON: tagContent,
 	}
 }
 
@@ -78,7 +62,7 @@ func GetTags(
 // the tag to the "map" and saving the new "map" to the DB
 func PutTag(
 	req *http.Request,
-	accountDB accounts.Database,
+	userAPI api.UserInternalAPI,
 	device *api.Device,
 	userID string,
 	roomID string,
@@ -98,34 +82,25 @@ func PutTag(
 		return *reqErr
 	}
 
-	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
+	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
 		return jsonerror.InternalServerError()
 	}
 
-	var tagContent gomatrix.TagContent
-	if data != nil {
-		if err = json.Unmarshal(data, &tagContent); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
-			return jsonerror.InternalServerError()
-		}
-	} else {
-		tagContent = newTag()
+	if tagContent.Tags == nil {
+		tagContent.Tags = make(map[string]gomatrix.TagProperties)
 	}
 	tagContent.Tags[tag] = properties
-	if err = saveTagData(req, localpart, roomID, accountDB, tagContent); err != nil {
+
+	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
 		return jsonerror.InternalServerError()
 	}
 
-	// Send data to syncProducer in order to inform clients of changes
-	// Run in a goroutine in order to prevent blocking the tag request response
-	go func() {
-		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
-			logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
-		}
-	}()
+	if err = syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+		logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -138,7 +113,7 @@ func PutTag(
 // the "map" and then saving the new "map" in the DB
 func DeleteTag(
 	req *http.Request,
-	accountDB accounts.Database,
+	userAPI api.UserInternalAPI,
 	device *api.Device,
 	userID string,
 	roomID string,
@@ -153,25 +128,9 @@ func DeleteTag(
 		}
 	}
 
-	localpart, data, err := obtainSavedTags(req, userID, roomID, accountDB)
+	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
-		return jsonerror.InternalServerError()
-	}
-
-	// If there are no tags in the database, exit
-	if data == nil {
-		// Spec only defines 200 responses for this endpoint so we don't return anything else.
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: struct{}{},
-		}
-	}
-
-	var tagContent gomatrix.TagContent
-	err = json.Unmarshal(data, &tagContent)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -185,18 +144,16 @@ func DeleteTag(
 			JSON: struct{}{},
 		}
 	}
-	if err = saveTagData(req, localpart, roomID, accountDB, tagContent); err != nil {
+
+	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
 		return jsonerror.InternalServerError()
 	}
 
-	// Send data to syncProducer in order to inform clients of changes
-	// Run in a goroutine in order to prevent blocking the tag request response
-	go func() {
-		if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
-			logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
-		}
-	}()
+	// TODO: user API should do this since it's account data
+	if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+		logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -210,32 +167,46 @@ func obtainSavedTags(
 	req *http.Request,
 	userID string,
 	roomID string,
-	accountDB accounts.Database,
-) (string, json.RawMessage, error) {
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return "", nil, err
+	userAPI api.UserInternalAPI,
+) (tags gomatrix.TagContent, err error) {
+	dataReq := api.QueryAccountDataRequest{
+		UserID:   userID,
+		RoomID:   roomID,
+		DataType: "m.tag",
 	}
-
-	data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, "m.tag",
-	)
-
-	return localpart, data, err
+	dataRes := api.QueryAccountDataResponse{}
+	err = userAPI.QueryAccountData(req.Context(), &dataReq, &dataRes)
+	if err != nil {
+		return
+	}
+	data, ok := dataRes.RoomAccountData[roomID]["m.tag"]
+	if !ok {
+		return
+	}
+	if err = json.Unmarshal(data, &tags); err != nil {
+		return
+	}
+	return tags, nil
 }
 
 // saveTagData saves the provided tag data into the database
 func saveTagData(
 	req *http.Request,
-	localpart string,
+	userID string,
 	roomID string,
-	accountDB accounts.Database,
+	userAPI api.UserInternalAPI,
 	Tag gomatrix.TagContent,
 ) error {
 	newTagData, err := json.Marshal(Tag)
 	if err != nil {
 		return err
 	}
-
-	return accountDB.SaveAccountData(req.Context(), localpart, roomID, "m.tag", json.RawMessage(newTagData))
+	dataReq := api.InputAccountDataRequest{
+		UserID:      userID,
+		RoomID:      roomID,
+		DataType:    "m.tag",
+		AccountData: json.RawMessage(newTagData),
+	}
+	dataRes := api.InputAccountDataResponse{}
+	return userAPI.InputAccountData(req.Context(), &dataReq, &dataRes)
 }

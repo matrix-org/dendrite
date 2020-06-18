@@ -83,18 +83,18 @@ func (s *accountDataStatements) insertAccountData(
 func (s *accountDataStatements) selectAccountData(
 	ctx context.Context, localpart string,
 ) (
-	global map[string]json.RawMessage,
-	rooms map[string]map[string]json.RawMessage,
-	err error,
+	/* global */ map[string]json.RawMessage,
+	/* rooms */ map[string]map[string]json.RawMessage,
+	error,
 ) {
 	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart)
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountData: rows.close() failed")
 
-	global = map[string]json.RawMessage{}
-	rooms = map[string]map[string]json.RawMessage{}
+	global := map[string]json.RawMessage{}
+	rooms := map[string]map[string]json.RawMessage{}
 
 	for rows.Next() {
 		var roomID string
@@ -102,7 +102,7 @@ func (s *accountDataStatements) selectAccountData(
 		var content []byte
 
 		if err = rows.Scan(&roomID, &dataType, &content); err != nil {
-			return
+			return nil, nil, err
 		}
 
 		if roomID != "" {

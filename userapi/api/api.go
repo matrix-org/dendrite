@@ -36,7 +36,7 @@ type UserInternalAPI interface {
 type InputAccountDataRequest struct {
 	UserID      string          // required: the user to set account data for
 	RoomID      string          // optional: the room to associate the account data with
-	DataType    string          // required: the data type of the data
+	DataType    string          // optional: the data type of the data
 	AccountData json.RawMessage // required: the message content
 }
 

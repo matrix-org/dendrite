@@ -205,14 +205,14 @@ func (rp *RequestPool) appendAccountData(
 	if req.since == nil {
 		// If this is the initial sync, we don't need to check if a data has
 		// already been sent. Instead, we send the whole batch.
-		var res userapi.QueryAccountDataResponse
-		err := rp.userAPI.QueryAccountData(req.ctx, &userapi.QueryAccountDataRequest{
+		dataReq := &userapi.QueryAccountDataRequest{
 			UserID: userID,
-		}, &res)
-		if err != nil {
+		}
+		dataRes := &userapi.QueryAccountDataResponse{}
+		if err := rp.userAPI.QueryAccountData(req.ctx, dataReq, dataRes); err != nil {
 			return nil, err
 		}
-		for datatype, databody := range res.GlobalAccountData {
+		for datatype, databody := range dataRes.GlobalAccountData {
 			data.AccountData.Events = append(
 				data.AccountData.Events,
 				gomatrixserverlib.ClientEvent{
@@ -222,7 +222,7 @@ func (rp *RequestPool) appendAccountData(
 			)
 		}
 		for r, j := range data.Rooms.Join {
-			for datatype, databody := range res.RoomAccountData[r] {
+			for datatype, databody := range dataRes.RoomAccountData[r] {
 				j.AccountData.Events = append(
 					j.AccountData.Events,
 					gomatrixserverlib.ClientEvent{

@@ -104,11 +104,6 @@ func SaveAccountData(
 		}
 	}
 
-	if err := syncProducer.SendData(userID, roomID, dataType); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
-		return jsonerror.InternalServerError()
-	}
-
 	dataReq := api.InputAccountDataRequest{
 		UserID:      userID,
 		DataType:    dataType,
@@ -118,10 +113,13 @@ func SaveAccountData(
 	dataRes := api.InputAccountDataResponse{}
 	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.Forbidden("data not found"),
-		}
+		return util.ErrorResponse(err)
+	}
+
+	// TODO: user API should do this since it's account data
+	if err := syncProducer.SendData(userID, roomID, dataType); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
+		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
