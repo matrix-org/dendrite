@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"sync"
@@ -180,7 +181,7 @@ func (d *Database) createAccount(
 		return nil, err
 	}
 
-	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", `{
+	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
 		"global": {
 			"content": [],
 			"override": [],
@@ -188,7 +189,7 @@ func (d *Database) createAccount(
 			"sender": [],
 			"underride": []
 		}
-	}`); err != nil {
+	}`)); err != nil {
 		return nil, err
 	}
 	return d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID)
@@ -306,7 +307,7 @@ func (d *Database) newMembership(
 // update the corresponding row with the new content
 // Returns a SQL error if there was an issue with the insertion/update
 func (d *Database) SaveAccountData(
-	ctx context.Context, localpart, roomID, dataType, content string,
+	ctx context.Context, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
 	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		return d.accountDatas.insertAccountData(ctx, txn, localpart, roomID, dataType, content)
@@ -317,8 +318,8 @@ func (d *Database) SaveAccountData(
 // If no account data could be found, returns an empty arrays
 // Returns an error if there was an issue with the retrieval
 func (d *Database) GetAccountData(ctx context.Context, localpart string) (
-	global []gomatrixserverlib.ClientEvent,
-	rooms map[string][]gomatrixserverlib.ClientEvent,
+	global map[string]json.RawMessage,
+	rooms map[string]map[string]json.RawMessage,
 	err error,
 ) {
 	return d.accountDatas.selectAccountData(ctx, localpart)
@@ -330,7 +331,7 @@ func (d *Database) GetAccountData(ctx context.Context, localpart string) (
 // Returns an error if there was an issue with the retrieval
 func (d *Database) GetAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
-) (data *gomatrixserverlib.ClientEvent, err error) {
+) (data json.RawMessage, err error) {
 	return d.accountDatas.selectAccountDataByType(
 		ctx, localpart, roomID, dataType,
 	)

@@ -2,6 +2,8 @@
 
 package embed
 
-func Embed(_ int, _ string) {
+import "github.com/gorilla/mux"
+
+func Embed(_ *mux.Router, _ int, _ string) {
 
 }

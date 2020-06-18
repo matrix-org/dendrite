@@ -7,19 +7,20 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/tidwall/sjson"
 )
 
 // From within the Riot Web directory:
 // go run github.com/mjibson/esc -o /path/to/dendrite/internal/embed/fs_riotweb.go -private -pkg embed .
 
-func Embed(listenPort int, serverName string) {
+func Embed(rootMux *mux.Router, listenPort int, serverName string) {
 	url := fmt.Sprintf("http://localhost:%d", listenPort)
 	embeddedFS := _escFS(false)
 	embeddedServ := http.FileServer(embeddedFS)
 
-	http.DefaultServeMux.Handle("/", embeddedServ)
-	http.DefaultServeMux.HandleFunc("/config.json", func(w http.ResponseWriter, _ *http.Request) {
+	rootMux.Handle("/", embeddedServ)
+	rootMux.HandleFunc("/config.json", func(w http.ResponseWriter, _ *http.Request) {
 		configFile, err := embeddedFS.Open("/config.sample.json")
 		if err != nil {
 			w.WriteHeader(500)

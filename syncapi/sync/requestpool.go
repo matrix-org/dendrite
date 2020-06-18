@@ -205,22 +205,34 @@ func (rp *RequestPool) appendAccountData(
 	if req.since == nil {
 		// If this is the initial sync, we don't need to check if a data has
 		// already been sent. Instead, we send the whole batch.
-		var res userapi.QueryAccountDataResponse
-		err := rp.userAPI.QueryAccountData(req.ctx, &userapi.QueryAccountDataRequest{
+		dataReq := &userapi.QueryAccountDataRequest{
 			UserID: userID,
-		}, &res)
-		if err != nil {
+		}
+		dataRes := &userapi.QueryAccountDataResponse{}
+		if err := rp.userAPI.QueryAccountData(req.ctx, dataReq, dataRes); err != nil {
 			return nil, err
 		}
-		data.AccountData.Events = res.GlobalAccountData
-
+		for datatype, databody := range dataRes.GlobalAccountData {
+			data.AccountData.Events = append(
+				data.AccountData.Events,
+				gomatrixserverlib.ClientEvent{
+					Type:    datatype,
+					Content: gomatrixserverlib.RawJSON(databody),
+				},
+			)
+		}
 		for r, j := range data.Rooms.Join {
-			if len(res.RoomAccountData[r]) > 0 {
-				j.AccountData.Events = res.RoomAccountData[r]
+			for datatype, databody := range dataRes.RoomAccountData[r] {
+				j.AccountData.Events = append(
+					j.AccountData.Events,
+					gomatrixserverlib.ClientEvent{
+						Type:    datatype,
+						Content: gomatrixserverlib.RawJSON(databody),
+					},
+				)
 				data.Rooms.Join[r] = j
 			}
 		}
-
 		return data, nil
 	}
 
@@ -249,32 +261,41 @@ func (rp *RequestPool) appendAccountData(
 
 	// Iterate over the rooms
 	for roomID, dataTypes := range dataTypes {
-		events := []gomatrixserverlib.ClientEvent{}
 		// Request the missing data from the database
 		for _, dataType := range dataTypes {
-			var res userapi.QueryAccountDataResponse
-			err = rp.userAPI.QueryAccountData(req.ctx, &userapi.QueryAccountDataRequest{
+			dataReq := userapi.QueryAccountDataRequest{
 				UserID:   userID,
 				RoomID:   roomID,
 				DataType: dataType,
-			}, &res)
+			}
+			dataRes := userapi.QueryAccountDataResponse{}
+			err = rp.userAPI.QueryAccountData(req.ctx, &dataReq, &dataRes)
 			if err != nil {
-				return nil, err
+				continue
 			}
-			if len(res.RoomAccountData[roomID]) > 0 {
-				events = append(events, res.RoomAccountData[roomID]...)
-			} else if len(res.GlobalAccountData) > 0 {
-				events = append(events, res.GlobalAccountData...)
+			if roomID == "" {
+				if globalData, ok := dataRes.GlobalAccountData[dataType]; ok {
+					data.AccountData.Events = append(
+						data.AccountData.Events,
+						gomatrixserverlib.ClientEvent{
+							Type:    dataType,
+							Content: gomatrixserverlib.RawJSON(globalData),
+						},
+					)
+				}
+			} else {
+				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
+					joinData := data.Rooms.Join[roomID]
+					joinData.AccountData.Events = append(
+						joinData.AccountData.Events,
+						gomatrixserverlib.ClientEvent{
+							Type:    dataType,
+							Content: gomatrixserverlib.RawJSON(roomData),
+						},
+					)
+					data.Rooms.Join[roomID] = joinData
+				}
 			}
-		}
-
-		// Append the data to the response
-		if len(roomID) > 0 {
-			jr := data.Rooms.Join[roomID]
-			jr.AccountData.Events = events
-			data.Rooms.Join[roomID] = jr
-		} else {
-			data.AccountData.Events = events
 		}
 	}
 

@@ -476,7 +476,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveAccountData(req, accountDB, device, vars["userID"], "", vars["type"], syncProducer)
+			return SaveAccountData(req, userAPI, device, vars["userID"], "", vars["type"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -486,7 +486,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
+			return SaveAccountData(req, userAPI, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -496,7 +496,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetAccountData(req, accountDB, device, vars["userID"], "", vars["type"])
+			return GetAccountData(req, userAPI, device, vars["userID"], "", vars["type"])
 		}),
 	).Methods(http.MethodGet)
 
@@ -506,7 +506,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"])
+			return GetAccountData(req, userAPI, device, vars["userID"], vars["roomID"], vars["type"])
 		}),
 	).Methods(http.MethodGet)
 
@@ -604,7 +604,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetTags(req, accountDB, device, vars["userId"], vars["roomId"], syncProducer)
+			return GetTags(req, userAPI, device, vars["userId"], vars["roomId"], syncProducer)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -614,7 +614,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return PutTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
+			return PutTag(req, userAPI, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -624,7 +624,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DeleteTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
+			return DeleteTag(req, userAPI, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 

@@ -113,7 +113,7 @@ func main() {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
-	embed.Embed(*instancePort, "Yggdrasil Demo")
+	embed.Embed(base.BaseMux, *instancePort, "Yggdrasil Demo")
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
