@@ -24,14 +24,14 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/dendrite/userapi/api"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -98,7 +98,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 
 	// Validate creation_content fields defined in the spec by marshalling the
 	// creation_content map into bytes and then unmarshalling the bytes into
-	// internal.CreateContent.
+	// eventutil.CreateContent.
 
 	creationContentBytes, err := json.Marshal(r.CreationContent)
 	if err != nil {
@@ -135,7 +135,7 @@ type fledglingEvent struct {
 
 // CreateRoom implements /createRoom
 func CreateRoom(
-	req *http.Request, device *authtypes.Device,
+	req *http.Request, device *api.Device,
 	cfg *config.Dendrite,
 	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -149,7 +149,7 @@ func CreateRoom(
 // createRoom implements /createRoom
 // nolint: gocyclo
 func createRoom(
-	req *http.Request, device *authtypes.Device,
+	req *http.Request, device *api.Device,
 	cfg *config.Dendrite, roomID string,
 	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -279,25 +279,25 @@ func createRoom(
 	eventsToMake := []fledglingEvent{
 		{"m.room.create", "", r.CreationContent},
 		{"m.room.member", userID, membershipContent},
-		{"m.room.power_levels", "", internal.InitialPowerLevelsContent(userID)},
+		{"m.room.power_levels", "", eventutil.InitialPowerLevelsContent(userID)},
 		{"m.room.join_rules", "", gomatrixserverlib.JoinRuleContent{JoinRule: joinRules}},
-		{"m.room.history_visibility", "", internal.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
+		{"m.room.history_visibility", "", eventutil.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
 	}
 	if roomAlias != "" {
 		// TODO: bit of a chicken and egg problem here as the alias doesn't exist and cannot until we have made the room.
 		// This means we might fail creating the alias but say the canonical alias is something that doesn't exist.
 		// m.room.aliases is handled when we call roomserver.SetRoomAlias
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.canonical_alias", "", internal.CanonicalAlias{Alias: roomAlias}})
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.canonical_alias", "", eventutil.CanonicalAlias{Alias: roomAlias}})
 	}
 	if r.GuestCanJoin {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.guest_access", "", internal.GuestAccessContent{GuestAccess: "can_join"}})
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.guest_access", "", eventutil.GuestAccessContent{GuestAccess: "can_join"}})
 	}
 	eventsToMake = append(eventsToMake, r.InitialState...)
 	if r.Name != "" {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.name", "", internal.NameContent{Name: r.Name}})
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.name", "", eventutil.NameContent{Name: r.Name}})
 	}
 	if r.Topic != "" {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.topic", "", internal.TopicContent{Topic: r.Topic}})
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.topic", "", eventutil.TopicContent{Topic: r.Topic}})
 	}
 	// TODO: invite events
 	// TODO: 3pid invite events

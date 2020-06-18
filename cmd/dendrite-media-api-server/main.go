@@ -15,18 +15,20 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/mediaapi"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "MediaAPI", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "MediaAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
+	client := gomatrixserverlib.NewClient()
 
-	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB)
+	mediaapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, userAPI, client)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.MediaAPI), string(base.Cfg.Listen.MediaAPI))
 

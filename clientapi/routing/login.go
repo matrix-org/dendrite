@@ -22,13 +22,13 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -49,9 +49,8 @@ type loginIdentifier struct {
 
 type loginWithPasswordRequest struct {
 	Identifier loginIdentifier `json:"identifier"`
-	Medium     string          `json:"medium"`   // third-party only
-	Password   string          `json:"password"` // m.login.password only
-	Token      string          `json:"token"`    // m.login.token only
+	User       string          `json:"user"` // deprecated in favour of identifier
+	Password   string          `json:"password"`
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string `json:"initial_device_display_name"`
@@ -88,9 +87,10 @@ func Login(
 			JSON: passwordLogin(),
 		}
 	} else if req.Method == http.MethodPost {
-		var temp interface{}
-		var acc *authtypes.Account
-		resErr := httputil.UnmarshalJSONRequest(req, &temp)
+		var r passwordRequest
+		var acc *api.Account
+		var errJSON *util.JSONResponse
+		resErr := httputil.UnmarshalJSONRequest(req, &r)
 		if resErr != nil {
 			return *resErr
 		}
@@ -113,43 +113,23 @@ func Login(
 						JSON: jsonerror.BadJSON("'user' must be supplied."),
 					}
 				}
-
-				util.GetLogger(req.Context()).WithField("user", r.Identifier.User).Info("Processing login request")
-
-				localpart, err := userutil.ParseUsernameParam(r.Identifier.User, &cfg.Matrix.ServerName)
-				if err != nil {
-					return util.JSONResponse{
-						Code: http.StatusBadRequest,
-						JSON: jsonerror.InvalidUsername(err.Error()),
-					}
-				}
-
-				acc, err = accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
-				if err != nil {
-					// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
-					// but that would leak the existence of the user.
-					return util.JSONResponse{
-						Code: http.StatusForbidden,
-						JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
-					}
-				}
-
-			case "m.login.token":
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.Unknown("Token login is not supported"),
-				}
-
-			default:
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.Unknown("login identifier '" + r.Identifier.Type + "' not supported"),
-				}
+			}
+			acc, errJSON = r.processUsernamePasswordLoginRequest(req, accountDB, cfg, r.Identifier.User)
+			if errJSON != nil {
+				return *errJSON
 			}
 		default:
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown(fmt.Sprintf("Login type %q not supported", r.Type)),
+			// TODO: The below behaviour is deprecated but without it Riot iOS won't log in
+			if r.User != "" {
+				acc, errJSON = r.processUsernamePasswordLoginRequest(req, accountDB, cfg, r.User)
+				if errJSON != nil {
+					return *errJSON
+				}
+			} else {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.BadJSON("login identifier '" + r.Identifier.Type + "' not supported"),
+				}
 			}
 		}
 
@@ -188,11 +168,40 @@ func getDevice(
 	ctx context.Context,
 	r loginWithPasswordRequest,
 	deviceDB devices.Database,
-	acc *authtypes.Account,
+	acc *api.Account,
 	token string,
-) (dev *authtypes.Device, err error) {
+) (dev *api.Device, err error) {
 	dev, err = deviceDB.CreateDevice(
 		ctx, acc.Localpart, r.DeviceID, token, r.InitialDisplayName,
 	)
+	return
+}
+
+func (r *passwordRequest) processUsernamePasswordLoginRequest(
+	req *http.Request, accountDB accounts.Database,
+	cfg *config.Dendrite, username string,
+) (acc *api.Account, errJSON *util.JSONResponse) {
+	util.GetLogger(req.Context()).WithField("user", username).Info("Processing login request")
+
+	localpart, err := userutil.ParseUsernameParam(username, &cfg.Matrix.ServerName)
+	if err != nil {
+		errJSON = &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername(err.Error()),
+		}
+		return
+	}
+
+	acc, err = accountDB.GetAccountByPassword(req.Context(), localpart, r.Password)
+	if err != nil {
+		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+		// but that would leak the existence of the user.
+		errJSON = &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+		}
+		return
+	}
+
 	return
 }

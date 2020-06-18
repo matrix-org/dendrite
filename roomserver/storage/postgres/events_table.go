@@ -22,6 +22,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -284,13 +285,13 @@ func (s *eventStatements) UpdateEventState(
 func (s *eventStatements) SelectEventSentToOutput(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
 ) (sentToOutput bool, err error) {
-	stmt := internal.TxStmt(txn, s.selectEventSentToOutputStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventSentToOutputStmt)
 	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
 	return
 }
 
 func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
-	stmt := internal.TxStmt(txn, s.updateEventSentToOutputStmt)
+	stmt := sqlutil.TxStmt(txn, s.updateEventSentToOutputStmt)
 	_, err := stmt.ExecContext(ctx, int64(eventNID))
 	return err
 }
@@ -298,7 +299,7 @@ func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.
 func (s *eventStatements) SelectEventID(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
 ) (eventID string, err error) {
-	stmt := internal.TxStmt(txn, s.selectEventIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventIDStmt)
 	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&eventID)
 	return
 }
@@ -306,7 +307,7 @@ func (s *eventStatements) SelectEventID(
 func (s *eventStatements) BulkSelectStateAtEventAndReference(
 	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]types.StateAtEventAndReference, error) {
-	stmt := internal.TxStmt(txn, s.bulkSelectStateAtEventAndReferenceStmt)
+	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateAtEventAndReferenceStmt)
 	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err

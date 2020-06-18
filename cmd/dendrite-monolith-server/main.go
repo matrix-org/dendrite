@@ -17,18 +17,21 @@ package main
 import (
 	"flag"
 	"net/http"
+	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
 )
@@ -39,10 +42,11 @@ var (
 	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
 	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
 	enableHTTPAPIs = flag.Bool("api", false, "Use HTTP APIs instead of short-circuiting (warning: exposes API endpoints!)")
+	traceInternal  = os.Getenv("DENDRITE_TRACE_INTERNAL") == "1"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(true)
+	cfg := setup.ParseFlags(true)
 	if *enableHTTPAPIs {
 		// If the HTTP APIs are enabled then we need to update the Listen
 		// statements in the configuration so that we know where to find
@@ -56,7 +60,7 @@ func main() {
 		cfg.Listen.ServerKeyAPI = addr
 	}
 
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
+	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -71,25 +75,32 @@ func main() {
 		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices)
 
-	rsComponent := roomserver.NewInternalAPI(
+	rsImpl := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
-	rsAPI := rsComponent
+	// call functions directly on the impl unless running in HTTP mode
+	rsAPI := rsImpl
 	if base.UseHTTPAPIs {
-		roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
+		roomserver.AddInternalRoutes(base.InternalAPIMux, rsImpl)
 		rsAPI = base.RoomserverHTTPClient()
+	}
+	if traceInternal {
+		rsAPI = &api.RoomserverInternalAPITrace{
+			Impl: rsAPI,
+		}
 	}
 
 	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), deviceDB,
+		base, cache.New(), userAPI,
 	)
 	if base.UseHTTPAPIs {
 		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
 		eduInputAPI = base.EDUServerClient()
 	}
 
-	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	if base.UseHTTPAPIs {
 		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
@@ -102,7 +113,9 @@ func main() {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationSenderHTTPClient()
 	}
-	rsComponent.SetFederationSenderAPI(fsAPI)
+	// The underlying roomserver implementation needs to be able to call the fedsender.
+	// This is different to rsAPI which can be the http client which doesn't need this dependency
+	rsImpl.SetFederationSenderAPI(fsAPI)
 
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
@@ -113,6 +126,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        gomatrixserverlib.NewClient(),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,
@@ -123,13 +137,14 @@ func main() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		ServerKeyAPI:        serverKeyAPI,
+		UserAPI:             userAPI,
 
 		PublicRoomsDB: publicRoomsDB,
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
-	internal.SetupHTTPAPI(
-		http.DefaultServeMux,
+	httputil.SetupHTTPAPI(
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
@@ -140,7 +155,8 @@ func main() {
 	go func() {
 		serv := http.Server{
 			Addr:         *httpBindAddr,
-			WriteTimeout: basecomponent.HTTPServerTimeout,
+			WriteTimeout: setup.HTTPServerTimeout,
+			Handler:      base.BaseMux,
 		}
 
 		logrus.Info("Listening on ", serv.Addr)
@@ -151,7 +167,8 @@ func main() {
 		go func() {
 			serv := http.Server{
 				Addr:         *httpsBindAddr,
-				WriteTimeout: basecomponent.HTTPServerTimeout,
+				WriteTimeout: setup.HTTPServerTimeout,
+				Handler:      base.BaseMux,
 			}
 
 			logrus.Info("Listening on ", serv.Addr)

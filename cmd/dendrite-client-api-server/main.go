@@ -16,31 +16,29 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/clientapi"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/transactions"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
+	cfg := setup.ParseFlags(false)
 
-	base := basecomponent.NewBaseDendrite(cfg, "ClientAPI", true)
+	base := setup.NewBaseDendrite(cfg, "ClientAPI", true)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := base.ServerKeyAPIClient()
-	keyRing := serverKeyAPI.KeyRing()
-
 	asQuery := base.AppserviceHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
 	fsAPI := base.FederationSenderHTTPClient()
 	eduInputAPI := base.EDUServerClient()
+	userAPI := base.UserAPIClient()
 
 	clientapi.AddPublicRoutes(
-		base.PublicAPIMux, base.Cfg, base.KafkaConsumer, base.KafkaProducer, deviceDB, accountDB, federation, keyRing,
-		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI,
+		base.PublicAPIMux, base.Cfg, base.KafkaConsumer, base.KafkaProducer, deviceDB, accountDB, federation,
+		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))

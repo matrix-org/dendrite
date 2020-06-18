@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -46,8 +46,8 @@ func (s *streamIDStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *streamIDStatements) nextStreamID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
-	increaseStmt := internal.TxStmt(txn, s.increaseStreamIDStmt)
-	selectStmt := internal.TxStmt(txn, s.selectStreamIDStmt)
+	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
+	selectStmt := sqlutil.TxStmt(txn, s.selectStreamIDStmt)
 	if _, err = increaseStmt.ExecContext(ctx, "global"); err != nil {
 		return
 	}

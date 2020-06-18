@@ -45,7 +45,6 @@ func (r *RoomserverInternalAPI) QueryLatestEventsAndState(
 
 	roomState := state.NewStateResolution(r.DB)
 
-	response.QueryLatestEventsAndStateRequest = *request
 	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
 	if err != nil {
 		return err
@@ -105,7 +104,6 @@ func (r *RoomserverInternalAPI) QueryStateAfterEvents(
 
 	roomState := state.NewStateResolution(r.DB)
 
-	response.QueryStateAfterEventsRequest = *request
 	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
 	if err != nil {
 		return err
@@ -153,8 +151,6 @@ func (r *RoomserverInternalAPI) QueryEventsByID(
 	request *api.QueryEventsByIDRequest,
 	response *api.QueryEventsByIDResponse,
 ) error {
-	response.QueryEventsByIDRequest = *request
-
 	eventNIDMap, err := r.DB.EventNIDs(ctx, request.EventIDs)
 	if err != nil {
 		return err
@@ -353,40 +349,6 @@ func getMembershipsAtState(
 	return events, nil
 }
 
-// QueryInvitesForUser implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryInvitesForUser(
-	ctx context.Context,
-	request *api.QueryInvitesForUserRequest,
-	response *api.QueryInvitesForUserResponse,
-) error {
-	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
-	if err != nil {
-		return err
-	}
-
-	targetUserNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{request.TargetUserID})
-	if err != nil {
-		return err
-	}
-	targetUserNID := targetUserNIDs[request.TargetUserID]
-
-	senderUserNIDs, err := r.DB.GetInvitesForUser(ctx, roomNID, targetUserNID)
-	if err != nil {
-		return err
-	}
-
-	senderUserIDs, err := r.DB.EventStateKeys(ctx, senderUserNIDs)
-	if err != nil {
-		return err
-	}
-
-	for _, senderUserID := range senderUserIDs {
-		response.InviteSenderUserIDs = append(response.InviteSenderUserIDs, senderUserID)
-	}
-
-	return nil
-}
-
 // QueryServerAllowedToSeeEvent implements api.RoomserverInternalAPI
 func (r *RoomserverInternalAPI) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
@@ -475,11 +437,11 @@ func (r *RoomserverInternalAPI) QueryMissingEvents(
 	return err
 }
 
-// QueryBackfill implements api.RoomServerQueryAPI
-func (r *RoomserverInternalAPI) QueryBackfill(
+// PerformBackfill implements api.RoomServerQueryAPI
+func (r *RoomserverInternalAPI) PerformBackfill(
 	ctx context.Context,
-	request *api.QueryBackfillRequest,
-	response *api.QueryBackfillResponse,
+	request *api.PerformBackfillRequest,
+	response *api.PerformBackfillResponse,
 ) error {
 	// if we are requesting the backfill then we need to do a federation hit
 	// TODO: we could be more sensible and fetch as many events we already have then request the rest
@@ -523,7 +485,7 @@ func (r *RoomserverInternalAPI) QueryBackfill(
 	return err
 }
 
-func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *api.QueryBackfillRequest, res *api.QueryBackfillResponse) error {
+func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *api.PerformBackfillRequest, res *api.PerformBackfillResponse) error {
 	roomVer, err := r.DB.GetRoomVersionForRoom(ctx, req.RoomID)
 	if err != nil {
 		return fmt.Errorf("backfillViaFederation: unknown room version for room %s : %w", req.RoomID, err)
@@ -681,7 +643,7 @@ func (r *RoomserverInternalAPI) scanEventTree(
 	var pre string
 
 	// TODO: add tests for this function to ensure it meets the contract that callers expect (and doc what that is supposed to be)
-	// Currently, callers like QueryBackfill will call scanEventTree with a pre-populated `visited` map, assuming that by doing
+	// Currently, callers like PerformBackfill will call scanEventTree with a pre-populated `visited` map, assuming that by doing
 	// so means that the events in that map will NOT be returned from this function. That is not currently true, resulting in
 	// duplicate events being sent in response to /backfill requests.
 	initialIgnoreList := make(map[string]bool, len(visited))
@@ -768,7 +730,6 @@ func (r *RoomserverInternalAPI) QueryStateAndAuthChain(
 	request *api.QueryStateAndAuthChainRequest,
 	response *api.QueryStateAndAuthChainResponse,
 ) error {
-	response.QueryStateAndAuthChainRequest = *request
 	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
 	if err != nil {
 		return err

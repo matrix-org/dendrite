@@ -15,9 +15,8 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/userutil"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -25,17 +24,9 @@ import (
 // GetUserDevices for the given user id
 func GetUserDevices(
 	req *http.Request,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	userID string,
 ) util.JSONResponse {
-	localpart, err := userutil.ParseUsernameParam(userID, nil)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("Invalid user ID"),
-		}
-	}
-
 	response := gomatrixserverlib.RespUserDevices{
 		UserID: userID,
 		// TODO: we should return an incrementing stream ID each time the device
@@ -43,13 +34,16 @@ func GetUserDevices(
 		StreamID: 0,
 	}
 
-	devs, err := deviceDB.GetDevicesByLocalpart(req.Context(), localpart)
+	var res userapi.QueryDevicesResponse
+	err := userAPI.QueryDevices(req.Context(), &userapi.QueryDevicesRequest{
+		UserID: userID,
+	}, &res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDevicesByLocalPart failed")
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryDevices failed")
 		return jsonerror.InternalServerError()
 	}
 
-	for _, dev := range devs {
+	for _, dev := range res.Devices {
 		device := gomatrixserverlib.RespUserDevice{
 			DeviceID:    dev.ID,
 			DisplayName: dev.DisplayName,

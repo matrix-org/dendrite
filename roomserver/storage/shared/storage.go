@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -68,7 +68,7 @@ func (d *Database) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		if len(state) > 0 {
 			var stateBlockNID types.StateBlockNID
 			stateBlockNID, err = d.StateBlockTable.BulkInsertStateData(ctx, txn, state)
@@ -158,7 +158,7 @@ func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (ro
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
 ) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		var eventNIDs []types.EventNID
 		eventNIDs, currentStateSnapshotNID, err = d.RoomsTable.SelectLatestEventNIDs(ctx, txn, roomNID)
 		if err != nil {
@@ -337,7 +337,7 @@ func (d *Database) StoreEvent(
 		err              error
 	)
 
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		if txnAndSessionID != nil {
 			if err = d.TransactionsTable.InsertTransaction(
 				ctx, txn, txnAndSessionID.TransactionID,

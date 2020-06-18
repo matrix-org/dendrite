@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -104,8 +105,8 @@ func (s *eventTypeStatements) InsertEventTypeNID(
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
 	var err error
-	insertStmt := internal.TxStmt(tx, s.insertEventTypeNIDStmt)
-	resultStmt := internal.TxStmt(tx, s.insertEventTypeNIDResultStmt)
+	insertStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDStmt)
+	resultStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDResultStmt)
 	if _, err = insertStmt.ExecContext(ctx, eventType); err == nil {
 		err = resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
 	}
@@ -116,7 +117,7 @@ func (s *eventTypeStatements) SelectEventTypeNID(
 	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	selectStmt := internal.TxStmt(tx, s.selectEventTypeNIDStmt)
+	selectStmt := sqlutil.TxStmt(tx, s.selectEventTypeNIDStmt)
 	err := selectStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
@@ -129,7 +130,7 @@ func (s *eventTypeStatements) BulkSelectEventTypeNID(
 	for k, v := range eventTypes {
 		iEventTypes[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", internal.QueryVariadic(len(iEventTypes)), 1)
+	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventTypes)), 1)
 	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err

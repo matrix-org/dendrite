@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -92,7 +93,7 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	for k, v := range stateNIDs {
 		nids[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", internal.QueryVariadic(len(nids)), 1)
+	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
 	selectStmt, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err

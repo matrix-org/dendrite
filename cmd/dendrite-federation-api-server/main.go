@@ -16,26 +16,24 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "FederationAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
 	federation := base.CreateFederationClient()
 	serverKeyAPI := base.ServerKeyAPIClient()
 	keyRing := serverKeyAPI.KeyRing()
 	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
-	asAPI := base.AppserviceHTTPClient()
 
 	federationapi.AddPublicRoutes(
-		base.PublicAPIMux, base.Cfg, accountDB, deviceDB, federation, keyRing,
-		rsAPI, asAPI, fsAPI, base.EDUServerClient(),
+		base.PublicAPIMux, base.Cfg, userAPI, federation, keyRing,
+		rsAPI, fsAPI, base.EDUServerClient(),
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

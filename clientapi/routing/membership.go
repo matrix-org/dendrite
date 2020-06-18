@@ -22,14 +22,15 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
@@ -42,7 +43,7 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 // TODO: Can we improve the cyclo count here? Separate code paths for invites?
 // nolint:gocyclo
 func SendMembership(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	roomID string, membership string, cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -95,7 +96,7 @@ func SendMembership(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(err.Error()),
 		}
-	} else if err == internal.ErrRoomNoExists {
+	} else if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),
@@ -149,7 +150,7 @@ func SendMembership(
 func buildMembershipEvent(
 	ctx context.Context,
 	body threepid.MembershipRequest, accountDB accounts.Database,
-	device *authtypes.Device,
+	device *userapi.Device,
 	membership, roomID string, isDirect bool,
 	cfg *config.Dendrite, evTime time.Time,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
@@ -188,7 +189,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return internal.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
+	return eventutil.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns
@@ -223,7 +224,7 @@ func loadProfile(
 // In the latter case, if there was an issue retrieving the user ID from the request body,
 // returns a JSONResponse with a corresponding error code and message.
 func getMembershipStateKey(
-	body threepid.MembershipRequest, device *authtypes.Device, membership string,
+	body threepid.MembershipRequest, device *userapi.Device, membership string,
 ) (stateKey string, reason string, err error) {
 	if membership == gomatrixserverlib.Ban || membership == "unban" || membership == "kick" || membership == gomatrixserverlib.Invite {
 		// If we're in this case, the state key is contained in the request body,
@@ -245,7 +246,7 @@ func getMembershipStateKey(
 
 func checkAndProcessThreepid(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	body *threepid.MembershipRequest,
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
@@ -268,7 +269,7 @@ func checkAndProcessThreepid(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotTrusted(body.IDServer),
 		}
-	} else if err == internal.ErrRoomNoExists {
+	} else if err == eventutil.ErrRoomNoExists {
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),

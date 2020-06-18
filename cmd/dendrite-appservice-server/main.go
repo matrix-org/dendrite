@@ -16,19 +16,18 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/internal/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags(false)
-	base := basecomponent.NewBaseDendrite(cfg, "AppServiceAPI", true)
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "AppServiceAPI", true)
 
 	defer base.Close() // nolint: errcheck
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
 	rsAPI := base.RoomserverHTTPClient()
 
-	intAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	intAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.AppServiceAPI), string(base.Cfg.Listen.AppServiceAPI))

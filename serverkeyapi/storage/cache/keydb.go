@@ -39,8 +39,8 @@ func (d *KeyDatabase) FetchKeys(
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	results := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
-	for req := range requests {
-		if res, cached := d.cache.GetServerKey(req); cached {
+	for req, ts := range requests {
+		if res, cached := d.cache.GetServerKey(req, ts); cached {
 			results[req] = res
 			delete(requests, req)
 		}

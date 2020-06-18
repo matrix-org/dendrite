@@ -18,8 +18,6 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
@@ -28,6 +26,9 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -41,12 +42,12 @@ func AddPublicRoutes(
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing *gomatrixserverlib.KeyRing,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
+	userAPI userapi.UserInternalAPI,
 ) {
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,
@@ -62,7 +63,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		router, cfg, eduInputAPI, rsAPI, asAPI,
-		accountsDB, deviceDB, federation, *keyRing,
+		accountsDB, deviceDB, userAPI, federation,
 		syncProducer, transactionsCache, fsAPI,
 	)
 }

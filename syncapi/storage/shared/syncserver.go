@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -42,7 +43,7 @@ type Database struct {
 	CurrentRoomState    tables.CurrentRoomState
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
-	SendToDeviceWriter  *internal.TransactionWriter
+	SendToDeviceWriter  *sqlutil.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
 
@@ -126,7 +127,7 @@ func (d *Database) GetStateEvent(
 func (d *Database) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *gomatrixserverlib.StateFilter,
 ) (stateEvents []gomatrixserverlib.HeaderedEvent, err error) {
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
 		return err
 	})
@@ -136,7 +137,7 @@ func (d *Database) GetStateEventsForRoom(
 func (d *Database) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
 	var maxID int64
 	var err error
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		maxID, err = d.OutputEvents.SelectMaxEventID(ctx, txn)
 		if err != nil {
 			return err
@@ -168,7 +169,7 @@ func (d *Database) SyncStreamPosition(ctx context.Context) (types.StreamPosition
 func (d *Database) AddInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (sp types.StreamPosition, err error) {
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
 		return err
 	})
@@ -207,14 +208,14 @@ func (d *Database) GetAccountDataInRange(
 func (d *Database) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (sp types.StreamPosition, err error) {
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		sp, err = d.AccountData.InsertAccountData(ctx, txn, userID, roomID, dataType)
 		return err
 	})
 	return
 }
 
-func (d *Database) StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent {
+func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent {
 	out := make([]gomatrixserverlib.HeaderedEvent, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].HeaderedEvent
@@ -275,7 +276,7 @@ func (d *Database) WriteEvent(
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
 ) (pduPosition types.StreamPosition, returnErr error) {
-	returnErr = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	returnErr = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.OutputEvents.InsertEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
@@ -375,7 +376,7 @@ func (d *Database) GetEventsInTopologicalRange(
 }
 
 func (d *Database) SyncPosition(ctx context.Context) (tok types.StreamingToken, err error) {
-	err = internal.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		pos, err := d.syncPositionTx(ctx, txn)
 		if err != nil {
 			return err
@@ -442,7 +443,7 @@ func (d *Database) syncPositionTx(
 // IDs of all rooms the user joined are returned so EDU deltas can be added for them.
 func (d *Database) addPDUDeltaToResponse(
 	ctx context.Context,
-	device authtypes.Device,
+	device userapi.Device,
 	r types.Range,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
@@ -454,7 +455,7 @@ func (d *Database) addPDUDeltaToResponse(
 	}
 	var succeeded bool
 	defer func() {
-		txerr := internal.EndTransaction(txn, &succeeded)
+		txerr := sqlutil.EndTransaction(txn, &succeeded)
 		if err == nil && txerr != nil {
 			err = txerr
 		}
@@ -549,7 +550,7 @@ func (d *Database) addEDUDeltaToResponse(
 
 func (d *Database) IncrementalSync(
 	ctx context.Context, res *types.Response,
-	device authtypes.Device,
+	device userapi.Device,
 	fromPos, toPos types.StreamingToken,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
@@ -608,7 +609,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 	var succeeded bool
 	defer func() {
-		txerr := internal.EndTransaction(txn, &succeeded)
+		txerr := sqlutil.EndTransaction(txn, &succeeded)
 		if err == nil && txerr != nil {
 			err = txerr
 		}
@@ -687,7 +688,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 
 func (d *Database) CompleteSync(
 	ctx context.Context, res *types.Response,
-	device authtypes.Device, numRecentEventsPerRoom int,
+	device userapi.Device, numRecentEventsPerRoom int,
 ) (*types.Response, error) {
 	toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
 		ctx, res, device.UserID, numRecentEventsPerRoom,
@@ -758,7 +759,7 @@ func (d *Database) getBackwardTopologyPos(
 // addRoomDeltaToResponse adds a room state delta to a sync response
 func (d *Database) addRoomDeltaToResponse(
 	ctx context.Context,
-	device *authtypes.Device,
+	device *userapi.Device,
 	txn *sql.Tx,
 	r types.Range,
 	delta stateDelta,
@@ -904,7 +905,7 @@ func (d *Database) fetchMissingStateEvents(
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
 func (d *Database) getStateDeltas(
-	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
+	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
@@ -979,7 +980,7 @@ func (d *Database) getStateDeltas(
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
 func (d *Database) getStateDeltasForFullStateSync(
-	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
+	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {

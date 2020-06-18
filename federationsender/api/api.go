@@ -15,14 +15,6 @@ type FederationSenderInternalAPI interface {
 		request *PerformDirectoryLookupRequest,
 		response *PerformDirectoryLookupResponse,
 	) error
-	// Query the joined hosts and the membership events accounting for their participation in a room.
-	// Note that if a server has multiple users in the room, it will have multiple entries in the returned slice.
-	// See `QueryJoinedHostServerNamesInRoom` for a de-duplicated version.
-	QueryJoinedHostsInRoom(
-		ctx context.Context,
-		request *QueryJoinedHostsInRoomRequest,
-		response *QueryJoinedHostsInRoomResponse,
-	) error
 	// Query the server names of the joined hosts in a room.
 	// Unlike QueryJoinedHostsInRoom, this function returns a de-duplicated slice
 	// containing only the server names (without information for membership events).
@@ -88,22 +80,12 @@ type PerformServersAliveRequest struct {
 type PerformServersAliveResponse struct {
 }
 
-// QueryJoinedHostsInRoomRequest is a request to QueryJoinedHostsInRoom
-type QueryJoinedHostsInRoomRequest struct {
-	RoomID string `json:"room_id"`
-}
-
-// QueryJoinedHostsInRoomResponse is a response to QueryJoinedHostsInRoom
-type QueryJoinedHostsInRoomResponse struct {
-	JoinedHosts []types.JoinedHost `json:"joined_hosts"`
-}
-
-// QueryJoinedHostServerNamesRequest is a request to QueryJoinedHostServerNames
+// QueryJoinedHostServerNamesInRoomRequest is a request to QueryJoinedHostServerNames
 type QueryJoinedHostServerNamesInRoomRequest struct {
 	RoomID string `json:"room_id"`
 }
 
-// QueryJoinedHostServerNamesResponse is a response to QueryJoinedHostServerNames
+// QueryJoinedHostServerNamesInRoomResponse is a response to QueryJoinedHostServerNames
 type QueryJoinedHostServerNamesInRoomResponse struct {
 	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
 }

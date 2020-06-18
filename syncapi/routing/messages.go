@@ -158,6 +158,7 @@ func OnIncomingMessagesRequest(
 		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
 		return jsonerror.InternalServerError()
 	}
+
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"from":         from.String(),
 		"to":           to.String(),
@@ -246,6 +247,12 @@ func (r *messagesReq) retrieveEvents() (
 	// change the way topological positions are defined (as depth isn't the most
 	// reliable way to define it), it would be easier and less troublesome to
 	// only have to change it in one place, i.e. the database.
+	start, end, err = r.getStartEnd(events)
+
+	return clientEvents, start, end, err
+}
+
+func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	start, err = r.db.EventPositionInTopology(
 		r.ctx, events[0].EventID(),
 	)
@@ -253,24 +260,28 @@ func (r *messagesReq) retrieveEvents() (
 		err = fmt.Errorf("EventPositionInTopology: for start event %s: %w", events[0].EventID(), err)
 		return
 	}
-	end, err = r.db.EventPositionInTopology(
-		r.ctx, events[len(events)-1].EventID(),
-	)
-	if err != nil {
-		err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
-		return
+	if r.backwardOrdering && events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
+		// We've hit the beginning of the room so there's really nowhere else
+		// to go. This seems to fix Riot iOS from looping on /messages endlessly.
+		end = types.NewTopologyToken(0, 0)
+	} else {
+		end, err = r.db.EventPositionInTopology(
+			r.ctx, events[len(events)-1].EventID(),
+		)
+		if err != nil {
+			err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
+			return
+		}
+		if r.backwardOrdering {
+			// A stream/topological position is a cursor located between two events.
+			// While they are identified in the code by the event on their right (if
+			// we consider a left to right chronological order), tokens need to refer
+			// to them by the event on their left, therefore we need to decrement the
+			// end position we send in the response if we're going backward.
+			end.Decrement()
+		}
 	}
-
-	if r.backwardOrdering {
-		// A stream/topological position is a cursor located between two events.
-		// While they are identified in the code by the event on their right (if
-		// we consider a left to right chronological order), tokens need to refer
-		// to them by the event on their left, therefore we need to decrement the
-		// end position we send in the response if we're going backward.
-		end.Decrement()
-	}
-
-	return clientEvents, start, end, err
+	return
 }
 
 // handleEmptyEventsSlice handles the case where the initial request to the
@@ -375,15 +386,15 @@ func (e eventsByDepth) Less(i, j int) bool {
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
 func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
-	var res api.QueryBackfillResponse
-	err := r.rsAPI.QueryBackfill(context.Background(), &api.QueryBackfillRequest{
+	var res api.PerformBackfillResponse
+	err := r.rsAPI.PerformBackfill(context.Background(), &api.PerformBackfillRequest{
 		RoomID:               roomID,
 		BackwardsExtremities: backwardsExtremities,
 		Limit:                limit,
 		ServerName:           r.cfg.Matrix.ServerName,
 	}, &res)
 	if err != nil {
-		return nil, fmt.Errorf("QueryBackfill failed: %w", err)
+		return nil, fmt.Errorf("PerformBackfill failed: %w", err)
 	}
 	util.GetLogger(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
 

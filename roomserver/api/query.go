@@ -18,7 +18,6 @@ package api
 
 import (
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -34,8 +33,6 @@ type QueryLatestEventsAndStateRequest struct {
 // This is used when sending events to set the prev_events, auth_events and depth.
 // It is also used to tell whether the event is allowed by the event auth rules.
 type QueryLatestEventsAndStateResponse struct {
-	// Copy of the request for debugging.
-	QueryLatestEventsAndStateRequest
 	// Does the room exist?
 	// If the room doesn't exist this will be false and LatestEvents will be empty.
 	RoomExists bool `json:"room_exists"`
@@ -67,8 +64,6 @@ type QueryStateAfterEventsRequest struct {
 
 // QueryStateAfterEventsResponse is a response to QueryStateAfterEvents
 type QueryStateAfterEventsResponse struct {
-	// Copy of the request for debugging.
-	QueryStateAfterEventsRequest
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
@@ -90,8 +85,6 @@ type QueryEventsByIDRequest struct {
 
 // QueryEventsByIDResponse is a response to QueryEventsByID
 type QueryEventsByIDResponse struct {
-	// Copy of the request for debugging.
-	QueryEventsByIDRequest
 	// A list of events with the requested IDs.
 	// If the roomserver does not have a copy of a requested event
 	// then it will omit that event from the list.
@@ -138,23 +131,6 @@ type QueryMembershipsForRoomResponse struct {
 	// True if the user has been in room before and has either stayed in it or
 	// left it.
 	HasBeenInRoom bool `json:"has_been_in_room"`
-}
-
-// QueryInvitesForUserRequest is a request to QueryInvitesForUser
-type QueryInvitesForUserRequest struct {
-	// The room ID to look up invites in.
-	RoomID string `json:"room_id"`
-	// The User ID to look up invites for.
-	TargetUserID string `json:"target_user_id"`
-}
-
-// QueryInvitesForUserResponse is a response to QueryInvitesForUser
-// This is used when accepting an invite or rejecting a invite to tell which
-// remote matrix servers to contact.
-type QueryInvitesForUserResponse struct {
-	// A list of matrix user IDs for each sender of an active invite targeting
-	// the requested user ID.
-	InviteSenderUserIDs []string `json:"invite_sender_user_ids"`
 }
 
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent
@@ -205,8 +181,6 @@ type QueryStateAndAuthChainRequest struct {
 
 // QueryStateAndAuthChainResponse is a response to QueryStateAndAuthChain
 type QueryStateAndAuthChainResponse struct {
-	// Copy of the request for debugging.
-	QueryStateAndAuthChainRequest
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
@@ -219,34 +193,6 @@ type QueryStateAndAuthChainResponse struct {
 	// The lists will be in an arbitrary order.
 	StateEvents     []gomatrixserverlib.HeaderedEvent `json:"state_events"`
 	AuthChainEvents []gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
-}
-
-// QueryBackfillRequest is a request to QueryBackfill.
-type QueryBackfillRequest struct {
-	// The room to backfill
-	RoomID string `json:"room_id"`
-	// A map of backwards extremity event ID to a list of its prev_event IDs.
-	BackwardsExtremities map[string][]string `json:"backwards_extremities"`
-	// The maximum number of events to retrieve.
-	Limit int `json:"limit"`
-	// The server interested in the events.
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
-}
-
-// PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.
-func (r *QueryBackfillRequest) PrevEventIDs() []string {
-	var prevEventIDs []string
-	for _, pes := range r.BackwardsExtremities {
-		prevEventIDs = append(prevEventIDs, pes...)
-	}
-	prevEventIDs = util.UniqueStrings(prevEventIDs)
-	return prevEventIDs
-}
-
-// QueryBackfillResponse is a response to QueryBackfill.
-type QueryBackfillResponse struct {
-	// Missing events, arbritrary order.
-	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
 // QueryRoomVersionCapabilitiesRequest asks for the default room version

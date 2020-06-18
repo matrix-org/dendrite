@@ -21,6 +21,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -107,14 +108,14 @@ func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, content string,
 ) (err error) {
-	_, err = internal.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
+	_, err = sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
 	return
 }
 
 func (s *sendToDeviceStatements) CountSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, userID, deviceID string,
 ) (count int, err error) {
-	row := internal.TxStmt(txn, s.countSendToDeviceMessagesStmt).QueryRowContext(ctx, userID, deviceID)
+	row := sqlutil.TxStmt(txn, s.countSendToDeviceMessagesStmt).QueryRowContext(ctx, userID, deviceID)
 	if err = row.Scan(&count); err != nil {
 		return
 	}
@@ -124,7 +125,7 @@ func (s *sendToDeviceStatements) CountSendToDeviceMessages(
 func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, userID, deviceID string,
 ) (events []types.SendToDeviceEvent, err error) {
-	rows, err := internal.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID)
+	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID)
 	if err != nil {
 		return
 	}

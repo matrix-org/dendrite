@@ -32,11 +32,12 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-libp2p/storage"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -79,6 +80,17 @@ func createFederationClient(
 	)
 }
 
+func createClient(
+	base *P2PDendrite,
+) *gomatrixserverlib.Client {
+	tr := &http.Transport{}
+	tr.RegisterProtocol(
+		"matrix",
+		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
+	)
+	return gomatrixserverlib.NewClientWithTransport(tr)
+}
+
 func main() {
 	instanceName := flag.String("name", "dendrite-p2p", "the name of this P2P demo instance")
 	instancePort := flag.Int("port", 8080, "the port that the client API will listen on")
@@ -101,6 +113,7 @@ func main() {
 	}
 
 	cfg := config.Dendrite{}
+	cfg.SetDefaults()
 	cfg.Matrix.ServerName = "p2p"
 	cfg.Matrix.PrivateKey = privKey
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))
@@ -128,6 +141,7 @@ func main() {
 	accountDB := base.Base.CreateAccountsDB()
 	deviceDB := base.Base.CreateDeviceDB()
 	federation := createFederationClient(base)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
 		base.Base.Cfg, federation, base.Base.Caches,
@@ -141,9 +155,9 @@ func main() {
 		&base.Base, keyRing, federation,
 	)
 	eduInputAPI := eduserver.NewInternalAPI(
-		&base.Base, cache.New(), deviceDB,
+		&base.Base, cache.New(), userAPI,
 	)
-	asAPI := appservice.NewInternalAPI(&base.Base, accountDB, deviceDB, rsAPI)
+	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	fsAPI := federationsender.NewInternalAPI(
 		&base.Base, federation, rsAPI, keyRing,
 	)
@@ -157,6 +171,7 @@ func main() {
 		Config:        base.Base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        createClient(base),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.Base.KafkaConsumer,
@@ -167,13 +182,14 @@ func main() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		ServerKeyAPI:        serverKeyAPI,
+		UserAPI:             userAPI,
 
 		PublicRoomsDB: publicRoomsDB,
 	}
 	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)
 
-	internal.SetupHTTPAPI(
-		http.DefaultServeMux,
+	httputil.SetupHTTPAPI(
+		base.Base.BaseMux,
 		base.Base.PublicAPIMux,
 		base.Base.InternalAPIMux,
 		&cfg,
@@ -184,7 +200,7 @@ func main() {
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.Base.BaseMux))
 	}()
 	// Expose the matrix APIs also via libp2p
 	if base.LibP2P != nil {
@@ -197,7 +213,7 @@ func main() {
 			defer func() {
 				logrus.Fatal(listener.Close())
 			}()
-			logrus.Fatal(http.Serve(listener, nil))
+			logrus.Fatal(http.Serve(listener, base.Base.BaseMux))
 		}()
 	}
 

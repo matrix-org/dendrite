@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -33,7 +32,6 @@ import (
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
 	roomServerConsumer *internal.ContinualConsumer
-	db                 accounts.Database
 	asDB               storage.Database
 	rsAPI              api.RoomserverInternalAPI
 	serverName         string
@@ -45,7 +43,6 @@ type OutputRoomEventConsumer struct {
 func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
-	store accounts.Database,
 	appserviceDB storage.Database,
 	rsAPI api.RoomserverInternalAPI,
 	workerStates []types.ApplicationServiceWorkerState,
@@ -53,11 +50,10 @@ func NewOutputRoomEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
-		PartitionStore: store,
+		PartitionStore: appserviceDB,
 	}
 	s := &OutputRoomEventConsumer{
 		roomServerConsumer: &consumer,
-		db:                 store,
 		asDB:               appserviceDB,
 		rsAPI:              rsAPI,
 		serverName:         string(cfg.Matrix.ServerName),
@@ -91,58 +87,11 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	ev := output.NewRoomEvent.Event
-	log.WithFields(log.Fields{
-		"event_id": ev.EventID(),
-		"room_id":  ev.RoomID(),
-		"type":     ev.Type(),
-	}).Info("appservice received an event from roomserver")
-
-	missingEvents, err := s.lookupMissingStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev)
-	if err != nil {
-		return err
-	}
-	events := append(missingEvents, ev)
+	events := []gomatrixserverlib.HeaderedEvent{output.NewRoomEvent.Event}
+	events = append(events, output.NewRoomEvent.AddStateEvents...)
 
 	// Send event to any relevant application services
 	return s.filterRoomserverEvents(context.TODO(), events)
-}
-
-// lookupMissingStateEvents looks up the state events that are added by a new event,
-// and returns any not already present.
-func (s *OutputRoomEventConsumer) lookupMissingStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.HeaderedEvent,
-) ([]gomatrixserverlib.HeaderedEvent, error) {
-	// Fast path if there aren't any new state events.
-	if len(addsStateEventIDs) == 0 {
-		return []gomatrixserverlib.HeaderedEvent{}, nil
-	}
-
-	// Fast path if the only state event added is the event itself.
-	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.HeaderedEvent{}, nil
-	}
-
-	result := []gomatrixserverlib.HeaderedEvent{}
-	missing := []string{}
-	for _, id := range addsStateEventIDs {
-		if id != event.EventID() {
-			// If the event isn't the current one, add it to the list of events
-			// to retrieve from the roomserver
-			missing = append(missing, id)
-		}
-	}
-
-	// Request the missing events from the roomserver
-	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
-	var eventResp api.QueryEventsByIDResponse
-	if err := s.rsAPI.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
-		return nil, err
-	}
-
-	result = append(result, eventResp.Events...)
-
-	return result, nil
 }
 
 // filterRoomserverEvents takes in events and decides whether any of them need

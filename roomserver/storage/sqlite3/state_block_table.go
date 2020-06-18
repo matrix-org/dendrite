@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -130,7 +131,7 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	for k, v := range stateBlockNIDs {
 		nids[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateBlockEntriesSQL, "($1)", internal.QueryVariadic(len(nids)), 1)
+	selectOrig := strings.Replace(bulkSelectStateBlockEntriesSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
 	selectStmt, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
@@ -186,9 +187,9 @@ func (s *stateBlockStatements) BulkSelectFilteredStateBlockEntries(
 	sort.Sort(tuples)
 
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
-	sqlStatement := strings.Replace(bulkSelectFilteredStateBlockEntriesSQL, "($1)", internal.QueryVariadic(len(stateBlockNIDs)), 1)
-	sqlStatement = strings.Replace(sqlStatement, "($2)", internal.QueryVariadicOffset(len(eventTypeNIDArray), len(stateBlockNIDs)), 1)
-	sqlStatement = strings.Replace(sqlStatement, "($3)", internal.QueryVariadicOffset(len(eventStateKeyNIDArray), len(stateBlockNIDs)+len(eventTypeNIDArray)), 1)
+	sqlStatement := strings.Replace(bulkSelectFilteredStateBlockEntriesSQL, "($1)", sqlutil.QueryVariadic(len(stateBlockNIDs)), 1)
+	sqlStatement = strings.Replace(sqlStatement, "($2)", sqlutil.QueryVariadicOffset(len(eventTypeNIDArray), len(stateBlockNIDs)), 1)
+	sqlStatement = strings.Replace(sqlStatement, "($3)", sqlutil.QueryVariadicOffset(len(eventStateKeyNIDArray), len(stateBlockNIDs)+len(eventTypeNIDArray)), 1)
 
 	var params []interface{}
 	for _, val := range stateBlockNIDs {

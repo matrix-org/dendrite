@@ -107,15 +107,13 @@ func getState(
 		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	authEventIDs := getIDsFromEventRef(event.AuthEvents())
-
 	var response api.QueryStateAndAuthChainResponse
 	err := rsAPI.QueryStateAndAuthChain(
 		ctx,
 		&api.QueryStateAndAuthChainRequest{
 			RoomID:       roomID,
 			PrevEventIDs: []string{eventID},
-			AuthEventIDs: authEventIDs,
+			AuthEventIDs: event.AuthEventIDs(),
 		},
 		&response,
 	)
@@ -132,15 +130,6 @@ func getState(
 		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
 		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
 	}, nil
-}
-
-func getIDsFromEventRef(events []gomatrixserverlib.EventReference) []string {
-	IDs := make([]string, len(events))
-	for i := range events {
-		IDs[i] = events[i].EventID
-	}
-
-	return IDs
 }
 
 func getIDsFromEvent(events []gomatrixserverlib.Event) []string {

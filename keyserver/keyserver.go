@@ -16,17 +16,14 @@ package keyserver
 
 import (
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/keyserver/routing"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // AddPublicRoutes registers HTTP handlers for CS API calls
 func AddPublicRoutes(
-	router *mux.Router, cfg *config.Dendrite,
-	deviceDB devices.Database,
-	accountsDB accounts.Database,
+	router *mux.Router, cfg *config.Dendrite, userAPI userapi.UserInternalAPI,
 ) {
-	routing.Setup(router, cfg, accountsDB, deviceDB)
+	routing.Setup(router, cfg, userAPI)
 }

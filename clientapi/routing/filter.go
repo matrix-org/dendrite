@@ -17,17 +17,17 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
 func GetFilter(
-	req *http.Request, device *authtypes.Device, accountDB accounts.Database, userID string, filterID string,
+	req *http.Request, device *api.Device, accountDB accounts.Database, userID string, filterID string,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -64,7 +64,7 @@ type filterResponse struct {
 
 //PutFilter implements POST /_matrix/client/r0/user/{userId}/filter
 func PutFilter(
-	req *http.Request, device *authtypes.Device, accountDB accounts.Database, userID string,
+	req *http.Request, device *api.Device, accountDB accounts.Database, userID string,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{

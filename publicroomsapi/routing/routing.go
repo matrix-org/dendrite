@@ -17,13 +17,11 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/publicroomsapi/directory"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
@@ -39,20 +37,14 @@ const pathPrefixR0 = "/client/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux *mux.Router, deviceDB devices.Database, publicRoomsDB storage.Database, rsAPI api.RoomserverInternalAPI,
+	publicAPIMux *mux.Router, userAPI userapi.UserInternalAPI, publicRoomsDB storage.Database, rsAPI api.RoomserverInternalAPI,
 	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider types.ExternalPublicRoomsProvider,
 ) {
 	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
 
-	authData := auth.Data{
-		AccountDB:   nil,
-		DeviceDB:    deviceDB,
-		AppServices: nil,
-	}
-
 	r0mux.Handle("/directory/list/room/{roomID}",
-		internal.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
-			vars, err := internal.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -61,8 +53,8 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 	// TODO: Add AS support
 	r0mux.Handle("/directory/list/room/{roomID}",
-		internal.MakeAuthAPI("directory_list", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := internal.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("directory_list", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -70,7 +62,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
-		internal.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
 			if extRoomsProvider != nil {
 				return directory.GetPostPublicRoomsWithExternal(req, publicRoomsDB, fedClient, extRoomsProvider)
 			}
@@ -80,7 +72,7 @@ func Setup(
 
 	// Federation - TODO: should this live here or in federation API? It's sure easier if it's here so here it is.
 	publicAPIMux.Handle("/federation/v1/publicRooms",
-		internal.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
 			return directory.GetPostPublicRooms(req, publicRoomsDB)
 		}),
 	).Methods(http.MethodGet)

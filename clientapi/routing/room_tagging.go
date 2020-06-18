@@ -20,11 +20,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -41,7 +41,7 @@ func newTag() gomatrix.TagContent {
 func GetTags(
 	req *http.Request,
 	accountDB accounts.Database,
-	device *authtypes.Device,
+	device *api.Device,
 	userID string,
 	roomID string,
 	syncProducer *producers.SyncAPIProducer,
@@ -79,7 +79,7 @@ func GetTags(
 func PutTag(
 	req *http.Request,
 	accountDB accounts.Database,
-	device *authtypes.Device,
+	device *api.Device,
 	userID string,
 	roomID string,
 	tag string,
@@ -139,7 +139,7 @@ func PutTag(
 func DeleteTag(
 	req *http.Request,
 	accountDB accounts.Database,
-	device *authtypes.Device,
+	device *api.Device,
 	userID string,
 	roomID string,
 	tag string,

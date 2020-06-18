@@ -17,11 +17,9 @@ package sqlite3
 
 import (
 	"context"
-	"time"
 
 	"golang.org/x/crypto/ed25519"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -48,7 +46,7 @@ func NewDatabase(
 	if err != nil {
 		return nil, err
 	}
-	db, err := sqlutil.Open(internal.SQLiteDriverName(), cs, nil)
+	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,25 +55,6 @@ func NewDatabase(
 	if err != nil {
 		return nil, err
 	}
-	// Store our own keys so that we don't end up making HTTP requests to find our
-	// own keys
-	index := gomatrixserverlib.PublicKeyLookupRequest{
-		ServerName: serverName,
-		KeyID:      serverKeyID,
-	}
-	value := gomatrixserverlib.PublicKeyLookupResult{
-		VerifyKey: gomatrixserverlib.VerifyKey{
-			Key: gomatrixserverlib.Base64Bytes(serverKey),
-		},
-		ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(100 * 365 * 24 * time.Hour)),
-		ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-	}
-	err = d.StoreKeys(
-		context.Background(),
-		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{
-			index: value,
-		},
-	)
 	if err != nil {
 		return nil, err
 	}

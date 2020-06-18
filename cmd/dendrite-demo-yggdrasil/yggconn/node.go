@@ -15,13 +15,16 @@
 package yggconn
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
@@ -46,6 +49,21 @@ type Node struct {
 	dialer    *yggdrasil.Dialer
 	sessions  sync.Map // string -> yamux.Session
 	incoming  chan *yamux.Stream
+}
+
+func (n *Node) Dialer(_, address string) (net.Conn, error) {
+	tokens := strings.Split(address, ":")
+	raw, err := hex.DecodeString(tokens[0])
+	if err != nil {
+		return nil, fmt.Errorf("hex.DecodeString: %w", err)
+	}
+	converted := convert.Ed25519PublicKeyToCurve25519(ed25519.PublicKey(raw))
+	convhex := hex.EncodeToString(converted)
+	return n.Dial("curve25519", convhex)
+}
+
+func (n *Node) DialerContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return n.Dialer(network, address)
 }
 
 // nolint:gocyclo

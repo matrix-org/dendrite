@@ -19,10 +19,10 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
@@ -30,7 +30,7 @@ import (
 
 // GetAccountData implements GET /user/{userId}/[rooms/{roomid}/]account_data/{type}
 func GetAccountData(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *api.Device,
 	userID string, roomID string, dataType string,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -51,7 +51,7 @@ func GetAccountData(
 	); err == nil {
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: data,
+			JSON: data.Content,
 		}
 	}
 
@@ -63,7 +63,7 @@ func GetAccountData(
 
 // SaveAccountData implements PUT /user/{userId}/[rooms/{roomId}/]account_data/{type}
 func SaveAccountData(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *api.Device,
 	userID string, roomID string, dataType string, syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	if userID != device.UserID {

@@ -21,13 +21,11 @@ import (
 	"net/http"
 	"time"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -57,10 +55,10 @@ var (
 
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
-	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
+	req *http.Request, rsAPI api.RoomserverInternalAPI,
+	cfg *config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
-	accountDB accounts.Database,
+	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -79,7 +77,7 @@ func CreateInvitesFrom3PIDInvites(
 		}
 
 		event, err := createInviteFrom3PIDInvite(
-			req.Context(), rsAPI, asAPI, cfg, inv, federation, accountDB,
+			req.Context(), rsAPI, cfg, inv, federation, userAPI,
 		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("createInviteFrom3PIDInvite failed")
@@ -107,7 +105,7 @@ func ExchangeThirdPartyInvite(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI api.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
@@ -197,10 +195,10 @@ func ExchangeThirdPartyInvite(
 // Returns an error if there was a problem building the event or fetching the
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
-	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI, cfg *config.Dendrite,
+	ctx context.Context, rsAPI api.RoomserverInternalAPI,
+	cfg *config.Dendrite,
 	inv invite, federation *gomatrixserverlib.FederationClient,
-	accountDB accounts.Database,
+	userAPI userapi.UserInternalAPI,
 ) (*gomatrixserverlib.Event, error) {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
@@ -225,14 +223,17 @@ func createInviteFrom3PIDInvite(
 		StateKey: &inv.MXID,
 	}
 
-	profile, err := appserviceAPI.RetrieveUserProfile(ctx, inv.MXID, asAPI, accountDB)
+	var res userapi.QueryProfileResponse
+	err = userAPI.QueryProfile(ctx, &userapi.QueryProfileRequest{
+		UserID: inv.MXID,
+	}, &res)
 	if err != nil {
 		return nil, err
 	}
 
 	content := gomatrixserverlib.MemberContent{
-		AvatarURL:   profile.AvatarURL,
-		DisplayName: profile.DisplayName,
+		AvatarURL:   res.AvatarURL,
+		DisplayName: res.DisplayName,
 		Membership:  gomatrixserverlib.Invite,
 		ThirdPartyInvite: &gomatrixserverlib.MemberThirdPartyInvite{
 			Signed: inv.Signed,
@@ -261,7 +262,7 @@ func createInviteFrom3PIDInvite(
 // Returns an error if something failed during the process.
 func buildMembershipEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, rsAPI roomserverAPI.RoomserverInternalAPI,
+	builder *gomatrixserverlib.EventBuilder, rsAPI api.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
@@ -274,11 +275,11 @@ func buildMembershipEvent(
 	}
 
 	// Ask the roomserver for information about this room
-	queryReq := roomserverAPI.QueryLatestEventsAndStateRequest{
+	queryReq := api.QueryLatestEventsAndStateRequest{
 		RoomID:       builder.RoomID,
 		StateToFetch: eventsNeeded.Tuples(),
 	}
-	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
+	var queryRes api.QueryLatestEventsAndStateResponse
 	if err = rsAPI.QueryLatestEventsAndState(ctx, &queryReq, &queryRes); err != nil {
 		return nil, err
 	}

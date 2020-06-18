@@ -21,12 +21,13 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/gomatrix"
@@ -42,7 +43,7 @@ func GetProfile(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == internal.ErrProfileNoExists {
+		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -55,7 +56,7 @@ func GetProfile(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: internal.ProfileResponse{
+		JSON: eventutil.ProfileResponse{
 			AvatarURL:   profile.AvatarURL,
 			DisplayName: profile.DisplayName,
 		},
@@ -70,7 +71,7 @@ func GetAvatarURL(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == internal.ErrProfileNoExists {
+		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -83,7 +84,7 @@ func GetAvatarURL(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: internal.AvatarURL{
+		JSON: eventutil.AvatarURL{
 			AvatarURL: profile.AvatarURL,
 		},
 	}
@@ -92,7 +93,7 @@ func GetAvatarURL(
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 // nolint:gocyclo
 func SetAvatarURL(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -102,7 +103,7 @@ func SetAvatarURL(
 		}
 	}
 
-	var r internal.AvatarURL
+	var r eventutil.AvatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -184,7 +185,7 @@ func GetDisplayName(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == internal.ErrProfileNoExists {
+		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -197,7 +198,7 @@ func GetDisplayName(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: internal.DisplayName{
+		JSON: eventutil.DisplayName{
 			DisplayName: profile.DisplayName,
 		},
 	}
@@ -206,7 +207,7 @@ func GetDisplayName(
 // SetDisplayName implements PUT /profile/{userID}/displayname
 // nolint:gocyclo
 func SetDisplayName(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -216,7 +217,7 @@ func SetDisplayName(
 		}
 	}
 
-	var r internal.DisplayName
+	var r eventutil.DisplayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -293,7 +294,7 @@ func SetDisplayName(
 // getProfile gets the full profile of a user by querying the database or a
 // remote homeserver.
 // Returns an error when something goes wrong or specifically
-// internal.ErrProfileNoExists when the profile doesn't exist.
+// eventutil.ErrProfileNoExists when the profile doesn't exist.
 func getProfile(
 	ctx context.Context, accountDB accounts.Database, cfg *config.Dendrite,
 	userID string,
@@ -310,7 +311,7 @@ func getProfile(
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {
-					return nil, internal.ErrProfileNoExists
+					return nil, eventutil.ErrProfileNoExists
 				}
 			}
 
@@ -365,7 +366,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := internal.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
+		event, err := eventutil.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}
