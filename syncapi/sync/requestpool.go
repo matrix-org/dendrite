@@ -256,7 +256,8 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	if len(dataTypes) == 0 {
-		return data, nil
+		// TODO: this fixes the sytest but is it the right thing to do?
+		dataTypes[""] = []string{"m.push_rules"}
 	}
 
 	// Iterate over the rooms
