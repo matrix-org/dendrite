@@ -62,6 +62,10 @@ func newSyncRequest(req *http.Request, device userapi.Device) (*syncRequest, err
 		}
 		since = &tok
 	}
+	if since == nil {
+		tok := types.NewStreamToken(0, 0)
+		since = &tok
+	}
 	timelineLimit := defaultTimelineLimit
 	// TODO: read from stored filters too
 	filterQuery := req.URL.Query().Get("filter")

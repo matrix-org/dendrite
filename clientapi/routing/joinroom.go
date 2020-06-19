@@ -37,6 +37,7 @@ func JoinRoomByIDOrAlias(
 	joinReq := roomserverAPI.PerformJoinRequest{
 		RoomIDOrAlias: roomIDOrAlias,
 		UserID:        device.UserID,
+		Content:       map[string]interface{}{},
 	}
 	joinRes := roomserverAPI.PerformJoinResponse{}
 
