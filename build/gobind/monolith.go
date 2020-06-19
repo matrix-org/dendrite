@@ -79,7 +79,7 @@ func (m *DendriteMonolith) Start() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	federation := base.CreateFederationClient()
+	federation := ygg.CreateFederationClient(base)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
@@ -112,7 +112,7 @@ func (m *DendriteMonolith) Start() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
-		Client:        gomatrixserverlib.NewClient(),
+		Client:        ygg.CreateClient(base),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,
