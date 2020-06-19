@@ -226,6 +226,7 @@ type Dendrite struct {
 		ServerKeyAPI     Address `yaml:"server_key_api"`
 		AppServiceAPI    Address `yaml:"appservice_api"`
 		SyncAPI          Address `yaml:"sync_api"`
+		UserAPI          Address `yaml:"user_api"`
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
 		PublicRoomsAPI   Address `yaml:"public_rooms_api"`

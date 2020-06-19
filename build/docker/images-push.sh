@@ -13,3 +13,4 @@ docker push matrixdotorg/dendrite:mediaapi
 docker push matrixdotorg/dendrite:publicroomsapi
 docker push matrixdotorg/dendrite:roomserver
 docker push matrixdotorg/dendrite:syncapi
+docker push matrixdotorg/dendrite:userapi
