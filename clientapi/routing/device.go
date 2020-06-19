@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
+// https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-devices
 type deviceJSON struct {
 	DeviceID    string `json:"device_id"`
 	DisplayName string `json:"display_name"`
