@@ -329,3 +329,13 @@ finished).
 ```bash
 ./bin/dendrite-key-server --config dendrite.yaml
 ```
+
+### User server
+
+This manages user accounts, device access tokens and user account data,
+amongst other things.
+
+```bash
+./bin/dendrite-user-api-server --config dendrite.yaml
+```
+
