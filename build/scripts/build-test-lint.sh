@@ -10,7 +10,7 @@ set -eu
 echo "Checking that it builds..."
 go build ./cmd/...
 
-./scripts/find-lint.sh
+./build/scripts/find-lint.sh
 
 echo "Testing..."
 go test -v ./...

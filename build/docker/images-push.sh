@@ -2,6 +2,7 @@
 
 docker push matrixdotorg/dendrite:monolith
 
+docker push matrixdotorg/dendrite:appservice
 docker push matrixdotorg/dendrite:clientapi
 docker push matrixdotorg/dendrite:clientproxy
 docker push matrixdotorg/dendrite:eduserver

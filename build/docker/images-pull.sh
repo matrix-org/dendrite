@@ -2,6 +2,7 @@
 
 docker pull matrixdotorg/dendrite:monolith
 
+docker pull matrixdotorg/dendrite:appservice
 docker pull matrixdotorg/dendrite:clientapi
 docker pull matrixdotorg/dendrite:clientproxy
 docker pull matrixdotorg/dendrite:eduserver
