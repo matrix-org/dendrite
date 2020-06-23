@@ -317,6 +317,8 @@ Invalid JSON integers
 Invalid JSON special values
 Invalid JSON floats
 Outbound federation will ignore a missing event with bad JSON for room version 6
+Server correctly handles transactions that break edu limits
+Server rejects invalid JSON in a version 6 room
 Can download without a file name over federation
 POST /media/r0/upload can create an upload
 GET /media/r0/download can fetch the value again
