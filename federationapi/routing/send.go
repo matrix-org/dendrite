@@ -149,7 +149,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, *util.JSONRe
 				// on PDUs.
 				//
 				// This enforces that the entire transaction is rejected if a single bad PDU is
-				// sent. It is unclear if this is the correct behavior or not.
+				// sent. It is unclear if this is the correct behaviour or not.
 				//
 				// See https://github.com/matrix-org/synapse/issues/7543
 				return nil, &util.JSONResponse{
