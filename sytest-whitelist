@@ -347,3 +347,6 @@ GET /rooms/:room_id/state/m.room.topic gets topic
 GET /rooms/:room_id/state fetches entire room state
 Setting room topic reports m.room.topic to myself
 setting 'm.room.name' respects room powerlevel
+Syncing a new room with a large timeline limit isn't limited
+Left rooms appear in the leave section of sync
+Banned rooms appear in the leave section of sync

@@ -17,9 +17,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const accountDataSchema = `
@@ -73,7 +73,7 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *accountDataStatements) insertAccountData(
-	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType, content string,
+	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType string, content json.RawMessage,
 ) (err error) {
 	stmt := txn.Stmt(s.insertAccountDataStmt)
 	_, err = stmt.ExecContext(ctx, localpart, roomID, dataType, content)
@@ -83,18 +83,18 @@ func (s *accountDataStatements) insertAccountData(
 func (s *accountDataStatements) selectAccountData(
 	ctx context.Context, localpart string,
 ) (
-	global []gomatrixserverlib.ClientEvent,
-	rooms map[string][]gomatrixserverlib.ClientEvent,
-	err error,
+	/* global */ map[string]json.RawMessage,
+	/* rooms */ map[string]map[string]json.RawMessage,
+	error,
 ) {
 	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart)
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountData: rows.close() failed")
 
-	global = []gomatrixserverlib.ClientEvent{}
-	rooms = make(map[string][]gomatrixserverlib.ClientEvent)
+	global := map[string]json.RawMessage{}
+	rooms := map[string]map[string]json.RawMessage{}
 
 	for rows.Next() {
 		var roomID string
@@ -102,41 +102,33 @@ func (s *accountDataStatements) selectAccountData(
 		var content []byte
 
 		if err = rows.Scan(&roomID, &dataType, &content); err != nil {
-			return
+			return nil, nil, err
 		}
 
-		ac := gomatrixserverlib.ClientEvent{
-			Type:    dataType,
-			Content: content,
-		}
-
-		if len(roomID) > 0 {
-			rooms[roomID] = append(rooms[roomID], ac)
+		if roomID != "" {
+			if _, ok := rooms[roomID]; !ok {
+				rooms[roomID] = map[string]json.RawMessage{}
+			}
+			rooms[roomID][dataType] = content
 		} else {
-			global = append(global, ac)
+			global[dataType] = content
 		}
 	}
+
 	return global, rooms, rows.Err()
 }
 
 func (s *accountDataStatements) selectAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
-) (data *gomatrixserverlib.ClientEvent, err error) {
+) (data json.RawMessage, err error) {
+	var bytes []byte
 	stmt := s.selectAccountDataByTypeStmt
-	var content []byte
-
-	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&content); err != nil {
+	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&bytes); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-
 		return
 	}
-
-	data = &gomatrixserverlib.ClientEvent{
-		Type:    dataType,
-		Content: content,
-	}
-
+	data = json.RawMessage(bytes)
 	return
 }

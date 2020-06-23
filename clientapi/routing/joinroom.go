@@ -37,15 +37,14 @@ func JoinRoomByIDOrAlias(
 	joinReq := roomserverAPI.PerformJoinRequest{
 		RoomIDOrAlias: roomIDOrAlias,
 		UserID:        device.UserID,
+		Content:       map[string]interface{}{},
 	}
 	joinRes := roomserverAPI.PerformJoinResponse{}
 
 	// If content was provided in the request then incude that
 	// in the request. It'll get used as a part of the membership
 	// event content.
-	if err := httputil.UnmarshalJSONRequest(req, &joinReq.Content); err != nil {
-		return *err
-	}
+	_ = httputil.UnmarshalJSONRequest(req, &joinReq.Content)
 
 	// Work out our localpart for the client profile request.
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)

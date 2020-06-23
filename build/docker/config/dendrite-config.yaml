@@ -117,6 +117,8 @@ listen:
     federation_sender: "federation_sender:7776"
     edu_server: "edu_server:7777"
     key_server: "key_server:7779"
+    user_api: "user_api:7780"
+    appservice_api: "appservice_api:7781"
 
 # The configuration for tracing the dendrite components.
 tracing:
