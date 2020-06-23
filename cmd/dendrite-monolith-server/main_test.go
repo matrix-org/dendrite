@@ -13,7 +13,7 @@ import (
 // Run the monolith: ./monolith.debug -test.coverprofile=/somewhere/to/dump/integrationcover.out DEVEL --config dendrite.yaml
 // Generate HTML with coverage: go tool cover -html=/somewhere/where/there/is/integrationcover.out -o cover.html
 // Source: https://dzone.com/articles/measuring-integration-test-coverage-rate-in-pouchc
-func TestMain(t *testing.T) {
+func TestMain(_ *testing.T) {
 	var (
 		args []string
 	)
