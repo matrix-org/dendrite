@@ -337,7 +337,7 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 func mustProcessTransaction(t *testing.T, txn *txnReq, pdusWithErrors []string) {
 	res, err := txn.processTransaction()
 	if err != nil {
-		t.Errorf("txn.processTransaction returned an error: %s", err)
+		t.Errorf("txn.processTransaction returned an error: %v", err)
 		return
 	}
 	if len(res.PDUs) != len(txn.PDUs) {
