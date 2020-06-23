@@ -352,3 +352,5 @@ setting 'm.room.name' respects room powerlevel
 Syncing a new room with a large timeline limit isn't limited
 Left rooms appear in the leave section of sync
 Banned rooms appear in the leave section of sync
+Getting state checks the events requested belong to the room
+Getting state IDs checks the events requested belong to the room
