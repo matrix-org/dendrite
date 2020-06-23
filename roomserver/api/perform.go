@@ -5,6 +5,17 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type JoinError int
+
+const (
+	// JoinErrorNotAllowed means the user is not allowed to join this room (e.g join_rule:invite or banned)
+	JoinErrorNotAllowed JoinError = 1
+	// JoinErrorBadRequest means the request was wrong in some way (invalid user ID, wrong server, etc)
+	JoinErrorBadRequest JoinError = 2
+	// JoinErrorNoRoom means that the room being joined doesn't exist.
+	JoinErrorNoRoom JoinError = 3
+)
+
 type PerformJoinRequest struct {
 	RoomIDOrAlias string                         `json:"room_id_or_alias"`
 	UserID        string                         `json:"user_id"`
@@ -13,7 +24,12 @@ type PerformJoinRequest struct {
 }
 
 type PerformJoinResponse struct {
+	// The room ID, populated on success.
 	RoomID string `json:"room_id"`
+	// The reason why the join failed. Can be blank.
+	Error JoinError `json:"error"`
+	// Debugging description of the error. Always present on failure.
+	ErrMsg string `json:"err_msg"`
 }
 
 type PerformLeaveRequest struct {
