@@ -18,6 +18,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -53,7 +54,8 @@ func JoinRoomByIDOrAlias(
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 	} else {
 		// Request our profile content to populate the request content with.
-		profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
+		var profile *authtypes.Profile
+		profile, err = accountDB.GetProfileByLocalpart(req.Context(), localpart)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
 		} else {

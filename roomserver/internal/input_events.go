@@ -298,9 +298,12 @@ func buildInviteStrippedState(
 		return nil, fmt.Errorf("room %q unknown", input.Event.RoomID())
 	}
 	stateWanted := []gomatrixserverlib.StateKeyTuple{}
+	// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
+	// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
 	for _, t := range []string{
 		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
 		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
+		"m.room.avatar",
 	} {
 		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
 			EventType: t,
