@@ -176,9 +176,17 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 				util.GetLogger(t.context).Warnf("Processing %s failed fatally: %s", e.EventID(), err)
 				return nil, err
 			} else {
-				util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).Warn("Failed to process incoming federation event, skipping")
+				// Auth errors mean the event is 'rejected' which have to be silent to appease sytest
+				_, rejected := err.(*gomatrixserverlib.NotAllowed)
+				errMsg := err.Error()
+				if rejected {
+					errMsg = ""
+				}
+				util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).WithField("rejected", rejected).Warn(
+					"Failed to process incoming federation event, skipping",
+				)
 				results[e.EventID()] = gomatrixserverlib.PDUResult{
-					Error: err.Error(),
+					Error: errMsg,
 				}
 			}
 		} else {
