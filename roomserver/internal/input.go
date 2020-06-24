@@ -74,18 +74,6 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 	// We lock as processRoomEvent can only be called once at a time
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	for i := range request.InputInviteEvents {
-		var loopback *api.InputRoomEvent
-		if loopback, err = r.processInviteEvent(ctx, r, request.InputInviteEvents[i]); err != nil {
-			return err
-		}
-		// The processInviteEvent function can optionally return a
-		// loopback room event containing the invite, for local invites.
-		// If it does, we should process it with the room events below.
-		if loopback != nil {
-			request.InputRoomEvents = append(request.InputRoomEvents, *loopback)
-		}
-	}
 	for i := range request.InputRoomEvents {
 		if response.EventID, err = r.processRoomEvent(ctx, request.InputRoomEvents[i]); err != nil {
 			return err

@@ -403,15 +403,15 @@ func createRoom(
 			}
 		}
 		// Send the invite event to the roomserver.
-		if err = roomserverAPI.SendInvite(
+		if perr := roomserverAPI.SendInvite(
 			req.Context(), rsAPI,
 			inviteEvent.Headered(roomVersion),
 			strippedState,         // invite room state
 			cfg.Matrix.ServerName, // send as server
 			nil,                   // transaction ID
-		); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("SendInvite failed")
-			return jsonerror.InternalServerError()
+		); perr != nil {
+			util.GetLogger(req.Context()).WithError(perr).Error("SendInvite failed")
+			return perr.JSONResponse()
 		}
 	}
 

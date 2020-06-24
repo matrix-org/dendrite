@@ -3,6 +3,7 @@ package inthttp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	fsInputAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -24,6 +25,7 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
+	RoomserverPerformInvitePath   = "/roomserver/performInvite"
 	RoomserverPerformJoinPath     = "/roomserver/performJoin"
 	RoomserverPerformLeavePath    = "/roomserver/performLeave"
 	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
@@ -146,16 +148,38 @@ func (h *httpRoomserverInternalAPI) InputRoomEvents(
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
+func (h *httpRoomserverInternalAPI) PerformInvite(
+	ctx context.Context,
+	request *api.PerformInviteRequest,
+	response *api.PerformInviteResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInvite")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformInvitePath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
+}
+
 func (h *httpRoomserverInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *api.PerformJoinRequest,
 	response *api.PerformJoinResponse,
-) error {
+) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformJoin")
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformJoinPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
 }
 
 func (h *httpRoomserverInternalAPI) PerformLeave(

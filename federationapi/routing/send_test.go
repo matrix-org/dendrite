@@ -97,12 +97,18 @@ func (t *testRoomserverAPI) InputRoomEvents(
 	return nil
 }
 
+func (t *testRoomserverAPI) PerformInvite(
+	ctx context.Context,
+	req *api.PerformInviteRequest,
+	res *api.PerformInviteResponse,
+) {
+}
+
 func (t *testRoomserverAPI) PerformJoin(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 	res *api.PerformJoinResponse,
-) error {
-	return nil
+) {
 }
 
 func (t *testRoomserverAPI) PerformLeave(
