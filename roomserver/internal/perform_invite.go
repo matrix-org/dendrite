@@ -137,19 +137,22 @@ func (r *RoomserverInternalAPI) processInviteEvent(
 
 	event := input.Event.Unwrap()
 
-	// check that the user is allowed to do this
-	_, err = checkAuthEvents(ctx, r.DB, input.Event, input.Event.AuthEventIDs())
-	if err != nil {
-		log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
-			"processInviteEvent.checkAuthEvents failed for event",
-		)
-		if _, ok := err.(*gomatrixserverlib.NotAllowed); ok {
-			return nil, &api.PerformError{
-				Msg:  err.Error(),
-				Code: api.PerformErrorNotAllowed,
+	// check that the user is allowed to do this. We can only do this check if it is
+	// a local invite as we have the auth events, else we have to take it on trust.
+	if loopback != nil {
+		_, err = checkAuthEvents(ctx, r.DB, input.Event, input.Event.AuthEventIDs())
+		if err != nil {
+			log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
+				"processInviteEvent.checkAuthEvents failed for event",
+			)
+			if _, ok := err.(*gomatrixserverlib.NotAllowed); ok {
+				return nil, &api.PerformError{
+					Msg:  err.Error(),
+					Code: api.PerformErrorNotAllowed,
+				}
 			}
+			return nil, err
 		}
-		return nil, err
 	}
 
 	if len(input.InviteRoomState) > 0 {
