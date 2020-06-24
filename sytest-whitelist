@@ -357,6 +357,8 @@ Getting state checks the events requested belong to the room
 Getting state IDs checks the events requested belong to the room
 Can invite users to invite-only rooms
 Uninvited users cannot join the room
+Users cannot invite themselves to a room
+Users cannot invite a user that is already in the room
 Invited user can reject invite
 Invited user can reject invite for empty room
 Invited user can reject local invite after originator leaves

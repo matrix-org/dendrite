@@ -38,6 +38,11 @@ func (p *PerformError) JSONResponse() util.JSONResponse {
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(p.Msg),
 		}
+	case PerformErrorNoOperation:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(p.Msg),
+		}
 	default:
 		return util.ErrorResponse(p)
 	}
