@@ -98,16 +98,15 @@ func SendInvite(
 	rsAPI RoomserverInternalAPI, inviteEvent gomatrixserverlib.HeaderedEvent,
 	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
-) error {
-	request := InputRoomEventsRequest{
-		InputInviteEvents: []InputInviteEvent{{
-			Event:           inviteEvent,
-			InviteRoomState: inviteRoomState,
-			RoomVersion:     inviteEvent.RoomVersion,
-			SendAsServer:    string(sendAsServer),
-			TransactionID:   txnID,
-		}},
+) *PerformError {
+	request := PerformInviteRequest{
+		Event:           inviteEvent,
+		InviteRoomState: inviteRoomState,
+		RoomVersion:     inviteEvent.RoomVersion,
+		SendAsServer:    string(sendAsServer),
+		TransactionID:   txnID,
 	}
-	var response InputRoomEventsResponse
-	return rsAPI.InputRoomEvents(ctx, &request, &response)
+	var response PerformInviteResponse
+	rsAPI.PerformInvite(ctx, &request, &response)
+	return response.Error
 }

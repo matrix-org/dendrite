@@ -18,11 +18,17 @@ type RoomserverInternalAPI interface {
 		response *InputRoomEventsResponse,
 	) error
 
+	PerformInvite(
+		ctx context.Context,
+		req *PerformInviteRequest,
+		res *PerformInviteResponse,
+	)
+
 	PerformJoin(
 		ctx context.Context,
 		req *PerformJoinRequest,
 		res *PerformJoinResponse,
-	) error
+	)
 
 	PerformLeave(
 		ctx context.Context,

@@ -111,16 +111,16 @@ func SendMembership(
 	switch membership {
 	case gomatrixserverlib.Invite:
 		// Invites need to be handled specially
-		err = roomserverAPI.SendInvite(
+		perr := roomserverAPI.SendInvite(
 			req.Context(), rsAPI,
 			event.Headered(verRes.RoomVersion),
 			nil, // ask the roomserver to draw up invite room state for us
 			cfg.Matrix.ServerName,
 			nil,
 		)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("producer.SendInvite failed")
-			return jsonerror.InternalServerError()
+		if perr != nil {
+			util.GetLogger(req.Context()).WithError(perr).Error("producer.SendInvite failed")
+			return perr.JSONResponse()
 		}
 	case gomatrixserverlib.Join:
 		// The join membership requires the room id to be sent in the response

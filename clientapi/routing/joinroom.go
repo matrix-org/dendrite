@@ -15,12 +15,10 @@
 package routing
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -65,32 +63,9 @@ func JoinRoomByIDOrAlias(
 	}
 
 	// Ask the roomserver to perform the join.
-	err = rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
-	// Handle known errors first, if this is 0 then there will be no matches (eg on success)
-	switch joinRes.Error {
-	case roomserverAPI.JoinErrorBadRequest:
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(joinRes.ErrMsg),
-		}
-	case roomserverAPI.JoinErrorNoRoom:
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound(joinRes.ErrMsg),
-		}
-	case roomserverAPI.JoinErrorNotAllowed:
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(joinRes.ErrMsg),
-		}
-	}
-	// this is always populated on generic errors
-	if joinRes.ErrMsg != "" {
-		return util.ErrorResponse(errors.New(joinRes.ErrMsg))
-	}
-	// this is set on network errors in polylith mode
-	if err != nil {
-		return util.ErrorResponse(err)
+	rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
+	if joinRes.Error != nil {
+		return joinRes.Error.JSONResponse()
 	}
 
 	return util.JSONResponse{
