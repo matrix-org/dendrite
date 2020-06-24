@@ -112,6 +112,8 @@ type QueryMembershipForUserResponse struct {
 	HasBeenInRoom bool `json:"has_been_in_room"`
 	// True if the user is in room.
 	IsInRoom bool `json:"is_in_room"`
+	// The current membership
+	Membership string
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom

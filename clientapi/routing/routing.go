@@ -101,6 +101,17 @@ func Setup(
 			return GetJoinedRooms(req, device, accountDB)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/join",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return JoinRoomByIDOrAlias(
+				req, device, rsAPI, accountDB, vars["roomID"],
+			)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/leave",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -112,13 +123,40 @@ func Setup(
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|invite)}",
+	r0mux.Handle("/rooms/{roomID}/ban",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, rsAPI, asAPI)
+			return SendBan(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/invite",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendInvite(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/kick",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendKick(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/unban",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendUnban(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
