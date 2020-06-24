@@ -98,15 +98,15 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = api.SendInvite(
+	if perr := api.SendInvite(
 		httpReq.Context(), rsAPI,
 		signedEvent.Headered(inviteReq.RoomVersion()),
 		inviteReq.InviteRoomState(),
 		event.Origin(),
 		nil,
-	); err != nil {
+	); perr != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
-		return jsonerror.InternalServerError()
+		return perr.JSONResponse()
 	}
 
 	// Return the signed event to the originating server, it should then tell
