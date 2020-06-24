@@ -356,3 +356,11 @@ Left rooms appear in the leave section of sync
 Banned rooms appear in the leave section of sync
 Getting state checks the events requested belong to the room
 Getting state IDs checks the events requested belong to the room
+Can invite users to invite-only rooms
+Uninvited users cannot join the room
+Invited user can reject invite
+Invited user can reject invite for empty room
+Invited user can reject local invite after originator leaves
+Typing notification sent to local room members
+Typing notifications also sent to remote room members
+Typing can be explicitly stopped
