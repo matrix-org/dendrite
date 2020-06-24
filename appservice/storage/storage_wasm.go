@@ -19,9 +19,13 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/appservice/storage/sqlite3"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-func NewDatabase(dataSourceName string) (Database, error) {
+func NewDatabase(
+	dataSourceName string,
+	dbProperties sqlutil.DbProperties, // nolint:unparam
+) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot use postgres implementation")

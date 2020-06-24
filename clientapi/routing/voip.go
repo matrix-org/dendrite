@@ -22,16 +22,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/util"
 )
 
 // RequestTurnServer implements:
 //     GET /voip/turnServer
-func RequestTurnServer(req *http.Request, device *authtypes.Device, cfg *config.Dendrite) util.JSONResponse {
+func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Dendrite) util.JSONResponse {
 	turnConfig := cfg.TURN
 
 	// TODO Guest Support

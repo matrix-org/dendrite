@@ -16,33 +16,29 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/clientapi"
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/common/transactions"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/internal/transactions"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
+	cfg := setup.ParseFlags(false)
 
-	base := basecomponent.NewBaseDendrite(cfg, "ClientAPI")
+	base := setup.NewBaseDendrite(cfg, "ClientAPI", true)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
-	asQuery := base.CreateHTTPAppServiceAPIs()
-	alias, input, query := base.CreateHTTPRoomserverAPIs()
-	fedSenderAPI := base.CreateHTTPFederationSenderAPIs()
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
+	asQuery := base.AppserviceHTTPClient()
+	rsAPI := base.RoomserverHTTPClient()
+	fsAPI := base.FederationSenderHTTPClient()
+	eduInputAPI := base.EDUServerClient()
+	userAPI := base.UserAPIClient()
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB, federation, &keyRing,
-		alias, input, query, eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
+	clientapi.AddPublicRoutes(
+		base.PublicAPIMux, base.Cfg, base.KafkaConsumer, base.KafkaProducer, deviceDB, accountDB, federation,
+		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))

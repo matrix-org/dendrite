@@ -16,14 +16,13 @@ package routing
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,7 +32,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const pathPrefixR0 = "/_matrix/media/r0"
+const pathPrefixR0 = "/media/r0"
+const pathPrefixV1 = "/media/v1" // TODO: remove when synapse is fixed
 
 // Setup registers the media API HTTP handlers
 //
@@ -41,27 +41,21 @@ const pathPrefixR0 = "/_matrix/media/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router,
+	publicAPIMux *mux.Router,
 	cfg *config.Dendrite,
 	db storage.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	client *gomatrixserverlib.Client,
 ) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
+	v1mux := publicAPIMux.PathPrefix(pathPrefixV1).Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
 	}
-	authData := auth.Data{
-		AccountDB:   nil,
-		DeviceDB:    deviceDB,
-		AppServices: nil,
-	}
-
-	// TODO: Add AS support
-	r0mux.Handle("/upload", common.MakeAuthAPI(
-		"upload", authData,
-		func(req *http.Request, dev *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/upload", httputil.MakeAuthAPI(
+		"upload", userAPI,
+		func(req *http.Request, dev *userapi.Device) util.JSONResponse {
 			return Upload(req, cfg, dev, db, activeThumbnailGeneration)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
@@ -69,9 +63,13 @@ func Setup(
 	activeRemoteRequests := &types.ActiveRemoteRequests{
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
-	r0mux.Handle("/download/{serverName}/{mediaId}",
-		makeDownloadAPI("download", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
-	).Methods(http.MethodGet, http.MethodOptions)
+
+	downloadHandler := makeDownloadAPI("download", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration)
+	r0mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
+	r0mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
+	v1mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)                // TODO: remove when synapse is fixed
+	v1mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions) // TODO: remove when synapse is fixed
+
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -95,15 +93,28 @@ func makeDownloadAPI(
 	httpHandler := func(w http.ResponseWriter, req *http.Request) {
 		req = util.RequestWithLogging(req)
 
-		// Set common headers returned regardless of the outcome of the request
+		// Set internal headers returned regardless of the outcome of the request
 		util.SetCORSHeaders(w)
 		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 		w.Header().Set("Content-Type", "application/json")
-		vars, _ := common.URLDecodeMapValues(mux.Vars(req))
+
+		vars, _ := httputil.URLDecodeMapValues(mux.Vars(req))
+		serverName := gomatrixserverlib.ServerName(vars["serverName"])
+
+		// For the purposes of loop avoidance, we will return a 404 if allow_remote is set to
+		// false in the query string and the target server name isn't our own.
+		// https://github.com/matrix-org/matrix-doc/pull/1265
+		if allowRemote := req.URL.Query().Get("allow_remote"); strings.ToLower(allowRemote) == "false" {
+			if serverName != cfg.Matrix.ServerName {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+		}
+
 		Download(
 			w,
 			req,
-			gomatrixserverlib.ServerName(vars["serverName"]),
+			serverName,
 			types.MediaID(vars["mediaId"]),
 			cfg,
 			db,
@@ -111,6 +122,7 @@ func makeDownloadAPI(
 			activeRemoteRequests,
 			activeThumbnailGeneration,
 			name == "thumbnail",
+			vars["downloadName"],
 		)
 	}
 	return promhttp.InstrumentHandlerCounter(counterVec, http.HandlerFunc(httpHandler))

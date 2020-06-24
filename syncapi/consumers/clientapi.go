@@ -18,18 +18,19 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
-	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
-	clientAPIConsumer *common.ContinualConsumer
+	clientAPIConsumer *internal.ContinualConsumer
 	db                storage.Database
 	notifier          *sync.Notifier
 }
@@ -42,7 +43,7 @@ func NewOutputClientDataConsumer(
 	store storage.Database,
 ) *OutputClientDataConsumer {
 
-	consumer := common.ContinualConsumer{
+	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputClientData),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
@@ -67,7 +68,7 @@ func (s *OutputClientDataConsumer) Start() error {
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
-	var output common.AccountData
+	var output eventutil.AccountData
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("client API server output log: message parse failure")
@@ -90,7 +91,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		}).Panicf("could not save account data")
 	}
 
-	s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.PaginationToken{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.NewStreamToken(pduPos, 0))
 
 	return nil
 }

@@ -15,57 +15,43 @@
 package roomserver
 
 import (
-	"net/http"
-
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/inthttp"
+	"github.com/matrix-org/gomatrixserverlib"
 
-	asQuery "github.com/matrix-org/dendrite/appservice/query"
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/roomserver/alias"
-	"github.com/matrix-org/dendrite/roomserver/input"
-	"github.com/matrix-org/dendrite/roomserver/query"
+	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/sirupsen/logrus"
 )
 
-// SetupRoomServerComponent sets up and registers HTTP handlers for the
-// RoomServer component. Returns instances of the various roomserver APIs,
-// allowing other components running in the same process to hit the query the
-// APIs directly instead of having to use HTTP.
-func SetupRoomServerComponent(
-	base *basecomponent.BaseDendrite,
-) (api.RoomserverAliasAPI, api.RoomserverInputAPI, api.RoomserverQueryAPI) {
-	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer))
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(router *mux.Router, intAPI api.RoomserverInternalAPI) {
+	inthttp.AddRoutes(intAPI, router)
+}
+
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI(
+	base *setup.BaseDendrite,
+	keyRing gomatrixserverlib.JSONVerifier,
+	fedClient *gomatrixserverlib.FederationClient,
+) api.RoomserverInternalAPI {
+	roomserverDB, err := storage.Open(string(base.Cfg.Database.RoomServer), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	inputAPI := input.RoomserverInputAPI{
+	return &internal.RoomserverInternalAPI{
 		DB:                   roomserverDB,
+		Cfg:                  base.Cfg,
 		Producer:             base.KafkaProducer,
 		OutputRoomEventTopic: string(base.Cfg.Kafka.Topics.OutputRoomEvent),
+		Cache:                base.Caches,
+		ServerName:           base.Cfg.Matrix.ServerName,
+		FedClient:            fedClient,
+		KeyRing:              keyRing,
 	}
-
-	inputAPI.SetupHTTP(http.DefaultServeMux)
-
-	queryAPI := query.RoomserverQueryAPI{
-		DB:             roomserverDB,
-		ImmutableCache: base.ImmutableCache,
-	}
-
-	queryAPI.SetupHTTP(http.DefaultServeMux)
-
-	asAPI := asQuery.AppServiceQueryAPI{Cfg: base.Cfg}
-
-	aliasAPI := alias.RoomserverAliasAPI{
-		DB:            roomserverDB,
-		Cfg:           base.Cfg,
-		InputAPI:      &inputAPI,
-		QueryAPI:      &queryAPI,
-		AppserviceAPI: &asAPI,
-	}
-
-	aliasAPI.SetupHTTP(http.DefaultServeMux)
-
-	return &aliasAPI, &inputAPI, &queryAPI
 }

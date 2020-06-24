@@ -15,22 +15,21 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/syncapi"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "SyncAPI")
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "SyncAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	deviceDB := base.CreateDeviceDB()
-	accountDB := base.CreateAccountsDB()
+	userAPI := base.UserAPIClient()
 	federation := base.CreateFederationClient()
 
-	_, _, query := base.CreateHTTPRoomserverAPIs()
+	rsAPI := base.RoomserverHTTPClient()
 
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)
+	syncapi.AddPublicRoutes(base.PublicAPIMux, base.KafkaConsumer, userAPI, rsAPI, federation, cfg)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
 

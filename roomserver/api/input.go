@@ -16,13 +16,7 @@
 package api
 
 import (
-	"context"
-	"errors"
-	"net/http"
-
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	"github.com/matrix-org/gomatrixserverlib"
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 const (
@@ -82,61 +76,12 @@ type TransactionID struct {
 	TransactionID string `json:"id"`
 }
 
-// InputInviteEvent is a matrix invite event received over federation without
-// the usual context a matrix room event would have. We usually do not have
-// access to the events needed to check the event auth rules for the invite.
-type InputInviteEvent struct {
-	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
-	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
-	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
-}
-
 // InputRoomEventsRequest is a request to InputRoomEvents
 type InputRoomEventsRequest struct {
-	InputRoomEvents   []InputRoomEvent   `json:"input_room_events"`
-	InputInviteEvents []InputInviteEvent `json:"input_invite_events"`
+	InputRoomEvents []InputRoomEvent `json:"input_room_events"`
 }
 
 // InputRoomEventsResponse is a response to InputRoomEvents
 type InputRoomEventsResponse struct {
 	EventID string `json:"event_id"`
-}
-
-// RoomserverInputAPI is used to write events to the room server.
-type RoomserverInputAPI interface {
-	InputRoomEvents(
-		ctx context.Context,
-		request *InputRoomEventsRequest,
-		response *InputRoomEventsResponse,
-	) error
-}
-
-// RoomserverInputRoomEventsPath is the HTTP path for the InputRoomEvents API.
-const RoomserverInputRoomEventsPath = "/api/roomserver/inputRoomEvents"
-
-// NewRoomserverInputAPIHTTP creates a RoomserverInputAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil an error is returned
-func NewRoomserverInputAPIHTTP(roomserverURL string, httpClient *http.Client) (RoomserverInputAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewRoomserverInputAPIHTTP: httpClient is <nil>")
-	}
-	return &httpRoomserverInputAPI{roomserverURL, httpClient}, nil
-}
-
-type httpRoomserverInputAPI struct {
-	roomserverURL string
-	httpClient    *http.Client
-}
-
-// InputRoomEvents implements RoomserverInputAPI
-func (h *httpRoomserverInputAPI) InputRoomEvents(
-	ctx context.Context,
-	request *InputRoomEventsRequest,
-	response *InputRoomEventsResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputRoomEvents")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverInputRoomEventsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

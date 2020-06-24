@@ -17,14 +17,7 @@
 package api
 
 import (
-	"context"
-	"errors"
-	"net/http"
-
-	"github.com/matrix-org/dendrite/common/caching"
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	"github.com/matrix-org/gomatrixserverlib"
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -32,7 +25,7 @@ type QueryLatestEventsAndStateRequest struct {
 	// The room ID to query the latest events for.
 	RoomID string `json:"room_id"`
 	// The state key tuples to fetch from the room current state.
-	// If this list is empty or nil then no state events are returned.
+	// If this list is empty or nil then *ALL* current state events are returned.
 	StateToFetch []gomatrixserverlib.StateKeyTuple `json:"state_to_fetch"`
 }
 
@@ -40,8 +33,6 @@ type QueryLatestEventsAndStateRequest struct {
 // This is used when sending events to set the prev_events, auth_events and depth.
 // It is also used to tell whether the event is allowed by the event auth rules.
 type QueryLatestEventsAndStateResponse struct {
-	// Copy of the request for debugging.
-	QueryLatestEventsAndStateRequest
 	// Does the room exist?
 	// If the room doesn't exist this will be false and LatestEvents will be empty.
 	RoomExists bool `json:"room_exists"`
@@ -73,8 +64,6 @@ type QueryStateAfterEventsRequest struct {
 
 // QueryStateAfterEventsResponse is a response to QueryStateAfterEvents
 type QueryStateAfterEventsResponse struct {
-	// Copy of the request for debugging.
-	QueryStateAfterEventsRequest
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
@@ -96,8 +85,6 @@ type QueryEventsByIDRequest struct {
 
 // QueryEventsByIDResponse is a response to QueryEventsByID
 type QueryEventsByIDResponse struct {
-	// Copy of the request for debugging.
-	QueryEventsByIDRequest
 	// A list of events with the requested IDs.
 	// If the roomserver does not have a copy of a requested event
 	// then it will omit that event from the list.
@@ -144,23 +131,6 @@ type QueryMembershipsForRoomResponse struct {
 	// True if the user has been in room before and has either stayed in it or
 	// left it.
 	HasBeenInRoom bool `json:"has_been_in_room"`
-}
-
-// QueryInvitesForUserRequest is a request to QueryInvitesForUser
-type QueryInvitesForUserRequest struct {
-	// The room ID to look up invites in.
-	RoomID string `json:"room_id"`
-	// The User ID to look up invites for.
-	TargetUserID string `json:"target_user_id"`
-}
-
-// QueryInvitesForUserResponse is a response to QueryInvitesForUser
-// This is used when accepting an invite or rejecting a invite to tell which
-// remote matrix servers to contact.
-type QueryInvitesForUserResponse struct {
-	// A list of matrix user IDs for each sender of an active invite targeting
-	// the requested user ID.
-	InviteSenderUserIDs []string `json:"invite_sender_user_ids"`
 }
 
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent
@@ -211,8 +181,6 @@ type QueryStateAndAuthChainRequest struct {
 
 // QueryStateAndAuthChainResponse is a response to QueryStateAndAuthChain
 type QueryStateAndAuthChainResponse struct {
-	// Copy of the request for debugging.
-	QueryStateAndAuthChainRequest
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`
@@ -227,37 +195,7 @@ type QueryStateAndAuthChainResponse struct {
 	AuthChainEvents []gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
 }
 
-// QueryBackfillRequest is a request to QueryBackfill.
-type QueryBackfillRequest struct {
-	// Events to start paginating from.
-	EarliestEventsIDs []string `json:"earliest_event_ids"`
-	// The maximum number of events to retrieve.
-	Limit int `json:"limit"`
-	// The server interested in the events.
-	ServerName gomatrixserverlib.ServerName `json:"server_name"`
-}
-
-// QueryBackfillResponse is a response to QueryBackfill.
-type QueryBackfillResponse struct {
-	// Missing events, arbritrary order.
-	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
-}
-
-// QueryServersInRoomAtEventRequest is a request to QueryServersInRoomAtEvent
-type QueryServersInRoomAtEventRequest struct {
-	// ID of the room to retrieve member servers for.
-	RoomID string `json:"room_id"`
-	// ID of the event for which to retrieve member servers.
-	EventID string `json:"event_id"`
-}
-
-// QueryServersInRoomAtEventResponse is a response to QueryServersInRoomAtEvent
-type QueryServersInRoomAtEventResponse struct {
-	// Servers present in the room for these events.
-	Servers []gomatrixserverlib.ServerName `json:"servers"`
-}
-
-// QueryRoomVersionCapabilities asks for the default room version
+// QueryRoomVersionCapabilitiesRequest asks for the default room version
 type QueryRoomVersionCapabilitiesRequest struct{}
 
 // QueryRoomVersionCapabilitiesResponse is a response to QueryRoomVersionCapabilitiesRequest
@@ -266,339 +204,12 @@ type QueryRoomVersionCapabilitiesResponse struct {
 	AvailableRoomVersions map[gomatrixserverlib.RoomVersion]string `json:"available"`
 }
 
-// QueryRoomVersionForRoom asks for the room version for a given room.
+// QueryRoomVersionForRoomRequest asks for the room version for a given room.
 type QueryRoomVersionForRoomRequest struct {
 	RoomID string `json:"room_id"`
 }
 
-// QueryRoomVersionCapabilitiesResponse is a response to QueryServersInRoomAtEventResponse
+// QueryRoomVersionForRoomResponse is a response to QueryRoomVersionForRoomRequest
 type QueryRoomVersionForRoomResponse struct {
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
-}
-
-// RoomserverQueryAPI is used to query information from the room server.
-type RoomserverQueryAPI interface {
-	// Query the latest events and state for a room from the room server.
-	QueryLatestEventsAndState(
-		ctx context.Context,
-		request *QueryLatestEventsAndStateRequest,
-		response *QueryLatestEventsAndStateResponse,
-	) error
-
-	// Query the state after a list of events in a room from the room server.
-	QueryStateAfterEvents(
-		ctx context.Context,
-		request *QueryStateAfterEventsRequest,
-		response *QueryStateAfterEventsResponse,
-	) error
-
-	// Query a list of events by event ID.
-	QueryEventsByID(
-		ctx context.Context,
-		request *QueryEventsByIDRequest,
-		response *QueryEventsByIDResponse,
-	) error
-
-	// Query the membership event for an user for a room.
-	QueryMembershipForUser(
-		ctx context.Context,
-		request *QueryMembershipForUserRequest,
-		response *QueryMembershipForUserResponse,
-	) error
-
-	// Query a list of membership events for a room
-	QueryMembershipsForRoom(
-		ctx context.Context,
-		request *QueryMembershipsForRoomRequest,
-		response *QueryMembershipsForRoomResponse,
-	) error
-
-	// Query a list of invite event senders for a user in a room.
-	QueryInvitesForUser(
-		ctx context.Context,
-		request *QueryInvitesForUserRequest,
-		response *QueryInvitesForUserResponse,
-	) error
-
-	// Query whether a server is allowed to see an event
-	QueryServerAllowedToSeeEvent(
-		ctx context.Context,
-		request *QueryServerAllowedToSeeEventRequest,
-		response *QueryServerAllowedToSeeEventResponse,
-	) error
-
-	// Query missing events for a room from roomserver
-	QueryMissingEvents(
-		ctx context.Context,
-		request *QueryMissingEventsRequest,
-		response *QueryMissingEventsResponse,
-	) error
-
-	// Query to get state and auth chain for a (potentially hypothetical) event.
-	// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
-	// the state and auth chain to return.
-	QueryStateAndAuthChain(
-		ctx context.Context,
-		request *QueryStateAndAuthChainRequest,
-		response *QueryStateAndAuthChainResponse,
-	) error
-
-	// Query a given amount (or less) of events prior to a given set of events.
-	QueryBackfill(
-		ctx context.Context,
-		request *QueryBackfillRequest,
-		response *QueryBackfillResponse,
-	) error
-
-	QueryServersInRoomAtEvent(
-		ctx context.Context,
-		request *QueryServersInRoomAtEventRequest,
-		response *QueryServersInRoomAtEventResponse,
-	) error
-
-	// Asks for the default room version as preferred by the server.
-	QueryRoomVersionCapabilities(
-		ctx context.Context,
-		request *QueryRoomVersionCapabilitiesRequest,
-		response *QueryRoomVersionCapabilitiesResponse,
-	) error
-
-	// Asks for the room version for a given room.
-	QueryRoomVersionForRoom(
-		ctx context.Context,
-		request *QueryRoomVersionForRoomRequest,
-		response *QueryRoomVersionForRoomResponse,
-	) error
-}
-
-// RoomserverQueryLatestEventsAndStatePath is the HTTP path for the QueryLatestEventsAndState API.
-const RoomserverQueryLatestEventsAndStatePath = "/api/roomserver/queryLatestEventsAndState"
-
-// RoomserverQueryStateAfterEventsPath is the HTTP path for the QueryStateAfterEvents API.
-const RoomserverQueryStateAfterEventsPath = "/api/roomserver/queryStateAfterEvents"
-
-// RoomserverQueryEventsByIDPath is the HTTP path for the QueryEventsByID API.
-const RoomserverQueryEventsByIDPath = "/api/roomserver/queryEventsByID"
-
-// RoomserverQueryMembershipForUserPath is the HTTP path for the QueryMembershipForUser API.
-const RoomserverQueryMembershipForUserPath = "/api/roomserver/queryMembershipForUser"
-
-// RoomserverQueryMembershipsForRoomPath is the HTTP path for the QueryMembershipsForRoom API
-const RoomserverQueryMembershipsForRoomPath = "/api/roomserver/queryMembershipsForRoom"
-
-// RoomserverQueryInvitesForUserPath is the HTTP path for the QueryInvitesForUser API
-const RoomserverQueryInvitesForUserPath = "/api/roomserver/queryInvitesForUser"
-
-// RoomserverQueryServerAllowedToSeeEventPath is the HTTP path for the QueryServerAllowedToSeeEvent API
-const RoomserverQueryServerAllowedToSeeEventPath = "/api/roomserver/queryServerAllowedToSeeEvent"
-
-// RoomserverQueryMissingEventsPath is the HTTP path for the QueryMissingEvents API
-const RoomserverQueryMissingEventsPath = "/api/roomserver/queryMissingEvents"
-
-// RoomserverQueryStateAndAuthChainPath is the HTTP path for the QueryStateAndAuthChain API
-const RoomserverQueryStateAndAuthChainPath = "/api/roomserver/queryStateAndAuthChain"
-
-// RoomserverQueryBackfillPath is the HTTP path for the QueryBackfillPath API
-const RoomserverQueryBackfillPath = "/api/roomserver/queryBackfill"
-
-// RoomserverQueryServersInRoomAtEventPath is the HTTP path for the QueryServersInRoomAtEvent API
-const RoomserverQueryServersInRoomAtEventPath = "/api/roomserver/queryServersInRoomAtEvents"
-
-// RoomserverQueryRoomVersionCapabilitiesPath is the HTTP path for the QueryRoomVersionCapabilities API
-const RoomserverQueryRoomVersionCapabilitiesPath = "/api/roomserver/queryRoomVersionCapabilities"
-
-// RoomserverQueryRoomVersionCapabilitiesPath is the HTTP path for the QueryRoomVersionCapabilities API
-const RoomserverQueryRoomVersionForRoomPath = "/api/roomserver/queryRoomVersionForRoom"
-
-// NewRoomserverQueryAPIHTTP creates a RoomserverQueryAPI implemented by talking to a HTTP POST API.
-// If httpClient is nil an error is returned
-func NewRoomserverQueryAPIHTTP(roomserverURL string, httpClient *http.Client, cache caching.ImmutableCache) (RoomserverQueryAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewRoomserverQueryAPIHTTP: httpClient is <nil>")
-	}
-	return &httpRoomserverQueryAPI{roomserverURL, httpClient, cache}, nil
-}
-
-type httpRoomserverQueryAPI struct {
-	roomserverURL  string
-	httpClient     *http.Client
-	immutableCache caching.ImmutableCache
-}
-
-// QueryLatestEventsAndState implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) QueryLatestEventsAndState(
-	ctx context.Context,
-	request *QueryLatestEventsAndStateRequest,
-	response *QueryLatestEventsAndStateResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryLatestEventsAndState")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryLatestEventsAndStatePath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryStateAfterEvents implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) QueryStateAfterEvents(
-	ctx context.Context,
-	request *QueryStateAfterEventsRequest,
-	response *QueryStateAfterEventsResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryStateAfterEvents")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryEventsByID implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) QueryEventsByID(
-	ctx context.Context,
-	request *QueryEventsByIDRequest,
-	response *QueryEventsByIDResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryEventsByID")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryMembershipForUser implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) QueryMembershipForUser(
-	ctx context.Context,
-	request *QueryMembershipForUserRequest,
-	response *QueryMembershipForUserResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershipForUser")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryMembershipForUserPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryMembershipsForRoom implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) QueryMembershipsForRoom(
-	ctx context.Context,
-	request *QueryMembershipsForRoomRequest,
-	response *QueryMembershipsForRoomResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershipsForRoom")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryInvitesForUser implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) QueryInvitesForUser(
-	ctx context.Context,
-	request *QueryInvitesForUserRequest,
-	response *QueryInvitesForUserResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryInvitesForUser")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryInvitesForUserPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryServerAllowedToSeeEvent implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) QueryServerAllowedToSeeEvent(
-	ctx context.Context,
-	request *QueryServerAllowedToSeeEventRequest,
-	response *QueryServerAllowedToSeeEventResponse,
-) (err error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerAllowedToSeeEvent")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryMissingEvents implements RoomServerQueryAPI
-func (h *httpRoomserverQueryAPI) QueryMissingEvents(
-	ctx context.Context,
-	request *QueryMissingEventsRequest,
-	response *QueryMissingEventsResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMissingEvents")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryMissingEventsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryStateAndAuthChain implements RoomserverQueryAPI
-func (h *httpRoomserverQueryAPI) QueryStateAndAuthChain(
-	ctx context.Context,
-	request *QueryStateAndAuthChainRequest,
-	response *QueryStateAndAuthChainResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryStateAndAuthChain")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryStateAndAuthChainPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryBackfill implements RoomServerQueryAPI
-func (h *httpRoomserverQueryAPI) QueryBackfill(
-	ctx context.Context,
-	request *QueryBackfillRequest,
-	response *QueryBackfillResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBackfill")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryBackfillPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryServersInRoomAtEvent implements RoomServerQueryAPI
-func (h *httpRoomserverQueryAPI) QueryServersInRoomAtEvent(
-	ctx context.Context,
-	request *QueryServersInRoomAtEventRequest,
-	response *QueryServersInRoomAtEventResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServersInRoomAtEvent")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryServersInRoomAtEventPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryRoomVersionCapabilities implements RoomServerQueryAPI
-func (h *httpRoomserverQueryAPI) QueryRoomVersionCapabilities(
-	ctx context.Context,
-	request *QueryRoomVersionCapabilitiesRequest,
-	response *QueryRoomVersionCapabilitiesResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomVersionCapabilities")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryRoomVersionCapabilitiesPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryRoomVersionForRoom implements RoomServerQueryAPI
-func (h *httpRoomserverQueryAPI) QueryRoomVersionForRoom(
-	ctx context.Context,
-	request *QueryRoomVersionForRoomRequest,
-	response *QueryRoomVersionForRoomResponse,
-) error {
-	if roomVersion, ok := h.immutableCache.GetRoomVersion(request.RoomID); ok {
-		response.RoomVersion = roomVersion
-		return nil
-	}
-
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomVersionForRoom")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryRoomVersionForRoomPath
-	err := commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err == nil {
-		h.immutableCache.StoreRoomVersion(request.RoomID, response.RoomVersion)
-	}
-	return err
 }

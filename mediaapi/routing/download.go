@@ -21,15 +21,17 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
@@ -43,7 +45,11 @@ import (
 const mediaIDCharacters = "A-Za-z0-9_=-"
 
 // Note: unfortunately regex.MustCompile() cannot be assigned to a const
-var mediaIDRegex = regexp.MustCompile("[" + mediaIDCharacters + "]+")
+var mediaIDRegex = regexp.MustCompile("^[" + mediaIDCharacters + "]+$")
+
+// Regular expressions to help us cope with Content-Disposition parsing
+var rfc2183 = regexp.MustCompile(`filename\=utf-8\"(.*)\"`)
+var rfc6266 = regexp.MustCompile(`filename\*\=utf-8\'\'(.*)`)
 
 // downloadRequest metadata included in or derivable from a download or thumbnail request
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-media-r0-download-servername-mediaid
@@ -53,6 +59,7 @@ type downloadRequest struct {
 	IsThumbnailRequest bool
 	ThumbnailSize      types.ThumbnailSize
 	Logger             *log.Entry
+	DownloadFilename   string
 }
 
 // Download implements GET /download and GET /thumbnail
@@ -72,6 +79,7 @@ func Download(
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	isThumbnailRequest bool,
+	customFilename string,
 ) {
 	dReq := &downloadRequest{
 		MediaMetadata: &types.MediaMetadata{
@@ -83,6 +91,7 @@ func Download(
 			"Origin":  origin,
 			"MediaID": mediaID,
 		}),
+		DownloadFilename: customFilename,
 	}
 
 	if dReq.IsThumbnailRequest {
@@ -118,7 +127,10 @@ func Download(
 	)
 	if err != nil {
 		// TODO: Handle the fact we might have started writing the response
-		dReq.jsonErrorResponse(w, util.ErrorResponse(err))
+		dReq.jsonErrorResponse(w, util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Failed to download: " + err.Error()),
+		})
 		return
 	}
 
@@ -138,7 +150,7 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to marshal JSONResponse")
 		// this should never fail to be marshalled so drop err to the floor
-		res = util.MessageResponse(http.StatusInternalServerError, "Internal Server Error")
+		res = util.MessageResponse(http.StatusNotFound, "Download request failed: "+err.Error())
 		resBytes, _ = json.Marshal(res.JSON)
 	}
 
@@ -297,9 +309,8 @@ func (r *downloadRequest) respondFromLocalFile(
 		}).Info("Responding with file")
 		responseFile = file
 		responseMetadata = r.MediaMetadata
-
-		if len(responseMetadata.UploadName) > 0 {
-			w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename*=utf-8"%s"`, responseMetadata.UploadName))
+		if err := r.addDownloadFilenameToHeaders(w, responseMetadata); err != nil {
+			return nil, err
 		}
 	}
 
@@ -316,6 +327,67 @@ func (r *downloadRequest) respondFromLocalFile(
 		return nil, errors.Wrap(err, "failed to copy from cache")
 	}
 	return responseMetadata, nil
+}
+
+func (r *downloadRequest) addDownloadFilenameToHeaders(
+	w http.ResponseWriter,
+	responseMetadata *types.MediaMetadata,
+) error {
+	// If the requestor supplied a filename to name the download then
+	// use that, otherwise use the filename from the response metadata.
+	filename := string(responseMetadata.UploadName)
+	if r.DownloadFilename != "" {
+		filename = r.DownloadFilename
+	}
+
+	if len(filename) == 0 {
+		return nil
+	}
+
+	unescaped, err := url.PathUnescape(filename)
+	if err != nil {
+		return fmt.Errorf("url.PathUnescape: %w", err)
+	}
+
+	isASCII := true // Is the string ASCII or UTF-8?
+	quote := ``     // Encloses the string (ASCII only)
+	for i := 0; i < len(unescaped); i++ {
+		if unescaped[i] > unicode.MaxASCII {
+			isASCII = false
+		}
+		if unescaped[i] == 0x20 || unescaped[i] == 0x3B {
+			// If the filename contains a space or a semicolon, which
+			// are special characters in Content-Disposition
+			quote = `"`
+		}
+	}
+
+	// We don't necessarily want a full escape as the Content-Disposition
+	// can take many of the characters that PathEscape would otherwise and
+	// browser support for encoding is a bit wild, so we'll escape only
+	// the characters that we know will mess up the parsing of the
+	// Content-Disposition header elements themselves
+	unescaped = strings.ReplaceAll(unescaped, `\`, `\\"`)
+	unescaped = strings.ReplaceAll(unescaped, `"`, `\"`)
+
+	if isASCII {
+		// For ASCII filenames, we should only quote the filename if
+		// it needs to be done, e.g. it contains a space or a character
+		// that would otherwise be parsed as a control character in the
+		// Content-Disposition header
+		w.Header().Set("Content-Disposition", fmt.Sprintf(
+			`inline; filename=%s%s%s`,
+			quote, unescaped, quote,
+		))
+	} else {
+		// For UTF-8 filenames, we quote always, as that's the standard
+		w.Header().Set("Content-Disposition", fmt.Sprintf(
+			`inline; filename*=utf-8''%s`,
+			url.QueryEscape(unescaped),
+		))
+	}
+
+	return nil
 }
 
 // Note: Thumbnail generation may be ongoing asynchronously.
@@ -632,9 +704,22 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(contentLength)
 	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
-	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
-	if err == nil && params["filename"] != "" {
-		r.MediaMetadata.UploadName = types.Filename(params["filename"])
+
+	dispositionHeader := resp.Header.Get("Content-Disposition")
+	if _, params, e := mime.ParseMediaType(dispositionHeader); e == nil {
+		if params["filename"] != "" {
+			r.MediaMetadata.UploadName = types.Filename(params["filename"])
+		} else if params["filename*"] != "" {
+			r.MediaMetadata.UploadName = types.Filename(params["filename*"])
+		}
+	} else {
+		if matches := rfc6266.FindStringSubmatch(dispositionHeader); len(matches) > 1 {
+			// Always prefer the RFC6266 UTF-8 name if possible
+			r.MediaMetadata.UploadName = types.Filename(matches[1])
+		} else if matches := rfc2183.FindStringSubmatch(dispositionHeader); len(matches) > 1 {
+			// Otherwise, see if an RFC2183 name was provided (ASCII only)
+			r.MediaMetadata.UploadName = types.Filename(matches[1])
+		}
 	}
 
 	r.Logger.Info("Transferring remote file")

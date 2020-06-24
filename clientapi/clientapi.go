@@ -15,60 +15,55 @@
 package clientapi
 
 import (
+	"github.com/Shopify/sarama"
+	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/consumers"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/transactions"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
-// SetupClientAPIComponent sets up and registers HTTP handlers for the ClientAPI
-// component.
-func SetupClientAPIComponent(
-	base *basecomponent.BaseDendrite,
+// AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
+func AddPublicRoutes(
+	router *mux.Router,
+	cfg *config.Dendrite,
+	consumer sarama.Consumer,
+	producer sarama.SyncProducer,
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing *gomatrixserverlib.KeyRing,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
-	inputAPI roomserverAPI.RoomserverInputAPI,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
-	fedSenderAPI federationSenderAPI.FederationSenderQueryAPI,
+	fsAPI federationSenderAPI.FederationSenderInternalAPI,
+	userAPI userapi.UserInternalAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-
-	userUpdateProducer := &producers.UserUpdateProducer{
-		Producer: base.KafkaProducer,
-		Topic:    string(base.Cfg.Kafka.Topics.UserUpdates),
-	}
-
 	syncProducer := &producers.SyncAPIProducer{
-		Producer: base.KafkaProducer,
-		Topic:    string(base.Cfg.Kafka.Topics.OutputClientData),
+		Producer: producer,
+		Topic:    string(cfg.Kafka.Topics.OutputClientData),
 	}
 
-	consumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, accountsDB, queryAPI,
+	roomEventConsumer := consumers.NewOutputRoomEventConsumer(
+		cfg, consumer, accountsDB, rsAPI,
 	)
-	if err := consumer.Start(); err != nil {
+	if err := roomEventConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	routing.Setup(
-		base.APIMux, base.Cfg, roomserverProducer, queryAPI, aliasAPI, asAPI,
-		accountsDB, deviceDB, federation, *keyRing, userUpdateProducer,
-		syncProducer, eduProducer, transactionsCache, fedSenderAPI,
+		router, cfg, eduInputAPI, rsAPI, asAPI,
+		accountsDB, deviceDB, userAPI, federation,
+		syncProducer, transactionsCache, fsAPI,
 	)
 }

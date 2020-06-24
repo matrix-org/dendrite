@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -46,8 +46,8 @@ func DirectoryRoom(
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
-	rsAPI roomserverAPI.RoomserverAliasAPI,
-	fedSenderAPI federationSenderAPI.FederationSenderQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	fedSenderAPI federationSenderAPI.FederationSenderInternalAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
@@ -77,7 +77,7 @@ func DirectoryRoom(
 			if fedErr != nil {
 				// TODO: Return 502 if the remote server errored.
 				// TODO: Return 504 if the remote server timed out.
-				util.GetLogger(req.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
+				util.GetLogger(req.Context()).WithError(fedErr).Error("federation.LookupRoomAlias failed")
 				return jsonerror.InternalServerError()
 			}
 			res.RoomID = fedRes.RoomID
@@ -112,10 +112,10 @@ func DirectoryRoom(
 // TODO: Check if the user has the power level to set an alias
 func SetLocalAlias(
 	req *http.Request,
-	device *authtypes.Device,
+	device *api.Device,
 	alias string,
 	cfg *config.Dendrite,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	aliasAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', alias)
 	if err != nil {
@@ -188,9 +188,9 @@ func SetLocalAlias(
 // RemoveLocalAlias implements DELETE /directory/room/{roomAlias}
 func RemoveLocalAlias(
 	req *http.Request,
-	device *authtypes.Device,
+	device *api.Device,
 	alias string,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	aliasAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 
 	creatorQueryReq := roomserverAPI.GetCreatorIDForAliasRequest{

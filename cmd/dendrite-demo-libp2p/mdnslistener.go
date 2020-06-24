@@ -21,12 +21,11 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/matrix-org/dendrite/common/keydb"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type mDNSListener struct {
-	keydb keydb.Database
+	keydb gomatrixserverlib.KeyDatabase
 	host  host.Host
 }
 
@@ -44,7 +43,7 @@ func (n *mDNSListener) HandlePeerFound(p peer.AddrInfo) {
 					KeyID:      "ed25519:p2pdemo",
 				}: {
 					VerifyKey: gomatrixserverlib.VerifyKey{
-						Key: gomatrixserverlib.Base64String(raw),
+						Key: gomatrixserverlib.Base64Bytes(raw),
 					},
 					ValidUntilTS: math.MaxUint64 >> 1,
 					ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,

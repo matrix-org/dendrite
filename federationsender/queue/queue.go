@@ -15,30 +15,81 @@
 package queue
 
 import (
+	"crypto/ed25519"
 	"fmt"
 	"sync"
 
+	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
-	origin gomatrixserverlib.ServerName
-	client *gomatrixserverlib.FederationClient
-	// The queuesMutex protects queues
-	queuesMutex sync.Mutex
+	rsAPI       api.RoomserverInternalAPI
+	origin      gomatrixserverlib.ServerName
+	client      *gomatrixserverlib.FederationClient
+	statistics  *types.Statistics
+	signing     *SigningInfo
+	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
 // NewOutgoingQueues makes a new OutgoingQueues
-func NewOutgoingQueues(origin gomatrixserverlib.ServerName, client *gomatrixserverlib.FederationClient) *OutgoingQueues {
+func NewOutgoingQueues(
+	origin gomatrixserverlib.ServerName,
+	client *gomatrixserverlib.FederationClient,
+	rsAPI api.RoomserverInternalAPI,
+	statistics *types.Statistics,
+	signing *SigningInfo,
+) *OutgoingQueues {
 	return &OutgoingQueues{
-		origin: origin,
-		client: client,
-		queues: map[gomatrixserverlib.ServerName]*destinationQueue{},
+		rsAPI:      rsAPI,
+		origin:     origin,
+		client:     client,
+		statistics: statistics,
+		signing:    signing,
+		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
+}
+
+// TODO: Move this somewhere useful for other components as we often need to ferry these 3 variables
+// around together
+type SigningInfo struct {
+	ServerName gomatrixserverlib.ServerName
+	KeyID      gomatrixserverlib.KeyID
+	PrivateKey ed25519.PrivateKey
+}
+
+func (oqs *OutgoingQueues) getQueueIfExists(destination gomatrixserverlib.ServerName) *destinationQueue {
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+	return oqs.queues[destination]
+}
+
+func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+	oq := oqs.queues[destination]
+	if oq == nil {
+		oq = &destinationQueue{
+			rsAPI:           oqs.rsAPI,
+			origin:          oqs.origin,
+			destination:     destination,
+			client:          oqs.client,
+			statistics:      oqs.statistics.ForServer(destination),
+			incomingPDUs:    make(chan *gomatrixserverlib.HeaderedEvent, 128),
+			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
+			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
+			retryServerCh:   make(chan bool),
+			signing:         oqs.signing,
+		}
+		oqs.queues[destination] = oq
+	}
+	return oq
 }
 
 // SendEvent sends an event to the destinations
@@ -55,26 +106,17 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	// Remove our own server from the list of destinations.
-	destinations = filterDestinations(oqs.origin, destinations)
+	destinations = filterAndDedupeDests(oqs.origin, destinations)
+	if len(destinations) == 0 {
+		return nil
+	}
 
 	log.WithFields(log.Fields{
 		"destinations": destinations, "event": ev.EventID(),
 	}).Info("Sending event")
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
 	for _, destination := range destinations {
-		oq := oqs.queues[destination]
-		if oq == nil {
-			oq = &destinationQueue{
-				origin:      oqs.origin,
-				destination: destination,
-				client:      oqs.client,
-			}
-			oqs.queues[destination] = oq
-		}
-
-		oq.sendEvent(ev)
+		oqs.getQueue(destination).sendEvent(ev)
 	}
 
 	return nil
@@ -103,22 +145,11 @@ func (oqs *OutgoingQueues) SendInvite(
 	}
 
 	log.WithFields(log.Fields{
-		"event_id": ev.EventID(),
+		"event_id":    ev.EventID(),
+		"server_name": destination,
 	}).Info("Sending invite")
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
-	oq := oqs.queues[destination]
-	if oq == nil {
-		oq = &destinationQueue{
-			origin:      oqs.origin,
-			destination: destination,
-			client:      oqs.client,
-		}
-		oqs.queues[destination] = oq
-	}
-
-	oq.sendInvite(inviteReq)
+	oqs.getQueue(destination).sendInvite(inviteReq)
 
 	return nil
 }
@@ -137,7 +168,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	// Remove our own server from the list of destinations.
-	destinations = filterDestinations(oqs.origin, destinations)
+	destinations = filterAndDedupeDests(oqs.origin, destinations)
 
 	if len(destinations) > 0 {
 		log.WithFields(log.Fields{
@@ -145,34 +176,36 @@ func (oqs *OutgoingQueues) SendEDU(
 		}).Info("Sending EDU event")
 	}
 
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
 	for _, destination := range destinations {
-		oq := oqs.queues[destination]
-		if oq == nil {
-			oq = &destinationQueue{
-				origin:      oqs.origin,
-				destination: destination,
-				client:      oqs.client,
-			}
-			oqs.queues[destination] = oq
-		}
-
-		oq.sendEDU(e)
+		oqs.getQueue(destination).sendEDU(e)
 	}
 
 	return nil
 }
 
-// filterDestinations removes our own server from the list of destinations.
-// Otherwise we could end up trying to talk to ourselves.
-func filterDestinations(origin gomatrixserverlib.ServerName, destinations []gomatrixserverlib.ServerName) []gomatrixserverlib.ServerName {
-	var result []gomatrixserverlib.ServerName
-	for _, destination := range destinations {
-		if destination == origin {
+// RetryServer attempts to resend events to the given server if we had given up.
+func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
+	q := oqs.getQueueIfExists(srv)
+	if q == nil {
+		return
+	}
+	q.retry()
+}
+
+// filterAndDedupeDests removes our own server from the list of destinations
+// and deduplicates any servers in the list that may appear more than once.
+func filterAndDedupeDests(origin gomatrixserverlib.ServerName, destinations []gomatrixserverlib.ServerName) (
+	result []gomatrixserverlib.ServerName,
+) {
+	strs := make([]string, len(destinations))
+	for i, d := range destinations {
+		strs[i] = string(d)
+	}
+	for _, destination := range util.UniqueStrings(strs) {
+		if gomatrixserverlib.ServerName(destination) == origin {
 			continue
 		}
-		result = append(result, destination)
+		result = append(result, gomatrixserverlib.ServerName(destination))
 	}
 	return result
 }

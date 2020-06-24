@@ -21,10 +21,12 @@ import (
 	"encoding/json"
 	"sort"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -109,47 +111,49 @@ type outputRoomEventsStatements struct {
 	selectStateInRangeStmt        *sql.Stmt
 }
 
-func (s *outputRoomEventsStatements) prepare(db *sql.DB, streamID *streamIDStatements) (err error) {
-	s.streamIDStatements = streamID
-	_, err = db.Exec(outputRoomEventsSchema)
+func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
+	s := &outputRoomEventsStatements{
+		streamIDStatements: streamID,
+	}
+	_, err := db.Exec(outputRoomEventsSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectEventsStmt, err = db.Prepare(selectEventsSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectMaxEventIDStmt, err = db.Prepare(selectMaxEventIDSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectRecentEventsForSyncStmt, err = db.Prepare(selectRecentEventsForSyncSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectEarlyEventsStmt, err = db.Prepare(selectEarlyEventsSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
-		return
+		return nil, err
 	}
-	return
+	return s, nil
 }
 
 // selectStateInRange returns the state events between the two given PDU stream positions, exclusive of oldPos, inclusive of newPos.
 // Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
 // two positions, only the most recent state is returned.
-func (s *outputRoomEventsStatements) selectStateInRange(
-	ctx context.Context, txn *sql.Tx, oldPos, newPos types.StreamPosition,
+func (s *outputRoomEventsStatements) SelectStateInRange(
+	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilterPart *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
-	stmt := common.TxStmt(txn, s.selectStateInRangeStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(
-		ctx, oldPos, newPos,
+		ctx, r.Low(), r.High(),
 		/*pq.StringArray(stateFilterPart.Senders),
 		pq.StringArray(stateFilterPart.NotSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
@@ -192,8 +196,8 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 		// since it'll just mark the event as not being needed.
 		if len(addIDs) < len(delIDs) {
 			log.WithFields(log.Fields{
-				"since":   oldPos,
-				"current": newPos,
+				"since":   r.From,
+				"current": r.To,
 				"adds":    addIDsJSON,
 				"dels":    delIDsJSON,
 			}).Warn("StateBetween: ignoring deleted state")
@@ -229,11 +233,11 @@ func (s *outputRoomEventsStatements) selectStateInRange(
 // MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
 // then this function should only ever be used at startup, as it will race with inserting events if it is
 // done afterwards. If there are no inserted events, 0 is returned.
-func (s *outputRoomEventsStatements) selectMaxEventID(
+func (s *outputRoomEventsStatements) SelectMaxEventID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := common.TxStmt(txn, s.selectMaxEventIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectMaxEventIDStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
@@ -243,7 +247,7 @@ func (s *outputRoomEventsStatements) selectMaxEventID(
 
 // InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs. Returns the position
 // of the inserted event.
-func (s *outputRoomEventsStatements) insertEvent(
+func (s *outputRoomEventsStatements) InsertEvent(
 	ctx context.Context, txn *sql.Tx,
 	event *gomatrixserverlib.HeaderedEvent, addState, removeState []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
@@ -283,7 +287,7 @@ func (s *outputRoomEventsStatements) insertEvent(
 		return
 	}
 
-	insertStmt := common.TxStmt(txn, s.insertEventStmt)
+	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
 	_, err = insertStmt.ExecContext(
 		ctx,
 		streamPos,
@@ -303,26 +307,23 @@ func (s *outputRoomEventsStatements) insertEvent(
 	return
 }
 
-// selectRecentEvents returns the most recent events in the given room, up to a maximum of 'limit'.
-// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude
-// from sync.
-func (s *outputRoomEventsStatements) selectRecentEvents(
+func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	roomID string, r types.Range, limit int,
 	chronologicalOrder bool, onlySyncEvents bool,
 ) ([]types.StreamEvent, error) {
 	var stmt *sql.Stmt
 	if onlySyncEvents {
-		stmt = common.TxStmt(txn, s.selectRecentEventsForSyncStmt)
+		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsForSyncStmt)
 	} else {
-		stmt = common.TxStmt(txn, s.selectRecentEventsStmt)
+		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
 	}
 
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -338,18 +339,16 @@ func (s *outputRoomEventsStatements) selectRecentEvents(
 	return events, nil
 }
 
-// selectEarlyEvents returns the earliest events in the given room, starting
-// from a given position, up to a maximum of 'limit'.
-func (s *outputRoomEventsStatements) selectEarlyEvents(
+func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, fromPos, toPos types.StreamPosition, limit int,
+	roomID string, r types.Range, limit int,
 ) ([]types.StreamEvent, error) {
-	stmt := common.TxStmt(txn, s.selectEarlyEventsStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, fromPos, toPos, limit)
+	stmt := sqlutil.TxStmt(txn, s.selectEarlyEventsStmt)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectEarlyEvents: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectEarlyEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -365,11 +364,11 @@ func (s *outputRoomEventsStatements) selectEarlyEvents(
 
 // selectEvents returns the events for the given event IDs. If an event is
 // missing from the database, it will be omitted.
-func (s *outputRoomEventsStatements) selectEvents(
+func (s *outputRoomEventsStatements) SelectEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
 	var returnEvents []types.StreamEvent
-	stmt := common.TxStmt(txn, s.selectEventsStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventsStmt)
 	for _, eventID := range eventIDs {
 		rows, err := stmt.QueryContext(ctx, eventID)
 		if err != nil {
@@ -378,7 +377,7 @@ func (s *outputRoomEventsStatements) selectEvents(
 		if streamEvents, err := rowsToStreamEvents(rows); err == nil {
 			returnEvents = append(returnEvents, streamEvents...)
 		}
-		common.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
+		internal.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
 	}
 	return returnEvents, nil
 }

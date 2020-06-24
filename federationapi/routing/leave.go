@@ -17,9 +17,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -30,9 +29,18 @@ func MakeLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID, userID string,
 ) util.JSONResponse {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return util.JSONResponse{
@@ -61,14 +69,19 @@ func MakeLeave(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := common.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), query, &queryRes)
-	if err == common.ErrRoomNoExists {
+	event, err := eventutil.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), rsAPI, &queryRes)
+	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
+	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
 	} else if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("common.BuildEvent failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -87,7 +100,10 @@ func MakeLeave(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: map[string]interface{}{"event": builder},
+		JSON: map[string]interface{}{
+			"room_version": verRes.RoomVersion,
+			"event":        builder,
+		},
 	}
 }
 
@@ -96,13 +112,13 @@ func SendLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.Dendrite,
-	producer *producers.RoomserverProducer,
-	keys gomatrixserverlib.KeyRing,
+	rsAPI api.RoomserverInternalAPI,
+	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := producer.QueryAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -177,8 +193,8 @@ func SendLeave(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = producer.SendEvents(
-		httpReq.Context(),
+	_, err = api.SendEvents(
+		httpReq.Context(), rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			event.Headered(verRes.RoomVersion),
 		},

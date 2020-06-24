@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/matrix-org/dendrite/common/test"
+	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"gopkg.in/yaml.v2"
 )

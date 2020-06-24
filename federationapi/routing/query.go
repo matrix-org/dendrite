@@ -19,8 +19,8 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -32,8 +32,8 @@ func RoomAliasToID(
 	httpReq *http.Request,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
-	senderAPI federationSenderAPI.FederationSenderQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	senderAPI federationSenderAPI.FederationSenderInternalAPI,
 ) util.JSONResponse {
 	roomAlias := httpReq.FormValue("room_alias")
 	if roomAlias == "" {
@@ -55,7 +55,7 @@ func RoomAliasToID(
 	if domain == cfg.Matrix.ServerName {
 		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
 		var queryRes roomserverAPI.GetRoomIDForAliasResponse
-		if err = aliasAPI.GetRoomIDForAlias(httpReq.Context(), &queryReq, &queryRes); err != nil {
+		if err = rsAPI.GetRoomIDForAlias(httpReq.Context(), &queryReq, &queryRes); err != nil {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
 			return jsonerror.InternalServerError()
 		}

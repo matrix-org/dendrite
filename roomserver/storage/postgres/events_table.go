@@ -21,7 +21,10 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -136,13 +139,14 @@ type eventStatements struct {
 	selectRoomNIDForEventNIDStmt           *sql.Stmt
 }
 
-func (s *eventStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(eventsSchema)
+func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
+	s := &eventStatements{}
+	_, err := db.Exec(eventsSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
@@ -157,11 +161,12 @@ func (s *eventStatements) prepare(db *sql.DB) (err error) {
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 		{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *eventStatements) insertEvent(
+func (s *eventStatements) InsertEvent(
 	ctx context.Context,
+	txn *sql.Tx,
 	roomNID types.RoomNID,
 	eventTypeNID types.EventTypeNID,
 	eventStateKeyNID types.EventStateKeyNID,
@@ -179,8 +184,8 @@ func (s *eventStatements) insertEvent(
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
-func (s *eventStatements) selectEvent(
-	ctx context.Context, eventID string,
+func (s *eventStatements) SelectEvent(
+	ctx context.Context, txn *sql.Tx, eventID string,
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
@@ -190,14 +195,14 @@ func (s *eventStatements) selectEvent(
 
 // bulkSelectStateEventByID lookups a list of state events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError
-func (s *eventStatements) bulkSelectStateEventByID(
+func (s *eventStatements) BulkSelectStateEventByID(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateEntry, error) {
 	rows, err := s.bulkSelectStateEventByIDStmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
 	// We know that we will only get as many results as event IDs
 	// because of the unique constraint on event IDs.
 	// So we can allocate an array of the correct size now.
@@ -222,7 +227,7 @@ func (s *eventStatements) bulkSelectStateEventByID(
 		// We don't know which ones were missing because we don't return the string IDs in the query.
 		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
 		// If this turns out to be impossible and we do need the debug information here, it would be better
-		// to do it as a separate query rather than slowing down/complicating the common case.
+		// to do it as a separate query rather than slowing down/complicating the internal case.
 		return nil, types.MissingEventError(
 			fmt.Sprintf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs)),
 		)
@@ -233,14 +238,14 @@ func (s *eventStatements) bulkSelectStateEventByID(
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError.
 // If we do not have the state for any of the requested events it returns a types.MissingEventError.
-func (s *eventStatements) bulkSelectStateAtEventByID(
+func (s *eventStatements) BulkSelectStateAtEventByID(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateAtEvent, error) {
 	rows, err := s.bulkSelectStateAtEventByIDStmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventByID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventByID: rows.close() failed")
 	results := make([]types.StateAtEvent, len(eventIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -270,44 +275,44 @@ func (s *eventStatements) bulkSelectStateAtEventByID(
 	return results, nil
 }
 
-func (s *eventStatements) updateEventState(
+func (s *eventStatements) UpdateEventState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
 	_, err := s.updateEventStateStmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
 	return err
 }
 
-func (s *eventStatements) selectEventSentToOutput(
+func (s *eventStatements) SelectEventSentToOutput(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
 ) (sentToOutput bool, err error) {
-	stmt := common.TxStmt(txn, s.selectEventSentToOutputStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventSentToOutputStmt)
 	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
 	return
 }
 
-func (s *eventStatements) updateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
-	stmt := common.TxStmt(txn, s.updateEventSentToOutputStmt)
+func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
+	stmt := sqlutil.TxStmt(txn, s.updateEventSentToOutputStmt)
 	_, err := stmt.ExecContext(ctx, int64(eventNID))
 	return err
 }
 
-func (s *eventStatements) selectEventID(
+func (s *eventStatements) SelectEventID(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
 ) (eventID string, err error) {
-	stmt := common.TxStmt(txn, s.selectEventIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventIDStmt)
 	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&eventID)
 	return
 }
 
-func (s *eventStatements) bulkSelectStateAtEventAndReference(
+func (s *eventStatements) BulkSelectStateAtEventAndReference(
 	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]types.StateAtEventAndReference, error) {
-	stmt := common.TxStmt(txn, s.bulkSelectStateAtEventAndReferenceStmt)
+	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateAtEventAndReferenceStmt)
 	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventAndReference: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventAndReference: rows.close() failed")
 	results := make([]types.StateAtEventAndReference, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -341,14 +346,14 @@ func (s *eventStatements) bulkSelectStateAtEventAndReference(
 	return results, nil
 }
 
-func (s *eventStatements) bulkSelectEventReference(
-	ctx context.Context, eventNIDs []types.EventNID,
+func (s *eventStatements) BulkSelectEventReference(
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]gomatrixserverlib.EventReference, error) {
 	rows, err := s.bulkSelectEventReferenceStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventReference: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventReference: rows.close() failed")
 	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -367,12 +372,12 @@ func (s *eventStatements) bulkSelectEventReference(
 }
 
 // bulkSelectEventID returns a map from numeric event ID to string event ID.
-func (s *eventStatements) bulkSelectEventID(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
+func (s *eventStatements) BulkSelectEventID(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
 	rows, err := s.bulkSelectEventIDStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventID: rows.close() failed")
 	results := make(map[types.EventNID]string, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
@@ -394,12 +399,12 @@ func (s *eventStatements) bulkSelectEventID(ctx context.Context, eventNIDs []typ
 
 // bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) bulkSelectEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error) {
+func (s *eventStatements) BulkSelectEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error) {
 	rows, err := s.bulkSelectEventNIDStmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventNID: rows.close() failed")
 	results := make(map[string]types.EventNID, len(eventIDs))
 	for rows.Next() {
 		var eventID string
@@ -412,7 +417,7 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, eventIDs []str
 	return results, rows.Err()
 }
 
-func (s *eventStatements) selectMaxEventDepth(ctx context.Context, eventNIDs []types.EventNID) (int64, error) {
+func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error) {
 	var result int64
 	stmt := s.selectMaxEventDepthStmt
 	err := stmt.QueryRowContext(ctx, eventNIDsAsArray(eventNIDs)).Scan(&result)
@@ -422,11 +427,10 @@ func (s *eventStatements) selectMaxEventDepth(ctx context.Context, eventNIDs []t
 	return result, nil
 }
 
-func (s *eventStatements) selectRoomNIDForEventNID(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
+func (s *eventStatements) SelectRoomNIDForEventNID(
+	ctx context.Context, eventNID types.EventNID,
 ) (roomNID types.RoomNID, err error) {
-	selectStmt := common.TxStmt(txn, s.selectRoomNIDForEventNIDStmt)
-	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&roomNID)
+	err = s.selectRoomNIDForEventNIDStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&roomNID)
 	return
 }
 

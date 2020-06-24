@@ -16,11 +16,13 @@ package routing
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -32,8 +34,8 @@ func Invite(
 	roomID string,
 	eventID string,
 	cfg *config.Dendrite,
-	producer *producers.RoomserverProducer,
-	keys gomatrixserverlib.KeyRing,
+	rsAPI api.RoomserverInternalAPI,
+	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 	inviteReq := gomatrixserverlib.InviteV2Request{}
 	if err := json.Unmarshal(request.Content(), &inviteReq); err != nil {
@@ -43,6 +45,16 @@ func Invite(
 		}
 	}
 	event := inviteReq.Event()
+
+	// Check that we can accept invites for this room version.
+	if _, err := roomserverVersion.SupportedRoomVersion(inviteReq.RoomVersion()); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(
+				fmt.Sprintf("Room version %q is not supported by this server.", inviteReq.RoomVersion()),
+			),
+		}
+	}
 
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
@@ -86,19 +98,21 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = producer.SendInvite(
-		httpReq.Context(),
+	if perr := api.SendInvite(
+		httpReq.Context(), rsAPI,
 		signedEvent.Headered(inviteReq.RoomVersion()),
 		inviteReq.InviteRoomState(),
-	); err != nil {
+		event.Origin(),
+		nil,
+	); perr != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
-		return jsonerror.InternalServerError()
+		return perr.JSONResponse()
 	}
 
 	// Return the signed event to the originating server, it should then tell
 	// the other servers in the room that we have been invited.
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespInvite{Event: signedEvent},
+		JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
 	}
 }

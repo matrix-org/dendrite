@@ -18,11 +18,12 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -84,7 +85,7 @@ func RequestEmailToken(req *http.Request, accountDB accounts.Database, cfg *conf
 
 // CheckAndSave3PIDAssociation implements POST /account/3pid
 func CheckAndSave3PIDAssociation(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *api.Device,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	var body threepid.EmailAssociationCheckRequest
@@ -148,7 +149,7 @@ func CheckAndSave3PIDAssociation(
 
 // GetAssociated3PIDs implements GET /account/3pid
 func GetAssociated3PIDs(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *api.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {

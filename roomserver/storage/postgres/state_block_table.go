@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/matrix-org/dendrite/common"
-
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 )
@@ -31,7 +32,7 @@ import (
 const stateDataSchema = `
 -- The state data map.
 -- Designed to give enough information to run the state resolution algorithm
--- without hitting the database in the common case.
+-- without hitting the database in the internal case.
 -- TODO: Is it worth replacing the unique btree index with a covering index so
 -- that postgres could lookup the state using an index-only scan?
 -- The type and state_key are included in the index to make it easier to
@@ -87,25 +88,30 @@ type stateBlockStatements struct {
 	bulkSelectFilteredStateBlockEntriesStmt *sql.Stmt
 }
 
-func (s *stateBlockStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(stateDataSchema)
+func NewPostgresStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+	s := &stateBlockStatements{}
+	_, err := db.Exec(stateDataSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertStateDataStmt, insertStateDataSQL},
 		{&s.selectNextStateBlockNIDStmt, selectNextStateBlockNIDSQL},
 		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
 		{&s.bulkSelectFilteredStateBlockEntriesStmt, bulkSelectFilteredStateBlockEntriesSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *stateBlockStatements) bulkInsertStateData(
+func (s *stateBlockStatements) BulkInsertStateData(
 	ctx context.Context,
-	stateBlockNID types.StateBlockNID,
+	txn *sql.Tx,
 	entries []types.StateEntry,
-) error {
+) (types.StateBlockNID, error) {
+	stateBlockNID, err := s.selectNextStateBlockNID(ctx)
+	if err != nil {
+		return 0, err
+	}
 	for _, entry := range entries {
 		_, err := s.insertStateDataStmt.ExecContext(
 			ctx,
@@ -115,10 +121,10 @@ func (s *stateBlockStatements) bulkInsertStateData(
 			int64(entry.EventNID),
 		)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
-	return nil
+	return stateBlockNID, nil
 }
 
 func (s *stateBlockStatements) selectNextStateBlockNID(
@@ -129,7 +135,7 @@ func (s *stateBlockStatements) selectNextStateBlockNID(
 	return types.StateBlockNID(stateBlockNID), err
 }
 
-func (s *stateBlockStatements) bulkSelectStateBlockEntries(
+func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
 	nids := make([]int64, len(stateBlockNIDs))
@@ -140,7 +146,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
 
 	results := make([]types.StateEntryList, len(stateBlockNIDs))
 	// current is a pointer to the StateEntryList to append the state entries to.
@@ -180,7 +186,7 @@ func (s *stateBlockStatements) bulkSelectStateBlockEntries(
 	return results, err
 }
 
-func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
+func (s *stateBlockStatements) BulkSelectFilteredStateBlockEntries(
 	ctx context.Context,
 	stateBlockNIDs []types.StateBlockNID,
 	stateKeyTuples []types.StateKeyTuple,
@@ -199,7 +205,7 @@ func (s *stateBlockStatements) bulkSelectFilteredStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectFilteredStateBlockEntries: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectFilteredStateBlockEntries: rows.close() failed")
 
 	var results []types.StateEntryList
 	var current types.StateEntryList

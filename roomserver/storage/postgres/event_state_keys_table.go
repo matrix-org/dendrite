@@ -20,7 +20,10 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -74,38 +77,39 @@ type eventStateKeyStatements struct {
 	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
-func (s *eventStateKeyStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(eventStateKeysSchema)
+func NewPostgresEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
+	s := &eventStateKeyStatements{}
+	_, err := db.Exec(eventStateKeysSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
 		{&s.bulkSelectEventStateKeyStmt, bulkSelectEventStateKeySQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *eventStateKeyStatements) insertEventStateKeyNID(
+func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := common.TxStmt(txn, s.insertEventStateKeyNIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) selectEventStateKeyNID(
+func (s *eventStateKeyStatements) SelectEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	var eventStateKeyNID int64
-	stmt := common.TxStmt(txn, s.selectEventStateKeyNIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectEventStateKeyNIDStmt)
 	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
+func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
 	rows, err := s.bulkSelectEventStateKeyNIDStmt.QueryContext(
@@ -114,7 +118,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKeyNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKeyNID: rows.close() failed")
 
 	result := make(map[string]types.EventStateKeyNID, len(eventStateKeys))
 	for rows.Next() {
@@ -128,7 +132,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKeyNID(
 	return result, rows.Err()
 }
 
-func (s *eventStateKeyStatements) bulkSelectEventStateKey(
+func (s *eventStateKeyStatements) BulkSelectEventStateKey(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
 	nIDs := make(pq.Int64Array, len(eventStateKeyNIDs))
@@ -139,7 +143,7 @@ func (s *eventStateKeyStatements) bulkSelectEventStateKey(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKey: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKey: rows.close() failed")
 
 	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
 	for rows.Next() {

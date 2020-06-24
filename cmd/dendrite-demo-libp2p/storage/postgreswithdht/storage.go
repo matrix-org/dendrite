@@ -44,8 +44,8 @@ type PublicRoomsServerDatabase struct {
 }
 
 // NewPublicRoomsServerDatabase creates a new public rooms server database.
-func NewPublicRoomsServerDatabase(dataSourceName string, dht *dht.IpfsDHT) (*PublicRoomsServerDatabase, error) {
-	pg, err := postgres.NewPublicRoomsServerDatabase(dataSourceName)
+func NewPublicRoomsServerDatabase(dataSourceName string, dht *dht.IpfsDHT, localServerName gomatrixserverlib.ServerName) (*PublicRoomsServerDatabase, error) {
+	pg, err := postgres.NewPublicRoomsServerDatabase(dataSourceName, nil, localServerName)
 	if err != nil {
 		return nil, err
 	}

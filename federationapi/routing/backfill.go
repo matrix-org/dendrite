@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -33,11 +33,11 @@ import (
 func Backfill(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
-	var res api.QueryBackfillResponse
+	var res api.PerformBackfillResponse
 	var eIDs []string
 	var limit string
 	var exists bool
@@ -68,9 +68,15 @@ func Backfill(
 	}
 
 	// Populate the request.
-	req := api.QueryBackfillRequest{
-		EarliestEventsIDs: eIDs,
-		ServerName:        request.Origin(),
+	req := api.PerformBackfillRequest{
+		RoomID: roomID,
+		// we don't know who the successors are for these events, which won't
+		// be a problem because we don't use that information when servicing /backfill requests,
+		// only when making them. TODO: Think of a better API shape
+		BackwardsExtremities: map[string][]string{
+			"": eIDs,
+		},
+		ServerName: request.Origin(),
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
@@ -81,8 +87,8 @@ func Backfill(
 	}
 
 	// Query the roomserver.
-	if err = query.QueryBackfill(httpReq.Context(), &req, &res); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryBackfill failed")
+	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -96,9 +102,18 @@ func Backfill(
 		}
 	}
 
-	var eventJSONs []json.RawMessage
-	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(evs) {
+	eventJSONs := []json.RawMessage{}
+	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(
+		evs,
+		gomatrixserverlib.TopologicalOrderByPrevEvents,
+	) {
 		eventJSONs = append(eventJSONs, e.JSON())
+	}
+
+	// sytest wants these in reversed order, similar to /messages, so reverse them now.
+	for i := len(eventJSONs)/2 - 1; i >= 0; i-- {
+		opp := len(eventJSONs) - 1 - i
+		eventJSONs[i], eventJSONs[opp] = eventJSONs[opp], eventJSONs[i]
 	}
 
 	txn := gomatrixserverlib.Transaction{

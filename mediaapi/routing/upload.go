@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,7 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/mediaapi/fileutils"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
@@ -125,7 +126,9 @@ func (r *uploadRequest) doUpload(
 
 	r.MediaMetadata.FileSizeBytes = bytesWritten
 	r.MediaMetadata.Base64Hash = hash
-	r.MediaMetadata.MediaID = types.MediaID(hash)
+	r.MediaMetadata.MediaID = types.MediaID(base64.RawURLEncoding.EncodeToString(
+		[]byte(string(r.MediaMetadata.UploadName) + string(r.MediaMetadata.Base64Hash)),
+	))
 
 	r.Logger = r.Logger.WithField("MediaID", r.MediaMetadata.MediaID)
 

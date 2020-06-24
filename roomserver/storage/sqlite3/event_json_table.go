@@ -20,7 +20,10 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -51,50 +54,46 @@ type eventJSONStatements struct {
 	bulkSelectEventJSONStmt *sql.Stmt
 }
 
-func (s *eventJSONStatements) prepare(db *sql.DB) (err error) {
+func NewSqliteEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
+	s := &eventJSONStatements{}
 	s.db = db
-	_, err = db.Exec(eventJSONSchema)
+	_, err := db.Exec(eventJSONSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertEventJSONStmt, insertEventJSONSQL},
 		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *eventJSONStatements) insertEventJSON(
+func (s *eventJSONStatements) InsertEventJSON(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, eventJSON []byte,
 ) error {
-	_, err := common.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
+	_, err := sqlutil.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
 	return err
 }
 
-type eventJSONPair struct {
-	EventNID  types.EventNID
-	EventJSON []byte
-}
-
-func (s *eventJSONStatements) bulkSelectEventJSON(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
-) ([]eventJSONPair, error) {
+func (s *eventJSONStatements) BulkSelectEventJSON(
+	ctx context.Context, eventNIDs []types.EventNID,
+) ([]tables.EventJSONPair, error) {
 	iEventNIDs := make([]interface{}, len(eventNIDs))
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", common.QueryVariadic(len(iEventNIDs)), 1)
+	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
 
-	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
+	rows, err := s.db.QueryContext(ctx, selectOrig, iEventNIDs...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
 
 	// We know that we will only get as many results as event NIDs
 	// because of the unique constraint on event NIDs.
 	// So we can allocate an array of the correct size now.
 	// We might get fewer results than NIDs so we adjust the length of the slice before returning it.
-	results := make([]eventJSONPair, len(eventNIDs))
+	results := make([]tables.EventJSONPair, len(eventNIDs))
 	i := 0
 	for ; rows.Next(); i++ {
 		result := &results[i]

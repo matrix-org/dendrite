@@ -15,22 +15,25 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/internal/setup"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "FederationSender")
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "FederationSender", true)
 	defer base.Close() // nolint: errcheck
 
 	federation := base.CreateFederationClient()
 
-	_, _, query := base.CreateHTTPRoomserverAPIs()
+	serverKeyAPI := base.ServerKeyAPIClient()
+	keyRing := serverKeyAPI.KeyRing()
 
-	federationsender.SetupFederationSenderComponent(
-		base, federation, query,
+	rsAPI := base.RoomserverHTTPClient()
+	fsAPI := federationsender.NewInternalAPI(
+		base, federation, rsAPI, keyRing,
 	)
+	federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationSender), string(base.Cfg.Listen.FederationSender))
 

@@ -18,11 +18,15 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func Open(dataSourceName string) (Database, error) {
+func Open(
+	dataSourceName string,
+	dbProperties sqlutil.DbProperties, // nolint:unparam
+) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot use postgres implementation")

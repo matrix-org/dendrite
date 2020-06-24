@@ -15,36 +15,51 @@
 package federationsender
 
 import (
-	"net/http"
-
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
-	"github.com/matrix-org/dendrite/federationsender/query"
+	"github.com/matrix-org/dendrite/federationsender/internal"
+	"github.com/matrix-org/dendrite/federationsender/inthttp"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
+	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal/setup"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
-// SetupFederationSenderComponent sets up and registers HTTP handlers for the
-// FederationSender component.
-func SetupFederationSenderComponent(
-	base *basecomponent.BaseDendrite,
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(router *mux.Router, intAPI api.FederationSenderInternalAPI) {
+	inthttp.AddRoutes(intAPI, router)
+}
+
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI(
+	base *setup.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
-	rsQueryAPI roomserverAPI.RoomserverQueryAPI,
-) api.FederationSenderQueryAPI {
-	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender))
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	keyRing *gomatrixserverlib.KeyRing,
+) api.FederationSenderInternalAPI {
+	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender), base.Cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
-	queues := queue.NewOutgoingQueues(base.Cfg.Matrix.ServerName, federation)
+	statistics := &types.Statistics{}
+	queues := queue.NewOutgoingQueues(
+		base.Cfg.Matrix.ServerName, federation, rsAPI, statistics, &queue.SigningInfo{
+			KeyID:      base.Cfg.Matrix.KeyID,
+			PrivateKey: base.Cfg.Matrix.PrivateKey,
+			ServerName: base.Cfg.Matrix.ServerName,
+		},
+	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.Cfg, base.KafkaConsumer, queues,
-		federationSenderDB, rsQueryAPI,
+		federationSenderDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
@@ -57,10 +72,5 @@ func SetupFederationSenderComponent(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	queryAPI := query.FederationSenderQueryAPI{
-		DB: federationSenderDB,
-	}
-	queryAPI.SetupHTTP(http.DefaultServeMux)
-
-	return &queryAPI
+	return internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, rsAPI, federation, keyRing, statistics, queues)
 }

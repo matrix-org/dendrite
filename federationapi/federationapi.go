@@ -15,39 +15,32 @@
 package federationapi
 
 import (
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/gorilla/mux"
+	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
-	// TODO: Are we really wanting to pull in the producer from clientapi
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// SetupFederationAPIComponent sets up and registers HTTP handlers for the
-// FederationAPI component.
-func SetupFederationAPIComponent(
-	base *basecomponent.BaseDendrite,
-	accountsDB accounts.Database,
-	deviceDB devices.Database,
+// AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
+func AddPublicRoutes(
+	router *mux.Router,
+	cfg *config.Dendrite,
+	userAPI userapi.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing *gomatrixserverlib.KeyRing,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
-	inputAPI roomserverAPI.RoomserverInputAPI,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
-	federationSenderAPI federationSenderAPI.FederationSenderQueryAPI,
-	eduProducer *producers.EDUServerProducer,
+	keyRing gomatrixserverlib.JSONVerifier,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
+	eduAPI eduserverAPI.EDUServerInputAPI,
 ) {
-	roomserverProducer := producers.NewRoomserverProducer(inputAPI, queryAPI)
 
 	routing.Setup(
-		base.APIMux, base.Cfg, queryAPI, aliasAPI, asAPI,
-		roomserverProducer, eduProducer, federationSenderAPI, *keyRing,
-		federation, accountsDB, deviceDB,
+		router, cfg, rsAPI,
+		eduAPI, federationSenderAPI, keyRing,
+		federation, userAPI,
 	)
 }

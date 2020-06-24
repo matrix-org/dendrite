@@ -16,7 +16,7 @@
 package types
 
 import (
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -75,6 +75,10 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 
 // StateAtEvent is the state before and after a matrix event.
 type StateAtEvent struct {
+	// Should this state overwrite the latest events and memberships of the room?
+	// This might be necessary when rejoining a federated room after a period of
+	// absence, as our state and latest events will be out of date.
+	Overwrite bool
 	// The state before the event.
 	BeforeStateSnapshotNID StateSnapshotNID
 	// The state entry for the event itself, allows us to calculate the state after the event.
@@ -168,9 +172,9 @@ type RoomRecentEventsUpdater interface {
 	MarkEventAsSent(eventNID EventNID) error
 	// Build a membership updater for the target user in this room.
 	// It will share the same transaction as this updater.
-	MembershipUpdater(targetUserNID EventStateKeyNID) (MembershipUpdater, error)
+	MembershipUpdater(targetUserNID EventStateKeyNID, isTargetLocalUser bool) (MembershipUpdater, error)
 	// Implements Transaction so it can be committed or rolledback
-	common.Transaction
+	sqlutil.Transaction
 }
 
 // A MembershipUpdater is used to update the membership of a user in a room.
@@ -195,7 +199,7 @@ type MembershipUpdater interface {
 	// Returns a list of invite event IDs that this state change retired.
 	SetToLeave(senderUserID string, eventID string) (inviteEventIDs []string, err error)
 	// Implements Transaction so it can be committed or rolledback.
-	common.Transaction
+	sqlutil.Transaction
 }
 
 // A MissingEventError is an error that happened because the roomserver was

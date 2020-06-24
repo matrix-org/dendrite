@@ -16,13 +16,13 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,24 +30,52 @@ import (
 const defaultSyncTimeout = time.Duration(0)
 const defaultTimelineLimit = 20
 
+type filter struct {
+	Room struct {
+		Timeline struct {
+			Limit *int `json:"limit"`
+		} `json:"timeline"`
+	} `json:"room"`
+}
+
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
 	ctx           context.Context
-	device        authtypes.Device
+	device        userapi.Device
 	limit         int
 	timeout       time.Duration
-	since         *types.PaginationToken // nil means that no since token was supplied
+	since         *types.StreamingToken // nil means that no since token was supplied
 	wantFullState bool
 	log           *log.Entry
 }
 
-func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, error) {
+func newSyncRequest(req *http.Request, device userapi.Device) (*syncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
-	since, err := getPaginationToken(req.URL.Query().Get("since"))
-	if err != nil {
-		return nil, err
+	var since *types.StreamingToken
+	sinceStr := req.URL.Query().Get("since")
+	if sinceStr != "" {
+		tok, err := types.NewStreamTokenFromString(sinceStr)
+		if err != nil {
+			return nil, err
+		}
+		since = &tok
+	}
+	if since == nil {
+		tok := types.NewStreamToken(0, 0)
+		since = &tok
+	}
+	timelineLimit := defaultTimelineLimit
+	// TODO: read from stored filters too
+	filterQuery := req.URL.Query().Get("filter")
+	if filterQuery != "" && filterQuery[0] == '{' {
+		// attempt to parse the timeline limit at least
+		var f filter
+		err := json.Unmarshal([]byte(filterQuery), &f)
+		if err == nil && f.Room.Timeline.Limit != nil {
+			timelineLimit = *f.Room.Timeline.Limit
+		}
 	}
 	// TODO: Additional query params: set_presence, filter
 	return &syncRequest{
@@ -56,7 +84,7 @@ func newSyncRequest(req *http.Request, device authtypes.Device) (*syncRequest, e
 		timeout:       timeout,
 		since:         since,
 		wantFullState: wantFullState,
-		limit:         defaultTimelineLimit, // TODO: read from filter
+		limit:         timelineLimit,
 		log:           util.GetLogger(req.Context()),
 	}, nil
 }
@@ -70,17 +98,4 @@ func getTimeout(timeoutMS string) time.Duration {
 		return defaultSyncTimeout
 	}
 	return time.Duration(i) * time.Millisecond
-}
-
-// getSyncStreamPosition tries to parse a 'since' token taken from the API to a
-// types.PaginationToken. If the string is empty then (nil, nil) is returned.
-// There are two forms of tokens: The full length form containing all PDU and EDU
-// positions separated by "_", and the short form containing only the PDU
-// position. Short form can be used for, e.g., `prev_batch` tokens.
-func getPaginationToken(since string) (*types.PaginationToken, error) {
-	if since == "" {
-		return nil, nil
-	}
-
-	return types.NewPaginationTokenFromString(since)
 }

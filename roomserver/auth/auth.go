@@ -27,7 +27,7 @@ func IsServerAllowed(
 	serverCurrentlyInRoom bool,
 	authEvents []gomatrixserverlib.Event,
 ) bool {
-	historyVisibility := historyVisibilityForRoom(authEvents)
+	historyVisibility := HistoryVisibilityForRoom(authEvents)
 
 	// 1. If the history_visibility was set to world_readable, allow.
 	if historyVisibility == "world_readable" {
@@ -52,7 +52,7 @@ func IsServerAllowed(
 	return false
 }
 
-func historyVisibilityForRoom(authEvents []gomatrixserverlib.Event) string {
+func HistoryVisibilityForRoom(authEvents []gomatrixserverlib.Event) string {
 	// https://matrix.org/docs/spec/client_server/r0.6.0#id87
 	// By default if no history_visibility is set, or if the value is not understood, the visibility is assumed to be shared.
 	visibility := "shared"

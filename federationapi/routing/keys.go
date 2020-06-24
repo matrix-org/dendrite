@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/ed25519"
@@ -44,7 +44,7 @@ func localKeys(cfg *config.Dendrite, validUntil time.Time) (*gomatrixserverlib.S
 
 	keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
 		cfg.Matrix.KeyID: {
-			Key: gomatrixserverlib.Base64String(publicKey),
+			Key: gomatrixserverlib.Base64Bytes(publicKey),
 		},
 	}
 

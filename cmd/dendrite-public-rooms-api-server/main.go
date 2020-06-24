@@ -15,25 +15,26 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "PublicRoomsAPI")
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "PublicRoomsAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
 
-	_, _, query := base.CreateHTTPRoomserverAPIs()
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	rsAPI := base.RoomserverHTTPClient()
+
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, query, nil, nil)
+	publicroomsapi.AddPublicRoutes(base.PublicAPIMux, base.Cfg, base.KafkaConsumer, userAPI, publicRoomsDB, rsAPI, nil, nil)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.PublicRoomsAPI), string(base.Cfg.Listen.PublicRoomsAPI))
 

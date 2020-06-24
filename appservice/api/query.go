@@ -20,16 +20,11 @@ package api
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/matrix-org/dendrite/common"
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // RoomAliasExistsRequest is a request to an application service
@@ -83,60 +78,9 @@ type AppServiceQueryAPI interface {
 	) error
 }
 
-// AppServiceRoomAliasExistsPath is the HTTP path for the RoomAliasExists API
-const AppServiceRoomAliasExistsPath = "/api/appservice/RoomAliasExists"
-
-// AppServiceUserIDExistsPath is the HTTP path for the UserIDExists API
-const AppServiceUserIDExistsPath = "/api/appservice/UserIDExists"
-
-// httpAppServiceQueryAPI contains the URL to an appservice query API and a
-// reference to a httpClient used to reach it
-type httpAppServiceQueryAPI struct {
-	appserviceURL string
-	httpClient    *http.Client
-}
-
-// NewAppServiceQueryAPIHTTP creates a AppServiceQueryAPI implemented by talking
-// to a HTTP POST API.
-// If httpClient is nil an error is returned
-func NewAppServiceQueryAPIHTTP(
-	appserviceURL string,
-	httpClient *http.Client,
-) (AppServiceQueryAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewRoomserverAliasAPIHTTP: httpClient is <nil>")
-	}
-	return &httpAppServiceQueryAPI{appserviceURL, httpClient}, nil
-}
-
-// RoomAliasExists implements AppServiceQueryAPI
-func (h *httpAppServiceQueryAPI) RoomAliasExists(
-	ctx context.Context,
-	request *RoomAliasExistsRequest,
-	response *RoomAliasExistsResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "appserviceRoomAliasExists")
-	defer span.Finish()
-
-	apiURL := h.appserviceURL + AppServiceRoomAliasExistsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// UserIDExists implements AppServiceQueryAPI
-func (h *httpAppServiceQueryAPI) UserIDExists(
-	ctx context.Context,
-	request *UserIDExistsRequest,
-	response *UserIDExistsResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "appserviceUserIDExists")
-	defer span.Finish()
-
-	apiURL := h.appserviceURL + AppServiceUserIDExistsPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
 // RetrieveUserProfile is a wrapper that queries both the local database and
 // application services for a given user's profile
+// TODO: Remove this, it's called from federationapi and clientapi but is a pure function
 func RetrieveUserProfile(
 	ctx context.Context,
 	userID string,
@@ -165,7 +109,7 @@ func RetrieveUserProfile(
 
 	// If no user exists, return
 	if !userResp.UserIDExists {
-		return nil, common.ErrProfileNoExists
+		return nil, eventutil.ErrProfileNoExists
 	}
 
 	// Try to query the user from the local database again

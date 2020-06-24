@@ -17,14 +17,13 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/transactions"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -42,16 +41,15 @@ type sendEventResponse struct {
 //   /rooms/{roomID}/state/{eventType}/{stateKey}
 func SendEvent(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	roomID, eventType string, txnID, stateKey *string,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
-	producer *producers.RoomserverProducer,
+	rsAPI api.RoomserverInternalAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -65,7 +63,7 @@ func SendEvent(
 		}
 	}
 
-	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, queryAPI)
+	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, rsAPI)
 	if resErr != nil {
 		return *resErr
 	}
@@ -80,8 +78,8 @@ func SendEvent(
 
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
-	eventID, err := producer.SendEvents(
-		req.Context(),
+	eventID, err := api.SendEvents(
+		req.Context(), rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			e.Headered(verRes.RoomVersion),
 		},
@@ -89,7 +87,7 @@ func SendEvent(
 		txnAndSessionID,
 	)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
@@ -112,10 +110,10 @@ func SendEvent(
 
 func generateSendEvent(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request
 	userID := device.UserID
@@ -148,14 +146,19 @@ func generateSendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := common.BuildEvent(req.Context(), &builder, cfg, evTime, queryAPI, &queryRes)
-	if err == common.ErrRoomNoExists {
+	e, err := eventutil.BuildEvent(req.Context(), &builder, cfg, evTime, rsAPI, &queryRes)
+	if err == eventutil.ErrRoomNoExists {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
+	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
 	} else if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("common.BuildEvent failed")
+		util.GetLogger(req.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}

@@ -17,8 +17,8 @@ package directory
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -59,7 +59,7 @@ func GetVisibility(
 // SetVisibility implements PUT /directory/list/room/{roomID}
 // TODO: Allow admin users to edit the room visibility
 func SetVisibility(
-	req *http.Request, publicRoomsDatabase storage.Database, queryAPI api.RoomserverQueryAPI, dev *authtypes.Device,
+	req *http.Request, publicRoomsDatabase storage.Database, rsAPI api.RoomserverInternalAPI, dev *userapi.Device,
 	roomID string,
 ) util.JSONResponse {
 	queryMembershipReq := api.QueryMembershipForUserRequest{
@@ -67,7 +67,7 @@ func SetVisibility(
 		UserID: dev.UserID,
 	}
 	var queryMembershipRes api.QueryMembershipForUserResponse
-	err := queryAPI.QueryMembershipForUser(req.Context(), &queryMembershipReq, &queryMembershipRes)
+	err := rsAPI.QueryMembershipForUser(req.Context(), &queryMembershipReq, &queryMembershipRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("could not query membership for user")
 		return jsonerror.InternalServerError()
@@ -87,7 +87,7 @@ func SetVisibility(
 		}},
 	}
 	var queryEventsRes api.QueryLatestEventsAndStateResponse
-	err = queryAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
+	err = rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
 	if err != nil || len(queryEventsRes.StateEvents) == 0 {
 		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
 		return jsonerror.InternalServerError()

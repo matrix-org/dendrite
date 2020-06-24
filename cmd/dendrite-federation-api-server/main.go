@@ -15,34 +15,25 @@
 package main
 
 import (
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/internal/setup"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "FederationAPI")
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "FederationAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
-	keyDB := base.CreateKeyDB()
+	userAPI := base.UserAPIClient()
 	federation := base.CreateFederationClient()
-	federationSender := base.CreateHTTPFederationSenderAPIs()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
+	serverKeyAPI := base.ServerKeyAPIClient()
+	keyRing := serverKeyAPI.KeyRing()
+	fsAPI := base.FederationSenderHTTPClient()
+	rsAPI := base.RoomserverHTTPClient()
 
-	alias, input, query := base.CreateHTTPRoomserverAPIs()
-	asQuery := base.CreateHTTPAppServiceAPIs()
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-
-	federationapi.SetupFederationAPIComponent(
-		base, accountDB, deviceDB, federation, &keyRing,
-		alias, input, query, asQuery, federationSender, eduProducer,
+	federationapi.AddPublicRoutes(
+		base.PublicAPIMux, base.Cfg, userAPI, federation, keyRing,
+		rsAPI, fsAPI, base.EDUServerClient(),
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

@@ -22,9 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -33,40 +32,22 @@ var (
 	randomMessageEvent  gomatrixserverlib.HeaderedEvent
 	aliceInviteBobEvent gomatrixserverlib.HeaderedEvent
 	bobLeaveEvent       gomatrixserverlib.HeaderedEvent
-	syncPositionVeryOld types.PaginationToken
-	syncPositionBefore  types.PaginationToken
-	syncPositionAfter   types.PaginationToken
-	syncPositionNewEDU  types.PaginationToken
-	syncPositionAfter2  types.PaginationToken
+	syncPositionVeryOld = types.NewStreamToken(5, 0)
+	syncPositionBefore  = types.NewStreamToken(11, 0)
+	syncPositionAfter   = types.NewStreamToken(12, 0)
+	syncPositionNewEDU  = types.NewStreamToken(syncPositionAfter.PDUPosition(), 1)
+	syncPositionAfter2  = types.NewStreamToken(13, 0)
 )
 
 var (
-	roomID = "!test:localhost"
-	alice  = "@alice:localhost"
-	bob    = "@bob:localhost"
+	roomID   = "!test:localhost"
+	alice    = "@alice:localhost"
+	aliceDev = "alicedevice"
+	bob      = "@bob:localhost"
+	bobDev   = "bobdev"
 )
 
 func init() {
-	baseSyncPos := types.PaginationToken{
-		PDUPosition:       0,
-		EDUTypingPosition: 0,
-	}
-
-	syncPositionVeryOld = baseSyncPos
-	syncPositionVeryOld.PDUPosition = 5
-
-	syncPositionBefore = baseSyncPos
-	syncPositionBefore.PDUPosition = 11
-
-	syncPositionAfter = baseSyncPos
-	syncPositionAfter.PDUPosition = 12
-
-	syncPositionNewEDU = syncPositionAfter
-	syncPositionNewEDU.EDUTypingPosition = 1
-
-	syncPositionAfter2 = baseSyncPos
-	syncPositionAfter2.PDUPosition = 13
-
 	var err error
 	err = json.Unmarshal([]byte(`{
 		"_room_version": "1",
@@ -118,16 +99,20 @@ func init() {
 	}
 }
 
+func mustEqualPositions(t *testing.T, got, want types.StreamingToken) {
+	if got.String() != want.String() {
+		t.Fatalf("mustEqualPositions got %s want %s", got.String(), want.String())
+	}
+}
+
 // Test that the current position is returned if a request is already behind.
 func TestImmediateNotification(t *testing.T) {
 	n := NewNotifier(syncPositionBefore)
-	pos, err := waitForEvents(n, newTestSyncRequest(alice, syncPositionVeryOld))
+	pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionVeryOld))
 	if err != nil {
 		t.Fatalf("TestImmediateNotification error: %s", err)
 	}
-	if pos != syncPositionBefore {
-		t.Fatalf("TestImmediateNotification want %v, got %v", syncPositionBefore, pos)
-	}
+	mustEqualPositions(t, pos, syncPositionBefore)
 }
 
 // Test that new events to a joined room unblocks the request.
@@ -140,22 +125,57 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewEventAndJoinedToRoom error: %w", err)
 		}
-		if pos != syncPositionAfter {
-			t.Errorf("TestNewEventAndJoinedToRoom want %v, got %v", syncPositionAfter, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, bob)
+	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter)
 
 	wg.Wait()
+}
+
+func TestCorrectStream(t *testing.T) {
+	n := NewNotifier(syncPositionBefore)
+	stream := lockedFetchUserStream(n, bob, bobDev)
+	if stream.UserID != bob {
+		t.Fatalf("expected user %q, got %q", bob, stream.UserID)
+	}
+	if stream.DeviceID != bobDev {
+		t.Fatalf("expected device %q, got %q", bobDev, stream.DeviceID)
+	}
+}
+
+func TestCorrectStreamWakeup(t *testing.T) {
+	n := NewNotifier(syncPositionBefore)
+	awoken := make(chan string)
+
+	streamone := lockedFetchUserStream(n, alice, "one")
+	streamtwo := lockedFetchUserStream(n, alice, "two")
+
+	go func() {
+		select {
+		case <-streamone.signalChannel:
+			awoken <- "one"
+		case <-streamtwo.signalChannel:
+			awoken <- "two"
+		}
+	}()
+
+	time.Sleep(1 * time.Second)
+
+	wake := "two"
+	n.wakeupUserDevice(alice, []string{wake}, syncPositionAfter)
+
+	if result := <-awoken; result != wake {
+		t.Fatalf("expected to wake %q, got %q", wake, result)
+	}
 }
 
 // Test that an invite unblocks the request
@@ -168,17 +188,15 @@ func TestNewInviteEventForUser(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
-		if pos != syncPositionAfter {
-			t.Errorf("TestNewInviteEventForUser want %v, got %v", syncPositionAfter, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, bob)
+	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionAfter)
@@ -196,17 +214,15 @@ func TestEDUWakeup(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionAfter))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err != nil {
 			t.Errorf("TestNewInviteEventForUser error: %w", err)
 		}
-		if pos != syncPositionNewEDU {
-			t.Errorf("TestNewInviteEventForUser want %v, got %v", syncPositionNewEDU, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionNewEDU)
 		wg.Done()
 	}()
 
-	stream := lockedFetchUserStream(n, bob)
+	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 1)
 
 	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionNewEDU)
@@ -224,20 +240,18 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(3)
 	poll := func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestMultipleRequestWakeup error: %w", err)
 		}
-		if pos != syncPositionAfter {
-			t.Errorf("TestMultipleRequestWakeup want %v, got %v", syncPositionAfter, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
 	}
 	go poll()
 	go poll()
 	go poll()
 
-	stream := lockedFetchUserStream(n, bob)
+	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 3)
 
 	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter)
@@ -264,38 +278,34 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	// Make bob leave the room
 	leaveWG.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
-		if pos != syncPositionAfter {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom want %v, got %v", syncPositionAfter, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter)
 		leaveWG.Done()
 	}()
-	bobStream := lockedFetchUserStream(n, bob)
+	bobStream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(bobStream, 1)
 	n.OnNewEvent(&bobLeaveEvent, "", nil, syncPositionAfter)
 	leaveWG.Wait()
 
 	// send an event into the room. Make sure alice gets it. Bob should not.
 	var aliceWG sync.WaitGroup
-	aliceStream := lockedFetchUserStream(n, alice)
+	aliceStream := lockedFetchUserStream(n, alice, aliceDev)
 	aliceWG.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(alice, syncPositionAfter))
+		pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionAfter))
 		if err != nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %w", err)
 		}
-		if pos != syncPositionAfter2 {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom want %v, got %v", syncPositionAfter2, pos)
-		}
+		mustEqualPositions(t, pos, syncPositionAfter2)
 		aliceWG.Done()
 	}()
 
 	go func() {
 		// this should timeout with an error (but the main goroutine won't wait for the timeout explicitly)
-		_, err := waitForEvents(n, newTestSyncRequest(bob, syncPositionAfter))
+		_, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err == nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom expect error but got nil")
 		}
@@ -312,13 +322,13 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 }
 
-func waitForEvents(n *Notifier, req syncRequest) (types.PaginationToken, error) {
+func waitForEvents(n *Notifier, req syncRequest) (types.StreamingToken, error) {
 	listener := n.GetListener(req)
 	defer listener.Close()
 
 	select {
 	case <-time.After(5 * time.Second):
-		return types.PaginationToken{}, fmt.Errorf(
+		return types.StreamingToken{}, fmt.Errorf(
 			"waitForEvents timed out waiting for %s (pos=%v)", req.device.UserID, req.since,
 		)
 	case <-listener.GetNotifyChannel(*req.since):
@@ -328,7 +338,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.PaginationToken, error) 
 }
 
 // Wait until something is Wait()ing on the user stream.
-func waitForBlocking(s *UserStream, numBlocking uint) {
+func waitForBlocking(s *UserDeviceStream, numBlocking uint) {
 	for numBlocking != s.NumWaiting() {
 		// This is horrible but I don't want to add a signalling mechanism JUST for testing.
 		time.Sleep(1 * time.Microsecond)
@@ -337,16 +347,19 @@ func waitForBlocking(s *UserStream, numBlocking uint) {
 
 // lockedFetchUserStream invokes Notifier.fetchUserStream, respecting Notifier.streamLock.
 // A new stream is made if it doesn't exist already.
-func lockedFetchUserStream(n *Notifier, userID string) *UserStream {
+func lockedFetchUserStream(n *Notifier, userID, deviceID string) *UserDeviceStream {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
-	return n.fetchUserStream(userID, true)
+	return n.fetchUserDeviceStream(userID, deviceID, true)
 }
 
-func newTestSyncRequest(userID string, since types.PaginationToken) syncRequest {
+func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) syncRequest {
 	return syncRequest{
-		device:        authtypes.Device{UserID: userID},
+		device: userapi.Device{
+			UserID: userID,
+			ID:     deviceID,
+		},
 		timeout:       1 * time.Minute,
 		since:         &since,
 		wantFullState: false,

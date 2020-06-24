@@ -22,7 +22,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/state/database"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -31,10 +31,10 @@ import (
 )
 
 type StateResolution struct {
-	db database.RoomStateDatabase
+	db storage.Database
 }
 
-func NewStateResolution(db database.RoomStateDatabase) StateResolution {
+func NewStateResolution(db storage.Database) StateResolution {
 	return StateResolution{
 		db: db,
 	}
@@ -86,7 +86,10 @@ func (v StateResolution) LoadStateAtEvent(
 ) ([]types.StateEntry, error) {
 	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %s", eventID, err)
+	}
+	if snapshotNID == 0 {
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID(%s) returned 0 NID, was this event stored?", eventID)
 	}
 
 	stateEntries, err := v.LoadStateAtSnapshot(ctx, snapshotNID)
@@ -564,7 +567,7 @@ func (v StateResolution) CalculateAndStoreStateAfterEvents(
 			// 3) None of the previous events were state events and they all
 			// have the same state, so this event has exactly the same state
 			// as the previous events.
-			// This should be the common case.
+			// This should be the internal case.
 			metrics.algorithm = "no_change"
 			return metrics.stop(prevState.BeforeStateSnapshotNID, nil)
 		}

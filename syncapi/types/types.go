@@ -23,22 +23,23 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 )
 
 var (
-	// ErrInvalidPaginationTokenType is returned when an attempt at creating a
-	// new instance of PaginationToken with an invalid type (i.e. neither "s"
+	// ErrInvalidSyncTokenType is returned when an attempt at creating a
+	// new instance of SyncToken with an invalid type (i.e. neither "s"
 	// nor "t").
-	ErrInvalidPaginationTokenType = fmt.Errorf("Pagination token has an unknown prefix (should be either s or t)")
-	// ErrInvalidPaginationTokenLen is returned when the pagination token is an
+	ErrInvalidSyncTokenType = fmt.Errorf("Sync token has an unknown prefix (should be either s or t)")
+	// ErrInvalidSyncTokenLen is returned when the pagination token is an
 	// invalid length
-	ErrInvalidPaginationTokenLen = fmt.Errorf("Pagination token has an invalid length")
+	ErrInvalidSyncTokenLen = fmt.Errorf("Sync token has an invalid length")
 )
 
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
 
-// Same as gomatrixserverlib.Event but also has the PDU stream position for this event.
+// StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
 	gomatrixserverlib.HeaderedEvent
 	StreamPosition  StreamPosition
@@ -46,112 +47,235 @@ type StreamEvent struct {
 	ExcludeFromSync bool
 }
 
-// PaginationTokenType represents the type of a pagination token.
+// Range represents a range between two stream positions.
+type Range struct {
+	// From is the position the client has already received.
+	From StreamPosition
+	// To is the position the client is going towards.
+	To StreamPosition
+	// True if the client is going backwards
+	Backwards bool
+}
+
+// Low returns the low number of the range.
+// This represents the position the client already has and hence is exclusive.
+func (r *Range) Low() StreamPosition {
+	if !r.Backwards {
+		return r.From
+	}
+	return r.To
+}
+
+// High returns the high number of the range
+// This represents the position the client is going towards and hence is inclusive.
+func (r *Range) High() StreamPosition {
+	if !r.Backwards {
+		return r.To
+	}
+	return r.From
+}
+
+// SyncTokenType represents the type of a sync token.
 // It can be either "s" (representing a position in the whole stream of events)
 // or "t" (representing a position in a room's topology/depth).
-type PaginationTokenType string
+type SyncTokenType string
 
 const (
-	// PaginationTokenTypeStream represents a position in the server's whole
+	// SyncTokenTypeStream represents a position in the server's whole
 	// stream of events
-	PaginationTokenTypeStream PaginationTokenType = "s"
-	// PaginationTokenTypeTopology represents a position in a room's topology.
-	PaginationTokenTypeTopology PaginationTokenType = "t"
+	SyncTokenTypeStream SyncTokenType = "s"
+	// SyncTokenTypeTopology represents a position in a room's topology.
+	SyncTokenTypeTopology SyncTokenType = "t"
 )
 
-// PaginationToken represents a pagination token, used for interactions with
-// /sync or /messages, for example.
-type PaginationToken struct {
-	//Position StreamPosition
-	Type              PaginationTokenType
-	PDUPosition       StreamPosition
-	EDUTypingPosition StreamPosition
+type StreamingToken struct {
+	syncToken
 }
 
-// NewPaginationTokenFromString takes a string of the form "xyyyy..." where "x"
-// represents the type of a pagination token and "yyyy..." the token itself, and
-// parses it in order to create a new instance of PaginationToken. Returns an
-// error if the token couldn't be parsed into an int64, or if the token type
-// isn't a known type (returns ErrInvalidPaginationTokenType in the latter
-// case).
-func NewPaginationTokenFromString(s string) (token *PaginationToken, err error) {
-	if len(s) == 0 {
-		return nil, ErrInvalidPaginationTokenLen
-	}
+func (t *StreamingToken) PDUPosition() StreamPosition {
+	return t.Positions[0]
+}
+func (t *StreamingToken) EDUPosition() StreamPosition {
+	return t.Positions[1]
+}
+func (t *StreamingToken) String() string {
+	return t.syncToken.String()
+}
 
-	token = new(PaginationToken)
-	var positions []string
-
-	switch t := PaginationTokenType(s[:1]); t {
-	case PaginationTokenTypeStream, PaginationTokenTypeTopology:
-		token.Type = t
-		positions = strings.Split(s[1:], "_")
-	default:
-		token.Type = PaginationTokenTypeStream
-		positions = strings.Split(s, "_")
-	}
-
-	// Try to get the PDU position.
-	if len(positions) >= 1 {
-		if pduPos, err := strconv.ParseInt(positions[0], 10, 64); err != nil {
-			return nil, err
-		} else if pduPos < 0 {
-			return nil, errors.New("negative PDU position not allowed")
-		} else {
-			token.PDUPosition = StreamPosition(pduPos)
+// IsAfter returns true if ANY position in this token is greater than `other`.
+func (t *StreamingToken) IsAfter(other StreamingToken) bool {
+	for i := range other.Positions {
+		if t.Positions[i] > other.Positions[i] {
+			return true
 		}
 	}
+	return false
+}
 
-	// Try to get the typing position.
-	if len(positions) >= 2 {
-		if typPos, err := strconv.ParseInt(positions[1], 10, 64); err != nil {
-			return nil, err
-		} else if typPos < 0 {
-			return nil, errors.New("negative EDU typing position not allowed")
-		} else {
-			token.EDUTypingPosition = StreamPosition(typPos)
+// WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
+// If the latter StreamingToken contains a field that is not 0, it is considered an update,
+// and its value will replace the corresponding value in the StreamingToken on which WithUpdates is called.
+func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) {
+	ret.Type = t.Type
+	ret.Positions = make([]StreamPosition, len(t.Positions))
+	for i := range t.Positions {
+		ret.Positions[i] = t.Positions[i]
+		if other.Positions[i] == 0 {
+			continue
 		}
-	}
-
-	return
-}
-
-// NewPaginationTokenFromTypeAndPosition takes a PaginationTokenType and a
-// StreamPosition and returns an instance of PaginationToken.
-func NewPaginationTokenFromTypeAndPosition(
-	t PaginationTokenType, pdupos StreamPosition, typpos StreamPosition,
-) (p *PaginationToken) {
-	return &PaginationToken{
-		Type:              t,
-		PDUPosition:       pdupos,
-		EDUTypingPosition: typpos,
-	}
-}
-
-// String translates a PaginationToken to a string of the "xyyyy..." (see
-// NewPaginationToken to know what it represents).
-func (p *PaginationToken) String() string {
-	return fmt.Sprintf("%s%d_%d", p.Type, p.PDUPosition, p.EDUTypingPosition)
-}
-
-// WithUpdates returns a copy of the PaginationToken with updates applied from another PaginationToken.
-// If the latter PaginationToken contains a field that is not 0, it is considered an update,
-// and its value will replace the corresponding value in the PaginationToken on which WithUpdates is called.
-func (pt *PaginationToken) WithUpdates(other PaginationToken) PaginationToken {
-	ret := *pt
-	if other.PDUPosition != 0 {
-		ret.PDUPosition = other.PDUPosition
-	}
-	if other.EDUTypingPosition != 0 {
-		ret.EDUTypingPosition = other.EDUTypingPosition
+		ret.Positions[i] = other.Positions[i]
 	}
 	return ret
 }
 
-// IsAfter returns whether one PaginationToken refers to states newer than another PaginationToken.
-func (sp *PaginationToken) IsAfter(other PaginationToken) bool {
-	return sp.PDUPosition > other.PDUPosition ||
-		sp.EDUTypingPosition > other.EDUTypingPosition
+type TopologyToken struct {
+	syncToken
+}
+
+func (t *TopologyToken) Depth() StreamPosition {
+	return t.Positions[0]
+}
+func (t *TopologyToken) PDUPosition() StreamPosition {
+	return t.Positions[1]
+}
+func (t *TopologyToken) StreamToken() StreamingToken {
+	return NewStreamToken(t.PDUPosition(), 0)
+}
+func (t *TopologyToken) String() string {
+	return t.syncToken.String()
+}
+
+// Decrement the topology token to one event earlier.
+func (t *TopologyToken) Decrement() {
+	depth := t.Positions[0]
+	pduPos := t.Positions[1]
+	if depth-1 <= 0 {
+		// nothing can be lower than this
+		depth = 1
+	} else {
+		// this assumes that we will never have 1000 events all with the same
+		// depth. TODO: work out what the right PDU position is to use, probably needs a db hit.
+		depth--
+		pduPos += 1000
+	}
+	// The lowest token value is 1, therefore we need to manually set it to that
+	// value if we're below it.
+	if depth < 1 {
+		depth = 1
+	}
+	t.Positions = []StreamPosition{
+		depth, pduPos,
+	}
+}
+
+// NewSyncTokenFromString takes a string of the form "xyyyy..." where "x"
+// represents the type of a pagination token and "yyyy..." the token itself, and
+// parses it in order to create a new instance of SyncToken. Returns an
+// error if the token couldn't be parsed into an int64, or if the token type
+// isn't a known type (returns ErrInvalidSyncTokenType in the latter
+// case).
+func newSyncTokenFromString(s string) (token *syncToken, err error) {
+	if len(s) == 0 {
+		return nil, ErrInvalidSyncTokenLen
+	}
+
+	token = new(syncToken)
+	var positions []string
+
+	switch t := SyncTokenType(s[:1]); t {
+	case SyncTokenTypeStream, SyncTokenTypeTopology:
+		token.Type = t
+		positions = strings.Split(s[1:], "_")
+	default:
+		return nil, ErrInvalidSyncTokenType
+	}
+
+	for _, pos := range positions {
+		if posInt, err := strconv.ParseInt(pos, 10, 64); err != nil {
+			return nil, err
+		} else if posInt < 0 {
+			return nil, errors.New("negative position not allowed")
+		} else {
+			token.Positions = append(token.Positions, StreamPosition(posInt))
+		}
+	}
+	return
+}
+
+// NewTopologyToken creates a new sync token for /messages
+func NewTopologyToken(depth, streamPos StreamPosition) TopologyToken {
+	if depth < 0 {
+		depth = 1
+	}
+	return TopologyToken{
+		syncToken: syncToken{
+			Type:      SyncTokenTypeTopology,
+			Positions: []StreamPosition{depth, streamPos},
+		},
+	}
+}
+func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
+	t, err := newSyncTokenFromString(tok)
+	if err != nil {
+		return
+	}
+	if t.Type != SyncTokenTypeTopology {
+		err = fmt.Errorf("token %s is not a topology token", tok)
+		return
+	}
+	if len(t.Positions) < 2 {
+		err = fmt.Errorf("token %s wrong number of values, got %d want at least 2", tok, len(t.Positions))
+		return
+	}
+	return TopologyToken{
+		syncToken: *t,
+	}, nil
+}
+
+// NewStreamToken creates a new sync token for /sync
+func NewStreamToken(pduPos, eduPos StreamPosition) StreamingToken {
+	return StreamingToken{
+		syncToken: syncToken{
+			Type:      SyncTokenTypeStream,
+			Positions: []StreamPosition{pduPos, eduPos},
+		},
+	}
+}
+func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
+	t, err := newSyncTokenFromString(tok)
+	if err != nil {
+		return
+	}
+	if t.Type != SyncTokenTypeStream {
+		err = fmt.Errorf("token %s is not a streaming token", tok)
+		return
+	}
+	if len(t.Positions) < 2 {
+		err = fmt.Errorf("token %s wrong number of values, got %d want at least 2", tok, len(t.Positions))
+		return
+	}
+	return StreamingToken{
+		syncToken: *t,
+	}, nil
+}
+
+// syncToken represents a syncapi token, used for interactions with
+// /sync or /messages, for example.
+type syncToken struct {
+	Type SyncTokenType
+	// A list of stream positions, their meanings vary depending on the token type.
+	Positions []StreamPosition
+}
+
+// String translates a SyncToken to a string of the "xyyyy..." (see
+// NewSyncToken to know what it represents).
+func (p *syncToken) String() string {
+	posStr := make([]string, len(p.Positions))
+	for i := range p.Positions {
+		posStr[i] = strconv.FormatInt(int64(p.Positions[i]), 10)
+	}
+
+	return fmt.Sprintf("%s%s", p.Type, strings.Join(posStr, "_"))
 }
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
@@ -175,13 +299,14 @@ type Response struct {
 		Invite map[string]InviteResponse `json:"invite"`
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
+	ToDevice struct {
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
+	} `json:"to_device"`
 }
 
 // NewResponse creates an empty response with initialised maps.
-func NewResponse(token PaginationToken) *Response {
-	res := Response{
-		NextBatch: token.String(),
-	}
+func NewResponse() *Response {
+	res := Response{}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
 	res.Rooms.Join = make(map[string]JoinResponse)
@@ -194,14 +319,7 @@ func NewResponse(token PaginationToken) *Response {
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
 	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
-
-	// Fill next_batch with a pagination token. Since this is a response to a sync request, we can assume
-	// we'll always return a stream token.
-	res.NextBatch = NewPaginationTokenFromTypeAndPosition(
-		PaginationTokenTypeStream,
-		StreamPosition(token.PDUPosition),
-		StreamPosition(token.EDUTypingPosition),
-	).String()
+	res.ToDevice.Events = make([]gomatrixserverlib.SendToDeviceEvent, 0)
 
 	return &res
 }
@@ -213,7 +331,8 @@ func (r *Response) IsEmpty() bool {
 		len(r.Rooms.Invite) == 0 &&
 		len(r.Rooms.Leave) == 0 &&
 		len(r.AccountData.Events) == 0 &&
-		len(r.Presence.Events) == 0
+		len(r.Presence.Events) == 0 &&
+		len(r.ToDevice.Events) == 0
 }
 
 // JoinResponse represents a /sync response for a room which is under the 'join' key.
@@ -247,14 +366,17 @@ func NewJoinResponse() *JoinResponse {
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
 type InviteResponse struct {
 	InviteState struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
+		Events json.RawMessage `json:"events"`
 	} `json:"invite_state"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse() *InviteResponse {
+func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
-	res.InviteState.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.InviteState.Events = json.RawMessage{'[', ']'}
+	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
+		res.InviteState.Events = json.RawMessage(inviteRoomState.Raw)
+	}
 	return &res
 }
 
@@ -276,4 +398,14 @@ func NewLeaveResponse() *LeaveResponse {
 	res.State.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	return &res
+}
+
+type SendToDeviceNID int
+
+type SendToDeviceEvent struct {
+	gomatrixserverlib.SendToDeviceEvent
+	ID          SendToDeviceNID
+	UserID      string
+	DeviceID    string
+	SentByToken *StreamingToken
 }

@@ -1,3 +1,7 @@
+// Copyright 2017 Vector Creations Ltd
+// Copyright 2017-2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,12 +19,8 @@ package api
 
 import (
 	"context"
-	"errors"
-	"net/http"
 
-	commonHTTP "github.com/matrix-org/dendrite/common/http"
 	"github.com/matrix-org/gomatrixserverlib"
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // InputTypingEvent is an event for notifying the typing server about typing updates.
@@ -37,6 +37,12 @@ type InputTypingEvent struct {
 	OriginServerTS gomatrixserverlib.Timestamp `json:"origin_server_ts"`
 }
 
+type InputSendToDeviceEvent struct {
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+	gomatrixserverlib.SendToDeviceEvent
+}
+
 // InputTypingEventRequest is a request to EDUServerInputAPI
 type InputTypingEventRequest struct {
 	InputTypingEvent InputTypingEvent `json:"input_typing_event"`
@@ -45,6 +51,14 @@ type InputTypingEventRequest struct {
 // InputTypingEventResponse is a response to InputTypingEvents
 type InputTypingEventResponse struct{}
 
+// InputSendToDeviceEventRequest is a request to EDUServerInputAPI
+type InputSendToDeviceEventRequest struct {
+	InputSendToDeviceEvent InputSendToDeviceEvent `json:"input_send_to_device_event"`
+}
+
+// InputSendToDeviceEventResponse is a response to InputSendToDeviceEventRequest
+type InputSendToDeviceEventResponse struct{}
+
 // EDUServerInputAPI is used to write events to the typing server.
 type EDUServerInputAPI interface {
 	InputTypingEvent(
@@ -52,33 +66,10 @@ type EDUServerInputAPI interface {
 		request *InputTypingEventRequest,
 		response *InputTypingEventResponse,
 	) error
-}
 
-// EDUServerInputTypingEventPath is the HTTP path for the InputTypingEvent API.
-const EDUServerInputTypingEventPath = "/api/eduserver/input"
-
-// NewEDUServerInputAPIHTTP creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
-func NewEDUServerInputAPIHTTP(eduServerURL string, httpClient *http.Client) (EDUServerInputAPI, error) {
-	if httpClient == nil {
-		return nil, errors.New("NewTypingServerInputAPIHTTP: httpClient is <nil>")
-	}
-	return &httpEDUServerInputAPI{eduServerURL, httpClient}, nil
-}
-
-type httpEDUServerInputAPI struct {
-	eduServerURL string
-	httpClient   *http.Client
-}
-
-// InputRoomEvents implements EDUServerInputAPI
-func (h *httpEDUServerInputAPI) InputTypingEvent(
-	ctx context.Context,
-	request *InputTypingEventRequest,
-	response *InputTypingEventResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputTypingEvent")
-	defer span.Finish()
-
-	apiURL := h.eduServerURL + EDUServerInputTypingEventPath
-	return commonHTTP.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	InputSendToDeviceEvent(
+		ctx context.Context,
+		request *InputSendToDeviceEventRequest,
+		response *InputSendToDeviceEventResponse,
+	) error
 }

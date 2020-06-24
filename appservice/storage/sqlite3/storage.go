@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	// Import SQLite database driver
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
@@ -28,6 +27,7 @@ import (
 
 // Database stores events intended to be later sent to application services
 type Database struct {
+	sqlutil.PartitionOffsetStatements
 	events eventsStatements
 	txnID  txnStatements
 	db     *sql.DB
@@ -37,10 +37,17 @@ type Database struct {
 func NewDatabase(dataSourceName string) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sqlutil.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
+	cs, err := sqlutil.ParseFileURI(dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+	if result.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {
+		return nil, err
+	}
+	if err = result.PartitionOffsetStatements.Prepare(result.db, "appservice"); err != nil {
 		return nil, err
 	}
 	return &result, nil

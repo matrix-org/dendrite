@@ -1,3 +1,7 @@
+// Copyright 2017 Vector Creations Ltd
+// Copyright 2017-2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -13,28 +17,34 @@
 package eduserver
 
 import (
-	"net/http"
-
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/eduserver/input"
+	"github.com/matrix-org/dendrite/eduserver/inthttp"
+	"github.com/matrix-org/dendrite/internal/setup"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
-// SetupEDUServerComponent sets up and registers HTTP handlers for the
-// EDUServer component. Returns instances of the various roomserver APIs,
-// allowing other components running in the same process to hit the query the
-// APIs directly instead of having to use HTTP.
-func SetupEDUServerComponent(
-	base *basecomponent.BaseDendrite,
-	eduCache *cache.EDUCache,
-) api.EDUServerInputAPI {
-	inputAPI := &input.EDUServerInputAPI{
-		Cache:                  eduCache,
-		Producer:               base.KafkaProducer,
-		OutputTypingEventTopic: string(base.Cfg.Kafka.Topics.OutputTypingEvent),
-	}
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(internalMux *mux.Router, inputAPI api.EDUServerInputAPI) {
+	inthttp.AddRoutes(inputAPI, internalMux)
+}
 
-	inputAPI.SetupHTTP(http.DefaultServeMux)
-	return inputAPI
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI(
+	base *setup.BaseDendrite,
+	eduCache *cache.EDUCache,
+	userAPI userapi.UserInternalAPI,
+) api.EDUServerInputAPI {
+	return &input.EDUServerInputAPI{
+		Cache:                        eduCache,
+		UserAPI:                      userAPI,
+		Producer:                     base.KafkaProducer,
+		OutputTypingEventTopic:       string(base.Cfg.Kafka.Topics.OutputTypingEvent),
+		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEvent),
+		ServerName:                   base.Cfg.Matrix.ServerName,
+	}
 }

@@ -17,9 +17,9 @@ package producers
 import (
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/common"
-
-	sarama "gopkg.in/Shopify/sarama.v1"
+	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	log "github.com/sirupsen/logrus"
 )
 
 // SyncAPIProducer produces events for the sync API server to consume
@@ -32,7 +32,7 @@ type SyncAPIProducer struct {
 func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string) error {
 	var m sarama.ProducerMessage
 
-	data := common.AccountData{
+	data := eventutil.AccountData{
 		RoomID: roomID,
 		Type:   dataType,
 	}
@@ -44,6 +44,11 @@ func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string
 	m.Topic = string(p.Topic)
 	m.Key = sarama.StringEncoder(userID)
 	m.Value = sarama.ByteEncoder(value)
+	log.WithFields(log.Fields{
+		"user_id":   userID,
+		"room_id":   roomID,
+		"data_type": dataType,
+	}).Infof("Producing to topic '%s'", p.Topic)
 
 	_, _, err = p.Producer.SendMessage(&m)
 	return err

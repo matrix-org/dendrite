@@ -17,25 +17,24 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
-	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	roomServerConsumer *common.ContinualConsumer
-	db                 storage.Database
-	notifier           *sync.Notifier
-	query              api.RoomserverQueryAPI
+	rsAPI      api.RoomserverInternalAPI
+	rsConsumer *internal.ContinualConsumer
+	db         storage.Database
+	notifier   *sync.Notifier
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -44,19 +43,19 @@ func NewOutputRoomEventConsumer(
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
 	store storage.Database,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
 
-	consumer := common.ContinualConsumer{
+	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
 	s := &OutputRoomEventConsumer{
-		roomServerConsumer: &consumer,
-		db:                 store,
-		notifier:           n,
-		query:              queryAPI,
+		rsConsumer: &consumer,
+		db:         store,
+		notifier:   n,
+		rsAPI:      rsAPI,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -65,7 +64,7 @@ func NewOutputRoomEventConsumer(
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	return s.roomServerConsumer.Start()
+	return s.rsConsumer.Start()
 }
 
 // onMessage is called when the sync server receives a new event from the room server output log.
@@ -99,23 +98,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-	log.WithFields(log.Fields{
-		"event_id":     ev.EventID(),
-		"room_id":      ev.RoomID(),
-		"room_version": ev.RoomVersion,
-	}).Info("received event from roomserver")
 
-	addsStateEvents, err := s.lookupStateEvents(msg.AddsStateEventIDs, ev)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"event":      string(ev.JSON()),
-			log.ErrorKey: err,
-			"add":        msg.AddsStateEventIDs,
-			"del":        msg.RemovesStateEventIDs,
-		}).Panicf("roomserver output log: state event lookup failure")
-	}
+	addsStateEvents := msg.AddsState()
 
-	ev, err = s.updateStateEvent(ev)
+	ev, err := s.updateStateEvent(ev)
 	if err != nil {
 		return err
 	}
@@ -146,7 +132,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&ev, "", nil, types.PaginationToken{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0))
 
 	return nil
 }
@@ -164,7 +150,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&msg.Event, "", nil, types.PaginationToken{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(&msg.Event, "", nil, types.NewStreamToken(pduPos, 0))
 	return nil
 }
 
@@ -183,63 +169,6 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	// TODO: Notify any active sync requests that the invite has been retired.
 	// s.notifier.OnNewEvent(nil, msg.TargetUserID, syncStreamPos)
 	return nil
-}
-
-// lookupStateEvents looks up the state events that are added by a new event.
-func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.HeaderedEvent,
-) ([]gomatrixserverlib.HeaderedEvent, error) {
-	// Fast path if there aren't any new state events.
-	if len(addsStateEventIDs) == 0 {
-		return nil, nil
-	}
-
-	// Fast path if the only state event added is the event itself.
-	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.HeaderedEvent{event}, nil
-	}
-
-	// Check if this is re-adding a state events that we previously processed
-	// If we have previously received a state event it may still be in
-	// our event database.
-	result, err := s.db.Events(context.TODO(), addsStateEventIDs)
-	if err != nil {
-		return nil, err
-	}
-	missing := missingEventsFrom(result, addsStateEventIDs)
-
-	// Check if event itself is being added.
-	for _, eventID := range missing {
-		if eventID == event.EventID() {
-			result = append(result, event)
-			break
-		}
-	}
-	missing = missingEventsFrom(result, addsStateEventIDs)
-
-	if len(missing) == 0 {
-		return result, nil
-	}
-
-	// At this point the missing events are neither the event itself nor are
-	// they present in our local database. Our only option is to fetch them
-	// from the roomserver using the query API.
-	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
-	var eventResp api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
-		return nil, err
-	}
-
-	result = append(result, eventResp.Events...)
-	missing = missingEventsFrom(result, addsStateEventIDs)
-
-	if len(missing) != 0 {
-		return nil, fmt.Errorf(
-			"missing %d state events IDs at event %q", len(missing), event.EventID(),
-		)
-	}
-
-	return result, nil
 }
 
 func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.HeaderedEvent) (gomatrixserverlib.HeaderedEvent, error) {
@@ -269,18 +198,4 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.Heade
 
 	event.Event, err = event.SetUnsigned(prev)
 	return event, err
-}
-
-func missingEventsFrom(events []gomatrixserverlib.HeaderedEvent, required []string) []string {
-	have := map[string]bool{}
-	for _, event := range events {
-		have[event.EventID()] = true
-	}
-	var missing []string
-	for _, eventID := range required {
-		if !have[eventID] {
-			missing = append(missing, eventID)
-		}
-	}
-	return missing
 }

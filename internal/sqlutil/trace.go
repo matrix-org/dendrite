@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -76,12 +77,27 @@ func (in *traceInterceptor) RowsNext(c context.Context, rows driver.Rows, dest [
 // Open opens a database specified by its database driver name and a driver-specific data source name,
 // usually consisting of at least a database name and connection information. Includes tracing driver
 // if DENDRITE_TRACE_SQL=1
-func Open(driverName, dsn string) (*sql.DB, error) {
+func Open(driverName, dsn string, dbProperties DbProperties) (*sql.DB, error) {
 	if tracingEnabled {
 		// install the wrapped driver
 		driverName += "-trace"
 	}
-	return sql.Open(driverName, dsn)
+	db, err := sql.Open(driverName, dsn)
+	if err != nil {
+		return nil, err
+	}
+	if driverName != SQLiteDriverName() && dbProperties != nil {
+		logrus.WithFields(logrus.Fields{
+			"MaxOpenConns":    dbProperties.MaxOpenConns(),
+			"MaxIdleConns":    dbProperties.MaxIdleConns(),
+			"ConnMaxLifetime": dbProperties.ConnMaxLifetime(),
+			"dataSourceName":  regexp.MustCompile(`://[^@]*@`).ReplaceAllLiteralString(dsn, "://"),
+		}).Debug("Setting DB connection limits")
+		db.SetMaxOpenConns(dbProperties.MaxOpenConns())
+		db.SetMaxIdleConns(dbProperties.MaxIdleConns())
+		db.SetConnMaxLifetime(dbProperties.ConnMaxLifetime())
+	}
+	return db, nil
 }
 
 func init() {

@@ -27,7 +27,7 @@ import (
 func GetState(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 ) util.JSONResponse {
 	eventID, err := parseEventIDParam(request)
@@ -35,7 +35,7 @@ func GetState(
 		return *err
 	}
 
-	state, err := getState(ctx, request, query, roomID, eventID)
+	state, err := getState(ctx, request, rsAPI, roomID, eventID)
 	if err != nil {
 		return *err
 	}
@@ -47,7 +47,7 @@ func GetState(
 func GetStateIDs(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 ) util.JSONResponse {
 	eventID, err := parseEventIDParam(request)
@@ -55,7 +55,7 @@ func GetStateIDs(
 		return *err
 	}
 
-	state, err := getState(ctx, request, query, roomID, eventID)
+	state, err := getState(ctx, request, rsAPI, roomID, eventID)
 	if err != nil {
 		return *err
 	}
@@ -94,28 +94,30 @@ func parseEventIDParam(
 func getState(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 	eventID string,
 ) (*gomatrixserverlib.RespState, *util.JSONResponse) {
-	event, resErr := getEvent(ctx, request, query, eventID)
+	event, resErr := fetchEvent(ctx, rsAPI, eventID)
 	if resErr != nil {
 		return nil, resErr
 	}
 
 	if event.RoomID() != roomID {
-		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
+		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: jsonerror.NotFound("event does not belong to this room")}
+	}
+	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
+	if resErr != nil {
+		return nil, resErr
 	}
 
-	authEventIDs := getIDsFromEventRef(event.AuthEvents())
-
 	var response api.QueryStateAndAuthChainResponse
-	err := query.QueryStateAndAuthChain(
+	err := rsAPI.QueryStateAndAuthChain(
 		ctx,
 		&api.QueryStateAndAuthChainRequest{
 			RoomID:       roomID,
 			PrevEventIDs: []string{eventID},
-			AuthEventIDs: authEventIDs,
+			AuthEventIDs: event.AuthEventIDs(),
 		},
 		&response,
 	)
@@ -132,15 +134,6 @@ func getState(
 		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
 		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
 	}, nil
-}
-
-func getIDsFromEventRef(events []gomatrixserverlib.EventReference) []string {
-	IDs := make([]string, len(events))
-	for i := range events {
-		IDs[i] = events[i].EventID
-	}
-
-	return IDs
 }
 
 func getIDsFromEvent(events []gomatrixserverlib.Event) []string {

@@ -16,7 +16,9 @@ package routing
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -27,46 +29,62 @@ import (
 func GetEvent(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	eventID string,
+	origin gomatrixserverlib.ServerName,
 ) util.JSONResponse {
-	event, err := getEvent(ctx, request, query, eventID)
+	err := allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
+	if err != nil {
+		return *err
+	}
+	event, err := fetchEvent(ctx, rsAPI, eventID)
 	if err != nil {
 		return *err
 	}
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: event}
+	return util.JSONResponse{Code: http.StatusOK, JSON: gomatrixserverlib.Transaction{
+		Origin:         origin,
+		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+		PDUs: []json.RawMessage{
+			event.JSON(),
+		},
+	}}
 }
 
-// getEvent returns the requested event,
+// allowedToSeeEvent returns no error if the server is allowed to see this event,
 // otherwise it returns an error response which can be sent to the client.
-func getEvent(
+func allowedToSeeEvent(
 	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
-	query api.RoomserverQueryAPI,
+	origin gomatrixserverlib.ServerName,
+	rsAPI api.RoomserverInternalAPI,
 	eventID string,
-) (*gomatrixserverlib.Event, *util.JSONResponse) {
+) *util.JSONResponse {
 	var authResponse api.QueryServerAllowedToSeeEventResponse
-	err := query.QueryServerAllowedToSeeEvent(
+	err := rsAPI.QueryServerAllowedToSeeEvent(
 		ctx,
 		&api.QueryServerAllowedToSeeEventRequest{
 			EventID:    eventID,
-			ServerName: request.Origin(),
+			ServerName: origin,
 		},
 		&authResponse,
 	)
 	if err != nil {
 		resErr := util.ErrorResponse(err)
-		return nil, &resErr
+		return &resErr
 	}
 
 	if !authResponse.AllowedToSeeEvent {
 		resErr := util.MessageResponse(http.StatusForbidden, "server not allowed to see event")
-		return nil, &resErr
+		return &resErr
 	}
 
+	return nil
+}
+
+// fetchEvent fetches the event without auth checks. Returns an error if the event cannot be found.
+func fetchEvent(ctx context.Context, rsAPI api.RoomserverInternalAPI, eventID string) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	var eventsResponse api.QueryEventsByIDResponse
-	err = query.QueryEventsByID(
+	err := rsAPI.QueryEventsByID(
 		ctx,
 		&api.QueryEventsByIDRequest{EventIDs: []string{eventID}},
 		&eventsResponse,

@@ -23,36 +23,38 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
-// UserStream represents a communication mechanism between the /sync request goroutine
+// UserDeviceStream represents a communication mechanism between the /sync request goroutine
 // and the underlying sync server goroutines.
 // Goroutines can get a UserStreamListener to wait for updates, and can Broadcast()
 // updates.
-type UserStream struct {
-	UserID string
+type UserDeviceStream struct {
+	UserID   string
+	DeviceID string
 	// The lock that protects changes to this struct
 	lock sync.Mutex
 	// Closed when there is an update.
 	signalChannel chan struct{}
 	// The last sync position that there may have been an update for the user
-	pos types.PaginationToken
+	pos types.StreamingToken
 	// The last time when we had some listeners waiting
 	timeOfLastChannel time.Time
 	// The number of listeners waiting
 	numWaiting uint
 }
 
-// UserStreamListener allows a sync request to wait for updates for a user.
-type UserStreamListener struct {
-	userStream *UserStream
+// UserDeviceStreamListener allows a sync request to wait for updates for a user.
+type UserDeviceStreamListener struct {
+	userStream *UserDeviceStream
 
 	// Whether the stream has been closed
 	hasClosed bool
 }
 
-// NewUserStream creates a new user stream
-func NewUserStream(userID string, currPos types.PaginationToken) *UserStream {
-	return &UserStream{
+// NewUserDeviceStream creates a new user stream
+func NewUserDeviceStream(userID, deviceID string, currPos types.StreamingToken) *UserDeviceStream {
+	return &UserDeviceStream{
 		UserID:            userID,
+		DeviceID:          deviceID,
 		timeOfLastChannel: time.Now(),
 		pos:               currPos,
 		signalChannel:     make(chan struct{}),
@@ -62,18 +64,18 @@ func NewUserStream(userID string, currPos types.PaginationToken) *UserStream {
 // GetListener returns UserStreamListener that a sync request can use to wait
 // for new updates with.
 // UserStreamListener must be closed
-func (s *UserStream) GetListener(ctx context.Context) UserStreamListener {
+func (s *UserDeviceStream) GetListener(ctx context.Context) UserDeviceStreamListener {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.numWaiting++ // We decrement when UserStreamListener is closed
 
-	listener := UserStreamListener{
+	listener := UserDeviceStreamListener{
 		userStream: s,
 	}
 
 	// Lets be a bit paranoid here and check that Close() is being called
-	runtime.SetFinalizer(&listener, func(l *UserStreamListener) {
+	runtime.SetFinalizer(&listener, func(l *UserDeviceStreamListener) {
 		if !l.hasClosed {
 			l.Close()
 		}
@@ -83,7 +85,7 @@ func (s *UserStream) GetListener(ctx context.Context) UserStreamListener {
 }
 
 // Broadcast a new sync position for this user.
-func (s *UserStream) Broadcast(pos types.PaginationToken) {
+func (s *UserDeviceStream) Broadcast(pos types.StreamingToken) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -96,7 +98,7 @@ func (s *UserStream) Broadcast(pos types.PaginationToken) {
 
 // NumWaiting returns the number of goroutines waiting for waiting for updates.
 // Used for metrics and testing.
-func (s *UserStream) NumWaiting() uint {
+func (s *UserDeviceStream) NumWaiting() uint {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	return s.numWaiting
@@ -105,7 +107,7 @@ func (s *UserStream) NumWaiting() uint {
 // TimeOfLastNonEmpty returns the last time that the number of waiting listeners
 // was non-empty, may be time.Now() if number of waiting listeners is currently
 // non-empty.
-func (s *UserStream) TimeOfLastNonEmpty() time.Time {
+func (s *UserDeviceStream) TimeOfLastNonEmpty() time.Time {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -116,9 +118,9 @@ func (s *UserStream) TimeOfLastNonEmpty() time.Time {
 	return s.timeOfLastChannel
 }
 
-// GetStreamPosition returns last sync position which the UserStream was
+// GetSyncPosition returns last sync position which the UserStream was
 // notified about
-func (s *UserStreamListener) GetSyncPosition() types.PaginationToken {
+func (s *UserDeviceStreamListener) GetSyncPosition() types.StreamingToken {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
 
@@ -130,7 +132,7 @@ func (s *UserStreamListener) GetSyncPosition() types.PaginationToken {
 // sincePos specifies from which point we want to be notified about. If there
 // has already been an update after sincePos we'll return a closed channel
 // immediately.
-func (s *UserStreamListener) GetNotifyChannel(sincePos types.PaginationToken) <-chan struct{} {
+func (s *UserDeviceStreamListener) GetNotifyChannel(sincePos types.StreamingToken) <-chan struct{} {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
 
@@ -147,7 +149,7 @@ func (s *UserStreamListener) GetNotifyChannel(sincePos types.PaginationToken) <-
 }
 
 // Close cleans up resources used
-func (s *UserStreamListener) Close() {
+func (s *UserDeviceStreamListener) Close() {
 	s.userStream.lock.Lock()
 	defer s.userStream.lock.Unlock()
 

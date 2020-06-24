@@ -19,7 +19,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -55,26 +57,27 @@ type previousEventStatements struct {
 	selectPreviousEventExistsStmt *sql.Stmt
 }
 
-func (s *previousEventStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(previousEventSchema)
+func NewSqlitePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
+	s := &previousEventStatements{}
+	_, err := db.Exec(previousEventSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
 		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *previousEventStatements) insertPreviousEvent(
+func (s *previousEventStatements) InsertPreviousEvent(
 	ctx context.Context,
 	txn *sql.Tx,
 	previousEventID string,
 	previousEventReferenceSHA256 []byte,
 	eventNID types.EventNID,
 ) error {
-	stmt := common.TxStmt(txn, s.insertPreviousEventStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
 	_, err := stmt.ExecContext(
 		ctx, previousEventID, previousEventReferenceSHA256, int64(eventNID),
 	)
@@ -83,10 +86,10 @@ func (s *previousEventStatements) insertPreviousEvent(
 
 // Check if the event reference exists
 // Returns sql.ErrNoRows if the event reference doesn't exist.
-func (s *previousEventStatements) selectPreviousEventExists(
+func (s *previousEventStatements) SelectPreviousEventExists(
 	ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte,
 ) error {
 	var ok int64
-	stmt := common.TxStmt(txn, s.selectPreviousEventExistsStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
 	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
 }

@@ -21,13 +21,13 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/gomatrix"
@@ -43,7 +43,7 @@ func GetProfile(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == common.ErrProfileNoExists {
+		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -56,7 +56,7 @@ func GetProfile(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: common.ProfileResponse{
+		JSON: eventutil.ProfileResponse{
 			AvatarURL:   profile.AvatarURL,
 			DisplayName: profile.DisplayName,
 		},
@@ -71,7 +71,7 @@ func GetAvatarURL(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == common.ErrProfileNoExists {
+		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -84,17 +84,17 @@ func GetAvatarURL(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: common.AvatarURL{
+		JSON: eventutil.AvatarURL{
 			AvatarURL: profile.AvatarURL,
 		},
 	}
 }
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
+// nolint:gocyclo
 func SetAvatarURL(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
-	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
-	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
+	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -103,9 +103,7 @@ func SetAvatarURL(
 		}
 	}
 
-	changedKey := "avatar_url"
-
-	var r common.AvatarURL
+	var r eventutil.AvatarURL
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -154,20 +152,22 @@ func SetAvatarURL(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), memberships, newProfile, userID, cfg, evTime, queryAPI,
+		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
 	)
-	if err != nil {
+	switch e := err.(type) {
+	case nil:
+	case gomatrixserverlib.BadJSONError:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
+	default:
 		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
-	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("rsProducer.SendEvents failed")
-		return jsonerror.InternalServerError()
-	}
-
-	if err := producer.SendUpdate(userID, changedKey, oldProfile.AvatarURL, r.AvatarURL); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendUpdate failed")
+	if _, err := api.SendEvents(req.Context(), rsAPI, events, cfg.Matrix.ServerName, nil); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -185,7 +185,7 @@ func GetDisplayName(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == common.ErrProfileNoExists {
+		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: jsonerror.NotFound("The user does not exist or does not have a profile"),
@@ -198,17 +198,17 @@ func GetDisplayName(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: common.DisplayName{
+		JSON: eventutil.DisplayName{
 			DisplayName: profile.DisplayName,
 		},
 	}
 }
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
+// nolint:gocyclo
 func SetDisplayName(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
-	userID string, producer *producers.UserUpdateProducer, cfg *config.Dendrite,
-	rsProducer *producers.RoomserverProducer, queryAPI api.RoomserverQueryAPI,
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
+	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -217,9 +217,7 @@ func SetDisplayName(
 		}
 	}
 
-	changedKey := "displayname"
-
-	var r common.DisplayName
+	var r eventutil.DisplayName
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
@@ -268,20 +266,22 @@ func SetDisplayName(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), memberships, newProfile, userID, cfg, evTime, queryAPI,
+		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
 	)
-	if err != nil {
+	switch e := err.(type) {
+	case nil:
+	case gomatrixserverlib.BadJSONError:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
+	default:
 		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
-	if _, err := rsProducer.SendEvents(req.Context(), events, cfg.Matrix.ServerName, nil); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("rsProducer.SendEvents failed")
-		return jsonerror.InternalServerError()
-	}
-
-	if err := producer.SendUpdate(userID, changedKey, oldProfile.DisplayName, r.DisplayName); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendUpdate failed")
+	if _, err := api.SendEvents(req.Context(), rsAPI, events, cfg.Matrix.ServerName, nil); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -294,7 +294,7 @@ func SetDisplayName(
 // getProfile gets the full profile of a user by querying the database or a
 // remote homeserver.
 // Returns an error when something goes wrong or specifically
-// common.ErrProfileNoExists when the profile doesn't exist.
+// eventutil.ErrProfileNoExists when the profile doesn't exist.
 func getProfile(
 	ctx context.Context, accountDB accounts.Database, cfg *config.Dendrite,
 	userID string,
@@ -311,7 +311,7 @@ func getProfile(
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {
-					return nil, common.ErrProfileNoExists
+					return nil, eventutil.ErrProfileNoExists
 				}
 			}
 
@@ -337,14 +337,14 @@ func buildMembershipEvents(
 	ctx context.Context,
 	memberships []authtypes.Membership,
 	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
-	evTime time.Time, queryAPI api.RoomserverQueryAPI,
+	evTime time.Time, rsAPI api.RoomserverInternalAPI,
 ) ([]gomatrixserverlib.HeaderedEvent, error) {
 	evs := []gomatrixserverlib.HeaderedEvent{}
 
 	for _, membership := range memberships {
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: membership.RoomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
-		if err := queryAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
+		if err := rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
 			return []gomatrixserverlib.HeaderedEvent{}, err
 		}
 
@@ -366,7 +366,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := common.BuildEvent(ctx, &builder, cfg, evTime, queryAPI, nil)
+		event, err := eventutil.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

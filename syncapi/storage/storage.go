@@ -19,22 +19,23 @@ package storage
 import (
 	"net/url"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 )
 
-// NewPublicRoomsServerDatabase opens a database connection.
-func NewSyncServerDatasource(dataSourceName string) (Database, error) {
+// NewSyncServerDatasource opens a database connection.
+func NewSyncServerDatasource(dataSourceName string, dbProperties sqlutil.DbProperties) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
-		return postgres.NewSyncServerDatasource(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	}
 	switch uri.Scheme {
 	case "postgres":
-		return postgres.NewSyncServerDatasource(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	case "file":
-		return sqlite3.NewSyncServerDatasource(dataSourceName)
+		return sqlite3.NewDatabase(dataSourceName)
 	default:
-		return postgres.NewSyncServerDatasource(dataSourceName)
+		return postgres.NewDatabase(dataSourceName, dbProperties)
 	}
 }

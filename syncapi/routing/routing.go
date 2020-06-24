@@ -18,19 +18,17 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixR0 = "/_matrix/client/r0"
+const pathPrefixR0 = "/client/r0"
 
 // Setup configures the given mux with sync-server listeners
 //
@@ -38,29 +36,23 @@ const pathPrefixR0 = "/_matrix/client/r0"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
-	deviceDB devices.Database, federation *gomatrixserverlib.FederationClient,
-	queryAPI api.RoomserverQueryAPI,
+	publicAPIMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
+	userAPI userapi.UserInternalAPI, federation *gomatrixserverlib.FederationClient,
+	rsAPI api.RoomserverInternalAPI,
 	cfg *config.Dendrite,
 ) {
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-
-	authData := auth.Data{
-		AccountDB:   nil,
-		DeviceDB:    deviceDB,
-		AppServices: nil,
-	}
+	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
 
 	// TODO: Add AS support for all handlers below.
-	r0mux.Handle("/sync", common.MakeAuthAPI("sync", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/rooms/{roomID}/messages", common.MakeAuthAPI("room_messages", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+	r0mux.Handle("/rooms/{roomID}/messages", httputil.MakeAuthAPI("room_messages", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], federation, queryAPI, cfg)
+		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], federation, rsAPI, cfg)
 	})).Methods(http.MethodGet, http.MethodOptions)
 }

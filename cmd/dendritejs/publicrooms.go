@@ -17,23 +17,48 @@
 package main
 
 import (
-	"github.com/matrix-org/go-http-js-libp2p/go_http_js_libp2p"
+	"context"
+
+	"github.com/matrix-org/dendrite/federationsender/api"
+	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type libp2pPublicRoomsProvider struct {
 	node      *go_http_js_libp2p.P2pLocalNode
 	providers []go_http_js_libp2p.PeerInfo
+	fedSender api.FederationSenderInternalAPI
 }
 
-func NewLibP2PPublicRoomsProvider(node *go_http_js_libp2p.P2pLocalNode) *libp2pPublicRoomsProvider {
+func NewLibP2PPublicRoomsProvider(node *go_http_js_libp2p.P2pLocalNode, fedSender api.FederationSenderInternalAPI) *libp2pPublicRoomsProvider {
 	p := &libp2pPublicRoomsProvider{
-		node: node,
+		node:      node,
+		fedSender: fedSender,
 	}
 	node.RegisterFoundProviders(p.foundProviders)
 	return p
 }
 
 func (p *libp2pPublicRoomsProvider) foundProviders(peerInfos []go_http_js_libp2p.PeerInfo) {
+	// work out the diff then poke for new ones
+	seen := make(map[string]bool, len(p.providers))
+	for _, pr := range p.providers {
+		seen[pr.Id] = true
+	}
+	var newPeers []gomatrixserverlib.ServerName
+	for _, pi := range peerInfos {
+		if !seen[pi.Id] {
+			newPeers = append(newPeers, gomatrixserverlib.ServerName(pi.Id))
+		}
+	}
+	if len(newPeers) > 0 {
+		var res api.PerformServersAliveResponse
+		// ignore errors, we don't care.
+		p.fedSender.PerformServersAlive(context.Background(), &api.PerformServersAliveRequest{
+			Servers: newPeers,
+		}, &res)
+	}
+
 	p.providers = peerInfos
 }
 

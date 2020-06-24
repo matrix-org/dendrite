@@ -19,15 +19,16 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
-
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 const eventTypesSchema = `
 -- Numeric versions of the event "type"s. Event types tend to be taken from a
--- small common pool. Assigning each a numeric ID should reduce the amount of
+-- small internal pool. Assigning each a numeric ID should reduce the amount of
 -- data that needs to be stored and fetched from the database.
 -- It also means that many operations can work with int64 arrays rather than
 -- string arrays which may help reduce GC pressure.
@@ -42,7 +43,7 @@ const eventTypesSchema = `
 -- Picking well-known numeric IDs for the events types that require special
 -- attention during state conflict resolution means that we write that code
 -- using numeric constants.
--- It also means that the numeric IDs for common event types should be
+-- It also means that the numeric IDs for internal event types should be
 -- consistent between different instances which might make ad-hoc debugging
 -- easier.
 -- Other event types are automatically assigned numeric IDs starting from 2**16.
@@ -98,43 +99,44 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
-func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(eventTypesSchema)
+func NewPostgresEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+	s := &eventTypeStatements{}
+	_, err := db.Exec(eventTypesSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
 		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *eventTypeStatements) insertEventTypeNID(
-	ctx context.Context, eventType string,
+func (s *eventTypeStatements) InsertEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.insertEventTypeNIDStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	err := txn.Stmt(s.insertEventTypeNIDStmt).QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) selectEventTypeNID(
-	ctx context.Context, eventType string,
+func (s *eventTypeStatements) SelectEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.selectEventTypeNIDStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	err := txn.Stmt(s.selectEventTypeNIDStmt).QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) bulkSelectEventTypeNID(
+func (s *eventTypeStatements) BulkSelectEventTypeNID(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
 	rows, err := s.bulkSelectEventTypeNIDStmt.QueryContext(ctx, pq.StringArray(eventTypes))
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
 
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
 	for rows.Next() {

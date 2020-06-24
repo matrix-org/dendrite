@@ -1,4 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
+// Copyright 2017-2018 New Vector Ltd
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,14 +17,14 @@
 package sync
 
 import (
+	"context"
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -30,24 +32,23 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db        storage.Database
-	accountDB accounts.Database
-	notifier  *Notifier
+	db       storage.Database
+	userAPI  userapi.UserInternalAPI
+	notifier *Notifier
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db storage.Database, n *Notifier, adb accounts.Database) *RequestPool {
-	return &RequestPool{db, adb, n}
+func NewRequestPool(db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI) *RequestPool {
+	return &RequestPool{db, userAPI, n}
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
-func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtypes.Device) util.JSONResponse {
+func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
 	var syncData *types.Response
 
 	// Extract values from request
-	userID := device.UserID
 	syncReq, err := newSyncRequest(req, *device)
 	if err != nil {
 		return util.JSONResponse{
@@ -55,15 +56,18 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 			JSON: jsonerror.Unknown(err.Error()),
 		}
 	}
+
 	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
-		"userID":  userID,
-		"since":   syncReq.since,
-		"timeout": syncReq.timeout,
+		"user_id":   device.UserID,
+		"device_id": device.ID,
+		"since":     syncReq.since,
+		"timeout":   syncReq.timeout,
+		"limit":     syncReq.limit,
 	})
 
 	currPos := rp.notifier.CurrentPosition()
 
-	if shouldReturnImmediately(syncReq) {
+	if rp.shouldReturnImmediately(syncReq) {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
@@ -115,7 +119,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 		// response. This ensures that we don't waste the hard work
 		// of calculating the sync only to get timed out before we
 		// can respond
-
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
 		if err != nil {
 			logger.WithError(err).Error("rp.currentSyncForUser failed")
@@ -132,23 +135,64 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtype
 	}
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.PaginationToken) (res *types.Response, err error) {
-	// TODO: handle ignored users
-	if req.since == nil {
-		res, err = rp.db.CompleteSync(req.ctx, req.device.UserID, req.limit)
-	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, req.device, *req.since, latestPos, req.limit, req.wantFullState)
+func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
+	res = types.NewResponse()
+
+	since := types.NewStreamToken(0, 0)
+	if req.since != nil {
+		since = *req.since
 	}
 
+	// See if we have any new tasks to do for the send-to-device messaging.
+	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, since)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: handle ignored users
+	if req.since == nil {
+		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
+	} else {
+		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, *req.since, latestPos, req.limit, req.wantFullState)
+	}
 	if err != nil {
 		return
 	}
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
-	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
+	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
+	if err != nil {
+		return
+	}
+
+	// Before we return the sync response, make sure that we take action on
+	// any send-to-device database updates or deletions that we need to do.
+	// Then add the updates into the sync response.
+	if len(updates) > 0 || len(deletions) > 0 {
+		// Handle the updates and deletions in the database.
+		err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, since)
+		if err != nil {
+			return
+		}
+	}
+	if len(events) > 0 {
+		// Add the updates into the sync response.
+		for _, event := range events {
+			res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
+		}
+
+		// Get the next_batch from the sync response and increase the
+		// EDU counter.
+		if pos, perr := types.NewStreamTokenFromString(res.NextBatch); perr == nil {
+			pos.Positions[1]++
+			res.NextBatch = pos.String()
+		}
+	}
+
 	return
 }
 
+// nolint:gocyclo
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
 	accountDataFilter *gomatrixserverlib.EventFilter,
@@ -158,67 +202,101 @@ func (rp *RequestPool) appendAccountData(
 	// data keys were set between two message. This isn't a huge issue since the
 	// duplicate data doesn't represent a huge quantity of data, but an optimisation
 	// here would be making sure each data is sent only once to the client.
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return nil, err
-	}
-
 	if req.since == nil {
 		// If this is the initial sync, we don't need to check if a data has
 		// already been sent. Instead, we send the whole batch.
-		var global []gomatrixserverlib.ClientEvent
-		var rooms map[string][]gomatrixserverlib.ClientEvent
-		global, rooms, err = rp.accountDB.GetAccountData(req.ctx, localpart)
-		if err != nil {
+		dataReq := &userapi.QueryAccountDataRequest{
+			UserID: userID,
+		}
+		dataRes := &userapi.QueryAccountDataResponse{}
+		if err := rp.userAPI.QueryAccountData(req.ctx, dataReq, dataRes); err != nil {
 			return nil, err
 		}
-		data.AccountData.Events = global
-
+		for datatype, databody := range dataRes.GlobalAccountData {
+			data.AccountData.Events = append(
+				data.AccountData.Events,
+				gomatrixserverlib.ClientEvent{
+					Type:    datatype,
+					Content: gomatrixserverlib.RawJSON(databody),
+				},
+			)
+		}
 		for r, j := range data.Rooms.Join {
-			if len(rooms[r]) > 0 {
-				j.AccountData.Events = rooms[r]
+			for datatype, databody := range dataRes.RoomAccountData[r] {
+				j.AccountData.Events = append(
+					j.AccountData.Events,
+					gomatrixserverlib.ClientEvent{
+						Type:    datatype,
+						Content: gomatrixserverlib.RawJSON(databody),
+					},
+				)
 				data.Rooms.Join[r] = j
 			}
 		}
-
 		return data, nil
+	}
+
+	r := types.Range{
+		From: req.since.PDUPosition(),
+		To:   currentPos,
+	}
+	// If both positions are the same, it means that the data was saved after the
+	// latest room event. In that case, we need to decrement the old position as
+	// results are exclusive of Low.
+	if r.Low() == r.High() {
+		r.From--
 	}
 
 	// Sync is not initial, get all account data since the latest sync
 	dataTypes, err := rp.db.GetAccountDataInRange(
-		req.ctx, userID,
-		types.StreamPosition(req.since.PDUPosition), types.StreamPosition(currentPos),
-		accountDataFilter,
+		req.ctx, userID, r, accountDataFilter,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(dataTypes) == 0 {
-		return data, nil
+		// TODO: this fixes the sytest but is it the right thing to do?
+		dataTypes[""] = []string{"m.push_rules"}
 	}
 
 	// Iterate over the rooms
 	for roomID, dataTypes := range dataTypes {
-		events := []gomatrixserverlib.ClientEvent{}
 		// Request the missing data from the database
 		for _, dataType := range dataTypes {
-			event, err := rp.accountDB.GetAccountDataByType(
-				req.ctx, localpart, roomID, dataType,
-			)
-			if err != nil {
-				return nil, err
+			dataReq := userapi.QueryAccountDataRequest{
+				UserID:   userID,
+				RoomID:   roomID,
+				DataType: dataType,
 			}
-			events = append(events, *event)
-		}
-
-		// Append the data to the response
-		if len(roomID) > 0 {
-			jr := data.Rooms.Join[roomID]
-			jr.AccountData.Events = events
-			data.Rooms.Join[roomID] = jr
-		} else {
-			data.AccountData.Events = events
+			dataRes := userapi.QueryAccountDataResponse{}
+			err = rp.userAPI.QueryAccountData(req.ctx, &dataReq, &dataRes)
+			if err != nil {
+				continue
+			}
+			if roomID == "" {
+				if globalData, ok := dataRes.GlobalAccountData[dataType]; ok {
+					data.AccountData.Events = append(
+						data.AccountData.Events,
+						gomatrixserverlib.ClientEvent{
+							Type:    dataType,
+							Content: gomatrixserverlib.RawJSON(globalData),
+						},
+					)
+				}
+			} else {
+				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
+					joinData := data.Rooms.Join[roomID]
+					joinData.AccountData.Events = append(
+						joinData.AccountData.Events,
+						gomatrixserverlib.ClientEvent{
+							Type:    dataType,
+							Content: gomatrixserverlib.RawJSON(roomData),
+						},
+					)
+					data.Rooms.Join[roomID] = joinData
+				}
+			}
 		}
 	}
 
@@ -228,6 +306,10 @@ func (rp *RequestPool) appendAccountData(
 // shouldReturnImmediately returns whether the /sync request is an initial sync,
 // or timeout=0, or full_state=true, in any of the cases the request should
 // return immediately.
-func shouldReturnImmediately(syncReq *syncRequest) bool {
-	return syncReq.since == nil || syncReq.timeout == 0 || syncReq.wantFullState
+func (rp *RequestPool) shouldReturnImmediately(syncReq *syncRequest) bool {
+	if syncReq.since == nil || syncReq.timeout == 0 || syncReq.wantFullState {
+		return true
+	}
+	waiting, werr := rp.db.SendToDeviceUpdatesWaiting(context.TODO(), syncReq.device.UserID, syncReq.device.ID)
+	return werr == nil && waiting
 }

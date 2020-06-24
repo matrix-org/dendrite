@@ -18,22 +18,22 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/Shopify/sarama"
 	log "github.com/sirupsen/logrus"
-	sarama "gopkg.in/Shopify/sarama.v1"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	roomServerConsumer *common.ContinualConsumer
-	db                 accounts.Database
-	query              api.RoomserverQueryAPI
-	serverName         string
+	rsAPI      api.RoomserverInternalAPI
+	rsConsumer *internal.ContinualConsumer
+	db         accounts.Database
+	serverName string
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -41,19 +41,19 @@ func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	store accounts.Database,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
 
-	consumer := common.ContinualConsumer{
+	consumer := internal.ContinualConsumer{
 		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
 	s := &OutputRoomEventConsumer{
-		roomServerConsumer: &consumer,
-		db:                 store,
-		query:              queryAPI,
-		serverName:         string(cfg.Matrix.ServerName),
+		rsConsumer: &consumer,
+		db:         store,
+		rsAPI:      rsAPI,
+		serverName: string(cfg.Matrix.ServerName),
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -62,7 +62,7 @@ func NewOutputRoomEventConsumer(
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	return s.roomServerConsumer.Start()
+	return s.rsConsumer.Start()
 }
 
 // onMessage is called when the sync server receives a new event from the room server output log.
@@ -84,63 +84,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	ev := output.NewRoomEvent.Event
-	log.WithFields(log.Fields{
-		"event_id": ev.EventID(),
-		"room_id":  ev.RoomID(),
-		"type":     ev.Type(),
-	}).Info("received event from roomserver")
-
-	events, err := s.lookupStateEvents(output.NewRoomEvent.AddsStateEventIDs, ev.Event)
-	if err != nil {
-		return err
-	}
-
-	return s.db.UpdateMemberships(context.TODO(), events, output.NewRoomEvent.RemovesStateEventIDs)
-}
-
-// lookupStateEvents looks up the state events that are added by a new event.
-func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.Event,
-) ([]gomatrixserverlib.Event, error) {
-	// Fast path if there aren't any new state events.
-	if len(addsStateEventIDs) == 0 {
-		// If the event is a membership update (e.g. for a profile update), it won't
-		// show up in AddsStateEventIDs, so we need to add it manually
-		if event.Type() == "m.room.member" {
-			return []gomatrixserverlib.Event{event}, nil
-		}
-		return nil, nil
-	}
-
-	// Fast path if the only state event added is the event itself.
-	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.Event{event}, nil
-	}
-
-	result := []gomatrixserverlib.Event{}
-	missing := []string{}
-	for _, id := range addsStateEventIDs {
-		// Append the current event in the results if its ID is in the events list
-		if id == event.EventID() {
-			result = append(result, event)
-		} else {
-			// If the event isn't the current one, add it to the list of events
-			// to retrieve from the roomserver
-			missing = append(missing, id)
-		}
-	}
-
-	// Request the missing events from the roomserver
-	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
-	var eventResp api.QueryEventsByIDResponse
-	if err := s.query.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
-		return nil, err
-	}
-
-	for _, headeredEvent := range eventResp.Events {
-		result = append(result, headeredEvent.Event)
-	}
-
-	return result, nil
+	return s.db.UpdateMemberships(
+		context.TODO(),
+		gomatrixserverlib.UnwrapEventHeaders(output.NewRoomEvent.AddsState()),
+		output.NewRoomEvent.RemovesStateEventIDs,
+	)
 }

@@ -17,32 +17,32 @@ package syncapi
 import (
 	"context"
 
+	"github.com/Shopify/sarama"
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 )
 
-// SetupSyncAPIComponent sets up and registers HTTP handlers for the SyncAPI
+// AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI
 // component.
-func SetupSyncAPIComponent(
-	base *basecomponent.BaseDendrite,
-	deviceDB devices.Database,
-	accountsDB accounts.Database,
-	queryAPI api.RoomserverQueryAPI,
+func AddPublicRoutes(
+	router *mux.Router,
+	consumer sarama.Consumer,
+	userAPI userapi.UserInternalAPI,
+	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 ) {
-	syncDB, err := storage.NewSyncServerDatasource(string(base.Cfg.Database.SyncAPI))
+	syncDB, err := storage.NewSyncServerDatasource(string(cfg.Database.SyncAPI), cfg.DbProperties())
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
@@ -58,28 +58,35 @@ func SetupSyncAPIComponent(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, accountsDB)
+	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI)
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB, queryAPI,
+		cfg, consumer, notifier, syncDB, rsAPI,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB,
+		cfg, consumer, notifier, syncDB,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		base.Cfg, base.KafkaConsumer, notifier, syncDB,
+		cfg, consumer, notifier, syncDB,
 	)
 	if err = typingConsumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start typing server consumer")
+		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
-	routing.Setup(base.APIMux, requestPool, syncDB, deviceDB, federation, queryAPI, cfg)
+	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
+		cfg, consumer, notifier, syncDB,
+	)
+	if err = sendToDeviceConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
+	}
+
+	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
 }

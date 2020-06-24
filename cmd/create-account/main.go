@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -63,22 +63,19 @@ func main() {
 
 	serverName := gomatrixserverlib.ServerName(*serverNameStr)
 
-	accountDB, err := accounts.NewDatabase(*database, serverName)
+	accountDB, err := accounts.NewDatabase(*database, nil, serverName)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	account, err := accountDB.CreateAccount(context.Background(), *username, *password, "")
+	_, err = accountDB.CreateAccount(context.Background(), *username, *password, "")
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
-	} else if account == nil {
-		fmt.Println("Username already exists")
-		os.Exit(1)
 	}
 
-	deviceDB, err := devices.NewDatabase(*database, serverName)
+	deviceDB, err := devices.NewDatabase(*database, nil, serverName)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

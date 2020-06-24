@@ -20,7 +20,10 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -81,64 +84,64 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt   *sql.Stmt
 }
 
-func (s *eventTypeStatements) prepare(db *sql.DB) (err error) {
+func NewSqliteEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+	s := &eventTypeStatements{}
 	s.db = db
-	_, err = db.Exec(eventTypesSchema)
+	_, err := db.Exec(eventTypesSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.insertEventTypeNIDResultStmt, insertEventTypeNIDResultSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
 		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *eventTypeStatements) insertEventTypeNID(
+func (s *eventTypeStatements) InsertEventTypeNID(
 	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
 	var err error
-	insertStmt := common.TxStmt(tx, s.insertEventTypeNIDStmt)
-	resultStmt := common.TxStmt(tx, s.insertEventTypeNIDResultStmt)
+	insertStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDStmt)
+	resultStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDResultStmt)
 	if _, err = insertStmt.ExecContext(ctx, eventType); err == nil {
 		err = resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
 	}
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) selectEventTypeNID(
+func (s *eventTypeStatements) SelectEventTypeNID(
 	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	selectStmt := common.TxStmt(tx, s.selectEventTypeNIDStmt)
+	selectStmt := sqlutil.TxStmt(tx, s.selectEventTypeNIDStmt)
 	err := selectStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) bulkSelectEventTypeNID(
-	ctx context.Context, tx *sql.Tx, eventTypes []string,
+func (s *eventTypeStatements) BulkSelectEventTypeNID(
+	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
 	///////////////
 	iEventTypes := make([]interface{}, len(eventTypes))
 	for k, v := range eventTypes {
 		iEventTypes[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", common.QueryVariadic(len(iEventTypes)), 1)
+	selectOrig := strings.Replace(bulkSelectEventTypeNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventTypes)), 1)
 	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
 	///////////////
 
-	selectStmt := common.TxStmt(tx, selectPrep)
-	rows, err := selectStmt.QueryContext(ctx, iEventTypes...)
+	rows, err := selectPrep.QueryContext(ctx, iEventTypes...)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
 
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
 	for rows.Next() {

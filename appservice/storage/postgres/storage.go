@@ -27,19 +27,23 @@ import (
 
 // Database stores events intended to be later sent to application services
 type Database struct {
+	sqlutil.PartitionOffsetStatements
 	events eventsStatements
 	txnID  txnStatements
 	db     *sql.DB
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (*Database, error) {
+func NewDatabase(dataSourceName string, dbProperties sqlutil.DbProperties) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
+	if result.db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {
+		return nil, err
+	}
+	if err = result.PartitionOffsetStatements.Prepare(result.db, "appservice"); err != nil {
 		return nil, err
 	}
 	return &result, nil

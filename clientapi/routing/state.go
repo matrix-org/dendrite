@@ -40,7 +40,7 @@ type stateEventInStateResp struct {
 // TODO: Check if the user is in the room. If not, check if the room's history
 // is publicly visible. Current behaviour is returning an empty array if the
 // user cannot see the room's history.
-func OnIncomingStateRequest(ctx context.Context, queryAPI api.RoomserverQueryAPI, roomID string) util.JSONResponse {
+func OnIncomingStateRequest(ctx context.Context, rsAPI api.RoomserverInternalAPI, roomID string) util.JSONResponse {
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 	stateReq := api.QueryLatestEventsAndStateRequest{
@@ -48,7 +48,7 @@ func OnIncomingStateRequest(ctx context.Context, queryAPI api.RoomserverQueryAPI
 	}
 	stateRes := api.QueryLatestEventsAndStateResponse{}
 
-	if err := queryAPI.QueryLatestEventsAndState(ctx, &stateReq, &stateRes); err != nil {
+	if err := rsAPI.QueryLatestEventsAndState(ctx, &stateReq, &stateRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return jsonerror.InternalServerError()
 	}
@@ -98,7 +98,8 @@ func OnIncomingStateRequest(ctx context.Context, queryAPI api.RoomserverQueryAPI
 // /rooms/{roomID}/state/{type}/{statekey} request. It will look in current
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
-func OnIncomingStateTypeRequest(ctx context.Context, queryAPI api.RoomserverQueryAPI, roomID string, evType, stateKey string) util.JSONResponse {
+// If eventFormat=true, sends the whole event else just the content.
+func OnIncomingStateTypeRequest(ctx context.Context, rsAPI api.RoomserverInternalAPI, roomID, evType, stateKey string, eventFormat bool) util.JSONResponse {
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
 	util.GetLogger(ctx).WithFields(log.Fields{
@@ -118,7 +119,7 @@ func OnIncomingStateTypeRequest(ctx context.Context, queryAPI api.RoomserverQuer
 	}
 	stateRes := api.QueryLatestEventsAndStateResponse{}
 
-	if err := queryAPI.QueryLatestEventsAndState(ctx, &stateReq, &stateRes); err != nil {
+	if err := rsAPI.QueryLatestEventsAndState(ctx, &stateReq, &stateRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return jsonerror.InternalServerError()
 	}
@@ -134,8 +135,15 @@ func OnIncomingStateTypeRequest(ctx context.Context, queryAPI api.RoomserverQuer
 		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(stateRes.StateEvents[0], gomatrixserverlib.FormatAll),
 	}
 
+	var res interface{}
+	if eventFormat {
+		res = stateEvent
+	} else {
+		res = stateEvent.Content
+	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: stateEvent.Content,
+		JSON: res,
 	}
 }

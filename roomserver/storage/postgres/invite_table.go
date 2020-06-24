@@ -19,7 +19,10 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -79,26 +82,27 @@ type inviteStatements struct {
 	updateInviteRetiredStmt             *sql.Stmt
 }
 
-func (s *inviteStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(inviteSchema)
+func NewPostgresInvitesTable(db *sql.DB) (tables.Invites, error) {
+	s := &inviteStatements{}
+	_, err := db.Exec(inviteSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, shared.StatementList{
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
 		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *inviteStatements) insertInviteEvent(
+func (s *inviteStatements) InsertInviteEvent(
 	ctx context.Context,
 	txn *sql.Tx, inviteEventID string, roomNID types.RoomNID,
 	targetUserNID, senderUserNID types.EventStateKeyNID,
 	inviteEventJSON []byte,
 ) (bool, error) {
-	result, err := common.TxStmt(txn, s.insertInviteEventStmt).ExecContext(
+	result, err := sqlutil.TxStmt(txn, s.insertInviteEventStmt).ExecContext(
 		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
 	)
 	if err != nil {
@@ -111,16 +115,16 @@ func (s *inviteStatements) insertInviteEvent(
 	return count != 0, nil
 }
 
-func (s *inviteStatements) updateInviteRetired(
+func (s *inviteStatements) UpdateInviteRetired(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) ([]string, error) {
-	stmt := common.TxStmt(txn, s.updateInviteRetiredStmt)
+	stmt := sqlutil.TxStmt(txn, s.updateInviteRetiredStmt)
 	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "updateInviteRetired: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "updateInviteRetired: rows.close() failed")
 
 	var eventIDs []string
 	for rows.Next() {
@@ -133,8 +137,8 @@ func (s *inviteStatements) updateInviteRetired(
 	return eventIDs, rows.Err()
 }
 
-// selectInviteActiveForUserInRoom returns a list of sender state key NIDs
-func (s *inviteStatements) selectInviteActiveForUserInRoom(
+// SelectInviteActiveForUserInRoom returns a list of sender state key NIDs
+func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 	ctx context.Context,
 	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
 ) ([]types.EventStateKeyNID, error) {
@@ -144,7 +148,7 @@ func (s *inviteStatements) selectInviteActiveForUserInRoom(
 	if err != nil {
 		return nil, err
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
 	var result []types.EventStateKeyNID
 	for rows.Next() {
 		var senderUserNID int64

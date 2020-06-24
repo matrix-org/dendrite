@@ -20,7 +20,9 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/common"
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -70,47 +72,41 @@ type accountDataStatements struct {
 	selectMaxAccountDataIDStmt   *sql.Stmt
 }
 
-func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(accountDataSchema)
+func NewPostgresAccountDataTable(db *sql.DB) (tables.AccountData, error) {
+	s := &accountDataStatements{}
+	_, err := db.Exec(accountDataSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectAccountDataInRangeStmt, err = db.Prepare(selectAccountDataInRangeSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectMaxAccountDataIDStmt, err = db.Prepare(selectMaxAccountDataIDSQL); err != nil {
-		return
+		return nil, err
 	}
-	return
+	return s, nil
 }
 
-func (s *accountDataStatements) insertAccountData(
-	ctx context.Context,
+func (s *accountDataStatements) InsertAccountData(
+	ctx context.Context, txn *sql.Tx,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
 	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
 	return
 }
 
-func (s *accountDataStatements) selectAccountDataInRange(
+func (s *accountDataStatements) SelectAccountDataInRange(
 	ctx context.Context,
 	userID string,
-	oldPos, newPos types.StreamPosition,
+	r types.Range,
 	accountDataEventFilter *gomatrixserverlib.EventFilter,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
-	// If both positions are the same, it means that the data was saved after the
-	// latest room event. In that case, we need to decrement the old position as
-	// it would prevent the SQL request from returning anything.
-	if oldPos == newPos {
-		oldPos--
-	}
-
-	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, oldPos, newPos,
+	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High(),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.NotTypes)),
 		accountDataEventFilter.Limit,
@@ -118,7 +114,7 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	if err != nil {
 		return
 	}
-	defer common.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
 
 	for rows.Next() {
 		var dataType string
@@ -137,11 +133,11 @@ func (s *accountDataStatements) selectAccountDataInRange(
 	return data, rows.Err()
 }
 
-func (s *accountDataStatements) selectMaxAccountDataID(
+func (s *accountDataStatements) SelectMaxAccountDataID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := common.TxStmt(txn, s.selectMaxAccountDataIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64

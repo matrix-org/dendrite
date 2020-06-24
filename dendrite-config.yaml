@@ -25,6 +25,8 @@ matrix:
     #        public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
     #      - key_id: ed25519:a_RXGa
     #        public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+    # Disables new users from registering (except via shared secrets)
+    registration_disabled: false
 
 # The media repository config
 media:
@@ -102,10 +104,13 @@ kafka:
     topics:
         output_room_event: roomserverOutput
         output_client_data: clientapiOutput
-        output_typing_event: eduServerOutput
+        output_typing_event: eduServerTypingOutput
+        output_send_to_device_event: eduServerSendToDeviceOutput
         user_updates: userUpdates
 
-# The postgres connection configs for connecting to the databases e.g a postgres:// URI
+# The postgres connection configs for connecting to the databases, e.g.
+# for Postgres: postgres://username:password@hostname/database
+# for SQLite: file:filename.db or file:///path/to/filename.db
 database:
     account: "postgres://dendrite:itsasecret@localhost/dendrite_account?sslmode=disable"
     device: "postgres://dendrite:itsasecret@localhost/dendrite_device?sslmode=disable"
@@ -116,7 +121,10 @@ database:
     federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
     appservice: "postgres://dendrite:itsasecret@localhost/dendrite_appservice?sslmode=disable"
     public_rooms_api: "postgres://dendrite:itsasecret@localhost/dendrite_publicroomsapi?sslmode=disable"
-    # If using naffka you need to specify a naffka database
+    max_open_conns: 100
+    max_idle_conns: 2
+    conn_max_lifetime: -1
+    # If 'use_naffka: true' set above then you need to specify a naffka database
     # naffka: "postgres://dendrite:itsasecret@localhost/dendrite_naffka?sslmode=disable"
 
 # The TCP host:port pairs to bind the internal HTTP APIs to.
@@ -132,6 +140,9 @@ listen:
     federation_sender: "localhost:7776"
     appservice_api: "localhost:7777"
     edu_server: "localhost:7778"
+    key_server: "localhost:7779"
+    server_key_api: "localhost:7780"
+    user_api: "localhost:7781"
 
 # The configuration for tracing the dendrite components.
 tracing:

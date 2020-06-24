@@ -15,18 +15,23 @@
 package main
 
 import (
-	_ "net/http/pprof"
-
-	"github.com/matrix-org/dendrite/common/basecomponent"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/roomserver"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "RoomServerAPI")
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "RoomServerAPI", true)
 	defer base.Close() // nolint: errcheck
+	federation := base.CreateFederationClient()
 
-	roomserver.SetupRoomServerComponent(base)
+	serverKeyAPI := base.ServerKeyAPIClient()
+	keyRing := serverKeyAPI.KeyRing()
+
+	fsAPI := base.FederationSenderHTTPClient()
+	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
+	rsAPI.SetFederationSenderAPI(fsAPI)
+	roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer), string(base.Cfg.Listen.RoomServer))
 

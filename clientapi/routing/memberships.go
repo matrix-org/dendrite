@@ -15,14 +15,15 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -35,11 +36,21 @@ type getJoinedRoomsResponse struct {
 	JoinedRooms []string `json:"joined_rooms"`
 }
 
+// https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-rooms-roomid-joined-members
+type getJoinedMembersResponse struct {
+	Joined map[string]joinedMember `json:"joined"`
+}
+
+type joinedMember struct {
+	DisplayName string `json:"display_name"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
-	req *http.Request, device *authtypes.Device, roomID string, joinedOnly bool,
+	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
 	_ *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	queryReq := api.QueryMembershipsForRoomRequest{
 		JoinedOnly: joinedOnly,
@@ -47,8 +58,8 @@ func GetMemberships(
 		Sender:     device.UserID,
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
-	if err := queryAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryMembershipsForRoom failed")
+	if err := rsAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -59,6 +70,22 @@ func GetMemberships(
 		}
 	}
 
+	if joinedOnly {
+		var res getJoinedMembersResponse
+		res.Joined = make(map[string]joinedMember)
+		for _, ev := range queryRes.JoinEvents {
+			var content joinedMember
+			if err := json.Unmarshal(ev.Content, &content); err != nil {
+				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
+				return jsonerror.InternalServerError()
+			}
+			res.Joined[ev.Sender] = content
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: res,
+		}
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: getMembershipResponse{queryRes.JoinEvents},
@@ -67,7 +94,7 @@ func GetMemberships(
 
 func GetJoinedRooms(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	accountsDB accounts.Database,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)

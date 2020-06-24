@@ -15,22 +15,23 @@ package main
 import (
 	_ "net/http/pprof"
 
-	"github.com/matrix-org/dendrite/common/basecomponent"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	cfg := basecomponent.ParseFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "EDUServerAPI")
+	cfg := setup.ParseFlags(false)
+	base := setup.NewBaseDendrite(cfg, "EDUServerAPI", true)
 	defer func() {
 		if err := base.Close(); err != nil {
 			logrus.WithError(err).Warn("BaseDendrite close failed")
 		}
 	}()
 
-	eduserver.SetupEDUServerComponent(base, cache.New())
+	intAPI := eduserver.NewInternalAPI(base, cache.New(), base.UserAPIClient())
+	eduserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.EDUServer), string(base.Cfg.Listen.EDUServer))
 

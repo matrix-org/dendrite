@@ -17,22 +17,21 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 type getEventRequest struct {
 	req            *http.Request
-	device         *authtypes.Device
+	device         *userapi.Device
 	roomID         string
 	eventID        string
 	cfg            *config.Dendrite
 	federation     *gomatrixserverlib.FederationClient
-	keyRing        gomatrixserverlib.KeyRing
 	requestedEvent gomatrixserverlib.Event
 }
 
@@ -40,19 +39,18 @@ type getEventRequest struct {
 // https://matrix.org/docs/spec/client_server/r0.4.0.html#get-matrix-client-r0-rooms-roomid-event-eventid
 func GetEvent(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	roomID string,
 	eventID string,
 	cfg *config.Dendrite,
-	queryAPI api.RoomserverQueryAPI,
+	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing gomatrixserverlib.KeyRing,
 ) util.JSONResponse {
 	eventsReq := api.QueryEventsByIDRequest{
 		EventIDs: []string{eventID},
 	}
 	var eventsResp api.QueryEventsByIDResponse
-	err := queryAPI.QueryEventsByID(req.Context(), &eventsReq, &eventsResp)
+	err := rsAPI.QueryEventsByID(req.Context(), &eventsReq, &eventsResp)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryEventsByID failed")
 		return jsonerror.InternalServerError()
@@ -75,7 +73,6 @@ func GetEvent(
 		eventID:        eventID,
 		cfg:            cfg,
 		federation:     federation,
-		keyRing:        keyRing,
 		requestedEvent: requestedEvent,
 	}
 
@@ -88,7 +85,7 @@ func GetEvent(
 		}},
 	}
 	var stateResp api.QueryStateAfterEventsResponse
-	if err := queryAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
+	if err := rsAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryStateAfterEvents failed")
 		return jsonerror.InternalServerError()
 	}

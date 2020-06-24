@@ -24,14 +24,14 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/dendrite/userapi/api"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/clientapi/threepid"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -98,7 +98,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 
 	// Validate creation_content fields defined in the spec by marshalling the
 	// creation_content map into bytes and then unmarshalling the bytes into
-	// common.CreateContent.
+	// eventutil.CreateContent.
 
 	creationContentBytes, err := json.Marshal(r.CreationContent)
 	if err != nil {
@@ -135,23 +135,23 @@ type fledglingEvent struct {
 
 // CreateRoom implements /createRoom
 func CreateRoom(
-	req *http.Request, device *authtypes.Device,
-	cfg *config.Dendrite, producer *producers.RoomserverProducer,
-	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	req *http.Request, device *api.Device,
+	cfg *config.Dendrite,
+	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	return createRoom(req, device, cfg, roomID, producer, accountDB, aliasAPI, asAPI)
+	return createRoom(req, device, cfg, roomID, accountDB, rsAPI, asAPI)
 }
 
 // createRoom implements /createRoom
 // nolint: gocyclo
 func createRoom(
-	req *http.Request, device *authtypes.Device,
-	cfg *config.Dendrite, roomID string, producer *producers.RoomserverProducer,
-	accountDB accounts.Database, aliasAPI roomserverAPI.RoomserverAliasAPI,
+	req *http.Request, device *api.Device,
+	cfg *config.Dendrite, roomID string,
+	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())
@@ -212,6 +212,25 @@ func createRoom(
 		return jsonerror.InternalServerError()
 	}
 
+	var roomAlias string
+	if r.RoomAliasName != "" {
+		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
+		// check it's free TODO: This races but is better than nothing
+		hasAliasReq := roomserverAPI.GetRoomIDForAliasRequest{
+			Alias: roomAlias,
+		}
+
+		var aliasResp roomserverAPI.GetRoomIDForAliasResponse
+		err = rsAPI.GetRoomIDForAlias(req.Context(), &hasAliasReq, &aliasResp)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			return jsonerror.InternalServerError()
+		}
+		if aliasResp.RoomID != "" {
+			return util.MessageResponse(400, "Alias already exists")
+		}
+	}
+
 	membershipContent := gomatrixserverlib.MemberContent{
 		Membership:  gomatrixserverlib.Join,
 		DisplayName: profile.DisplayName,
@@ -243,9 +262,9 @@ func createRoom(
 	//  1- m.room.create
 	//  2- room creator join member
 	//  3- m.room.power_levels
-	//  4- m.room.canonical_alias (opt) TODO
-	//  5- m.room.join_rules
-	//  6- m.room.history_visibility
+	//  4- m.room.join_rules
+	//  5- m.room.history_visibility
+	//  6- m.room.canonical_alias (opt)
 	//  7- m.room.guest_access (opt)
 	//  8- other initial state items
 	//  9- m.room.name (opt)
@@ -260,24 +279,28 @@ func createRoom(
 	eventsToMake := []fledglingEvent{
 		{"m.room.create", "", r.CreationContent},
 		{"m.room.member", userID, membershipContent},
-		{"m.room.power_levels", "", common.InitialPowerLevelsContent(userID)},
-		// TODO: m.room.canonical_alias
+		{"m.room.power_levels", "", eventutil.InitialPowerLevelsContent(userID)},
 		{"m.room.join_rules", "", gomatrixserverlib.JoinRuleContent{JoinRule: joinRules}},
-		{"m.room.history_visibility", "", common.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
+		{"m.room.history_visibility", "", eventutil.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
+	}
+	if roomAlias != "" {
+		// TODO: bit of a chicken and egg problem here as the alias doesn't exist and cannot until we have made the room.
+		// This means we might fail creating the alias but say the canonical alias is something that doesn't exist.
+		// m.room.aliases is handled when we call roomserver.SetRoomAlias
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.canonical_alias", "", eventutil.CanonicalAlias{Alias: roomAlias}})
 	}
 	if r.GuestCanJoin {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.guest_access", "", common.GuestAccessContent{GuestAccess: "can_join"}})
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.guest_access", "", eventutil.GuestAccessContent{GuestAccess: "can_join"}})
 	}
 	eventsToMake = append(eventsToMake, r.InitialState...)
 	if r.Name != "" {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.name", "", common.NameContent{Name: r.Name}})
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.name", "", eventutil.NameContent{Name: r.Name}})
 	}
 	if r.Topic != "" {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.topic", "", common.TopicContent{Topic: r.Topic}})
+		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.topic", "", eventutil.TopicContent{Topic: r.Topic}})
 	}
 	// TODO: invite events
 	// TODO: 3pid invite events
-	// TODO: m.room.aliases
 
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
@@ -320,19 +343,16 @@ func createRoom(
 	}
 
 	// send events to the room server
-	_, err = producer.SendEvents(req.Context(), builtEvents, cfg.Matrix.ServerName, nil)
+	_, err = roomserverAPI.SendEvents(req.Context(), rsAPI, builtEvents, cfg.Matrix.ServerName, nil)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
+		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
 	// TODO(#269): Reserve room alias while we create the room. This stops us
 	// from creating the room but still failing due to the alias having already
 	// been taken.
-	var roomAlias string
-	if r.RoomAliasName != "" {
-		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
-
+	if roomAlias != "" {
 		aliasReq := roomserverAPI.SetRoomAliasRequest{
 			Alias:  roomAlias,
 			RoomID: roomID,
@@ -340,7 +360,7 @@ func createRoom(
 		}
 
 		var aliasResp roomserverAPI.SetRoomAliasResponse
-		err = aliasAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
+		err = rsAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
 			return jsonerror.InternalServerError()
@@ -348,6 +368,50 @@ func createRoom(
 
 		if aliasResp.AliasExists {
 			return util.MessageResponse(400, "Alias already exists")
+		}
+	}
+
+	// If this is a direct message then we should invite the participants.
+	for _, invitee := range r.Invite {
+		// Build the membership request.
+		body := threepid.MembershipRequest{
+			UserID: invitee,
+		}
+		// Build the invite event.
+		inviteEvent, err := buildMembershipEvent(
+			req.Context(), body, accountDB, device, gomatrixserverlib.Invite,
+			roomID, true, cfg, evTime, rsAPI, asAPI,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvent failed")
+			continue
+		}
+		// Build some stripped state for the invite.
+		candidates := append(gomatrixserverlib.UnwrapEventHeaders(builtEvents), *inviteEvent)
+		var strippedState []gomatrixserverlib.InviteV2StrippedState
+		for _, event := range candidates {
+			switch event.Type() {
+			// TODO: case gomatrixserverlib.MRoomEncryption:
+			//	fallthrough
+			case gomatrixserverlib.MRoomMember:
+				fallthrough
+			case gomatrixserverlib.MRoomJoinRules:
+				strippedState = append(
+					strippedState,
+					gomatrixserverlib.NewInviteV2StrippedState(&event),
+				)
+			}
+		}
+		// Send the invite event to the roomserver.
+		if perr := roomserverAPI.SendInvite(
+			req.Context(), rsAPI,
+			inviteEvent.Headered(roomVersion),
+			strippedState,         // invite room state
+			cfg.Matrix.ServerName, // send as server
+			nil,                   // transaction ID
+		); perr != nil {
+			util.GetLogger(req.Context()).WithError(perr).Error("SendInvite failed")
+			return perr.JSONResponse()
 		}
 	}
 

@@ -21,7 +21,6 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/matrix-org/dendrite/common"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -30,7 +29,7 @@ import (
 type Database struct {
 	joinedHostsStatements
 	roomStatements
-	common.PartitionOffsetStatements
+	sqlutil.PartitionOffsetStatements
 	db *sql.DB
 }
 
@@ -38,7 +37,11 @@ type Database struct {
 func NewDatabase(dataSourceName string) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sqlutil.Open(common.SQLiteDriverName(), dataSourceName); err != nil {
+	cs, err := sqlutil.ParseFileURI(dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+	if result.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {
@@ -72,7 +75,7 @@ func (d *Database) UpdateRoom(
 	addHosts []types.JoinedHost,
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {
-	err = common.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		err = d.insertRoom(ctx, txn, roomID)
 		if err != nil {
 			return err

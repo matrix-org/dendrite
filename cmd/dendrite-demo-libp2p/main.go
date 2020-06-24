@@ -29,40 +29,26 @@ import (
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/clientapi"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-libp2p/storage"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/dendrite/publicroomsapi"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/syncapi"
+	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
 func createKeyDB(
 	base *P2PDendrite,
-) keydb.Database {
-	db, err := keydb.NewDatabase(
-		string(base.Base.Cfg.Database.ServerKey),
-		base.Base.Cfg.Matrix.ServerName,
-		base.Base.Cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
-		base.Base.Cfg.Matrix.KeyID,
-	)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to keys db")
-	}
+	db gomatrixserverlib.KeyDatabase,
+) {
 	mdns := mDNSListener{
 		host:  base.LibP2P,
 		keydb: db,
@@ -77,7 +63,6 @@ func createKeyDB(
 		panic(err)
 	}
 	serv.RegisterNotifee(&mdns)
-	return db
 }
 
 func createFederationClient(
@@ -93,6 +78,17 @@ func createFederationClient(
 	return gomatrixserverlib.NewFederationClientWithTransport(
 		base.Base.Cfg.Matrix.ServerName, base.Base.Cfg.Matrix.KeyID, base.Base.Cfg.Matrix.PrivateKey, tr,
 	)
+}
+
+func createClient(
+	base *P2PDendrite,
+) *gomatrixserverlib.Client {
+	tr := &http.Transport{}
+	tr.RegisterProtocol(
+		"matrix",
+		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
+	)
+	return gomatrixserverlib.NewClientWithTransport(tr)
 }
 
 func main() {
@@ -117,6 +113,7 @@ func main() {
 	}
 
 	cfg := config.Dendrite{}
+	cfg.SetDefaults()
 	cfg.Matrix.ServerName = "p2p"
 	cfg.Matrix.PrivateKey = privKey
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))
@@ -124,7 +121,6 @@ func main() {
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
 	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Kafka.Topics.UserUpdates = "userUpdates"
 	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
@@ -144,44 +140,67 @@ func main() {
 
 	accountDB := base.Base.CreateAccountsDB()
 	deviceDB := base.Base.CreateDeviceDB()
-	keyDB := createKeyDB(base)
 	federation := createFederationClient(base)
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
-	alias, input, query := roomserver.SetupRoomServerComponent(&base.Base)
-	eduInputAPI := eduserver.SetupEDUServerComponent(&base.Base, cache.New())
-	asQuery := appservice.SetupAppServiceAPIComponent(
-		&base.Base, accountDB, deviceDB, federation, alias, query, transactions.New(),
+	serverKeyAPI := serverkeyapi.NewInternalAPI(
+		base.Base.Cfg, federation, base.Base.Caches,
 	)
-	fedSenderAPI := federationsender.SetupFederationSenderComponent(&base.Base, federation, query)
+	keyRing := serverKeyAPI.KeyRing()
+	createKeyDB(
+		base, serverKeyAPI,
+	)
 
-	clientapi.SetupClientAPIComponent(
-		&base.Base, deviceDB, accountDB,
-		federation, &keyRing, alias, input, query,
-		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
+	rsAPI := roomserver.NewInternalAPI(
+		&base.Base, keyRing, federation,
 	)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(&base.Base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(&base.Base, deviceDB)
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub)
+	eduInputAPI := eduserver.NewInternalAPI(
+		&base.Base, cache.New(), userAPI,
+	)
+	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
+	fsAPI := federationsender.NewInternalAPI(
+		&base.Base, federation, rsAPI, keyRing,
+	)
+	rsAPI.SetFederationSenderAPI(fsAPI)
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabaseWithPubSub(string(base.Base.Cfg.Database.PublicRoomsAPI), base.LibP2PPubsub, cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(&base.Base, deviceDB, publicRoomsDB, query, federation, nil) // Check this later
-	syncapi.SetupSyncAPIComponent(&base.Base, deviceDB, accountDB, query, federation, &cfg)
 
-	httpHandler := common.WrapHandlerInCORS(base.Base.APIMux)
+	monolith := setup.Monolith{
+		Config:        base.Base.Cfg,
+		AccountDB:     accountDB,
+		DeviceDB:      deviceDB,
+		Client:        createClient(base),
+		FedClient:     federation,
+		KeyRing:       keyRing,
+		KafkaConsumer: base.Base.KafkaConsumer,
+		KafkaProducer: base.Base.KafkaProducer,
 
-	// Set up the API endpoints we handle. /metrics is for prometheus, and is
-	// not wrapped by CORS, while everything else is
-	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/", httpHandler)
+		AppserviceAPI:       asAPI,
+		EDUInternalAPI:      eduInputAPI,
+		FederationSenderAPI: fsAPI,
+		RoomserverAPI:       rsAPI,
+		ServerKeyAPI:        serverKeyAPI,
+		UserAPI:             userAPI,
+
+		PublicRoomsDB: publicRoomsDB,
+	}
+	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)
+
+	httputil.SetupHTTPAPI(
+		base.Base.BaseMux,
+		base.Base.PublicAPIMux,
+		base.Base.InternalAPIMux,
+		&cfg,
+		base.Base.UseHTTPAPIs,
+	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.Base.BaseMux))
 	}()
 	// Expose the matrix APIs also via libp2p
 	if base.LibP2P != nil {
@@ -194,7 +213,7 @@ func main() {
 			defer func() {
 				logrus.Fatal(listener.Close())
 			}()
-			logrus.Fatal(http.Serve(listener, nil))
+			logrus.Fatal(http.Serve(listener, base.Base.BaseMux))
 		}()
 	}
 

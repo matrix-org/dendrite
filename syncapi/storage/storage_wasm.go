@@ -18,11 +18,15 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func NewSyncServerDatasource(dataSourceName string) (Database, error) {
+func NewSyncServerDatasource(
+	dataSourceName string,
+	dbProperties sqlutil.DbProperties, // nolint:unparam
+) (Database, error) {
 	uri, err := url.Parse(dataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot use postgres implementation")
@@ -31,7 +35,7 @@ func NewSyncServerDatasource(dataSourceName string) (Database, error) {
 	case "postgres":
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	case "file":
-		return sqlite3.NewSyncServerDatasource(dataSourceName)
+		return sqlite3.NewDatabase(dataSourceName)
 	default:
 		return nil, fmt.Errorf("Cannot use postgres implementation")
 	}

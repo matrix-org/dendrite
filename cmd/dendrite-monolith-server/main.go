@@ -17,82 +17,146 @@ package main
 import (
 	"flag"
 	"net/http"
+	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/clientapi"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/basecomponent"
-	"github.com/matrix-org/dendrite/common/keydb"
-	"github.com/matrix-org/dendrite/common/transactions"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/dendrite/publicroomsapi"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/syncapi"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
+	httpBindAddr   = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
+	httpsBindAddr  = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
+	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
+	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
+	enableHTTPAPIs = flag.Bool("api", false, "Use HTTP APIs instead of short-circuiting (warning: exposes API endpoints!)")
+	traceInternal  = os.Getenv("DENDRITE_TRACE_INTERNAL") == "1"
 )
 
 func main() {
-	cfg := basecomponent.ParseMonolithFlags()
-	base := basecomponent.NewBaseDendrite(cfg, "Monolith")
+	cfg := setup.ParseFlags(true)
+	if *enableHTTPAPIs {
+		// If the HTTP APIs are enabled then we need to update the Listen
+		// statements in the configuration so that we know where to find
+		// the API endpoints. They'll listen on the same port as the monolith
+		// itself.
+		addr := config.Address(*httpBindAddr)
+		cfg.Listen.RoomServer = addr
+		cfg.Listen.EDUServer = addr
+		cfg.Listen.AppServiceAPI = addr
+		cfg.Listen.FederationSender = addr
+		cfg.Listen.ServerKeyAPI = addr
+	}
+
+	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	keyDB := base.CreateKeyDB()
 	federation := base.CreateFederationClient()
-	keyRing := keydb.CreateKeyRing(federation.Client, keyDB, cfg.Matrix.KeyPerspectives)
 
-	alias, input, query := roomserver.SetupRoomServerComponent(base)
-	eduInputAPI := eduserver.SetupEDUServerComponent(base, cache.New())
-	asQuery := appservice.SetupAppServiceAPIComponent(
-		base, accountDB, deviceDB, federation, alias, query, transactions.New(),
+	serverKeyAPI := serverkeyapi.NewInternalAPI(
+		base.Cfg, federation, base.Caches,
 	)
-	fedSenderAPI := federationsender.SetupFederationSenderComponent(base, federation, query)
+	if base.UseHTTPAPIs {
+		serverkeyapi.AddInternalRoutes(base.InternalAPIMux, serverKeyAPI, base.Caches)
+		serverKeyAPI = base.ServerKeyAPIClient()
+	}
+	keyRing := serverKeyAPI.KeyRing()
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices)
 
-	clientapi.SetupClientAPIComponent(
-		base, deviceDB, accountDB,
-		federation, &keyRing, alias, input, query,
-		eduInputAPI, asQuery, transactions.New(), fedSenderAPI,
+	rsImpl := roomserver.NewInternalAPI(
+		base, keyRing, federation,
 	)
-	eduProducer := producers.NewEDUServerProducer(eduInputAPI)
-	federationapi.SetupFederationAPIComponent(base, accountDB, deviceDB, federation, &keyRing, alias, input, query, asQuery, fedSenderAPI, eduProducer)
-	mediaapi.SetupMediaAPIComponent(base, deviceDB)
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI))
+	// call functions directly on the impl unless running in HTTP mode
+	rsAPI := rsImpl
+	if base.UseHTTPAPIs {
+		roomserver.AddInternalRoutes(base.InternalAPIMux, rsImpl)
+		rsAPI = base.RoomserverHTTPClient()
+	}
+	if traceInternal {
+		rsAPI = &api.RoomserverInternalAPITrace{
+			Impl: rsAPI,
+		}
+	}
+
+	eduInputAPI := eduserver.NewInternalAPI(
+		base, cache.New(), userAPI,
+	)
+	if base.UseHTTPAPIs {
+		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
+		eduInputAPI = base.EDUServerClient()
+	}
+
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	if base.UseHTTPAPIs {
+		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
+		asAPI = base.AppserviceHTTPClient()
+	}
+
+	fsAPI := federationsender.NewInternalAPI(
+		base, federation, rsAPI, keyRing,
+	)
+	if base.UseHTTPAPIs {
+		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
+		fsAPI = base.FederationSenderHTTPClient()
+	}
+	// The underlying roomserver implementation needs to be able to call the fedsender.
+	// This is different to rsAPI which can be the http client which doesn't need this dependency
+	rsImpl.SetFederationSenderAPI(fsAPI)
+
+	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	publicroomsapi.SetupPublicRoomsAPIComponent(base, deviceDB, publicRoomsDB, query, federation, nil)
-	syncapi.SetupSyncAPIComponent(base, deviceDB, accountDB, query, federation, cfg)
 
-	httpHandler := common.WrapHandlerInCORS(base.APIMux)
+	monolith := setup.Monolith{
+		Config:        base.Cfg,
+		AccountDB:     accountDB,
+		DeviceDB:      deviceDB,
+		Client:        gomatrixserverlib.NewClient(),
+		FedClient:     federation,
+		KeyRing:       keyRing,
+		KafkaConsumer: base.KafkaConsumer,
+		KafkaProducer: base.KafkaProducer,
 
-	// Set up the API endpoints we handle. /metrics is for prometheus, and is
-	// not wrapped by CORS, while everything else is
-	if cfg.Metrics.Enabled {
-		http.Handle("/metrics", common.WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
+		AppserviceAPI:       asAPI,
+		EDUInternalAPI:      eduInputAPI,
+		FederationSenderAPI: fsAPI,
+		RoomserverAPI:       rsAPI,
+		ServerKeyAPI:        serverKeyAPI,
+		UserAPI:             userAPI,
+
+		PublicRoomsDB: publicRoomsDB,
 	}
-	http.Handle("/", httpHandler)
+	monolith.AddAllPublicRoutes(base.PublicAPIMux)
+
+	httputil.SetupHTTPAPI(
+		base.BaseMux,
+		base.PublicAPIMux,
+		base.InternalAPIMux,
+		cfg,
+		base.UseHTTPAPIs,
+	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		serv := http.Server{
 			Addr:         *httpBindAddr,
-			WriteTimeout: basecomponent.HTTPServerTimeout,
+			WriteTimeout: setup.HTTPServerTimeout,
+			Handler:      base.BaseMux,
 		}
 
 		logrus.Info("Listening on ", serv.Addr)
@@ -103,7 +167,8 @@ func main() {
 		go func() {
 			serv := http.Server{
 				Addr:         *httpsBindAddr,
-				WriteTimeout: basecomponent.HTTPServerTimeout,
+				WriteTimeout: setup.HTTPServerTimeout,
+				Handler:      base.BaseMux,
 			}
 
 			logrus.Info("Listening on ", serv.Addr)

@@ -22,15 +22,15 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
@@ -40,15 +40,16 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 
 // SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
 // by building a m.room.member event then sending it to the room server
+// TODO: Can we improve the cyclo count here? Separate code paths for invites?
+// nolint:gocyclo
 func SendMembership(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	roomID string, membership string, cfg *config.Dendrite,
-	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
-	producer *producers.RoomserverProducer,
+	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := queryAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
@@ -69,7 +70,7 @@ func SendMembership(
 	}
 
 	inviteStored, jsonErrResp := checkAndProcessThreepid(
-		req, device, &body, cfg, queryAPI, accountDB, producer,
+		req, device, &body, cfg, rsAPI, accountDB,
 		membership, roomID, evTime,
 	)
 	if jsonErrResp != nil {
@@ -87,14 +88,15 @@ func SendMembership(
 	}
 
 	event, err := buildMembershipEvent(
-		req.Context(), body, accountDB, device, membership, roomID, cfg, evTime, queryAPI, asAPI,
+		req.Context(), body, accountDB, device, membership,
+		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(err.Error()),
 		}
-	} else if err == common.ErrRoomNoExists {
+	} else if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),
@@ -104,23 +106,39 @@ func SendMembership(
 		return jsonerror.InternalServerError()
 	}
 
-	if _, err := producer.SendEvents(
-		req.Context(),
-		[]gomatrixserverlib.HeaderedEvent{(*event).Headered(verRes.RoomVersion)},
-		cfg.Matrix.ServerName,
-		nil,
-	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("producer.SendEvents failed")
-		return jsonerror.InternalServerError()
-	}
-
 	var returnData interface{} = struct{}{}
 
-	// The join membership requires the room id to be sent in the response
-	if membership == gomatrixserverlib.Join {
+	switch membership {
+	case gomatrixserverlib.Invite:
+		// Invites need to be handled specially
+		perr := roomserverAPI.SendInvite(
+			req.Context(), rsAPI,
+			event.Headered(verRes.RoomVersion),
+			nil, // ask the roomserver to draw up invite room state for us
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if perr != nil {
+			util.GetLogger(req.Context()).WithError(perr).Error("producer.SendInvite failed")
+			return perr.JSONResponse()
+		}
+	case gomatrixserverlib.Join:
+		// The join membership requires the room id to be sent in the response
 		returnData = struct {
 			RoomID string `json:"room_id"`
 		}{roomID}
+		fallthrough
+	default:
+		_, err = roomserverAPI.SendEvents(
+			req.Context(), rsAPI,
+			[]gomatrixserverlib.HeaderedEvent{event.Headered(verRes.RoomVersion)},
+			cfg.Matrix.ServerName,
+			nil,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	return util.JSONResponse{
@@ -132,10 +150,10 @@ func SendMembership(
 func buildMembershipEvent(
 	ctx context.Context,
 	body threepid.MembershipRequest, accountDB accounts.Database,
-	device *authtypes.Device,
-	membership, roomID string,
+	device *userapi.Device,
+	membership, roomID string, isDirect bool,
 	cfg *config.Dendrite, evTime time.Time,
-	queryAPI roomserverAPI.RoomserverQueryAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.Event, error) {
 	stateKey, reason, err := getMembershipStateKey(body, device, membership)
 	if err != nil {
@@ -164,13 +182,14 @@ func buildMembershipEvent(
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
 		Reason:      reason,
+		IsDirect:    isDirect,
 	}
 
 	if err = builder.SetContent(content); err != nil {
 		return nil, err
 	}
 
-	return common.BuildEvent(ctx, &builder, cfg, evTime, queryAPI, nil)
+	return eventutil.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns
@@ -205,7 +224,7 @@ func loadProfile(
 // In the latter case, if there was an issue retrieving the user ID from the request body,
 // returns a JSONResponse with a corresponding error code and message.
 func getMembershipStateKey(
-	body threepid.MembershipRequest, device *authtypes.Device, membership string,
+	body threepid.MembershipRequest, device *userapi.Device, membership string,
 ) (stateKey string, reason string, err error) {
 	if membership == gomatrixserverlib.Ban || membership == "unban" || membership == "kick" || membership == gomatrixserverlib.Invite {
 		// If we're in this case, the state key is contained in the request body,
@@ -227,18 +246,17 @@ func getMembershipStateKey(
 
 func checkAndProcessThreepid(
 	req *http.Request,
-	device *authtypes.Device,
+	device *userapi.Device,
 	body *threepid.MembershipRequest,
 	cfg *config.Dendrite,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	accountDB accounts.Database,
-	producer *producers.RoomserverProducer,
 	membership, roomID string,
 	evTime time.Time,
 ) (inviteStored bool, errRes *util.JSONResponse) {
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req.Context(), device, body, cfg, queryAPI, accountDB, producer,
+		req.Context(), device, body, cfg, rsAPI, accountDB,
 		membership, roomID, evTime,
 	)
 	if err == threepid.ErrMissingParameter {
@@ -251,12 +269,18 @@ func checkAndProcessThreepid(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotTrusted(body.IDServer),
 		}
-	} else if err == common.ErrRoomNoExists {
+	} else if err == eventutil.ErrRoomNoExists {
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),
 		}
-	} else if err != nil {
+	} else if e, ok := err.(gomatrixserverlib.BadJSONError); ok {
+		return inviteStored, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
+	}
+	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		er := jsonerror.InternalServerError()
 		return inviteStored, &er

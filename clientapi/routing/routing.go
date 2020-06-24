@@ -21,24 +21,24 @@ import (
 
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/common"
-	"github.com/matrix-org/dendrite/common/config"
-	"github.com/matrix-org/dendrite/common/transactions"
+	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixV1 = "/_matrix/client/api/v1"
-const pathPrefixR0 = "/_matrix/client/r0"
-const pathPrefixUnstable = "/_matrix/client/unstable"
+const pathPrefixV1 = "/client/api/v1"
+const pathPrefixR0 = "/client/r0"
+const pathPrefixUnstable = "/client/unstable"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -47,24 +47,21 @@ const pathPrefixUnstable = "/_matrix/client/unstable"
 // applied:
 // nolint: gocyclo
 func Setup(
-	apiMux *mux.Router, cfg *config.Dendrite,
-	producer *producers.RoomserverProducer,
-	queryAPI roomserverAPI.RoomserverQueryAPI,
-	aliasAPI roomserverAPI.RoomserverAliasAPI,
+	publicAPIMux *mux.Router, cfg *config.Dendrite,
+	eduAPI eduServerAPI.EDUServerInputAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	accountDB accounts.Database,
 	deviceDB devices.Database,
+	userAPI api.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing gomatrixserverlib.KeyRing,
-	userUpdateProducer *producers.UserUpdateProducer,
 	syncProducer *producers.SyncAPIProducer,
-	eduProducer *producers.EDUServerProducer,
 	transactionsCache *transactions.Cache,
-	federationSender federationSenderAPI.FederationSenderQueryAPI,
+	federationSender federationSenderAPI.FederationSenderInternalAPI,
 ) {
 
-	apiMux.Handle("/_matrix/client/versions",
-		common.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
+	publicAPIMux.Handle("/client/versions",
+		httputil.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: struct {
@@ -79,104 +76,115 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux := apiMux.PathPrefix(pathPrefixR0).Subrouter()
-	v1mux := apiMux.PathPrefix(pathPrefixV1).Subrouter()
-	unstableMux := apiMux.PathPrefix(pathPrefixUnstable).Subrouter()
-
-	authData := auth.Data{
-		AccountDB:   accountDB,
-		DeviceDB:    deviceDB,
-		AppServices: cfg.Derived.ApplicationServices,
-	}
+	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
+	v1mux := publicAPIMux.PathPrefix(pathPrefixV1).Subrouter()
+	unstableMux := publicAPIMux.PathPrefix(pathPrefixUnstable).Subrouter()
 
 	r0mux.Handle("/createRoom",
-		common.MakeAuthAPI("createRoom", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return CreateRoom(req, device, cfg, producer, accountDB, aliasAPI, asAPI)
+		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			return CreateRoom(req, device, cfg, accountDB, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/join/{roomIDOrAlias}",
-		common.MakeAuthAPI(gomatrixserverlib.Join, authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return JoinRoomByIDOrAlias(
-				req, device, vars["roomIDOrAlias"], cfg, federation, producer, queryAPI, aliasAPI, keyRing, accountDB,
+				req, device, rsAPI, accountDB, vars["roomIDOrAlias"],
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/joined_rooms",
-		common.MakeAuthAPI("joined_rooms", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("joined_rooms", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return GetJoinedRooms(req, device, accountDB)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
-
-	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|leave|invite)}",
-		common.MakeAuthAPI("membership", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+	r0mux.Handle("/rooms/{roomID}/leave",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, queryAPI, asAPI, producer)
+			return LeaveRoomByID(
+				req, device, rsAPI, vars["roomID"],
+			)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/{membership:(?:join|kick|ban|unban|invite)}",
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendMembership(req, accountDB, device, vars["roomID"], vars["membership"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}",
-		common.MakeAuthAPI("send_message", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, queryAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
-		common.MakeAuthAPI("send_message", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID,
-				nil, cfg, queryAPI, producer, transactionsCache)
+				nil, cfg, rsAPI, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/event/{eventID}",
-		common.MakeAuthAPI("rooms_get_event", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("rooms_get_event", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, queryAPI, federation, keyRing)
+			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, federation)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/rooms/{roomID}/state", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+	r0mux.Handle("/rooms/{roomID}/state", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingStateRequest(req.Context(), queryAPI, vars["roomID"])
+		return OnIncomingStateRequest(req.Context(), rsAPI, vars["roomID"])
 	})).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/rooms/{roomID}/state/{type}", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+	r0mux.Handle("/rooms/{roomID}/state/{type:[^/]+/?}", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingStateTypeRequest(req.Context(), queryAPI, vars["roomID"], vars["type"], "")
+		// If there's a trailing slash, remove it
+		eventType := vars["type"]
+		if strings.HasSuffix(eventType, "/") {
+			eventType = eventType[:len(eventType)-1]
+		}
+		eventFormat := req.URL.Query().Get("format") == "event"
+		return OnIncomingStateTypeRequest(req.Context(), rsAPI, vars["roomID"], eventType, "", eventFormat)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", common.MakeAuthAPI("room_state", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-		vars, err := common.URLDecodeMapValues(mux.Vars(req))
+	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingStateTypeRequest(req.Context(), queryAPI, vars["roomID"], vars["type"], vars["stateKey"])
+		eventFormat := req.URL.Query().Get("format") == "event"
+		return OnIncomingStateTypeRequest(req.Context(), rsAPI, vars["roomID"], vars["type"], vars["stateKey"], eventFormat)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
-		common.MakeAuthAPI("send_message", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -186,87 +194,112 @@ func Setup(
 			if strings.HasSuffix(eventType, "/") {
 				eventType = eventType[:len(eventType)-1]
 			}
-			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, queryAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
-		common.MakeAuthAPI("send_message", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			stateKey := vars["stateKey"]
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, queryAPI, producer, nil)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
-	r0mux.Handle("/register", common.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		return Register(req, accountDB, deviceDB, cfg)
+	r0mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
+		return Register(req, userAPI, accountDB, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
-	v1mux.Handle("/register", common.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		return LegacyRegister(req, accountDB, deviceDB, cfg)
+	v1mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
+		return LegacyRegister(req, userAPI, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
-	r0mux.Handle("/register/available", common.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
+	r0mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
 		return RegisterAvailable(req, cfg, accountDB)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/directory/room/{roomAlias}",
-		common.MakeExternalAPI("directory_room", func(req *http.Request) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeExternalAPI("directory_room", func(req *http.Request) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DirectoryRoom(req, vars["roomAlias"], federation, cfg, aliasAPI, federationSender)
+			return DirectoryRoom(req, vars["roomAlias"], federation, cfg, rsAPI, federationSender)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/directory/room/{roomAlias}",
-		common.MakeAuthAPI("directory_room", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("directory_room", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetLocalAlias(req, device, vars["roomAlias"], cfg, aliasAPI)
+			return SetLocalAlias(req, device, vars["roomAlias"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/directory/room/{roomAlias}",
-		common.MakeAuthAPI("directory_room", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("directory_room", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return RemoveLocalAlias(req, device, vars["roomAlias"], aliasAPI)
+			return RemoveLocalAlias(req, device, vars["roomAlias"], rsAPI)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 
 	r0mux.Handle("/logout",
-		common.MakeAuthAPI("logout", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("logout", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return Logout(req, deviceDB, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/logout/all",
-		common.MakeAuthAPI("logout", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("logout", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return LogoutAll(req, deviceDB, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
-		common.MakeAuthAPI("rooms_typing", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("rooms_typing", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduProducer)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduAPI)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
+
+	r0mux.Handle("/sendToDevice/{eventType}/{txnID}",
+		httputil.MakeAuthAPI("send_to_device", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			txnID := vars["txnID"]
+			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
+
+	// This is only here because sytest refers to /unstable for this endpoint
+	// rather than r0. It's an exact duplicate of the above handler.
+	// TODO: Remove this if/when sytest is fixed!
+	unstableMux.Handle("/sendToDevice/{eventType}/{txnID}",
+		httputil.MakeAuthAPI("send_to_device", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			txnID := vars["txnID"]
+			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/account/whoami",
-		common.MakeAuthAPI("whoami", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("whoami", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return Whoami(req, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -274,20 +307,20 @@ func Setup(
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
-		common.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
 			return Login(req, accountDB, deviceDB, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/auth/{authType}/fallback/web",
-		common.MakeHTMLAPI("auth_fallback", func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
+		httputil.MakeHTMLAPI("auth_fallback", func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
 			vars := mux.Vars(req)
 			return AuthFallback(w, req, vars["authType"], cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/pushrules/",
-		common.MakeExternalAPI("push_rules", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("push_rules", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement push rules API
 			res := json.RawMessage(`{
 					"global": {
@@ -306,8 +339,8 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/filter",
-		common.MakeAuthAPI("put_filter", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("put_filter", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -316,8 +349,8 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/filter/{filterId}",
-		common.MakeAuthAPI("get_filter", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("get_filter", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -328,8 +361,8 @@ func Setup(
 	// Riot user settings
 
 	r0mux.Handle("/profile/{userID}",
-		common.MakeExternalAPI("profile", func(req *http.Request) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeExternalAPI("profile", func(req *http.Request) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -338,8 +371,8 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
-		common.MakeExternalAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeExternalAPI("profile_avatar_url", func(req *http.Request) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -348,20 +381,20 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
-		common.MakeAuthAPI("profile_avatar_url", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("profile_avatar_url", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetAvatarURL(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, queryAPI)
+			return SetAvatarURL(req, accountDB, device, vars["userID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
 
 	r0mux.Handle("/profile/{userID}/displayname",
-		common.MakeExternalAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeExternalAPI("profile_displayname", func(req *http.Request) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -370,44 +403,44 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/profile/{userID}/displayname",
-		common.MakeAuthAPI("profile_displayname", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("profile_displayname", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetDisplayName(req, accountDB, device, vars["userID"], userUpdateProducer, cfg, producer, queryAPI)
+			return SetDisplayName(req, accountDB, device, vars["userID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
 
 	r0mux.Handle("/account/3pid",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return GetAssociated3PIDs(req, accountDB, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/account/3pid",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return CheckAndSave3PIDAssociation(req, accountDB, device, cfg)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstableMux.Handle("/account/3pid/delete",
-		common.MakeAuthAPI("account_3pid", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return Forget3PID(req, accountDB)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
-		common.MakeExternalAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
 			return RequestEmailToken(req, accountDB, cfg)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	// Riot logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",
-		common.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
 			// TODO: Set presence (probably the responsibility of a presence server not clientapi)
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -417,13 +450,13 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/voip/turnServer",
-		common.MakeAuthAPI("turn_server", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("turn_server", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return RequestTurnServer(req, device, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/thirdparty/protocols",
-		common.MakeExternalAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
 			// TODO: Return the third party protcols
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -433,7 +466,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/initialSync",
-		common.MakeExternalAPI("rooms_initial_sync", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("rooms_initial_sync", func(req *http.Request) util.JSONResponse {
 			// TODO: Allow people to peek into rooms.
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
@@ -443,81 +476,81 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userID}/account_data/{type}",
-		common.MakeAuthAPI("user_account_data", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("user_account_data", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveAccountData(req, accountDB, device, vars["userID"], "", vars["type"], syncProducer)
+			return SaveAccountData(req, userAPI, device, vars["userID"], "", vars["type"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/user/{userID}/rooms/{roomID}/account_data/{type}",
-		common.MakeAuthAPI("user_account_data", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("user_account_data", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
+			return SaveAccountData(req, userAPI, device, vars["userID"], vars["roomID"], vars["type"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/user/{userID}/account_data/{type}",
-		common.MakeAuthAPI("user_account_data", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("user_account_data", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetAccountData(req, accountDB, device, vars["userID"], "", vars["type"])
+			return GetAccountData(req, userAPI, device, vars["userID"], "", vars["type"])
 		}),
 	).Methods(http.MethodGet)
 
 	r0mux.Handle("/user/{userID}/rooms/{roomID}/account_data/{type}",
-		common.MakeAuthAPI("user_account_data", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("user_account_data", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetAccountData(req, accountDB, device, vars["userID"], vars["roomID"], vars["type"])
+			return GetAccountData(req, userAPI, device, vars["userID"], vars["roomID"], vars["type"])
 		}),
 	).Methods(http.MethodGet)
 
 	r0mux.Handle("/rooms/{roomID}/members",
-		common.MakeAuthAPI("rooms_members", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetMemberships(req, device, vars["roomID"], false, cfg, queryAPI)
+			return GetMemberships(req, device, vars["roomID"], false, cfg, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/joined_members",
-		common.MakeAuthAPI("rooms_members", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetMemberships(req, device, vars["roomID"], true, cfg, queryAPI)
+			return GetMemberships(req, device, vars["roomID"], true, cfg, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/read_markers",
-		common.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
 			// TODO: return the read_markers.
 			return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/devices",
-		common.MakeAuthAPI("get_devices", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("get_devices", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return GetDevicesByLocalpart(req, deviceDB, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/devices/{deviceID}",
-		common.MakeAuthAPI("get_device", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("get_device", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -526,8 +559,8 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/devices/{deviceID}",
-		common.MakeAuthAPI("device_data", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("device_data", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -536,8 +569,8 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/devices/{deviceID}",
-		common.MakeAuthAPI("delete_device", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("delete_device", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -546,14 +579,14 @@ func Setup(
 	).Methods(http.MethodDelete, http.MethodOptions)
 
 	r0mux.Handle("/delete_devices",
-		common.MakeAuthAPI("delete_devices", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("delete_devices", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
 			return DeleteDevices(req, deviceDB, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	// Stub implementations for sytest
 	r0mux.Handle("/events",
-		common.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("events", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{Code: http.StatusOK, JSON: map[string]interface{}{
 				"chunk": []interface{}{},
 				"start": "",
@@ -563,7 +596,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/initialSync",
-		common.MakeExternalAPI("initial_sync", func(req *http.Request) util.JSONResponse {
+		httputil.MakeExternalAPI("initial_sync", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{Code: http.StatusOK, JSON: map[string]interface{}{
 				"end": "",
 			}}
@@ -571,38 +604,38 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags",
-		common.MakeAuthAPI("get_tags", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("get_tags", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetTags(req, accountDB, device, vars["userId"], vars["roomId"], syncProducer)
+			return GetTags(req, userAPI, device, vars["userId"], vars["roomId"], syncProducer)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
-		common.MakeAuthAPI("put_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("put_tag", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return PutTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
+			return PutTag(req, userAPI, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
-		common.MakeAuthAPI("delete_tag", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			vars, err := common.URLDecodeMapValues(mux.Vars(req))
+		httputil.MakeAuthAPI("delete_tag", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DeleteTag(req, accountDB, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
+			return DeleteTag(req, userAPI, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 
 	r0mux.Handle("/capabilities",
-		common.MakeAuthAPI("capabilities", authData, func(req *http.Request, device *authtypes.Device) util.JSONResponse {
-			return GetCapabilities(req, queryAPI)
+		httputil.MakeAuthAPI("capabilities", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
+			return GetCapabilities(req, rsAPI)
 		}),
 	).Methods(http.MethodGet)
 }

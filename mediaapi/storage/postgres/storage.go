@@ -33,10 +33,10 @@ type Database struct {
 }
 
 // Open opens a postgres database.
-func Open(dataSourceName string) (*Database, error) {
+func Open(dataSourceName string, dbProperties sqlutil.DbProperties) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, err = sqlutil.Open("postgres", dataSourceName); err != nil {
+	if d.db, err = sqlutil.Open("postgres", dataSourceName, dbProperties); err != nil {
 		return nil, err
 	}
 	if err = d.statements.prepare(d.db); err != nil {
