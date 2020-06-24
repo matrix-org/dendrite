@@ -108,5 +108,10 @@ func SendInvite(
 	}
 	var response PerformInviteResponse
 	rsAPI.PerformInvite(ctx, &request, &response)
-	return response.Error
+	// we need to do this because many places people will use `var err error` as the return
+	// arg and a nil interface != nil pointer to a concrete interface (in this case PerformError)
+	if response.Error != nil && response.Error.Msg != "" {
+		return response.Error
+	}
+	return nil
 }
