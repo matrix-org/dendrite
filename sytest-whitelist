@@ -363,3 +363,4 @@ Invited user can reject local invite after originator leaves
 Typing notification sent to local room members
 Typing notifications also sent to remote room members
 Typing can be explicitly stopped
+Banned user is kicked and may not rejoin until unbanned

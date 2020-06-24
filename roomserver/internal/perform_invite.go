@@ -55,6 +55,7 @@ func (r *RoomserverInternalAPI) performInvite(ctx context.Context,
 	return nil
 }
 
+// nolint:gocyclo
 func (r *RoomserverInternalAPI) processInviteEvent(
 	ctx context.Context,
 	ow *RoomserverInternalAPI,
@@ -135,6 +136,22 @@ func (r *RoomserverInternalAPI) processInviteEvent(
 	}
 
 	event := input.Event.Unwrap()
+
+	// check that the user is allowed to do this
+	_, err = checkAuthEvents(ctx, r.DB, input.Event, input.Event.AuthEventIDs())
+	if err != nil {
+		log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
+			"processInviteEvent.checkAuthEvents failed for event",
+		)
+		if _, ok := err.(*gomatrixserverlib.NotAllowed); ok {
+			return nil, &api.PerformError{
+				Msg:  err.Error(),
+				Code: api.PerformErrorNotAllowed,
+			}
+		}
+		return nil, err
+	}
+
 	if len(input.InviteRoomState) > 0 {
 		// If we were supplied with some invite room state already (which is
 		// most likely to be if the event came in over federation) then use

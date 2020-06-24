@@ -88,10 +88,10 @@ func CheckAndProcessInvite(
 	ctx context.Context,
 	device *userapi.Device, body *MembershipRequest, cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI, db accounts.Database,
-	membership string, roomID string,
+	roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
-	if membership != gomatrixserverlib.Invite || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
+	if body.Address == "" && body.IDServer == "" && body.Medium == "" {
 		// If none of the 3PID-specific fields are supplied, it's a standard invite
 		// so return nil for it to be processed as such
 		return
