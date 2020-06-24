@@ -34,7 +34,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := r.PerformJoin(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
+				response.ErrMsg = err.Error()
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),

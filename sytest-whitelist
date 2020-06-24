@@ -62,6 +62,8 @@ Request to logout with invalid an access token is rejected
 Request to logout without an access token is rejected
 Room creation reports m.room.create to myself
 Room creation reports m.room.member to myself
+Invited user can see room metadata
+Remote invited user can see room metadata
 # Blacklisted because these tests call /r0/events which we don't implement
 # New room members see their own join event
 # Existing members see new members' join events

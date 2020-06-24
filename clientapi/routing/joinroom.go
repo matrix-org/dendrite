@@ -15,8 +15,10 @@
 package routing
 
 import (
+	"errors"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -52,7 +54,8 @@ func JoinRoomByIDOrAlias(
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 	} else {
 		// Request our profile content to populate the request content with.
-		profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
+		var profile *authtypes.Profile
+		profile, err = accountDB.GetProfileByLocalpart(req.Context(), localpart)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
 		} else {
@@ -62,11 +65,32 @@ func JoinRoomByIDOrAlias(
 	}
 
 	// Ask the roomserver to perform the join.
-	if err := rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes); err != nil {
+	err = rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
+	// Handle known errors first, if this is 0 then there will be no matches (eg on success)
+	switch joinRes.Error {
+	case roomserverAPI.JoinErrorBadRequest:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(err.Error()),
+			JSON: jsonerror.Unknown(joinRes.ErrMsg),
 		}
+	case roomserverAPI.JoinErrorNoRoom:
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(joinRes.ErrMsg),
+		}
+	case roomserverAPI.JoinErrorNotAllowed:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(joinRes.ErrMsg),
+		}
+	}
+	// this is always populated on generic errors
+	if joinRes.ErrMsg != "" {
+		return util.ErrorResponse(errors.New(joinRes.ErrMsg))
+	}
+	// this is set on network errors in polylith mode
+	if err != nil {
+		return util.ErrorResponse(err)
 	}
 
 	return util.JSONResponse{

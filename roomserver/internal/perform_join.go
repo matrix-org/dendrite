@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -21,9 +22,11 @@ func (r *RoomserverInternalAPI) PerformJoin(
 ) error {
 	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
+		res.Error = api.JoinErrorBadRequest
 		return fmt.Errorf("Supplied user ID %q in incorrect format", req.UserID)
 	}
 	if domain != r.Cfg.Matrix.ServerName {
+		res.Error = api.JoinErrorBadRequest
 		return fmt.Errorf("User %q does not belong to this homeserver", req.UserID)
 	}
 	if strings.HasPrefix(req.RoomIDOrAlias, "!") {
@@ -32,6 +35,7 @@ func (r *RoomserverInternalAPI) PerformJoin(
 	if strings.HasPrefix(req.RoomIDOrAlias, "#") {
 		return r.performJoinRoomByAlias(ctx, req, res)
 	}
+	res.Error = api.JoinErrorBadRequest
 	return fmt.Errorf("Room ID or alias %q is invalid", req.RoomIDOrAlias)
 }
 
@@ -99,6 +103,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	// Get the domain part of the room ID.
 	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
 	if err != nil {
+		res.Error = api.JoinErrorBadRequest
 		return fmt.Errorf("Room ID %q is invalid", req.RoomIDOrAlias)
 	}
 	req.ServerNames = append(req.ServerNames, domain)
@@ -198,6 +203,10 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 			}
 			inputRes := api.InputRoomEventsResponse{}
 			if err = r.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+				var notAllowed *gomatrixserverlib.NotAllowed
+				if errors.As(err, &notAllowed) {
+					res.Error = api.JoinErrorNotAllowed
+				}
 				return fmt.Errorf("r.InputRoomEvents: %w", err)
 			}
 		}
@@ -207,6 +216,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// room. If it is then there's nothing more to do - the room just
 		// hasn't been created yet.
 		if domain == r.Cfg.Matrix.ServerName {
+			res.Error = api.JoinErrorNoRoom
 			return fmt.Errorf("Room ID %q does not exist", req.RoomIDOrAlias)
 		}
 
