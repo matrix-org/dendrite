@@ -87,7 +87,7 @@ func (h *httpFederationSenderInternalAPI) PerformJoin(
 	if err != nil {
 		response.LastError = &gomatrix.HTTPError{
 			Message:      err.Error(),
-			Code:         599, // to distinguish from genuine 500
+			Code:         0,
 			WrappedError: err,
 		}
 	}

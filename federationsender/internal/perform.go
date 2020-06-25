@@ -90,7 +90,6 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	// If we reach here then we didn't complete a join for some reason.
 	var httpErr gomatrix.HTTPError
 	if ok := errors.As(lastErr, &httpErr); ok {
-		logrus.Infof("TYPE CAST LASTERR OK!")
 		httpErr.Message = string(httpErr.Contents)
 		response.LastError = &httpErr
 	} else {

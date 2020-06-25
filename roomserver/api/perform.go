@@ -46,12 +46,13 @@ func (p *PerformError) JSONResponse() util.JSONResponse {
 			JSON: jsonerror.Forbidden(p.Msg),
 		}
 	case PerformErrRemote:
-		code := p.RemoteCode
-		if code == 0 {
-			code = 500
+		// if the code is 0 then something bad happened and it isn't
+		// a remote HTTP error being encapsulated, e.g network error to remote.
+		if p.RemoteCode == 0 {
+			return util.ErrorResponse(fmt.Errorf("%s", p.Msg))
 		}
 		return util.JSONResponse{
-			Code: code,
+			Code: p.RemoteCode,
 			// TODO: Should we assert this is in fact JSON? E.g gjson parse?
 			JSON: json.RawMessage(p.Msg),
 		}
