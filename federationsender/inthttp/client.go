@@ -91,7 +91,6 @@ func (h *httpFederationSenderInternalAPI) PerformJoin(
 			WrappedError: err,
 		}
 	}
-	return
 }
 
 // Handle an instruction to make_join & send_join with a remote server.
