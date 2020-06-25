@@ -58,9 +58,8 @@ var (
 )
 
 func makeProxy(targetURL string) (*httputil.ReverseProxy, error) {
-	if !strings.HasSuffix(targetURL, "/") {
-		targetURL += "/"
-	}
+	targetURL = strings.TrimSuffix(targetURL, "/")
+
 	// Check that we can parse the URL.
 	_, err := url.Parse(targetURL)
 	if err != nil {
