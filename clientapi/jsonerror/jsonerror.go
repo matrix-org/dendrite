@@ -125,10 +125,20 @@ func GuestAccessForbidden(msg string) *MatrixError {
 	return &MatrixError{"M_GUEST_ACCESS_FORBIDDEN", msg}
 }
 
+type IncompatibleRoomVersionError struct {
+	RoomVersion string `json:"room_version"`
+	Error       string `json:"error"`
+	Code        string `json:"errcode"`
+}
+
 // IncompatibleRoomVersion is an error which is returned when the client
 // requests a room with a version that is unsupported.
-func IncompatibleRoomVersion(roomVersion gomatrixserverlib.RoomVersion) *MatrixError {
-	return &MatrixError{"M_INCOMPATIBLE_ROOM_VERSION", string(roomVersion)}
+func IncompatibleRoomVersion(roomVersion gomatrixserverlib.RoomVersion) *IncompatibleRoomVersionError {
+	return &IncompatibleRoomVersionError{
+		Code:        "M_INCOMPATIBLE_ROOM_VERSION",
+		RoomVersion: string(roomVersion),
+		Error:       "Your homeserver does not support the features required to join this room",
+	}
 }
 
 // UnsupportedRoomVersion is an error which is returned when the client

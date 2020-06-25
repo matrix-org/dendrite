@@ -270,9 +270,13 @@ func (r *RoomserverInternalAPI) performFederatedJoinRoomByID(
 		Content:     req.Content,       // the membership event content
 	}
 	fedRes := fsAPI.PerformJoinResponse{}
-	if err := r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes); err != nil {
-		return fmt.Errorf("Error joining federated room: %q", err)
+	r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
+	if fedRes.LastError != nil {
+		return &api.PerformError{
+			Code:       api.PerformErrRemote,
+			Msg:        fedRes.LastError.Message,
+			RemoteCode: fedRes.LastError.Code,
+		}
 	}
-
 	return nil
 }

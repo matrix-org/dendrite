@@ -366,3 +366,10 @@ Typing notification sent to local room members
 Typing notifications also sent to remote room members
 Typing can be explicitly stopped
 Banned user is kicked and may not rejoin until unbanned
+Inbound federation rejects attempts to join v1 rooms from servers without v1 support
+Inbound federation rejects attempts to join v2 rooms from servers lacking version support
+Inbound federation rejects attempts to join v2 rooms from servers only supporting v1
+Outbound federation passes make_join failures through to the client
+Outbound federation correctly handles unsupported room versions
+Remote users may not join unfederated rooms
+Guest users denied access over federation if guest access prohibited
