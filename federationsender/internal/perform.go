@@ -97,7 +97,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	} else {
 		response.LastError = &gomatrix.HTTPError{
 			Code:         0,
-			WrappedError: lastErr,
+			WrappedError: nil,
 			Message:      lastErr.Error(),
 		}
 	}
