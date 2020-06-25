@@ -83,10 +83,26 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
+	v1fedmux.Handle("/invite/{roomID}/{eventID}", httputil.MakeFedAPI(
+		"federation_invite", cfg.Matrix.ServerName, keys, wakeup,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			res := InviteV1(
+				httpReq, request, vars["roomID"], vars["eventID"],
+				cfg, rsAPI, keys,
+			)
+			return util.JSONResponse{
+				Code: res.Code,
+				JSON: []interface{}{
+					res.Code, res.JSON,
+				},
+			}
+		},
+	)).Methods(http.MethodPut, http.MethodOptions)
+
 	v2fedmux.Handle("/invite/{roomID}/{eventID}", httputil.MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
-			return Invite(
+			return InviteV2(
 				httpReq, request, vars["roomID"], vars["eventID"],
 				cfg, rsAPI, keys,
 			)
