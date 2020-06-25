@@ -377,3 +377,4 @@ Outbound federation passes make_join failures through to the client
 Outbound federation correctly handles unsupported room versions
 Remote users may not join unfederated rooms
 Guest users denied access over federation if guest access prohibited
+Non-numeric ports in server names are rejected
