@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -12,8 +13,9 @@ import (
 type PerformErrorCode int
 
 type PerformError struct {
-	Msg  string
-	Code PerformErrorCode
+	Msg        string
+	RemoteCode int // remote HTTP status code, for PerformErrRemote
+	Code       PerformErrorCode
 }
 
 func (p *PerformError) Error() string {
@@ -43,6 +45,16 @@ func (p *PerformError) JSONResponse() util.JSONResponse {
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(p.Msg),
 		}
+	case PerformErrRemote:
+		code := p.RemoteCode
+		if code == 0 {
+			code = 500
+		}
+		return util.JSONResponse{
+			Code: code,
+			// TODO: Should we assert this is in fact JSON? E.g gjson parse?
+			JSON: json.RawMessage(p.Msg),
+		}
 	default:
 		return util.ErrorResponse(p)
 	}
@@ -57,6 +69,8 @@ const (
 	PerformErrorNoRoom PerformErrorCode = 3
 	// PerformErrorNoOperation means that the request resulted in nothing happening e.g invite->invite or leave->leave.
 	PerformErrorNoOperation PerformErrorCode = 4
+	// PerformErrRemote means that the request failed and the PerformError.Msg is the raw remote JSON error response
+	PerformErrRemote PerformErrorCode = 5
 )
 
 type PerformJoinRequest struct {
