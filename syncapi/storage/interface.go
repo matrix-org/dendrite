@@ -78,9 +78,9 @@ type Database interface {
 	// If the invite was successfully stored this returns the stream ID it was stored at.
 	// Returns an error if there was a problem communicating with the database.
 	AddInviteEvent(ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent) (types.StreamPosition, error)
-	// RetireInviteEvent removes an old invite event from the database.
+	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
-	RetireInviteEvent(ctx context.Context, inviteEventID string) error
+	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
 	// SetTypingTimeoutCallback sets a callback function that is called right after
 	// a user is removed from the typing user list due to timeout.
 	SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn)

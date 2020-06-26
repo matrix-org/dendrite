@@ -378,3 +378,11 @@ Outbound federation correctly handles unsupported room versions
 Remote users may not join unfederated rooms
 Guest users denied access over federation if guest access prohibited
 Non-numeric ports in server names are rejected
+Invited user can reject invite over federation
+Invited user can reject invite over federation for empty room
+Can reject invites over federation for rooms with version 1
+Can reject invites over federation for rooms with version 2
+Can reject invites over federation for rooms with version 3
+Can reject invites over federation for rooms with version 4
+Can reject invites over federation for rooms with version 5
+Can reject invites over federation for rooms with version 6
