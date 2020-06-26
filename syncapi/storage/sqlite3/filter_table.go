@@ -26,7 +26,7 @@ import (
 
 const filterSchema = `
 -- Stores data about filters
-CREATE TABLE IF NOT EXISTS account_filter (
+CREATE TABLE IF NOT EXISTS syncapi_filter (
 	-- The filter
 	filter TEXT NOT NULL,
 	-- The ID
@@ -37,17 +37,17 @@ CREATE TABLE IF NOT EXISTS account_filter (
 	UNIQUE (id, localpart)
 );
 
-CREATE INDEX IF NOT EXISTS account_filter_localpart ON account_filter(localpart);
+CREATE INDEX IF NOT EXISTS syncapi_filter_localpart ON syncapi_filter(localpart);
 `
 
 const selectFilterSQL = "" +
-	"SELECT filter FROM account_filter WHERE localpart = $1 AND id = $2"
+	"SELECT filter FROM syncapi_filter WHERE localpart = $1 AND id = $2"
 
 const selectFilterIDByContentSQL = "" +
-	"SELECT id FROM account_filter WHERE localpart = $1 AND filter = $2"
+	"SELECT id FROM syncapi_filter WHERE localpart = $1 AND filter = $2"
 
 const insertFilterSQL = "" +
-	"INSERT INTO account_filter (filter, localpart) VALUES ($1, $2)"
+	"INSERT INTO syncapi_filter (filter, localpart) VALUES ($1, $2)"
 
 type filterStatements struct {
 	selectFilterStmt            *sql.Stmt

@@ -311,7 +311,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, r types.Range, limit int,
 	chronologicalOrder bool, onlySyncEvents bool,
-) ([]types.StreamEvent, error) {
+) ([]types.StreamEvent, bool, error) {
 	var stmt *sql.Stmt
 	if onlySyncEvents {
 		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsForSyncStmt)
@@ -319,14 +319,21 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
 	}
 
-	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit+1)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	// we queried for 1 more than the limit, so if we returned one more mark limited=true
+	limited := false
+	if len(events) > limit {
+		limited = true
+		// re-slice the extra event out
+		events = events[:len(events)-1]
 	}
 	if chronologicalOrder {
 		// The events need to be returned from oldest to latest, which isn't
@@ -336,7 +343,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 			return events[i].StreamPosition < events[j].StreamPosition
 		})
 	}
-	return events, nil
+	return events, limited, nil
 }
 
 func (s *outputRoomEventsStatements) SelectEarlyEvents(

@@ -21,8 +21,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -49,7 +51,7 @@ type syncRequest struct {
 	log           *log.Entry
 }
 
-func newSyncRequest(req *http.Request, device userapi.Device) (*syncRequest, error) {
+func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*syncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
@@ -69,12 +71,25 @@ func newSyncRequest(req *http.Request, device userapi.Device) (*syncRequest, err
 	timelineLimit := defaultTimelineLimit
 	// TODO: read from stored filters too
 	filterQuery := req.URL.Query().Get("filter")
-	if filterQuery != "" && filterQuery[0] == '{' {
-		// attempt to parse the timeline limit at least
-		var f filter
-		err := json.Unmarshal([]byte(filterQuery), &f)
-		if err == nil && f.Room.Timeline.Limit != nil {
-			timelineLimit = *f.Room.Timeline.Limit
+	if filterQuery != "" {
+		if filterQuery[0] == '{' {
+			// attempt to parse the timeline limit at least
+			var f filter
+			err := json.Unmarshal([]byte(filterQuery), &f)
+			if err == nil && f.Room.Timeline.Limit != nil {
+				timelineLimit = *f.Room.Timeline.Limit
+			}
+		} else {
+			// attempt to load the filter ID
+			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+			if err != nil {
+				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+				return nil, err
+			}
+			f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery)
+			if err == nil {
+				timelineLimit = f.Room.Timeline.Limit
+			}
 		}
 	}
 	// TODO: Additional query params: set_presence, filter
