@@ -71,6 +71,10 @@ func NewDatabase(dbDataSourceName string, dbProperties sqlutil.DbProperties) (*S
 	if err != nil {
 		return nil, err
 	}
+	filter, err := NewPostgresFilterTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Invites:             invites,
@@ -79,6 +83,7 @@ func NewDatabase(dbDataSourceName string, dbProperties sqlutil.DbProperties) (*S
 		Topology:            topology,
 		CurrentRoomState:    currState,
 		BackwardExtremities: backwardExtremities,
+		Filter:              filter,
 		SendToDevice:        sendToDevice,
 		SendToDeviceWriter:  sqlutil.NewTransactionWriter(),
 		EDUCache:            cache.New(),

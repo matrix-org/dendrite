@@ -376,26 +376,6 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/user/{userId}/filter",
-		httputil.MakeAuthAPI("put_filter", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
-			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-			if err != nil {
-				return util.ErrorResponse(err)
-			}
-			return PutFilter(req, device, accountDB, vars["userId"])
-		}),
-	).Methods(http.MethodPost, http.MethodOptions)
-
-	r0mux.Handle("/user/{userId}/filter/{filterId}",
-		httputil.MakeAuthAPI("get_filter", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
-			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-			if err != nil {
-				return util.ErrorResponse(err)
-			}
-			return GetFilter(req, device, accountDB, vars["userId"], vars["filterId"])
-		}),
-	).Methods(http.MethodGet, http.MethodOptions)
-
 	// Riot user settings
 
 	r0mux.Handle("/profile/{userID}",

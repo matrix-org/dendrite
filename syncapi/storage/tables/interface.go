@@ -44,8 +44,8 @@ type Events interface {
 	InsertEvent(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, addState, removeState []string, transactionID *api.TransactionID, excludeFromSync bool) (streamPos types.StreamPosition, err error)
 	// SelectRecentEvents returns events between the two stream positions: exclusive of low and inclusive of high.
 	// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude from sync.
-	// Returns up to `limit` events.
-	SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, error)
+	// Returns up to `limit` events. Returns `limited=true` if there are more events in this range but we hit the `limit`.
+	SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
 	// SelectEarlyEvents returns the earliest events in the given room.
 	SelectEarlyEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int) ([]types.StreamEvent, error)
 	SelectEvents(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StreamEvent, error)
@@ -132,4 +132,9 @@ type SendToDevice interface {
 	UpdateSentSendToDeviceMessages(ctx context.Context, txn *sql.Tx, token string, nids []types.SendToDeviceNID) (err error)
 	DeleteSendToDeviceMessages(ctx context.Context, txn *sql.Tx, nids []types.SendToDeviceNID) (err error)
 	CountSendToDeviceMessages(ctx context.Context, txn *sql.Tx, userID, deviceID string) (count int, err error)
+}
+
+type Filter interface {
+	SelectFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
+	InsertFilter(ctx context.Context, filter *gomatrixserverlib.Filter, localpart string) (filterID string, err error)
 }

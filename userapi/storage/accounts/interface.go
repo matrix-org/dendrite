@@ -52,8 +52,6 @@ type Database interface {
 	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
 	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, err error)
 	GetThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
-	GetFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
-	PutFilter(ctx context.Context, localpart string, filter *gomatrixserverlib.Filter) (string, error)
 	CheckAccountAvailability(ctx context.Context, localpart string) (bool, error)
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
 }

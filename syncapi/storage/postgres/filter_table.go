@@ -19,12 +19,13 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const filterSchema = `
 -- Stores data about filters
-CREATE TABLE IF NOT EXISTS account_filter (
+CREATE TABLE IF NOT EXISTS syncapi_filter (
 	-- The filter
 	filter TEXT NOT NULL,
 	-- The ID
@@ -35,17 +36,17 @@ CREATE TABLE IF NOT EXISTS account_filter (
 	PRIMARY KEY(id, localpart)
 );
 
-CREATE INDEX IF NOT EXISTS account_filter_localpart ON account_filter(localpart);
+CREATE INDEX IF NOT EXISTS syncapi_filter_localpart ON syncapi_filter(localpart);
 `
 
 const selectFilterSQL = "" +
-	"SELECT filter FROM account_filter WHERE localpart = $1 AND id = $2"
+	"SELECT filter FROM syncapi_filter WHERE localpart = $1 AND id = $2"
 
 const selectFilterIDByContentSQL = "" +
-	"SELECT id FROM account_filter WHERE localpart = $1 AND filter = $2"
+	"SELECT id FROM syncapi_filter WHERE localpart = $1 AND filter = $2"
 
 const insertFilterSQL = "" +
-	"INSERT INTO account_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id"
+	"INSERT INTO syncapi_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id"
 
 type filterStatements struct {
 	selectFilterStmt            *sql.Stmt
@@ -53,24 +54,25 @@ type filterStatements struct {
 	insertFilterStmt            *sql.Stmt
 }
 
-func (s *filterStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(filterSchema)
+func NewPostgresFilterTable(db *sql.DB) (tables.Filter, error) {
+	_, err := db.Exec(filterSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
+	s := &filterStatements{}
 	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectFilterIDByContentStmt, err = db.Prepare(selectFilterIDByContentSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.insertFilterStmt, err = db.Prepare(insertFilterSQL); err != nil {
-		return
+		return nil, err
 	}
-	return
+	return s, nil
 }
 
-func (s *filterStatements) selectFilter(
+func (s *filterStatements) SelectFilter(
 	ctx context.Context, localpart string, filterID string,
 ) (*gomatrixserverlib.Filter, error) {
 	// Retrieve filter from database (stored as canonical JSON)
@@ -88,7 +90,7 @@ func (s *filterStatements) selectFilter(
 	return &filter, nil
 }
 
-func (s *filterStatements) insertFilter(
+func (s *filterStatements) InsertFilter(
 	ctx context.Context, filter *gomatrixserverlib.Filter, localpart string,
 ) (filterID string, err error) {
 	var existingFilterID string

@@ -49,7 +49,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	var syncData *types.Response
 
 	// Extract values from request
-	syncReq, err := newSyncRequest(req, *device)
+	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,

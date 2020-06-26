@@ -43,6 +43,7 @@ type Database struct {
 	CurrentRoomState    tables.CurrentRoomState
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
+	Filter              tables.Filter
 	SendToDeviceWriter  *sqlutil.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
@@ -78,7 +79,7 @@ func (d *Database) GetEventsInStreamingRange(
 	}
 	if backwardOrdering {
 		// When using backward ordering, we want the most recent events first.
-		if events, err = d.OutputEvents.SelectRecentEvents(
+		if events, _, err = d.OutputEvents.SelectRecentEvents(
 			ctx, nil, roomID, r, limit, false, false,
 		); err != nil {
 			return
@@ -545,6 +546,18 @@ func (d *Database) addEDUDeltaToResponse(
 	return
 }
 
+func (d *Database) GetFilter(
+	ctx context.Context, localpart string, filterID string,
+) (*gomatrixserverlib.Filter, error) {
+	return d.Filter.SelectFilter(ctx, localpart, filterID)
+}
+
+func (d *Database) PutFilter(
+	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
+) (string, error) {
+	return d.Filter.InsertFilter(ctx, filter, localpart)
+}
+
 func (d *Database) IncrementalSync(
 	ctx context.Context, res *types.Response,
 	device userapi.Device,
@@ -642,7 +655,8 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		// TODO: When filters are added, we may need to call this multiple times to get enough events.
 		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 		var recentStreamEvents []types.StreamEvent
-		recentStreamEvents, err = d.OutputEvents.SelectRecentEvents(
+		var limited bool
+		recentStreamEvents, limited, err = d.OutputEvents.SelectRecentEvents(
 			ctx, txn, roomID, r, numRecentEventsPerRoom, true, true,
 		)
 		if err != nil {
@@ -670,7 +684,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = prevBatchStr
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = true
+		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[roomID] = *jr
 	}
@@ -776,7 +790,7 @@ func (d *Database) addRoomDeltaToResponse(
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
 		r.To = delta.membershipPos
 	}
-	recentStreamEvents, err := d.OutputEvents.SelectRecentEvents(
+	recentStreamEvents, limited, err := d.OutputEvents.SelectRecentEvents(
 		ctx, txn, delta.roomID, r,
 		numRecentEventsPerRoom, true, true,
 	)
@@ -796,7 +810,7 @@ func (d *Database) addRoomDeltaToResponse(
 
 		jr.Timeline.PrevBatch = prevBatch.String()
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.roomID] = *jr
 	case gomatrixserverlib.Leave:

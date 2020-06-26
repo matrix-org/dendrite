@@ -15,19 +15,22 @@
 package routing
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
 )
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
 func GetFilter(
-	req *http.Request, device *api.Device, accountDB accounts.Database, userID string, filterID string,
+	req *http.Request, device *api.Device, syncDB storage.Database, userID string, filterID string,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -41,7 +44,7 @@ func GetFilter(
 		return jsonerror.InternalServerError()
 	}
 
-	filter, err := accountDB.GetFilter(req.Context(), localpart, filterID)
+	filter, err := syncDB.GetFilter(req.Context(), localpart, filterID)
 	if err != nil {
 		//TODO better error handling. This error message is *probably* right,
 		// but if there are obscure db errors, this will also be returned,
@@ -64,7 +67,7 @@ type filterResponse struct {
 
 //PutFilter implements POST /_matrix/client/r0/user/{userId}/filter
 func PutFilter(
-	req *http.Request, device *api.Device, accountDB accounts.Database, userID string,
+	req *http.Request, device *api.Device, syncDB storage.Database, userID string,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -81,8 +84,27 @@ func PutFilter(
 
 	var filter gomatrixserverlib.Filter
 
-	if reqErr := httputil.UnmarshalJSONRequest(req, &filter); reqErr != nil {
-		return *reqErr
+	defer req.Body.Close() // nolint:errcheck
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be read. " + err.Error()),
+		}
+	}
+
+	if err = json.Unmarshal(body, &filter); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+	// the filter `limit` is `int` which defaults to 0 if not set which is not what we want. We want to use the default
+	// limit if it is unset, which is what this does.
+	limitRes := gjson.GetBytes(body, "room.timeline.limit")
+	if !limitRes.Exists() {
+		util.GetLogger(req.Context()).Infof("missing timeline limit, using default")
+		filter.Room.Timeline.Limit = sync.DefaultTimelineLimit
 	}
 
 	// Validate generates a user-friendly error
@@ -93,9 +115,9 @@ func PutFilter(
 		}
 	}
 
-	filterID, err := accountDB.PutFilter(req.Context(), localpart, &filter)
+	filterID, err := syncDB.PutFilter(req.Context(), localpart, &filter)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.PutFilter failed")
+		util.GetLogger(req.Context()).WithError(err).Error("syncDB.PutFilter failed")
 		return jsonerror.InternalServerError()
 	}
 
