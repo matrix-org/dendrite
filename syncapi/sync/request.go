@@ -30,7 +30,7 @@ import (
 )
 
 const defaultSyncTimeout = time.Duration(0)
-const defaultTimelineLimit = 20
+const DefaultTimelineLimit = 20
 
 type filter struct {
 	Room struct {
@@ -68,7 +68,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		tok := types.NewStreamToken(0, 0)
 		since = &tok
 	}
-	timelineLimit := defaultTimelineLimit
+	timelineLimit := DefaultTimelineLimit
 	// TODO: read from stored filters too
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {

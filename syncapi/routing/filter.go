@@ -15,14 +15,17 @@
 package routing
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
 )
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
@@ -81,8 +84,27 @@ func PutFilter(
 
 	var filter gomatrixserverlib.Filter
 
-	if reqErr := httputil.UnmarshalJSONRequest(req, &filter); reqErr != nil {
-		return *reqErr
+	defer req.Body.Close() // nolint:errcheck
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be read. " + err.Error()),
+		}
+	}
+
+	if err = json.Unmarshal(body, &filter); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+	// the filter `limit` is `int` which defaults to 0 if not set which is not what we want. We want to use the default
+	// limit if it is unset, which is what this does.
+	limitRes := gjson.GetBytes(body, "room.timeline.limit")
+	if !limitRes.Exists() {
+		util.GetLogger(req.Context()).Infof("missing timeline limit, using default")
+		filter.Room.Timeline.Limit = sync.DefaultTimelineLimit
 	}
 
 	// Validate generates a user-friendly error

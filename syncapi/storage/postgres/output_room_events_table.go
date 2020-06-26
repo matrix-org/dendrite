@@ -317,13 +317,6 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	if err != nil {
 		return nil, false, err
 	}
-	// we queried for 1 more than the limit, so if we returned one more mark limited=true
-	limited := false
-	if len(events) > limit {
-		limited = true
-		// re-slice the extra event out
-		events = events[:len(events)-1]
-	}
 	if chronologicalOrder {
 		// The events need to be returned from oldest to latest, which isn't
 		// necessary the way the SQL query returns them, so a sort is necessary to
@@ -331,6 +324,17 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		sort.SliceStable(events, func(i int, j int) bool {
 			return events[i].StreamPosition < events[j].StreamPosition
 		})
+	}
+	// we queried for 1 more than the limit, so if we returned one more mark limited=true
+	limited := false
+	if len(events) > limit {
+		limited = true
+		// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
+		if chronologicalOrder {
+			events = events[1:]
+		} else {
+			events = events[:len(events)-1]
+		}
 	}
 
 	return events, limited, nil
