@@ -391,3 +391,5 @@ Can sync a room with a single message
 Can sync a room with a message with a transaction id
 A full_state incremental update returns only recent timeline
 A prev_batch token can be used in the v1 messages API
+We don't send redundant membership state across incremental syncs by default
+Typing notifications don't leak
