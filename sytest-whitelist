@@ -387,3 +387,7 @@ Can reject invites over federation for rooms with version 4
 Can reject invites over federation for rooms with version 5
 Can reject invites over federation for rooms with version 6
 Event size limits
+Can sync a room with a single message
+Can sync a room with a message with a transaction id
+A full_state incremental update returns only recent timeline
+A prev_batch token can be used in the v1 messages API
