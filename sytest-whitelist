@@ -386,3 +386,4 @@ Can reject invites over federation for rooms with version 3
 Can reject invites over federation for rooms with version 4
 Can reject invites over federation for rooms with version 5
 Can reject invites over federation for rooms with version 6
+Event size limits
