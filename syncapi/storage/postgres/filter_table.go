@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sqlite3
+package postgres
 
 import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 
+	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -29,11 +29,11 @@ CREATE TABLE IF NOT EXISTS account_filter (
 	-- The filter
 	filter TEXT NOT NULL,
 	-- The ID
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	id SERIAL UNIQUE,
 	-- The localpart of the Matrix user ID associated to this filter
 	localpart TEXT NOT NULL,
 
-	UNIQUE (id, localpart)
+	PRIMARY KEY(id, localpart)
 );
 
 CREATE INDEX IF NOT EXISTS account_filter_localpart ON account_filter(localpart);
@@ -46,7 +46,7 @@ const selectFilterIDByContentSQL = "" +
 	"SELECT id FROM account_filter WHERE localpart = $1 AND filter = $2"
 
 const insertFilterSQL = "" +
-	"INSERT INTO account_filter (filter, localpart) VALUES ($1, $2)"
+	"INSERT INTO account_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id"
 
 type filterStatements struct {
 	selectFilterStmt            *sql.Stmt
@@ -54,24 +54,25 @@ type filterStatements struct {
 	insertFilterStmt            *sql.Stmt
 }
 
-func (s *filterStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(filterSchema)
+func NewPostgresFilterTable(db *sql.DB) (tables.Filter, error) {
+	_, err := db.Exec(filterSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
+	s := &filterStatements{}
 	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.selectFilterIDByContentStmt, err = db.Prepare(selectFilterIDByContentSQL); err != nil {
-		return
+		return nil, err
 	}
 	if s.insertFilterStmt, err = db.Prepare(insertFilterSQL); err != nil {
-		return
+		return nil, err
 	}
-	return
+	return s, nil
 }
 
-func (s *filterStatements) selectFilter(
+func (s *filterStatements) SelectFilter(
 	ctx context.Context, localpart string, filterID string,
 ) (*gomatrixserverlib.Filter, error) {
 	// Retrieve filter from database (stored as canonical JSON)
@@ -89,7 +90,7 @@ func (s *filterStatements) selectFilter(
 	return &filter, nil
 }
 
-func (s *filterStatements) insertFilter(
+func (s *filterStatements) InsertFilter(
 	ctx context.Context, filter *gomatrixserverlib.Filter, localpart string,
 ) (filterID string, err error) {
 	var existingFilterID string
@@ -122,14 +123,7 @@ func (s *filterStatements) insertFilter(
 	}
 
 	// Otherwise insert the filter and return the new ID
-	res, err := s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart)
-	if err != nil {
-		return "", err
-	}
-	rowid, err := res.LastInsertId()
-	if err != nil {
-		return "", err
-	}
-	filterID = fmt.Sprintf("%d", rowid)
+	err = s.insertFilterStmt.QueryRowContext(ctx, filterJSON, localpart).
+		Scan(&filterID)
 	return
 }

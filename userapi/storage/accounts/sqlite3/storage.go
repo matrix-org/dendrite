@@ -39,7 +39,6 @@ type Database struct {
 	memberships  membershipStatements
 	accountDatas accountDataStatements
 	threepids    threepidStatements
-	filter       filterStatements
 	serverName   gomatrixserverlib.ServerName
 
 	createAccountMu sync.Mutex
@@ -80,11 +79,7 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = t.prepare(db); err != nil {
 		return nil, err
 	}
-	f := filterStatements{}
-	if err = f.prepare(db); err != nil {
-		return nil, err
-	}
-	return &Database{db, partitions, a, p, m, ac, t, f, serverName, sync.Mutex{}}, nil
+	return &Database{db, partitions, a, p, m, ac, t, serverName, sync.Mutex{}}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -408,24 +403,6 @@ func (d *Database) GetThreePIDsForLocalpart(
 	ctx context.Context, localpart string,
 ) (threepids []authtypes.ThreePID, err error) {
 	return d.threepids.selectThreePIDsForLocalpart(ctx, localpart)
-}
-
-// GetFilter looks up the filter associated with a given local user and filter ID.
-// Returns a filter structure. Otherwise returns an error if no such filter exists
-// or if there was an error talking to the database.
-func (d *Database) GetFilter(
-	ctx context.Context, localpart string, filterID string,
-) (*gomatrixserverlib.Filter, error) {
-	return d.filter.selectFilter(ctx, localpart, filterID)
-}
-
-// PutFilter puts the passed filter into the database.
-// Returns the filterID as a string. Otherwise returns an error if something
-// goes wrong.
-func (d *Database) PutFilter(
-	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
-) (string, error) {
-	return d.filter.insertFilter(ctx, filter, localpart)
 }
 
 // CheckAccountAvailability checks if the username/localpart is already present

@@ -43,6 +43,7 @@ type Database struct {
 	CurrentRoomState    tables.CurrentRoomState
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
+	Filter              tables.Filter
 	SendToDeviceWriter  *sqlutil.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
@@ -543,6 +544,18 @@ func (d *Database) addEDUDeltaToResponse(
 	}
 
 	return
+}
+
+func (d *Database) GetFilter(
+	ctx context.Context, localpart string, filterID string,
+) (*gomatrixserverlib.Filter, error) {
+	return d.Filter.SelectFilter(ctx, localpart, filterID)
+}
+
+func (d *Database) PutFilter(
+	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
+) (string, error) {
+	return d.Filter.InsertFilter(ctx, filter, localpart)
 }
 
 func (d *Database) IncrementalSync(
