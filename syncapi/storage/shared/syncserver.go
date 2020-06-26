@@ -180,11 +180,8 @@ func (d *Database) AddInviteEvent(
 // Returns an error if there was a problem communicating with the database.
 func (d *Database) RetireInviteEvent(
 	ctx context.Context, inviteEventID string,
-) error {
-	// TODO: Record that invite has been retired in a stream so that we can
-	// notify the user in an incremental sync.
-	err := d.Invites.DeleteInviteEvent(ctx, inviteEventID)
-	return err
+) (types.StreamPosition, error) {
+	return d.Invites.DeleteInviteEvent(ctx, inviteEventID)
 }
 
 // GetAccountDataInRange returns all account data for a given user inserted or
@@ -724,7 +721,7 @@ func (d *Database) addInvitesToResponse(
 	r types.Range,
 	res *types.Response,
 ) error {
-	invites, err := d.Invites.SelectInviteEventsInRange(
+	invites, retiredInvites, err := d.Invites.SelectInviteEventsInRange(
 		ctx, txn, userID, r,
 	)
 	if err != nil {
@@ -733,6 +730,10 @@ func (d *Database) addInvitesToResponse(
 	for roomID, inviteEvent := range invites {
 		ir := types.NewInviteResponse(inviteEvent)
 		res.Rooms.Invite[roomID] = *ir
+	}
+	for roomID := range retiredInvites {
+		lr := types.NewLeaveResponse()
+		res.Rooms.Leave[roomID] = *lr
 	}
 	return nil
 }

@@ -157,7 +157,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	ctx context.Context, msg api.OutputRetireInviteEvent,
 ) error {
-	err := s.db.RetireInviteEvent(ctx, msg.EventID)
+	sp, err := s.db.RetireInviteEvent(ctx, msg.EventID)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -166,8 +166,9 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		}).Panicf("roomserver output log: remove invite failure")
 		return nil
 	}
-	// TODO: Notify any active sync requests that the invite has been retired.
-	// s.notifier.OnNewEvent(nil, msg.TargetUserID, syncStreamPos)
+	// Notify any active sync requests that the invite has been retired.
+	// Invites share the same stream counter as PDUs
+	s.notifier.OnNewEvent(nil, "", []string{msg.TargetUserID}, types.NewStreamToken(sp, 0))
 	return nil
 }
 

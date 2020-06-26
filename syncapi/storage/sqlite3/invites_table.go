@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS syncapi_invite_events (
 	event_id TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	target_user_id TEXT NOT NULL,
-	headered_event_json TEXT NOT NULL
+	headered_event_json TEXT NOT NULL,
+	deleted BOOL NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS syncapi_invites_target_user_id_idx ON syncapi_invite_events (target_user_id, id);
@@ -42,14 +43,14 @@ CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx ON syncapi_invite_events
 
 const insertInviteEventSQL = "" +
 	"INSERT INTO syncapi_invite_events" +
-	" (id, room_id, event_id, target_user_id, headered_event_json)" +
-	" VALUES ($1, $2, $3, $4, $5)"
+	" (id, room_id, event_id, target_user_id, headered_event_json, deleted)" +
+	" VALUES ($1, $2, $3, $4, $5, false)"
 
 const deleteInviteEventSQL = "" +
-	"DELETE FROM syncapi_invite_events WHERE event_id = $1"
+	"UPDATE syncapi_invite_events SET deleted=true, id=$1 WHERE event_id = $2"
 
 const selectInviteEventsInRangeSQL = "" +
-	"SELECT room_id, headered_event_json FROM syncapi_invite_events" +
+	"SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +
 	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC"
 
@@ -114,40 +115,49 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 
 func (s *inviteEventsStatements) DeleteInviteEvent(
 	ctx context.Context, inviteEventID string,
-) error {
-	_, err := s.deleteInviteEventStmt.ExecContext(ctx, inviteEventID)
-	return err
+) (types.StreamPosition, error) {
+	streamPos, err := s.streamIDStatements.nextStreamID(ctx, nil)
+	if err != nil {
+		return streamPos, err
+	}
+	_, err = s.deleteInviteEventStmt.ExecContext(ctx, streamPos, inviteEventID)
+	return streamPos, err
 }
 
 // selectInviteEventsInRange returns a map of room ID to invite event for the
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
-) (map[string]gomatrixserverlib.HeaderedEvent, error) {
+) (map[string]gomatrixserverlib.HeaderedEvent, map[string]gomatrixserverlib.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
 	result := map[string]gomatrixserverlib.HeaderedEvent{}
+	retired := map[string]gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var (
 			roomID    string
 			eventJSON []byte
+			deleted   bool
 		)
-		if err = rows.Scan(&roomID, &eventJSON); err != nil {
-			return nil, err
+		if err = rows.Scan(&roomID, &eventJSON, &deleted); err != nil {
+			return nil, nil, err
 		}
 
 		var event gomatrixserverlib.HeaderedEvent
 		if err := json.Unmarshal(eventJSON, &event); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-
-		result[roomID] = event
+		if deleted {
+			retired[roomID] = event
+		} else {
+			result[roomID] = event
+		}
 	}
-	return result, nil
+	return result, retired, nil
 }
 
 func (s *inviteEventsStatements) SelectMaxInviteID(
