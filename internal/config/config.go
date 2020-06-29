@@ -160,10 +160,13 @@ type Dendrite struct {
 	// Postgres Config
 	Database struct {
 		// The Account database stores the login details and account information
-		// for local users. It is accessed by the ClientAPI.
+		// for local users. It is accessed by the UserAPI.
 		Account DataSource `yaml:"account"`
+		// The CurrentState database stores the current state of all rooms.
+		// It is accessed by the CurrentStateServer.
+		CurrentState DataSource `yaml:"current_state"`
 		// The Device database stores session information for the devices of logged
-		// in local users. It is accessed by the ClientAPI, the MediaAPI and the SyncAPI.
+		// in local users. It is accessed by the UserAPI.
 		Device DataSource `yaml:"device"`
 		// The MediaAPI database stores information about files uploaded and downloaded
 		// by local users. It is only accessed by the MediaAPI.
@@ -222,6 +225,7 @@ type Dendrite struct {
 	Bind struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
+		CurrentState     Address `yaml:"current_state_server"`
 		FederationAPI    Address `yaml:"federation_api"`
 		ServerKeyAPI     Address `yaml:"server_key_api"`
 		AppServiceAPI    Address `yaml:"appservice_api"`
@@ -238,6 +242,7 @@ type Dendrite struct {
 	Listen struct {
 		MediaAPI         Address `yaml:"media_api"`
 		ClientAPI        Address `yaml:"client_api"`
+		CurrentState     Address `yaml:"current_state_server"`
 		FederationAPI    Address `yaml:"federation_api"`
 		ServerKeyAPI     Address `yaml:"server_key_api"`
 		AppServiceAPI    Address `yaml:"appservice_api"`
@@ -601,6 +606,7 @@ func (config *Dendrite) checkDatabase(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "database.media_api", string(config.Database.MediaAPI))
 	checkNotEmpty(configErrs, "database.sync_api", string(config.Database.SyncAPI))
 	checkNotEmpty(configErrs, "database.room_server", string(config.Database.RoomServer))
+	checkNotEmpty(configErrs, "database.current_state", string(config.Database.CurrentState))
 }
 
 // checkListen verifies the parameters listen.* are valid.
@@ -613,6 +619,7 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "listen.edu_server", string(config.Listen.EDUServer))
 	checkNotEmpty(configErrs, "listen.server_key_api", string(config.Listen.EDUServer))
 	checkNotEmpty(configErrs, "listen.user_api", string(config.Listen.UserAPI))
+	checkNotEmpty(configErrs, "listen.current_state_server", string(config.Listen.CurrentState))
 }
 
 // checkLogging verifies the parameters logging.* are valid.
@@ -735,6 +742,15 @@ func (config *Dendrite) UserAPIURL() string {
 	return "http://" + string(config.Listen.UserAPI)
 }
 
+// CurrentStateAPIURL returns an HTTP URL for where the currentstateserver is listening.
+func (config *Dendrite) CurrentStateAPIURL() string {
+	// Hard code the currentstateserver to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.CurrentState)
+}
+
 // EDUServerURL returns an HTTP URL for where the EDU server is listening.
 func (config *Dendrite) EDUServerURL() string {
 	// Hard code the EDU server to talk HTTP for now.
@@ -753,7 +769,7 @@ func (config *Dendrite) FederationSenderURL() string {
 	return "http://" + string(config.Listen.FederationSender)
 }
 
-// FederationSenderURL returns an HTTP URL for where the federation sender is listening.
+// ServerKeyAPIURL returns an HTTP URL for where the federation sender is listening.
 func (config *Dendrite) ServerKeyAPIURL() string {
 	// Hard code the server key API server to talk HTTP for now.
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
