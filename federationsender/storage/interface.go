@@ -19,10 +19,13 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
 	internal.PartitionStorer
 	UpdateRoom(ctx context.Context, roomID, oldEventID, newEventID string, addHosts []types.JoinedHost, removeHosts []string) (joinedHosts []types.JoinedHost, err error)
 	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
+	GetFailedPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName) ([]*gomatrixserverlib.HeaderedEvent, error)
+	StoreFailedPDUs(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, pdus []*gomatrixserverlib.HeaderedEvent) error
 }

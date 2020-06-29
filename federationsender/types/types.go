@@ -20,6 +20,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+const (
+	FailedEventTypePDU          = "pdu"
+	FailedEventTypeInvite       = "invite"
+	FailedEventTypeSendToDevice = "send_to_device"
+)
+
 // A JoinedHost is a server that is joined to a matrix room.
 type JoinedHost struct {
 	// The MemberEventID of a m.room.member join event.

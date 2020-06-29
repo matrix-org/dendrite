@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -29,6 +30,7 @@ import (
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
+	db          storage.Database
 	rsAPI       api.RoomserverInternalAPI
 	origin      gomatrixserverlib.ServerName
 	client      *gomatrixserverlib.FederationClient
@@ -40,6 +42,7 @@ type OutgoingQueues struct {
 
 // NewOutgoingQueues makes a new OutgoingQueues
 func NewOutgoingQueues(
+	db storage.Database,
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
@@ -47,6 +50,7 @@ func NewOutgoingQueues(
 	signing *SigningInfo,
 ) *OutgoingQueues {
 	return &OutgoingQueues{
+		db:         db,
 		rsAPI:      rsAPI,
 		origin:     origin,
 		client:     client,
@@ -76,6 +80,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	oq := oqs.queues[destination]
 	if oq == nil {
 		oq = &destinationQueue{
+			db:              oqs.db,
 			rsAPI:           oqs.rsAPI,
 			origin:          oqs.origin,
 			destination:     destination,

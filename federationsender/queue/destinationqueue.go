@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
@@ -34,22 +35,23 @@ import (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
-	signing            *SigningInfo
-	rsAPI              api.RoomserverInternalAPI
-	client             *gomatrixserverlib.FederationClient     // federation client
-	origin             gomatrixserverlib.ServerName            // origin of requests
-	destination        gomatrixserverlib.ServerName            // destination of requests
-	running            atomic.Bool                             // is the queue worker running?
-	backingOff         atomic.Bool                             // true if we're backing off
-	statistics         *types.ServerStatistics                 // statistics about this remote server
-	incomingPDUs       chan *gomatrixserverlib.HeaderedEvent   // PDUs to send
-	incomingEDUs       chan *gomatrixserverlib.EDU             // EDUs to send
-	incomingInvites    chan *gomatrixserverlib.InviteV2Request // invites to send
-	lastTransactionIDs []gomatrixserverlib.TransactionID       // last transaction ID
-	pendingPDUs        []*gomatrixserverlib.HeaderedEvent      // owned by backgroundSend
-	pendingEDUs        []*gomatrixserverlib.EDU                // owned by backgroundSend
-	pendingInvites     []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
-	retryServerCh      chan bool                               // interrupts backoff
+	db              storage.Database
+	signing         *SigningInfo
+	rsAPI           api.RoomserverInternalAPI
+	client          *gomatrixserverlib.FederationClient     // federation client
+	origin          gomatrixserverlib.ServerName            // origin of requests
+	destination     gomatrixserverlib.ServerName            // destination of requests
+	running         atomic.Bool                             // is the queue worker running?
+	backingOff      atomic.Bool                             // true if we're backing off
+	statistics      *types.ServerStatistics                 // statistics about this remote server
+	incomingPDUs    chan *gomatrixserverlib.HeaderedEvent   // PDUs to send
+	incomingEDUs    chan *gomatrixserverlib.EDU             // EDUs to send
+	incomingInvites chan *gomatrixserverlib.InviteV2Request // invites to send
+	transactionID   gomatrixserverlib.TransactionID         // last transaction ID
+	pendingPDUs     []*gomatrixserverlib.HeaderedEvent      // owned by backgroundSend
+	pendingEDUs     []*gomatrixserverlib.EDU                // owned by backgroundSend
+	pendingInvites  []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
+	retryServerCh   chan bool                               // interrupts backoff
 }
 
 // retry will clear the blacklist state and attempt to send built up events to the server,
@@ -200,19 +202,49 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		if numPDUs > 0 || numEDUs > 0 {
+			// Generate a transaction ID.
+			if oq.transactionID == "" {
+				now := gomatrixserverlib.AsTimestamp(time.Now())
+				oq.transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.statistics.SuccessCount()))
+			}
+
 			// Try sending the next transaction and see what happens.
-			transaction, terr := oq.nextTransaction(oq.pendingPDUs, oq.pendingEDUs, oq.statistics.SuccessCount())
+			transaction, terr := oq.nextTransaction(oq.transactionID, oq.pendingPDUs, oq.pendingEDUs, oq.statistics.SuccessCount())
 			if terr != nil {
 				// We failed to send the transaction.
-				if giveUp := oq.statistics.Failure(); giveUp {
+				giveUp := oq.statistics.Failure()
+				// TODO: commit the transaction to the database
+				if terr = oq.db.StoreFailedPDUs(
+					context.TODO(),
+					oq.transactionID,
+					oq.destination,
+					oq.pendingPDUs,
+				); terr != nil {
+					// We failed to persist the events to the database for some
+					// reason, so we'll keep them in memory for now. Hopefully
+					// it's a temporary condition but log it.
+					logrus.WithError(terr).Errorf("Failed to persist failed sends for server %q to database", oq.destination)
+				} else {
+					// Reallocate so that the underlying arrays can be GC'd, as
+					// opposed to growing forever.
+					for i := 0; i < numPDUs; i++ {
+						oq.pendingPDUs[i] = nil
+					}
+					oq.pendingPDUs = append(
+						[]*gomatrixserverlib.HeaderedEvent{},
+						oq.pendingPDUs[numPDUs:]...,
+					)
+				}
+				if giveUp {
 					// It's been suggested that we should give up because
 					// the backoff has exceeded a maximum allowable value.
 					return
 				}
 			} else if transaction {
 				// If we successfully sent the transaction then clear out
-				// the pending events and EDUs.
+				// the pending events and EDUs, and wipe our transaction ID.
 				oq.statistics.Success()
+				oq.transactionID = ""
 				// Reallocate so that the underlying arrays can be GC'd, as
 				// opposed to growing forever.
 				for i := 0; i < numPDUs; i++ {
@@ -262,6 +294,7 @@ func (oq *destinationQueue) backgroundSend() {
 // queue and sends it. Returns true if a transaction was sent or
 // false otherwise.
 func (oq *destinationQueue) nextTransaction(
+	transactionID gomatrixserverlib.TransactionID,
 	pendingPDUs []*gomatrixserverlib.HeaderedEvent,
 	pendingEDUs []*gomatrixserverlib.EDU,
 	sentCounter uint32,
@@ -270,17 +303,12 @@ func (oq *destinationQueue) nextTransaction(
 		PDUs: []json.RawMessage{},
 		EDUs: []gomatrixserverlib.EDU{},
 	}
-	now := gomatrixserverlib.AsTimestamp(time.Now())
-	t.TransactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, sentCounter))
+	t.TransactionID = transactionID
 	t.Origin = oq.origin
 	t.Destination = oq.destination
-	t.OriginServerTS = now
-	t.PreviousIDs = oq.lastTransactionIDs
-	if t.PreviousIDs == nil {
-		t.PreviousIDs = []gomatrixserverlib.TransactionID{}
-	}
+	t.OriginServerTS = gomatrixserverlib.AsTimestamp(time.Now())
 
-	oq.lastTransactionIDs = []gomatrixserverlib.TransactionID{t.TransactionID}
+	oq.transactionID = t.TransactionID
 
 	for _, pdu := range pendingPDUs {
 		// Append the JSON of the event, since this is a json.RawMessage type in the

@@ -18,17 +18,20 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // Database stores information needed by the federation sender
 type Database struct {
 	joinedHostsStatements
 	roomStatements
+	queueRetryStatements
 	sqlutil.PartitionOffsetStatements
 	db *sql.DB
 }
@@ -58,6 +61,10 @@ func (d *Database) prepare() error {
 	}
 
 	if err = d.roomStatements.prepare(d.db); err != nil {
+		return err
+	}
+
+	if err = d.queueRetryStatements.prepare(d.db); err != nil {
 		return err
 	}
 
@@ -125,4 +132,46 @@ func (d *Database) GetJoinedHosts(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
 	return d.selectJoinedHosts(ctx, roomID)
+}
+
+// GetFailedPDUs retrieves PDUs that we have failed to send on
+// a specific destination queue.
+func (d *Database) GetFailedPDUs(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	transactionID, err := d.selectRetryNextTransactionID(ctx, nil, string(serverName), types.FailedEventTypePDU)
+	if err != nil {
+		return nil, fmt.Errorf("d.selectRetryNextTransactionID: %w", err)
+	}
+
+	events, err := d.selectQueueRetryPDUs(ctx, nil, string(serverName), transactionID)
+	if err != nil {
+		return nil, fmt.Errorf("d.selectQueueRetryPDUs: %w", err)
+	}
+	return events, nil
+}
+
+// StoreFailedPDUs stores PDUs that we have failed to send on
+// a specific destination queue.
+func (d *Database) StoreFailedPDUs(
+	ctx context.Context,
+	transactionID gomatrixserverlib.TransactionID,
+	serverName gomatrixserverlib.ServerName,
+	pdus []*gomatrixserverlib.HeaderedEvent,
+) error {
+	for _, pdu := range pdus {
+		if _, err := d.insertRetryStmt.ExecContext(
+			ctx,
+			string(transactionID),    // transaction ID
+			types.FailedEventTypePDU, // type of event that was queued
+			pdu.EventID(),            // event ID
+			pdu.OriginServerTS(),     // event origin server TS
+			string(serverName),       // destination server name
+			pdu.JSON(),               // JSON body
+		); err != nil {
+			return fmt.Errorf("d.insertQueueRetryStmt.ExecContext: %w", err)
+		}
+	}
+	return nil
 }
