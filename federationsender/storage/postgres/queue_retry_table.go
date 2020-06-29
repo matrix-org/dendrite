@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_retry (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_retry_event_id_idx
-    ON federationsender_queue_retry (event_id);
+    ON federationsender_queue_retry (event_id, server_name);
 `
 
 const insertRetrySQL = "" +
