@@ -404,8 +404,7 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 	// at this point we know we're going to have a gap: we need to work out the room state at the new backwards extremity.
 	// security: we have to do state resolution on the new backwards extremity (TODO: WHY)
 	// Therefore, we cannot just query /state_ids with this event to get the state before. Instead, we need to query
-	// the state AFTER all the prev_events for this event, then mix in our current room state and apply state resolution
-	// to that to get the state before the event.
+	// the state AFTER all the prev_events for this event, then apply state resolution to that to get the state before the event.
 	var states []*gomatrixserverlib.RespState
 	needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{*backwardsExtremity}).Tuples()
 	for _, prevEventID := range backwardsExtremity.PrevEventIDs() {
@@ -417,13 +416,6 @@ func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVer
 		}
 		states = append(states, prevState)
 	}
-	// mix in the current room state
-	currState, err := t.lookupCurrentState(backwardsExtremity)
-	if err != nil {
-		util.GetLogger(t.context).WithError(err).Errorf("Failed to lookup current room state")
-		return err
-	}
-	states = append(states, currState)
 	resolvedState, err := t.resolveStatesAndCheck(roomVersion, states, backwardsExtremity)
 	if err != nil {
 		util.GetLogger(t.context).WithError(err).Errorf("Failed to resolve state conflicts for event %s", backwardsExtremity.EventID())
@@ -524,23 +516,6 @@ func (t *txnReq) lookupStateAfterEventLocally(roomID, eventID string, needed []g
 		StateEvents: evs,
 		AuthEvents:  authEvents,
 	}
-}
-
-func (t *txnReq) lookupCurrentState(newEvent *gomatrixserverlib.Event) (*gomatrixserverlib.RespState, error) {
-	// Ask the roomserver for information about this room
-	queryReq := api.QueryLatestEventsAndStateRequest{
-		RoomID:       newEvent.RoomID(),
-		StateToFetch: gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{*newEvent}).Tuples(),
-	}
-	var queryRes api.QueryLatestEventsAndStateResponse
-	if err := t.rsAPI.QueryLatestEventsAndState(t.context, &queryReq, &queryRes); err != nil {
-		return nil, fmt.Errorf("lookupCurrentState rsAPI.QueryLatestEventsAndState: %w", err)
-	}
-	evs := gomatrixserverlib.UnwrapEventHeaders(queryRes.StateEvents)
-	return &gomatrixserverlib.RespState{
-		StateEvents: evs,
-		AuthEvents:  evs,
-	}, nil
 }
 
 // lookuptStateBeforeEvent returns the room state before the event e, which is just /state_ids and/or /state depending on what
