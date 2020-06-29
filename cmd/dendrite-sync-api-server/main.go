@@ -24,13 +24,12 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "SyncAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	deviceDB := base.CreateDeviceDB()
-	accountDB := base.CreateAccountsDB()
+	userAPI := base.UserAPIClient()
 	federation := base.CreateFederationClient()
 
 	rsAPI := base.RoomserverHTTPClient()
 
-	syncapi.AddPublicRoutes(base.PublicAPIMux, base.KafkaConsumer, deviceDB, accountDB, rsAPI, federation, cfg)
+	syncapi.AddPublicRoutes(base.PublicAPIMux, base.KafkaConsumer, userAPI, rsAPI, federation, cfg)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
 

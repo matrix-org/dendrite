@@ -265,7 +265,7 @@ func (d *Database) GetInvitesForUser(
 	ctx context.Context,
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
-) (senderUserIDs []types.EventStateKeyNID, err error) {
+) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, err error) {
 	return d.InvitesTable.SelectInviteActiveForUserInRoom(ctx, targetUserNID, roomNID)
 }
 

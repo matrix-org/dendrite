@@ -45,7 +45,7 @@ const insertInviteEventSQL = "" +
 	" ON CONFLICT DO NOTHING"
 
 const selectInviteActiveForUserInRoomSQL = "" +
-	"SELECT sender_nid FROM roomserver_invites" +
+	"SELECT invite_event_id, sender_nid FROM roomserver_invites" +
 	" WHERE target_nid = $1 AND room_nid = $2" +
 	" AND NOT retired"
 
@@ -133,21 +133,24 @@ func (s *inviteStatements) UpdateInviteRetired(
 func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 	ctx context.Context,
 	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
-) ([]types.EventStateKeyNID, error) {
+) ([]types.EventStateKeyNID, []string, error) {
 	rows, err := s.selectInviteActiveForUserInRoomStmt.QueryContext(
 		ctx, targetUserNID, roomNID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
 	var result []types.EventStateKeyNID
+	var eventIDs []string
 	for rows.Next() {
+		var eventID string
 		var senderUserNID int64
-		if err := rows.Scan(&senderUserNID); err != nil {
-			return nil, err
+		if err := rows.Scan(&eventID, &senderUserNID); err != nil {
+			return nil, nil, err
 		}
 		result = append(result, types.EventStateKeyNID(senderUserNID))
+		eventIDs = append(eventIDs, eventID)
 	}
-	return result, nil
+	return result, eventIDs, nil
 }

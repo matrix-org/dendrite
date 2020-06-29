@@ -10,6 +10,7 @@ import (
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -51,15 +52,6 @@ func init() {
 			}] = h
 		}
 	}
-}
-
-type testNopJSONVerifier struct {
-	// this verifier verifies nothing
-}
-
-func (t *testNopJSONVerifier) VerifyJSONs(ctx context.Context, requests []gomatrixserverlib.VerifyJSONRequest) ([]gomatrixserverlib.VerifyJSONResult, error) {
-	result := make([]gomatrixserverlib.VerifyJSONResult, len(requests))
-	return result, nil
 }
 
 type testEDUProducer struct {
@@ -105,12 +97,18 @@ func (t *testRoomserverAPI) InputRoomEvents(
 	return nil
 }
 
+func (t *testRoomserverAPI) PerformInvite(
+	ctx context.Context,
+	req *api.PerformInviteRequest,
+	res *api.PerformInviteResponse,
+) {
+}
+
 func (t *testRoomserverAPI) PerformJoin(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 	res *api.PerformJoinResponse,
-) error {
-	return nil
+) {
 }
 
 func (t *testRoomserverAPI) PerformLeave(
@@ -330,7 +328,7 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 		context:    context.Background(),
 		rsAPI:      rsAPI,
 		eduAPI:     &testEDUProducer{},
-		keys:       &testNopJSONVerifier{},
+		keys:       &test.NopJSONVerifier{},
 		federation: fedClient,
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
 		newEvents:  make(map[string]bool),
@@ -345,7 +343,7 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 func mustProcessTransaction(t *testing.T, txn *txnReq, pdusWithErrors []string) {
 	res, err := txn.processTransaction()
 	if err != nil {
-		t.Errorf("txn.processTransaction returned an error: %s", err)
+		t.Errorf("txn.processTransaction returned an error: %v", err)
 		return
 	}
 	if len(res.PDUs) != len(txn.PDUs) {

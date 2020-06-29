@@ -29,14 +29,22 @@ func (t *RoomserverInternalAPITrace) InputRoomEvents(
 	return err
 }
 
+func (t *RoomserverInternalAPITrace) PerformInvite(
+	ctx context.Context,
+	req *PerformInviteRequest,
+	res *PerformInviteResponse,
+) {
+	t.Impl.PerformInvite(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformInvite req=%+v res=%+v", js(req), js(res))
+}
+
 func (t *RoomserverInternalAPITrace) PerformJoin(
 	ctx context.Context,
 	req *PerformJoinRequest,
 	res *PerformJoinResponse,
-) error {
-	err := t.Impl.PerformJoin(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("PerformJoin req=%+v res=%+v", js(req), js(res))
-	return err
+) {
+	t.Impl.PerformJoin(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformJoin req=%+v res=%+v", js(req), js(res))
 }
 
 func (t *RoomserverInternalAPITrace) PerformLeave(

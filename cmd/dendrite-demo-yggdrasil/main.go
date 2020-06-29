@@ -16,18 +16,14 @@ package main
 
 import (
 	"context"
-	"crypto/ed25519"
 	"crypto/tls"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
@@ -39,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
@@ -50,63 +47,11 @@ var (
 	instancePeer = flag.String("peer", "", "an internet Yggdrasil peer to connect to")
 )
 
-type yggroundtripper struct {
-	inner *http.Transport
-}
-
-func (y *yggroundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.URL.Scheme = "http"
-	return y.inner.RoundTrip(req)
-}
-
-func createFederationClient(
-	base *setup.BaseDendrite, n *yggconn.Node,
-) *gomatrixserverlib.FederationClient {
-	yggdialer := func(_, address string) (net.Conn, error) {
-		tokens := strings.Split(address, ":")
-		raw, err := hex.DecodeString(tokens[0])
-		if err != nil {
-			return nil, fmt.Errorf("hex.DecodeString: %w", err)
-		}
-		converted := convert.Ed25519PublicKeyToCurve25519(ed25519.PublicKey(raw))
-		convhex := hex.EncodeToString(converted)
-		return n.Dial("curve25519", convhex)
-	}
-	yggdialerctx := func(ctx context.Context, network, address string) (net.Conn, error) {
-		return yggdialer(network, address)
-	}
-	tr := &http.Transport{}
-	tr.RegisterProtocol(
-		"matrix", &yggroundtripper{
-			inner: &http.Transport{
-				ResponseHeaderTimeout: 15 * time.Second,
-				IdleConnTimeout:       60 * time.Second,
-				DialContext:           yggdialerctx,
-			},
-		},
-	)
-	return gomatrixserverlib.NewFederationClientWithTransport(
-		base.Cfg.Matrix.ServerName, base.Cfg.Matrix.KeyID, base.Cfg.Matrix.PrivateKey, tr,
-	)
-}
-
 // nolint:gocyclo
 func main() {
 	flag.Parse()
 
-	// Build both ends of a HTTP multiplex.
-	httpServer := &http.Server{
-		Addr:         ":0",
-		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 45 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		BaseContext: func(_ net.Listener) context.Context {
-			return context.Background()
-		},
-	}
-
-	ygg, err := yggconn.Setup(*instanceName, *instancePeer)
+	ygg, err := yggconn.Setup(*instanceName, *instancePeer, ".")
 	if err != nil {
 		panic(err)
 	}
@@ -139,10 +84,12 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
-	federation := createFederationClient(base, ygg)
+	federation := ygg.CreateFederationClient(base)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
+
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	rsComponent := roomserver.NewInternalAPI(
 		base, keyRing, federation,
@@ -150,10 +97,10 @@ func main() {
 	rsAPI := rsComponent
 
 	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), deviceDB,
+		base, cache.New(), userAPI,
 	)
 
-	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, keyRing,
@@ -166,12 +113,13 @@ func main() {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
-	embed.Embed(*instancePort, "Yggdrasil Demo")
+	embed.Embed(base.BaseMux, *instancePort, "Yggdrasil Demo")
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        ygg.CreateClient(base),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,
@@ -181,6 +129,7 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
+		UserAPI:             userAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB: publicRoomsDB,
@@ -188,21 +137,34 @@ func main() {
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
 		base.UseHTTPAPIs,
 	)
 
+	// Build both ends of a HTTP multiplex.
+	httpServer := &http.Server{
+		Addr:         ":0",
+		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 45 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		BaseContext: func(_ net.Listener) context.Context {
+			return context.Background()
+		},
+		Handler: base.BaseMux,
+	}
+
 	go func() {
 		logrus.Info("Listening on ", ygg.DerivedServerName())
 		logrus.Fatal(httpServer.Serve(ygg))
 	}()
 	go func() {
-		httpBindAddr := fmt.Sprintf("localhost:%d", *instancePort)
+		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, nil))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.BaseMux))
 	}()
 
 	select {}

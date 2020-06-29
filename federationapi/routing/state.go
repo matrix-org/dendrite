@@ -98,13 +98,17 @@ func getState(
 	roomID string,
 	eventID string,
 ) (*gomatrixserverlib.RespState, *util.JSONResponse) {
-	event, resErr := getEvent(ctx, request, rsAPI, eventID)
+	event, resErr := fetchEvent(ctx, rsAPI, eventID)
 	if resErr != nil {
 		return nil, resErr
 	}
 
 	if event.RoomID() != roomID {
-		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
+		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: jsonerror.NotFound("event does not belong to this room")}
+	}
+	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
+	if resErr != nil {
+		return nil, resErr
 	}
 
 	var response api.QueryStateAndAuthChainResponse

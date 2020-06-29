@@ -18,17 +18,17 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 func JoinRoomByIDOrAlias(
 	req *http.Request,
-	device *authtypes.Device,
+	device *api.Device,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	accountDB accounts.Database,
 	roomIDOrAlias string,
@@ -37,15 +37,14 @@ func JoinRoomByIDOrAlias(
 	joinReq := roomserverAPI.PerformJoinRequest{
 		RoomIDOrAlias: roomIDOrAlias,
 		UserID:        device.UserID,
+		Content:       map[string]interface{}{},
 	}
 	joinRes := roomserverAPI.PerformJoinResponse{}
 
 	// If content was provided in the request then incude that
 	// in the request. It'll get used as a part of the membership
 	// event content.
-	if err := httputil.UnmarshalJSONRequest(req, &joinReq.Content); err != nil {
-		return *err
-	}
+	_ = httputil.UnmarshalJSONRequest(req, &joinReq.Content)
 
 	// Work out our localpart for the client profile request.
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -53,7 +52,8 @@ func JoinRoomByIDOrAlias(
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 	} else {
 		// Request our profile content to populate the request content with.
-		profile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
+		var profile *authtypes.Profile
+		profile, err = accountDB.GetProfileByLocalpart(req.Context(), localpart)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
 		} else {
@@ -63,11 +63,9 @@ func JoinRoomByIDOrAlias(
 	}
 
 	// Ask the roomserver to perform the join.
-	if err := rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(err.Error()),
-		}
+	rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
+	if joinRes.Error != nil {
+		return joinRes.Error.JSONResponse()
 	}
 
 	return util.JSONResponse{

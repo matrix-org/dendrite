@@ -21,7 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -42,6 +43,7 @@ type Database struct {
 	CurrentRoomState    tables.CurrentRoomState
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
+	Filter              tables.Filter
 	SendToDeviceWriter  *sqlutil.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
@@ -77,7 +79,7 @@ func (d *Database) GetEventsInStreamingRange(
 	}
 	if backwardOrdering {
 		// When using backward ordering, we want the most recent events first.
-		if events, err = d.OutputEvents.SelectRecentEvents(
+		if events, _, err = d.OutputEvents.SelectRecentEvents(
 			ctx, nil, roomID, r, limit, false, false,
 		); err != nil {
 			return
@@ -179,11 +181,8 @@ func (d *Database) AddInviteEvent(
 // Returns an error if there was a problem communicating with the database.
 func (d *Database) RetireInviteEvent(
 	ctx context.Context, inviteEventID string,
-) error {
-	// TODO: Record that invite has been retired in a stream so that we can
-	// notify the user in an incremental sync.
-	err := d.Invites.DeleteInviteEvent(ctx, inviteEventID)
-	return err
+) (types.StreamPosition, error) {
+	return d.Invites.DeleteInviteEvent(ctx, inviteEventID)
 }
 
 // GetAccountDataInRange returns all account data for a given user inserted or
@@ -214,7 +213,7 @@ func (d *Database) UpsertAccountData(
 	return
 }
 
-func (d *Database) StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent {
+func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent {
 	out := make([]gomatrixserverlib.HeaderedEvent, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[i].HeaderedEvent
@@ -442,7 +441,7 @@ func (d *Database) syncPositionTx(
 // IDs of all rooms the user joined are returned so EDU deltas can be added for them.
 func (d *Database) addPDUDeltaToResponse(
 	ctx context.Context,
-	device authtypes.Device,
+	device userapi.Device,
 	r types.Range,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
@@ -547,9 +546,21 @@ func (d *Database) addEDUDeltaToResponse(
 	return
 }
 
+func (d *Database) GetFilter(
+	ctx context.Context, localpart string, filterID string,
+) (*gomatrixserverlib.Filter, error) {
+	return d.Filter.SelectFilter(ctx, localpart, filterID)
+}
+
+func (d *Database) PutFilter(
+	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
+) (string, error) {
+	return d.Filter.InsertFilter(ctx, filter, localpart)
+}
+
 func (d *Database) IncrementalSync(
 	ctx context.Context, res *types.Response,
-	device authtypes.Device,
+	device userapi.Device,
 	fromPos, toPos types.StreamingToken,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
@@ -644,7 +655,8 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		// TODO: When filters are added, we may need to call this multiple times to get enough events.
 		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 		var recentStreamEvents []types.StreamEvent
-		recentStreamEvents, err = d.OutputEvents.SelectRecentEvents(
+		var limited bool
+		recentStreamEvents, limited, err = d.OutputEvents.SelectRecentEvents(
 			ctx, txn, roomID, r, numRecentEventsPerRoom, true, true,
 		)
 		if err != nil {
@@ -672,7 +684,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = prevBatchStr
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = true
+		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[roomID] = *jr
 	}
@@ -687,7 +699,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 
 func (d *Database) CompleteSync(
 	ctx context.Context, res *types.Response,
-	device authtypes.Device, numRecentEventsPerRoom int,
+	device userapi.Device, numRecentEventsPerRoom int,
 ) (*types.Response, error) {
 	toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
 		ctx, res, device.UserID, numRecentEventsPerRoom,
@@ -723,7 +735,7 @@ func (d *Database) addInvitesToResponse(
 	r types.Range,
 	res *types.Response,
 ) error {
-	invites, err := d.Invites.SelectInviteEventsInRange(
+	invites, retiredInvites, err := d.Invites.SelectInviteEventsInRange(
 		ctx, txn, userID, r,
 	)
 	if err != nil {
@@ -732,6 +744,10 @@ func (d *Database) addInvitesToResponse(
 	for roomID, inviteEvent := range invites {
 		ir := types.NewInviteResponse(inviteEvent)
 		res.Rooms.Invite[roomID] = *ir
+	}
+	for roomID := range retiredInvites {
+		lr := types.NewLeaveResponse()
+		res.Rooms.Leave[roomID] = *lr
 	}
 	return nil
 }
@@ -758,7 +774,7 @@ func (d *Database) getBackwardTopologyPos(
 // addRoomDeltaToResponse adds a room state delta to a sync response
 func (d *Database) addRoomDeltaToResponse(
 	ctx context.Context,
-	device *authtypes.Device,
+	device *userapi.Device,
 	txn *sql.Tx,
 	r types.Range,
 	delta stateDelta,
@@ -774,7 +790,7 @@ func (d *Database) addRoomDeltaToResponse(
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
 		r.To = delta.membershipPos
 	}
-	recentStreamEvents, err := d.OutputEvents.SelectRecentEvents(
+	recentStreamEvents, limited, err := d.OutputEvents.SelectRecentEvents(
 		ctx, txn, delta.roomID, r,
 		numRecentEventsPerRoom, true, true,
 	)
@@ -794,7 +810,7 @@ func (d *Database) addRoomDeltaToResponse(
 
 		jr.Timeline.PrevBatch = prevBatch.String()
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
+		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.roomID] = *jr
 	case gomatrixserverlib.Leave:
@@ -904,7 +920,7 @@ func (d *Database) fetchMissingStateEvents(
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
 func (d *Database) getStateDeltas(
-	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
+	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
@@ -979,7 +995,7 @@ func (d *Database) getStateDeltas(
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
 func (d *Database) getStateDeltasForFullStateSync(
-	ctx context.Context, device *authtypes.Device, txn *sql.Tx,
+	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {

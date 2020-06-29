@@ -98,6 +98,9 @@ func (t *StreamingToken) PDUPosition() StreamPosition {
 func (t *StreamingToken) EDUPosition() StreamPosition {
 	return t.Positions[1]
 }
+func (t *StreamingToken) String() string {
+	return t.syncToken.String()
+}
 
 // IsAfter returns true if ANY position in this token is greater than `other`.
 func (t *StreamingToken) IsAfter(other StreamingToken) bool {
@@ -220,8 +223,8 @@ func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
 		err = fmt.Errorf("token %s is not a topology token", tok)
 		return
 	}
-	if len(t.Positions) != 2 {
-		err = fmt.Errorf("token %s wrong number of values, got %d want 2", tok, len(t.Positions))
+	if len(t.Positions) < 2 {
+		err = fmt.Errorf("token %s wrong number of values, got %d want at least 2", tok, len(t.Positions))
 		return
 	}
 	return TopologyToken{
@@ -247,8 +250,8 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		err = fmt.Errorf("token %s is not a streaming token", tok)
 		return
 	}
-	if len(t.Positions) != 2 {
-		err = fmt.Errorf("token %s wrong number of values, got %d want 2", tok, len(t.Positions))
+	if len(t.Positions) < 2 {
+		err = fmt.Errorf("token %s wrong number of values, got %d want at least 2", tok, len(t.Positions))
 		return
 	}
 	return StreamingToken{
@@ -287,10 +290,10 @@ type Response struct {
 	NextBatch   string `json:"next_batch"`
 	AccountData struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"account_data"`
+	} `json:"account_data,omitempty"`
 	Presence struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"presence"`
+	} `json:"presence,omitempty"`
 	Rooms struct {
 		Join   map[string]JoinResponse   `json:"join"`
 		Invite map[string]InviteResponse `json:"invite"`

@@ -16,7 +16,6 @@ package appservice
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -29,12 +28,10 @@ import (
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/appservice/workers"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,8 +44,7 @@ func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQuer
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *setup.BaseDendrite,
-	accountsDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
 	// Create a connection to the appservice postgres DB
@@ -70,7 +66,7 @@ func NewInternalAPI(
 		workerStates[i] = ws
 
 		// Create bot account for this AS if it doesn't already exist
-		if err = generateAppServiceAccount(accountsDB, deviceDB, appservice); err != nil {
+		if err = generateAppServiceAccount(userAPI, appservice); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"appservice": appservice.ID,
 			}).WithError(err).Panicf("failed to generate bot account for appservice")
@@ -90,7 +86,7 @@ func NewInternalAPI(
 	// We can't add ASes at runtime so this is safe to do.
 	if len(workerStates) > 0 {
 		consumer := consumers.NewOutputRoomEventConsumer(
-			base.Cfg, base.KafkaConsumer, accountsDB, appserviceDB,
+			base.Cfg, base.KafkaConsumer, appserviceDB,
 			rsAPI, workerStates,
 		)
 		if err := consumer.Start(); err != nil {
@@ -109,22 +105,25 @@ func NewInternalAPI(
 // `sender_localpart` field of each application service if it doesn't
 // exist already
 func generateAppServiceAccount(
-	accountsDB accounts.Database,
-	deviceDB devices.Database,
+	userAPI userapi.UserInternalAPI,
 	as config.ApplicationService,
 ) error {
-	ctx := context.Background()
-
-	// Create an account for the application service
-	_, err := accountsDB.CreateAccount(ctx, as.SenderLocalpart, "", as.ID)
+	var accRes userapi.PerformAccountCreationResponse
+	err := userAPI.PerformAccountCreation(context.Background(), &userapi.PerformAccountCreationRequest{
+		AccountType:  userapi.AccountTypeUser,
+		Localpart:    as.SenderLocalpart,
+		AppServiceID: as.ID,
+		OnConflict:   userapi.ConflictUpdate,
+	}, &accRes)
 	if err != nil {
-		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
-			return nil
-		}
 		return err
 	}
-
-	// Create a dummy device with a dummy token for the application service
-	_, err = deviceDB.CreateDevice(ctx, as.SenderLocalpart, nil, as.ASToken, &as.SenderLocalpart)
+	var devRes userapi.PerformDeviceCreationResponse
+	err = userAPI.PerformDeviceCreation(context.Background(), &userapi.PerformDeviceCreationRequest{
+		Localpart:         as.SenderLocalpart,
+		AccessToken:       as.ASToken,
+		DeviceID:          &as.SenderLocalpart,
+		DeviceDisplayName: &as.SenderLocalpart,
+	}, &devRes)
 	return err
 }

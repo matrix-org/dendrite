@@ -25,10 +25,11 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -85,12 +86,12 @@ var (
 // can be emitted.
 func CheckAndProcessInvite(
 	ctx context.Context,
-	device *authtypes.Device, body *MembershipRequest, cfg *config.Dendrite,
+	device *userapi.Device, body *MembershipRequest, cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI, db accounts.Database,
-	membership string, roomID string,
+	roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
-	if membership != gomatrixserverlib.Invite || (body.Address == "" && body.IDServer == "" && body.Medium == "") {
+	if body.Address == "" && body.IDServer == "" && body.Medium == "" {
 		// If none of the 3PID-specific fields are supplied, it's a standard invite
 		// so return nil for it to be processed as such
 		return
@@ -136,7 +137,7 @@ func CheckAndProcessInvite(
 // Returns an error if a check or a request failed.
 func queryIDServer(
 	ctx context.Context,
-	db accounts.Database, cfg *config.Dendrite, device *authtypes.Device,
+	db accounts.Database, cfg *config.Dendrite, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	if err = isTrusted(body.IDServer, cfg); err != nil {
@@ -205,7 +206,7 @@ func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServe
 // Returns an error if the request failed to send or if the response couldn't be parsed.
 func queryIDServerStoreInvite(
 	ctx context.Context,
-	db accounts.Database, cfg *config.Dendrite, device *authtypes.Device,
+	db accounts.Database, cfg *config.Dendrite, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name
@@ -329,7 +330,7 @@ func checkIDServerSignatures(
 func emit3PIDInviteEvent(
 	ctx context.Context,
 	body *MembershipRequest, res *idServerStoreInviteResponse,
-	device *authtypes.Device, roomID string, cfg *config.Dendrite,
+	device *userapi.Device, roomID string, cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
 	evTime time.Time,
 ) error {

@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -123,7 +124,9 @@ func (r *uploadRequest) doUpload(
 
 	r.MediaMetadata.FileSizeBytes = bytesWritten
 	r.MediaMetadata.Base64Hash = hash
-	r.MediaMetadata.MediaID = types.MediaID(hash)
+	r.MediaMetadata.MediaID = types.MediaID(base64.RawURLEncoding.EncodeToString(
+		[]byte(string(r.MediaMetadata.UploadName) + string(r.MediaMetadata.Base64Hash)),
+	))
 
 	r.Logger = r.Logger.WithField("MediaID", r.MediaMetadata.MediaID)
 

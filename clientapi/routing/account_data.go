@@ -16,21 +16,20 @@ package routing
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/util"
 )
 
 // GetAccountData implements GET /user/{userId}/[rooms/{roomid}/]account_data/{type}
 func GetAccountData(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 	userID string, roomID string, dataType string,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -40,15 +39,25 @@ func GetAccountData(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
+	dataReq := api.QueryAccountDataRequest{
+		UserID:   userID,
+		DataType: dataType,
+		RoomID:   roomID,
+	}
+	dataRes := api.QueryAccountDataResponse{}
+	if err := userAPI.QueryAccountData(req.Context(), &dataReq, &dataRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
+		return util.ErrorResponse(fmt.Errorf("userAPI.QueryAccountData: %w", err))
 	}
 
-	if data, err := accountDB.GetAccountDataByType(
-		req.Context(), localpart, roomID, dataType,
-	); err == nil {
+	var data json.RawMessage
+	var ok bool
+	if roomID != "" {
+		data, ok = dataRes.RoomAccountData[roomID][dataType]
+	} else {
+		data, ok = dataRes.GlobalAccountData[dataType]
+	}
+	if ok {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: data,
@@ -63,7 +72,7 @@ func GetAccountData(
 
 // SaveAccountData implements PUT /user/{userId}/[rooms/{roomId}/]account_data/{type}
 func SaveAccountData(
-	req *http.Request, accountDB accounts.Database, device *authtypes.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 	userID string, roomID string, dataType string, syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -71,12 +80,6 @@ func SaveAccountData(
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("userID does not match the current user"),
 		}
-	}
-
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
 	}
 
 	defer req.Body.Close() // nolint: errcheck
@@ -101,13 +104,19 @@ func SaveAccountData(
 		}
 	}
 
-	if err := accountDB.SaveAccountData(
-		req.Context(), localpart, roomID, dataType, string(body),
-	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.SaveAccountData failed")
-		return jsonerror.InternalServerError()
+	dataReq := api.InputAccountDataRequest{
+		UserID:      userID,
+		DataType:    dataType,
+		RoomID:      roomID,
+		AccountData: json.RawMessage(body),
+	}
+	dataRes := api.InputAccountDataResponse{}
+	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
+		return util.ErrorResponse(err)
 	}
 
+	// TODO: user API should do this since it's account data
 	if err := syncProducer.SendData(userID, roomID, dataType); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
 		return jsonerror.InternalServerError()

@@ -44,3 +44,10 @@ Existing members see new members' join events
 Can recv device messages over federation
 Device messages over federation wake up /sync
 Wildcard device messages over federation wake up /sync
+
+# See https://github.com/matrix-org/sytest/pull/901
+Remote invited user can see room metadata
+
+# We don't implement soft-failed events yet, but because the /send response is vague,
+# this test thinks it's all fine...
+Inbound federation accepts a second soft-failed event

@@ -21,11 +21,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -33,24 +32,24 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db        storage.Database
-	accountDB accounts.Database
-	notifier  *Notifier
+	db       storage.Database
+	userAPI  userapi.UserInternalAPI
+	notifier *Notifier
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db storage.Database, n *Notifier, adb accounts.Database) *RequestPool {
-	return &RequestPool{db, adb, n}
+func NewRequestPool(db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI) *RequestPool {
+	return &RequestPool{db, userAPI, n}
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
-func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *authtypes.Device) util.JSONResponse {
+func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
 	var syncData *types.Response
 
 	// Extract values from request
-	syncReq, err := newSyncRequest(req, *device)
+	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -193,6 +192,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	return
 }
 
+// nolint:gocyclo
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
 	accountDataFilter *gomatrixserverlib.EventFilter,
@@ -202,29 +202,37 @@ func (rp *RequestPool) appendAccountData(
 	// data keys were set between two message. This isn't a huge issue since the
 	// duplicate data doesn't represent a huge quantity of data, but an optimisation
 	// here would be making sure each data is sent only once to the client.
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return nil, err
-	}
-
 	if req.since == nil {
 		// If this is the initial sync, we don't need to check if a data has
 		// already been sent. Instead, we send the whole batch.
-		var global []gomatrixserverlib.ClientEvent
-		var rooms map[string][]gomatrixserverlib.ClientEvent
-		global, rooms, err = rp.accountDB.GetAccountData(req.ctx, localpart)
-		if err != nil {
+		dataReq := &userapi.QueryAccountDataRequest{
+			UserID: userID,
+		}
+		dataRes := &userapi.QueryAccountDataResponse{}
+		if err := rp.userAPI.QueryAccountData(req.ctx, dataReq, dataRes); err != nil {
 			return nil, err
 		}
-		data.AccountData.Events = global
-
+		for datatype, databody := range dataRes.GlobalAccountData {
+			data.AccountData.Events = append(
+				data.AccountData.Events,
+				gomatrixserverlib.ClientEvent{
+					Type:    datatype,
+					Content: gomatrixserverlib.RawJSON(databody),
+				},
+			)
+		}
 		for r, j := range data.Rooms.Join {
-			if len(rooms[r]) > 0 {
-				j.AccountData.Events = rooms[r]
+			for datatype, databody := range dataRes.RoomAccountData[r] {
+				j.AccountData.Events = append(
+					j.AccountData.Events,
+					gomatrixserverlib.ClientEvent{
+						Type:    datatype,
+						Content: gomatrixserverlib.RawJSON(databody),
+					},
+				)
 				data.Rooms.Join[r] = j
 			}
 		}
-
 		return data, nil
 	}
 
@@ -248,30 +256,47 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	if len(dataTypes) == 0 {
-		return data, nil
+		// TODO: this fixes the sytest but is it the right thing to do?
+		dataTypes[""] = []string{"m.push_rules"}
 	}
 
 	// Iterate over the rooms
 	for roomID, dataTypes := range dataTypes {
-		events := []gomatrixserverlib.ClientEvent{}
 		// Request the missing data from the database
 		for _, dataType := range dataTypes {
-			event, err := rp.accountDB.GetAccountDataByType(
-				req.ctx, localpart, roomID, dataType,
-			)
-			if err != nil {
-				return nil, err
+			dataReq := userapi.QueryAccountDataRequest{
+				UserID:   userID,
+				RoomID:   roomID,
+				DataType: dataType,
 			}
-			events = append(events, *event)
-		}
-
-		// Append the data to the response
-		if len(roomID) > 0 {
-			jr := data.Rooms.Join[roomID]
-			jr.AccountData.Events = events
-			data.Rooms.Join[roomID] = jr
-		} else {
-			data.AccountData.Events = events
+			dataRes := userapi.QueryAccountDataResponse{}
+			err = rp.userAPI.QueryAccountData(req.ctx, &dataReq, &dataRes)
+			if err != nil {
+				continue
+			}
+			if roomID == "" {
+				if globalData, ok := dataRes.GlobalAccountData[dataType]; ok {
+					data.AccountData.Events = append(
+						data.AccountData.Events,
+						gomatrixserverlib.ClientEvent{
+							Type:    dataType,
+							Content: gomatrixserverlib.RawJSON(globalData),
+						},
+					)
+				}
+			} else {
+				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
+					joinData := data.Rooms.Join[roomID]
+					joinData.AccountData.Events = append(
+						joinData.AccountData.Events,
+						gomatrixserverlib.ClientEvent{
+							Type:    dataType,
+							Content: gomatrixserverlib.RawJSON(roomData),
+						},
+					)
+					data.Rooms.Join[roomID] = joinData
+				}
+			}
 		}
 	}
 

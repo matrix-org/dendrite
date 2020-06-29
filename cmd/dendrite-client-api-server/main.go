@@ -30,17 +30,15 @@ func main() {
 	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := base.ServerKeyAPIClient()
-	keyRing := serverKeyAPI.KeyRing()
-
 	asQuery := base.AppserviceHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
 	fsAPI := base.FederationSenderHTTPClient()
 	eduInputAPI := base.EDUServerClient()
+	userAPI := base.UserAPIClient()
 
 	clientapi.AddPublicRoutes(
-		base.PublicAPIMux, base.Cfg, base.KafkaConsumer, base.KafkaProducer, deviceDB, accountDB, federation, keyRing,
-		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI,
+		base.PublicAPIMux, base.Cfg, base.KafkaConsumer, base.KafkaProducer, deviceDB, accountDB, federation,
+		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))

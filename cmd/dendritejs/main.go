@@ -19,7 +19,6 @@ package main
 import (
 	"crypto/ed25519"
 	"fmt"
-	"net/http"
 	"syscall/js"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -31,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/userapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -145,6 +145,11 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 	return fed
 }
 
+func createClient(node *go_http_js_libp2p.P2pLocalNode) *gomatrixserverlib.Client {
+	tr := go_http_js_libp2p.NewP2pTransport(node)
+	return gomatrixserverlib.NewClientWithTransport(tr)
+}
+
 func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
 	hosted := "/dns4/rendezvous.matrix.org/tcp/8443/wss/p2p-websocket-star/"
 	node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", privKey.Seed(), []string{hosted}, "p2p")
@@ -189,6 +194,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := createFederationClient(cfg, node)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
 
 	fetcher := &libp2pKeyFetcher{}
 	keyRing := gomatrixserverlib.KeyRing{
@@ -199,9 +205,9 @@ func main() {
 	}
 
 	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
-	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
+	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
-		base, accountDB, deviceDB, rsAPI,
+		base, userAPI, rsAPI,
 	)
 	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, &keyRing)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
@@ -216,6 +222,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        createClient(node),
 		FedClient:     federation,
 		KeyRing:       &keyRing,
 		KafkaConsumer: base.KafkaConsumer,
@@ -225,6 +232,7 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fedSenderAPI,
 		RoomserverAPI:       rsAPI,
+		UserAPI:             userAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB:          publicRoomsDB,
@@ -233,7 +241,7 @@ func main() {
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
@@ -245,7 +253,7 @@ func main() {
 		go func() {
 			logrus.Info("Listening on libp2p-js host ID ", node.Id)
 			s := JSServer{
-				Mux: http.DefaultServeMux,
+				Mux: base.BaseMux,
 			}
 			s.ListenAndServe("p2p")
 		}()
@@ -255,7 +263,7 @@ func main() {
 	go func() {
 		logrus.Info("Listening for service-worker fetch traffic")
 		s := JSServer{
-			Mux: http.DefaultServeMux,
+			Mux: base.BaseMux,
 		}
 		s.ListenAndServe("fetch")
 	}()

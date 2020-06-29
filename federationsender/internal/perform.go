@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/internal/perform"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -40,7 +42,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *api.PerformJoinRequest,
 	response *api.PerformJoinResponse,
-) (err error) {
+) {
 	// Look up the supported room versions.
 	var supportedVersions []gomatrixserverlib.RoomVersion
 	for version := range version.SupportedRoomVersions() {
@@ -63,6 +65,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-join send-join dance.
+	var lastErr error
 	for _, serverName := range request.ServerNames {
 		if err := r.performJoinUsingServer(
 			ctx,
@@ -76,17 +79,32 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 				"server_name": serverName,
 				"room_id":     request.RoomID,
 			}).Warnf("Failed to join room through server")
+			lastErr = err
 			continue
 		}
 
 		// We're all good.
-		return nil
+		return
 	}
 
 	// If we reach here then we didn't complete a join for some reason.
-	return fmt.Errorf(
-		"failed to join user %q to room %q through %d server(s)",
-		request.UserID, request.RoomID, len(request.ServerNames),
+	var httpErr gomatrix.HTTPError
+	if ok := errors.As(lastErr, &httpErr); ok {
+		httpErr.Message = string(httpErr.Contents)
+		// Clear the wrapped error, else serialising to JSON (in polylith mode) will fail
+		httpErr.WrappedError = nil
+		response.LastError = &httpErr
+	} else {
+		response.LastError = &gomatrix.HTTPError{
+			Code:         0,
+			WrappedError: nil,
+			Message:      lastErr.Error(),
+		}
+	}
+
+	logrus.Errorf(
+		"failed to join user %q to room %q through %d server(s): last error %s",
+		request.UserID, request.RoomID, len(request.ServerNames), lastErr,
 	)
 }
 

@@ -97,8 +97,8 @@ rst PUT power_levels should not explode if the old power levels were empty
 rst Both GET and PUT work
 rct POST /rooms/:room_id/receipt can create receipts 
 red POST /rooms/:room_id/read_markers can create read marker
-med POST /media/v1/upload can create an upload 
-med GET /media/v1/download can fetch the value again 
+med POST /media/r0/upload can create an upload 
+med GET /media/r0/download can fetch the value again 
 cap GET /capabilities is present and well formed for registered user 
 cap GET /r0/capabilities is not public
 reg Register with a recaptcha 
@@ -854,3 +854,7 @@ fbk Outbound federation rejects backfill containing invalid JSON for events in r
 jso Invalid JSON integers
 jso Invalid JSON floats
 jso Invalid JSON special values
+inv Can invite users to invite-only rooms (2 subtests)
+plv setting 'm.room.name' respects room powerlevel (2 subtests)
+psh Messages that notify from another user increment notification_count
+psh Messages that org.matrix.msc2625.mark_unread from another user increment org.matrix.msc2625.unread_count

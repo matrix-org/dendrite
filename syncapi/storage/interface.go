@@ -18,11 +18,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -57,10 +57,10 @@ type Database interface {
 	// from when the device sent the event via an API that included a transaction
 	// ID. A response object must be provided for IncrementaSync to populate - it
 	// will not create one.
-	IncrementalSync(ctx context.Context, res *types.Response, device authtypes.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
+	IncrementalSync(ctx context.Context, res *types.Response, device userapi.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
 	// CompleteSync returns a complete /sync API response for the given user. A response object
 	// must be provided for CompleteSync to populate - it will not create one.
-	CompleteSync(ctx context.Context, res *types.Response, device authtypes.Device, numRecentEventsPerRoom int) (*types.Response, error)
+	CompleteSync(ctx context.Context, res *types.Response, device userapi.Device, numRecentEventsPerRoom int) (*types.Response, error)
 	// GetAccountDataInRange returns all account data for a given user inserted or
 	// updated between two given positions
 	// Returns a map following the format data[roomID] = []dataTypes
@@ -78,9 +78,9 @@ type Database interface {
 	// If the invite was successfully stored this returns the stream ID it was stored at.
 	// Returns an error if there was a problem communicating with the database.
 	AddInviteEvent(ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent) (types.StreamPosition, error)
-	// RetireInviteEvent removes an old invite event from the database.
+	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
-	RetireInviteEvent(ctx context.Context, inviteEventID string) error
+	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
 	// SetTypingTimeoutCallback sets a callback function that is called right after
 	// a user is removed from the typing user list due to timeout.
 	SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn)
@@ -103,7 +103,7 @@ type Database interface {
 	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.
-	StreamEventsToEvents(device *authtypes.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent
+	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent
 	// SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
 	SyncStreamPosition(ctx context.Context) (types.StreamPosition, error)
 	// AddSendToDevice increases the EDU position in the cache and returns the stream position.
@@ -128,4 +128,12 @@ type Database interface {
 	CleanSendToDeviceUpdates(ctx context.Context, toUpdate, toDelete []types.SendToDeviceNID, token types.StreamingToken) (err error)
 	// SendToDeviceUpdatesWaiting returns true if there are send-to-device updates waiting to be sent.
 	SendToDeviceUpdatesWaiting(ctx context.Context, userID, deviceID string) (bool, error)
+	// GetFilter looks up the filter associated with a given local user and filter ID.
+	// Returns a filter structure. Otherwise returns an error if no such filter exists
+	// or if there was an error talking to the database.
+	GetFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
+	// PutFilter puts the passed filter into the database.
+	// Returns the filterID as a string. Otherwise returns an error if something
+	// goes wrong.
+	PutFilter(ctx context.Context, localpart string, filter *gomatrixserverlib.Filter) (string, error)
 }

@@ -28,9 +28,9 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	"github.com/matrix-org/dendrite/userapi/storage/devices"
 
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
@@ -46,6 +46,8 @@ import (
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	skinthttp "github.com/matrix-org/dendrite/serverkeyapi/inthttp"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -63,6 +65,7 @@ type BaseDendrite struct {
 	// PublicAPIMux should be used to register new public matrix api endpoints
 	PublicAPIMux   *mux.Router
 	InternalAPIMux *mux.Router
+	BaseMux        *mux.Router // base router which created public/internal subrouters
 	UseHTTPAPIs    bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
@@ -95,7 +98,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
-	cache, err := caching.NewInMemoryLRUCache()
+	cache, err := caching.NewInMemoryLRUCache(true)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
@@ -127,6 +130,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		Caches:         cache,
+		BaseMux:        httpmux,
 		PublicAPIMux:   httpmux.PathPrefix(httputil.PublicPathPrefix).Subrouter().UseEncodedPath(),
 		InternalAPIMux: httpmux.PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		httpClient:     &client,
@@ -156,6 +160,15 @@ func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAP
 		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.httpClient)
 	}
 	return rsAPI
+}
+
+// UserAPIClient returns UserInternalAPI for hitting the userapi over HTTP.
+func (b *BaseDendrite) UserAPIClient() userapi.UserInternalAPI {
+	userAPI, err := userapiinthttp.NewUserAPIClient(b.Cfg.UserAPIURL(), b.httpClient)
+	if err != nil {
+		logrus.WithError(err).Panic("UserAPIClient failed", b.httpClient)
+	}
+	return userAPI
 }
 
 // EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
@@ -238,12 +251,13 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 	}
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		b.BaseMux,
 		b.PublicAPIMux,
 		b.InternalAPIMux,
 		b.Cfg,
 		b.UseHTTPAPIs,
 	)
+	serv.Handler = b.BaseMux
 	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 
 	err := serv.ListenAndServe()

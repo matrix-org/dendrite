@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,15 +28,15 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// Invite implements /_matrix/federation/v2/invite/{roomID}/{eventID}
-func Invite(
+// InviteV2 implements /_matrix/federation/v2/invite/{roomID}/{eventID}
+func InviteV2(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
 	eventID string,
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
-	keys gomatrixserverlib.KeyRing,
+	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 	inviteReq := gomatrixserverlib.InviteV2Request{}
 	if err := json.Unmarshal(request.Content(), &inviteReq); err != nil {
@@ -44,14 +45,58 @@ func Invite(
 			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
 		}
 	}
-	event := inviteReq.Event()
+	return processInvite(
+		httpReq.Context(), inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
+	)
+}
+
+// InviteV1 implements /_matrix/federation/v1/invite/{roomID}/{eventID}
+func InviteV1(
+	httpReq *http.Request,
+	request *gomatrixserverlib.FederationRequest,
+	roomID string,
+	eventID string,
+	cfg *config.Dendrite,
+	rsAPI api.RoomserverInternalAPI,
+	keys gomatrixserverlib.JSONVerifier,
+) util.JSONResponse {
+	roomVer := gomatrixserverlib.RoomVersionV1
+	body := request.Content()
+	event, err := gomatrixserverlib.NewEventFromTrustedJSON(body, false, roomVer)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite v1 request: " + err.Error()),
+		}
+	}
+	var strippedState []gomatrixserverlib.InviteV2StrippedState
+	if err := json.Unmarshal(event.Unsigned(), &strippedState); err != nil {
+		// just warn, they may not have added any.
+		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
+	}
+	return processInvite(
+		httpReq.Context(), event, roomVer, strippedState, roomID, eventID, cfg, rsAPI, keys,
+	)
+}
+
+func processInvite(
+	ctx context.Context,
+	event gomatrixserverlib.Event,
+	roomVer gomatrixserverlib.RoomVersion,
+	strippedState []gomatrixserverlib.InviteV2StrippedState,
+	roomID string,
+	eventID string,
+	cfg *config.Dendrite,
+	rsAPI api.RoomserverInternalAPI,
+	keys gomatrixserverlib.JSONVerifier,
+) util.JSONResponse {
 
 	// Check that we can accept invites for this room version.
-	if _, err := roomserverVersion.SupportedRoomVersion(inviteReq.RoomVersion()); err != nil {
+	if _, err := roomserverVersion.SupportedRoomVersion(roomVer); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Room version %q is not supported by this server.", inviteReq.RoomVersion()),
+				fmt.Sprintf("Room version %q is not supported by this server.", roomVer),
 			),
 		}
 	}
@@ -80,9 +125,9 @@ func Invite(
 		AtTS:                   event.OriginServerTS(),
 		StrictValidityChecking: true,
 	}}
-	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
+	verifyResults, err := keys.VerifyJSONs(ctx, verifyRequests)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+		util.GetLogger(ctx).WithError(err).Error("keys.VerifyJSONs failed")
 		return jsonerror.InternalServerError()
 	}
 	if verifyResults[0].Error != nil {
@@ -98,15 +143,11 @@ func Invite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err = api.SendInvite(
-		httpReq.Context(), rsAPI,
-		signedEvent.Headered(inviteReq.RoomVersion()),
-		inviteReq.InviteRoomState(),
-		event.Origin(),
-		nil,
-	); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendInvite failed")
-		return jsonerror.InternalServerError()
+	if perr := api.SendInvite(
+		ctx, rsAPI, signedEvent.Headered(roomVer), strippedState, event.Origin(), nil,
+	); perr != nil {
+		util.GetLogger(ctx).WithError(err).Error("producer.SendInvite failed")
+		return perr.JSONResponse()
 	}
 
 	// Return the signed event to the originating server, it should then tell

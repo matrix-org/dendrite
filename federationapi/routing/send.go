@@ -37,7 +37,7 @@ func Send(
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
-	keys gomatrixserverlib.KeyRing,
+	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	t := txnReq{
@@ -61,6 +61,14 @@ func Send(
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
+	// Transactions are limited in size; they can have at most 50 PDUs and 100 EDUs.
+	// https://matrix.org/docs/spec/server_server/latest#transactions
+	if len(txnEvents.PDUs) > 50 || len(txnEvents.EDUs) > 100 {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("max 50 pdus / 100 edus"),
+		}
+	}
 
 	// TODO: Really we should have a function to convert FederationRequest to txnReq
 	t.PDUs = txnEvents.PDUs
@@ -71,10 +79,10 @@ func Send(
 
 	util.GetLogger(httpReq.Context()).Infof("Received transaction %q containing %d PDUs, %d EDUs", txnID, len(t.PDUs), len(t.EDUs))
 
-	resp, err := t.processTransaction()
-	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("t.processTransaction failed")
-		return util.ErrorResponse(err)
+	resp, jsonErr := t.processTransaction()
+	if jsonErr != nil {
+		util.GetLogger(httpReq.Context()).WithField("jsonErr", jsonErr).Error("t.processTransaction failed")
+		return *jsonErr
 	}
 
 	// https://matrix.org/docs/spec/server_server/r0.1.3#put-matrix-federation-v1-send-txnid
@@ -112,7 +120,7 @@ type txnFederationClient interface {
 		roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
-func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
+func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, *util.JSONResponse) {
 	results := make(map[string]gomatrixserverlib.PDUResult)
 
 	pdus := []gomatrixserverlib.HeaderedEvent{}
@@ -136,10 +144,20 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 		}
 		event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, verRes.RoomVersion)
 		if err != nil {
-			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
-			results[event.EventID()] = gomatrixserverlib.PDUResult{
-				Error: err.Error(),
+			if _, ok := err.(gomatrixserverlib.BadJSONError); ok {
+				// Room version 6 states that homeservers should strictly enforce canonical JSON
+				// on PDUs.
+				//
+				// This enforces that the entire transaction is rejected if a single bad PDU is
+				// sent. It is unclear if this is the correct behaviour or not.
+				//
+				// See https://github.com/matrix-org/synapse/issues/7543
+				return nil, &util.JSONResponse{
+					Code: 400,
+					JSON: jsonerror.BadJSON("PDU contains bad JSON"),
+				}
 			}
+			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %s", string(pdu))
 			continue
 		}
 		if err = gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {
@@ -174,11 +192,20 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, error) {
 				// Any other error should be the result of a temporary error in
 				// our server so we should bail processing the transaction entirely.
 				util.GetLogger(t.context).Warnf("Processing %s failed fatally: %s", e.EventID(), err)
-				return nil, err
+				jsonErr := util.ErrorResponse(err)
+				return nil, &jsonErr
 			} else {
-				util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).Warn("Failed to process incoming federation event, skipping")
+				// Auth errors mean the event is 'rejected' which have to be silent to appease sytest
+				_, rejected := err.(*gomatrixserverlib.NotAllowed)
+				errMsg := err.Error()
+				if rejected {
+					errMsg = ""
+				}
+				util.GetLogger(t.context).WithError(err).WithField("event_id", e.EventID()).WithField("rejected", rejected).Warn(
+					"Failed to process incoming federation event, skipping",
+				)
 				results[e.EventID()] = gomatrixserverlib.PDUResult{
-					Error: err.Error(),
+					Error: errMsg,
 				}
 			}
 		} else {

@@ -29,9 +29,8 @@ func main() {
 			logrus.WithError(err).Warn("BaseDendrite close failed")
 		}
 	}()
-	deviceDB := base.CreateDeviceDB()
 
-	intAPI := eduserver.NewInternalAPI(base, cache.New(), deviceDB)
+	intAPI := eduserver.NewInternalAPI(base, cache.New(), base.UserAPIClient())
 	eduserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.EDUServer), string(base.Cfg.Listen.EDUServer))

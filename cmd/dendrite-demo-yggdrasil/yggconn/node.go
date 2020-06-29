@@ -15,13 +15,16 @@
 package yggconn
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
@@ -48,8 +51,23 @@ type Node struct {
 	incoming  chan *yamux.Stream
 }
 
+func (n *Node) Dialer(_, address string) (net.Conn, error) {
+	tokens := strings.Split(address, ":")
+	raw, err := hex.DecodeString(tokens[0])
+	if err != nil {
+		return nil, fmt.Errorf("hex.DecodeString: %w", err)
+	}
+	converted := convert.Ed25519PublicKeyToCurve25519(ed25519.PublicKey(raw))
+	convhex := hex.EncodeToString(converted)
+	return n.Dial("curve25519", convhex)
+}
+
+func (n *Node) DialerContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return n.Dialer(network, address)
+}
+
 // nolint:gocyclo
-func Setup(instanceName, instancePeer string) (*Node, error) {
+func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasil.Core{},
 		config:    yggdrasilconfig.GenerateConfig(),
@@ -59,7 +77,7 @@ func Setup(instanceName, instancePeer string) (*Node, error) {
 		incoming:  make(chan *yamux.Stream),
 	}
 
-	yggfile := fmt.Sprintf("%s-yggdrasil.conf", instanceName)
+	yggfile := fmt.Sprintf("%s/%s-yggdrasil.conf", storageDirectory, instanceName)
 	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
 		yggconf, e := ioutil.ReadFile(yggfile)
 		if e != nil {
@@ -69,7 +87,7 @@ func Setup(instanceName, instancePeer string) (*Node, error) {
 			panic(err)
 		}
 	} else {
-		n.config.AdminListen = fmt.Sprintf("unix://./%s-yggdrasil.sock", instanceName)
+		n.config.AdminListen = "none" // fmt.Sprintf("unix://%s/%s-yggdrasil.sock", storageDirectory, instanceName)
 		n.config.MulticastInterfaces = []string{".*"}
 		n.config.EncryptionPrivateKey = hex.EncodeToString(n.EncryptionPrivateKey())
 		n.config.EncryptionPublicKey = hex.EncodeToString(n.EncryptionPublicKey())
@@ -96,20 +114,22 @@ func Setup(instanceName, instancePeer string) (*Node, error) {
 			panic(err)
 		}
 	}
-	if err = n.admin.Init(n.core, n.state, n.log, nil); err != nil {
-		panic(err)
-	}
-	if err = n.admin.Start(); err != nil {
-		panic(err)
-	}
+	/*
+		if err = n.admin.Init(n.core, n.state, n.log, nil); err != nil {
+			panic(err)
+		}
+		if err = n.admin.Start(); err != nil {
+			panic(err)
+		}
+	*/
 	if err = n.multicast.Init(n.core, n.state, n.log, nil); err != nil {
 		panic(err)
 	}
 	if err = n.multicast.Start(); err != nil {
 		panic(err)
 	}
-	n.admin.SetupAdminHandlers(n.admin)
-	n.multicast.SetupAdminHandlers(n.admin)
+	//n.admin.SetupAdminHandlers(n.admin)
+	//n.multicast.SetupAdminHandlers(n.admin)
 	n.listener, err = n.core.ConnListen()
 	if err != nil {
 		panic(err)
@@ -118,6 +138,9 @@ func Setup(instanceName, instancePeer string) (*Node, error) {
 	if err != nil {
 		panic(err)
 	}
+
+	n.log.Println("Public curve25519:", n.core.EncryptionPublicKey())
+	n.log.Println("Public ed25519:", n.core.SigningPublicKey())
 
 	go n.listenFromYgg()
 

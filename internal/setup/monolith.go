@@ -19,8 +19,6 @@ import (
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -34,6 +32,9 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/dendrite/syncapi"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -44,6 +45,7 @@ type Monolith struct {
 	DeviceDB      devices.Database
 	AccountDB     accounts.Database
 	KeyRing       *gomatrixserverlib.KeyRing
+	Client        *gomatrixserverlib.Client
 	FedClient     *gomatrixserverlib.FederationClient
 	KafkaConsumer sarama.Consumer
 	KafkaProducer sarama.SyncProducer
@@ -53,6 +55,7 @@ type Monolith struct {
 	FederationSenderAPI federationSenderAPI.FederationSenderInternalAPI
 	RoomserverAPI       roomserverAPI.RoomserverInternalAPI
 	ServerKeyAPI        serverKeyAPI.ServerKeyInternalAPI
+	UserAPI             userapi.UserInternalAPI
 
 	// TODO: can we remove this? It's weird that we are required the database
 	// yet every other component can do that on its own. libp2p-demo uses a custom
@@ -67,23 +70,23 @@ type Monolith struct {
 func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 	clientapi.AddPublicRoutes(
 		publicMux, m.Config, m.KafkaConsumer, m.KafkaProducer, m.DeviceDB, m.AccountDB,
-		m.FedClient, m.KeyRing, m.RoomserverAPI,
+		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
-		m.FederationSenderAPI,
+		m.FederationSenderAPI, m.UserAPI,
 	)
 
-	keyserver.AddPublicRoutes(publicMux, m.Config, m.DeviceDB, m.AccountDB)
+	keyserver.AddPublicRoutes(publicMux, m.Config, m.UserAPI)
 	federationapi.AddPublicRoutes(
-		publicMux, m.Config, m.AccountDB, m.DeviceDB, m.FedClient,
-		m.KeyRing, m.RoomserverAPI, m.AppserviceAPI, m.FederationSenderAPI,
+		publicMux, m.Config, m.UserAPI, m.FedClient,
+		m.KeyRing, m.RoomserverAPI, m.FederationSenderAPI,
 		m.EDUInternalAPI,
 	)
-	mediaapi.AddPublicRoutes(publicMux, m.Config, m.DeviceDB)
+	mediaapi.AddPublicRoutes(publicMux, m.Config, m.UserAPI, m.Client)
 	publicroomsapi.AddPublicRoutes(
-		publicMux, m.Config, m.KafkaConsumer, m.DeviceDB, m.PublicRoomsDB, m.RoomserverAPI, m.FedClient,
+		publicMux, m.Config, m.KafkaConsumer, m.UserAPI, m.PublicRoomsDB, m.RoomserverAPI, m.FedClient,
 		m.ExtPublicRoomsProvider,
 	)
 	syncapi.AddPublicRoutes(
-		publicMux, m.KafkaConsumer, m.DeviceDB, m.AccountDB, m.RoomserverAPI, m.FedClient, m.Config,
+		publicMux, m.KafkaConsumer, m.UserAPI, m.RoomserverAPI, m.FedClient, m.Config,
 	)
 }

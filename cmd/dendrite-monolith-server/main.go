@@ -30,6 +30,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
 )
@@ -73,12 +75,15 @@ func main() {
 		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices)
 
-	rsAPI := roomserver.NewInternalAPI(
+	rsImpl := roomserver.NewInternalAPI(
 		base, keyRing, federation,
 	)
+	// call functions directly on the impl unless running in HTTP mode
+	rsAPI := rsImpl
 	if base.UseHTTPAPIs {
-		roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
+		roomserver.AddInternalRoutes(base.InternalAPIMux, rsImpl)
 		rsAPI = base.RoomserverHTTPClient()
 	}
 	if traceInternal {
@@ -88,14 +93,14 @@ func main() {
 	}
 
 	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), deviceDB,
+		base, cache.New(), userAPI,
 	)
 	if base.UseHTTPAPIs {
 		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
 		eduInputAPI = base.EDUServerClient()
 	}
 
-	asAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	if base.UseHTTPAPIs {
 		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
@@ -108,7 +113,9 @@ func main() {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationSenderHTTPClient()
 	}
-	rsAPI.SetFederationSenderAPI(fsAPI)
+	// The underlying roomserver implementation needs to be able to call the fedsender.
+	// This is different to rsAPI which can be the http client which doesn't need this dependency
+	rsImpl.SetFederationSenderAPI(fsAPI)
 
 	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
 	if err != nil {
@@ -119,6 +126,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
+		Client:        gomatrixserverlib.NewClient(),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,
@@ -129,13 +137,14 @@ func main() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		ServerKeyAPI:        serverKeyAPI,
+		UserAPI:             userAPI,
 
 		PublicRoomsDB: publicRoomsDB,
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
 	httputil.SetupHTTPAPI(
-		http.DefaultServeMux,
+		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
 		cfg,
@@ -147,6 +156,7 @@ func main() {
 		serv := http.Server{
 			Addr:         *httpBindAddr,
 			WriteTimeout: setup.HTTPServerTimeout,
+			Handler:      base.BaseMux,
 		}
 
 		logrus.Info("Listening on ", serv.Addr)
@@ -158,6 +168,7 @@ func main() {
 			serv := http.Server{
 				Addr:         *httpsBindAddr,
 				WriteTimeout: setup.HTTPServerTimeout,
+				Handler:      base.BaseMux,
 			}
 
 			logrus.Info("Listening on ", serv.Addr)

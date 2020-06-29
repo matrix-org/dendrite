@@ -19,16 +19,19 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/devices"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
+// https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-devices
 type deviceJSON struct {
-	DeviceID string `json:"device_id"`
-	UserID   string `json:"user_id"`
+	DeviceID    string `json:"device_id"`
+	DisplayName string `json:"display_name"`
+	LastSeenIP  string `json:"last_seen_ip"`
+	LastSeenTS  uint64 `json:"last_seen_ts"`
 }
 
 type devicesJSON struct {
@@ -45,7 +48,7 @@ type devicesDeleteJSON struct {
 
 // GetDeviceByID handles /devices/{deviceID}
 func GetDeviceByID(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -70,14 +73,13 @@ func GetDeviceByID(
 		Code: http.StatusOK,
 		JSON: deviceJSON{
 			DeviceID: dev.ID,
-			UserID:   dev.UserID,
 		},
 	}
 }
 
 // GetDevicesByLocalpart handles /devices
 func GetDevicesByLocalpart(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
@@ -98,7 +100,6 @@ func GetDevicesByLocalpart(
 	for _, dev := range deviceList {
 		res.Devices = append(res.Devices, deviceJSON{
 			DeviceID: dev.ID,
-			UserID:   dev.UserID,
 		})
 	}
 
@@ -110,7 +111,7 @@ func GetDevicesByLocalpart(
 
 // UpdateDeviceByID handles PUT on /devices/{deviceID}
 func UpdateDeviceByID(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -160,7 +161,7 @@ func UpdateDeviceByID(
 
 // DeleteDeviceById handles DELETE requests to /devices/{deviceId}
 func DeleteDeviceById(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -185,7 +186,7 @@ func DeleteDeviceById(
 
 // DeleteDevices handles POST requests to /delete_devices
 func DeleteDevices(
-	req *http.Request, deviceDB devices.Database, device *authtypes.Device,
+	req *http.Request, deviceDB devices.Database, device *api.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {

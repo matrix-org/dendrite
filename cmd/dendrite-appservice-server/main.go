@@ -24,11 +24,10 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "AppServiceAPI", true)
 
 	defer base.Close() // nolint: errcheck
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
 	rsAPI := base.RoomserverHTTPClient()
 
-	intAPI := appservice.NewInternalAPI(base, accountDB, deviceDB, rsAPI)
+	intAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.AppServiceAPI), string(base.Cfg.Listen.AppServiceAPI))

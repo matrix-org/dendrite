@@ -7,6 +7,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/gomatrix"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -77,12 +78,19 @@ func (h *httpFederationSenderInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *api.PerformJoinRequest,
 	response *api.PerformJoinResponse,
-) error {
+) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformJoinRequest")
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformJoinRequestPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.LastError = &gomatrix.HTTPError{
+			Message:      err.Error(),
+			Code:         0,
+			WrappedError: err,
+		}
+	}
 }
 
 // Handle an instruction to make_join & send_join with a remote server.

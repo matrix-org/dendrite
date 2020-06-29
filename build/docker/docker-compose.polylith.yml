@@ -152,6 +152,31 @@ services:
     networks:
       - internal
 
+  user_api:
+    hostname: user_api
+    image: matrixdotorg/dendrite:userapi
+    command: [
+        "--config=dendrite.yaml"
+    ]
+    volumes:
+        - ./config:/etc/dendrite
+    networks:
+        - internal
+
+  appservice_api:
+    hostname: appservice_api
+    image: matrixdotorg/dendrite:appservice
+    command: [
+      "--config=dendrite.yaml"
+    ]
+    volumes:
+      - ./config:/etc/dendrite
+    networks:
+      - internal
+    depends_on:
+      - room_server
+      - user_api
+
 networks:
   internal:
     attachable: true

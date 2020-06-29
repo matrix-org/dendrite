@@ -17,10 +17,12 @@ package storage
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
+	internal.PartitionStorer
 	StoreEvent(ctx context.Context, appServiceID string, event *gomatrixserverlib.HeaderedEvent) error
 	GetEventsWithAppServiceID(ctx context.Context, appServiceID string, limit int) (int, int, []gomatrixserverlib.HeaderedEvent, bool, error)
 	CountEventsWithAppServiceID(ctx context.Context, appServiceID string) (int, error)

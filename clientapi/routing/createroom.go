@@ -24,14 +24,13 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	roomserverVersion "github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/matrix-org/dendrite/userapi/api"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/storage/accounts"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -135,7 +134,7 @@ type fledglingEvent struct {
 
 // CreateRoom implements /createRoom
 func CreateRoom(
-	req *http.Request, device *authtypes.Device,
+	req *http.Request, device *api.Device,
 	cfg *config.Dendrite,
 	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -149,7 +148,7 @@ func CreateRoom(
 // createRoom implements /createRoom
 // nolint: gocyclo
 func createRoom(
-	req *http.Request, device *authtypes.Device,
+	req *http.Request, device *api.Device,
 	cfg *config.Dendrite, roomID string,
 	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -373,13 +372,9 @@ func createRoom(
 
 	// If this is a direct message then we should invite the participants.
 	for _, invitee := range r.Invite {
-		// Build the membership request.
-		body := threepid.MembershipRequest{
-			UserID: invitee,
-		}
 		// Build the invite event.
 		inviteEvent, err := buildMembershipEvent(
-			req.Context(), body, accountDB, device, gomatrixserverlib.Invite,
+			req.Context(), invitee, "", accountDB, device, gomatrixserverlib.Invite,
 			roomID, true, cfg, evTime, rsAPI, asAPI,
 		)
 		if err != nil {
@@ -403,15 +398,15 @@ func createRoom(
 			}
 		}
 		// Send the invite event to the roomserver.
-		if err = roomserverAPI.SendInvite(
+		if perr := roomserverAPI.SendInvite(
 			req.Context(), rsAPI,
 			inviteEvent.Headered(roomVersion),
 			strippedState,         // invite room state
 			cfg.Matrix.ServerName, // send as server
 			nil,                   // transaction ID
-		); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("SendInvite failed")
-			return jsonerror.InternalServerError()
+		); perr != nil {
+			util.GetLogger(req.Context()).WithError(perr).Error("SendInvite failed")
+			return perr.JSONResponse()
 		}
 	}
 

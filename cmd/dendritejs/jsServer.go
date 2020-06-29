@@ -28,7 +28,7 @@ import (
 // JSServer exposes an HTTP-like server interface which allows JS to 'send' requests to it.
 type JSServer struct {
 	// The router which will service requests
-	Mux *http.ServeMux
+	Mux http.Handler
 }
 
 // OnRequestFromJS is the function that JS will invoke when there is a new request.

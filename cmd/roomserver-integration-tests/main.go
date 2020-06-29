@@ -255,7 +255,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		panic(err)
 	}
 
-	cache, err := caching.NewInMemoryLRUCache()
+	cache, err := caching.NewInMemoryLRUCache(false)
 	if err != nil {
 		panic(err)
 	}

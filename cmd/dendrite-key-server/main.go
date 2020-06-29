@@ -24,10 +24,9 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "KeyServer", true)
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
+	userAPI := base.UserAPIClient()
 
-	keyserver.AddPublicRoutes(base.PublicAPIMux, base.Cfg, deviceDB, accountDB)
+	keyserver.AddPublicRoutes(base.PublicAPIMux, base.Cfg, userAPI)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.KeyServer), string(base.Cfg.Listen.KeyServer))
 
