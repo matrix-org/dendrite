@@ -17,6 +17,7 @@ package queue
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -121,7 +122,12 @@ func (oqs *OutgoingQueues) SendEvent(
 		"destinations": destinations, "event": ev.EventID(),
 	}).Info("Sending event")
 
-	nid, err := oqs.db.StoreJSON(context.TODO(), string(ev.JSON()))
+	headeredJSON, err := json.Marshal(ev)
+	if err != nil {
+		return fmt.Errorf("json.Marshal: %w", err)
+	}
+
+	nid, err := oqs.db.StoreJSON(context.TODO(), string(headeredJSON))
 	if err != nil {
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
