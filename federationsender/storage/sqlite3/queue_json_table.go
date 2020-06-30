@@ -27,7 +27,7 @@ import (
 const queueJSONSchema = `
 -- The queue_retry_json table contains event contents that
 -- we failed to send. 
-CREATE TABLE IF NOT EXISTS federationsender_queue_retry_json (
+CREATE TABLE IF NOT EXISTS federationsender_queue_json (
 	-- The JSON NID. This allows the federationsender_queue_retry table to
 	-- cross-reference to find the JSON blob.
 	json_nid BIGSERIAL,
@@ -37,15 +37,15 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_retry_json (
 `
 
 const insertJSONSQL = "" +
-	"INSERT INTO federationsender_queue_retry_json (json_body)" +
+	"INSERT INTO federationsender_queue_json (json_body)" +
 	" VALUES ($1)" +
 	" ON CONFLICT DO NOTHING"
 
 const deleteJSONSQL = "" +
-	"DELETE FROM federationsender_queue_retry_json WHERE json_nid = ANY($1)"
+	"DELETE FROM federationsender_queue_json WHERE json_nid = ANY($1)"
 
 const selectJSONSQL = "" +
-	"SELECT json_nid, json_body FROM federationsender_queue_retry_json" +
+	"SELECT json_nid, json_body FROM federationsender_queue_json" +
 	" WHERE json_nid = ANY($1)"
 
 type queueJSONStatements struct {
