@@ -18,8 +18,9 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -30,7 +31,7 @@ const queueJSONSchema = `
 CREATE TABLE IF NOT EXISTS federationsender_queue_json (
 	-- The JSON NID. This allows the federationsender_queue_retry table to
 	-- cross-reference to find the JSON blob.
-	json_nid BIGSERIAL,
+	json_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 	-- The JSON body. Text so that we preserve UTF-8.
 	json_body TEXT NOT NULL
 );
@@ -38,20 +39,19 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_json (
 
 const insertJSONSQL = "" +
 	"INSERT INTO federationsender_queue_json (json_body)" +
-	" VALUES ($1)" +
-	" RETURNING json_nid"
+	" VALUES ($1)"
 
 const deleteJSONSQL = "" +
-	"DELETE FROM federationsender_queue_json WHERE json_nid = ANY($1)"
+	"DELETE FROM federationsender_queue_json WHERE json_nid IN ($1)"
 
 const selectJSONSQL = "" +
 	"SELECT json_nid, json_body FROM federationsender_queue_json" +
-	" WHERE json_nid = ANY($1)"
+	" WHERE json_nid IN ($1)"
 
 type queueJSONStatements struct {
 	insertJSONStmt *sql.Stmt
-	deleteJSONStmt *sql.Stmt
-	selectJSONStmt *sql.Stmt
+	//deleteJSONStmt *sql.Stmt - prepared at runtime due to variadic
+	//selectJSONStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
 func (s *queueJSONStatements) prepare(db *sql.DB) (err error) {
@@ -62,12 +62,6 @@ func (s *queueJSONStatements) prepare(db *sql.DB) (err error) {
 	if s.insertJSONStmt, err = db.Prepare(insertJSONSQL); err != nil {
 		return
 	}
-	if s.deleteJSONStmt, err = db.Prepare(deleteJSONSQL); err != nil {
-		return
-	}
-	if s.selectJSONStmt, err = db.Prepare(selectJSONSQL); err != nil {
-		return
-	}
 	return
 }
 
@@ -75,36 +69,62 @@ func (s *queueJSONStatements) insertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
 ) (int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
-	var lastid int64
-	if err := stmt.QueryRowContext(ctx, json).Scan(&lastid); err != nil {
-		return 0, err
+	res, err := stmt.ExecContext(ctx, json)
+	if err != nil {
+		return 0, fmt.Errorf("stmt.QueryContext: %w", err)
+	}
+	lastid, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("res.LastInsertId: %w", err)
 	}
 	return lastid, nil
 }
 
 func (s *queueJSONStatements) deleteQueueJSON(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, nids []int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
-	_, err := stmt.ExecContext(ctx, pq.StringArray(eventIDs))
+	deleteSQL := strings.Replace(deleteJSONSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
+	deleteStmt, err := txn.Prepare(deleteSQL)
+	if err != nil {
+		return fmt.Errorf("s.deleteQueueJSON s.db.Prepare: %w", err)
+	}
+
+	iNIDs := make([]interface{}, len(nids))
+	for k, v := range nids {
+		iNIDs[k] = v
+	}
+
+	stmt := sqlutil.TxStmt(txn, deleteStmt)
+	_, err = stmt.ExecContext(ctx, iNIDs...)
 	return err
 }
 
-func (s *queueJSONStatements) selectJSON(
+func (s *queueJSONStatements) selectQueueJSON(
 	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
-	blobs := map[int64][]byte{}
-	stmt := sqlutil.TxStmt(txn, s.selectJSONStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Int64Array(jsonNIDs))
+	selectSQL := strings.Replace(selectJSONSQL, "($1)", sqlutil.QueryVariadic(len(jsonNIDs)), 1)
+	selectStmt, err := txn.Prepare(selectSQL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("s.selectQueueJSON s.db.Prepare: %w", err)
+	}
+
+	iNIDs := make([]interface{}, len(jsonNIDs))
+	for k, v := range jsonNIDs {
+		iNIDs[k] = v
+	}
+
+	blobs := map[int64][]byte{}
+	stmt := sqlutil.TxStmt(txn, selectStmt)
+	rows, err := stmt.QueryContext(ctx, iNIDs...)
+	if err != nil {
+		return nil, fmt.Errorf("s.selectQueueJSON stmt.QueryContext: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJSON: rows.close() failed")
 	for rows.Next() {
 		var nid int64
 		var blob []byte
 		if err = rows.Scan(&nid, &blob); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("s.selectQueueJSON rows.Scan: %w", err)
 		}
 		blobs[nid] = blob
 	}
