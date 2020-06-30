@@ -40,6 +40,7 @@ type QueryCurrentStateResponse struct {
 func (r *QueryCurrentStateResponse) MarshalJSON() ([]byte, error) {
 	se := make(map[string]gomatrixserverlib.HeaderedEvent, len(r.StateEvents))
 	for k, v := range r.StateEvents {
+		// use 0x1F (unit separator) as the delimiter between type/state key,
 		se[fmt.Sprintf("%s\x1F%s", k.EventType, k.StateKey)] = v
 	}
 	return json.Marshal(se)
