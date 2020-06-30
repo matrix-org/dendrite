@@ -15,6 +15,7 @@
 package queue
 
 import (
+	"context"
 	"crypto/ed25519"
 	"fmt"
 	"sync"
@@ -86,7 +87,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			destination:     destination,
 			client:          oqs.client,
 			statistics:      oqs.statistics.ForServer(destination),
-			incomingPDUs:    make(chan *gomatrixserverlib.HeaderedEvent, 128),
+			incomingPDUs:    make(chan struct{}, 128),
 			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
 			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
 			retryServerCh:   make(chan bool),
@@ -120,8 +121,13 @@ func (oqs *OutgoingQueues) SendEvent(
 		"destinations": destinations, "event": ev.EventID(),
 	}).Info("Sending event")
 
+	nid, err := oqs.db.StoreJSON(context.TODO(), ev.JSON())
+	if err != nil {
+		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
+	}
+
 	for _, destination := range destinations {
-		oqs.getQueue(destination).sendEvent(ev)
+		oqs.getQueue(destination).sendEvent(nid)
 	}
 
 	return nil

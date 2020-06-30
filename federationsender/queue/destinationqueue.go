@@ -30,28 +30,31 @@ import (
 	"go.uber.org/atomic"
 )
 
+const maxPDUsPerTransaction = 50
+
 // destinationQueue is a queue of events for a single destination.
 // It is responsible for sending the events to the destination and
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
-	db              storage.Database
-	signing         *SigningInfo
-	rsAPI           api.RoomserverInternalAPI
-	client          *gomatrixserverlib.FederationClient     // federation client
-	origin          gomatrixserverlib.ServerName            // origin of requests
-	destination     gomatrixserverlib.ServerName            // destination of requests
-	running         atomic.Bool                             // is the queue worker running?
-	backingOff      atomic.Bool                             // true if we're backing off
-	statistics      *types.ServerStatistics                 // statistics about this remote server
-	incomingPDUs    chan *gomatrixserverlib.HeaderedEvent   // PDUs to send
-	incomingEDUs    chan *gomatrixserverlib.EDU             // EDUs to send
-	incomingInvites chan *gomatrixserverlib.InviteV2Request // invites to send
-	transactionID   gomatrixserverlib.TransactionID         // last transaction ID
-	pendingPDUs     []*gomatrixserverlib.HeaderedEvent      // owned by backgroundSend
-	pendingEDUs     []*gomatrixserverlib.EDU                // owned by backgroundSend
-	pendingInvites  []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
-	retryServerCh   chan bool                               // interrupts backoff
+	db               storage.Database
+	signing          *SigningInfo
+	rsAPI            api.RoomserverInternalAPI
+	client           *gomatrixserverlib.FederationClient     // federation client
+	origin           gomatrixserverlib.ServerName            // origin of requests
+	destination      gomatrixserverlib.ServerName            // destination of requests
+	running          atomic.Bool                             // is the queue worker running?
+	backingOff       atomic.Bool                             // true if we're backing off
+	statistics       *types.ServerStatistics                 // statistics about this remote server
+	incomingPDUs     chan struct{}                           // signal that there are PDUs waiting
+	incomingInvites  chan *gomatrixserverlib.InviteV2Request // invites to send
+	incomingEDUs     chan *gomatrixserverlib.EDU             // EDUs to send
+	transactionID    gomatrixserverlib.TransactionID         // last transaction ID
+	transactionCount int                                     // how many events in this transaction so far
+	pendingPDUs      []*gomatrixserverlib.HeaderedEvent      // owned by backgroundSend
+	pendingEDUs      []*gomatrixserverlib.EDU                // owned by backgroundSend
+	pendingInvites   []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
+	retryServerCh    chan bool                               // interrupts backoff
 }
 
 // retry will clear the blacklist state and attempt to send built up events to the server,
@@ -81,15 +84,42 @@ func (oq *destinationQueue) retry() {
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(ev *gomatrixserverlib.HeaderedEvent) {
+func (oq *destinationQueue) sendEvent(nid int64) {
 	if oq.statistics.Blacklisted() {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
+	// Create a transaction ID. We'll either do this if we don't have
+	// one made up yet, or if we've exceeded the number of maximum
+	// events allowed in a single tranaction. We'll reset the counter
+	// when we do.
+	if oq.transactionID == "" || oq.transactionCount >= maxPDUsPerTransaction {
+		now := gomatrixserverlib.AsTimestamp(time.Now())
+		oq.transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.statistics.SuccessCount()))
+		oq.transactionCount = 0
+	}
+	// Create a database entry that associates the given PDU NID with
+	// this destination queue. We'll then be able to retrieve the PDU
+	// later.
+	if err := oq.db.AssociatePDUWithDestination(
+		context.TODO(),
+		oq.transactionID, // the current transaction ID
+		oq.destination,   // the destination server name
+		[]int64{nid},     // NID from federationsender_queue_json table
+	); err != nil {
+		log.WithError(err).Errorf("failed to associate PDU with ID %d with destination %q", oq.destination)
+		return
+	}
+	// We've successfully added a PDU to the transaction so increase
+	// the counter.
+	oq.transactionCount++
+	// If the queue isn't running at this point then start it.
 	if !oq.running.Load() {
 		go oq.backgroundSend()
 	}
-	oq.incomingPDUs <- ev
+	// Signal that we've sent a new PDU. This will cause the queue to
+	// wake up if it's asleep.
+	oq.incomingPDUs <- struct{}{}
 }
 
 // sendEDU adds the EDU event to the pending queue for the destination.
@@ -131,21 +161,32 @@ func (oq *destinationQueue) backgroundSend() {
 	defer oq.running.Store(false)
 
 	for {
+		// For now we don't know the next transaction ID that we'll
+		// pluck from the database.
+		transactionID := gomatrixserverlib.TransactionID("")
+
+		// Check to see if there are any pending PDUs in the database.
+		// If we haven't reached the PDU limit yet then retrieve those
+		// events so that they can be added into this transaction.
+		if len(oq.pendingPDUs) < maxPDUsPerTransaction {
+			txid, pdus, err := oq.db.GetNextTransactionPDUs(
+				context.TODO(), // context
+				oq.destination, // server name
+				maxPDUsPerTransaction-len(oq.pendingPDUs), // how many events to retrieve
+			)
+			if err != nil {
+				log.WithError(err).Errorf("failed to get next transaction PDUs for server %q", oq.destination)
+				continue
+			}
+			transactionID = txid
+			oq.pendingPDUs = append(oq.pendingPDUs, pdus...)
+		}
+
 		// Wait either for incoming events, or until we hit an
 		// idle timeout.
 		select {
-		case pdu := <-oq.incomingPDUs:
-			// Ordering of PDUs is important so we add them to the end
-			// of the queue and they will all be added to transactions
-			// in order.
-			oq.pendingPDUs = append(oq.pendingPDUs, pdu)
-			// If there are any more things waiting in the channel queue
-			// then read them. This is safe because we guarantee only
-			// having one goroutine per destination queue, so the channel
-			// isn't being consumed anywhere else.
-			for len(oq.incomingPDUs) > 0 {
-				oq.pendingPDUs = append(oq.pendingPDUs, <-oq.incomingPDUs)
-			}
+		case <-oq.incomingPDUs:
+			// There are new PDUs waiting in the database.
 		case edu := <-oq.incomingEDUs:
 			// Likewise for EDUs, although we should probably not try
 			// too hard with some EDUs (like typing notifications) after
@@ -202,40 +243,20 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		if numPDUs > 0 || numEDUs > 0 {
-			// Generate a transaction ID.
-			if oq.transactionID == "" {
+			// If we haven't got a transaction ID then we should generate
+			// one. Ideally we'd know this already because something queued
+			// in the database would give us one, but if we're dealing with
+			// EDUs alone, we won't go via the database so we'll make one.
+			if transactionID == "" {
 				now := gomatrixserverlib.AsTimestamp(time.Now())
-				oq.transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.statistics.SuccessCount()))
+				transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.statistics.SuccessCount()))
 			}
 
 			// Try sending the next transaction and see what happens.
-			transaction, terr := oq.nextTransaction(oq.transactionID, oq.pendingPDUs, oq.pendingEDUs, oq.statistics.SuccessCount())
+			transaction, terr := oq.nextTransaction(transactionID, oq.pendingPDUs, oq.pendingEDUs, oq.statistics.SuccessCount())
 			if terr != nil {
 				// We failed to send the transaction.
-				giveUp := oq.statistics.Failure()
-				// TODO: commit the transaction to the database
-				if terr = oq.db.StoreFailedPDUs(
-					context.TODO(),
-					oq.transactionID,
-					oq.destination,
-					oq.pendingPDUs,
-				); terr != nil {
-					// We failed to persist the events to the database for some
-					// reason, so we'll keep them in memory for now. Hopefully
-					// it's a temporary condition but log it.
-					logrus.WithError(terr).Errorf("Failed to persist failed sends for server %q to database", oq.destination)
-				} else {
-					// Reallocate so that the underlying arrays can be GC'd, as
-					// opposed to growing forever.
-					for i := 0; i < numPDUs; i++ {
-						oq.pendingPDUs[i] = nil
-					}
-					oq.pendingPDUs = append(
-						[]*gomatrixserverlib.HeaderedEvent{},
-						oq.pendingPDUs[numPDUs:]...,
-					)
-				}
-				if giveUp {
+				if giveUp := oq.statistics.Failure(); giveUp {
 					// It's been suggested that we should give up because
 					// the backoff has exceeded a maximum allowable value.
 					return
@@ -261,6 +282,14 @@ func (oq *destinationQueue) backgroundSend() {
 					[]*gomatrixserverlib.EDU{},
 					oq.pendingEDUs[numEDUs:]...,
 				)
+				// Clean up the transaction in the database.
+				if err := oq.db.CleanTransactionPDUs(
+					context.TODO(),
+					oq.destination,
+					transactionID,
+				); err != nil {
+					log.WithError(err).Errorf("failed to clean transaction %q for server %q", transactionID, oq.destination)
+				}
 			}
 		}
 
@@ -307,8 +336,6 @@ func (oq *destinationQueue) nextTransaction(
 	t.Origin = oq.origin
 	t.Destination = oq.destination
 	t.OriginServerTS = gomatrixserverlib.AsTimestamp(time.Now())
-
-	oq.transactionID = t.TransactionID
 
 	for _, pdu := range pendingPDUs {
 		// Append the JSON of the event, since this is a json.RawMessage type in the
