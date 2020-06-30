@@ -134,7 +134,7 @@ func (s *queuePDUsStatements) selectQueueReferenceJSONCount(
 	ctx context.Context, txn *sql.Tx, jsonNID int64,
 ) (int64, error) {
 	var count int64
-	stmt := sqlutil.TxStmt(txn, s.selectQueueNextTransactionIDStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectQueueReferenceJSONCountStmt)
 	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
 	if err == sql.ErrNoRows {
 		return -1, nil
