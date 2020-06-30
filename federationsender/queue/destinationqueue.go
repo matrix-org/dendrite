@@ -107,7 +107,7 @@ func (oq *destinationQueue) sendEvent(nid int64) {
 		oq.destination,   // the destination server name
 		[]int64{nid},     // NID from federationsender_queue_json table
 	); err != nil {
-		log.WithError(err).Errorf("failed to associate PDU with ID %d with destination %q", oq.destination)
+		log.WithError(err).Errorf("failed to associate PDU NID %d with destination %q", nid, oq.destination)
 		return
 	}
 	// We've successfully added a PDU to the transaction so increase

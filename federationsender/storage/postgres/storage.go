@@ -191,7 +191,7 @@ func (d *Database) GetNextTransactionPDUs(
 		return "", nil, fmt.Errorf("d.selectQueuePDUs: %w", err)
 	}
 
-	blobs, err := d.selectJSON(ctx, nil, nids)
+	blobs, err := d.selectQueueJSON(ctx, nil, nids)
 	if err != nil {
 		return "", nil, fmt.Errorf("d.selectJSON: %w", err)
 	}
@@ -216,10 +216,14 @@ func (d *Database) CleanTransactionPDUs(
 	serverName gomatrixserverlib.ServerName,
 	transactionID gomatrixserverlib.TransactionID,
 ) error {
+	fmt.Println("Cleaning up after transaction", transactionID)
+
 	nids, err := d.selectQueuePDUs(ctx, nil, serverName, transactionID, 50)
 	if err != nil {
 		return fmt.Errorf("d.selectQueuePDUs: %w", err)
 	}
+
+	fmt.Println("Transaction", transactionID, "has", len(nids), "NIDs")
 
 	if err = d.deleteQueueTransaction(ctx, nil, serverName, transactionID); err != nil {
 		return fmt.Errorf("d.deleteQueueTransaction: %w", err)
@@ -236,6 +240,9 @@ func (d *Database) CleanTransactionPDUs(
 			deleteNIDs = append(deleteNIDs, nid)
 		}
 	}
+
+	fmt.Println("There are", len(deleteNIDs), "unreferenced NIDs ready for deletion")
+	fmt.Println("There are", len(nids)-len(deleteNIDs), "NIDs still referenced")
 
 	if len(deleteNIDs) > 0 {
 		if err = d.deleteQueueJSON(ctx, nil, deleteNIDs); err != nil {

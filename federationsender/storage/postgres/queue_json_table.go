@@ -90,7 +90,7 @@ func (s *queueJSONStatements) deleteQueueJSON(
 	return err
 }
 
-func (s *queueJSONStatements) selectJSON(
+func (s *queueJSONStatements) selectQueueJSON(
 	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
 	blobs := map[int64][]byte{}
