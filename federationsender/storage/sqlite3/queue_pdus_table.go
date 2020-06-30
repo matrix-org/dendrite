@@ -30,29 +30,29 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_pdus (
 	transaction_id TEXT NOT NULL,
     -- The domain part of the user ID the m.room.member event is for.
 	server_name TEXT NOT NULL,
-	-- The JSON NID from the federationsender_queue_json table.
+	-- The JSON NID from the federationsender_queue_pdus_json table.
 	json_nid BIGINT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_pdus_event_id_idx
-    ON federationsender_queue (event_id, server_name);
+CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_pdus_pdus_event_id_idx
+    ON federationsender_queue_pdus (event_id, server_name);
 `
 
 const insertQueuePDUSQL = "" +
-	"INSERT INTO federationsender_queue (transaction_id, server_name, json_nid)" +
+	"INSERT INTO federationsender_queue_pdus (transaction_id, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
 const deleteQueueTransactionPDUsSQL = "" +
-	"DELETE FROM federationsender_queue WHERE server_name = $1 AND transaction_id = $2"
+	"DELETE FROM federationsender_queue_pdus WHERE server_name = $1 AND transaction_id = $2"
 
 const selectQueueNextTransactionIDSQL = "" +
-	"SELECT transaction_id FROM federationsender_queue" +
+	"SELECT transaction_id FROM federationsender_queue_pdus" +
 	" WHERE server_name = $1" +
 	" ORDER BY transaction_id ASC" +
 	" LIMIT 1"
 
 const selectQueuePDUsByTransactionSQL = "" +
-	"SELECT json_nid FROM federationsender_queue" +
+	"SELECT json_nid FROM federationsender_queue_pdus" +
 	" WHERE server_name = $1 AND transaction_id = $2" +
 	" LIMIT 50"
 
