@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS currentstate_current_room_state (
 -- for event deletion
 CREATE UNIQUE INDEX IF NOT EXISTS currentstate_event_id_idx ON currentstate_current_room_state(event_id, room_id, type, sender);
 -- for querying membership states of users
-CREATE INDEX IF NOT EXISTS currentstate_membership_idx ON currentstate_current_room_state(type, state_key, membership)
+CREATE INDEX IF NOT EXISTS currentstate_membership_idx ON currentstate_current_room_state(type, state_key, content_value)
 WHERE type='m.room.member' AND content_value IS NOT NULL AND content_value != 'leave';
 `
 
