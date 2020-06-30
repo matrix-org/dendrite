@@ -255,7 +255,7 @@ func (oq *destinationQueue) backgroundSend() {
 			}
 
 			// Try sending the next transaction and see what happens.
-			transaction, terr := oq.nextTransaction(transactionID, oq.pendingPDUs, oq.pendingEDUs, oq.statistics.SuccessCount())
+			transaction, terr := oq.nextTransaction(transactionID, oq.pendingPDUs, oq.pendingEDUs)
 			if terr != nil {
 				// We failed to send the transaction.
 				if giveUp := oq.statistics.Failure(); giveUp {
@@ -328,7 +328,6 @@ func (oq *destinationQueue) nextTransaction(
 	transactionID gomatrixserverlib.TransactionID,
 	pendingPDUs []*gomatrixserverlib.HeaderedEvent,
 	pendingEDUs []*gomatrixserverlib.EDU,
-	sentCounter uint32,
 ) (bool, error) {
 	t := gomatrixserverlib.Transaction{
 		PDUs: []json.RawMessage{},

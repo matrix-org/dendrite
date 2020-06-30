@@ -83,10 +83,10 @@ func (s *queueJSONStatements) insertQueueJSON(
 }
 
 func (s *queueJSONStatements) deleteQueueJSON(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, nids []int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
-	_, err := stmt.ExecContext(ctx, pq.StringArray(eventIDs))
+	_, err := stmt.ExecContext(ctx, pq.Int64Array(nids))
 	return err
 }
 
