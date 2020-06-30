@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strconv"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/currentstateserver/storage/tables"
@@ -26,7 +27,9 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const currentRoomStateSchema = `
+var leaveEnum = strconv.Itoa(tables.MembershipToEnum["leave"])
+
+var currentRoomStateSchema = `
 -- Stores the current room state for every room.
 CREATE TABLE IF NOT EXISTS currentstate_current_room_state (
     -- The 'room_id' key for the state event.
@@ -41,16 +44,16 @@ CREATE TABLE IF NOT EXISTS currentstate_current_room_state (
     state_key TEXT NOT NULL,
     -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
     headered_event_json TEXT NOT NULL,
-    -- The 'content.membership' value if this event is an m.room.member event. For other
-    -- events, this will be NULL.
-    membership TEXT,
+    -- The 'content.membership' enum value if this event is an m.room.member event.
+    membership SMALLINT NOT NULL DEFAULT 0,
     -- Clobber based on 3-uple of room_id, type and state_key
     CONSTRAINT currentstate_current_room_state_unique UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
 CREATE UNIQUE INDEX IF NOT EXISTS currentstate_event_id_idx ON currentstate_current_room_state(event_id, room_id, type, sender);
 -- for querying membership states of users
-CREATE INDEX IF NOT EXISTS currentstate_membership_idx ON currentstate_current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
+CREATE INDEX IF NOT EXISTS currentstate_membership_idx ON currentstate_current_room_state(type, state_key, membership)
+WHERE membership IS NOT NULL AND membership != ` + leaveEnum + `;
 `
 
 const upsertRoomStateSQL = "" +
@@ -108,10 +111,10 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	ctx context.Context,
 	txn *sql.Tx,
 	userID string,
-	membership string,
+	membershipEnum int,
 ) ([]string, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, userID, membership)
+	rows, err := stmt.QueryContext(ctx, userID, membershipEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +141,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) UpsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.HeaderedEvent, membership *string,
+	event gomatrixserverlib.HeaderedEvent, membershipEnum int,
 ) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
@@ -155,7 +158,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		event.Sender(),
 		*event.StateKey(),
 		headeredJSON,
-		membership,
+		membershipEnum,
 	)
 	return err
 }

@@ -167,7 +167,7 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
-	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+	stateAPI := currentstateserver.NewInternalAPI(base.Base.Cfg, base.Base.KafkaConsumer)
 
 	monolith := setup.Monolith{
 		Config:        base.Base.Cfg,

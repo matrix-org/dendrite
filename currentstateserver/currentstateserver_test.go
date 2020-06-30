@@ -136,8 +136,8 @@ func TestQueryCurrentState(t *testing.T) {
 				},
 			},
 			wantRes: api.QueryCurrentStateResponse{
-				StateEvents: map[gomatrixserverlib.StateKeyTuple]gomatrixserverlib.HeaderedEvent{
-					plTuple: plEvent,
+				StateEvents: map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent{
+					plTuple: &plEvent,
 				},
 			},
 		},
