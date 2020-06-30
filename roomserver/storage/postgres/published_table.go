@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS roomserver_published (
 
 const upsertPublishedSQL = "" +
 	"INSERT INTO roomserver_published (room_id, published) VALUES ($1, $2) " +
-	"ON CONFLICT room_id DO UPDATE SET published=$2"
+	"ON CONFLICT (room_id) DO UPDATE SET published=$2"
 
 const selectAllPublishedSQL = "" +
 	"SELECT room_id FROM roomserver_published WHERE published = $1"
