@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -31,7 +32,8 @@ import (
 type Database struct {
 	joinedHostsStatements
 	roomStatements
-	queueRetryStatements
+	queuePDUsStatements
+	queueJSONStatements
 	sqlutil.PartitionOffsetStatements
 	db *sql.DB
 }
@@ -64,7 +66,11 @@ func (d *Database) prepare() error {
 		return err
 	}
 
-	if err = d.queueRetryStatements.prepare(d.db); err != nil {
+	if err = d.queuePDUsStatements.prepare(d.db); err != nil {
+		return err
+	}
+
+	if err = d.queueJSONStatements.prepare(d.db); err != nil {
 		return err
 	}
 
@@ -134,44 +140,87 @@ func (d *Database) GetJoinedHosts(
 	return d.selectJoinedHosts(ctx, roomID)
 }
 
-// GetFailedPDUs retrieves PDUs that we have failed to send on
-// a specific destination queue.
-func (d *Database) GetFailedPDUs(
-	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
-) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	transactionID, err := d.selectRetryNextTransactionID(ctx, nil, string(serverName), types.FailedEventTypePDU)
+// StoreJSON adds a JSON blob into the queue JSON table and returns
+// a NID. The NID will then be used when inserting the per-destination
+// metadata entries.
+func (d *Database) StoreJSON(
+	ctx context.Context, js []byte,
+) (int64, error) {
+	res, err := d.insertJSONStmt.ExecContext(ctx, js)
 	if err != nil {
-		return nil, fmt.Errorf("d.selectRetryNextTransactionID: %w", err)
+		return 0, fmt.Errorf("d.insertRetryJSONStmt: %w", err)
 	}
-
-	events, err := d.selectQueueRetryPDUs(ctx, nil, string(serverName), transactionID)
+	nid, err := res.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("d.selectQueueRetryPDUs: %w", err)
+		return 0, fmt.Errorf("res.LastInsertID: %w", err)
 	}
-	return events, nil
+	return nid, nil
 }
 
-// StoreFailedPDUs stores PDUs that we have failed to send on
-// a specific destination queue.
-func (d *Database) StoreFailedPDUs(
+// AssociatePDUWithDestination creates an association that the
+// destination queues will use to determine which JSON blobs to send
+// to which servers.
+func (d *Database) AssociatePDUWithDestination(
 	ctx context.Context,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName gomatrixserverlib.ServerName,
-	pdus []*gomatrixserverlib.HeaderedEvent,
+	nids []int64,
 ) error {
-	for _, pdu := range pdus {
-		if _, err := d.insertRetryStmt.ExecContext(
-			ctx,
-			string(transactionID),    // transaction ID
-			types.FailedEventTypePDU, // type of event that was queued
-			pdu.EventID(),            // event ID
-			pdu.OriginServerTS(),     // event origin server TS
-			string(serverName),       // destination server name
-			pdu.JSON(),               // JSON body
+	for _, nid := range nids {
+		if err := d.insertQueuePDU(
+			ctx,           // context
+			nil,           // SQL transaction
+			transactionID, // transaction ID
+			serverName,    // destination server name
+			nid,           // NID from the federationsender_queue_json table
 		); err != nil {
 			return fmt.Errorf("d.insertQueueRetryStmt.ExecContext: %w", err)
 		}
 	}
 	return nil
+}
+
+// GetNextTransactionPDUs retrieves events from the database for
+// the next pending transaction, up to the limit specified.
+func (d *Database) GetNextTransactionPDUs(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	limit int,
+) (gomatrixserverlib.TransactionID, []*gomatrixserverlib.HeaderedEvent, error) {
+	transactionID, err := d.selectQueueNextTransactionID(ctx, nil, string(serverName), types.FailedEventTypePDU)
+	if err != nil {
+		return "", nil, fmt.Errorf("d.selectRetryNextTransactionID: %w", err)
+	}
+
+	nids, err := d.selectQueuePDUs(ctx, nil, string(serverName), transactionID, limit)
+	if err != nil {
+		return "", nil, fmt.Errorf("d.selectQueueRetryPDUs: %w", err)
+	}
+
+	blobs, err := d.selectJSON(ctx, nil, nids)
+	if err != nil {
+		return "", nil, fmt.Errorf("d.selectJSON: %w", err)
+	}
+
+	var events []*gomatrixserverlib.HeaderedEvent
+	for _, blob := range blobs {
+		var event gomatrixserverlib.HeaderedEvent
+		if err := json.Unmarshal(blob, &event); err != nil {
+			return "", nil, fmt.Errorf("json.Unmarshal: %w", err)
+		}
+		events = append(events, &event)
+	}
+
+	return gomatrixserverlib.TransactionID(transactionID), events, nil
+}
+
+// CleanTransactionPDUs cleans up all associated events for a
+// given transaction. This is done when the transaction was sent
+// successfully.
+func (d *Database) CleanTransactionPDUs(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	transactionID gomatrixserverlib.TransactionID,
+) error {
+	return d.deleteQueueTransaction(ctx, nil, serverName, transactionID)
 }

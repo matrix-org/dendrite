@@ -30,7 +30,7 @@ import (
 type Database struct {
 	joinedHostsStatements
 	roomStatements
-	queueStatements
+	queuePDUsStatements
 	queueJSONStatements
 	sqlutil.PartitionOffsetStatements
 	db *sql.DB
@@ -60,7 +60,7 @@ func (d *Database) prepare() error {
 		return err
 	}
 
-	if err = d.queueStatements.prepare(d.db); err != nil {
+	if err = d.queuePDUsStatements.prepare(d.db); err != nil {
 		return err
 	}
 
