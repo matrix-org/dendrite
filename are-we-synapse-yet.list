@@ -91,6 +91,7 @@ snd PUT /rooms/:room_id/send/:event_type/:txn_id deduplicates the same txn id
 get GET /rooms/:room_id/messages returns a message
 get GET /rooms/:room_id/messages lazy loads members correctly 
 typ PUT /rooms/:room_id/typing/:user_id sets typing notification 
+typ Typing notifications don't leak (3 subtests)
 rst GET /rooms/:room_id/state/m.room.power_levels can fetch levels
 rst PUT /rooms/:room_id/state/m.room.power_levels can set levels
 rst PUT power_levels should not explode if the old power levels were empty
