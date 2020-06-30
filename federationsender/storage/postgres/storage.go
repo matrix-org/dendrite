@@ -138,15 +138,11 @@ func (d *Database) GetJoinedHosts(
 // a NID. The NID will then be used when inserting the per-destination
 // metadata entries.
 func (d *Database) StoreJSON(
-	ctx context.Context, js []byte,
+	ctx context.Context, js string,
 ) (int64, error) {
-	res, err := d.insertJSONStmt.ExecContext(ctx, js)
+	nid, err := d.insertQueueJSON(ctx, nil, js)
 	if err != nil {
-		return 0, fmt.Errorf("d.insertRetryJSONStmt: %w", err)
-	}
-	nid, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("res.LastInsertID: %w", err)
+		return 0, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
 	return nid, nil
 }

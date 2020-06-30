@@ -121,7 +121,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		"destinations": destinations, "event": ev.EventID(),
 	}).Info("Sending event")
 
-	nid, err := oqs.db.StoreJSON(context.TODO(), ev.JSON())
+	nid, err := oqs.db.StoreJSON(context.TODO(), string(ev.JSON()))
 	if err != nil {
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
