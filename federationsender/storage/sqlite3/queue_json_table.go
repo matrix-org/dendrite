@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_json (
 const insertJSONSQL = "" +
 	"INSERT INTO federationsender_queue_json (json_body)" +
 	" VALUES ($1)" +
-	" ON CONFLICT DO NOTHING"
+	" RETURNING json_nid"
 
 const deleteJSONSQL = "" +
 	"DELETE FROM federationsender_queue_json WHERE json_nid = ANY($1)"
@@ -75,12 +75,11 @@ func (s *queueJSONStatements) insertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
 ) (int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
-	res, err := stmt.ExecContext(ctx, json)
-	if err != nil {
+	var lastid int64
+	if err := stmt.QueryRowContext(ctx, json).Scan(&lastid); err != nil {
 		return 0, err
 	}
-	lastid, err := res.LastInsertId()
-	return lastid, err
+	return lastid, nil
 }
 
 func (s *queueJSONStatements) deleteQueueJSON(
