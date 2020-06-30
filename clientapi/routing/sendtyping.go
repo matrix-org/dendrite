@@ -13,15 +13,15 @@
 package routing
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/userutil"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -36,6 +36,7 @@ func SendTyping(
 	req *http.Request, device *userapi.Device, roomID string,
 	userID string, accountDB accounts.Database,
 	eduAPI api.EDUServerInputAPI,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
 ) util.JSONResponse {
 	if device.UserID != userID {
 		return util.JSONResponse{
@@ -44,22 +45,37 @@ func SendTyping(
 		}
 	}
 
-	localpart, err := userutil.ParseUsernameParam(userID, nil)
+	// Verify that the user is a member of this room
+	tuple := gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomMember,
+		StateKey:  userID,
+	}
+	var res currentstateAPI.QueryCurrentStateResponse
+	err := stateAPI.QueryCurrentState(req.Context(), &currentstateAPI.QueryCurrentStateRequest{
+		RoomID:      roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
+	}, &res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("userutil.ParseUsernameParam failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryCurrentState failed")
 		return jsonerror.InternalServerError()
 	}
-
-	// Verify that the user is a member of this room
-	_, err = accountDB.GetMembershipInRoomByLocalpart(req.Context(), localpart, roomID)
-	if err == sql.ErrNoRows {
+	ev := res.StateEvents[tuple]
+	if ev == nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("User not in this room"),
 		}
-	} else if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetMembershipInRoomByLocalPart failed")
+	}
+	membership, err := ev.Membership()
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("Member event isn't valid")
 		return jsonerror.InternalServerError()
+	}
+	if membership != gomatrixserverlib.Join {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("User not in this room"),
+		}
 	}
 
 	// parse the incoming http request

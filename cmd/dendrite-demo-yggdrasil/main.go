@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
+	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -115,6 +116,8 @@ func main() {
 
 	embed.Embed(base.BaseMux, *instancePort, "Yggdrasil Demo")
 
+	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
@@ -130,6 +133,7 @@ func main() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
+		StateAPI:            stateAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB: publicRoomsDB,

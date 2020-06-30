@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS currentstate_membership_idx ON currentstate_current_r
 const upsertRoomStateSQL = "" +
 	"INSERT INTO currentstate_current_room_state (room_id, event_id, type, sender, state_key, headered_event_json, membership)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
-	" ON CONFLICT ON CONSTRAINT currentstate_room_state_unique" +
+	" ON CONFLICT ON CONSTRAINT currentstate_current_room_state_unique" +
 	" DO UPDATE SET event_id = $2, sender=$4, headered_event_json = $6, membership = $7"
 
 const deleteRoomStateByEventIDSQL = "" +

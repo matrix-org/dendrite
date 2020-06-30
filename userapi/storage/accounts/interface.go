@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
@@ -36,10 +35,6 @@ type Database interface {
 	// account already exists, it will return nil, ErrUserExists.
 	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*api.Account, error)
 	CreateGuestAccount(ctx context.Context) (*api.Account, error)
-	UpdateMemberships(ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string) error
-	GetMembershipInRoomByLocalpart(ctx context.Context, localpart, roomID string) (authtypes.Membership, error)
-	GetRoomIDsByLocalPart(ctx context.Context, localpart string) ([]string, error)
-	GetMembershipsByLocalpart(ctx context.Context, localpart string) (memberships []authtypes.Membership, err error)
 	SaveAccountData(ctx context.Context, localpart, roomID, dataType string, content json.RawMessage) error
 	GetAccountData(ctx context.Context, localpart string) (global map[string]json.RawMessage, rooms map[string]map[string]json.RawMessage, err error)
 	// GetAccountDataByType returns account data matching a given

@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
+	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -122,6 +123,8 @@ func main() {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
+	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
@@ -137,6 +140,7 @@ func main() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		ServerKeyAPI:        serverKeyAPI,
+		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
 
 		PublicRoomsDB: publicRoomsDB,

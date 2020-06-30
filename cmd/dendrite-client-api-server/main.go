@@ -37,7 +37,7 @@ func main() {
 	userAPI := base.UserAPIClient()
 
 	clientapi.AddPublicRoutes(
-		base.PublicAPIMux, base.Cfg, base.KafkaConsumer, base.KafkaProducer, deviceDB, accountDB, federation,
+		base.PublicAPIMux, base.Cfg, base.KafkaProducer, deviceDB, accountDB, federation,
 		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI,
 	)
 

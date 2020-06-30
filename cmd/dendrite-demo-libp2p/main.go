@@ -30,6 +30,7 @@ import (
 	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-libp2p/storage"
+	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -166,6 +167,7 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
+	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
 
 	monolith := setup.Monolith{
 		Config:        base.Base.Cfg,
@@ -182,6 +184,7 @@ func main() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		ServerKeyAPI:        serverKeyAPI,
+		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
 
 		PublicRoomsDB: publicRoomsDB,

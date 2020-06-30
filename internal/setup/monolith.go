@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -56,6 +57,7 @@ type Monolith struct {
 	RoomserverAPI       roomserverAPI.RoomserverInternalAPI
 	ServerKeyAPI        serverKeyAPI.ServerKeyInternalAPI
 	UserAPI             userapi.UserInternalAPI
+	StateAPI            currentstateAPI.CurrentStateInternalAPI
 
 	// TODO: can we remove this? It's weird that we are required the database
 	// yet every other component can do that on its own. libp2p-demo uses a custom
@@ -69,9 +71,9 @@ type Monolith struct {
 // AddAllPublicRoutes attaches all public paths to the given router
 func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 	clientapi.AddPublicRoutes(
-		publicMux, m.Config, m.KafkaConsumer, m.KafkaProducer, m.DeviceDB, m.AccountDB,
+		publicMux, m.Config, m.KafkaProducer, m.DeviceDB, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
-		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
+		m.EDUInternalAPI, m.AppserviceAPI, m.StateAPI, transactions.New(),
 		m.FederationSenderAPI, m.UserAPI,
 	)
 
