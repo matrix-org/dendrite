@@ -17,7 +17,6 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/currentstateserver/storage/tables"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -48,20 +47,9 @@ func (d *Database) StoreStateEvents(ctx context.Context, addStateEvents []gomatr
 				// ignore non state events
 				continue
 			}
-			var membershipEnum int
-			if event.Type() == "m.room.member" {
-				membership, err := event.Membership()
-				if err != nil {
-					return err
-				}
-				enum, ok := tables.MembershipToEnum[membership]
-				if !ok {
-					return fmt.Errorf("unknown membership: %s", membership)
-				}
-				membershipEnum = enum
-			}
+			contentVal := tables.ExtractContentValue(&event)
 
-			if err := d.CurrentRoomState.UpsertRoomState(ctx, txn, event, membershipEnum); err != nil {
+			if err := d.CurrentRoomState.UpsertRoomState(ctx, txn, event, contentVal); err != nil {
 				return err
 			}
 		}
@@ -70,9 +58,5 @@ func (d *Database) StoreStateEvents(ctx context.Context, addStateEvents []gomatr
 }
 
 func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error) {
-	enum, ok := tables.MembershipToEnum[membership]
-	if !ok {
-		return nil, fmt.Errorf("unknown membership: %s", membership)
-	}
-	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, nil, userID, enum)
+	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, nil, userID, membership)
 }
