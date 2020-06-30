@@ -225,14 +225,10 @@ func (d *Database) CleanTransactionPDUs(
 	transactionID gomatrixserverlib.TransactionID,
 ) error {
 	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
-		fmt.Println("Cleaning up after transaction", transactionID)
-
 		nids, err := d.selectQueuePDUs(ctx, txn, serverName, transactionID, 50)
 		if err != nil {
 			return fmt.Errorf("d.selectQueuePDUs: %w", err)
 		}
-
-		fmt.Println("Transaction", transactionID, "has", len(nids), "NIDs")
 
 		if err = d.deleteQueueTransaction(ctx, txn, serverName, transactionID); err != nil {
 			return fmt.Errorf("d.deleteQueueTransaction: %w", err)
@@ -249,9 +245,6 @@ func (d *Database) CleanTransactionPDUs(
 				deleteNIDs = append(deleteNIDs, nid)
 			}
 		}
-
-		fmt.Println("There are", len(deleteNIDs), "unreferenced NIDs ready for deletion")
-		fmt.Println("There are", len(nids)-len(deleteNIDs), "NIDs still referenced")
 
 		if len(deleteNIDs) > 0 {
 			if err = d.deleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
