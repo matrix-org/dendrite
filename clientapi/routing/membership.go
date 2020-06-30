@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -357,4 +358,36 @@ func checkAndProcessThreepid(
 		return inviteStored, &er
 	}
 	return
+}
+
+func checkMemberInRoom(ctx context.Context, stateAPI currentstateAPI.CurrentStateInternalAPI, userID, roomID string) *util.JSONResponse {
+	tuple := gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomMember,
+		StateKey:  userID,
+	}
+	var membershipRes currentstateAPI.QueryCurrentStateResponse
+	err := stateAPI.QueryCurrentState(ctx, &currentstateAPI.QueryCurrentStateRequest{
+		RoomID:      roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
+	}, &membershipRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("QueryCurrentState: could not query membership for user")
+		e := jsonerror.InternalServerError()
+		return &e
+	}
+	ev, ok := membershipRes.StateEvents[tuple]
+	if !ok {
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user does not belong to room"),
+		}
+	}
+	membership, err := ev.Membership()
+	if err != nil || membership != "join" {
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user does not belong to room"),
+		}
+	}
+	return nil
 }

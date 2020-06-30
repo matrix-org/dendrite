@@ -48,3 +48,23 @@ func (a *CurrentStateInternalAPI) QueryRoomsForUser(ctx context.Context, req *ap
 	res.RoomIDs = roomIDs
 	return nil
 }
+
+func (a *CurrentStateInternalAPI) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
+	events, err := a.DB.GetBulkStateContent(ctx, req.RoomIDs, req.StateTuples, req.AllowWildcards)
+	if err != nil {
+		return err
+	}
+	res.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
+	for _, ev := range events {
+		if res.Rooms[ev.RoomID] == nil {
+			res.Rooms[ev.RoomID] = make(map[gomatrixserverlib.StateKeyTuple]string)
+		}
+		room := res.Rooms[ev.RoomID]
+		room[gomatrixserverlib.StateKeyTuple{
+			EventType: ev.EventType,
+			StateKey:  ev.StateKey,
+		}] = ev.ContentValue
+		res.Rooms[ev.RoomID] = room
+	}
+	return nil
+}

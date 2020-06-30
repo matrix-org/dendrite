@@ -26,6 +26,7 @@ type Database struct {
 	PrevEventsTable     tables.PreviousEvents
 	InvitesTable        tables.Invites
 	MembershipTable     tables.Membership
+	PublishedTable      tables.Published
 }
 
 func (d *Database) EventTypeNIDs(
@@ -418,6 +419,14 @@ func (d *Database) StoreEvent(
 			EventNID: eventNID,
 		},
 	}, nil
+}
+
+func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
+	return d.PublishedTable.UpsertRoomPublished(ctx, roomID, publish)
+}
+
+func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
+	return d.PublishedTable.SelectAllPublishedRooms(ctx, true)
 }
 
 func (d *Database) assignRoomNID(

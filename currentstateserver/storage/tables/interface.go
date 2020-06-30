@@ -33,6 +33,15 @@ type CurrentRoomState interface {
 	DeleteRoomStateByEventID(ctx context.Context, txn *sql.Tx, eventID string) error
 	// SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
 	SelectRoomIDsWithMembership(ctx context.Context, txn *sql.Tx, userID string, membership string) ([]string, error)
+	SelectBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]StrippedEvent, error)
+}
+
+// StrippedEvent represents a stripped event for returning extracted content values.
+type StrippedEvent struct {
+	RoomID       string
+	EventType    string
+	StateKey     string
+	ContentValue string
 }
 
 // ExtractContentValue from the given state event. For example, given an m.room.name event with:

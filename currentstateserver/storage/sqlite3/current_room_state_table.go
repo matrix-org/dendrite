@@ -192,3 +192,9 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 	}
 	return &ev, err
 }
+
+func (s *currentRoomStateStatements) SelectBulkStateContent(
+	ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool,
+) ([]tables.StrippedEvent, error) {
+	return nil, nil
+}

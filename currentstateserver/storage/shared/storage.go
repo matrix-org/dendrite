@@ -32,6 +32,10 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	return d.CurrentRoomState.SelectStateEvent(ctx, roomID, evType, stateKey)
 }
 
+func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error) {
+	return d.CurrentRoomState.SelectBulkStateContent(ctx, roomIDs, tuples, allowWildcards)
+}
+
 func (d *Database) StoreStateEvents(ctx context.Context, addStateEvents []gomatrixserverlib.HeaderedEvent,
 	removeStateEventIDs []string) error {
 	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {

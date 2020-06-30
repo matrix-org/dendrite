@@ -930,3 +930,16 @@ func (r *RoomserverInternalAPI) QueryRoomVersionForRoom(
 	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	return nil
 }
+
+func (r *RoomserverInternalAPI) QueryPublishedRooms(
+	ctx context.Context,
+	req *api.QueryPublishedRoomsRequest,
+	res *api.QueryPublishedRoomsResponse,
+) error {
+	rooms, err := r.DB.GetPublishedRooms(ctx)
+	if err != nil {
+		return err
+	}
+	res.RoomIDs = rooms
+	return nil
+}

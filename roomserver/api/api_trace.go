@@ -57,6 +57,25 @@ func (t *RoomserverInternalAPITrace) PerformLeave(
 	return err
 }
 
+func (t *RoomserverInternalAPITrace) PerformPublish(
+	ctx context.Context,
+	req *PerformPublishRequest,
+	res *PerformPublishResponse,
+) {
+	t.Impl.PerformPublish(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformPublish req=%+v res=%+v", js(req), js(res))
+}
+
+func (t *RoomserverInternalAPITrace) QueryPublishedRooms(
+	ctx context.Context,
+	req *QueryPublishedRoomsRequest,
+	res *QueryPublishedRoomsResponse,
+) error {
+	err := t.Impl.QueryPublishedRooms(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryPublishedRooms req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func (t *RoomserverInternalAPITrace) QueryLatestEventsAndState(
 	ctx context.Context,
 	req *QueryLatestEventsAndStateRequest,

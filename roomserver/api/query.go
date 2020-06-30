@@ -215,3 +215,13 @@ type QueryRoomVersionForRoomRequest struct {
 type QueryRoomVersionForRoomResponse struct {
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 }
+
+type QueryPublishedRoomsRequest struct {
+	// Optional. If specified, returns whether this room is published or not.
+	RoomID string
+}
+
+type QueryPublishedRoomsResponse struct {
+	// The list of published rooms.
+	RoomIDs []string
+}

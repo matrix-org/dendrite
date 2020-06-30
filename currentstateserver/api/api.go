@@ -29,6 +29,8 @@ type CurrentStateInternalAPI interface {
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	// QueryRoomsForUser retrieves a list of room IDs matching the given query.
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
+	// QueryBulkStateContent does a bulk query for state event content in the given rooms.
+	QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error
 }
 
 type QueryRoomsForUserRequest struct {
@@ -39,6 +41,30 @@ type QueryRoomsForUserRequest struct {
 
 type QueryRoomsForUserResponse struct {
 	RoomIDs []string
+}
+
+type QueryBulkStateContentRequest struct {
+	// Returns state events in these rooms
+	RoomIDs []string
+	// If true, treats the '*' StateKey as "all state events of this type" rather than a literal value of '*'
+	AllowWildcards bool
+	// The state events to return. Only a small subset of tuples are allowed in this request as only certain events
+	// have their content fields extracted. Specifically, the tuple Type must be one of:
+	//   m.room.avatar
+	//   m.room.create
+	//   m.room.canonical_alias
+	//   m.room.guest_access
+	//   m.room.history_visibility
+	//   m.room.join_rules
+	//   m.room.member
+	//   m.room.name
+	//   m.room.topic
+	// Any other tuple type will result in the query failing.
+	StateTuples []gomatrixserverlib.StateKeyTuple
+}
+type QueryBulkStateContentResponse struct {
+	// map of room ID -> tuple -> content_value
+	Rooms map[string]map[gomatrixserverlib.StateKeyTuple]string
 }
 
 type QueryCurrentStateRequest struct {
