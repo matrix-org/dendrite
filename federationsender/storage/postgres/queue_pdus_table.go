@@ -54,7 +54,7 @@ const selectQueueNextTransactionIDSQL = "" +
 const selectQueuePDUsByTransactionSQL = "" +
 	"SELECT json_nid FROM federationsender_queue_pdus" +
 	" WHERE server_name = $1 AND transaction_id = $2" +
-	" LIMIT 50"
+	" LIMIT $3"
 
 type queuePDUsStatements struct {
 	insertQueuePDUStmt               *sql.Stmt
@@ -111,11 +111,14 @@ func (s *queuePDUsStatements) deleteQueueTransaction(
 }
 
 func (s *queuePDUsStatements) selectQueueNextTransactionID(
-	ctx context.Context, txn *sql.Tx, serverName, sendType string,
+	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) (string, error) {
 	var transactionID string
 	stmt := sqlutil.TxStmt(txn, s.selectQueueNextTransactionIDStmt)
 	err := stmt.QueryRowContext(ctx, serverName).Scan(&transactionID)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
 	return transactionID, err
 }
 
@@ -123,7 +126,7 @@ func (s *queuePDUsStatements) selectQueuePDUs(
 	ctx context.Context, txn *sql.Tx, serverName string, transactionID string, limit int,
 ) ([]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsByTransactionStmt)
-	rows, err := stmt.QueryContext(ctx, serverName, transactionID)
+	rows, err := stmt.QueryContext(ctx, serverName, transactionID, limit)
 	if err != nil {
 		return nil, err
 	}

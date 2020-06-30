@@ -177,14 +177,18 @@ func (d *Database) GetNextTransactionPDUs(
 	serverName gomatrixserverlib.ServerName,
 	limit int,
 ) (gomatrixserverlib.TransactionID, []*gomatrixserverlib.HeaderedEvent, error) {
-	transactionID, err := d.selectQueueNextTransactionID(ctx, nil, string(serverName), types.FailedEventTypePDU)
+	transactionID, err := d.selectQueueNextTransactionID(ctx, nil, serverName)
 	if err != nil {
-		return "", nil, fmt.Errorf("d.selectRetryNextTransactionID: %w", err)
+		return "", nil, fmt.Errorf("d.selectQueueNextTransactionID: %w", err)
+	}
+
+	if transactionID == "" {
+		return "", nil, nil
 	}
 
 	nids, err := d.selectQueuePDUs(ctx, nil, string(serverName), transactionID, limit)
 	if err != nil {
-		return "", nil, fmt.Errorf("d.selectQueueRetryPDUs: %w", err)
+		return "", nil, fmt.Errorf("d.selectQueuePDUs: %w", err)
 	}
 
 	blobs, err := d.selectJSON(ctx, nil, nids)
