@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS currentstate_current_room_state (
     sender TEXT NOT NULL,
     state_key TEXT NOT NULL,
     headered_event_json TEXT NOT NULL,
-    membership TEXT,
+    membership INTEGER NOT NULL DEFAULT 0,
     UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
@@ -100,10 +100,10 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	ctx context.Context,
 	txn *sql.Tx,
 	userID string,
-	membership string, // nolint: unparam
+	membershipEnum int,
 ) ([]string, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, userID, membership)
+	rows, err := stmt.QueryContext(ctx, userID, membershipEnum)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) UpsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.HeaderedEvent, membership *string,
+	event gomatrixserverlib.HeaderedEvent, membershipEnum int,
 ) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
@@ -147,7 +147,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		event.Sender(),
 		*event.StateKey(),
 		headeredJSON,
-		membership,
+		membershipEnum,
 	)
 	return err
 }

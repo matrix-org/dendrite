@@ -29,4 +29,6 @@ type Database interface {
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
+	// GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
+	GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error)
 }

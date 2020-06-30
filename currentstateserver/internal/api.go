@@ -27,15 +27,24 @@ type CurrentStateInternalAPI struct {
 }
 
 func (a *CurrentStateInternalAPI) QueryCurrentState(ctx context.Context, req *api.QueryCurrentStateRequest, res *api.QueryCurrentStateResponse) error {
-	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]gomatrixserverlib.HeaderedEvent)
+	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
 	for _, tuple := range req.StateTuples {
 		ev, err := a.DB.GetStateEvent(ctx, req.RoomID, tuple.EventType, tuple.StateKey)
 		if err != nil {
 			return err
 		}
 		if ev != nil {
-			res.StateEvents[tuple] = *ev
+			res.StateEvents[tuple] = ev
 		}
 	}
+	return nil
+}
+
+func (a *CurrentStateInternalAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
+	roomIDs, err := a.DB.GetRoomsByMembership(ctx, req.UserID, req.WantMembership)
+	if err != nil {
+		return err
+	}
+	res.RoomIDs = roomIDs
 	return nil
 }
