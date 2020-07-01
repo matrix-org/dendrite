@@ -252,14 +252,6 @@ func (oq *destinationQueue) backgroundSend() {
 				oq.transactionID = ""
 				// Clean up the in-memory buffers.
 				oq.cleanPendingEDUs()
-				// Clean up the transaction in the database.
-				if err := oq.db.CleanTransactionPDUs(
-					context.TODO(),
-					oq.destination,
-					transactionID,
-				); err != nil {
-					log.WithError(err).Errorf("failed to clean transaction %q for server %q", transactionID, oq.destination)
-				}
 			}
 		}
 
@@ -359,7 +351,15 @@ func (oq *destinationQueue) nextTransaction(
 	switch e := err.(type) {
 	case nil:
 		// No error was returned so the transaction looks to have
-		// been successfully sent.
+		// been successfully sent. Clean up the transaction in the
+		// database.
+		if err = oq.db.CleanTransactionPDUs(
+			context.TODO(),
+			t.Destination,
+			t.TransactionID,
+		); err != nil {
+			log.WithError(err).Errorf("failed to clean transaction %q for server %q", transactionID, oq.destination)
+		}
 		return true, nil
 	case gomatrix.HTTPError:
 		// We received a HTTP error back. In this instance we only
