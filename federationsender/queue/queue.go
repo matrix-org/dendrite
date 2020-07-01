@@ -15,10 +15,13 @@
 package queue
 
 import (
+	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"sync"
 
+	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -29,6 +32,7 @@ import (
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
+	db          storage.Database
 	rsAPI       api.RoomserverInternalAPI
 	origin      gomatrixserverlib.ServerName
 	client      *gomatrixserverlib.FederationClient
@@ -40,6 +44,7 @@ type OutgoingQueues struct {
 
 // NewOutgoingQueues makes a new OutgoingQueues
 func NewOutgoingQueues(
+	db storage.Database,
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
@@ -47,6 +52,7 @@ func NewOutgoingQueues(
 	signing *SigningInfo,
 ) *OutgoingQueues {
 	return &OutgoingQueues{
+		db:         db,
 		rsAPI:      rsAPI,
 		origin:     origin,
 		client:     client,
@@ -76,14 +82,15 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	oq := oqs.queues[destination]
 	if oq == nil {
 		oq = &destinationQueue{
+			db:              oqs.db,
 			rsAPI:           oqs.rsAPI,
 			origin:          oqs.origin,
 			destination:     destination,
 			client:          oqs.client,
 			statistics:      oqs.statistics.ForServer(destination),
-			incomingPDUs:    make(chan *gomatrixserverlib.HeaderedEvent, 128),
 			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
 			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
+			wakeServerCh:    make(chan bool, 128),
 			retryServerCh:   make(chan bool),
 			signing:         oqs.signing,
 		}
@@ -115,8 +122,18 @@ func (oqs *OutgoingQueues) SendEvent(
 		"destinations": destinations, "event": ev.EventID(),
 	}).Info("Sending event")
 
+	headeredJSON, err := json.Marshal(ev)
+	if err != nil {
+		return fmt.Errorf("json.Marshal: %w", err)
+	}
+
+	nid, err := oqs.db.StoreJSON(context.TODO(), string(headeredJSON))
+	if err != nil {
+		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
+	}
+
 	for _, destination := range destinations {
-		oqs.getQueue(destination).sendEvent(ev)
+		oqs.getQueue(destination).sendEvent(nid)
 	}
 
 	return nil
