@@ -176,5 +176,5 @@ func (n *Node) SigningPrivateKey() ed25519.PrivateKey {
 }
 
 func (n *Node) PeerCount() int {
-	return len(n.core.GetSwitchPeers())
+	return len(n.core.GetPeers()) - 1
 }
