@@ -169,11 +169,10 @@ func (oq *destinationQueue) backgroundSend() {
 		// PDUs in the database. Otherwise we'll generate one later on,
 		// e.g. in response to EDUs.
 		transactionID := gomatrixserverlib.TransactionID("")
-		pendingPDUs := oq.pendingPDUs.Load()
 
 		// If we have nothing to do then wait either for incoming events, or
 		// until we hit an idle timeout.
-		if pendingPDUs == 0 {
+		if oq.pendingPDUs.Load() == 0 && len(oq.pendingEDUs) == 0 && len(oq.pendingInvites) == 0 {
 			select {
 			case <-oq.wakeServerCh:
 				// We were woken up because there are new PDUs waiting in the
@@ -228,7 +227,7 @@ func (oq *destinationQueue) backgroundSend() {
 		}
 
 		// If we have pending PDUs or EDUs then construct a transaction.
-		if pendingPDUs > 0 || len(oq.pendingEDUs) > 0 {
+		if oq.pendingPDUs.Load() > 0 || len(oq.pendingEDUs) > 0 {
 			// If we haven't got a transaction ID then we should generate
 			// one. Ideally we'd know this already because something queued
 			// in the database would give us one, but if we're dealing with
