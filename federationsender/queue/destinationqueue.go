@@ -322,6 +322,10 @@ func (oq *destinationQueue) nextTransaction(
 		return false, fmt.Errorf("oq.db.GetNextTransactionPDUs: %w", err)
 	}
 
+	if len(pdus) == 0 && len(pendingEDUs) == 0 {
+		return false, nil
+	}
+
 	if txid != "" {
 		// The database supplied us with a transaction ID to use
 		// from a failed PDU so use that.
