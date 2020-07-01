@@ -118,9 +118,11 @@ func (oq *destinationQueue) sendEvent(nid int64) {
 		go oq.backgroundSend()
 	}
 	// Signal that we've sent a new PDU. This will cause the queue to
-	// wake up if it's asleep.
-	oq.pendingPDUs.Add(1)
-	oq.wakeServerCh <- true
+	// wake up if it's asleep. The return to the Add function will only
+	// be 1 if the previous value was 0, e.g. nothing was waiting before.
+	if oq.pendingPDUs.Add(1) == 1 {
+		oq.wakeServerCh <- true
+	}
 }
 
 // sendEDU adds the EDU event to the pending queue for the destination.
@@ -167,10 +169,11 @@ func (oq *destinationQueue) backgroundSend() {
 		// PDUs in the database. Otherwise we'll generate one later on,
 		// e.g. in response to EDUs.
 		transactionID := gomatrixserverlib.TransactionID("")
+		pendingPDUs := oq.pendingPDUs.Load()
 
 		// If we have nothing to do then wait either for incoming events, or
 		// until we hit an idle timeout.
-		if oq.pendingPDUs.Load() == 0 {
+		if pendingPDUs == 0 {
 			select {
 			case <-oq.wakeServerCh:
 				// We were woken up because there are new PDUs waiting in the
@@ -225,7 +228,7 @@ func (oq *destinationQueue) backgroundSend() {
 		}
 
 		// If we have pending PDUs or EDUs then construct a transaction.
-		if oq.pendingPDUs.Load() > 0 || len(oq.pendingEDUs) > 0 {
+		if pendingPDUs > 0 || len(oq.pendingEDUs) > 0 {
 			// If we haven't got a transaction ID then we should generate
 			// one. Ideally we'd know this already because something queued
 			// in the database would give us one, but if we're dealing with
