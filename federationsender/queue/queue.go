@@ -88,9 +88,9 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			destination:     destination,
 			client:          oqs.client,
 			statistics:      oqs.statistics.ForServer(destination),
-			incomingPDUs:    make(chan struct{}, 128),
 			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
 			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
+			wakeServerCh:    make(chan bool, 128),
 			retryServerCh:   make(chan bool),
 			signing:         oqs.signing,
 		}
