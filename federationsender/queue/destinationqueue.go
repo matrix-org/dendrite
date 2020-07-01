@@ -205,10 +205,9 @@ func (oq *destinationQueue) backgroundSend() {
 				// There are new PDUs waiting in the database.
 				hydrate()
 			case edu := <-oq.incomingEDUs:
-				// Likewise for EDUs, although we should probably not try
-				// too hard with some EDUs (like typing notifications) after
-				// a certain amount of time has passed.
-				// TODO: think about EDU expiry some more
+				// EDUs are handled in-memory for now. We will try to keep
+				// the ordering intact.
+				// TODO: Certain EDU types need persistence, e.g. send-to-device
 				oq.pendingEDUs = append(oq.pendingEDUs, edu)
 				// If there are any more things waiting in the channel queue
 				// then read them. This is safe because we guarantee only
@@ -322,41 +321,29 @@ func (oq *destinationQueue) backgroundSend() {
 // cleanPendingPDUs cleans out the pending PDU buffer, removing
 // all references so that the underlying objects can be GC'd.
 func (oq *destinationQueue) cleanPendingPDUs() {
-	numPDUs := len(oq.pendingPDUs)
-	for i := 0; i < numPDUs; i++ {
+	for i := 0; i < len(oq.pendingPDUs); i++ {
 		oq.pendingPDUs[i] = nil
 	}
-	oq.pendingPDUs = append(
-		[]*gomatrixserverlib.HeaderedEvent{},
-		oq.pendingPDUs[numPDUs:]...,
-	)
+	oq.pendingPDUs = []*gomatrixserverlib.HeaderedEvent{}
 }
 
 // cleanPendingEDUs cleans out the pending EDU buffer, removing
 // all references so that the underlying objects can be GC'd.
 func (oq *destinationQueue) cleanPendingEDUs() {
-	numEDUs := len(oq.pendingEDUs)
-	for i := 0; i < numEDUs; i++ {
+	for i := 0; i < len(oq.pendingEDUs); i++ {
 		oq.pendingEDUs[i] = nil
 	}
-	oq.pendingEDUs = append(
-		[]*gomatrixserverlib.EDU{},
-		oq.pendingEDUs[numEDUs:]...,
-	)
+	oq.pendingEDUs = []*gomatrixserverlib.EDU{}
 }
 
 // cleanPendingInvites cleans out the pending invite buffer,
 // removing all references so that the underlying objects can
 // be GC'd.
 func (oq *destinationQueue) cleanPendingInvites() {
-	numInvites := len(oq.pendingInvites)
-	for i := 0; i < numInvites; i++ {
+	for i := 0; i < len(oq.pendingInvites); i++ {
 		oq.pendingInvites[i] = nil
 	}
-	oq.pendingInvites = append(
-		[]*gomatrixserverlib.InviteV2Request{},
-		oq.pendingInvites[numInvites:]...,
-	)
+	oq.pendingInvites = []*gomatrixserverlib.InviteV2Request{}
 }
 
 // nextTransaction creates a new transaction from the pending event

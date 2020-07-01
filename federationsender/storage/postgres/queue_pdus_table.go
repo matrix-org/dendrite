@@ -1,5 +1,4 @@
-// Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +27,7 @@ const queuePDUsSchema = `
 CREATE TABLE IF NOT EXISTS federationsender_queue_pdus (
     -- The transaction ID that was generated before persisting the event.
 	transaction_id TEXT NOT NULL,
-    -- The domain part of the user ID the m.room.member event is for.
+    -- The destination server that we will send the event to.
 	server_name TEXT NOT NULL,
 	-- The JSON NID from the federationsender_queue_pdus_json table.
 	json_nid BIGINT NOT NULL
@@ -137,7 +136,10 @@ func (s *queuePDUsStatements) selectQueueReferenceJSONCount(
 	stmt := sqlutil.TxStmt(txn, s.selectQueueReferenceJSONCountStmt)
 	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
 	if err == sql.ErrNoRows {
-		return -1, nil
+		// It's acceptable for there to be no rows referencing a given
+		// JSON NID but it's not an error condition. Just return as if
+		// there's a zero count.
+		return 0, nil
 	}
 	return count, err
 }

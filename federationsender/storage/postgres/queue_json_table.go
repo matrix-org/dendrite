@@ -1,5 +1,4 @@
-// Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +24,7 @@ import (
 )
 
 const queueJSONSchema = `
--- The queue_retry_json table contains event contents that
+-- The federationsender_queue_json table contains event contents that
 -- we failed to send. 
 CREATE TABLE IF NOT EXISTS federationsender_queue_json (
 	-- The JSON NID. This allows the federationsender_queue_retry table to
