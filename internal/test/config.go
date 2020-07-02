@@ -96,7 +96,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Database.RoomServer = config.DataSource(database)
 	cfg.Database.ServerKey = config.DataSource(database)
 	cfg.Database.SyncAPI = config.DataSource(database)
-	cfg.Database.PublicRoomsAPI = config.DataSource(database)
+	cfg.Database.CurrentState = config.DataSource(database)
 
 	cfg.Listen.ClientAPI = assignAddress()
 	cfg.Listen.AppServiceAPI = assignAddress()
@@ -104,7 +104,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Listen.MediaAPI = assignAddress()
 	cfg.Listen.RoomServer = assignAddress()
 	cfg.Listen.SyncAPI = assignAddress()
-	cfg.Listen.PublicRoomsAPI = assignAddress()
+	cfg.Listen.CurrentState = assignAddress()
 	cfg.Listen.EDUServer = assignAddress()
 
 	// Bind to the same address as the listen address
@@ -115,7 +115,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Bind.MediaAPI = cfg.Listen.MediaAPI
 	cfg.Bind.RoomServer = cfg.Listen.RoomServer
 	cfg.Bind.SyncAPI = cfg.Listen.SyncAPI
-	cfg.Bind.PublicRoomsAPI = cfg.Listen.PublicRoomsAPI
+	cfg.Bind.CurrentState = cfg.Listen.CurrentState
 	cfg.Bind.EDUServer = cfg.Listen.EDUServer
 
 	return &cfg, port, nil
