@@ -71,12 +71,20 @@ const selectStateEventSQL = "" +
 const selectEventsWithEventIDsSQL = "" +
 	"SELECT headered_event_json FROM currentstate_current_room_state WHERE event_id = ANY($1)"
 
+const selectBulkStateContentSQL = "" +
+	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id = ANY($1) AND type = ANY($2) AND state_key = ANY($3)"
+
+const selectBulkStateContentWildSQL = "" +
+	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id = ANY($1) AND type = ANY($2)"
+
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
 	selectEventsWithEventIDsStmt    *sql.Stmt
 	selectStateEventStmt            *sql.Stmt
+	selectBulkStateContentStmt      *sql.Stmt
+	selectBulkStateContentWildStmt  *sql.Stmt
 }
 
 func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -98,6 +106,12 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 		return nil, err
 	}
 	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
+		return nil, err
+	}
+	if s.selectBulkStateContentStmt, err = db.Prepare(selectBulkStateContentSQL); err != nil {
+		return nil, err
+	}
+	if s.selectBulkStateContentWildStmt, err = db.Prepare(selectBulkStateContentWildSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -207,5 +221,52 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 func (s *currentRoomStateStatements) SelectBulkStateContent(
 	ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool,
 ) ([]tables.StrippedEvent, error) {
-	return nil, nil
+	hasWildcards := false
+	eventTypeSet := make(map[string]bool)
+	stateKeySet := make(map[string]bool)
+	var eventTypes []string
+	var stateKeys []string
+	for _, tuple := range tuples {
+		if !eventTypeSet[tuple.EventType] {
+			eventTypeSet[tuple.EventType] = true
+			eventTypes = append(eventTypes, tuple.EventType)
+		}
+		if !stateKeySet[tuple.StateKey] {
+			stateKeySet[tuple.StateKey] = true
+			stateKeys = append(stateKeys, tuple.StateKey)
+		}
+		if tuple.StateKey == "*" {
+			hasWildcards = true
+		}
+	}
+	var rows *sql.Rows
+	var err error
+	if hasWildcards && allowWildcards {
+		rows, err = s.selectBulkStateContentWildStmt.QueryContext(ctx, pq.StringArray(roomIDs), pq.StringArray(eventTypes))
+	} else {
+		rows, err = s.selectBulkStateContentStmt.QueryContext(
+			ctx, pq.StringArray(roomIDs), pq.StringArray(eventTypes), pq.StringArray(stateKeys),
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	strippedEvents := []tables.StrippedEvent{}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectBulkStateContent: rows.close() failed")
+	for rows.Next() {
+		var roomID string
+		var eventType string
+		var stateKey string
+		var contentVal string
+		if err = rows.Scan(&roomID, &eventType, &stateKey, &contentVal); err != nil {
+			return nil, err
+		}
+		strippedEvents = append(strippedEvents, tables.StrippedEvent{
+			RoomID:       roomID,
+			ContentValue: contentVal,
+			EventType:    eventType,
+			StateKey:     stateKey,
+		})
+	}
+	return strippedEvents, rows.Err()
 }
