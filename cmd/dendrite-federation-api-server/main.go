@@ -33,7 +33,7 @@ func main() {
 
 	federationapi.AddPublicRoutes(
 		base.PublicAPIMux, base.Cfg, userAPI, federation, keyRing,
-		rsAPI, fsAPI, base.EDUServerClient(),
+		rsAPI, fsAPI, base.EDUServerClient(), base.CurrentStateAPIClient(),
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

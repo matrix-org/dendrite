@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"strconv"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/currentstateserver/storage/tables"
@@ -26,8 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
-
-var leaveEnum = strconv.Itoa(tables.MembershipToEnum["leave"])
 
 var currentRoomStateSchema = `
 -- Stores the current room state for every room.
@@ -44,29 +41,29 @@ CREATE TABLE IF NOT EXISTS currentstate_current_room_state (
     state_key TEXT NOT NULL,
     -- The JSON for the event. Stored as TEXT because this should be valid UTF-8.
     headered_event_json TEXT NOT NULL,
-    -- The 'content.membership' enum value if this event is an m.room.member event.
-    membership SMALLINT NOT NULL DEFAULT 0,
+    -- A piece of extracted content e.g membership for m.room.member events
+    content_value TEXT NOT NULL DEFAULT '',
     -- Clobber based on 3-uple of room_id, type and state_key
     CONSTRAINT currentstate_current_room_state_unique UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
 CREATE UNIQUE INDEX IF NOT EXISTS currentstate_event_id_idx ON currentstate_current_room_state(event_id, room_id, type, sender);
 -- for querying membership states of users
-CREATE INDEX IF NOT EXISTS currentstate_membership_idx ON currentstate_current_room_state(type, state_key, membership)
-WHERE membership IS NOT NULL AND membership != ` + leaveEnum + `;
+CREATE INDEX IF NOT EXISTS currentstate_membership_idx ON currentstate_current_room_state(type, state_key, content_value)
+WHERE type='m.room.member' AND content_value IS NOT NULL AND content_value != 'leave';
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO currentstate_current_room_state (room_id, event_id, type, sender, state_key, headered_event_json, membership)" +
+	"INSERT INTO currentstate_current_room_state (room_id, event_id, type, sender, state_key, headered_event_json, content_value)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" ON CONFLICT ON CONSTRAINT currentstate_current_room_state_unique" +
-	" DO UPDATE SET event_id = $2, sender=$4, headered_event_json = $6, membership = $7"
+	" DO UPDATE SET event_id = $2, sender=$4, headered_event_json = $6, content_value = $7"
 
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM currentstate_current_room_state WHERE event_id = $1"
 
 const selectRoomIDsWithMembershipSQL = "" +
-	"SELECT room_id FROM currentstate_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
+	"SELECT room_id FROM currentstate_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND content_value = $2"
 
 const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM currentstate_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
@@ -74,12 +71,20 @@ const selectStateEventSQL = "" +
 const selectEventsWithEventIDsSQL = "" +
 	"SELECT headered_event_json FROM currentstate_current_room_state WHERE event_id = ANY($1)"
 
+const selectBulkStateContentSQL = "" +
+	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id = ANY($1) AND type = ANY($2) AND state_key = ANY($3)"
+
+const selectBulkStateContentWildSQL = "" +
+	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id = ANY($1) AND type = ANY($2)"
+
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
 	selectEventsWithEventIDsStmt    *sql.Stmt
 	selectStateEventStmt            *sql.Stmt
+	selectBulkStateContentStmt      *sql.Stmt
+	selectBulkStateContentWildStmt  *sql.Stmt
 }
 
 func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -103,6 +108,12 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
 		return nil, err
 	}
+	if s.selectBulkStateContentStmt, err = db.Prepare(selectBulkStateContentSQL); err != nil {
+		return nil, err
+	}
+	if s.selectBulkStateContentWildStmt, err = db.Prepare(selectBulkStateContentWildSQL); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -111,10 +122,10 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	ctx context.Context,
 	txn *sql.Tx,
 	userID string,
-	membershipEnum int,
+	contentVal string,
 ) ([]string, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, userID, membershipEnum)
+	rows, err := stmt.QueryContext(ctx, userID, contentVal)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +152,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) UpsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.HeaderedEvent, membershipEnum int,
+	event gomatrixserverlib.HeaderedEvent, contentVal string,
 ) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
@@ -158,7 +169,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		event.Sender(),
 		*event.StateKey(),
 		headeredJSON,
-		membershipEnum,
+		contentVal,
 	)
 	return err
 }
@@ -205,4 +216,57 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 		return nil, err
 	}
 	return &ev, err
+}
+
+func (s *currentRoomStateStatements) SelectBulkStateContent(
+	ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool,
+) ([]tables.StrippedEvent, error) {
+	hasWildcards := false
+	eventTypeSet := make(map[string]bool)
+	stateKeySet := make(map[string]bool)
+	var eventTypes []string
+	var stateKeys []string
+	for _, tuple := range tuples {
+		if !eventTypeSet[tuple.EventType] {
+			eventTypeSet[tuple.EventType] = true
+			eventTypes = append(eventTypes, tuple.EventType)
+		}
+		if !stateKeySet[tuple.StateKey] {
+			stateKeySet[tuple.StateKey] = true
+			stateKeys = append(stateKeys, tuple.StateKey)
+		}
+		if tuple.StateKey == "*" {
+			hasWildcards = true
+		}
+	}
+	var rows *sql.Rows
+	var err error
+	if hasWildcards && allowWildcards {
+		rows, err = s.selectBulkStateContentWildStmt.QueryContext(ctx, pq.StringArray(roomIDs), pq.StringArray(eventTypes))
+	} else {
+		rows, err = s.selectBulkStateContentStmt.QueryContext(
+			ctx, pq.StringArray(roomIDs), pq.StringArray(eventTypes), pq.StringArray(stateKeys),
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	strippedEvents := []tables.StrippedEvent{}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectBulkStateContent: rows.close() failed")
+	for rows.Next() {
+		var roomID string
+		var eventType string
+		var stateKey string
+		var contentVal string
+		if err = rows.Scan(&roomID, &eventType, &stateKey, &contentVal); err != nil {
+			return nil, err
+		}
+		strippedEvents = append(strippedEvents, tables.StrippedEvent{
+			RoomID:       roomID,
+			ContentValue: contentVal,
+			EventType:    eventType,
+			StateKey:     stateKey,
+		})
+	}
+	return strippedEvents, rows.Err()
 }

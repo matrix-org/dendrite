@@ -61,6 +61,31 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(RoomserverPerformPublishPath,
+		httputil.MakeInternalAPI("performPublish", func(req *http.Request) util.JSONResponse {
+			var request api.PerformPublishRequest
+			var response api.PerformPublishResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			r.PerformPublish(req.Context(), &request, &response)
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(
+		RoomserverQueryPublishedRoomsPath,
+		httputil.MakeInternalAPI("queryPublishedRooms", func(req *http.Request) util.JSONResponse {
+			var request api.QueryPublishedRoomsRequest
+			var response api.QueryPublishedRoomsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryPublishedRooms(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(
 		RoomserverQueryLatestEventsAndStatePath,
 		httputil.MakeInternalAPI("queryLatestEventsAndState", func(req *http.Request) util.JSONResponse {

@@ -35,39 +35,39 @@ CREATE TABLE IF NOT EXISTS currentstate_current_room_state (
     sender TEXT NOT NULL,
     state_key TEXT NOT NULL,
     headered_event_json TEXT NOT NULL,
-    membership INTEGER NOT NULL DEFAULT 0,
+    content_value TEXT NOT NULL DEFAULT '',
     UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
 CREATE UNIQUE INDEX IF NOT EXISTS currentstate_event_id_idx ON currentstate_current_room_state(event_id, room_id, type, sender);
--- for querying membership states of users
--- CREATE INDEX IF NOT EXISTS currentstate_membership_idx ON currentstate_current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO currentstate_current_room_state (room_id, event_id, type, sender, state_key, headered_event_json, membership)" +
+	"INSERT INTO currentstate_current_room_state (room_id, event_id, type, sender, state_key, headered_event_json, content_value)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" ON CONFLICT (event_id, room_id, type, sender)" +
-	" DO UPDATE SET event_id = $2, sender=$4, headered_event_json = $6, membership = $7"
+	" DO UPDATE SET event_id = $2, sender=$4, headered_event_json = $6, content_value = $7"
 
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM currentstate_current_room_state WHERE event_id = $1"
 
 const selectRoomIDsWithMembershipSQL = "" +
-	"SELECT room_id FROM currentstate_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
+	"SELECT room_id FROM currentstate_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND content_value = $2"
 
 const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM currentstate_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
-	// TODO: The session_id and transaction_id blanks are here because otherwise
-	// the rowsToStreamEvents expects there to be exactly five columns. We need to
-	// figure out if these really need to be in the DB, and if so, we need a
-	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
-	" FROM currentstate_current_room_state WHERE event_id IN ($1)"
+	"SELECT headered_event_json FROM currentstate_current_room_state WHERE event_id IN ($1)"
+
+const selectBulkStateContentSQL = "" +
+	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id IN ($1) AND type IN ($2) AND state_key IN ($3)"
+
+const selectBulkStateContentWildSQL = "" +
+	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id IN ($1) AND type IN ($2)"
 
 type currentRoomStateStatements struct {
+	db                              *sql.DB
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
@@ -75,7 +75,9 @@ type currentRoomStateStatements struct {
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
-	s := &currentRoomStateStatements{}
+	s := &currentRoomStateStatements{
+		db: db,
+	}
 	_, err := db.Exec(currentRoomStateSchema)
 	if err != nil {
 		return nil, err
@@ -100,10 +102,10 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	ctx context.Context,
 	txn *sql.Tx,
 	userID string,
-	membershipEnum int,
+	membership string,
 ) ([]string, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, userID, membershipEnum)
+	rows, err := stmt.QueryContext(ctx, userID, membership)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +132,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 
 func (s *currentRoomStateStatements) UpsertRoomState(
 	ctx context.Context, txn *sql.Tx,
-	event gomatrixserverlib.HeaderedEvent, membershipEnum int,
+	event gomatrixserverlib.HeaderedEvent, contentVal string,
 ) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
@@ -147,7 +149,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		event.Sender(),
 		*event.StateKey(),
 		headeredJSON,
-		membershipEnum,
+		contentVal,
 	)
 	return err
 }
@@ -198,4 +200,77 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 		return nil, err
 	}
 	return &ev, err
+}
+
+func (s *currentRoomStateStatements) SelectBulkStateContent(
+	ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool,
+) ([]tables.StrippedEvent, error) {
+	hasWildcards := false
+	eventTypeSet := make(map[string]bool)
+	stateKeySet := make(map[string]bool)
+	var eventTypes []string
+	var stateKeys []string
+	for _, tuple := range tuples {
+		if !eventTypeSet[tuple.EventType] {
+			eventTypeSet[tuple.EventType] = true
+			eventTypes = append(eventTypes, tuple.EventType)
+		}
+		if !stateKeySet[tuple.StateKey] {
+			stateKeySet[tuple.StateKey] = true
+			stateKeys = append(stateKeys, tuple.StateKey)
+		}
+		if tuple.StateKey == "*" {
+			hasWildcards = true
+		}
+	}
+
+	iRoomIDs := make([]interface{}, len(roomIDs))
+	for i, v := range roomIDs {
+		iRoomIDs[i] = v
+	}
+	iEventTypes := make([]interface{}, len(eventTypes))
+	for i, v := range eventTypes {
+		iEventTypes[i] = v
+	}
+	iStateKeys := make([]interface{}, len(stateKeys))
+	for i, v := range stateKeys {
+		iStateKeys[i] = v
+	}
+
+	var query string
+	var args []interface{}
+	if hasWildcards && allowWildcards {
+		query = strings.Replace(selectBulkStateContentWildSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
+		query = strings.Replace(query, "($2)", sqlutil.QueryVariadicOffset(len(iEventTypes), len(iRoomIDs)), 1)
+		args = append(iRoomIDs, iEventTypes...)
+	} else {
+		query = strings.Replace(selectBulkStateContentSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
+		query = strings.Replace(query, "($2)", sqlutil.QueryVariadicOffset(len(iEventTypes), len(iRoomIDs)), 1)
+		query = strings.Replace(query, "($3)", sqlutil.QueryVariadicOffset(len(iStateKeys), len(iEventTypes)+len(iRoomIDs)), 1)
+		args = append(iRoomIDs, iEventTypes...)
+		args = append(args, iStateKeys...)
+	}
+	rows, err := s.db.QueryContext(ctx, query, args...)
+
+	if err != nil {
+		return nil, err
+	}
+	strippedEvents := []tables.StrippedEvent{}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectBulkStateContent: rows.close() failed")
+	for rows.Next() {
+		var roomID string
+		var eventType string
+		var stateKey string
+		var contentVal string
+		if err = rows.Scan(&roomID, &eventType, &stateKey, &contentVal); err != nil {
+			return nil, err
+		}
+		strippedEvents = append(strippedEvents, tables.StrippedEvent{
+			RoomID:       roomID,
+			ContentValue: contentVal,
+			EventType:    eventType,
+			StateKey:     stateKey,
+		})
+	}
+	return strippedEvents, rows.Err()
 }

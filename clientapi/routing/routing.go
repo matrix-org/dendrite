@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -290,6 +291,34 @@ func Setup(
 			return RemoveLocalAlias(req, device, vars["roomAlias"], rsAPI)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
+	r0mux.Handle("/directory/list/room/{roomID}",
+		httputil.MakeExternalAPI("directory_list", func(req *http.Request) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetVisibility(req, rsAPI, vars["roomID"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+	// TODO: Add AS support
+	r0mux.Handle("/directory/list/room/{roomID}",
+		httputil.MakeAuthAPI("directory_list", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SetVisibility(req, stateAPI, rsAPI, device, vars["roomID"])
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
+	r0mux.Handle("/publicRooms",
+		httputil.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
+			/* TODO:
+			if extRoomsProvider != nil {
+				return GetPostPublicRoomsWithExternal(req, stateAPI, fedClient, extRoomsProvider)
+			} */
+			return GetPostPublicRooms(req, rsAPI, stateAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/logout",
 		httputil.MakeAuthAPI("logout", userAPI, func(req *http.Request, device *api.Device) util.JSONResponse {
