@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/userapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
@@ -169,7 +168,6 @@ func main() {
 	cfg.Database.FederationSender = "file:/idb/dendritejs_fedsender.db"
 	cfg.Database.MediaAPI = "file:/idb/dendritejs_mediaapi.db"
 	cfg.Database.Naffka = "file:/idb/dendritejs_naffka.db"
-	cfg.Database.PublicRoomsAPI = "file:/idb/dendritejs_publicrooms.db"
 	cfg.Database.RoomServer = "file:/idb/dendritejs_roomserver.db"
 	cfg.Database.ServerKey = "file:/idb/dendritejs_serverkey.db"
 	cfg.Database.SyncAPI = "file:/idb/dendritejs_syncapi.db"
@@ -215,11 +213,6 @@ func main() {
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI)
 
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), cfg.Matrix.ServerName)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
-	}
-
 	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
 
 	monolith := setup.Monolith{
@@ -239,8 +232,6 @@ func main() {
 		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
 		//ServerKeyAPI:        serverKeyAPI,
-
-		PublicRoomsDB:          publicRoomsDB,
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)

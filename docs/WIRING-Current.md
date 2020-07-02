@@ -9,23 +9,22 @@ a request/response model like HTTP or RPC. Therefore, components can expose "int
 Note in Monolith mode these are actually direct function calls and are not serialised HTTP requests.
 
 ```
-   Tier 1            Sync        PublicRooms      FederationAPI      ClientAPI    MediaAPI
-Public Facing        | .-----1------`              | | |    | |        | | | |
-                     2 | .-------3-----------------` | |    | `--------|-|-|-|--11--------------------.
-                     | | | .--------4----------------------------------` | | |                        |
-                     | | | |         .---5-----------` |    |            | | |                        |
-                     | | | |         |  .---6----------------------------` | |                        |
-                     | | | |         |  |              |  .-----7----------` |                        |
-                     | | | |         |  |              8  | |                10                       |
-                     | | | |         |  |              |  | `---9----.       |                        |
-                     V V V V         V  V              V  V          V       V                        V
+   Tier 1            Sync                         FederationAPI      ClientAPI    MediaAPI
+Public Facing        |                             | | |    | |        | | | |
+                     2   .-------3-----------------` | |    | `--------|-|-|-|--11--------------------.
+                     |   | .--------4----------------------------------` | | |                        |
+                     |   | |         .---5-----------` |    |            | | |                        |
+                     |   | |         |  .---6----------------------------` | |                        |
+                     |   | |         |  |              |  .-----7----------` |                        |
+                     |   | |         |  |              8  | |                10                       |
+                     |   | |         |  |              |  | `---9----.       |                        |
+                     V   V V         V  V              V  V          V       V                        V
    Tier 2           Roomserver     EDUServer         FedSender       AppService    KeyServer   ServerKeyAPI
 Internal only               |                               `------------------------12----------^   ^
                             `------------------------------------------------------------13----------`
 
  Client ---> Server
 ```
-- 1 (PublicRooms -> Roomserver): Calculating current auth for changing visibility
 - 2 (Sync -> Roomserver): When making backfill requests
 - 3 (FedAPI -> Roomserver): Calculating (prev/auth events) and sending new events, processing backfill/state/state_ids requests
 - 4 (ClientAPI -> Roomserver): Calculating (prev/auth events) and sending new events, processing /state requests
@@ -46,20 +45,20 @@ In addition to this, all public facing components (Tier 1) talk to the `UserAPI`
 ```
                        .----1--------------------------------------------.
                        V                                                 |
-   Tier 1            Sync        PublicRooms      FederationAPI      ClientAPI    MediaAPI
-Public Facing        ^   ^           ^                                 ^  
-                     |   |           |                                 |
-                     2   |           |                                 |
+   Tier 1            Sync                         FederationAPI      ClientAPI    MediaAPI
+Public Facing        ^   ^                                             ^  
+                     |   |                                             |
+                     2   |                                             |
                      |   `-3------------.                              |
-                     |               |  |                              |
-                     |               |  |                              |
-                     | .------4------`  |                              |
-                     | | .--------5-----|------------------------------`             
-                     | | |              |           
+                     |                  |                              |
+                     |                  |                              |
+                     |                  |                              |
+                     |   .--------4-----|------------------------------`             
+                     |   |              |           
    Tier 2           Roomserver     EDUServer         FedSender       AppService    KeyServer   ServerKeyAPI
 Internal only              |          |                ^ ^
-                           |          `-----6----------` |
-                           `--------------------7--------`
+                           |          `-----5----------` |
+                           `--------------------6--------`
 
 
 Producer ----> Consumer
@@ -67,7 +66,6 @@ Producer ----> Consumer
 - 1 (ClientAPI -> Sync): For tracking account data
 - 2 (Roomserver -> Sync): For all data to send to clients
 - 3 (EDUServer -> Sync): For typing/send-to-device data to send to clients
-- 4 (Roomserver -> PublicRooms): For tracking the current room name/topic/joined count/etc.
-- 5 (Roomserver -> ClientAPI): For tracking memberships for profile updates.
-- 6 (EDUServer -> FedSender): For sending EDUs over federation
-- 7 (Roomserver -> FedSender): For sending PDUs over federation, for tracking joined hosts.
+- 4 (Roomserver -> ClientAPI): For tracking memberships for profile updates.
+- 5 (EDUServer -> FedSender): For sending EDUs over federation
+- 6 (Roomserver -> FedSender): For sending PDUs over federation, for tracking joined hosts.

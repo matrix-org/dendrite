@@ -99,7 +99,6 @@ func StartProxy(bindAddr string, cfg *config.Dendrite) (*exec.Cmd, chan error) {
 		"--sync-api-server-url", "http://" + string(cfg.Listen.SyncAPI),
 		"--client-api-server-url", "http://" + string(cfg.Listen.ClientAPI),
 		"--media-api-server-url", "http://" + string(cfg.Listen.MediaAPI),
-		"--public-rooms-api-server-url", "http://" + string(cfg.Listen.PublicRoomsAPI),
 		"--tls-cert", "server.crt",
 		"--tls-key", "server.key",
 	}

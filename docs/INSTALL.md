@@ -108,7 +108,7 @@ Assuming that Postgres 9.5 (or later) is installed:
 * Create the component databases:
 
   ```bash
-  for i in account device mediaapi syncapi roomserver serverkey federationsender publicroomsapi appservice naffka; do
+  for i in account device mediaapi syncapi roomserver serverkey federationsender currentstate appservice naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
@@ -176,17 +176,17 @@ The following contains scripts which will run all the required processes in orde
                       |            |            :7774
                       |            |
                       |            |
-                      |            |   /directory +----------------------------------+
-                      |            |   +--------->| dendrite-public-rooms-api-server |<========++
-                      |            |   |          +----------------------------------+         ||
-                      |            |   |        :7775    |                                     ||
-                      |            |   |    +<-----------+                                     ||
-                      |            |   |    |                                                  ||
-                      |            |   | /sync    +--------------------------+                 ||
+                      |            |   
+                      |            |   
+                      |            |   
+                      |            |  
+                      |            |  
+                      |            |  
+                      |            |     /sync    +--------------------------+                 
                       |            |   +--------->| dendrite-sync-api-server |<================++
-                      |            |   |    |     +--------------------------+                 ||
-                      |            |   |    |   :7773    |         ^^                          ||
-Matrix      +------------------+   |   |    |            |         ||    client_data           ||
+                      |            |   |          +--------------------------+                 ||
+                      |            |   |        :7773    |         ^^                          ||
+Matrix      +------------------+   |   |                 |         ||    client_data           ||
 Clients --->| client-api-proxy |-------+    +<-----------+         ++=============++           ||
             +------------------+   |   |    |                                     ||           ||
           :8008                    |   | CS API   +----------------------------+  ||           ||
@@ -232,7 +232,6 @@ your client at `http://localhost:8008`.
 --client-api-server-url "http://localhost:7771" \
 --sync-api-server-url "http://localhost:7773" \
 --media-api-server-url "http://localhost:7774" \
---public-rooms-api-server-url "http://localhost:7775" \
 ```
 
 ### Federation proxy
@@ -280,15 +279,6 @@ order to upload and retrieve media.
 
 ```bash
 ./bin/dendrite-media-api-server --config dendrite.yaml
-```
-
-### Public room server
-
-This implements `/directory` requests. Clients talk to this via the proxy
-in order to retrieve room directory listings.
-
-```bash
-./bin/dendrite-public-rooms-api-server --config dendrite.yaml
 ```
 
 ### Federation API server

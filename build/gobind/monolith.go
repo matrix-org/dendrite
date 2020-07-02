@@ -18,7 +18,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -75,7 +74,6 @@ func (m *DendriteMonolith) Start() {
 	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s/dendrite-serverkey.db", m.StorageDirectory))
 	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s/dendrite-federationsender.db", m.StorageDirectory))
 	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s/dendrite-appservice.db", m.StorageDirectory))
-	cfg.Database.PublicRoomsAPI = config.DataSource(fmt.Sprintf("file:%s/dendrite-publicroomsa.db", m.StorageDirectory))
 	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s/dendrite-currentstate.db", m.StorageDirectory))
 	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s/dendrite-naffka.db", m.StorageDirectory))
 	if err = cfg.Derive(); err != nil {
@@ -111,11 +109,6 @@ func (m *DendriteMonolith) Start() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
-	}
-
 	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
 
 	monolith := setup.Monolith{
@@ -135,8 +128,6 @@ func (m *DendriteMonolith) Start() {
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
 		//ServerKeyAPI:        serverKeyAPI,
-
-		PublicRoomsDB: publicRoomsDB,
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 

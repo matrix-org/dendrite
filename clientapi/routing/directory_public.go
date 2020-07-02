@@ -24,10 +24,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
-	"github.com/matrix-org/dendrite/publicroomsapi/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -64,7 +64,7 @@ func GetPostPublicRooms(
 // GetPostPublicRoomsWithExternal is the same as GetPostPublicRooms but also mixes in public rooms from the provider supplied.
 func GetPostPublicRoomsWithExternal(
 	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
-	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider types.ExternalPublicRoomsProvider,
+	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider api.ExternalPublicRoomsProvider,
 ) util.JSONResponse {
 	var request PublicRoomReq
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
