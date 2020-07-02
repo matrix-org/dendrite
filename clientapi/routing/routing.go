@@ -61,7 +61,7 @@ func Setup(
 	transactionsCache *transactions.Cache,
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
 	stateAPI currentstateAPI.CurrentStateInternalAPI,
-	extRoomsProvider api.ExternalPublicRoomsProvider,
+	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
 
 	publicAPIMux.Handle("/client/versions",
@@ -313,11 +313,7 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
 		httputil.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
-			/* TODO:
-			if extRoomsProvider != nil {
-				return GetPostPublicRoomsWithExternal(req, stateAPI, fedClient, extRoomsProvider)
-			} */
-			return GetPostPublicRooms(req, rsAPI, stateAPI)
+			return GetPostPublicRooms(req, rsAPI, stateAPI, extRoomsProvider)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 

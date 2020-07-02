@@ -3,16 +3,26 @@ package routing
 import (
 	"reflect"
 	"testing"
+
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
+func pubRoom(name string) gomatrixserverlib.PublicRoom {
+	return gomatrixserverlib.PublicRoom{
+		Name: name,
+	}
+}
+
 func TestSliceInto(t *testing.T) {
-	slice := []string{"a", "b", "c", "d", "e", "f", "g"}
+	slice := []gomatrixserverlib.PublicRoom{
+		pubRoom("a"), pubRoom("b"), pubRoom("c"), pubRoom("d"), pubRoom("e"), pubRoom("f"), pubRoom("g"),
+	}
 	limit := int16(3)
 	testCases := []struct {
 		since      int64
 		wantPrev   int
 		wantNext   int
-		wantSubset []string
+		wantSubset []gomatrixserverlib.PublicRoom
 	}{
 		{
 			since:      0,

@@ -48,7 +48,7 @@ func AddPublicRoutes(
 	transactionsCache *transactions.Cache,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 	userAPI userapi.UserInternalAPI,
-	extRoomsProvider api.ExternalPublicRoomsProvider,
+	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,

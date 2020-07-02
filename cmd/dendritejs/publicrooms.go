@@ -62,6 +62,10 @@ func (p *libp2pPublicRoomsProvider) foundProviders(peerInfos []go_http_js_libp2p
 	p.providers = peerInfos
 }
 
+func (p *libp2pPublicRoomsProvider) Rooms() []gomatrixserverlib.PublicRoom {
+	return nil
+}
+
 func (p *libp2pPublicRoomsProvider) Homeservers() []string {
 	result := make([]string, len(p.providers))
 	for i := range p.providers {

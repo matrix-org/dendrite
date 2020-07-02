@@ -58,7 +58,7 @@ type Monolith struct {
 	StateAPI            currentstateAPI.CurrentStateInternalAPI
 
 	// Optional
-	ExtPublicRoomsProvider api.ExternalPublicRoomsProvider
+	ExtPublicRoomsProvider api.ExtraPublicRoomsProvider
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router

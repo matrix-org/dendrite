@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -31,6 +30,11 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+)
+
+var (
+	cacheMu          sync.Mutex
+	publicRoomsCache []gomatrixserverlib.PublicRoom
 )
 
 type PublicRoomReq struct {
@@ -46,13 +50,15 @@ type filter struct {
 // GetPostPublicRooms implements GET and POST /publicRooms
 func GetPostPublicRooms(
 	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
+	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) util.JSONResponse {
 	var request PublicRoomReq
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
 		return *fillErr
 	}
-	response, err := publicRooms(req.Context(), request, rsAPI, stateAPI)
+	response, err := publicRooms(req.Context(), request, rsAPI, stateAPI, extRoomsProvider)
 	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Errorf("failed to work out public rooms")
 		return jsonerror.InternalServerError()
 	}
 	return util.JSONResponse{
@@ -64,13 +70,13 @@ func GetPostPublicRooms(
 // GetPostPublicRoomsWithExternal is the same as GetPostPublicRooms but also mixes in public rooms from the provider supplied.
 func GetPostPublicRoomsWithExternal(
 	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
-	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider api.ExternalPublicRoomsProvider,
+	fedClient *gomatrixserverlib.FederationClient, extRoomsProvider api.ExtraPublicRoomsProvider,
 ) util.JSONResponse {
 	var request PublicRoomReq
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
 		return *fillErr
 	}
-	response, err := publicRooms(req.Context(), request, rsAPI, stateAPI)
+	response, err := publicRooms(req.Context(), request, rsAPI, stateAPI, extRoomsProvider)
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
@@ -98,8 +104,8 @@ func GetPostPublicRoomsWithExternal(
 	}
 
 	// downcasting `limit` is safe as we know it isn't bigger than request.Limit which is int16
-	fedRooms := bulkFetchPublicRoomsFromServers(req.Context(), fedClient, extRoomsProvider.Homeservers(), int16(limit))
-	response.Chunk = append(response.Chunk, fedRooms...)
+	//fedRooms := bulkFetchPublicRoomsFromServers(req.Context(), fedClient, extRoomsProvider.Homeservers(), int16(limit))
+	//response.Chunk = append(response.Chunk, fedRooms...)
 
 	// de-duplicate rooms with the same room ID. We can join the room via any of these aliases as we know these servers
 	// are alive and well, so we arbitrarily pick one (purposefully shuffling them to spread the load a bit)
@@ -128,6 +134,7 @@ func GetPostPublicRoomsWithExternal(
 	}
 }
 
+/*
 // bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
 // Returns a list of public rooms up to the limit specified.
 func bulkFetchPublicRoomsFromServers(
@@ -198,9 +205,11 @@ FanIn:
 
 	return publicRooms
 }
+*/
 
 func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI.RoomserverInternalAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI) (*gomatrixserverlib.RespPublicRooms, error) {
+	stateAPI currentstateAPI.CurrentStateInternalAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
+) (*gomatrixserverlib.RespPublicRooms, error) {
 
 	var response gomatrixserverlib.RespPublicRooms
 	var limit int16
@@ -216,23 +225,25 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 		util.GetLogger(ctx).WithError(err).Error("strconv.ParseInt failed")
 		return nil, err
 	}
+	err = nil
 
-	var queryRes roomserverAPI.QueryPublishedRoomsResponse
-	err = rsAPI.QueryPublishedRooms(ctx, &roomserverAPI.QueryPublishedRoomsRequest{}, &queryRes)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
-		return nil, err
+	var rooms []gomatrixserverlib.PublicRoom
+	if request.Since == "" {
+		rooms = refreshPublicRoomCache(ctx, rsAPI, extRoomsProvider, stateAPI)
+	} else {
+		rooms = getPublicRoomsFromCache()
 	}
-	response.TotalRoomCountEstimate = len(queryRes.RoomIDs)
 
-	roomIDs, prev, next := sliceInto(queryRes.RoomIDs, offset, limit)
+	response.TotalRoomCountEstimate = len(rooms)
+
+	chunk, prev, next := sliceInto(rooms, offset, limit)
 	if prev >= 0 {
 		response.PrevBatch = "T" + strconv.Itoa(prev)
 	}
 	if next >= 0 {
 		response.NextBatch = "T" + strconv.Itoa(next)
 	}
-	response.Chunk, err = fillInRooms(ctx, roomIDs, stateAPI)
+	response.Chunk = chunk
 	return &response, err
 }
 
@@ -348,7 +359,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, stateAPI currentstateAPI
 //   limit=3&since=6  => G     (prev='3', next='')
 //
 //  A value of '-1' for prev/next indicates no position.
-func sliceInto(slice []string, since int64, limit int16) (subset []string, prev, next int) {
+func sliceInto(slice []gomatrixserverlib.PublicRoom, since int64, limit int16) (subset []gomatrixserverlib.PublicRoom, prev, next int) {
 	prev = -1
 	next = -1
 
@@ -370,4 +381,42 @@ func sliceInto(slice []string, since int64, limit int16) (subset []string, prev,
 
 	subset = slice[since:nextIndex]
 	return
+}
+
+func refreshPublicRoomCache(
+	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
+) []gomatrixserverlib.PublicRoom {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	var extraRooms []gomatrixserverlib.PublicRoom
+	if extRoomsProvider != nil {
+		extraRooms = extRoomsProvider.Rooms()
+	}
+
+	var queryRes roomserverAPI.QueryPublishedRoomsResponse
+	err := rsAPI.QueryPublishedRooms(ctx, &roomserverAPI.QueryPublishedRoomsRequest{}, &queryRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
+		return publicRoomsCache
+	}
+	pubRooms, err := fillInRooms(ctx, queryRes.RoomIDs, stateAPI)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("fillInRooms failed")
+		return publicRoomsCache
+	}
+	publicRoomsCache = []gomatrixserverlib.PublicRoom{}
+	publicRoomsCache = append(publicRoomsCache, pubRooms...)
+	publicRoomsCache = append(publicRoomsCache, extraRooms...)
+	// sort by total joined member count (big to small)
+	sort.SliceStable(publicRoomsCache, func(i, j int) bool {
+		return publicRoomsCache[i].JoinedMembersCount > publicRoomsCache[j].JoinedMembersCount
+	})
+	return publicRoomsCache
+}
+
+func getPublicRoomsFromCache() []gomatrixserverlib.PublicRoom {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	return publicRoomsCache
 }
