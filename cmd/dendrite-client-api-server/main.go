@@ -39,7 +39,7 @@ func main() {
 
 	clientapi.AddPublicRoutes(
 		base.PublicAPIMux, base.Cfg, base.KafkaProducer, deviceDB, accountDB, federation,
-		rsAPI, eduInputAPI, asQuery, stateAPI, transactions.New(), fsAPI, userAPI,
+		rsAPI, eduInputAPI, asQuery, stateAPI, transactions.New(), fsAPI, userAPI, nil,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.ClientAPI), string(base.Cfg.Listen.ClientAPI))

@@ -34,7 +34,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -74,7 +73,6 @@ func main() {
 	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
 	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
 	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.Database.PublicRoomsAPI = config.DataSource(fmt.Sprintf("file:%s-publicrooms.db", *instanceName))
 	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
 	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
@@ -110,11 +108,6 @@ func main() {
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	publicRoomsDB, err := storage.NewPublicRoomsServerDatabase(string(base.Cfg.Database.PublicRoomsAPI), base.Cfg.DbProperties(), cfg.Matrix.ServerName)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to public rooms db")
-	}
-
 	embed.Embed(base.BaseMux, *instancePort, "Yggdrasil Demo")
 
 	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
@@ -136,8 +129,6 @@ func main() {
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
 		//ServerKeyAPI:        serverKeyAPI,
-
-		PublicRoomsDB: publicRoomsDB,
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 

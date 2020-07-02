@@ -18,6 +18,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
@@ -47,6 +48,7 @@ func AddPublicRoutes(
 	transactionsCache *transactions.Cache,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 	userAPI userapi.UserInternalAPI,
+	extRoomsProvider api.ExternalPublicRoomsProvider,
 ) {
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,
@@ -56,6 +58,6 @@ func AddPublicRoutes(
 	routing.Setup(
 		router, cfg, eduInputAPI, rsAPI, asAPI,
 		accountsDB, deviceDB, userAPI, federation,
-		syncProducer, transactionsCache, fsAPI, stateAPI,
+		syncProducer, transactionsCache, fsAPI, stateAPI, extRoomsProvider,
 	)
 }

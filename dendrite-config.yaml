@@ -120,7 +120,6 @@ database:
     server_key: "postgres://dendrite:itsasecret@localhost/dendrite_serverkey?sslmode=disable"
     federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
     appservice: "postgres://dendrite:itsasecret@localhost/dendrite_appservice?sslmode=disable"
-    public_rooms_api: "postgres://dendrite:itsasecret@localhost/dendrite_publicroomsapi?sslmode=disable"
     current_state: "postgres://dendrite:itsasecret@localhost/dendrite_currentstate?sslmode=disable"
     max_open_conns: 100
     max_idle_conns: 2
@@ -137,7 +136,6 @@ listen:
     federation_api: "localhost:7772"
     sync_api: "localhost:7773"
     media_api: "localhost:7774"
-    public_rooms_api: "localhost:7775"
     federation_sender: "localhost:7776"
     appservice_api: "localhost:7777"
     edu_server: "localhost:7778"

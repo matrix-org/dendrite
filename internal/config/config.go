@@ -186,9 +186,6 @@ type Dendrite struct {
 		// The AppServices database stores information used by the AppService component.
 		// It is only accessed by the AppService component.
 		AppService DataSource `yaml:"appservice"`
-		// The PublicRoomsAPI database stores information used to compute the public
-		// room directory. It is only accessed by the PublicRoomsAPI server.
-		PublicRoomsAPI DataSource `yaml:"public_rooms_api"`
 		// The Naffka database is used internally by the naffka library, if used.
 		Naffka DataSource `yaml:"naffka,omitempty"`
 		// Maximum open connections to the DB (0 = use default, negative means unlimited)
@@ -233,7 +230,6 @@ type Dendrite struct {
 		UserAPI          Address `yaml:"user_api"`
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
-		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
 		EDUServer        Address `yaml:"edu_server"`
 		KeyServer        Address `yaml:"key_server"`
 	} `yaml:"bind"`
@@ -250,7 +246,6 @@ type Dendrite struct {
 		UserAPI          Address `yaml:"user_api"`
 		RoomServer       Address `yaml:"room_server"`
 		FederationSender Address `yaml:"federation_sender"`
-		PublicRoomsAPI   Address `yaml:"public_rooms_api"`
 		EDUServer        Address `yaml:"edu_server"`
 		KeyServer        Address `yaml:"key_server"`
 	} `yaml:"listen"`

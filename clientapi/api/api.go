@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package api
 
-// ExternalPublicRoomsProvider provides a list of homeservers who should be queried
-// periodically for a list of public rooms on their server.
 type ExternalPublicRoomsProvider interface {
 	// The list of homeserver domains to query. These servers will receive a request
 	// via this API: https://matrix.org/docs/spec/server_server/latest#public-room-directory
