@@ -205,6 +205,9 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 	var limit int16
 	var offset int64
 	limit = request.Limit
+	if limit == 0 {
+		limit = 50
+	}
 	offset, err := strconv.ParseInt(request.Since, 10, 64)
 	// ParseInt returns 0 and an error when trying to parse an empty string
 	// In that case, we want to assign 0 so we ignore the error

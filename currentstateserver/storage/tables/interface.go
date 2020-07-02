@@ -64,7 +64,7 @@ func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
 	case gomatrixserverlib.MRoomName:
 		key = "name"
 	case "m.room.avatar":
-		key = "avatar"
+		key = "url"
 	case "m.room.topic":
 		key = "topic"
 	case "m.room.guest_access":
