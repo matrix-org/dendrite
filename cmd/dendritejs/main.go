@@ -173,6 +173,7 @@ func main() {
 	cfg.Database.RoomServer = "file:/idb/dendritejs_roomserver.db"
 	cfg.Database.ServerKey = "file:/idb/dendritejs_serverkey.db"
 	cfg.Database.SyncAPI = "file:/idb/dendritejs_syncapi.db"
+	cfg.Database.CurrentState = "file:/idb/dendritejs_currentstate.db"
 	cfg.Kafka.Topics.OutputTypingEvent = "output_typing_event"
 	cfg.Kafka.Topics.OutputSendToDeviceEvent = "output_send_to_device_event"
 	cfg.Kafka.Topics.OutputClientData = "output_client_data"

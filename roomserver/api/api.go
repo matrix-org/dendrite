@@ -36,6 +36,18 @@ type RoomserverInternalAPI interface {
 		res *PerformLeaveResponse,
 	) error
 
+	PerformPublish(
+		ctx context.Context,
+		req *PerformPublishRequest,
+		res *PerformPublishResponse,
+	)
+
+	QueryPublishedRooms(
+		ctx context.Context,
+		req *QueryPublishedRoomsRequest,
+		res *QueryPublishedRoomsResponse,
+	) error
+
 	// Query the latest events and state for a room from the room server.
 	QueryLatestEventsAndState(
 		ctx context.Context,

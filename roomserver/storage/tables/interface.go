@@ -120,3 +120,9 @@ type Membership interface {
 	SelectMembershipsFromRoomAndMembership(ctx context.Context, roomNID types.RoomNID, membership MembershipState, localOnly bool) (eventNIDs []types.EventNID, err error)
 	UpdateMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership MembershipState, eventNID types.EventNID) error
 }
+
+type Published interface {
+	UpsertRoomPublished(ctx context.Context, roomID string, published bool) (err error)
+	SelectPublishedFromRoomID(ctx context.Context, roomID string) (published bool, err error)
+	SelectAllPublishedRooms(ctx context.Context, published bool) ([]string, error)
+}

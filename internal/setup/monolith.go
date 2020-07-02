@@ -27,7 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/transactions"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/dendrite/publicroomsapi"
 	"github.com/matrix-org/dendrite/publicroomsapi/storage"
 	"github.com/matrix-org/dendrite/publicroomsapi/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -81,13 +80,14 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 	federationapi.AddPublicRoutes(
 		publicMux, m.Config, m.UserAPI, m.FedClient,
 		m.KeyRing, m.RoomserverAPI, m.FederationSenderAPI,
-		m.EDUInternalAPI,
+		m.EDUInternalAPI, m.StateAPI,
 	)
 	mediaapi.AddPublicRoutes(publicMux, m.Config, m.UserAPI, m.Client)
-	publicroomsapi.AddPublicRoutes(
-		publicMux, m.Config, m.KafkaConsumer, m.UserAPI, m.PublicRoomsDB, m.RoomserverAPI, m.FedClient,
-		m.ExtPublicRoomsProvider,
-	)
+	/*
+		publicroomsapi.AddPublicRoutes(
+			publicMux, m.Config, m.KafkaConsumer, m.UserAPI, m.PublicRoomsDB, m.RoomserverAPI, m.FedClient,
+			m.ExtPublicRoomsProvider,
+		) */
 	syncapi.AddPublicRoutes(
 		publicMux, m.KafkaConsumer, m.UserAPI, m.RoomserverAPI, m.FedClient, m.Config,
 	)

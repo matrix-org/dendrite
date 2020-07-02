@@ -51,4 +51,17 @@ func AddRoutes(internalAPIMux *mux.Router, intAPI api.CurrentStateInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(QueryBulkStateContentPath,
+		httputil.MakeInternalAPI("queryBulkStateContent", func(req *http.Request) util.JSONResponse {
+			request := api.QueryBulkStateContentRequest{}
+			response := api.QueryBulkStateContentResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := intAPI.QueryBulkStateContent(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

@@ -136,3 +136,13 @@ type PerformBackfillResponse struct {
 	// Missing events, arbritrary order.
 	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
 }
+
+type PerformPublishRequest struct {
+	RoomID     string
+	Visibility string
+}
+
+type PerformPublishResponse struct {
+	// If non-nil, the publish request failed. Contains more information why it failed.
+	Error *PerformError
+}
