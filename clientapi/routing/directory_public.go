@@ -269,9 +269,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 	// strip the 'T' which is only required because when sytest does pagination tests it stops
 	// iterating when !prev_batch which then fails if prev_batch==0, so add arbitrary text to
 	// make it truthy not falsey.
-	if strings.HasPrefix(request.Since, "T") {
-		request.Since = request.Since[1:]
-	}
+	request.Since = strings.TrimPrefix(request.Since, "T")
 	return nil
 }
 
