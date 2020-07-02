@@ -38,7 +38,7 @@ const upsertPublishedSQL = "" +
 	"ON CONFLICT (room_id) DO UPDATE SET published=$2"
 
 const selectAllPublishedSQL = "" +
-	"SELECT room_id FROM roomserver_published WHERE published = $1"
+	"SELECT room_id FROM roomserver_published WHERE published = $1 ORDER BY room_id ASC"
 
 const selectPublishedSQL = "" +
 	"SELECT published FROM roomserver_published WHERE room_id = $1"

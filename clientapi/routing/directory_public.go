@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -224,21 +225,13 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 	}
 	response.TotalRoomCountEstimate = len(queryRes.RoomIDs)
 
-	if offset > 0 {
-		response.PrevBatch = strconv.Itoa(int(offset) - 1)
+	roomIDs, prev, next := sliceInto(queryRes.RoomIDs, offset, limit)
+	if prev >= 0 {
+		response.PrevBatch = "T" + strconv.Itoa(prev)
 	}
-	nextIndex := int(offset) + int(limit)
-	if response.TotalRoomCountEstimate > nextIndex {
-		response.NextBatch = strconv.Itoa(nextIndex)
+	if next >= 0 {
+		response.NextBatch = "T" + strconv.Itoa(next)
 	}
-
-	if offset < 0 {
-		offset = 0
-	}
-	if nextIndex > len(queryRes.RoomIDs) {
-		nextIndex = len(queryRes.RoomIDs)
-	}
-	roomIDs := queryRes.RoomIDs[offset:nextIndex]
 	response.Chunk, err = fillInRooms(ctx, roomIDs, stateAPI)
 	return &response, err
 }
@@ -247,26 +240,39 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 // on /publicRooms by parsing the incoming HTTP request
 // Filter is only filled for POST requests
 func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSONResponse {
-	if httpReq.Method == http.MethodGet {
+	if httpReq.Method != "GET" && httpReq.Method != "POST" {
+		return &util.JSONResponse{
+			Code: http.StatusMethodNotAllowed,
+			JSON: jsonerror.NotFound("Bad method"),
+		}
+	}
+	if httpReq.Method == "GET" {
 		limit, err := strconv.Atoi(httpReq.FormValue("limit"))
 		// Atoi returns 0 and an error when trying to parse an empty string
 		// In that case, we want to assign 0 so we ignore the error
 		if err != nil && len(httpReq.FormValue("limit")) > 0 {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
-			reqErr := jsonerror.InternalServerError()
-			return &reqErr
+			return &util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.BadJSON("limit param is not a number"),
+			}
 		}
 		request.Limit = int16(limit)
 		request.Since = httpReq.FormValue("since")
-		return nil
-	} else if httpReq.Method == http.MethodPost {
-		return httputil.UnmarshalJSONRequest(httpReq, request)
+	} else {
+		resErr := httputil.UnmarshalJSONRequest(httpReq, request)
+		if resErr != nil {
+			return resErr
+		}
 	}
 
-	return &util.JSONResponse{
-		Code: http.StatusMethodNotAllowed,
-		JSON: jsonerror.NotFound("Bad method"),
+	// strip the 'T' which is only required because when sytest does pagination tests it stops
+	// iterating when !prev_batch which then fails if prev_batch==0, so add arbitrary text to
+	// make it truthy not falsey.
+	if strings.HasPrefix(request.Since, "T") {
+		request.Since = request.Since[1:]
 	}
+	return nil
 }
 
 // due to lots of switches
@@ -332,4 +338,38 @@ func fillInRooms(ctx context.Context, roomIDs []string, stateAPI currentstateAPI
 		i++
 	}
 	return chunk, nil
+}
+
+// sliceInto returns a subslice of `slice` which honours the since/limit values given.
+//
+//    0  1  2  3  4  5  6   index
+//   [A, B, C, D, E, F, G]  slice
+//
+//   limit=3          => A,B,C (prev='', next='3')
+//   limit=3&since=3  => D,E,F (prev='0', next='6')
+//   limit=3&since=6  => G     (prev='3', next='')
+//
+//  A value of '-1' for prev/next indicates no position.
+func sliceInto(slice []string, since int64, limit int16) (subset []string, prev, next int) {
+	prev = -1
+	next = -1
+
+	if since > 0 {
+		prev = int(since) - int(limit)
+	}
+	nextIndex := int(since) + int(limit)
+	if len(slice) > nextIndex { // there are more rooms ahead of us
+		next = nextIndex
+	}
+
+	// apply sanity caps
+	if since < 0 {
+		since = 0
+	}
+	if nextIndex > len(slice) {
+		nextIndex = len(slice)
+	}
+
+	subset = slice[since:nextIndex]
+	return
 }
