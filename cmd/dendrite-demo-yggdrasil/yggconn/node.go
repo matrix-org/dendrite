@@ -17,6 +17,7 @@ package yggconn
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -26,10 +27,11 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/lucas-clemente/quic-go"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
 
-	"github.com/libp2p/go-yamux"
 	yggdrasiladmin "github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
@@ -39,16 +41,26 @@ import (
 )
 
 type Node struct {
-	core      *yggdrasil.Core
-	config    *yggdrasilconfig.NodeConfig
-	state     *yggdrasilconfig.NodeState
-	admin     *yggdrasiladmin.AdminSocket
-	multicast *yggdrasilmulticast.Multicast
-	log       *gologme.Logger
-	listener  *yggdrasil.Listener
-	dialer    *yggdrasil.Dialer
-	sessions  sync.Map // string -> yamux.Session
-	incoming  chan *yamux.Stream
+	core       *yggdrasil.Core
+	config     *yggdrasilconfig.NodeConfig
+	state      *yggdrasilconfig.NodeState
+	admin      *yggdrasiladmin.AdminSocket
+	multicast  *yggdrasilmulticast.Multicast
+	log        *gologme.Logger
+	packetConn *yggdrasil.PacketConn
+	listener   quic.Listener
+	tlsConfig  *tls.Config
+	quicConfig *quic.Config
+	sessions   sync.Map // string -> quic.Session
+	incoming   chan QUICStream
+}
+
+func (n *Node) BuildName() string {
+	return "dendrite"
+}
+
+func (n *Node) BuildVersion() string {
+	return "dev"
 }
 
 func (n *Node) Dialer(_, address string) (net.Conn, error) {
@@ -74,8 +86,9 @@ func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
 		admin:     &yggdrasiladmin.AdminSocket{},
 		multicast: &yggdrasilmulticast.Multicast{},
 		log:       gologme.New(os.Stdout, "YGG ", log.Flags()),
-		incoming:  make(chan *yamux.Stream),
+		incoming:  make(chan QUICStream),
 	}
+	n.core.SetBuildInfo(n)
 
 	yggfile := fmt.Sprintf("%s/%s-yggdrasil.conf", storageDirectory, instanceName)
 	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
@@ -114,29 +127,21 @@ func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
 			panic(err)
 		}
 	}
-	/*
-		if err = n.admin.Init(n.core, n.state, n.log, nil); err != nil {
-			panic(err)
-		}
-		if err = n.admin.Start(); err != nil {
-			panic(err)
-		}
-	*/
 	if err = n.multicast.Init(n.core, n.state, n.log, nil); err != nil {
 		panic(err)
 	}
 	if err = n.multicast.Start(); err != nil {
 		panic(err)
 	}
-	//n.admin.SetupAdminHandlers(n.admin)
-	//n.multicast.SetupAdminHandlers(n.admin)
-	n.listener, err = n.core.ConnListen()
-	if err != nil {
-		panic(err)
-	}
-	n.dialer, err = n.core.ConnDialer()
-	if err != nil {
-		panic(err)
+
+	n.packetConn = n.core.PacketConn()
+	n.tlsConfig = n.generateTLSConfig()
+	n.quicConfig = &quic.Config{
+		MaxIncomingStreams:    0,
+		MaxIncomingUniStreams: 0,
+		KeepAlive:             true,
+		MaxIdleTimeout:        time.Second * 120,
+		HandshakeTimeout:      time.Second * 30,
 	}
 
 	n.log.Println("Public curve25519:", n.core.EncryptionPublicKey())

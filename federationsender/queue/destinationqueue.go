@@ -52,7 +52,7 @@ type destinationQueue struct {
 	transactionIDMutex sync.Mutex                              // protects transactionID
 	transactionID      gomatrixserverlib.TransactionID         // last transaction ID
 	transactionCount   atomic.Int32                            // how many events in this transaction so far
-	pendingPDUs        atomic.Int32                            // how many PDUs are waiting to be sent
+	pendingPDUs        atomic.Int64                            // how many PDUs are waiting to be sent
 	pendingEDUs        []*gomatrixserverlib.EDU                // owned by backgroundSend
 	pendingInvites     []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
 	wakeServerCh       chan bool                               // interrupts idle wait
@@ -91,6 +91,7 @@ func (oq *destinationQueue) sendEvent(nid int64) {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
+	oq.wakeQueueIfNeeded()
 	// Create a transaction ID. We'll either do this if we don't have
 	// one made up yet, or if we've exceeded the number of maximum
 	// events allowed in a single tranaction. We'll reset the counter
@@ -117,10 +118,6 @@ func (oq *destinationQueue) sendEvent(nid int64) {
 	// We've successfully added a PDU to the transaction so increase
 	// the counter.
 	oq.transactionCount.Add(1)
-	// If the queue isn't running at this point then start it.
-	if !oq.running.Load() {
-		go oq.backgroundSend()
-	}
 	// Signal that we've sent a new PDU. This will cause the queue to
 	// wake up if it's asleep. The return to the Add function will only
 	// be 1 if the previous value was 0, e.g. nothing was waiting before.
@@ -137,9 +134,7 @@ func (oq *destinationQueue) sendEDU(ev *gomatrixserverlib.EDU) {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
-	if !oq.running.Load() {
-		go oq.backgroundSend()
-	}
+	oq.wakeQueueIfNeeded()
 	oq.incomingEDUs <- ev
 }
 
@@ -151,10 +146,30 @@ func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.InviteV2Request) {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
+	oq.wakeQueueIfNeeded()
+	oq.incomingInvites <- ev
+}
+
+func (oq *destinationQueue) wakeQueueIfNeeded() {
 	if !oq.running.Load() {
+		// Look up how many events are pending in this queue. We need
+		// to do this so that the queue thinks it has work to do.
+		count, err := oq.db.GetPendingPDUCount(
+			context.TODO(),
+			oq.destination,
+		)
+		if err == nil {
+			oq.pendingPDUs.Store(count)
+			log.Printf("Destination queue %q has %d pending PDUs", oq.destination, count)
+		} else {
+			log.WithError(err).Errorf("Can't get pending PDU count for %q destination queue", oq.destination)
+		}
+		if count > 0 {
+			oq.wakeServerCh <- true
+		}
+		// Then start the queue.
 		go oq.backgroundSend()
 	}
-	oq.incomingInvites <- ev
 }
 
 // backgroundSend is the worker goroutine for sending events.
@@ -170,46 +185,44 @@ func (oq *destinationQueue) backgroundSend() {
 	for {
 		// If we have nothing to do then wait either for incoming events, or
 		// until we hit an idle timeout.
-		if oq.pendingPDUs.Load() == 0 && len(oq.pendingEDUs) == 0 && len(oq.pendingInvites) == 0 {
-			select {
-			case <-oq.wakeServerCh:
-				// We were woken up because there are new PDUs waiting in the
-				// database.
-			case edu := <-oq.incomingEDUs:
-				// EDUs are handled in-memory for now. We will try to keep
-				// the ordering intact.
-				// TODO: Certain EDU types need persistence, e.g. send-to-device
-				oq.pendingEDUs = append(oq.pendingEDUs, edu)
-				// If there are any more things waiting in the channel queue
-				// then read them. This is safe because we guarantee only
-				// having one goroutine per destination queue, so the channel
-				// isn't being consumed anywhere else.
-				for len(oq.incomingEDUs) > 0 {
-					oq.pendingEDUs = append(oq.pendingEDUs, <-oq.incomingEDUs)
-				}
-			case invite := <-oq.incomingInvites:
-				// There's no strict ordering requirement for invites like
-				// there is for transactions, so we put the invite onto the
-				// front of the queue. This means that if an invite that is
-				// stuck failing already, that it won't block our new invite
-				// from being sent.
-				oq.pendingInvites = append(
-					[]*gomatrixserverlib.InviteV2Request{invite},
-					oq.pendingInvites...,
-				)
-				// If there are any more things waiting in the channel queue
-				// then read them. This is safe because we guarantee only
-				// having one goroutine per destination queue, so the channel
-				// isn't being consumed anywhere else.
-				for len(oq.incomingInvites) > 0 {
-					oq.pendingInvites = append(oq.pendingInvites, <-oq.incomingInvites)
-				}
-			case <-time.After(time.Second * 30):
-				// The worker is idle so stop the goroutine. It'll get
-				// restarted automatically the next time we have an event to
-				// send.
-				return
+		select {
+		case <-oq.wakeServerCh:
+			// We were woken up because there are new PDUs waiting in the
+			// database.
+		case edu := <-oq.incomingEDUs:
+			// EDUs are handled in-memory for now. We will try to keep
+			// the ordering intact.
+			// TODO: Certain EDU types need persistence, e.g. send-to-device
+			oq.pendingEDUs = append(oq.pendingEDUs, edu)
+			// If there are any more things waiting in the channel queue
+			// then read them. This is safe because we guarantee only
+			// having one goroutine per destination queue, so the channel
+			// isn't being consumed anywhere else.
+			for len(oq.incomingEDUs) > 0 {
+				oq.pendingEDUs = append(oq.pendingEDUs, <-oq.incomingEDUs)
 			}
+		case invite := <-oq.incomingInvites:
+			// There's no strict ordering requirement for invites like
+			// there is for transactions, so we put the invite onto the
+			// front of the queue. This means that if an invite that is
+			// stuck failing already, that it won't block our new invite
+			// from being sent.
+			oq.pendingInvites = append(
+				[]*gomatrixserverlib.InviteV2Request{invite},
+				oq.pendingInvites...,
+			)
+			// If there are any more things waiting in the channel queue
+			// then read them. This is safe because we guarantee only
+			// having one goroutine per destination queue, so the channel
+			// isn't being consumed anywhere else.
+			for len(oq.incomingInvites) > 0 {
+				oq.pendingInvites = append(oq.pendingInvites, <-oq.incomingInvites)
+			}
+		case <-time.After(time.Second * 30):
+			// The worker is idle so stop the goroutine. It'll get
+			// restarted automatically the next time we have an event to
+			// send.
+			return
 		}
 
 		// If we are backing off this server then wait for the
@@ -317,8 +330,10 @@ func (oq *destinationQueue) nextTransaction(
 	// Ask the database for any pending PDUs from the next transaction.
 	// maxPDUsPerTransaction is an upper limit but we probably won't
 	// actually retrieve that many events.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	txid, pdus, err := oq.db.GetNextTransactionPDUs(
-		context.TODO(),        // context
+		ctx,                   // context
 		oq.destination,        // server name
 		maxPDUsPerTransaction, // max events to retrieve
 	)
@@ -366,7 +381,7 @@ func (oq *destinationQueue) nextTransaction(
 	case nil:
 		// No error was returned so the transaction looks to have
 		// been successfully sent.
-		oq.pendingPDUs.Sub(int32(len(t.PDUs)))
+		oq.pendingPDUs.Sub(int64(len(t.PDUs)))
 		// Clean up the transaction in the database.
 		if err = oq.db.CleanTransactionPDUs(
 			context.TODO(),

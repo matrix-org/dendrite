@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
@@ -50,6 +51,7 @@ var (
 // nolint:gocyclo
 func main() {
 	flag.Parse()
+	internal.SetupPprof()
 
 	ygg, err := yggconn.Setup(*instanceName, *instancePeer, ".")
 	if err != nil {

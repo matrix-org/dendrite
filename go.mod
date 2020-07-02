@@ -17,7 +17,8 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.5.0
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
 	github.com/libp2p/go-libp2p-record v0.1.2
-	github.com/libp2p/go-yamux v1.3.7
+	github.com/libp2p/go-yamux v1.3.7 // indirect
+	github.com/lucas-clemente/quic-go v0.17.2
 	github.com/matrix-org/dugong v0.0.0-20171220115018-ea0a4690a0d5
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
@@ -37,9 +38,9 @@ require (
 	github.com/uber-go/atomic v1.3.0 // indirect
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0
-	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200530233943-aec82d7a391b
+	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200702163833-11ecfa688d93
 	go.uber.org/atomic v1.4.0
-	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d
+	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	gopkg.in/h2non/bimg.v1 v1.0.18
 	gopkg.in/yaml.v2 v2.2.8
 )
