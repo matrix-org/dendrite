@@ -18,17 +18,22 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // Database stores information needed by the federation sender
 type Database struct {
 	joinedHostsStatements
 	roomStatements
+	queuePDUsStatements
+	queueJSONStatements
 	sqlutil.PartitionOffsetStatements
 	db *sql.DB
 }
@@ -58,6 +63,14 @@ func (d *Database) prepare() error {
 	}
 
 	if err = d.roomStatements.prepare(d.db); err != nil {
+		return err
+	}
+
+	if err = d.queuePDUsStatements.prepare(d.db); err != nil {
+		return err
+	}
+
+	if err = d.queueJSONStatements.prepare(d.db); err != nil {
 		return err
 	}
 
@@ -125,4 +138,126 @@ func (d *Database) GetJoinedHosts(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
 	return d.selectJoinedHosts(ctx, roomID)
+}
+
+// StoreJSON adds a JSON blob into the queue JSON table and returns
+// a NID. The NID will then be used when inserting the per-destination
+// metadata entries.
+func (d *Database) StoreJSON(
+	ctx context.Context, js string,
+) (int64, error) {
+	nid, err := d.insertQueueJSON(ctx, nil, js)
+	if err != nil {
+		return 0, fmt.Errorf("d.insertQueueJSON: %w", err)
+	}
+	return nid, nil
+}
+
+// AssociatePDUWithDestination creates an association that the
+// destination queues will use to determine which JSON blobs to send
+// to which servers.
+func (d *Database) AssociatePDUWithDestination(
+	ctx context.Context,
+	transactionID gomatrixserverlib.TransactionID,
+	serverName gomatrixserverlib.ServerName,
+	nids []int64,
+) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		for _, nid := range nids {
+			if err := d.insertQueuePDU(
+				ctx,           // context
+				txn,           // SQL transaction
+				transactionID, // transaction ID
+				serverName,    // destination server name
+				nid,           // NID from the federationsender_queue_json table
+			); err != nil {
+				return fmt.Errorf("d.insertQueueRetryStmt.ExecContext: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+// GetNextTransactionPDUs retrieves events from the database for
+// the next pending transaction, up to the limit specified.
+func (d *Database) GetNextTransactionPDUs(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	limit int,
+) (
+	transactionID gomatrixserverlib.TransactionID,
+	events []*gomatrixserverlib.HeaderedEvent,
+	err error,
+) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		transactionID, err = d.selectQueueNextTransactionID(ctx, txn, serverName)
+		if err != nil {
+			return fmt.Errorf("d.selectQueueNextTransactionID: %w", err)
+		}
+
+		if transactionID == "" {
+			return nil
+		}
+
+		nids, err := d.selectQueuePDUs(ctx, txn, serverName, transactionID, limit)
+		if err != nil {
+			return fmt.Errorf("d.selectQueuePDUs: %w", err)
+		}
+
+		blobs, err := d.selectQueueJSON(ctx, txn, nids)
+		if err != nil {
+			return fmt.Errorf("d.selectJSON: %w", err)
+		}
+
+		for _, blob := range blobs {
+			var event gomatrixserverlib.HeaderedEvent
+			if err := json.Unmarshal(blob, &event); err != nil {
+				return fmt.Errorf("json.Unmarshal: %w", err)
+			}
+			events = append(events, &event)
+		}
+
+		return nil
+	})
+	return
+}
+
+// CleanTransactionPDUs cleans up all associated events for a
+// given transaction. This is done when the transaction was sent
+// successfully.
+func (d *Database) CleanTransactionPDUs(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	transactionID gomatrixserverlib.TransactionID,
+) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		nids, err := d.selectQueuePDUs(ctx, txn, serverName, transactionID, 50)
+		if err != nil {
+			return fmt.Errorf("d.selectQueuePDUs: %w", err)
+		}
+
+		if err = d.deleteQueueTransaction(ctx, txn, serverName, transactionID); err != nil {
+			return fmt.Errorf("d.deleteQueueTransaction: %w", err)
+		}
+
+		var count int64
+		var deleteNIDs []int64
+		for _, nid := range nids {
+			count, err = d.selectQueueReferenceJSONCount(ctx, txn, nid)
+			if err != nil {
+				return fmt.Errorf("d.selectQueueReferenceJSONCount: %w", err)
+			}
+			if count == 0 {
+				deleteNIDs = append(deleteNIDs, nid)
+			}
+		}
+
+		if len(deleteNIDs) > 0 {
+			if err = d.deleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
+				return fmt.Errorf("d.deleteQueueJSON: %w", err)
+			}
+		}
+
+		return nil
+	})
 }

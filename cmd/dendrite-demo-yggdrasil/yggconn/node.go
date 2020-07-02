@@ -174,3 +174,7 @@ func (n *Node) SigningPrivateKey() ed25519.PrivateKey {
 	privBytes, _ := hex.DecodeString(n.config.SigningPrivateKey)
 	return ed25519.PrivateKey(privBytes)
 }
+
+func (n *Node) PeerCount() int {
+	return len(n.core.GetPeers()) - 1
+}

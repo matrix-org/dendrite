@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
+	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -25,12 +26,17 @@ import (
 )
 
 type DendriteMonolith struct {
+	YggdrasilNode    *yggconn.Node
 	StorageDirectory string
 	listener         net.Listener
 }
 
 func (m *DendriteMonolith) BaseURL() string {
 	return fmt.Sprintf("http://%s", m.listener.Addr().String())
+}
+
+func (m *DendriteMonolith) PeerCount() int {
+	return m.YggdrasilNode.PeerCount()
 }
 
 func (m *DendriteMonolith) Start() {
@@ -49,6 +55,7 @@ func (m *DendriteMonolith) Start() {
 	if err != nil {
 		panic(err)
 	}
+	m.YggdrasilNode = ygg
 
 	cfg := &config.Dendrite{}
 	cfg.SetDefaults()
@@ -69,6 +76,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s/dendrite-federationsender.db", m.StorageDirectory))
 	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s/dendrite-appservice.db", m.StorageDirectory))
 	cfg.Database.PublicRoomsAPI = config.DataSource(fmt.Sprintf("file:%s/dendrite-publicroomsa.db", m.StorageDirectory))
+	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s/dendrite-currentstate.db", m.StorageDirectory))
 	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s/dendrite-naffka.db", m.StorageDirectory))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
@@ -108,6 +116,8 @@ func (m *DendriteMonolith) Start() {
 		logrus.WithError(err).Panicf("failed to connect to public rooms db")
 	}
 
+	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
@@ -123,6 +133,7 @@ func (m *DendriteMonolith) Start() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
+		StateAPI:            stateAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 
 		PublicRoomsDB: publicRoomsDB,
