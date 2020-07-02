@@ -23,7 +23,6 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"math/big"
 	"net"
 	"time"
@@ -100,17 +99,6 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 		}
 		var pubKey crypto.BoxPubKey
 		copy(pubKey[:], dest)
-
-		nodeID := crypto.GetNodeID(&pubKey)
-		var nodeMask crypto.NodeID
-		for i := range nodeMask {
-			nodeMask[i] = 0xFF
-		}
-		if _, pk, rerr := n.core.Resolve(nodeID, &nodeMask); err != nil {
-			return nil, fmt.Errorf("n.core.Resolve: %w", rerr)
-		} else if pk != nil {
-			pubKey = *pk
-		}
 
 		session, err = quic.Dial(
 			n.packetConn, // yggdrasil.PacketConn
