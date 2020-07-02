@@ -55,6 +55,14 @@ type Node struct {
 	incoming   chan QUICStream
 }
 
+func (n *Node) BuildName() string {
+	return "dendrite"
+}
+
+func (n *Node) BuildVersion() string {
+	return "dev"
+}
+
 func (n *Node) Dialer(_, address string) (net.Conn, error) {
 	tokens := strings.Split(address, ":")
 	raw, err := hex.DecodeString(tokens[0])
@@ -80,6 +88,7 @@ func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
 		log:       gologme.New(os.Stdout, "YGG ", log.Flags()),
 		incoming:  make(chan QUICStream),
 	}
+	n.core.SetBuildInfo(n)
 
 	yggfile := fmt.Sprintf("%s/%s-yggdrasil.conf", storageDirectory, instanceName)
 	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
