@@ -7,8 +7,7 @@ services:
       "--bind-address=:8008",
       "--client-api-server-url=http://client_api:7771",
       "--sync-api-server-url=http://sync_api:7773",
-      "--media-api-server-url=http://media_api:7774",
-      "--public-rooms-api-server-url=http://public_rooms_api:7775"
+      "--media-api-server-url=http://media_api:7774"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -18,7 +17,6 @@ services:
       - sync_api
       - client_api
       - media_api
-      - public_rooms_api
     ports:
       - "8008:8008"
 
@@ -45,9 +43,9 @@ services:
     networks:
       - internal
 
-  public_rooms_api:
-    hostname: public_rooms_api
-    image: matrixdotorg/dendrite:publicroomsapi
+  current_state_server:
+    hostname: current_state_server
+    image: matrixdotorg/dendrite:currentstateserver
     command: [
       "--config=dendrite.yaml"
     ]

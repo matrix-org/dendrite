@@ -3,6 +3,8 @@ module github.com/matrix-org/dendrite
 require (
 	github.com/Shopify/sarama v1.26.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
+	github.com/docker/distribution v2.7.1+incompatible // indirect
+	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4

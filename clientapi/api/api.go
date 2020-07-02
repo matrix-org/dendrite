@@ -12,22 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package api
 
-import (
-	"github.com/matrix-org/dendrite/currentstateserver"
-	"github.com/matrix-org/dendrite/internal/setup"
-)
-
-func main() {
-	cfg := setup.ParseFlags(false)
-	base := setup.NewBaseDendrite(cfg, "CurrentStateServer", true)
-	defer base.Close() // nolint: errcheck
-
-	stateAPI := currentstateserver.NewInternalAPI(cfg, base.KafkaConsumer)
-
-	currentstateserver.AddInternalRoutes(base.InternalAPIMux, stateAPI)
-
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.CurrentState), string(base.Cfg.Listen.CurrentState))
-
+type ExternalPublicRoomsProvider interface {
+	// The list of homeserver domains to query. These servers will receive a request
+	// via this API: https://matrix.org/docs/spec/server_server/latest#public-room-directory
+	// This will be called -on demand- by clients, so cache appropriately!
+	Homeservers() []string
 }
