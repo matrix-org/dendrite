@@ -27,6 +27,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
@@ -126,6 +127,13 @@ func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
 
 	n.packetConn = n.core.PacketConn()
 	n.tlsConfig = n.generateTLSConfig()
+	n.quicConfig = &quic.Config{
+		MaxIncomingStreams:    0,
+		MaxIncomingUniStreams: 0,
+		KeepAlive:             true,
+		MaxIdleTimeout:        time.Second * 120,
+		HandshakeTimeout:      time.Second * 30,
+	}
 
 	n.log.Println("Public curve25519:", n.core.EncryptionPublicKey())
 	n.log.Println("Public ed25519:", n.core.SigningPublicKey())
