@@ -52,7 +52,7 @@ type destinationQueue struct {
 	transactionIDMutex sync.Mutex                              // protects transactionID
 	transactionID      gomatrixserverlib.TransactionID         // last transaction ID
 	transactionCount   atomic.Int32                            // how many events in this transaction so far
-	pendingPDUs        atomic.Int32                            // how many PDUs are waiting to be sent
+	pendingPDUs        atomic.Int64                            // how many PDUs are waiting to be sent
 	pendingEDUs        []*gomatrixserverlib.EDU                // owned by backgroundSend
 	pendingInvites     []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
 	wakeServerCh       chan bool                               // interrupts idle wait
@@ -91,6 +91,7 @@ func (oq *destinationQueue) sendEvent(nid int64) {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
+	oq.wakeQueueIfNeeded()
 	// Create a transaction ID. We'll either do this if we don't have
 	// one made up yet, or if we've exceeded the number of maximum
 	// events allowed in a single tranaction. We'll reset the counter
@@ -117,10 +118,6 @@ func (oq *destinationQueue) sendEvent(nid int64) {
 	// We've successfully added a PDU to the transaction so increase
 	// the counter.
 	oq.transactionCount.Add(1)
-	// If the queue isn't running at this point then start it.
-	if !oq.running.Load() {
-		go oq.backgroundSend()
-	}
 	// Signal that we've sent a new PDU. This will cause the queue to
 	// wake up if it's asleep. The return to the Add function will only
 	// be 1 if the previous value was 0, e.g. nothing was waiting before.
@@ -137,9 +134,7 @@ func (oq *destinationQueue) sendEDU(ev *gomatrixserverlib.EDU) {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
-	if !oq.running.Load() {
-		go oq.backgroundSend()
-	}
+	oq.wakeQueueIfNeeded()
 	oq.incomingEDUs <- ev
 }
 
@@ -151,10 +146,27 @@ func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.InviteV2Request) {
 		// If the destination is blacklisted then drop the event.
 		return
 	}
+	oq.wakeQueueIfNeeded()
+	oq.incomingInvites <- ev
+}
+
+func (oq *destinationQueue) wakeQueueIfNeeded() {
 	if !oq.running.Load() {
+		// Look up how many events are pending in this queue. We need
+		// to do this so that the queue thinks it has work to do.
+		count, err := oq.db.GetPendingPDUCount(
+			context.TODO(),
+			oq.destination,
+		)
+		if err == nil {
+			oq.pendingPDUs.Store(count)
+			log.Printf("Destination queue %q has %d pending PDUs", oq.destination, count)
+		} else {
+			log.WithError(err).Errorf("Can't get pending PDU count for %q destination queue", oq.destination)
+		}
+		// Then start the queue.
 		go oq.backgroundSend()
 	}
-	oq.incomingInvites <- ev
 }
 
 // backgroundSend is the worker goroutine for sending events.
@@ -366,7 +378,7 @@ func (oq *destinationQueue) nextTransaction(
 	case nil:
 		// No error was returned so the transaction looks to have
 		// been successfully sent.
-		oq.pendingPDUs.Sub(int32(len(t.PDUs)))
+		oq.pendingPDUs.Sub(int64(len(t.PDUs)))
 		// Clean up the transaction in the database.
 		if err = oq.db.CleanTransactionPDUs(
 			context.TODO(),
