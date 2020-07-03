@@ -61,10 +61,12 @@ func NewOutgoingQueues(
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
 	// Look up which servers we have pending items for and then rehydrate those queues.
-	if serverNames, err := db.GetPendingServerNames(context.TODO()); err == nil {
+	if serverNames, err := db.GetPendingServerNames(context.Background()); err == nil {
 		for _, serverName := range serverNames {
 			queues.getQueue(serverName).wakeQueueIfNeeded()
 		}
+	} else {
+		log.WithError(err).Error("Failed to get server names for destination queue hydration")
 	}
 	return queues
 }
