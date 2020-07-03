@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 // SendEvents to the roomserver The events are written with KindNew.
@@ -114,4 +115,20 @@ func SendInvite(
 		return response.Error
 	}
 	return nil
+}
+
+// GetEvent returns the event or nil, even on errors.
+func GetEvent(ctx context.Context, rsAPI RoomserverInternalAPI, eventID string) *gomatrixserverlib.HeaderedEvent {
+	var res QueryEventsByIDResponse
+	err := rsAPI.QueryEventsByID(ctx, &QueryEventsByIDRequest{
+		EventIDs: []string{eventID},
+	}, &res)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to QueryEventsByID")
+		return nil
+	}
+	if len(res.Events) != 1 {
+		return nil
+	}
+	return &res.Events[0]
 }
