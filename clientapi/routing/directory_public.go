@@ -71,7 +71,9 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 	stateAPI currentstateAPI.CurrentStateInternalAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
 ) (*gomatrixserverlib.RespPublicRooms, error) {
 
-	var response gomatrixserverlib.RespPublicRooms
+	response := gomatrixserverlib.RespPublicRooms{
+		Chunk: []gomatrixserverlib.PublicRoom{},
+	}
 	var limit int16
 	var offset int64
 	limit = request.Limit
@@ -103,7 +105,9 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 	if next >= 0 {
 		response.NextBatch = "T" + strconv.Itoa(next)
 	}
-	response.Chunk = chunk
+	if chunk != nil {
+		response.Chunk = chunk
+	}
 	return &response, err
 }
 

@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggrooms"
 	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -131,6 +132,9 @@ func main() {
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
 		//ServerKeyAPI:        serverKeyAPI,
+		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
+			ygg, fsAPI, federation,
+		),
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 

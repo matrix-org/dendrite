@@ -31,6 +31,7 @@ import (
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	yggdrasiladmin "github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
@@ -140,7 +141,7 @@ func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
 		MaxIncomingStreams:    0,
 		MaxIncomingUniStreams: 0,
 		KeepAlive:             true,
-		MaxIdleTimeout:        time.Second * 120,
+		MaxIdleTimeout:        time.Second * 900,
 		HandshakeTimeout:      time.Second * 30,
 	}
 
@@ -182,4 +183,30 @@ func (n *Node) SigningPrivateKey() ed25519.PrivateKey {
 
 func (n *Node) PeerCount() int {
 	return len(n.core.GetPeers()) - 1
+}
+
+func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
+	nodemap := map[string]struct{}{}
+	/*
+		for _, peer := range n.core.GetSwitchPeers() {
+			nodemap[hex.EncodeToString(peer.SigningKey[:])] = struct{}{}
+		}
+	*/
+	n.sessions.Range(func(_, v interface{}) bool {
+		session, ok := v.(quic.Session)
+		if !ok {
+			return true
+		}
+		if len(session.ConnectionState().PeerCertificates) != 1 {
+			return true
+		}
+		subjectName := session.ConnectionState().PeerCertificates[0].Subject.CommonName
+		nodemap[subjectName] = struct{}{}
+		return true
+	})
+	var nodes []gomatrixserverlib.ServerName
+	for node := range nodemap {
+		nodes = append(nodes, gomatrixserverlib.ServerName(node))
+	}
+	return nodes
 }

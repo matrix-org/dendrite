@@ -20,6 +20,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
@@ -127,6 +128,9 @@ func (n *Node) generateTLSConfig() *tls.Config {
 		panic(err)
 	}
 	template := x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: n.DerivedServerName(),
+		},
 		SerialNumber: big.NewInt(1),
 		NotAfter:     time.Now().Add(time.Hour * 24 * 365),
 		DNSNames:     []string{n.DerivedSessionName()},
