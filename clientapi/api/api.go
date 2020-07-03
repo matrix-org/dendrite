@@ -14,9 +14,10 @@
 
 package api
 
-type ExternalPublicRoomsProvider interface {
-	// The list of homeserver domains to query. These servers will receive a request
-	// via this API: https://matrix.org/docs/spec/server_server/latest#public-room-directory
-	// This will be called -on demand- by clients, so cache appropriately!
-	Homeservers() []string
+import "github.com/matrix-org/gomatrixserverlib"
+
+// ExtraPublicRoomsProvider provides a way to inject extra published rooms into /publicRooms requests.
+type ExtraPublicRoomsProvider interface {
+	// Rooms returns the extra rooms. This is called on-demand by clients, so cache appropriately.
+	Rooms() []gomatrixserverlib.PublicRoom
 }
