@@ -3,8 +3,6 @@ module github.com/matrix-org/dendrite
 require (
 	github.com/Shopify/sarama v1.26.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
@@ -38,7 +36,7 @@ require (
 	github.com/uber-go/atomic v1.3.0 // indirect
 	github.com/uber/jaeger-client-go v2.15.0+incompatible
 	github.com/uber/jaeger-lib v1.5.0
-	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200702163833-11ecfa688d93
+	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200703125141-dbe5c1b1c190
 	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	gopkg.in/h2non/bimg.v1 v1.0.18
