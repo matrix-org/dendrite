@@ -162,7 +162,10 @@ func main() {
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	stateAPI := currentstateserver.NewInternalAPI(base.Base.Cfg, base.Base.KafkaConsumer)
 	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI, stateAPI)
-	provider.Start()
+	err = provider.Start()
+	if err != nil {
+		panic("failed to create new public rooms provider: " + err.Error())
+	}
 
 	monolith := setup.Monolith{
 		Config:        base.Base.Cfg,
