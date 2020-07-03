@@ -87,6 +87,10 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err != nil {
 		return err
 	}
+	filter, err := NewSqliteFilterTable(d.db)
+	if err != nil {
+		return err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Invites:             invites,
@@ -95,6 +99,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		BackwardExtremities: bwExtrem,
 		CurrentRoomState:    roomState,
 		Topology:            topology,
+		Filter:              filter,
 		SendToDevice:        sendToDevice,
 		SendToDeviceWriter:  sqlutil.NewTransactionWriter(),
 		EDUCache:            cache.New(),

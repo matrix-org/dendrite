@@ -16,60 +16,52 @@ package yggconn
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/pem"
+	"errors"
+	"math/big"
 	"net"
-	"strings"
 	"time"
 
-	"github.com/libp2p/go-yamux"
+	"github.com/lucas-clemente/quic-go"
+	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 )
 
-func (n *Node) yamuxConfig() *yamux.Config {
-	cfg := yamux.DefaultConfig()
-	cfg.EnableKeepAlive = false
-	cfg.ConnectionWriteTimeout = time.Second * 15
-	cfg.MaxMessageSize = 65535
-	cfg.ReadBufSize = 655350
-	return cfg
-}
-
 func (n *Node) listenFromYgg() {
+	var err error
+	n.listener, err = quic.Listen(
+		n.packetConn, // yggdrasil.PacketConn
+		n.tlsConfig,  // TLS config
+		n.quicConfig, // QUIC config
+	)
+	if err != nil {
+		panic(err)
+	}
+
 	for {
-		conn, err := n.listener.Accept()
+		session, err := n.listener.Accept(context.TODO())
 		if err != nil {
 			n.log.Println("n.listener.Accept:", err)
 			return
 		}
-		var session *yamux.Session
-		// If the remote address is lower than ours then we'll be the
-		// server. Otherwse we'll be the client.
-		if strings.Compare(conn.RemoteAddr().String(), n.DerivedSessionName()) < 0 {
-			session, err = yamux.Server(conn, n.yamuxConfig())
-		} else {
-			session, err = yamux.Client(conn, n.yamuxConfig())
-		}
-		if err != nil {
-			return
-		}
-		go n.listenFromYggConn(session)
+		go n.listenFromQUIC(session)
 	}
 }
 
-func (n *Node) listenFromYggConn(session *yamux.Session) {
+func (n *Node) listenFromQUIC(session quic.Session) {
 	n.sessions.Store(session.RemoteAddr().String(), session)
 	defer n.sessions.Delete(session.RemoteAddr())
-	defer func() {
-		if err := session.Close(); err != nil {
-			n.log.Println("session.Close:", err)
-		}
-	}()
-
 	for {
-		st, err := session.AcceptStream()
+		st, err := session.AcceptStream(context.TODO())
 		if err != nil {
 			n.log.Println("session.AcceptStream:", err)
 			return
 		}
-		n.incoming <- st
+		n.incoming <- QUICStream{st, session}
 	}
 }
 
@@ -96,29 +88,63 @@ func (n *Node) Dial(network, address string) (net.Conn, error) {
 // Implements http.Transport.DialContext
 func (n *Node) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	s, ok1 := n.sessions.Load(address)
-	session, ok2 := s.(*yamux.Session)
-	if !ok1 || !ok2 || (ok1 && ok2 && session.IsClosed()) {
-		conn, err := n.dialer.DialContext(ctx, network, address)
+	session, ok2 := s.(quic.Session)
+	if !ok1 || !ok2 || (ok1 && ok2 && session.ConnectionState().HandshakeComplete) {
+		dest, err := hex.DecodeString(address)
+		if err != nil {
+			return nil, err
+		}
+		if len(dest) != crypto.BoxPubKeyLen {
+			return nil, errors.New("invalid key length supplied")
+		}
+		var pubKey crypto.BoxPubKey
+		copy(pubKey[:], dest)
+
+		session, err = quic.Dial(
+			n.packetConn, // yggdrasil.PacketConn
+			&pubKey,      // dial address
+			address,      // dial SNI
+			n.tlsConfig,  // TLS config
+			n.quicConfig, // QUIC config
+		)
 		if err != nil {
 			n.log.Println("n.dialer.DialContext:", err)
 			return nil, err
 		}
-		// If the remote address is lower than ours then we will be the
-		// server. Otherwise we'll be the client.
-		if strings.Compare(conn.RemoteAddr().String(), n.DerivedSessionName()) < 0 {
-			session, err = yamux.Server(conn, n.yamuxConfig())
-		} else {
-			session, err = yamux.Client(conn, n.yamuxConfig())
-		}
-		if err != nil {
-			return nil, err
-		}
-		go n.listenFromYggConn(session)
+		go n.listenFromQUIC(session)
 	}
 	st, err := session.OpenStream()
 	if err != nil {
 		n.log.Println("session.OpenStream:", err)
 		return nil, err
 	}
-	return st, nil
+	return QUICStream{st, session}, nil
+}
+
+func (n *Node) generateTLSConfig() *tls.Config {
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		panic(err)
+	}
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotAfter:     time.Now().Add(time.Hour * 24 * 365),
+		DNSNames:     []string{n.DerivedSessionName()},
+	}
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		panic(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		panic(err)
+	}
+	return &tls.Config{
+		Certificates:       []tls.Certificate{tlsCert},
+		NextProtos:         []string{"quic-matrix-ygg"},
+		InsecureSkipVerify: true,
+	}
 }

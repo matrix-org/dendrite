@@ -55,6 +55,7 @@ database:
   sync_api: "postgresql:///syn_api"
   room_server: "postgresql:///room_server"
   appservice: "postgresql:///appservice"
+  current_state: "postgresql:///current_state"
 listen:
   room_server: "localhost:7770"
   client_api: "localhost:7771"
@@ -64,6 +65,7 @@ listen:
   appservice_api: "localhost:7777"
   edu_server: "localhost:7778"
   user_api: "localhost:7779"
+  current_state_server: "localhost:7775"
 logging:
   - type: "file"
     level: "info"

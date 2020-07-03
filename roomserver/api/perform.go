@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -12,8 +13,9 @@ import (
 type PerformErrorCode int
 
 type PerformError struct {
-	Msg  string
-	Code PerformErrorCode
+	Msg        string
+	RemoteCode int // remote HTTP status code, for PerformErrRemote
+	Code       PerformErrorCode
 }
 
 func (p *PerformError) Error() string {
@@ -38,6 +40,22 @@ func (p *PerformError) JSONResponse() util.JSONResponse {
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(p.Msg),
 		}
+	case PerformErrorNoOperation:
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(p.Msg),
+		}
+	case PerformErrRemote:
+		// if the code is 0 then something bad happened and it isn't
+		// a remote HTTP error being encapsulated, e.g network error to remote.
+		if p.RemoteCode == 0 {
+			return util.ErrorResponse(fmt.Errorf("%s", p.Msg))
+		}
+		return util.JSONResponse{
+			Code: p.RemoteCode,
+			// TODO: Should we assert this is in fact JSON? E.g gjson parse?
+			JSON: json.RawMessage(p.Msg),
+		}
 	default:
 		return util.ErrorResponse(p)
 	}
@@ -52,6 +70,8 @@ const (
 	PerformErrorNoRoom PerformErrorCode = 3
 	// PerformErrorNoOperation means that the request resulted in nothing happening e.g invite->invite or leave->leave.
 	PerformErrorNoOperation PerformErrorCode = 4
+	// PerformErrRemote means that the request failed and the PerformError.Msg is the raw remote JSON error response
+	PerformErrRemote PerformErrorCode = 5
 )
 
 type PerformJoinRequest struct {
@@ -115,4 +135,14 @@ func (r *PerformBackfillRequest) PrevEventIDs() []string {
 type PerformBackfillResponse struct {
 	// Missing events, arbritrary order.
 	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
+}
+
+type PerformPublishRequest struct {
+	RoomID     string
+	Visibility string
+}
+
+type PerformPublishResponse struct {
+	// If non-nil, the publish request failed. Contains more information why it failed.
+	Error *PerformError
 }

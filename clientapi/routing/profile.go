@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -93,8 +94,8 @@ func GetAvatarURL(
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 // nolint:gocyclo
 func SetAvatarURL(
-	req *http.Request, accountDB accounts.Database, device *userapi.Device,
-	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
+	req *http.Request, accountDB accounts.Database, stateAPI currentstateAPI.CurrentStateInternalAPI,
+	device *userapi.Device, userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -139,9 +140,13 @@ func SetAvatarURL(
 		return jsonerror.InternalServerError()
 	}
 
-	memberships, err := accountDB.GetMembershipsByLocalpart(req.Context(), localpart)
+	var res currentstateAPI.QueryRoomsForUserResponse
+	err = stateAPI.QueryRoomsForUser(req.Context(), &currentstateAPI.QueryRoomsForUserRequest{
+		UserID:         device.UserID,
+		WantMembership: "join",
+	}, &res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetMembershipsByLocalpart failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -152,7 +157,7 @@ func SetAvatarURL(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
+		req.Context(), res.RoomIDs, newProfile, userID, cfg, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -207,8 +212,8 @@ func GetDisplayName(
 // SetDisplayName implements PUT /profile/{userID}/displayname
 // nolint:gocyclo
 func SetDisplayName(
-	req *http.Request, accountDB accounts.Database, device *userapi.Device,
-	userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
+	req *http.Request, accountDB accounts.Database, stateAPI currentstateAPI.CurrentStateInternalAPI,
+	device *userapi.Device, userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -253,9 +258,13 @@ func SetDisplayName(
 		return jsonerror.InternalServerError()
 	}
 
-	memberships, err := accountDB.GetMembershipsByLocalpart(req.Context(), localpart)
+	var res currentstateAPI.QueryRoomsForUserResponse
+	err = stateAPI.QueryRoomsForUser(req.Context(), &currentstateAPI.QueryRoomsForUserRequest{
+		UserID:         device.UserID,
+		WantMembership: "join",
+	}, &res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetMembershipsByLocalpart failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -266,7 +275,7 @@ func SetDisplayName(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), memberships, newProfile, userID, cfg, evTime, rsAPI,
+		req.Context(), res.RoomIDs, newProfile, userID, cfg, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -335,14 +344,14 @@ func getProfile(
 
 func buildMembershipEvents(
 	ctx context.Context,
-	memberships []authtypes.Membership,
+	roomIDs []string,
 	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
 	evTime time.Time, rsAPI api.RoomserverInternalAPI,
 ) ([]gomatrixserverlib.HeaderedEvent, error) {
 	evs := []gomatrixserverlib.HeaderedEvent{}
 
-	for _, membership := range memberships {
-		verReq := api.QueryRoomVersionForRoomRequest{RoomID: membership.RoomID}
+	for _, roomID := range roomIDs {
+		verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
 		if err := rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
 			return []gomatrixserverlib.HeaderedEvent{}, err
@@ -350,7 +359,7 @@ func buildMembershipEvents(
 
 		builder := gomatrixserverlib.EventBuilder{
 			Sender:   userID,
-			RoomID:   membership.RoomID,
+			RoomID:   roomID,
 			Type:     "m.room.member",
 			StateKey: &userID,
 		}

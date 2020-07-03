@@ -19,6 +19,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -52,6 +53,7 @@ func Setup(
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	userAPI userapi.UserInternalAPI,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
 ) {
 	v2keysmux := publicAPIMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := publicAPIMux.PathPrefix(pathPrefixV1Federation).Subrouter()
@@ -83,10 +85,26 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
+	v1fedmux.Handle("/invite/{roomID}/{eventID}", httputil.MakeFedAPI(
+		"federation_invite", cfg.Matrix.ServerName, keys, wakeup,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			res := InviteV1(
+				httpReq, request, vars["roomID"], vars["eventID"],
+				cfg, rsAPI, keys,
+			)
+			return util.JSONResponse{
+				Code: res.Code,
+				JSON: []interface{}{
+					res.Code, res.JSON,
+				},
+			}
+		},
+	)).Methods(http.MethodPut, http.MethodOptions)
+
 	v2fedmux.Handle("/invite/{roomID}/{eventID}", httputil.MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
-			return Invite(
+			return InviteV2(
 				httpReq, request, vars["roomID"], vars["eventID"],
 				cfg, rsAPI, keys,
 			)
@@ -275,4 +293,10 @@ func Setup(
 			return Backfill(httpReq, request, rsAPI, vars["roomID"], cfg)
 		},
 	)).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/publicRooms",
+		httputil.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
+			return GetPostPublicRooms(req, rsAPI, stateAPI)
+		}),
+	).Methods(http.MethodGet)
 }

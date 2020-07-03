@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -38,40 +39,141 @@ import (
 
 var errMissingUserID = errors.New("'user_id' must be supplied")
 
-// SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
-// by building a m.room.member event then sending it to the room server
-// TODO: Can we improve the cyclo count here? Separate code paths for invites?
-// nolint:gocyclo
-func SendMembership(
+func SendBan(
 	req *http.Request, accountDB accounts.Database, device *userapi.Device,
-	roomID string, membership string, cfg *config.Dendrite,
+	roomID string, cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
+	if reqErr != nil {
+		return *reqErr
+	}
+	return sendMembership(req.Context(), accountDB, device, roomID, "ban", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
+}
+
+func sendMembership(ctx context.Context, accountDB accounts.Database, device *userapi.Device,
+	roomID, membership, reason string, cfg *config.Dendrite, targetUserID string, evTime time.Time,
+	roomVer gomatrixserverlib.RoomVersion,
+	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI) util.JSONResponse {
+
+	event, err := buildMembershipEvent(
+		ctx, targetUserID, reason, accountDB, device, membership,
+		roomID, false, cfg, evTime, rsAPI, asAPI,
+	)
+	if err == errMissingUserID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	} else if err == eventutil.ErrRoomNoExists {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(err.Error()),
+		}
+	} else if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
+		return jsonerror.InternalServerError()
+	}
+
+	_, err = roomserverAPI.SendEvents(
+		ctx, rsAPI,
+		[]gomatrixserverlib.HeaderedEvent{event.Headered(roomVer)},
+		cfg.Matrix.ServerName,
+		nil,
+	)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+		return jsonerror.InternalServerError()
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+func SendKick(
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
+	roomID string, cfg *config.Dendrite,
+	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+) util.JSONResponse {
+	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
+	if reqErr != nil {
+		return *reqErr
+	}
+	if body.UserID == "" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("missing user_id"),
 		}
 	}
 
-	var body threepid.MembershipRequest
-	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
+	var queryRes roomserverAPI.QueryMembershipForUserResponse
+	err := rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: body.UserID,
+	}, &queryRes)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	// kick is only valid if the user is not currently banned
+	if queryRes.Membership == "ban" {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Unknown("cannot /kick banned users"),
+		}
+	}
+	// TODO: should we be using SendLeave instead?
+	return sendMembership(req.Context(), accountDB, device, roomID, "leave", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
+}
+
+func SendUnban(
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
+	roomID string, cfg *config.Dendrite,
+	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+) util.JSONResponse {
+	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
+	if reqErr != nil {
+		return *reqErr
+	}
+	if body.UserID == "" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON("missing user_id"),
+		}
+	}
+
+	var queryRes roomserverAPI.QueryMembershipForUserResponse
+	err := rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: body.UserID,
+	}, &queryRes)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	// unban is only valid if the user is currently banned
+	if queryRes.Membership != "ban" {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.Unknown("can only /unban users that are banned"),
+		}
+	}
+	// TODO: should we be using SendLeave instead?
+	return sendMembership(req.Context(), accountDB, device, roomID, "leave", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
+}
+
+func SendInvite(
+	req *http.Request, accountDB accounts.Database, device *userapi.Device,
+	roomID string, cfg *config.Dendrite,
+	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+) util.JSONResponse {
+	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
+	if reqErr != nil {
 		return *reqErr
 	}
 
-	evTime, err := httputil.ParseTSParam(req)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
-		}
-	}
-
 	inviteStored, jsonErrResp := checkAndProcessThreepid(
-		req, device, &body, cfg, rsAPI, accountDB,
-		membership, roomID, evTime,
+		req, device, body, cfg, rsAPI, accountDB, roomID, evTime,
 	)
 	if jsonErrResp != nil {
 		return *jsonErrResp
@@ -88,7 +190,7 @@ func SendMembership(
 	}
 
 	event, err := buildMembershipEvent(
-		req.Context(), body, accountDB, device, membership,
+		req.Context(), body.UserID, body.Reason, accountDB, device, "invite",
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err == errMissingUserID {
@@ -106,61 +208,32 @@ func SendMembership(
 		return jsonerror.InternalServerError()
 	}
 
-	var returnData interface{} = struct{}{}
-
-	switch membership {
-	case gomatrixserverlib.Invite:
-		// Invites need to be handled specially
-		perr := roomserverAPI.SendInvite(
-			req.Context(), rsAPI,
-			event.Headered(verRes.RoomVersion),
-			nil, // ask the roomserver to draw up invite room state for us
-			cfg.Matrix.ServerName,
-			nil,
-		)
-		if perr != nil {
-			util.GetLogger(req.Context()).WithError(perr).Error("producer.SendInvite failed")
-			return perr.JSONResponse()
-		}
-	case gomatrixserverlib.Join:
-		// The join membership requires the room id to be sent in the response
-		returnData = struct {
-			RoomID string `json:"room_id"`
-		}{roomID}
-		fallthrough
-	default:
-		_, err = roomserverAPI.SendEvents(
-			req.Context(), rsAPI,
-			[]gomatrixserverlib.HeaderedEvent{event.Headered(verRes.RoomVersion)},
-			cfg.Matrix.ServerName,
-			nil,
-		)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
-			return jsonerror.InternalServerError()
-		}
+	perr := roomserverAPI.SendInvite(
+		req.Context(), rsAPI,
+		event.Headered(roomVer),
+		nil, // ask the roomserver to draw up invite room state for us
+		cfg.Matrix.ServerName,
+		nil,
+	)
+	if perr != nil {
+		util.GetLogger(req.Context()).WithError(perr).Error("producer.SendInvite failed")
+		return perr.JSONResponse()
 	}
-
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: returnData,
+		JSON: struct{}{},
 	}
 }
 
 func buildMembershipEvent(
 	ctx context.Context,
-	body threepid.MembershipRequest, accountDB accounts.Database,
+	targetUserID, reason string, accountDB accounts.Database,
 	device *userapi.Device,
 	membership, roomID string, isDirect bool,
 	cfg *config.Dendrite, evTime time.Time,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.Event, error) {
-	stateKey, reason, err := getMembershipStateKey(body, device, membership)
-	if err != nil {
-		return nil, err
-	}
-
-	profile, err := loadProfile(ctx, stateKey, cfg, accountDB, asAPI)
+	profile, err := loadProfile(ctx, targetUserID, cfg, accountDB, asAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -169,12 +242,7 @@ func buildMembershipEvent(
 		Sender:   device.UserID,
 		RoomID:   roomID,
 		Type:     "m.room.member",
-		StateKey: &stateKey,
-	}
-
-	// "unban" or "kick" isn't a valid membership value, change it to "leave"
-	if membership == "unban" || membership == "kick" {
-		membership = gomatrixserverlib.Leave
+		StateKey: &targetUserID,
 	}
 
 	content := gomatrixserverlib.MemberContent{
@@ -218,29 +286,33 @@ func loadProfile(
 	return profile, err
 }
 
-// getMembershipStateKey extracts the target user ID of a membership change.
-// For "join" and "leave" this will be the ID of the user making the change.
-// For "ban", "unban", "kick" and "invite" the target user ID will be in the JSON request body.
-// In the latter case, if there was an issue retrieving the user ID from the request body,
-// returns a JSONResponse with a corresponding error code and message.
-func getMembershipStateKey(
-	body threepid.MembershipRequest, device *userapi.Device, membership string,
-) (stateKey string, reason string, err error) {
-	if membership == gomatrixserverlib.Ban || membership == "unban" || membership == "kick" || membership == gomatrixserverlib.Invite {
-		// If we're in this case, the state key is contained in the request body,
-		// possibly along with a reason (for "kick" and "ban") so we need to parse
-		// it
-		if body.UserID == "" {
-			err = errMissingUserID
-			return
+func extractRequestData(req *http.Request, roomID string, rsAPI api.RoomserverInternalAPI) (
+	body *threepid.MembershipRequest, evTime time.Time, roomVer gomatrixserverlib.RoomVersion, resErr *util.JSONResponse,
+) {
+	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := api.QueryRoomVersionForRoomResponse{}
+	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+		resErr = &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnsupportedRoomVersion(err.Error()),
 		}
+		return
+	}
+	roomVer = verRes.RoomVersion
 
-		stateKey = body.UserID
-		reason = body.Reason
-	} else {
-		stateKey = device.UserID
+	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
+		resErr = reqErr
+		return
 	}
 
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		resErr = &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
+		return
+	}
 	return
 }
 
@@ -251,13 +323,13 @@ func checkAndProcessThreepid(
 	cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	accountDB accounts.Database,
-	membership, roomID string,
+	roomID string,
 	evTime time.Time,
 ) (inviteStored bool, errRes *util.JSONResponse) {
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
 		req.Context(), device, body, cfg, rsAPI, accountDB,
-		membership, roomID, evTime,
+		roomID, evTime,
 	)
 	if err == threepid.ErrMissingParameter {
 		return inviteStored, &util.JSONResponse{
@@ -286,4 +358,36 @@ func checkAndProcessThreepid(
 		return inviteStored, &er
 	}
 	return
+}
+
+func checkMemberInRoom(ctx context.Context, stateAPI currentstateAPI.CurrentStateInternalAPI, userID, roomID string) *util.JSONResponse {
+	tuple := gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomMember,
+		StateKey:  userID,
+	}
+	var membershipRes currentstateAPI.QueryCurrentStateResponse
+	err := stateAPI.QueryCurrentState(ctx, &currentstateAPI.QueryCurrentStateRequest{
+		RoomID:      roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
+	}, &membershipRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("QueryCurrentState: could not query membership for user")
+		e := jsonerror.InternalServerError()
+		return &e
+	}
+	ev, ok := membershipRes.StateEvents[tuple]
+	if !ok {
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user does not belong to room"),
+		}
+	}
+	membership, err := ev.Membership()
+	if err != nil || membership != "join" {
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user does not belong to room"),
+		}
+	}
+	return nil
 }

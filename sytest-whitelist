@@ -181,7 +181,11 @@ Outbound federation can query profile data
 /event/ on joined room works
 /event/ does not allow access to events before the user joined
 Federation key API allows unsigned requests for keys
+GET /publicRooms lists rooms
+GET /publicRooms includes avatar URLs
 Can paginate public room list
+GET /publicRooms lists newly-created room
+Name/topic keys are correct
 GET /directory/room/:room_alias yields room ID
 PUT /directory/room/:room_alias creates alias
 Room aliases can contain Unicode
@@ -243,6 +247,9 @@ User can invite local user to room with version 2
 Remote user can backfill in a room with version 2
 Inbound federation accepts attempts to join v2 rooms from servers with support
 Outbound federation can send invites via v2 API
+Outbound federation can send invites via v1 API
+Inbound federation can receive invites via v1 API
+Inbound federation can receive invites via v2 API
 User can create and send/receive messages in a room with version 3
 local user can join room with version 3
 Remote user can backfill in a room with version 3
@@ -357,9 +364,36 @@ Getting state checks the events requested belong to the room
 Getting state IDs checks the events requested belong to the room
 Can invite users to invite-only rooms
 Uninvited users cannot join the room
+Users cannot invite themselves to a room
+Users cannot invite a user that is already in the room
 Invited user can reject invite
 Invited user can reject invite for empty room
 Invited user can reject local invite after originator leaves
+PUT /rooms/:room_id/typing/:user_id sets typing notification
 Typing notification sent to local room members
 Typing notifications also sent to remote room members
 Typing can be explicitly stopped
+Banned user is kicked and may not rejoin until unbanned
+Inbound federation rejects attempts to join v1 rooms from servers without v1 support
+Inbound federation rejects attempts to join v2 rooms from servers lacking version support
+Inbound federation rejects attempts to join v2 rooms from servers only supporting v1
+Outbound federation passes make_join failures through to the client
+Outbound federation correctly handles unsupported room versions
+Remote users may not join unfederated rooms
+Guest users denied access over federation if guest access prohibited
+Non-numeric ports in server names are rejected
+Invited user can reject invite over federation
+Invited user can reject invite over federation for empty room
+Can reject invites over federation for rooms with version 1
+Can reject invites over federation for rooms with version 2
+Can reject invites over federation for rooms with version 3
+Can reject invites over federation for rooms with version 4
+Can reject invites over federation for rooms with version 5
+Can reject invites over federation for rooms with version 6
+Event size limits
+Can sync a room with a single message
+Can sync a room with a message with a transaction id
+A full_state incremental update returns only recent timeline
+A prev_batch token can be used in the v1 messages API
+We don't send redundant membership state across incremental syncs by default
+Typing notifications don't leak

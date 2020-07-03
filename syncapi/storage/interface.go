@@ -78,9 +78,9 @@ type Database interface {
 	// If the invite was successfully stored this returns the stream ID it was stored at.
 	// Returns an error if there was a problem communicating with the database.
 	AddInviteEvent(ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent) (types.StreamPosition, error)
-	// RetireInviteEvent removes an old invite event from the database.
+	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
-	RetireInviteEvent(ctx context.Context, inviteEventID string) error
+	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
 	// SetTypingTimeoutCallback sets a callback function that is called right after
 	// a user is removed from the typing user list due to timeout.
 	SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn)
@@ -128,4 +128,12 @@ type Database interface {
 	CleanSendToDeviceUpdates(ctx context.Context, toUpdate, toDelete []types.SendToDeviceNID, token types.StreamingToken) (err error)
 	// SendToDeviceUpdatesWaiting returns true if there are send-to-device updates waiting to be sent.
 	SendToDeviceUpdatesWaiting(ctx context.Context, userID, deviceID string) (bool, error)
+	// GetFilter looks up the filter associated with a given local user and filter ID.
+	// Returns a filter structure. Otherwise returns an error if no such filter exists
+	// or if there was an error talking to the database.
+	GetFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
+	// PutFilter puts the passed filter into the database.
+	// Returns the filterID as a string. Otherwise returns an error if something
+	// goes wrong.
+	PutFilter(ctx context.Context, localpart string, filter *gomatrixserverlib.Filter) (string, error)
 }

@@ -225,13 +225,18 @@ func (r *RoomserverInternalAPI) QueryMembershipForUser(
 	}
 
 	response.IsInRoom = stillInRoom
-	eventIDMap, err := r.DB.EventIDs(ctx, []types.EventNID{membershipEventNID})
+
+	evs, err := r.DB.Events(ctx, []types.EventNID{membershipEventNID})
 	if err != nil {
 		return err
 	}
+	if len(evs) != 1 {
+		return fmt.Errorf("failed to load membership event for event NID %d", membershipEventNID)
+	}
 
-	response.EventID = eventIDMap[membershipEventNID]
-	return nil
+	response.EventID = evs[0].EventID()
+	response.Membership, err = evs[0].Membership()
+	return err
 }
 
 // QueryMembershipsForRoom implements api.RoomserverInternalAPI
@@ -923,5 +928,18 @@ func (r *RoomserverInternalAPI) QueryRoomVersionForRoom(
 	}
 	response.RoomVersion = roomVersion
 	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
+	return nil
+}
+
+func (r *RoomserverInternalAPI) QueryPublishedRooms(
+	ctx context.Context,
+	req *api.QueryPublishedRoomsRequest,
+	res *api.QueryPublishedRoomsResponse,
+) error {
+	rooms, err := r.DB.GetPublishedRooms(ctx)
+	if err != nil {
+		return err
+	}
+	res.RoomIDs = rooms
 	return nil
 }

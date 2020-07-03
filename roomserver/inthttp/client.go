@@ -29,6 +29,7 @@ const (
 	RoomserverPerformJoinPath     = "/roomserver/performJoin"
 	RoomserverPerformLeavePath    = "/roomserver/performLeave"
 	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath  = "/roomserver/performPublish"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -41,6 +42,7 @@ const (
 	RoomserverQueryStateAndAuthChainPath       = "/roomserver/queryStateAndAuthChain"
 	RoomserverQueryRoomVersionCapabilitiesPath = "/roomserver/queryRoomVersionCapabilities"
 	RoomserverQueryRoomVersionForRoomPath      = "/roomserver/queryRoomVersionForRoom"
+	RoomserverQueryPublishedRoomsPath          = "/roomserver/queryPublishedRooms"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -194,6 +196,23 @@ func (h *httpRoomserverInternalAPI) PerformLeave(
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
+func (h *httpRoomserverInternalAPI) PerformPublish(
+	ctx context.Context,
+	req *api.PerformPublishRequest,
+	res *api.PerformPublishResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPublish")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformPublishPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
+}
+
 // QueryLatestEventsAndState implements RoomserverQueryAPI
 func (h *httpRoomserverInternalAPI) QueryLatestEventsAndState(
 	ctx context.Context,
@@ -230,6 +249,18 @@ func (h *httpRoomserverInternalAPI) QueryEventsByID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpRoomserverInternalAPI) QueryPublishedRooms(
+	ctx context.Context,
+	request *api.QueryPublishedRoomsRequest,
+	response *api.QueryPublishedRoomsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPublishedRooms")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryPublishedRoomsPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

@@ -290,10 +290,10 @@ type Response struct {
 	NextBatch   string `json:"next_batch"`
 	AccountData struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"account_data"`
+	} `json:"account_data,omitempty"`
 	Presence struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"presence"`
+	} `json:"presence,omitempty"`
 	Rooms struct {
 		Join   map[string]JoinResponse   `json:"join"`
 		Invite map[string]InviteResponse `json:"invite"`

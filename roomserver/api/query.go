@@ -112,6 +112,8 @@ type QueryMembershipForUserResponse struct {
 	HasBeenInRoom bool `json:"has_been_in_room"`
 	// True if the user is in room.
 	IsInRoom bool `json:"is_in_room"`
+	// The current membership
+	Membership string
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
@@ -212,4 +214,14 @@ type QueryRoomVersionForRoomRequest struct {
 // QueryRoomVersionForRoomResponse is a response to QueryRoomVersionForRoomRequest
 type QueryRoomVersionForRoomResponse struct {
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
+}
+
+type QueryPublishedRoomsRequest struct {
+	// Optional. If specified, returns whether this room is published or not.
+	RoomID string
+}
+
+type QueryPublishedRoomsResponse struct {
+	// The list of published rooms.
+	RoomIDs []string
 }

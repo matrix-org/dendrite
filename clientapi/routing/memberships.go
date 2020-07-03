@@ -18,9 +18,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -95,20 +94,19 @@ func GetMemberships(
 func GetJoinedRooms(
 	req *http.Request,
 	device *userapi.Device,
-	accountsDB accounts.Database,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	var res currentstateAPI.QueryRoomsForUserResponse
+	err := stateAPI.QueryRoomsForUser(req.Context(), &currentstateAPI.QueryRoomsForUserRequest{
+		UserID:         device.UserID,
+		WantMembership: "join",
+	}, &res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
-	}
-	joinedRooms, err := accountsDB.GetRoomIDsByLocalPart(req.Context(), localpart)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountsDB.GetRoomIDsByLocalPart failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
 		return jsonerror.InternalServerError()
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getJoinedRoomsResponse{joinedRooms},
+		JSON: getJoinedRoomsResponse{res.RoomIDs},
 	}
 }

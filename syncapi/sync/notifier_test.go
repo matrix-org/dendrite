@@ -363,7 +363,7 @@ func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) syn
 		timeout:       1 * time.Minute,
 		since:         &since,
 		wantFullState: false,
-		limit:         defaultTimelineLimit,
+		limit:         DefaultTimelineLimit,
 		log:           util.GetLogger(context.TODO()),
 		ctx:           context.TODO(),
 	}

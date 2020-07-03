@@ -9,6 +9,7 @@ import (
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -38,9 +39,9 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 ) error {
 	// If there's an invite outstanding for the room then respond to
 	// that.
-	isInvitePending, senderUser, err := r.isInvitePending(ctx, req.RoomID, req.UserID)
+	isInvitePending, senderUser, eventID, err := r.isInvitePending(ctx, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
-		return r.performRejectInvite(ctx, req, res, senderUser)
+		return r.performRejectInvite(ctx, req, res, senderUser, eventID)
 	}
 
 	// There's no invite pending, so first of all we want to find out
@@ -134,7 +135,7 @@ func (r *RoomserverInternalAPI) performRejectInvite(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse, // nolint:unparam
-	senderUser string,
+	senderUser, eventID string,
 ) error {
 	_, domain, err := gomatrixserverlib.SplitID('@', senderUser)
 	if err != nil {
@@ -152,56 +153,68 @@ func (r *RoomserverInternalAPI) performRejectInvite(
 		return err
 	}
 
-	// TODO: Withdraw the invite, so that the sync API etc are
+	// Withdraw the invite, so that the sync API etc are
 	// notified that we rejected it.
-
-	return nil
+	return r.WriteOutputEvents(req.RoomID, []api.OutputEvent{
+		{
+			Type: api.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &api.OutputRetireInviteEvent{
+				EventID:      eventID,
+				Membership:   "leave",
+				TargetUserID: req.UserID,
+			},
+		},
+	})
 }
 
 func (r *RoomserverInternalAPI) isInvitePending(
 	ctx context.Context,
 	roomID, userID string,
-) (bool, string, error) {
+) (bool, string, string, error) {
 	// Look up the room NID for the supplied room ID.
 	roomNID, err := r.DB.RoomNID(ctx, roomID)
 	if err != nil {
-		return false, "", fmt.Errorf("r.DB.RoomNID: %w", err)
+		return false, "", "", fmt.Errorf("r.DB.RoomNID: %w", err)
 	}
 
 	// Look up the state key NID for the supplied user ID.
 	targetUserNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{userID})
 	if err != nil {
-		return false, "", fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
+		return false, "", "", fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
 	}
 	targetUserNID, targetUserFound := targetUserNIDs[userID]
 	if !targetUserFound {
-		return false, "", fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
+		return false, "", "", fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
 	}
 
 	// Let's see if we have an event active for the user in the room. If
 	// we do then it will contain a server name that we can direct the
 	// send_leave to.
-	senderUserNIDs, err := r.DB.GetInvitesForUser(ctx, roomNID, targetUserNID)
+	senderUserNIDs, eventIDs, err := r.DB.GetInvitesForUser(ctx, roomNID, targetUserNID)
 	if err != nil {
-		return false, "", fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
+		return false, "", "", fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
 	}
 	if len(senderUserNIDs) == 0 {
-		return false, "", nil
+		return false, "", "", nil
+	}
+	userNIDToEventID := make(map[types.EventStateKeyNID]string)
+	for i, nid := range senderUserNIDs {
+		userNIDToEventID[nid] = eventIDs[i]
 	}
 
 	// Look up the user ID from the NID.
 	senderUsers, err := r.DB.EventStateKeys(ctx, senderUserNIDs)
 	if err != nil {
-		return false, "", fmt.Errorf("r.DB.EventStateKeys: %w", err)
+		return false, "", "", fmt.Errorf("r.DB.EventStateKeys: %w", err)
 	}
 	if len(senderUsers) == 0 {
-		return false, "", fmt.Errorf("no senderUsers")
+		return false, "", "", fmt.Errorf("no senderUsers")
 	}
 
 	senderUser, senderUserFound := senderUsers[senderUserNIDs[0]]
 	if !senderUserFound {
-		return false, "", fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
+		return false, "", "", fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
 	}
 
-	return true, senderUser, nil
+	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], nil
 }

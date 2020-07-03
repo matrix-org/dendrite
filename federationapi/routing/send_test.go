@@ -111,6 +111,13 @@ func (t *testRoomserverAPI) PerformJoin(
 ) {
 }
 
+func (t *testRoomserverAPI) PerformPublish(
+	ctx context.Context,
+	req *api.PerformPublishRequest,
+	res *api.PerformPublishResponse,
+) {
+}
+
 func (t *testRoomserverAPI) PerformLeave(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
@@ -164,6 +171,14 @@ func (t *testRoomserverAPI) QueryMembershipForUser(
 	ctx context.Context,
 	request *api.QueryMembershipForUserRequest,
 	response *api.QueryMembershipForUserResponse,
+) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (t *testRoomserverAPI) QueryPublishedRooms(
+	ctx context.Context,
+	request *api.QueryPublishedRoomsRequest,
+	response *api.QueryPublishedRoomsResponse,
 ) error {
 	return fmt.Errorf("not implemented")
 }

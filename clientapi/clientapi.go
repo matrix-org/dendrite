@@ -18,9 +18,10 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/clientapi/consumers"
+	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -30,14 +31,12 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
 	router *mux.Router,
 	cfg *config.Dendrite,
-	consumer sarama.Consumer,
 	producer sarama.SyncProducer,
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
@@ -45,25 +44,20 @@ func AddPublicRoutes(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 	userAPI userapi.UserInternalAPI,
+	extRoomsProvider api.ExternalPublicRoomsProvider,
 ) {
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,
 		Topic:    string(cfg.Kafka.Topics.OutputClientData),
 	}
 
-	roomEventConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg, consumer, accountsDB, rsAPI,
-	)
-	if err := roomEventConsumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start room server consumer")
-	}
-
 	routing.Setup(
 		router, cfg, eduInputAPI, rsAPI, asAPI,
 		accountsDB, deviceDB, userAPI, federation,
-		syncProducer, transactionsCache, fsAPI,
+		syncProducer, transactionsCache, fsAPI, stateAPI, extRoomsProvider,
 	)
 }

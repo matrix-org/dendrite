@@ -85,6 +85,11 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		}
 		return nil
 	}
+
+	if err = a.AccountDB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
+		return err
+	}
+
 	res.AccountCreated = true
 	res.Account = acc
 	return nil

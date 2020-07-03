@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,10 +20,12 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -225,6 +227,92 @@ func RemoveLocalAlias(
 	if err := aliasAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
 		return jsonerror.InternalServerError()
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+type roomVisibility struct {
+	Visibility string `json:"visibility"`
+}
+
+// GetVisibility implements GET /directory/list/room/{roomID}
+func GetVisibility(
+	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
+	roomID string,
+) util.JSONResponse {
+	var res roomserverAPI.QueryPublishedRoomsResponse
+	err := rsAPI.QueryPublishedRooms(req.Context(), &roomserverAPI.QueryPublishedRoomsRequest{
+		RoomID: roomID,
+	}, &res)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("QueryPublishedRooms failed")
+		return jsonerror.InternalServerError()
+	}
+
+	var v roomVisibility
+	if len(res.RoomIDs) == 1 {
+		v.Visibility = gomatrixserverlib.Public
+	} else {
+		v.Visibility = "private"
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: v,
+	}
+}
+
+// SetVisibility implements PUT /directory/list/room/{roomID}
+// TODO: Allow admin users to edit the room visibility
+func SetVisibility(
+	req *http.Request, stateAPI currentstateAPI.CurrentStateInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI, dev *userapi.Device,
+	roomID string,
+) util.JSONResponse {
+	resErr := checkMemberInRoom(req.Context(), stateAPI, dev.UserID, roomID)
+	if resErr != nil {
+		return *resErr
+	}
+
+	queryEventsReq := roomserverAPI.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
+			EventType: gomatrixserverlib.MRoomPowerLevels,
+			StateKey:  "",
+		}},
+	}
+	var queryEventsRes roomserverAPI.QueryLatestEventsAndStateResponse
+	err := rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
+	if err != nil || len(queryEventsRes.StateEvents) == 0 {
+		util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
+		return jsonerror.InternalServerError()
+	}
+
+	// NOTSPEC: Check if the user's power is greater than power required to change m.room.aliases event
+	power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
+	if power.UserLevel(dev.UserID) < power.EventLevel(gomatrixserverlib.MRoomAliases, true) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("userID doesn't have power level to change visibility"),
+		}
+	}
+
+	var v roomVisibility
+	if reqErr := httputil.UnmarshalJSONRequest(req, &v); reqErr != nil {
+		return *reqErr
+	}
+
+	var publishRes roomserverAPI.PerformPublishResponse
+	rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
+		RoomID:     roomID,
+		Visibility: v.Visibility,
+	}, &publishRes)
+	if publishRes.Error != nil {
+		util.GetLogger(req.Context()).WithError(publishRes.Error).Error("PerformPublish failed")
+		return publishRes.Error.JSONResponse()
 	}
 
 	return util.JSONResponse{

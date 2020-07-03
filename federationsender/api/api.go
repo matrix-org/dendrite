@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -28,7 +29,7 @@ type FederationSenderInternalAPI interface {
 		ctx context.Context,
 		request *PerformJoinRequest,
 		response *PerformJoinResponse,
-	) error
+	)
 	// Handle an instruction to make_leave & send_leave with a remote server.
 	PerformLeave(
 		ctx context.Context,
@@ -62,6 +63,7 @@ type PerformJoinRequest struct {
 }
 
 type PerformJoinResponse struct {
+	LastError *gomatrix.HTTPError
 }
 
 type PerformLeaveRequest struct {

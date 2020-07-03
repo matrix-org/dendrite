@@ -159,6 +159,8 @@ def print_stats(header_name, gid_to_tests, gid_to_name, verbose):
     total_tests = 0
     for gid, tests in gid_to_tests.items():
         group_total = len(tests)
+        if group_total == 0:
+            continue
         group_passing = 0
         test_names_and_marks = []
         for name, passing in tests.items():

@@ -36,13 +36,11 @@ type Database struct {
 	sqlutil.PartitionOffsetStatements
 	accounts     accountsStatements
 	profiles     profilesStatements
-	memberships  membershipStatements
 	accountDatas accountDataStatements
 	threepids    threepidStatements
-	filter       filterStatements
 	serverName   gomatrixserverlib.ServerName
 
-	createGuestAccountMu sync.Mutex
+	createAccountMu sync.Mutex
 }
 
 // NewDatabase creates a new accounts and profiles database
@@ -68,10 +66,6 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = p.prepare(db); err != nil {
 		return nil, err
 	}
-	m := membershipStatements{}
-	if err = m.prepare(db); err != nil {
-		return nil, err
-	}
 	ac := accountDataStatements{}
 	if err = ac.prepare(db); err != nil {
 		return nil, err
@@ -80,11 +74,7 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 	if err = t.prepare(db); err != nil {
 		return nil, err
 	}
-	f := filterStatements{}
-	if err = f.prepare(db); err != nil {
-		return nil, err
-	}
-	return &Database{db, partitions, a, p, m, ac, t, f, serverName, sync.Mutex{}}, nil
+	return &Database{db, partitions, a, p, ac, t, serverName, sync.Mutex{}}, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
@@ -129,14 +119,14 @@ func (d *Database) SetDisplayName(
 // CreateGuestAccount makes a new guest account and creates an empty profile
 // for this account.
 func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, err error) {
+	// We need to lock so we sequentially create numeric localparts. If we don't, two calls to
+	// this function will cause the same number to be selected and one will fail with 'database is locked'
+	// when the first txn upgrades to a write txn. We also need to lock the account creation else we can
+	// race with CreateAccount
+	// We know we'll be the only process since this is sqlite ;) so a lock here will be all that is needed.
+	d.createAccountMu.Lock()
+	defer d.createAccountMu.Unlock()
 	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
-		// We need to lock so we sequentially create numeric localparts. If we don't, two calls to
-		// this function will cause the same number to be selected and one will fail with 'database is locked'
-		// when the first txn upgrades to a write txn.
-		// We know we'll be the only process since this is sqlite ;) so a lock here will be all that is needed.
-		d.createGuestAccountMu.Lock()
-		defer d.createGuestAccountMu.Unlock()
-
 		var numLocalpart int64
 		numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
 		if err != nil {
@@ -155,6 +145,9 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, er
 func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
 ) (acc *api.Account, err error) {
+	// Create one account at a time else we can get 'database is locked'.
+	d.createAccountMu.Lock()
+	defer d.createAccountMu.Unlock()
 	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
 		return err
@@ -193,112 +186,6 @@ func (d *Database) createAccount(
 		return nil, err
 	}
 	return d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID)
-}
-
-// SaveMembership saves the user matching a given localpart as a member of a given
-// room. It also stores the ID of the membership event.
-// If a membership already exists between the user and the room, or if the
-// insert fails, returns the SQL error
-func (d *Database) saveMembership(
-	ctx context.Context, txn *sql.Tx, localpart, roomID, eventID string,
-) error {
-	return d.memberships.insertMembership(ctx, txn, localpart, roomID, eventID)
-}
-
-// removeMembershipsByEventIDs removes the memberships corresponding to the
-// `join` membership events IDs in the eventIDs slice.
-// If the removal fails, or if there is no membership to remove, returns an error
-func (d *Database) removeMembershipsByEventIDs(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
-) error {
-	return d.memberships.deleteMembershipsByEventIDs(ctx, txn, eventIDs)
-}
-
-// UpdateMemberships adds the "join" membership events included in a given state
-// events array, and removes those which ID is included in a given array of events
-// IDs. All of the process is run in a transaction, which commits only once/if every
-// insertion and deletion has been successfully processed.
-// Returns a SQL error if there was an issue with any part of the process
-func (d *Database) UpdateMemberships(
-	ctx context.Context, eventsToAdd []gomatrixserverlib.Event, idsToRemove []string,
-) error {
-	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
-		if err := d.removeMembershipsByEventIDs(ctx, txn, idsToRemove); err != nil {
-			return err
-		}
-
-		for _, event := range eventsToAdd {
-			if err := d.newMembership(ctx, txn, event); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
-// GetMembershipInRoomByLocalpart returns the membership for an user
-// matching the given localpart if he is a member of the room matching roomID,
-// if not sql.ErrNoRows is returned.
-// If there was an issue during the retrieval, returns the SQL error
-func (d *Database) GetMembershipInRoomByLocalpart(
-	ctx context.Context, localpart, roomID string,
-) (authtypes.Membership, error) {
-	return d.memberships.selectMembershipInRoomByLocalpart(ctx, localpart, roomID)
-}
-
-// GetMembershipsByLocalpart returns an array containing the memberships for all
-// the rooms a user matching a given localpart is a member of
-// If no membership match the given localpart, returns an empty array
-// If there was an issue during the retrieval, returns the SQL error
-func (d *Database) GetMembershipsByLocalpart(
-	ctx context.Context, localpart string,
-) (memberships []authtypes.Membership, err error) {
-	return d.memberships.selectMembershipsByLocalpart(ctx, localpart)
-}
-
-// GetRoomIDsByLocalPart returns an array containing the room ids of all
-// the rooms a user matching a given localpart is a member of
-// If no membership match the given localpart, returns an empty array
-// If there was an issue during the retrieval, returns the SQL error
-func (d *Database) GetRoomIDsByLocalPart(
-	ctx context.Context, localpart string,
-) ([]string, error) {
-	return d.memberships.selectRoomIDsByLocalPart(ctx, localpart)
-}
-
-// newMembership saves a new membership in the database.
-// If the event isn't a valid m.room.member event with type `join`, does nothing.
-// If an error occurred, returns the SQL error
-func (d *Database) newMembership(
-	ctx context.Context, txn *sql.Tx, ev gomatrixserverlib.Event,
-) error {
-	if ev.Type() == "m.room.member" && ev.StateKey() != nil {
-		localpart, serverName, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
-		if err != nil {
-			return err
-		}
-
-		// We only want state events from local users
-		if string(serverName) != string(d.serverName) {
-			return nil
-		}
-
-		eventID := ev.EventID()
-		roomID := ev.RoomID()
-		membership, err := ev.Membership()
-		if err != nil {
-			return err
-		}
-
-		// Only "join" membership events can be considered as new memberships
-		if membership == gomatrixserverlib.Join {
-			if err := d.saveMembership(ctx, txn, localpart, roomID, eventID); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 // SaveAccountData saves new account data for a given user and a given room.
@@ -405,24 +292,6 @@ func (d *Database) GetThreePIDsForLocalpart(
 	ctx context.Context, localpart string,
 ) (threepids []authtypes.ThreePID, err error) {
 	return d.threepids.selectThreePIDsForLocalpart(ctx, localpart)
-}
-
-// GetFilter looks up the filter associated with a given local user and filter ID.
-// Returns a filter structure. Otherwise returns an error if no such filter exists
-// or if there was an error talking to the database.
-func (d *Database) GetFilter(
-	ctx context.Context, localpart string, filterID string,
-) (*gomatrixserverlib.Filter, error) {
-	return d.filter.selectFilter(ctx, localpart, filterID)
-}
-
-// PutFilter puts the passed filter into the database.
-// Returns the filterID as a string. Otherwise returns an error if something
-// goes wrong.
-func (d *Database) PutFilter(
-	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
-) (string, error) {
-	return d.filter.insertFilter(ctx, filter, localpart)
 }
 
 // CheckAccountAvailability checks if the username/localpart is already present

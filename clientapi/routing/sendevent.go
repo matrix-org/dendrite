@@ -157,6 +157,17 @@ func generateSendEvent(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(e.Error()),
 		}
+	} else if e, ok := err.(gomatrixserverlib.EventValidationError); ok {
+		if e.Code == gomatrixserverlib.EventValidationTooLarge {
+			return nil, &util.JSONResponse{
+				Code: http.StatusRequestEntityTooLarge,
+				JSON: jsonerror.BadJSON(e.Error()),
+			}
+		}
+		return nil, &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(e.Error()),
+		}
 	} else if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("eventutil.BuildEvent failed")
 		resErr := jsonerror.InternalServerError()

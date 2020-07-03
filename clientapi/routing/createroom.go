@@ -28,7 +28,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -373,13 +372,9 @@ func createRoom(
 
 	// If this is a direct message then we should invite the participants.
 	for _, invitee := range r.Invite {
-		// Build the membership request.
-		body := threepid.MembershipRequest{
-			UserID: invitee,
-		}
 		// Build the invite event.
 		inviteEvent, err := buildMembershipEvent(
-			req.Context(), body, accountDB, device, gomatrixserverlib.Invite,
+			req.Context(), invitee, "", accountDB, device, gomatrixserverlib.Invite,
 			roomID, true, cfg, evTime, rsAPI, asAPI,
 		)
 		if err != nil {
@@ -412,6 +407,19 @@ func createRoom(
 		); perr != nil {
 			util.GetLogger(req.Context()).WithError(perr).Error("SendInvite failed")
 			return perr.JSONResponse()
+		}
+	}
+
+	if r.Visibility == "public" {
+		// expose this room in the published room list
+		var pubRes roomserverAPI.PerformPublishResponse
+		rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
+			RoomID:     roomID,
+			Visibility: "public",
+		}, &pubRes)
+		if pubRes.Error != nil {
+			// treat as non-fatal since the room is already made by this point
+			util.GetLogger(req.Context()).WithError(pubRes.Error).Error("failed to visibility:public")
 		}
 	}
 

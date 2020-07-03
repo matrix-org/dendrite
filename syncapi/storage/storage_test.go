@@ -601,6 +601,83 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	}
 }
 
+func TestInviteBehaviour(t *testing.T) {
+	db := MustCreateDatabase(t)
+	inviteRoom1 := "!inviteRoom1:somewhere"
+	inviteEvent1 := MustCreateEvent(t, inviteRoom1, nil, &gomatrixserverlib.EventBuilder{
+		Content:  []byte(fmt.Sprintf(`{"membership":"invite"}`)),
+		Type:     "m.room.member",
+		StateKey: &testUserIDA,
+		Sender:   "@inviteUser1:somewhere",
+	})
+	inviteRoom2 := "!inviteRoom2:somewhere"
+	inviteEvent2 := MustCreateEvent(t, inviteRoom2, nil, &gomatrixserverlib.EventBuilder{
+		Content:  []byte(fmt.Sprintf(`{"membership":"invite"}`)),
+		Type:     "m.room.member",
+		StateKey: &testUserIDA,
+		Sender:   "@inviteUser2:somewhere",
+	})
+	for _, ev := range []gomatrixserverlib.HeaderedEvent{inviteEvent1, inviteEvent2} {
+		_, err := db.AddInviteEvent(ctx, ev)
+		if err != nil {
+			t.Fatalf("Failed to AddInviteEvent: %s", err)
+		}
+	}
+	latest, err := db.SyncPosition(ctx)
+	if err != nil {
+		t.Fatalf("failed to get SyncPosition: %s", err)
+	}
+	// both invite events should appear in a new sync
+	beforeRetireRes := types.NewResponse()
+	beforeRetireRes, err = db.IncrementalSync(ctx, beforeRetireRes, testUserDeviceA, types.NewStreamToken(0, 0), latest, 0, false)
+	if err != nil {
+		t.Fatalf("IncrementalSync failed: %s", err)
+	}
+	assertInvitedToRooms(t, beforeRetireRes, []string{inviteRoom1, inviteRoom2})
+
+	// retire one event: a fresh sync should just return 1 invite room
+	if _, err = db.RetireInviteEvent(ctx, inviteEvent1.EventID()); err != nil {
+		t.Fatalf("Failed to RetireInviteEvent: %s", err)
+	}
+	latest, err = db.SyncPosition(ctx)
+	if err != nil {
+		t.Fatalf("failed to get SyncPosition: %s", err)
+	}
+	res := types.NewResponse()
+	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, types.NewStreamToken(0, 0), latest, 0, false)
+	if err != nil {
+		t.Fatalf("IncrementalSync failed: %s", err)
+	}
+	assertInvitedToRooms(t, res, []string{inviteRoom2})
+
+	// a sync after we have received both invites should result in a leave for the retired room
+	beforeRetireTok, err := types.NewStreamTokenFromString(beforeRetireRes.NextBatch)
+	if err != nil {
+		t.Fatalf("NewStreamTokenFromString cannot parse next batch '%s' : %s", beforeRetireRes.NextBatch, err)
+	}
+	res = types.NewResponse()
+	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, beforeRetireTok, latest, 0, false)
+	if err != nil {
+		t.Fatalf("IncrementalSync failed: %s", err)
+	}
+	assertInvitedToRooms(t, res, []string{})
+	if _, ok := res.Rooms.Leave[inviteRoom1]; !ok {
+		t.Fatalf("IncrementalSync: expected to see room left after it was retired but it wasn't")
+	}
+}
+
+func assertInvitedToRooms(t *testing.T, res *types.Response, roomIDs []string) {
+	t.Helper()
+	if len(res.Rooms.Invite) != len(roomIDs) {
+		t.Fatalf("got %d invited rooms, want %d", len(res.Rooms.Invite), len(roomIDs))
+	}
+	for _, roomID := range roomIDs {
+		if _, ok := res.Rooms.Invite[roomID]; !ok {
+			t.Fatalf("missing room ID %s", roomID)
+		}
+	}
+}
+
 func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []gomatrixserverlib.HeaderedEvent) {
 	if len(gots) != len(wants) {
 		t.Fatalf("%s response returned %d events, want %d", msg, len(gots), len(wants))

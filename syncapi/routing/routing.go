@@ -55,4 +55,24 @@ func Setup(
 		}
 		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], federation, rsAPI, cfg)
 	})).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/user/{userId}/filter",
+		httputil.MakeAuthAPI("put_filter", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return PutFilter(req, device, syncDB, vars["userId"])
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	r0mux.Handle("/user/{userId}/filter/{filterId}",
+		httputil.MakeAuthAPI("get_filter", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetFilter(req, device, syncDB, vars["userId"], vars["filterId"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
