@@ -74,14 +74,16 @@ func SendRedaction(
 		if plEvent == nil {
 			return util.JSONResponse{
 				Code: 403,
-				JSON: jsonerror.Forbidden("cannot redact event, missing pl event"),
+				JSON: jsonerror.Forbidden("You don't have permission to redact this event, no power_levels event in this room."),
 			}
 		}
 		pl, err := plEvent.PowerLevels()
 		if err != nil {
 			return util.JSONResponse{
 				Code: 403,
-				JSON: jsonerror.Forbidden("cannot redact event, malformed pl event"),
+				JSON: jsonerror.Forbidden(
+					"You don't have permission to redact this event, the power_levels event for this room is malformed so auth checks cannot be performed.",
+				),
 			}
 		}
 		allowedToRedact = pl.UserLevel(device.UserID) >= pl.Redact
@@ -89,7 +91,7 @@ func SendRedaction(
 	if !allowedToRedact {
 		return util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Forbidden("cannot redact event"),
+			JSON: jsonerror.Forbidden("You don't have permission to redact this event, power level too low."),
 		}
 	}
 
