@@ -250,6 +250,10 @@ func (oq *destinationQueue) backgroundSend() {
 					oq.cleanPendingEDUs()
 					oq.cleanPendingInvites()
 					return
+				} else {
+					// We haven't been told to give up terminally yet
+					// but we still need to wake up the next iteration.
+					oq.wakeServerCh <- true
 				}
 			} else if transaction {
 				// If we successfully sent the transaction then clear out

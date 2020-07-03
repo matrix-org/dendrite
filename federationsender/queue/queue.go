@@ -51,7 +51,7 @@ func NewOutgoingQueues(
 	statistics *types.Statistics,
 	signing *SigningInfo,
 ) *OutgoingQueues {
-	return &OutgoingQueues{
+	queues := &OutgoingQueues{
 		db:         db,
 		rsAPI:      rsAPI,
 		origin:     origin,
@@ -60,6 +60,13 @@ func NewOutgoingQueues(
 		signing:    signing,
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
+	// Look up which servers we have pending items for and then rehydrate those queues.
+	if serverNames, err := db.GetPendingServerNames(context.TODO()); err == nil {
+		for _, serverName := range serverNames {
+			queues.getQueue(serverName).wakeQueueIfNeeded()
+		}
+	}
+	return queues
 }
 
 // TODO: Move this somewhere useful for other components as we often need to ferry these 3 variables
