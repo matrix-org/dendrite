@@ -124,7 +124,13 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 			Msg:  fmt.Sprintf("Room ID %q is invalid: %s", req.RoomIDOrAlias, err),
 		}
 	}
-	req.ServerNames = append(req.ServerNames, domain)
+
+	// If the server name in the room ID isn't ours then it's a
+	// possible candidate for finding the room via federation. Add
+	// it to the list of servers to try.
+	if domain != r.Cfg.Matrix.ServerName {
+		req.ServerNames = append(req.ServerNames, domain)
+	}
 
 	// Prepare the template for the join event.
 	userID := req.UserID
@@ -233,13 +239,18 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		}
 
 	case eventutil.ErrRoomNoExists:
-		// The room doesn't exist. First of all check if the room is a local
-		// room. If it is then there's nothing more to do - the room just
-		// hasn't been created yet.
+		// The room doesn't exist locally. If the room ID looks like it should
+		// be ours then this probably means that we've nuked our database at
+		// some point.
 		if domain == r.Cfg.Matrix.ServerName {
-			return "", &api.PerformError{
-				Code: api.PerformErrorNoRoom,
-				Msg:  fmt.Sprintf("Room ID %q does not exist", req.RoomIDOrAlias),
+			// If there are no more server names to try then give up here.
+			// Otherwise we'll try a federated join as normal, since it's quite
+			// possible that the room still exists on other servers.
+			if len(req.ServerNames) == 0 {
+				return "", &api.PerformError{
+					Code: api.PerformErrorNoRoom,
+					Msg:  fmt.Sprintf("Room ID %q does not exist", req.RoomIDOrAlias),
+				}
 			}
 		}
 
