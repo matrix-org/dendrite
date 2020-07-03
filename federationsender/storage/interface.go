@@ -31,4 +31,5 @@ type Database interface {
 	GetNextTransactionPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (gomatrixserverlib.TransactionID, []*gomatrixserverlib.HeaderedEvent, error)
 	CleanTransactionPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, transactionID gomatrixserverlib.TransactionID) error
 	GetPendingPDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error)
+	GetPendingServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 }

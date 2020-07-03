@@ -250,6 +250,12 @@ func (oq *destinationQueue) backgroundSend() {
 					oq.cleanPendingEDUs()
 					oq.cleanPendingInvites()
 					return
+				} else {
+					// We haven't been told to give up terminally yet but we still have
+					// PDUs waiting to be sent. By sending a message into the wake chan,
+					// the next loop iteration will try processing these PDUs again,
+					// subject to the backoff.
+					oq.wakeServerCh <- true
 				}
 			} else if transaction {
 				// If we successfully sent the transaction then clear out

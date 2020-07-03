@@ -264,3 +264,11 @@ func (d *Database) GetPendingPDUCount(
 ) (int64, error) {
 	return d.selectQueuePDUCount(ctx, nil, serverName)
 }
+
+// GetPendingServerNames returns the server names that have PDUs
+// waiting to be sent.
+func (d *Database) GetPendingServerNames(
+	ctx context.Context,
+) ([]gomatrixserverlib.ServerName, error) {
+	return d.selectQueueServerNames(ctx, nil)
+}
