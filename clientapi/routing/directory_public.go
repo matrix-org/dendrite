@@ -144,71 +144,6 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 	return nil
 }
 
-// due to lots of switches
-// nolint:gocyclo
-func fillInRooms(ctx context.Context, roomIDs []string, stateAPI currentstateAPI.CurrentStateInternalAPI) ([]gomatrixserverlib.PublicRoom, error) {
-	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
-	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
-	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
-	topicTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.topic", StateKey: ""}
-	guestTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.guest_access", StateKey: ""}
-	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""}
-	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}
-
-	var stateRes currentstateAPI.QueryBulkStateContentResponse
-	err := stateAPI.QueryBulkStateContent(ctx, &currentstateAPI.QueryBulkStateContentRequest{
-		RoomIDs:        roomIDs,
-		AllowWildcards: true,
-		StateTuples: []gomatrixserverlib.StateKeyTuple{
-			nameTuple, canonicalTuple, topicTuple, guestTuple, visibilityTuple, joinRuleTuple, avatarTuple,
-			{EventType: gomatrixserverlib.MRoomMember, StateKey: "*"},
-		},
-	}, &stateRes)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryBulkStateContent failed")
-		return nil, err
-	}
-	chunk := make([]gomatrixserverlib.PublicRoom, len(roomIDs))
-	i := 0
-	for roomID, data := range stateRes.Rooms {
-		pub := gomatrixserverlib.PublicRoom{
-			RoomID: roomID,
-		}
-		joinCount := 0
-		var joinRule, guestAccess string
-		for tuple, contentVal := range data {
-			if tuple.EventType == gomatrixserverlib.MRoomMember && contentVal == "join" {
-				joinCount++
-				continue
-			}
-			switch tuple {
-			case avatarTuple:
-				pub.AvatarURL = contentVal
-			case nameTuple:
-				pub.Name = contentVal
-			case topicTuple:
-				pub.Topic = contentVal
-			case canonicalTuple:
-				pub.CanonicalAlias = contentVal
-			case visibilityTuple:
-				pub.WorldReadable = contentVal == "world_readable"
-			// need both of these to determine whether guests can join
-			case joinRuleTuple:
-				joinRule = contentVal
-			case guestTuple:
-				guestAccess = contentVal
-			}
-		}
-		if joinRule == gomatrixserverlib.Public && guestAccess == "can_join" {
-			pub.GuestCanJoin = true
-		}
-		pub.JoinedMembersCount = joinCount
-		chunk[i] = pub
-		i++
-	}
-	return chunk, nil
-}
-
 // sliceInto returns a subslice of `slice` which honours the since/limit values given.
 //
 //    0  1  2  3  4  5  6   index
@@ -260,9 +195,9 @@ func refreshPublicRoomCache(
 		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return publicRoomsCache
 	}
-	pubRooms, err := fillInRooms(ctx, queryRes.RoomIDs, stateAPI)
+	pubRooms, err := currentstateAPI.PopulatePublicRooms(ctx, queryRes.RoomIDs, stateAPI)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("fillInRooms failed")
+		util.GetLogger(ctx).WithError(err).Error("PopulatePublicRooms failed")
 		return publicRoomsCache
 	}
 	publicRoomsCache = []gomatrixserverlib.PublicRoom{}
