@@ -85,17 +85,17 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	oq := oqs.queues[destination]
 	if oq == nil {
 		oq = &destinationQueue{
-			db:                 oqs.db,
-			rsAPI:              oqs.rsAPI,
-			origin:             oqs.origin,
-			destination:        destination,
-			client:             oqs.client,
-			statistics:         oqs.statistics.ForServer(destination),
-			incomingEDUs:       make(chan *gomatrixserverlib.EDU, 128),
-			incomingInvites:    make(chan *gomatrixserverlib.InviteV2Request, 128),
-			notifyPDUs:         make(chan bool, 128),
-			interruptBackoffCh: make(chan bool),
-			signing:            oqs.signing,
+			db:               oqs.db,
+			rsAPI:            oqs.rsAPI,
+			origin:           oqs.origin,
+			destination:      destination,
+			client:           oqs.client,
+			statistics:       oqs.statistics.ForServer(destination),
+			incomingEDUs:     make(chan *gomatrixserverlib.EDU, 128),
+			incomingInvites:  make(chan *gomatrixserverlib.InviteV2Request, 128),
+			notifyPDUs:       make(chan bool, 128),
+			interruptBackoff: make(chan bool),
+			signing:          oqs.signing,
 		}
 		oqs.queues[destination] = oq
 	}

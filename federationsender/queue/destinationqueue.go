@@ -56,7 +56,7 @@ type destinationQueue struct {
 	pendingEDUs        []*gomatrixserverlib.EDU                // owned by backgroundSend
 	pendingInvites     []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
 	notifyPDUs         chan bool                               // interrupts idle wait for PDUs
-	interruptBackoffCh chan bool                               // interrupts backoff
+	interruptBackoff   chan bool                               // interrupts backoff
 }
 
 // Send event adds the event to the pending queue for the destination.
@@ -133,7 +133,7 @@ func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.InviteV2Request) {
 func (oq *destinationQueue) wakeQueueIfNeeded() {
 	// If we are backing off then interrupt the backoff.
 	if oq.backingOff.CAS(true, false) {
-		oq.interruptBackoffCh <- true
+		oq.interruptBackoff <- true
 	}
 	// If we aren't running then wake up the queue.
 	if !oq.running.Load() {
@@ -217,7 +217,7 @@ func (oq *destinationQueue) backgroundSend() {
 			oq.backingOff.Store(true)
 			select {
 			case <-time.After(duration):
-			case <-oq.interruptBackoffCh:
+			case <-oq.interruptBackoff:
 			}
 			oq.backingOff.Store(false)
 		}
