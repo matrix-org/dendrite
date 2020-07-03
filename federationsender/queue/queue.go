@@ -79,29 +79,23 @@ type SigningInfo struct {
 	PrivateKey ed25519.PrivateKey
 }
 
-func (oqs *OutgoingQueues) getQueueIfExists(destination gomatrixserverlib.ServerName) *destinationQueue {
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
-	return oqs.queues[destination]
-}
-
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
 	oq := oqs.queues[destination]
 	if oq == nil {
 		oq = &destinationQueue{
-			db:              oqs.db,
-			rsAPI:           oqs.rsAPI,
-			origin:          oqs.origin,
-			destination:     destination,
-			client:          oqs.client,
-			statistics:      oqs.statistics.ForServer(destination),
-			incomingEDUs:    make(chan *gomatrixserverlib.EDU, 128),
-			incomingInvites: make(chan *gomatrixserverlib.InviteV2Request, 128),
-			wakeServerCh:    make(chan bool, 128),
-			retryServerCh:   make(chan bool),
-			signing:         oqs.signing,
+			db:               oqs.db,
+			rsAPI:            oqs.rsAPI,
+			origin:           oqs.origin,
+			destination:      destination,
+			client:           oqs.client,
+			statistics:       oqs.statistics.ForServer(destination),
+			incomingEDUs:     make(chan *gomatrixserverlib.EDU, 128),
+			incomingInvites:  make(chan *gomatrixserverlib.InviteV2Request, 128),
+			notifyPDUs:       make(chan bool, 128),
+			interruptBackoff: make(chan bool),
+			signing:          oqs.signing,
 		}
 		oqs.queues[destination] = oq
 	}
@@ -211,11 +205,11 @@ func (oqs *OutgoingQueues) SendEDU(
 
 // RetryServer attempts to resend events to the given server if we had given up.
 func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
-	q := oqs.getQueueIfExists(srv)
+	q := oqs.getQueue(srv)
 	if q == nil {
 		return
 	}
-	q.retry()
+	q.wakeQueueIfNeeded()
 }
 
 // filterAndDedupeDests removes our own server from the list of destinations
