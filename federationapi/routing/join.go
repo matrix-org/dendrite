@@ -118,7 +118,7 @@ func MakeJoin(
 	}
 
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(*event, &provider); err != nil {
+	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()),

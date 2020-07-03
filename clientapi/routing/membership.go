@@ -77,7 +77,7 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 
 	_, err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
-		[]gomatrixserverlib.HeaderedEvent{event.Headered(roomVer)},
+		[]gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
 		cfg.Matrix.ServerName,
 		nil,
 	)
@@ -210,7 +210,7 @@ func SendInvite(
 
 	perr := roomserverAPI.SendInvite(
 		req.Context(), rsAPI,
-		event.Headered(roomVer),
+		event.Event.Headered(roomVer),
 		nil, // ask the roomserver to draw up invite room state for us
 		cfg.Matrix.ServerName,
 		nil,
@@ -232,7 +232,7 @@ func buildMembershipEvent(
 	membership, roomID string, isDirect bool,
 	cfg *config.Dendrite, evTime time.Time,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
-) (*gomatrixserverlib.Event, error) {
+) (*gomatrixserverlib.HeaderedEvent, error) {
 	profile, err := loadProfile(ctx, targetUserID, cfg, accountDB, asAPI)
 	if err != nil {
 		return nil, err

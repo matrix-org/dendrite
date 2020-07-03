@@ -338,6 +338,15 @@ func Setup(
 			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduAPI, stateAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/redact/{eventID}",
+		httputil.MakeAuthAPI("rooms_redact", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, stateAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/sendToDevice/{eventType}/{txnID}",
 		httputil.MakeAuthAPI("send_to_device", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
