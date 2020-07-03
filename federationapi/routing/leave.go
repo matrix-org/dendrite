@@ -32,15 +32,6 @@ func MakeLeave(
 	rsAPI api.RoomserverInternalAPI,
 	roomID, userID string,
 ) util.JSONResponse {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
-		}
-	}
-
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return util.JSONResponse{
@@ -91,7 +82,7 @@ func MakeLeave(
 		stateEvents[i] = &queryRes.StateEvents[i].Event
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(*event, &provider); err != nil {
+	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()),
@@ -101,7 +92,7 @@ func MakeLeave(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: map[string]interface{}{
-			"room_version": verRes.RoomVersion,
+			"room_version": event.RoomVersion,
 			"event":        builder,
 		},
 	}

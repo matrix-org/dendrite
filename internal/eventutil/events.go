@@ -40,12 +40,12 @@ func BuildEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Dendrite, evTime time.Time,
 	rsAPI api.RoomserverInternalAPI, queryRes *api.QueryLatestEventsAndStateResponse,
-) (*gomatrixserverlib.Event, error) {
+) (*gomatrixserverlib.HeaderedEvent, error) {
 	if queryRes == nil {
 		queryRes = &api.QueryLatestEventsAndStateResponse{}
 	}
 
-	err := AddPrevEventsToEvent(ctx, builder, rsAPI, queryRes)
+	ver, err := AddPrevEventsToEvent(ctx, builder, rsAPI, queryRes)
 	if err != nil {
 		// This can pass through a ErrRoomNoExists to the caller
 		return nil, err
@@ -59,7 +59,8 @@ func BuildEvent(
 		return nil, err
 	}
 
-	return &event, nil
+	h := event.Headered(ver)
+	return &h, nil
 }
 
 // AddPrevEventsToEvent fills out the prev_events and auth_events fields in builder
@@ -67,14 +68,14 @@ func AddPrevEventsToEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder,
 	rsAPI api.RoomserverInternalAPI, queryRes *api.QueryLatestEventsAndStateResponse,
-) error {
+) (gomatrixserverlib.RoomVersion, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
+		return "", fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
 	}
 
 	if len(eventsNeeded.Tuples()) == 0 {
-		return errors.New("expecting state tuples for event builder, got none")
+		return "", errors.New("expecting state tuples for event builder, got none")
 	}
 
 	// Ask the roomserver for information about this room
@@ -83,16 +84,16 @@ func AddPrevEventsToEvent(
 		StateToFetch: eventsNeeded.Tuples(),
 	}
 	if err = rsAPI.QueryLatestEventsAndState(ctx, &queryReq, queryRes); err != nil {
-		return fmt.Errorf("rsAPI.QueryLatestEventsAndState: %w", err)
+		return "", fmt.Errorf("rsAPI.QueryLatestEventsAndState: %w", err)
 	}
 
 	if !queryRes.RoomExists {
-		return ErrRoomNoExists
+		return "", ErrRoomNoExists
 	}
 
 	eventFormat, err := queryRes.RoomVersion.EventFormat()
 	if err != nil {
-		return fmt.Errorf("queryRes.RoomVersion.EventFormat: %w", err)
+		return "", fmt.Errorf("queryRes.RoomVersion.EventFormat: %w", err)
 	}
 
 	builder.Depth = queryRes.Depth
@@ -102,13 +103,13 @@ func AddPrevEventsToEvent(
 	for i := range queryRes.StateEvents {
 		err = authEvents.AddEvent(&queryRes.StateEvents[i].Event)
 		if err != nil {
-			return fmt.Errorf("authEvents.AddEvent: %w", err)
+			return "", fmt.Errorf("authEvents.AddEvent: %w", err)
 		}
 	}
 
 	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
 	if err != nil {
-		return fmt.Errorf("eventsNeeded.AuthEventReferences: %w", err)
+		return "", fmt.Errorf("eventsNeeded.AuthEventReferences: %w", err)
 	}
 
 	truncAuth, truncPrev := truncateAuthAndPrevEvents(refs, queryRes.LatestEvents)
@@ -128,7 +129,7 @@ func AddPrevEventsToEvent(
 		builder.PrevEvents = v2PrevRefs
 	}
 
-	return nil
+	return queryRes.RoomVersion, nil
 }
 
 // truncateAuthAndPrevEvents limits the number of events we add into

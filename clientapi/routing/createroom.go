@@ -382,7 +382,7 @@ func createRoom(
 			continue
 		}
 		// Build some stripped state for the invite.
-		candidates := append(gomatrixserverlib.UnwrapEventHeaders(builtEvents), *inviteEvent)
+		candidates := append(gomatrixserverlib.UnwrapEventHeaders(builtEvents), inviteEvent.Event)
 		var strippedState []gomatrixserverlib.InviteV2StrippedState
 		for _, event := range candidates {
 			switch event.Type() {

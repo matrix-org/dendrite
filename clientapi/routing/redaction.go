@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -118,6 +119,11 @@ func SendRedaction(
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
+	}
+	_, err = roomserverAPI.SendEvents(context.Background(), rsAPI, []gomatrixserverlib.HeaderedEvent{*e}, cfg.Matrix.ServerName, nil)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
+		return jsonerror.InternalServerError()
 	}
 	return util.JSONResponse{
 		Code: 200,

@@ -180,11 +180,11 @@ func generateSendEvent(
 		stateEvents[i] = &queryRes.StateEvents[i].Event
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(*e, &provider); err != nil {
+	if err = gomatrixserverlib.Allowed(e.Event, &provider); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
 		}
 	}
-	return e, nil
+	return &e.Event, nil
 }
