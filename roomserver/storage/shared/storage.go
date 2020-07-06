@@ -542,7 +542,10 @@ func (d *Database) handleRedactions(ctx context.Context, txn *sql.Tx, eventNID t
 	}
 
 	// mark the event as redacted
-	redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
+	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
+	if err != nil {
+		return err
+	}
 	if redactionsArePermanent {
 		redactedEvent.Event = redactedEvent.Redact()
 	}
@@ -556,11 +559,14 @@ func (d *Database) handleRedactions(ctx context.Context, txn *sql.Tx, eventNID t
 }
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.
+// nolint:gocyclo
 func (d *Database) loadRedactionPair(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event,
 ) (*types.Event, *types.Event, bool, error) {
 	var redactionEvent, redactedEvent *types.Event
 	var info *tables.RedactionInfo
+	var nids map[string]types.EventNID
+	var evs []types.Event
 	var err error
 	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
 	if isRedactionEvent {
@@ -577,14 +583,14 @@ func (d *Database) loadRedactionPair(
 			// we don't have the redacted event yet
 			return nil, nil, false, nil
 		}
-		nids, err := d.EventNIDs(ctx, []string{info.RedactsEventID})
+		nids, err = d.EventNIDs(ctx, []string{info.RedactsEventID})
 		if err != nil {
 			return nil, nil, false, err
 		}
 		if len(nids) == 0 {
 			return nil, nil, false, fmt.Errorf("redaction: missing event NID being redacted: %+v", info)
 		}
-		evs, err := d.Events(ctx, []types.EventNID{nids[info.RedactsEventID]})
+		evs, err = d.Events(ctx, []types.EventNID{nids[info.RedactsEventID]})
 		if err != nil {
 			return nil, nil, false, err
 		}
@@ -606,14 +612,14 @@ func (d *Database) loadRedactionPair(
 			// this event is not redacted
 			return nil, nil, false, nil
 		}
-		nids, err := d.EventNIDs(ctx, []string{info.RedactionEventID})
+		nids, err = d.EventNIDs(ctx, []string{info.RedactionEventID})
 		if err != nil {
 			return nil, nil, false, err
 		}
 		if len(nids) == 0 {
 			return nil, nil, false, fmt.Errorf("redaction: missing redaction event NID: %+v", info)
 		}
-		evs, err := d.Events(ctx, []types.EventNID{nids[info.RedactionEventID]})
+		evs, err = d.Events(ctx, []types.EventNID{nids[info.RedactionEventID]})
 		if err != nil {
 			return nil, nil, false, err
 		}
