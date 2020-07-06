@@ -19,7 +19,7 @@ func Embed(rootMux *mux.Router, listenPort int, serverName string) {
 	embeddedFS := _escFS(false)
 	embeddedServ := http.FileServer(embeddedFS)
 
-	rootMux.Handle("/", embeddedServ)
+	rootMux.NotFoundHandler = embeddedServ
 	rootMux.HandleFunc("/config.json", func(w http.ResponseWriter, _ *http.Request) {
 		configFile, err := embeddedFS.Open("/config.sample.json")
 		if err != nil {
