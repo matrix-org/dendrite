@@ -80,7 +80,7 @@ func (n *Node) DialerContext(ctx context.Context, network, address string) (net.
 }
 
 // nolint:gocyclo
-func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
+func Setup(instanceName, instancePeer, storageDirectory string, enableMulticast bool) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasil.Core{},
 		config:    yggdrasilconfig.GenerateConfig(),
@@ -100,33 +100,36 @@ func Setup(instanceName, instancePeer, storageDirectory string) (*Node, error) {
 		if err := json.Unmarshal([]byte(yggconf), &n.config); err != nil {
 			panic(err)
 		}
-	} else {
-		n.config.AdminListen = "none" // fmt.Sprintf("unix://%s/%s-yggdrasil.sock", storageDirectory, instanceName)
-		n.config.MulticastInterfaces = []string{".*"}
-		n.config.EncryptionPrivateKey = hex.EncodeToString(n.EncryptionPrivateKey())
-		n.config.EncryptionPublicKey = hex.EncodeToString(n.EncryptionPublicKey())
-
-		j, err := json.MarshalIndent(n.config, "", "  ")
-		if err != nil {
-			panic(err)
-		}
-		if e := ioutil.WriteFile(yggfile, j, 0600); e != nil {
-			n.log.Printf("Couldn't write private key to file '%s': %s\n", yggfile, e)
-		}
 	}
 
-	var err error
+	if instancePeer != "" {
+		n.config.Peers = []string{instancePeer}
+	} else {
+		n.config.Peers = []string{}
+	}
+	n.config.AdminListen = "none"
+	if enableMulticast {
+		n.config.MulticastInterfaces = []string{".*"}
+	} else {
+		n.config.MulticastInterfaces = []string{}
+	}
+	n.config.EncryptionPrivateKey = hex.EncodeToString(n.EncryptionPrivateKey())
+	n.config.EncryptionPublicKey = hex.EncodeToString(n.EncryptionPublicKey())
+
+	j, err := json.MarshalIndent(n.config, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	if e := ioutil.WriteFile(yggfile, j, 0600); e != nil {
+		n.log.Printf("Couldn't write private key to file '%s': %s\n", yggfile, e)
+	}
+
 	n.log.EnableLevel("error")
 	n.log.EnableLevel("warn")
 	n.log.EnableLevel("info")
 	n.state, err = n.core.Start(n.config, n.log)
 	if err != nil {
 		panic(err)
-	}
-	if instancePeer != "" {
-		if err = n.core.AddPeer(instancePeer, ""); err != nil {
-			panic(err)
-		}
 	}
 	if err = n.multicast.Init(n.core, n.state, n.log, nil); err != nil {
 		panic(err)
@@ -209,4 +212,52 @@ func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
 		nodes = append(nodes, gomatrixserverlib.ServerName(node))
 	}
 	return nodes
+}
+
+func (n *Node) SetMulticastEnabled(enabled bool) {
+	if enabled {
+		n.config.MulticastInterfaces = []string{".*"}
+	} else {
+		n.config.MulticastInterfaces = []string{}
+	}
+	n.multicast.UpdateConfig(n.config)
+	if !enabled {
+		n.DisconnectMulticastPeers()
+	}
+}
+
+func (n *Node) DisconnectMulticastPeers() {
+	for _, sp := range n.core.GetSwitchPeers() {
+		if !strings.HasPrefix(sp.Endpoint, "fe80") {
+			continue
+		}
+		if err := n.core.DisconnectPeer(sp.Port); err != nil {
+			n.log.Printf("Failed to disconnect port %d: %s", sp.Port, err)
+		}
+	}
+}
+
+func (n *Node) DisconnectNonMulticastPeers() {
+	for _, sp := range n.core.GetSwitchPeers() {
+		if strings.HasPrefix(sp.Endpoint, "fe80") {
+			continue
+		}
+		if err := n.core.DisconnectPeer(sp.Port); err != nil {
+			n.log.Printf("Failed to disconnect port %d: %s", sp.Port, err)
+		}
+	}
+}
+
+func (n *Node) SetStaticPeer(uri string) error {
+	n.config.Peers = []string{}
+	n.core.UpdateConfig(n.config)
+	n.DisconnectNonMulticastPeers()
+	if uri != "" {
+		n.log.Infoln("Adding static peer", uri)
+		if err := n.core.AddPeer(uri, ""); err != nil {
+			n.log.Infoln("Adding static peer failed:", err)
+			return err
+		}
+	}
+	return nil
 }

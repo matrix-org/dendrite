@@ -54,7 +54,7 @@ func main() {
 	flag.Parse()
 	internal.SetupPprof()
 
-	ygg, err := yggconn.Setup(*instanceName, *instancePeer, ".")
+	ygg, err := yggconn.Setup(*instanceName, *instancePeer, ".", true)
 	if err != nil {
 		panic(err)
 	}

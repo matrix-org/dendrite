@@ -39,7 +39,23 @@ func (m *DendriteMonolith) PeerCount() int {
 	return m.YggdrasilNode.PeerCount()
 }
 
-func (m *DendriteMonolith) Start() {
+func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
+	m.YggdrasilNode.SetMulticastEnabled(enabled)
+}
+
+func (m *DendriteMonolith) SetStaticPeer(uri string) error {
+	return m.YggdrasilNode.SetStaticPeer(uri)
+}
+
+func (m *DendriteMonolith) DisconnectNonMulticastPeers() {
+	m.YggdrasilNode.DisconnectNonMulticastPeers()
+}
+
+func (m *DendriteMonolith) DisconnectMulticastPeers() {
+	m.YggdrasilNode.DisconnectMulticastPeers()
+}
+
+func (m *DendriteMonolith) Start(staticPeer string, enableMulticast bool) {
 	logger := logrus.Logger{
 		Out: BindLogger{},
 	}
@@ -51,7 +67,7 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	ygg, err := yggconn.Setup("dendrite", "", m.StorageDirectory)
+	ygg, err := yggconn.Setup("dendrite", staticPeer, m.StorageDirectory, enableMulticast)
 	if err != nil {
 		panic(err)
 	}
