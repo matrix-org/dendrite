@@ -156,6 +156,13 @@ func Setup(instanceName, instancePeer, storageDirectory string, enableMulticast 
 	return n, nil
 }
 
+func (n *Node) Stop() {
+	if err := n.multicast.Stop(); err != nil {
+		n.log.Println("Error stopping multicast:", err)
+	}
+	n.core.Stop()
+}
+
 func (n *Node) DerivedServerName() string {
 	return hex.EncodeToString(n.SigningPublicKey())
 }

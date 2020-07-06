@@ -180,3 +180,10 @@ func (m *DendriteMonolith) Start(staticPeer string, enableMulticast bool) {
 		logger.Fatal(httpServer.Serve(m.listener))
 	}()
 }
+
+func (m *DendriteMonolith) Stop() {
+	if err := m.listener.Close(); err != nil {
+		logrus.Warn("Error stopping listener:", err)
+	}
+	m.YggdrasilNode.Stop()
+}
