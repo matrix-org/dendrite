@@ -14,6 +14,7 @@ type EventJSONPair struct {
 }
 
 type EventJSON interface {
+	// Insert the event JSON. On conflict, replace the event JSON with the new value (for redactions).
 	InsertEventJSON(ctx context.Context, tx *sql.Tx, eventNID types.EventNID, eventJSON []byte) error
 	BulkSelectEventJSON(ctx context.Context, eventNIDs []types.EventNID) ([]EventJSONPair, error)
 }
@@ -125,4 +126,24 @@ type Published interface {
 	UpsertRoomPublished(ctx context.Context, roomID string, published bool) (err error)
 	SelectPublishedFromRoomID(ctx context.Context, roomID string) (published bool, err error)
 	SelectAllPublishedRooms(ctx context.Context, published bool) ([]string, error)
+}
+
+type RedactionInfo struct {
+	// whether this redaction is validated (we have both events)
+	Validated bool
+	// the ID of the event being redacted
+	RedactsEventID string
+	// the ID of the redaction event
+	RedactionEventID string
+}
+
+type Redactions interface {
+	InsertRedaction(ctx context.Context, txn *sql.Tx, info RedactionInfo) error
+	// SelectRedactedEvent returns the redaction info for the given redaction event ID, or nil if there is no match.
+	SelectRedactedEvent(ctx context.Context, txn *sql.Tx, redactionEventID string) (*RedactionInfo, error)
+	// SelectRedactionEvent returns the redaction info for the given redacted event ID, or nil if there is no match.
+	SelectRedactionEvent(ctx context.Context, txn *sql.Tx, redactedEventID string) (*RedactionInfo, error)
+	// Mark this redaction event as having been validated. This means we have both sides of the redaction and have
+	// successfully redacted the event JSON.
+	MarkRedactionValidated(ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool) error
 }

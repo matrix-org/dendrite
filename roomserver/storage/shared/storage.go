@@ -4,13 +4,26 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 )
+
+// Ideally, when we have both events we should redact the event JSON and forget about the redaction, but we currently
+// don't because the redaction code is brand new. When we are more certain that redactions don't misbehave or are
+// vulnerable to attacks from remote servers (e.g a server bypassing event auth rules shouldn't redact our data)
+// then we should flip this to true. This will mean redactions /actually delete information irretrievably/ which
+// will be necessary for compliance with the law. Note that downstream components (syncapi) WILL delete information
+// in their database on receipt of a redaction. Also note that we still modify the event JSON to set the field
+// unsigned.redacted_because - we just don't clear out the content fields yet.
+//
+// If this hasn't been done by 09/2020 this should be flipped to true.
+const redactionsArePermanent = false
 
 type Database struct {
 	DB                  *sql.DB
@@ -27,6 +40,7 @@ type Database struct {
 	InvitesTable        tables.Invites
 	MembershipTable     tables.Membership
 	PublishedTable      tables.Published
+	RedactionsTable     tables.Redactions
 }
 
 func (d *Database) EventTypeNIDs(
@@ -298,6 +312,9 @@ func (d *Database) Events(
 			return nil, err
 		}
 	}
+	if !redactionsArePermanent {
+		d.applyRedactions(results)
+	}
 	return results, nil
 }
 
@@ -403,7 +420,7 @@ func (d *Database) StoreEvent(
 			return err
 		}
 
-		return nil
+		return d.handleRedactions(ctx, txn, eventNID, event)
 	})
 	if err != nil {
 		return 0, types.StateAtEvent{}, err
@@ -499,4 +516,126 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 		roomVersion = gomatrixserverlib.RoomVersion(*createContent.RoomVersion)
 	}
 	return roomVersion, err
+}
+
+// handleRedactions manages the redacted status of events. There's two cases to consider in order to comply with the spec:
+// "servers should not apply or send redactions to clients until both the redaction event and original event have been seen, and are valid."
+// https://matrix.org/docs/spec/rooms/v3#authorization-rules-for-events
+// These cases are:
+//  - This is a redaction event, redact the event it references if we know about it.
+//  - This is a normal event which may have been previously redacted.
+// In the first case, check if we have the referenced event then apply the redaction, else store it
+// in the redactions table with validated=FALSE. In the second case, check if there is a redaction for it:
+// if there is then apply the redactions and set validated=TRUE.
+//
+// When an event is redacted, the redacted event JSON is modified to add an `unsigned.redacted_because` field. We use this field
+// when loading events to determine whether to apply redactions. This keeps the hot-path of reading events quick as we don't need
+// to cross-reference with other tables when loading.
+func (d *Database) handleRedactions(ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event) error {
+	redactionEvent, redactedEvent, validated, err := d.loadRedactionPair(ctx, txn, eventNID, event)
+	if err != nil {
+		return err
+	}
+	if validated || redactedEvent == nil || redactionEvent == nil {
+		// we've seen this redaction before or there is nothing to redact
+		return nil
+	}
+
+	// mark the event as redacted
+	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
+	if err != nil {
+		return err
+	}
+	if redactionsArePermanent {
+		redactedEvent.Event = redactedEvent.Redact()
+	}
+	// overwrite the eventJSON table
+	err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
+	if err != nil {
+		return err
+	}
+
+	return d.RedactionsTable.MarkRedactionValidated(ctx, txn, redactionEvent.EventID(), true)
+}
+
+// loadRedactionPair returns both the redaction event and the redacted event, else nil.
+// nolint:gocyclo
+func (d *Database) loadRedactionPair(
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event,
+) (*types.Event, *types.Event, bool, error) {
+	var redactionEvent, redactedEvent *types.Event
+	var info *tables.RedactionInfo
+	var nids map[string]types.EventNID
+	var evs []types.Event
+	var err error
+	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
+	if isRedactionEvent {
+		redactionEvent = &types.Event{
+			EventNID: eventNID,
+			Event:    event,
+		}
+		// find the redacted event if one exists
+		info, err = d.RedactionsTable.SelectRedactedEvent(ctx, txn, event.EventID())
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if info == nil {
+			// we don't have the redacted event yet
+			return nil, nil, false, nil
+		}
+		nids, err = d.EventNIDs(ctx, []string{info.RedactsEventID})
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if len(nids) == 0 {
+			return nil, nil, false, fmt.Errorf("redaction: missing event NID being redacted: %+v", info)
+		}
+		evs, err = d.Events(ctx, []types.EventNID{nids[info.RedactsEventID]})
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if len(evs) != 1 {
+			return nil, nil, false, fmt.Errorf("redaction: missing event being redacted: %+v", info)
+		}
+		redactedEvent = &evs[0]
+	} else {
+		redactedEvent = &types.Event{
+			EventNID: eventNID,
+			Event:    event,
+		}
+		// find the redaction event if one exists
+		info, err = d.RedactionsTable.SelectRedactionEvent(ctx, txn, event.EventID())
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if info == nil {
+			// this event is not redacted
+			return nil, nil, false, nil
+		}
+		nids, err = d.EventNIDs(ctx, []string{info.RedactionEventID})
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if len(nids) == 0 {
+			return nil, nil, false, fmt.Errorf("redaction: missing redaction event NID: %+v", info)
+		}
+		evs, err = d.Events(ctx, []types.EventNID{nids[info.RedactionEventID]})
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if len(evs) != 1 {
+			return nil, nil, false, fmt.Errorf("redaction: missing redaction event: %+v", info)
+		}
+		redactionEvent = &evs[0]
+	}
+	return redactionEvent, redactedEvent, info.Validated, nil
+}
+
+// applyRedactions will redact events that have an `unsigned.redacted_because` field.
+func (d *Database) applyRedactions(events []types.Event) {
+	for i := range events {
+		if result := gjson.GetBytes(events[i].Unsigned(), "redacted_because"); result.Exists() {
+			events[i].Event = events[i].Redact()
+		}
+	}
 }

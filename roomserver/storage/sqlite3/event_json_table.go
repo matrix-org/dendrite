@@ -35,8 +35,7 @@ const eventJSONSchema = `
 `
 
 const insertEventJSONSQL = `
-	INSERT INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)
-	  ON CONFLICT DO NOTHING
+	INSERT OR REPLACE INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)
 `
 
 // Bulk event JSON lookup by numeric event ID.
