@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS roomserver_event_json (
 
 const insertEventJSONSQL = "" +
 	"INSERT INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)" +
-	" ON CONFLICT DO NOTHING"
+	" ON CONFLICT (event_nid) DO UPDATE SET event_json=$2"
 
 // Bulk event JSON lookup by numeric event ID.
 // Sort by the numeric event ID.
