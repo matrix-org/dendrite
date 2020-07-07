@@ -382,7 +382,7 @@ func (oq *destinationQueue) nextTransaction(
 	// since we shouldn't queue things indefinitely in response
 	// to a 400-ish error
 	_, err = oq.client.SendTransaction(context.TODO(), t)
-	switch e := err.(type) {
+	switch err.(type) {
 	case nil:
 		// No error was returned so the transaction looks to have
 		// been successfully sent.
