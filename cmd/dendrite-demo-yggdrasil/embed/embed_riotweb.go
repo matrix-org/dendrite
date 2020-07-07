@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 
 	"github.com/gorilla/mux"
 	"github.com/tidwall/sjson"
@@ -14,10 +15,30 @@ import (
 // From within the Riot Web directory:
 // go run github.com/mjibson/esc -o /path/to/dendrite/internal/embed/fs_riotweb.go -private -pkg embed .
 
+var cssFile = regexp.MustCompile("\\.css$")
+var jsFile = regexp.MustCompile("\\.js$")
+
+type mimeFixingHandler struct {
+	fs http.Handler
+}
+
+func (h mimeFixingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ruri := r.RequestURI
+	fmt.Println(ruri)
+	switch {
+	case cssFile.MatchString(ruri):
+		w.Header().Set("Content-Type", "text/css")
+	case jsFile.MatchString(ruri):
+		w.Header().Set("Content-Type", "application/javascript")
+	default:
+	}
+	h.fs.ServeHTTP(w, r)
+}
+
 func Embed(rootMux *mux.Router, listenPort int, serverName string) {
 	url := fmt.Sprintf("http://localhost:%d", listenPort)
 	embeddedFS := _escFS(false)
-	embeddedServ := http.FileServer(embeddedFS)
+	embeddedServ := mimeFixingHandler{http.FileServer(embeddedFS)}
 
 	rootMux.NotFoundHandler = embeddedServ
 	rootMux.HandleFunc("/config.json", func(w http.ResponseWriter, _ *http.Request) {
