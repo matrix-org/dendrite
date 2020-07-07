@@ -99,7 +99,11 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 func (c *OutputRoomEventConsumer) onRedactEvent(
 	ctx context.Context, msg api.OutputRedactedEvent,
 ) error {
-	return c.db.RedactEvent(ctx, msg.RedactedEventID, &msg.RedactedBecause)
+	err := c.db.RedactEvent(ctx, msg.RedactedEventID, &msg.RedactedBecause)
+	if err != nil {
+		log.WithError(err).Error("RedactEvent error'd")
+	}
+	return err
 }
 
 func (s *OutputRoomEventConsumer) onNewRoomEvent(

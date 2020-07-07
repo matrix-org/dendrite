@@ -607,10 +607,12 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
 		return nil
 	}
+	logrus.Infof("redaction-ver:%v event-ver:%v", redactedBecause.RoomVersion, redactedEvents[0].RoomVersion)
 	eventToRedact := redactedEvents[0].Unwrap()
 	redactionEvent := redactedBecause.Unwrap()
 	ev, err := eventutil.RedactEvent(&redactionEvent, &eventToRedact)
 	if err != nil {
+		logrus.Infof("REDACTME RedactEvent returned an error: %s", err)
 		return err
 	}
 

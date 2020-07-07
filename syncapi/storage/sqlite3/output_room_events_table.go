@@ -155,7 +155,7 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 	if err != nil {
 		return err
 	}
-	_, err = s.updateEventJSONStmt.ExecContext(ctx, event.EventID(), headeredJSON)
+	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
 	return err
 }
 
