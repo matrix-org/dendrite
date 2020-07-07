@@ -276,10 +276,10 @@ func (oq *destinationQueue) backgroundSend() {
 			}
 		}
 
-		// If something else has come along since we sent the previous
-		// transactions then we want the next loop iteration to skip the
-		// wait and not go to sleep. In which case, if there isn't a
-		// wake-up message already, send one.
+		// If something else has come along while we were busy sending
+		// the previous transaction then we don't want the next loop
+		// iteration to sleep. Send a message if someone else hasn't
+		// already sent a wake-up.
 		if oq.pendingPDUs.Load() > 0 {
 			select {
 			case oq.notifyPDUs <- true:
