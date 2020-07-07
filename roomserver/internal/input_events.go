@@ -19,6 +19,7 @@ package internal
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -31,6 +32,8 @@ import (
 // TODO(#375): This should be rewritten to allow concurrent calls. The
 // difficulty is in ensuring that we correctly annotate events with the correct
 // state deltas when sending to kafka streams
+// TODO: Break up function - we should probably do transaction ID checks before calling this.
+// nolint:gocyclo
 func (r *RoomserverInternalAPI) processRoomEvent(
 	ctx context.Context,
 	input api.InputRoomEvent,
@@ -60,9 +63,17 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 	}
 
 	// Store the event.
-	roomNID, stateAtEvent, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
+	roomNID, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
 		return
+	}
+	// if storing this event results in it being redacted then do so.
+	if redactedEventID == event.EventID() {
+		r, rerr := eventutil.RedactEvent(redactionEvent, &event)
+		if rerr != nil {
+			return "", rerr
+		}
+		event = *r
 	}
 
 	// For outliers we can stop after we've stored the event itself as it
@@ -95,6 +106,25 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 		input.TransactionID, // transaction ID
 	); err != nil {
 		return
+	}
+
+	// processing this event resulted in an event (which may not be the one we're processing)
+	// being redacted. We are guaranteed to have both sides (the redaction/redacted event),
+	// so notify downstream components to redact this event - they should have it if they've
+	// been tracking our output log.
+	if redactedEventID != "" {
+		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
+			{
+				Type: api.OutputTypeRedactedEvent,
+				RedactedEvent: &api.OutputRedactedEvent{
+					RedactedEventID: redactedEventID,
+					RedactedBecause: redactionEvent.Headered(headered.RoomVersion),
+				},
+			},
+		})
+		if err != nil {
+			return
+		}
 	}
 
 	// Update the extremities of the event graph for the room

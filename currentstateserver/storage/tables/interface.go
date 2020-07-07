@@ -24,6 +24,8 @@ import (
 
 type CurrentRoomState interface {
 	SelectStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
+	// SelectEventsWithEventIDs returns the events for the given event IDs. If the event(s) are missing, they are not returned
+	// and no error is returned.
 	SelectEventsWithEventIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]gomatrixserverlib.HeaderedEvent, error)
 	// UpsertRoomState stores the given event in the database, along with an extracted piece of content.
 	// The piece of content will vary depending on the event type, and table implementations may use this information to optimise

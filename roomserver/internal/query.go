@@ -880,10 +880,23 @@ func persistEvents(ctx context.Context, db storage.Database, events []gomatrixse
 			i++
 		}
 		var stateAtEvent types.StateAtEvent
-		roomNID, stateAtEvent, err = db.StoreEvent(ctx, ev.Unwrap(), nil, authNids)
+		var redactedEventID string
+		var redactionEvent *gomatrixserverlib.Event
+		roomNID, stateAtEvent, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), nil, authNids)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
 			continue
+		}
+		// If storing this event results in it being redacted, then do so.
+		// It's also possible for this event to be a redaction which results in another event being
+		// redacted, which we don't care about since we aren't returning it in this backfill.
+		if redactedEventID == ev.EventID() {
+			ev = ev.Redact().Headered(ev.RoomVersion)
+			err = ev.SetUnsignedField("redacted_because", redactionEvent)
+			if err != nil {
+				logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to set unsigned field")
+				continue
+			}
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{
 			EventNID: stateAtEvent.StateEntry.EventNID,

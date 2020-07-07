@@ -41,11 +41,11 @@ const insertRedactionSQL = "" +
 	"INSERT INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
 	" VALUES ($1, $2, $3)"
 
-const selectRedactedEventSQL = "" +
+const selectRedactionInfoByRedactionEventIDSQL = "" +
 	"SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
 	" WHERE redaction_event_id = $1"
 
-const selectRedactionEventSQL = "" +
+const selectRedactionInfoByEventBeingRedactedSQL = "" +
 	"SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
 	" WHERE redacts_event_id = $1"
 
@@ -53,10 +53,10 @@ const markRedactionValidatedSQL = "" +
 	" UPDATE roomserver_redactions SET validated = $2 WHERE redaction_event_id = $1"
 
 type redactionStatements struct {
-	insertRedactionStmt        *sql.Stmt
-	selectRedactedEventStmt    *sql.Stmt
-	selectRedactionEventStmt   *sql.Stmt
-	markRedactionValidatedStmt *sql.Stmt
+	insertRedactionStmt                         *sql.Stmt
+	selectRedactionInfoByRedactionEventIDStmt   *sql.Stmt
+	selectRedactionInfoByEventBeingRedactedStmt *sql.Stmt
+	markRedactionValidatedStmt                  *sql.Stmt
 }
 
 func NewPostgresRedactionsTable(db *sql.DB) (tables.Redactions, error) {
@@ -68,8 +68,8 @@ func NewPostgresRedactionsTable(db *sql.DB) (tables.Redactions, error) {
 
 	return s, shared.StatementList{
 		{&s.insertRedactionStmt, insertRedactionSQL},
-		{&s.selectRedactedEventStmt, selectRedactedEventSQL},
-		{&s.selectRedactionEventStmt, selectRedactionEventSQL},
+		{&s.selectRedactionInfoByRedactionEventIDStmt, selectRedactionInfoByRedactionEventIDSQL},
+		{&s.selectRedactionInfoByEventBeingRedactedStmt, selectRedactionInfoByEventBeingRedactedSQL},
 		{&s.markRedactionValidatedStmt, markRedactionValidatedSQL},
 	}.Prepare(db)
 }
@@ -82,32 +82,32 @@ func (s *redactionStatements) InsertRedaction(
 	return err
 }
 
-func (s *redactionStatements) SelectRedactedEvent(
+func (s *redactionStatements) SelectRedactionInfoByRedactionEventID(
 	ctx context.Context, txn *sql.Tx, redactionEventID string,
 ) (info *tables.RedactionInfo, err error) {
 	info = &tables.RedactionInfo{}
-	stmt := sqlutil.TxStmt(txn, s.selectRedactedEventStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectRedactionInfoByRedactionEventIDStmt)
 	err = stmt.QueryRowContext(ctx, redactionEventID).Scan(
 		&info.RedactionEventID, &info.RedactsEventID, &info.Validated,
 	)
 	if err == sql.ErrNoRows {
-		err = nil
 		info = nil
+		err = nil
 	}
 	return
 }
 
-func (s *redactionStatements) SelectRedactionEvent(
-	ctx context.Context, txn *sql.Tx, redactedEventID string,
+func (s *redactionStatements) SelectRedactionInfoByEventBeingRedacted(
+	ctx context.Context, txn *sql.Tx, eventID string,
 ) (info *tables.RedactionInfo, err error) {
 	info = &tables.RedactionInfo{}
-	stmt := sqlutil.TxStmt(txn, s.selectRedactionEventStmt)
-	err = stmt.QueryRowContext(ctx, redactedEventID).Scan(
+	stmt := sqlutil.TxStmt(txn, s.selectRedactionInfoByEventBeingRedactedStmt)
+	err = stmt.QueryRowContext(ctx, eventID).Scan(
 		&info.RedactionEventID, &info.RedactsEventID, &info.Validated,
 	)
 	if err == sql.ErrNoRows {
-		err = nil
 		info = nil
+		err = nil
 	}
 	return
 }

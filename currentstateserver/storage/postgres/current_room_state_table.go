@@ -189,7 +189,6 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 		if err := rows.Scan(&eventBytes); err != nil {
 			return nil, err
 		}
-		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
