@@ -162,7 +162,13 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 		iEventIDs[k] = v
 	}
 	query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
-	rows, err := txn.QueryContext(ctx, query, iEventIDs...)
+	var rows *sql.Rows
+	var err error
+	if txn != nil {
+		rows, err = txn.QueryContext(ctx, query, iEventIDs...)
+	} else {
+		rows, err = s.db.QueryContext(ctx, query, iEventIDs...)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +179,6 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 		if err := rows.Scan(&eventBytes); err != nil {
 			return nil, err
 		}
-		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err

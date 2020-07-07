@@ -28,6 +28,8 @@ const (
 	OutputTypeNewInviteEvent OutputType = "new_invite_event"
 	// OutputTypeRetireInviteEvent indicates that the event is an OutputRetireInviteEvent
 	OutputTypeRetireInviteEvent OutputType = "retire_invite_event"
+	// OutputTypeRedactedEvent indicates that the event is an OutputRedactedEvent
+	OutputTypeRedactedEvent OutputType = "redacted_event"
 )
 
 // An OutputEvent is an entry in the roomserver output kafka log.
@@ -41,6 +43,8 @@ type OutputEvent struct {
 	NewInviteEvent *OutputNewInviteEvent `json:"new_invite_event,omitempty"`
 	// The content of event with type OutputTypeRetireInviteEvent
 	RetireInviteEvent *OutputRetireInviteEvent `json:"retire_invite_event,omitempty"`
+	// The content of event with type  OutputTypeRedactedEvent
+	RedactedEvent *OutputRedactedEvent `json:"redacted_event,omitempty"`
 }
 
 // An OutputNewRoomEvent is written when the roomserver receives a new event.
@@ -164,4 +168,14 @@ type OutputRetireInviteEvent struct {
 	// The "membership" of the user after retiring the invite. One of "join"
 	// "leave" or "ban".
 	Membership string
+}
+
+// An OutputRedactedEvent is written whenever a redaction has been /validated/.
+// Downstream components MUST redact the given event ID if they have stored the
+// event JSON. It is guaranteed that this event ID has been seen before.
+type OutputRedactedEvent struct {
+	// The event ID that was redacted
+	RedactedEventID string
+	// The value of `unsigned.redacted_because` - the redaction event itself
+	RedactedBecause gomatrixserverlib.HeaderedEvent
 }

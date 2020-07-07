@@ -139,10 +139,10 @@ type RedactionInfo struct {
 
 type Redactions interface {
 	InsertRedaction(ctx context.Context, txn *sql.Tx, info RedactionInfo) error
-	// SelectRedactedEvent returns the redaction info for the given redaction event ID, or nil if there is no match.
-	SelectRedactedEvent(ctx context.Context, txn *sql.Tx, redactionEventID string) (*RedactionInfo, error)
-	// SelectRedactionEvent returns the redaction info for the given redacted event ID, or nil if there is no match.
-	SelectRedactionEvent(ctx context.Context, txn *sql.Tx, redactedEventID string) (*RedactionInfo, error)
+	// SelectRedactionInfoByRedactionEventID returns the redaction info for the given redaction event ID, or nil if there is no match.
+	SelectRedactionInfoByRedactionEventID(ctx context.Context, txn *sql.Tx, redactionEventID string) (*RedactionInfo, error)
+	// SelectRedactionInfoByEventBeingRedacted returns the redaction info for the given redacted event ID, or nil if there is no match.
+	SelectRedactionInfoByEventBeingRedacted(ctx context.Context, txn *sql.Tx, eventID string) (*RedactionInfo, error)
 	// Mark this redaction event as having been validated. This means we have both sides of the redaction and have
 	// successfully redacted the event JSON.
 	MarkRedactionValidated(ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool) error

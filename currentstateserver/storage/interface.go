@@ -35,4 +35,6 @@ type Database interface {
 	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
 	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
+	// Redact a state event
+	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause gomatrixserverlib.HeaderedEvent) error
 }

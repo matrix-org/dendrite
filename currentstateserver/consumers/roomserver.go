@@ -61,6 +61,8 @@ func (c *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return c.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:
 	case api.OutputTypeRetireInviteEvent:
+	case api.OutputTypeRedactedEvent:
+		return c.onRedactEvent(context.Background(), *output.RedactedEvent)
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -103,6 +105,12 @@ func (c *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write event failure")
 	}
 	return nil
+}
+
+func (c *OutputRoomEventConsumer) onRedactEvent(
+	ctx context.Context, msg api.OutputRedactedEvent,
+) error {
+	return c.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause)
 }
 
 // Start consuming from room servers
