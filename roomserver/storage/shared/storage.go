@@ -540,6 +540,11 @@ func (d *Database) handleRedactions(
 	var err error
 	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
 	if isRedactionEvent {
+		// an event which redacts itself should be ignored
+		if event.EventID() == event.Redacts() {
+			return nil, "", nil
+		}
+
 		err = d.RedactionsTable.InsertRedaction(ctx, txn, tables.RedactionInfo{
 			Validated:        false,
 			RedactionEventID: event.EventID(),
