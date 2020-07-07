@@ -32,6 +32,8 @@ import (
 // TODO(#375): This should be rewritten to allow concurrent calls. The
 // difficulty is in ensuring that we correctly annotate events with the correct
 // state deltas when sending to kafka streams
+// TODO: Break up function - we should probably do transaction ID checks before calling this.
+// nolint:gocyclo
 func (r *RoomserverInternalAPI) processRoomEvent(
 	ctx context.Context,
 	input api.InputRoomEvent,
@@ -67,9 +69,9 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 	}
 	// if storing this event results in it being redacted then do so.
 	if redactedEventID == event.EventID() {
-		r, err := eventutil.RedactEvent(redactionEvent, &event)
-		if err != nil {
-			return "", err
+		r, rerr := eventutil.RedactEvent(redactionEvent, &event)
+		if rerr != nil {
+			return "", rerr
 		}
 		event = *r
 	}

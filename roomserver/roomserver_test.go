@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	testOrigin      = gomatrixserverlib.ServerName("kaer.morhen")
-	testDestination = gomatrixserverlib.ServerName("white.orchard")
+	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
 	// we have to use an on-disk DB because we open multiple connections due to the *Updater structs.
 	// Using :memory: results in a brand new DB for each open connection, and sharing memory via
 	// ?cache=shared just allows read-only sharing, so writes to the database on other connections are lost.
