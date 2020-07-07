@@ -65,6 +65,7 @@ type destinationQueue struct {
 func (oq *destinationQueue) sendEvent(nid int64) {
 	if oq.statistics.Blacklisted() {
 		// If the destination is blacklisted then drop the event.
+		log.Infof("%s is blacklisted; dropping event", oq.destination)
 		return
 	}
 	oq.wakeQueueIfNeeded()
@@ -214,6 +215,7 @@ func (oq *destinationQueue) backgroundSend() {
 		// backoff duration to complete first, or until explicitly
 		// told to retry.
 		if backoff, duration := oq.statistics.BackoffDuration(); backoff {
+			log.WithField("duration", duration).Infof("Backing off %s", oq.destination)
 			oq.backingOff.Store(true)
 			select {
 			case <-time.After(duration):
@@ -336,6 +338,7 @@ func (oq *destinationQueue) nextTransaction(
 	// If we didn't get anything from the database and there are no
 	// pending EDUs then there's nothing to do - stop here.
 	if len(pdus) == 0 && len(pendingEDUs) == 0 {
+		log.Warnf("no pdus/edus for nextTransaction for destination %q", oq.destination)
 		return false, nil
 	}
 
