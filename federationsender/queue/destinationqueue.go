@@ -225,7 +225,7 @@ func (oq *destinationQueue) backgroundSend() {
 		}
 
 		// If we have pending PDUs or EDUs then construct a transaction.
-		if oq.pendingPDUs.Load() > 0 || len(oq.pendingEDUs) > 0 {
+		for oq.pendingPDUs.Load() > 0 || len(oq.pendingEDUs) > 0 {
 			// Try sending the next transaction and see what happens.
 			transaction, terr := oq.nextTransaction(oq.pendingEDUs)
 			if terr != nil {
