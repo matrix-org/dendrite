@@ -59,6 +59,9 @@ func main() {
 		panic(err)
 	}
 	ygg.SetMulticastEnabled(true)
+	if instancePeer != nil && *instancePeer != "" {
+		ygg.SetStaticPeer(*instancePeer)
+	}
 
 	cfg := &config.Dendrite{}
 	cfg.SetDefaults()
