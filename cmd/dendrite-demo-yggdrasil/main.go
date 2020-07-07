@@ -54,10 +54,11 @@ func main() {
 	flag.Parse()
 	internal.SetupPprof()
 
-	ygg, err := yggconn.Setup(*instanceName, *instancePeer, ".", true)
+	ygg, err := yggconn.Setup(*instanceName, ".")
 	if err != nil {
 		panic(err)
 	}
+	ygg.SetMulticastEnabled(true)
 
 	cfg := &config.Dendrite{}
 	cfg.SetDefaults()

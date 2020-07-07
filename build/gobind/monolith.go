@@ -55,7 +55,7 @@ func (m *DendriteMonolith) DisconnectMulticastPeers() {
 	m.YggdrasilNode.DisconnectMulticastPeers()
 }
 
-func (m *DendriteMonolith) Start(staticPeer string, enableMulticast bool) {
+func (m *DendriteMonolith) Start() {
 	logger := logrus.Logger{
 		Out: BindLogger{},
 	}
@@ -67,7 +67,7 @@ func (m *DendriteMonolith) Start(staticPeer string, enableMulticast bool) {
 		panic(err)
 	}
 
-	ygg, err := yggconn.Setup("dendrite", staticPeer, m.StorageDirectory, enableMulticast)
+	ygg, err := yggconn.Setup("dendrite", m.StorageDirectory)
 	if err != nil {
 		panic(err)
 	}

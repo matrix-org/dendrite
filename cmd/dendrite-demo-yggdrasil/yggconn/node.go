@@ -80,7 +80,7 @@ func (n *Node) DialerContext(ctx context.Context, network, address string) (net.
 }
 
 // nolint:gocyclo
-func Setup(instanceName, instancePeer, storageDirectory string, enableMulticast bool) (*Node, error) {
+func Setup(instanceName, storageDirectory string) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasil.Core{},
 		config:    yggdrasilconfig.GenerateConfig(),
@@ -102,17 +102,9 @@ func Setup(instanceName, instancePeer, storageDirectory string, enableMulticast 
 		}
 	}
 
-	if instancePeer != "" {
-		n.config.Peers = []string{instancePeer}
-	} else {
-		n.config.Peers = []string{}
-	}
+	n.config.Peers = []string{}
 	n.config.AdminListen = "none"
-	if enableMulticast {
-		n.config.MulticastInterfaces = []string{".*"}
-	} else {
-		n.config.MulticastInterfaces = []string{}
-	}
+	n.config.MulticastInterfaces = []string{}
 	n.config.EncryptionPrivateKey = hex.EncodeToString(n.EncryptionPrivateKey())
 	n.config.EncryptionPublicKey = hex.EncodeToString(n.EncryptionPublicKey())
 
@@ -197,11 +189,9 @@ func (n *Node) PeerCount() int {
 
 func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
 	nodemap := map[string]struct{}{}
-	/*
-		for _, peer := range n.core.GetSwitchPeers() {
-			nodemap[hex.EncodeToString(peer.SigningKey[:])] = struct{}{}
-		}
-	*/
+	for _, peer := range n.core.GetSwitchPeers() {
+		nodemap[hex.EncodeToString(peer.SigningKey[:])] = struct{}{}
+	}
 	n.sessions.Range(func(_, v interface{}) bool {
 		session, ok := v.(quic.Session)
 		if !ok {
@@ -262,7 +252,11 @@ func (n *Node) SetStaticPeer(uri string) error {
 	if uri != "" {
 		n.log.Infoln("Adding static peer", uri)
 		if err := n.core.AddPeer(uri, ""); err != nil {
-			n.log.Infoln("Adding static peer failed:", err)
+			n.log.Warnln("Adding static peer failed:", err)
+			return err
+		}
+		if err := n.core.CallPeer(uri, ""); err != nil {
+			n.log.Warnln("Calling static peer failed:", err)
 			return err
 		}
 	}
