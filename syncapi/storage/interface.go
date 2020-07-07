@@ -136,4 +136,6 @@ type Database interface {
 	// Returns the filterID as a string. Otherwise returns an error if something
 	// goes wrong.
 	PutFilter(ctx context.Context, localpart string, filter *gomatrixserverlib.Filter) (string, error)
+	// RedactEvent wipes an event in the database and sets the unsigned.redacted_because key to the redaction event
+	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error
 }

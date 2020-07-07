@@ -86,12 +86,20 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
 		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
+	case api.OutputTypeRedactedEvent:
+		return s.onRedactEvent(context.TODO(), *output.RedactedEvent)
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
 		return nil
 	}
+}
+
+func (c *OutputRoomEventConsumer) onRedactEvent(
+	ctx context.Context, msg api.OutputRedactedEvent,
+) error {
+	return c.db.RedactEvent(ctx, msg.RedactedEventID, &msg.RedactedBecause)
 }
 
 func (s *OutputRoomEventConsumer) onNewRoomEvent(
@@ -173,12 +181,10 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 }
 
 func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.HeaderedEvent) (gomatrixserverlib.HeaderedEvent, error) {
-	var stateKey string
 	if event.StateKey() == nil {
-		stateKey = ""
-	} else {
-		stateKey = *event.StateKey()
+		return event, nil
 	}
+	stateKey := *event.StateKey()
 
 	prevEvent, err := s.db.GetStateEvent(
 		context.TODO(), event.RoomID(), event.Type(), stateKey,

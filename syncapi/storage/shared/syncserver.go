@@ -24,6 +24,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -597,6 +598,26 @@ func (d *Database) IncrementalSync(
 	return res, nil
 }
 
+func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error {
+	redactedEvents, err := d.Events(ctx, []string{redactedEventID})
+	if err != nil {
+		return err
+	}
+	if len(redactedEvents) == 0 {
+		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
+		return nil
+	}
+	eventToRedact := redactedEvents[0].Unwrap()
+	redactionEvent := redactedBecause.Unwrap()
+	ev, err := eventutil.RedactEvent(&redactionEvent, &eventToRedact)
+	if err != nil {
+		return err
+	}
+
+	newEvent := ev.Headered(redactedBecause.RoomVersion)
+	return d.OutputEvents.UpdateEventJSON(ctx, &newEvent)
+}
+
 // getResponseWithPDUsForCompleteSync creates a response and adds all PDUs needed
 // to it. It returns toPos and joinedRoomIDs for use of adding EDUs.
 // nolint:nakedret
@@ -619,6 +640,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 	var succeeded bool
 	defer func() {
+		logrus.Infof("getResponseWithPDUsForCompleteSync: limit:%d rooms:%v", numRecentEventsPerRoom, joinedRoomIDs)
 		txerr := sqlutil.EndTransaction(txn, &succeeded)
 		if err == nil && txerr != nil {
 			err = txerr
@@ -790,6 +812,7 @@ func (d *Database) addRoomDeltaToResponse(
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
 		r.To = delta.membershipPos
 	}
+	logrus.Infof("addRoomDeltaToResponse range:%+v roomID:%s limit:%d", r, delta.roomID, numRecentEventsPerRoom)
 	recentStreamEvents, limited, err := d.OutputEvents.SelectRecentEvents(
 		ctx, txn, delta.roomID, r,
 		numRecentEventsPerRoom, true, true,
@@ -797,6 +820,7 @@ func (d *Database) addRoomDeltaToResponse(
 	if err != nil {
 		return err
 	}
+	logrus.Infof("addRoomDeltaToResponse produced %d events, limited:%v", len(recentStreamEvents), limited)
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 	prevBatch, err := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
