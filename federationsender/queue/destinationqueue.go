@@ -225,7 +225,7 @@ func (oq *destinationQueue) backgroundSend() {
 		}
 
 		// If we have pending PDUs or EDUs then construct a transaction.
-		for oq.pendingPDUs.Load() > 0 || len(oq.pendingEDUs) > 0 {
+		if oq.pendingPDUs.Load() > 0 || len(oq.pendingEDUs) > 0 {
 			// Try sending the next transaction and see what happens.
 			transaction, terr := oq.nextTransaction(oq.pendingEDUs)
 			if terr != nil {
@@ -273,6 +273,17 @@ func (oq *destinationQueue) backgroundSend() {
 				// Reallocate so that the underlying array can be GC'd, as
 				// opposed to growing forever.
 				oq.cleanPendingInvites()
+			}
+		}
+
+		// If something else has come along since we sent the previous
+		// transactions then we want the next loop iteration to skip the
+		// wait and not go to sleep. In which case, if there isn't a
+		// wake-up message already, send one.
+		if oq.pendingPDUs.Load() > 0 {
+			select {
+			case oq.notifyPDUs <- true:
+			default:
 			}
 		}
 	}
