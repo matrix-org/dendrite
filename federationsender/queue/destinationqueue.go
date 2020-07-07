@@ -250,8 +250,6 @@ func (oq *destinationQueue) backgroundSend() {
 				oq.statistics.Success()
 				// Clean up the in-memory buffers.
 				oq.cleanPendingEDUs()
-			} else {
-				break
 			}
 		}
 
