@@ -397,15 +397,8 @@ func (oq *destinationQueue) nextTransaction(
 		}
 		return true, nil
 	case gomatrix.HTTPError:
-		// We received a HTTP error back. In this instance we only
-		// should report an error if
-		if e.Code >= 400 && e.Code <= 499 {
-			// We tried but the remote side has sent back a client error.
-			// It's no use retrying because it will happen again.
-			return true, nil
-		}
-		// Otherwise, report that we failed to send the transaction
-		// and we will retry again.
+		// Report that we failed to send the transaction and we
+		// will retry again, subject to backoff.
 		return false, err
 	default:
 		log.WithFields(log.Fields{
