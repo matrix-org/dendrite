@@ -29,7 +29,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -165,9 +164,7 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 	if err != nil {
 		return err
 	}
-	rr, err := s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
-	mod, _ := rr.RowsAffected()
-	logrus.Infof("UpdateEventJSON modified=%d json=%s", mod, string(headeredJSON))
+	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
 	return err
 }
 

@@ -22,7 +22,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -158,7 +157,6 @@ func RedactEvent(redactionEvent, redactedEvent *gomatrixserverlib.Event) (*gomat
 	if redactionEvent.Type() != gomatrixserverlib.MRoomRedaction {
 		return nil, fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
 	}
-	logrus.Infof("IMMA REDACTME NOW! redacted=", redactedEvent.Redacted(), " ver=", redactedEvent.Version())
 	r := redactedEvent.Redact()
 	err := r.SetUnsignedField("redacted_because", redactionEvent)
 	if err != nil {

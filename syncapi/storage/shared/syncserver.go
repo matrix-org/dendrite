@@ -607,12 +607,10 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
 		return nil
 	}
-	logrus.Infof("redaction-ver:%v event-ver:%v", redactedBecause.RoomVersion, redactedEvents[0].RoomVersion)
 	eventToRedact := redactedEvents[0].Unwrap()
 	redactionEvent := redactedBecause.Unwrap()
 	ev, err := eventutil.RedactEvent(&redactionEvent, &eventToRedact)
 	if err != nil {
-		logrus.Infof("REDACTME RedactEvent returned an error: %s", err)
 		return err
 	}
 
@@ -642,7 +640,6 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 	var succeeded bool
 	defer func() {
-		logrus.Infof("getResponseWithPDUsForCompleteSync: limit:%d rooms:%v", numRecentEventsPerRoom, joinedRoomIDs)
 		txerr := sqlutil.EndTransaction(txn, &succeeded)
 		if err == nil && txerr != nil {
 			err = txerr
@@ -814,7 +811,6 @@ func (d *Database) addRoomDeltaToResponse(
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
 		r.To = delta.membershipPos
 	}
-	logrus.Infof("addRoomDeltaToResponse range:%+v roomID:%s limit:%d", r, delta.roomID, numRecentEventsPerRoom)
 	recentStreamEvents, limited, err := d.OutputEvents.SelectRecentEvents(
 		ctx, txn, delta.roomID, r,
 		numRecentEventsPerRoom, true, true,
@@ -822,7 +818,6 @@ func (d *Database) addRoomDeltaToResponse(
 	if err != nil {
 		return err
 	}
-	logrus.Infof("addRoomDeltaToResponse produced %d events, limited:%v", len(recentStreamEvents), limited)
 	recentEvents := d.StreamEventsToEvents(device, recentStreamEvents)
 	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
 	prevBatch, err := d.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
