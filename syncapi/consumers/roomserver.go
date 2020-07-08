@@ -81,11 +81,23 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
+		// Ignore redaction events. We will add them to the database when they are
+		// validated (when we receive OutputTypeRedactedEvent)
+		event := output.NewRoomEvent.Event
+		if event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil {
+			// in the special case where the event redacts itself, just pass the message through because
+			// we will never see the other part of the pair
+			if event.Redacts() != event.EventID() {
+				return nil
+			}
+		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:
 		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
 		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
+	case api.OutputTypeRedactedEvent:
+		return s.onRedactEvent(context.TODO(), *output.RedactedEvent)
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -94,11 +106,25 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 }
 
+func (s *OutputRoomEventConsumer) onRedactEvent(
+	ctx context.Context, msg api.OutputRedactedEvent,
+) error {
+	err := s.db.RedactEvent(ctx, msg.RedactedEventID, &msg.RedactedBecause)
+	if err != nil {
+		log.WithError(err).Error("RedactEvent error'd")
+		return err
+	}
+	// fake a room event so we notify clients about the redaction, as if it were
+	// a normal event.
+	return s.onNewRoomEvent(ctx, api.OutputNewRoomEvent{
+		Event: msg.RedactedBecause,
+	})
+}
+
 func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-
 	addsStateEvents := msg.AddsState()
 
 	ev, err := s.updateStateEvent(ev)
@@ -173,12 +199,10 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 }
 
 func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.HeaderedEvent) (gomatrixserverlib.HeaderedEvent, error) {
-	var stateKey string
 	if event.StateKey() == nil {
-		stateKey = ""
-	} else {
-		stateKey = *event.StateKey()
+		return event, nil
 	}
+	stateKey := *event.StateKey()
 
 	prevEvent, err := s.db.GetStateEvent(
 		context.TODO(), event.RoomID(), event.Type(), stateKey,

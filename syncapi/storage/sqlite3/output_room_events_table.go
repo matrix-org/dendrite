@@ -76,6 +76,9 @@ const selectEarlyEventsSQL = "" +
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
 
+const updateEventJSONSQL = "" +
+	"UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
+
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 /*
 	$1 = oldPos,
@@ -109,6 +112,7 @@ type outputRoomEventsStatements struct {
 	selectRecentEventsForSyncStmt *sql.Stmt
 	selectEarlyEventsStmt         *sql.Stmt
 	selectStateInRangeStmt        *sql.Stmt
+	updateEventJSONStmt           *sql.Stmt
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
@@ -140,7 +144,19 @@ func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Even
 	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
 		return nil, err
 	}
+	if s.updateEventJSONStmt, err = db.Prepare(updateEventJSONSQL); err != nil {
+		return nil, err
+	}
 	return s, nil
+}
+
+func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+	headeredJSON, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+	return err
 }
 
 // selectStateInRange returns the state events between the two given PDU stream positions, exclusive of oldPos, inclusive of newPos.

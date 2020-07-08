@@ -160,14 +160,6 @@ User can create and send/receive messages in a room with version 1
 POST /createRoom ignores attempts to set the room version via creation_content
 Inbound federation rejects remote attempts to join local users to rooms
 Inbound federation rejects remote attempts to kick local users to rooms
-# SyTest currently only implements the v1 endpoints for /send_join and /send_leave,
-# whereas Dendrite only supports the v2 endpoints for those, so let's ignore this
-# test for now.
-#An event which redacts itself should be ignored
-# SyTest currently only implements the v1 endpoints for /send_join and /send_leave,
-# whereas Dendrite only supports the v2 endpoints for those, so let's ignore this
-# test for now.
-#A pair of events which redact each other should be ignored
 Full state sync includes joined rooms
 A message sent after an initial sync appears in the timeline of an incremental sync.
 Can add tag
@@ -295,6 +287,14 @@ POST /rooms/:room_id/redact/:event_id as random user does not redact message
 POST /redact disallows redaction of event in different room
 An event which redacts itself should be ignored
 A pair of events which redact each other should be ignored
+Redaction of a redaction redacts the redaction reason
+An event which redacts an event in a different room should be ignored
+Can receive redactions from regular users over federation in room version 1
+Can receive redactions from regular users over federation in room version 2
+Can receive redactions from regular users over federation in room version 3
+Can receive redactions from regular users over federation in room version 4
+Can receive redactions from regular users over federation in room version 5
+Can receive redactions from regular users over federation in room version 6
 Outbound federation can backfill events
 Inbound federation can backfill events
 Backfill checks the events requested belong to the room

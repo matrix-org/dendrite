@@ -162,5 +162,10 @@ func RedactEvent(redactionEvent, redactedEvent *gomatrixserverlib.Event) (*gomat
 	if err != nil {
 		return nil, err
 	}
+	// NOTSPEC: sytest relies on this unspecced field existing :(
+	err = r.SetUnsignedField("redacted_by", redactionEvent.EventID())
+	if err != nil {
+		return nil, err
+	}
 	return &r, nil
 }

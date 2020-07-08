@@ -49,6 +49,7 @@ type Events interface {
 	// SelectEarlyEvents returns the earliest events in the given room.
 	SelectEarlyEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int) ([]types.StreamEvent, error)
 	SelectEvents(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StreamEvent, error)
+	UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
 }
 
 // Topology keeps track of the depths and stream positions for all events.

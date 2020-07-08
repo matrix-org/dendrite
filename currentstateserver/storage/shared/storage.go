@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 type Database struct {
@@ -45,10 +44,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		return err
 	}
 	if len(events) != 1 {
-		// this should never happen but is non-fatal
-		util.GetLogger(ctx).WithField("redacted_event_id", redactedEventID).WithField("redaction_event_id", redactedBecause.EventID()).Warnf(
-			"RedactEvent: missing redacted event",
-		)
+		// this will happen for all non-state events
 		return nil
 	}
 	redactionEvent := redactedBecause.Unwrap()
