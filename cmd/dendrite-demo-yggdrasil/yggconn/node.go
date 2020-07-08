@@ -136,7 +136,7 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 	n.quicConfig = &quic.Config{
 		MaxIncomingStreams:    0,
 		MaxIncomingUniStreams: 0,
-		KeepAlive:             false,
+		KeepAlive:             true,
 		MaxIdleTimeout:        time.Second * 60,
 		HandshakeTimeout:      time.Second * 30,
 	}
