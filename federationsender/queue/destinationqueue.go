@@ -349,7 +349,17 @@ func (oq *destinationQueue) nextTransaction(
 	// If we didn't get anything from the database and there are no
 	// pending EDUs then there's nothing to do - stop here.
 	if len(pdus) == 0 && len(pendingEDUs) == 0 {
-		log.Warnf("no pdus/edus for nextTransaction for destination %q", oq.destination)
+		log.Warnf("Expected PDUs/EDUs for destination %q but got none", oq.destination)
+		// This shouldn't really happen but since it has, let's check
+		// how many events are *really* in the database that are waiting.
+		if count, cerr := oq.db.GetPendingPDUCount(
+			context.TODO(),
+			oq.destination,
+		); cerr == nil {
+			oq.pendingPDUs.Store(count)
+		} else {
+			log.Warnf("Failed to retrieve pending PDU count for %q", oq.destination)
+		}
 		return false, nil
 	}
 
