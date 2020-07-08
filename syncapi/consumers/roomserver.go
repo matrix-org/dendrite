@@ -83,8 +83,13 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	case api.OutputTypeNewRoomEvent:
 		// Ignore redaction events. We will add them to the database when they are
 		// validated (when we receive OutputTypeRedactedEvent)
-		if output.NewRoomEvent.Event.Type() == gomatrixserverlib.MRoomRedaction && output.NewRoomEvent.Event.StateKey() == nil {
-			return nil
+		event := output.NewRoomEvent.Event
+		if event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil {
+			// in the special case where the event redacts itself, just pass the message through because
+			// we will never see the other part of the pair
+			if event.Redacts() != event.EventID() {
+				return nil
+			}
 		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:

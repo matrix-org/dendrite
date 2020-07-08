@@ -29,6 +29,22 @@ const (
 	// OutputTypeRetireInviteEvent indicates that the event is an OutputRetireInviteEvent
 	OutputTypeRetireInviteEvent OutputType = "retire_invite_event"
 	// OutputTypeRedactedEvent indicates that the event is an OutputRedactedEvent
+	//
+	// This event is emitted when a redaction has been 'validated' (meaning both the redaction and the event to redact are known).
+	// Redaction validation happens when the roomserver receives either:
+	// - A redaction for which we have the event to redact.
+	// - Any event for which we have a redaction.
+	// When the roomserver receives an event, it will check against the redactions table to see if there is a matching redaction
+	// for the event. If there is, it will mark the redaction as validated and emit this event. In the common case of a redaction
+	// happening after receiving the event to redact, the roomserver will emit a OutputTypeNewRoomEvent of m.room.redaction
+	// immediately followed by a OutputTypeRedactedEvent. In the uncommon case of receiving the redaction BEFORE the event to redact,
+	// the roomserver will emit a OutputTypeNewRoomEvent of the event to redact immediately followed by a OutputTypeRedactedEvent.
+	//
+	// In order to honour redactions correctly, downstream components must ignore m.room.redaction events emitted via OutputTypeNewRoomEvent.
+	// When downstream components receive an OutputTypeRedactedEvent they must:
+	// - Pull out the event to redact from the database. They should have this because the redaction is validated.
+	// - Redact the event and set the corresponding `unsigned` fields to indicate it as redacted.
+	// - Replace the event in the database.
 	OutputTypeRedactedEvent OutputType = "redacted_event"
 )
 
