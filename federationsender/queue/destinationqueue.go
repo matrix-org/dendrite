@@ -381,7 +381,9 @@ func (oq *destinationQueue) nextTransaction(
 	// TODO: we should check for 500-ish fails vs 400-ish here,
 	// since we shouldn't queue things indefinitely in response
 	// to a 400-ish error
-	_, err = oq.client.SendTransaction(context.TODO(), t)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
+	_, err = oq.client.SendTransaction(ctx, t)
 	switch err.(type) {
 	case nil:
 		// No error was returned so the transaction looks to have
@@ -389,7 +391,7 @@ func (oq *destinationQueue) nextTransaction(
 		oq.pendingPDUs.Sub(int64(len(t.PDUs)))
 		// Clean up the transaction in the database.
 		if err = oq.db.CleanTransactionPDUs(
-			context.TODO(),
+			context.Background(),
 			t.Destination,
 			t.TransactionID,
 		); err != nil {

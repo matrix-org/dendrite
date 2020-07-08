@@ -35,6 +35,7 @@ import (
 
 	yggdrasiladmin "github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
+	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
 	"github.com/yggdrasil-network/yggdrasil-go/src/yggdrasil"
 
@@ -135,8 +136,8 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 	n.quicConfig = &quic.Config{
 		MaxIncomingStreams:    0,
 		MaxIncomingUniStreams: 0,
-		KeepAlive:             true,
-		MaxIdleTimeout:        time.Second * 900,
+		KeepAlive:             false,
+		MaxIdleTimeout:        time.Second * 60,
 		HandshakeTimeout:      time.Second * 30,
 	}
 
@@ -261,4 +262,20 @@ func (n *Node) SetStaticPeer(uri string) error {
 		}
 	}
 	return nil
+}
+
+func (n *Node) NotifyLinkNew(f func(boxPubKey crypto.BoxPubKey, linkType, remote string)) {
+	n.core.NotifyLinkNew(f)
+}
+
+func (n *Node) NotifyLinkGone(f func(boxPubKey crypto.BoxPubKey, linkType, remote string)) {
+	n.core.NotifyLinkGone(f)
+}
+
+func (n *Node) NotifySessionNew(f func(boxPubKey crypto.BoxPubKey)) {
+	n.core.NotifySessionNew(f)
+}
+
+func (n *Node) NotifySessionGone(f func(boxPubKey crypto.BoxPubKey)) {
+	n.core.NotifySessionGone(f)
 }
