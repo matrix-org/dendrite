@@ -62,7 +62,9 @@ func main() {
 	}
 	ygg.SetMulticastEnabled(true)
 	if instancePeer != nil && *instancePeer != "" {
-		ygg.SetStaticPeer(*instancePeer)
+		if err := ygg.SetStaticPeer(*instancePeer); err != nil {
+			logrus.WithError(err).Error("Failed to set static peer")
+		}
 	}
 
 	cfg := &config.Dendrite{}
