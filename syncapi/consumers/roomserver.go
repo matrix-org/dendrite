@@ -81,6 +81,11 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
+		// Ignore redaction events. We will add them to the database when they are
+		// validated (when we receive OutputTypeRedactedEvent)
+		if output.NewRoomEvent.Event.Type() == gomatrixserverlib.MRoomRedaction && output.NewRoomEvent.Event.StateKey() == nil {
+			return nil
+		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeNewInviteEvent:
 		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
@@ -96,21 +101,25 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 }
 
-func (c *OutputRoomEventConsumer) onRedactEvent(
+func (s *OutputRoomEventConsumer) onRedactEvent(
 	ctx context.Context, msg api.OutputRedactedEvent,
 ) error {
-	err := c.db.RedactEvent(ctx, msg.RedactedEventID, &msg.RedactedBecause)
+	err := s.db.RedactEvent(ctx, msg.RedactedEventID, &msg.RedactedBecause)
 	if err != nil {
 		log.WithError(err).Error("RedactEvent error'd")
+		return err
 	}
-	return err
+	// fake a room event so we notify clients about the redaction, as if it were
+	// a normal event.
+	return s.onNewRoomEvent(ctx, api.OutputNewRoomEvent{
+		Event: msg.RedactedBecause,
+	})
 }
 
 func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-
 	addsStateEvents := msg.AddsState()
 
 	ev, err := s.updateStateEvent(ev)
