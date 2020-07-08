@@ -95,6 +95,8 @@ func (m *DendriteMonolith) Start() {
 	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s/dendrite-appservice.db", m.StorageDirectory))
 	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s/dendrite-currentstate.db", m.StorageDirectory))
 	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s/dendrite-naffka.db", m.StorageDirectory))
+	cfg.Media.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
+	cfg.Media.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}

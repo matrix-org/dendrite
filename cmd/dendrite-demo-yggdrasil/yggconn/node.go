@@ -138,7 +138,7 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		MaxIncomingUniStreams: 0,
 		KeepAlive:             true,
 		MaxIdleTimeout:        time.Second * 60,
-		HandshakeTimeout:      time.Second * 30,
+		HandshakeTimeout:      time.Second * 15,
 	}
 
 	n.log.Println("Public curve25519:", n.core.EncryptionPublicKey())
