@@ -225,7 +225,7 @@ func (oq *destinationQueue) backgroundSend() {
 		}
 
 		// If we have pending PDUs or EDUs then construct a transaction.
-		for oq.pendingPDUs.Load() > 0 || len(oq.pendingEDUs) > 0 {
+		if oq.pendingPDUs.Load() > 0 || len(oq.pendingEDUs) > 0 {
 			// Try sending the next transaction and see what happens.
 			transaction, terr := oq.nextTransaction(oq.pendingEDUs)
 			if terr != nil {
@@ -250,8 +250,6 @@ func (oq *destinationQueue) backgroundSend() {
 				oq.statistics.Success()
 				// Clean up the in-memory buffers.
 				oq.cleanPendingEDUs()
-			} else {
-				break
 			}
 		}
 
@@ -273,6 +271,17 @@ func (oq *destinationQueue) backgroundSend() {
 				// Reallocate so that the underlying array can be GC'd, as
 				// opposed to growing forever.
 				oq.cleanPendingInvites()
+			}
+		}
+
+		// If something else has come along while we were busy sending
+		// the previous transaction then we don't want the next loop
+		// iteration to sleep. Send a message if someone else hasn't
+		// already sent a wake-up.
+		if oq.pendingPDUs.Load() > 0 {
+			select {
+			case oq.notifyPDUs <- true:
+			default:
 			}
 		}
 	}
@@ -340,7 +349,17 @@ func (oq *destinationQueue) nextTransaction(
 	// If we didn't get anything from the database and there are no
 	// pending EDUs then there's nothing to do - stop here.
 	if len(pdus) == 0 && len(pendingEDUs) == 0 {
-		log.Warnf("no pdus/edus for nextTransaction for destination %q", oq.destination)
+		log.Warnf("Expected PDUs/EDUs for destination %q but got none", oq.destination)
+		// This shouldn't really happen but since it has, let's check
+		// how many events are *really* in the database that are waiting.
+		if count, cerr := oq.db.GetPendingPDUCount(
+			context.TODO(),
+			oq.destination,
+		); cerr == nil {
+			oq.pendingPDUs.Store(count)
+		} else {
+			log.Warnf("Failed to retrieve pending PDU count for %q", oq.destination)
+		}
 		return false, nil
 	}
 
@@ -372,15 +391,17 @@ func (oq *destinationQueue) nextTransaction(
 	// TODO: we should check for 500-ish fails vs 400-ish here,
 	// since we shouldn't queue things indefinitely in response
 	// to a 400-ish error
-	_, err = oq.client.SendTransaction(context.TODO(), t)
-	switch e := err.(type) {
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
+	_, err = oq.client.SendTransaction(ctx, t)
+	switch err.(type) {
 	case nil:
 		// No error was returned so the transaction looks to have
 		// been successfully sent.
 		oq.pendingPDUs.Sub(int64(len(t.PDUs)))
 		// Clean up the transaction in the database.
 		if err = oq.db.CleanTransactionPDUs(
-			context.TODO(),
+			context.Background(),
 			t.Destination,
 			t.TransactionID,
 		); err != nil {
@@ -388,15 +409,8 @@ func (oq *destinationQueue) nextTransaction(
 		}
 		return true, nil
 	case gomatrix.HTTPError:
-		// We received a HTTP error back. In this instance we only
-		// should report an error if
-		if e.Code >= 400 && e.Code <= 499 {
-			// We tried but the remote side has sent back a client error.
-			// It's no use retrying because it will happen again.
-			return true, nil
-		}
-		// Otherwise, report that we failed to send the transaction
-		// and we will retry again.
+		// Report that we failed to send the transaction and we
+		// will retry again, subject to backoff.
 		return false, err
 	default:
 		log.WithFields(log.Fields{
