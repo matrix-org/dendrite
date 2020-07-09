@@ -136,7 +136,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	for _, destination := range destinations {
-		oqs.getQueue(destination).sendEvent(nid)
+		go oqs.getQueue(destination).sendEvent(nid)
 	}
 
 	return nil
