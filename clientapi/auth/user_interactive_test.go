@@ -41,7 +41,7 @@ func setup() *UserInteractive {
 func TestUserInteractiveChallenge(t *testing.T) {
 	uia := setup()
 	// no auth key results in a challenge
-	errRes := uia.Verify(ctx, []byte(`{}`), device)
+	_, errRes := uia.Verify(ctx, []byte(`{}`), device)
 	if errRes == nil {
 		t.Fatalf("Verify succeeded with {} but expected failure")
 	}
@@ -81,7 +81,7 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 		}`),
 	}
 	for _, tc := range testCases {
-		errRes := uia.Verify(ctx, tc, device)
+		_, errRes := uia.Verify(ctx, tc, device)
 		if errRes != nil {
 			t.Errorf("Verify failed but expected success for request: %s - got %+v", string(tc), errRes)
 		}
@@ -162,7 +162,7 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		errRes := uia.Verify(ctx, tc.body, device)
+		_, errRes := uia.Verify(ctx, tc.body, device)
 		if errRes == nil {
 			t.Errorf("Verify succeeded but expected failure for request: %s", string(tc.body))
 			continue

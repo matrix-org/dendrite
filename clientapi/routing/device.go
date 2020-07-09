@@ -177,7 +177,7 @@ func DeleteDeviceById(
 			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
 		}
 	}
-	errRes := userInteractiveAuth.Verify(ctx, bodyBytes, device)
+	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, device)
 	if errRes != nil {
 		return *errRes
 	}
@@ -188,7 +188,14 @@ func DeleteDeviceById(
 		return jsonerror.InternalServerError()
 	}
 
-	defer req.Body.Close() // nolint: errcheck
+	// make sure that the access token being used matches the login creds used for user interactive auth, else
+	// 1 compromised access token could be used to logout all devices.
+	if login.Username() != localpart && login.Username() != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("Cannot delete another user's device"),
+		}
+	}
 
 	if err := deviceDB.RemoveDevice(ctx, deviceID, localpart); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("deviceDB.RemoveDevice failed")

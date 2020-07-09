@@ -172,23 +172,48 @@ func (u *UserInteractive) NewSession() *util.JSONResponse {
 	return u.Challenge(sessionID)
 }
 
+// ResponseWithChallenge mixes together a JSON body (e.g an error with errcode/message) with the
+// standard challenge response.
+func (u *UserInteractive) ResponseWithChallenge(sessionID string, response interface{}) *util.JSONResponse {
+	mixedObjects := make(map[string]interface{})
+	b, err := json.Marshal(response)
+	if err != nil {
+		ise := jsonerror.InternalServerError()
+		return &ise
+	}
+	_ = json.Unmarshal(b, &mixedObjects)
+	challenge := u.Challenge(sessionID)
+	b, err = json.Marshal(challenge.JSON)
+	if err != nil {
+		ise := jsonerror.InternalServerError()
+		return &ise
+	}
+	_ = json.Unmarshal(b, &mixedObjects)
+
+	return &util.JSONResponse{
+		Code: 401,
+		JSON: mixedObjects,
+	}
+}
+
 // Verify returns an error/challenge response to send to the client, or nil if the user is authenticated.
 // `bodyBytes` is the HTTP request body which must contain an `auth` key.
-func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) *util.JSONResponse {
+// Returns the login that was verified for additional checks if required.
+func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) (*Login, *util.JSONResponse) {
 	// TODO: rate limit
 
 	// "A client should first make a request with no auth parameter. The homeserver returns an HTTP 401 response, with a JSON body"
 	// https://matrix.org/docs/spec/client_server/r0.6.1#user-interactive-api-in-the-rest-api
 	hasResponse := gjson.GetBytes(bodyBytes, "auth").Exists()
 	if !hasResponse {
-		return u.NewSession()
+		return nil, u.NewSession()
 	}
 
 	// extract the type so we know which login type to use
 	authType := gjson.GetBytes(bodyBytes, "auth.type").Str
 	loginType, ok := u.Types[authType]
 	if !ok {
-		return &util.JSONResponse{
+		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("unknown auth.type: " + authType),
 		}
@@ -199,7 +224,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	if _, ok = u.Sessions[sessionID]; !ok {
 		// if the login type is part of a single stage flow then allow them to omit the session ID
 		if !u.IsSingleStageFlow(authType) {
-			return &util.JSONResponse{
+			return nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.Unknown("missing or unknown auth.session"),
 			}
@@ -208,15 +233,16 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 
 	r := loginType.Request()
 	if err := json.Unmarshal([]byte(gjson.GetBytes(bodyBytes, "auth").Raw), r); err != nil {
-		return &util.JSONResponse{
+		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
-	_, resErr := loginType.Login(ctx, r)
+	login, resErr := loginType.Login(ctx, r)
 	if resErr == nil {
 		u.AddCompletedStage(sessionID, authType)
 		// TODO: Check if there's more stages to go and return an error
+		return login, nil
 	}
-	return resErr
+	return nil, u.ResponseWithChallenge(sessionID, resErr.JSON)
 }
