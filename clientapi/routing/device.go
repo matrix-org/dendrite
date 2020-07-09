@@ -169,7 +169,7 @@ func DeleteDeviceById(
 	deviceID string,
 ) util.JSONResponse {
 	ctx := req.Context()
-	defer req.Body.Close()
+	defer req.Body.Close() // nolint:errcheck
 	bodyBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return util.JSONResponse{
