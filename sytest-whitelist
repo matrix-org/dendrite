@@ -31,6 +31,12 @@ PUT /profile/:user_id/avatar_url sets my avatar
 GET /profile/:user_id/avatar_url publicly accessible
 GET /device/{deviceId} gives a 404 for unknown devices
 PUT /device/{deviceId} gives a 404 for unknown devices
+GET /device/{deviceId}
+GET /devices
+PUT /device/{deviceId} updates device fields
+DELETE /device/{deviceId}
+DELETE /device/{deviceId} requires UI auth user to match device owner
+DELETE /device/{deviceId} with no body gives a 401
 POST /createRoom makes a public room
 POST /createRoom makes a private room
 POST /createRoom makes a private room with invites
