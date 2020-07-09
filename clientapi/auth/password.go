@@ -67,7 +67,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 		// but that would leak the existence of the user.
 		return nil, &util.JSONResponse{
-			Code: http.StatusUnauthorized,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
 		}
 	}
