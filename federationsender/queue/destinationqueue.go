@@ -353,7 +353,6 @@ func (oq *destinationQueue) nextTransaction(
 	// If we didn't get anything from the database and there are no
 	// pending EDUs then there's nothing to do - stop here.
 	if len(pdus) == 0 && len(pendingEDUs) == 0 {
-		log.Warnf("Expected PDUs/EDUs for destination %q but got none", oq.destination)
 		return false, nil
 	}
 
