@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
@@ -154,27 +155,28 @@ func main() {
 		base.UseHTTPAPIs,
 	)
 
-	ygg.NotifySessionNew(func(boxPubKey crypto.BoxPubKey) {
+	ygg.NewSession = func(serverName gomatrixserverlib.ServerName) {
+		logrus.Infof("Found new session %q", serverName)
 		req := &api.PerformServersAliveRequest{
-			Servers: []gomatrixserverlib.ServerName{
-				gomatrixserverlib.ServerName(boxPubKey.String()),
-			},
+			Servers: []gomatrixserverlib.ServerName{serverName},
 		}
 		res := &api.PerformServersAliveResponse{}
 		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
 			logrus.WithError(err).Warn("Failed to notify server alive due to new session")
 		}
-	})
+	}
 
-	ygg.NotifyLinkNew(func(boxPubKey crypto.BoxPubKey, linkType, remote string) {
+	ygg.NotifyLinkNew(func(_ crypto.BoxPubKey, sigPubKey crypto.SigPubKey, linkType, remote string) {
+		serverName := hex.EncodeToString(sigPubKey[:])
+		logrus.Infof("Found new peer %q", serverName)
 		req := &api.PerformServersAliveRequest{
 			Servers: []gomatrixserverlib.ServerName{
-				gomatrixserverlib.ServerName(boxPubKey.String()),
+				gomatrixserverlib.ServerName(serverName),
 			},
 		}
 		res := &api.PerformServersAliveResponse{}
 		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Warn("Failed to notify server alive due to new link")
+			logrus.WithError(err).Warn("Failed to notify server alive due to new session")
 		}
 	})
 

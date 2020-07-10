@@ -46,7 +46,8 @@ func (n *Node) CreateClient(
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{
 			inner: &http.Transport{
-				ResponseHeaderTimeout: 15 * time.Second,
+				TLSHandshakeTimeout:   20 * time.Second,
+				ResponseHeaderTimeout: 10 * time.Second,
 				IdleConnTimeout:       60 * time.Second,
 				DialContext:           n.yggdialerctx,
 			},
@@ -62,7 +63,8 @@ func (n *Node) CreateFederationClient(
 	tr.RegisterProtocol(
 		"matrix", &yggroundtripper{
 			inner: &http.Transport{
-				ResponseHeaderTimeout: 15 * time.Second,
+				TLSHandshakeTimeout:   20 * time.Second,
+				ResponseHeaderTimeout: 10 * time.Second,
 				IdleConnTimeout:       60 * time.Second,
 				DialContext:           n.yggdialerctx,
 			},

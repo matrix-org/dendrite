@@ -256,7 +256,10 @@ func (oq *destinationQueue) backgroundSend() {
 					// PDUs waiting to be sent. By sending a message into the wake chan,
 					// the next loop iteration will try processing these PDUs again,
 					// subject to the backoff.
-					oq.notifyPDUs <- true
+					select {
+					case oq.notifyPDUs <- true:
+					default:
+					}
 				}
 			} else if transaction {
 				// If we successfully sent the transaction then clear out
@@ -384,7 +387,7 @@ func (oq *destinationQueue) nextTransaction(
 	// TODO: we should check for 500-ish fails vs 400-ish here,
 	// since we shouldn't queue things indefinitely in response
 	// to a 400-ish error
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	_, err = oq.client.SendTransaction(ctx, t)
 	switch err.(type) {

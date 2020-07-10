@@ -663,6 +663,8 @@ github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200708123331-4e0b0e723459 
 github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200708123331-4e0b0e723459/go.mod h1:d+Nz6SPeG6kmeSPFL0cvfWfgwEql75fUnZiAONgvyBE=
 github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200708124809-79077e271c6d h1:ly327dysc3r7lfG+AKJWPSAQmGf4h++fk+Y2dD8nDV4=
 github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200708124809-79077e271c6d/go.mod h1:d+Nz6SPeG6kmeSPFL0cvfWfgwEql75fUnZiAONgvyBE=
+github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200709151813-3c2f73ac5e86 h1:l1zL1Cu/oi8MaBfcKHz4aMdSF5OWOT82SL6y5qP2law=
+github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200709151813-3c2f73ac5e86/go.mod h1:d+Nz6SPeG6kmeSPFL0cvfWfgwEql75fUnZiAONgvyBE=
 go.opencensus.io v0.18.0/go.mod h1:vKdFvxhtzZ9onBp9VKHK8z/sRpBMnKAsufL7wlDrCOA=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.1/go.mod h1:Ap50jQcDJrx6rB6VgeeFPtuPIf3wMRvRfrfYDO6+BmA=

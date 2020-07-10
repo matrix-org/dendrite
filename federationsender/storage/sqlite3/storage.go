@@ -239,39 +239,37 @@ func (d *Database) CleanTransactionPDUs(
 	serverName gomatrixserverlib.ServerName,
 	transactionID gomatrixserverlib.TransactionID,
 ) error {
-	var err error
-	var nids []int64
 	var deleteNIDs []int64
+	nids, err := d.selectQueuePDUs(ctx, nil, serverName, transactionID, 50)
+	if err != nil {
+		return fmt.Errorf("d.selectQueuePDUs: %w", err)
+	}
 	if err = d.queuePDUsWriter.Do(d.db, func(txn *sql.Tx) error {
-		nids, err = d.selectQueuePDUs(ctx, txn, serverName, transactionID, 50)
-		if err != nil {
-			return fmt.Errorf("d.selectQueuePDUs: %w", err)
-		}
 		if err = d.deleteQueueTransaction(ctx, txn, serverName, transactionID); err != nil {
 			return fmt.Errorf("d.deleteQueueTransaction: %w", err)
-		}
-		var count int64
-		for _, nid := range nids {
-			count, err = d.selectQueueReferenceJSONCount(ctx, txn, nid)
-			if err != nil {
-				return fmt.Errorf("d.selectQueueReferenceJSONCount: %w", err)
-			}
-			if count == 0 {
-				deleteNIDs = append(deleteNIDs, nid)
-			}
 		}
 		return nil
 	}); err != nil {
 		return err
 	}
-	err = d.queueJSONWriter.Do(d.db, func(txn *sql.Tx) error {
-		if len(deleteNIDs) > 0 {
+	var count int64
+	for _, nid := range nids {
+		count, err = d.selectQueueReferenceJSONCount(ctx, nil, nid)
+		if err != nil {
+			return fmt.Errorf("d.selectQueueReferenceJSONCount: %w", err)
+		}
+		if count == 0 {
+			deleteNIDs = append(deleteNIDs, nid)
+		}
+	}
+	if len(deleteNIDs) > 0 {
+		err = d.queueJSONWriter.Do(d.db, func(txn *sql.Tx) error {
 			if err = d.deleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
 				return fmt.Errorf("d.deleteQueueJSON: %w", err)
 			}
-		}
-		return nil
-	})
+			return nil
+		})
+	}
 	return err
 }
 

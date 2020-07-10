@@ -55,6 +55,7 @@ type Node struct {
 	quicConfig *quic.Config
 	sessions   sync.Map // string -> quic.Session
 	incoming   chan QUICStream
+	NewSession func(remote gomatrixserverlib.ServerName)
 }
 
 func (n *Node) BuildName() string {
@@ -137,7 +138,7 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		MaxIncomingStreams:    0,
 		MaxIncomingUniStreams: 0,
 		KeepAlive:             true,
-		MaxIdleTimeout:        time.Second * 60,
+		MaxIdleTimeout:        time.Minute * 15,
 		HandshakeTimeout:      time.Second * 15,
 	}
 
@@ -189,7 +190,9 @@ func (n *Node) PeerCount() int {
 }
 
 func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
-	nodemap := map[string]struct{}{}
+	nodemap := map[string]struct{}{
+		"b5ae50589e50991dd9dd7d59c5c5f7a4521e8da5b603b7f57076272abc58b374": struct{}{},
+	}
 	for _, peer := range n.core.GetSwitchPeers() {
 		nodemap[hex.EncodeToString(peer.SigningKey[:])] = struct{}{}
 	}
@@ -264,18 +267,10 @@ func (n *Node) SetStaticPeer(uri string) error {
 	return nil
 }
 
-func (n *Node) NotifyLinkNew(f func(boxPubKey crypto.BoxPubKey, linkType, remote string)) {
+func (n *Node) NotifyLinkNew(f func(boxPubKey crypto.BoxPubKey, sigPubKey crypto.SigPubKey, linkType, remote string)) {
 	n.core.NotifyLinkNew(f)
 }
 
-func (n *Node) NotifyLinkGone(f func(boxPubKey crypto.BoxPubKey, linkType, remote string)) {
+func (n *Node) NotifyLinkGone(f func(boxPubKey crypto.BoxPubKey, sigPubKey crypto.SigPubKey, linkType, remote string)) {
 	n.core.NotifyLinkGone(f)
-}
-
-func (n *Node) NotifySessionNew(f func(boxPubKey crypto.BoxPubKey)) {
-	n.core.NotifySessionNew(f)
-}
-
-func (n *Node) NotifySessionGone(f func(boxPubKey crypto.BoxPubKey)) {
-	n.core.NotifySessionGone(f)
 }

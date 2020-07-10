@@ -3,6 +3,7 @@ package gobind
 import (
 	"context"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
@@ -25,12 +26,17 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
+	"go.uber.org/atomic"
 )
 
 type DendriteMonolith struct {
+	logger           logrus.Logger
 	YggdrasilNode    *yggconn.Node
 	StorageDirectory string
 	listener         net.Listener
+	httpServer       *http.Server
+	httpListening    atomic.Bool
+	yggListening     atomic.Bool
 }
 
 func (m *DendriteMonolith) BaseURL() string {
@@ -58,9 +64,10 @@ func (m *DendriteMonolith) DisconnectMulticastPeers() {
 }
 
 func (m *DendriteMonolith) Start() {
-	logger := logrus.Logger{
+	m.logger = logrus.Logger{
 		Out: BindLogger{},
 	}
+	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
 	var err error
@@ -162,38 +169,39 @@ func (m *DendriteMonolith) Start() {
 		base.UseHTTPAPIs,
 	)
 
-	ygg.NotifySessionNew(func(boxPubKey crypto.BoxPubKey) {
-		serv := gomatrixserverlib.ServerName(boxPubKey.String())
+	ygg.NewSession = func(serverName gomatrixserverlib.ServerName) {
+		logrus.Infof("Found new session %q", serverName)
+		time.Sleep(time.Second * 3)
 		req := &api.PerformServersAliveRequest{
-			Servers: []gomatrixserverlib.ServerName{serv},
+			Servers: []gomatrixserverlib.ServerName{serverName},
 		}
 		res := &api.PerformServersAliveResponse{}
 		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Warnf("Failed to notify server %q alive due to new session", serv)
-		} else {
-			logrus.Infof("Notified server %q alive due to new session", serv)
+			logrus.WithError(err).Warn("Failed to notify server alive due to new session")
 		}
-	})
+	}
 
-	ygg.NotifyLinkNew(func(boxPubKey crypto.BoxPubKey, linkType, remote string) {
-		serv := gomatrixserverlib.ServerName(boxPubKey.String())
+	ygg.NotifyLinkNew(func(_ crypto.BoxPubKey, sigPubKey crypto.SigPubKey, linkType, remote string) {
+		serverName := hex.EncodeToString(sigPubKey[:])
+		logrus.Infof("Found new peer %q", serverName)
+		time.Sleep(time.Second * 3)
 		req := &api.PerformServersAliveRequest{
-			Servers: []gomatrixserverlib.ServerName{serv},
+			Servers: []gomatrixserverlib.ServerName{
+				gomatrixserverlib.ServerName(serverName),
+			},
 		}
 		res := &api.PerformServersAliveResponse{}
 		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Warnf("Failed to notify server %q alive due to new peer", serv)
-		} else {
-			logrus.Infof("Notified server %q alive due to new peer", serv)
+			logrus.WithError(err).Warn("Failed to notify server alive due to new session")
 		}
 	})
 
 	// Build both ends of a HTTP multiplex.
-	httpServer := &http.Server{
+	m.httpServer = &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 45 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
@@ -201,19 +209,33 @@ func (m *DendriteMonolith) Start() {
 		Handler: base.BaseMux,
 	}
 
-	go func() {
-		logger.Info("Listening on ", ygg.DerivedServerName())
-		logger.Fatal(httpServer.Serve(ygg))
-	}()
-	go func() {
-		logger.Info("Listening on ", m.BaseURL())
-		logger.Fatal(httpServer.Serve(m.listener))
-	}()
+	m.Resume()
 }
 
-func (m *DendriteMonolith) Stop() {
-	if err := m.listener.Close(); err != nil {
-		logrus.Warn("Error stopping listener:", err)
+func (m *DendriteMonolith) Resume() {
+	logrus.Info("Resuming monolith")
+	if listener, err := net.Listen("tcp", "localhost:65432"); err == nil {
+		m.listener = listener
 	}
-	m.YggdrasilNode.Stop()
+	if m.yggListening.CAS(false, true) {
+		go func() {
+			m.logger.Info("Listening on ", m.YggdrasilNode.DerivedServerName())
+			m.logger.Fatal(m.httpServer.Serve(m.YggdrasilNode))
+			m.yggListening.Store(false)
+		}()
+	}
+	if m.httpListening.CAS(false, true) {
+		go func() {
+			m.logger.Info("Listening on ", m.BaseURL())
+			m.logger.Fatal(m.httpServer.Serve(m.listener))
+			m.httpListening.Store(false)
+		}()
+	}
+}
+
+func (m *DendriteMonolith) Suspend() {
+	m.logger.Info("Suspending monolith")
+	if err := m.httpServer.Close(); err != nil {
+		m.logger.Warn("Error stopping HTTP server:", err)
+	}
 }
