@@ -44,6 +44,8 @@ import (
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	fsinthttp "github.com/matrix-org/dendrite/federationsender/inthttp"
 	"github.com/matrix-org/dendrite/internal/config"
+	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
+	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
@@ -210,6 +212,15 @@ func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
 	)
 	if err != nil {
 		logrus.WithError(err).Panic("NewServerKeyInternalAPIHTTP failed", b.httpClient)
+	}
+	return f
+}
+
+// KeyServerHTTPClient returns KeyInternalAPI for hitting the key server over HTTP
+func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
+	f, err := keyinthttp.NewKeyServerClient(b.Cfg.KeyServerURL(), b.httpClient)
+	if err != nil {
+		logrus.WithError(err).Panic("KeyServerHTTPClient failed", b.httpClient)
 	}
 	return f
 }

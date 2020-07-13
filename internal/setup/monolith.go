@@ -26,7 +26,7 @@ import (
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
-	"github.com/matrix-org/dendrite/keyserver"
+	keyAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/mediaapi"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
@@ -56,6 +56,7 @@ type Monolith struct {
 	ServerKeyAPI        serverKeyAPI.ServerKeyInternalAPI
 	UserAPI             userapi.UserInternalAPI
 	StateAPI            currentstateAPI.CurrentStateInternalAPI
+	KeyAPI              keyAPI.KeyInternalAPI
 
 	// Optional
 	ExtPublicRoomsProvider api.ExtraPublicRoomsProvider
@@ -69,8 +70,6 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 		m.EDUInternalAPI, m.AppserviceAPI, m.StateAPI, transactions.New(),
 		m.FederationSenderAPI, m.UserAPI, m.ExtPublicRoomsProvider,
 	)
-
-	keyserver.AddPublicRoutes(publicMux, m.Config, m.UserAPI)
 	federationapi.AddPublicRoutes(
 		publicMux, m.Config, m.UserAPI, m.FedClient,
 		m.KeyRing, m.RoomserverAPI, m.FederationSenderAPI,

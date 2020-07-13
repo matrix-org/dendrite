@@ -31,3 +31,10 @@ func QueryKeys(
 		},
 	}
 }
+
+func UploadKeys(req *http.Request) util.JSONResponse {
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
+	}
+}
