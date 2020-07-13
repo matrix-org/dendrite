@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/serverkeyapi"
@@ -118,6 +119,7 @@ func main() {
 	rsImpl.SetFederationSenderAPI(fsAPI)
 
 	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+	keyAPI := keyserver.NewInternalAPI()
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -136,6 +138,7 @@ func main() {
 		ServerKeyAPI:        serverKeyAPI,
 		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
+		KeyAPI:              keyAPI,
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
