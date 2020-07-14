@@ -16,14 +16,19 @@ package keyserver
 
 import (
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/keyserver/routing"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/internal"
+	"github.com/matrix-org/dendrite/keyserver/inthttp"
 )
 
-// AddPublicRoutes registers HTTP handlers for CS API calls
-func AddPublicRoutes(
-	router *mux.Router, cfg *config.Dendrite, userAPI userapi.UserInternalAPI,
-) {
-	routing.Setup(router, cfg, userAPI)
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
+	inthttp.AddRoutes(router, intAPI)
+}
+
+// NewInternalAPI returns a concerete implementation of the internal API. Callers
+// can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
+func NewInternalAPI() api.KeyInternalAPI {
+	return &internal.KeyInternalAPI{}
 }

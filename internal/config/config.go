@@ -764,13 +764,22 @@ func (config *Dendrite) FederationSenderURL() string {
 	return "http://" + string(config.Listen.FederationSender)
 }
 
-// ServerKeyAPIURL returns an HTTP URL for where the federation sender is listening.
+// ServerKeyAPIURL returns an HTTP URL for where the server key API is listening.
 func (config *Dendrite) ServerKeyAPIURL() string {
 	// Hard code the server key API server to talk HTTP for now.
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return "http://" + string(config.Listen.ServerKeyAPI)
+}
+
+// KeyServerURL returns an HTTP URL for where the key server is listening.
+func (config *Dendrite) KeyServerURL() string {
+	// Hard code the key server to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return "http://" + string(config.Listen.KeyServer)
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.

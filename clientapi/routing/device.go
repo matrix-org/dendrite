@@ -17,8 +17,10 @@ package routing
 import (
 	"database/sql"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
@@ -72,7 +74,8 @@ func GetDeviceByID(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: deviceJSON{
-			DeviceID: dev.ID,
+			DeviceID:    dev.ID,
+			DisplayName: dev.DisplayName,
 		},
 	}
 }
@@ -99,7 +102,8 @@ func GetDevicesByLocalpart(
 
 	for _, dev := range deviceList {
 		res.Devices = append(res.Devices, deviceJSON{
-			DeviceID: dev.ID,
+			DeviceID:    dev.ID,
+			DisplayName: dev.DisplayName,
 		})
 	}
 
@@ -161,20 +165,40 @@ func UpdateDeviceByID(
 
 // DeleteDeviceById handles DELETE requests to /devices/{deviceId}
 func DeleteDeviceById(
-	req *http.Request, deviceDB devices.Database, device *api.Device,
+	req *http.Request, userInteractiveAuth *auth.UserInteractive, deviceDB devices.Database, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
+	ctx := req.Context()
+	defer req.Body.Close() // nolint:errcheck
+	bodyBytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
+		}
+	}
+	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, device)
+	if errRes != nil {
+		return *errRes
+	}
+
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
 	}
-	ctx := req.Context()
 
-	defer req.Body.Close() // nolint: errcheck
+	// make sure that the access token being used matches the login creds used for user interactive auth, else
+	// 1 compromised access token could be used to logout all devices.
+	if login.Username() != localpart && login.Username() != device.UserID {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("Cannot delete another user's device"),
+		}
+	}
 
 	if err := deviceDB.RemoveDevice(ctx, deviceID, localpart); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveDevice failed")
+		util.GetLogger(ctx).WithError(err).Error("deviceDB.RemoveDevice failed")
 		return jsonerror.InternalServerError()
 	}
 

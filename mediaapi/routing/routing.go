@@ -53,12 +53,16 @@ func Setup(
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
 	}
-	r0mux.Handle("/upload", httputil.MakeAuthAPI(
+
+	uploadHandler := httputil.MakeAuthAPI(
 		"upload", userAPI,
 		func(req *http.Request, _ *userapi.Device) util.JSONResponse {
 			return Upload(req, cfg, db, activeThumbnailGeneration)
 		},
-	)).Methods(http.MethodPost, http.MethodOptions)
+	)
+
+	r0mux.Handle("/upload", uploadHandler).Methods(http.MethodPost, http.MethodOptions)
+	v1mux.Handle("/upload", uploadHandler).Methods(http.MethodPost, http.MethodOptions)
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
 		MXCToResult: map[string]*types.RemoteRequestResult{},

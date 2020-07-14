@@ -24,6 +24,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -595,6 +596,26 @@ func (d *Database) IncrementalSync(
 	}
 
 	return res, nil
+}
+
+func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error {
+	redactedEvents, err := d.Events(ctx, []string{redactedEventID})
+	if err != nil {
+		return err
+	}
+	if len(redactedEvents) == 0 {
+		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
+		return nil
+	}
+	eventToRedact := redactedEvents[0].Unwrap()
+	redactionEvent := redactedBecause.Unwrap()
+	ev, err := eventutil.RedactEvent(&redactionEvent, &eventToRedact)
+	if err != nil {
+		return err
+	}
+
+	newEvent := ev.Headered(redactedBecause.RoomVersion)
+	return d.OutputEvents.UpdateEventJSON(ctx, &newEvent)
 }
 
 // getResponseWithPDUsForCompleteSync creates a response and adds all PDUs needed

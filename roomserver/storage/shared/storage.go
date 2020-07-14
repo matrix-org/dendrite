@@ -563,6 +563,10 @@ func (d *Database) handleRedactions(
 		// we've seen this redaction before or there is nothing to redact
 		return nil, "", nil
 	}
+	if redactedEvent.RoomID() != redactionEvent.RoomID() {
+		// redactions across rooms aren't allowed
+		return nil, "", nil
+	}
 
 	// mark the event as redacted
 	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)

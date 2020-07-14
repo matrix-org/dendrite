@@ -22,6 +22,7 @@ import (
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
+	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
@@ -63,6 +64,7 @@ func Setup(
 	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
+	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
 
 	publicAPIMux.Handle("/client/versions",
 		httputil.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
@@ -629,7 +631,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DeleteDeviceById(req, deviceDB, device, vars["deviceID"])
+			return DeleteDeviceById(req, userInteractiveAuth, deviceDB, device, vars["deviceID"])
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 
@@ -693,4 +695,17 @@ func Setup(
 			return GetCapabilities(req, rsAPI)
 		}),
 	).Methods(http.MethodGet)
+
+	r0mux.Handle("/keys/query",
+		httputil.MakeAuthAPI("queryKeys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return QueryKeys(req)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	// Supplying a device ID is deprecated.
+	r0mux.Handle("/keys/upload/{deviceID}",
+		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return UploadKeys(req)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 }

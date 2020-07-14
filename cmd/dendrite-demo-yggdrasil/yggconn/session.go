@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/lucas-clemente/quic-go"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 )
 
@@ -56,6 +57,12 @@ func (n *Node) listenFromYgg() {
 func (n *Node) listenFromQUIC(session quic.Session) {
 	n.sessions.Store(session.RemoteAddr().String(), session)
 	defer n.sessions.Delete(session.RemoteAddr())
+	if n.NewSession != nil {
+		if len(session.ConnectionState().PeerCertificates) == 1 {
+			subjectName := session.ConnectionState().PeerCertificates[0].Subject.CommonName
+			go n.NewSession(gomatrixserverlib.ServerName(subjectName))
+		}
+	}
 	for {
 		st, err := session.AcceptStream(context.TODO())
 		if err != nil {

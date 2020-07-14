@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
@@ -32,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -39,6 +41,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 
 	"github.com/sirupsen/logrus"
 )
@@ -60,7 +63,9 @@ func main() {
 	}
 	ygg.SetMulticastEnabled(true)
 	if instancePeer != nil && *instancePeer != "" {
-		ygg.SetStaticPeer(*instancePeer)
+		if err = ygg.SetStaticPeer(*instancePeer); err != nil {
+			logrus.WithError(err).Error("Failed to set static peer")
+		}
 	}
 
 	cfg := &config.Dendrite{}
@@ -149,6 +154,31 @@ func main() {
 		cfg,
 		base.UseHTTPAPIs,
 	)
+
+	ygg.NewSession = func(serverName gomatrixserverlib.ServerName) {
+		logrus.Infof("Found new session %q", serverName)
+		req := &api.PerformServersAliveRequest{
+			Servers: []gomatrixserverlib.ServerName{serverName},
+		}
+		res := &api.PerformServersAliveResponse{}
+		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
+			logrus.WithError(err).Warn("Failed to notify server alive due to new session")
+		}
+	}
+
+	ygg.NotifyLinkNew(func(_ crypto.BoxPubKey, sigPubKey crypto.SigPubKey, linkType, remote string) {
+		serverName := hex.EncodeToString(sigPubKey[:])
+		logrus.Infof("Found new peer %q", serverName)
+		req := &api.PerformServersAliveRequest{
+			Servers: []gomatrixserverlib.ServerName{
+				gomatrixserverlib.ServerName(serverName),
+			},
+		}
+		res := &api.PerformServersAliveResponse{}
+		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
+			logrus.WithError(err).Warn("Failed to notify server alive due to new session")
+		}
+	})
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
