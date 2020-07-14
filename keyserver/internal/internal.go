@@ -100,7 +100,7 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 		}
 		for keyIDWithAlgo := range existingKeys {
 			// if keys exist and the JSON doesn't match, error out as the key already exists
-			if bytes.Compare(existingKeys[keyIDWithAlgo], key.KeyJSON[keyIDWithAlgo]) != 0 {
+			if !bytes.Equal(existingKeys[keyIDWithAlgo], key.KeyJSON[keyIDWithAlgo]) {
 				res.KeyError(key.UserID, key.DeviceID, &api.KeyError{
 					Error: fmt.Sprintf("%s device %s: algorithm / key ID %s one-time key already exists", key.UserID, key.DeviceID, keyIDWithAlgo),
 				})
