@@ -1,12 +1,7 @@
 # Code Style
 
-We follow the standard Go style using goimports, but with a few extra
-considerations.
-
-## Linters
-
-We use `golangci-lint` to run a number of linters, the exact list can be found
-under linters in [.golangci.yml](.golangci.yml).
+In addition to standard Go code style (`gofmt`, `goimports`), we use `golangci-lint`
+to run a number of linters, the exact list can be found under linters in [.golangci.yml](.golangci.yml).
 [Installation](https://github.com/golangci/golangci-lint#install) and [Editor
 Integration](https://github.com/golangci/golangci-lint#editor-integration) for
 it can be found in the readme of golangci-lint.
@@ -22,37 +17,10 @@ The linters can be run using [scripts/find-lint.sh](scripts/find-lint.sh)
 [scripts/build-test-lint.sh](scripts/build-test-lint.sh).
 
 
-## HTTP Error Handling
+## Labels
 
-Unfortunately, converting errors into HTTP responses with the correct status
-code and message can be done in a number of ways in golang:
-
-1. Having functions return `JSONResponse` directly, which can then either set
-   it to an error response or a `200 OK`.
-2. Have the HTTP handler try and cast error values to types that are handled
-   differently.
-3. Have the HTTP handler call functions whose errors can only be interpreted
-   one way, for example if a `validate(...)` call returns an error then handler
-   knows to respond with a `400 Bad Request`.
-
-We attempt to always use option #3, as it more naturally fits with the way that
-golang generally does error handling. In particular, option #1 effectively
-requires reinventing a new error handling scheme just for HTTP handlers.
-
-
-## Line length
-
-We strive for a line length of roughly 80 characters, though less than 100 is
-acceptable if necessary. Longer lines are fine if there is nothing of interest
-after the first 80-100 characters (e.g. long string literals).
-
-
-## TODOs and FIXMEs
-
-The majority of TODOs and FIXMEs should have an associated tracking issue on
-github. These can be added just before merging of the PR to master, and the
-issue number should be added to the comment, e.g. `// TODO(#324): ...`
-
+In addition to `TODO` and `FIXME` we also use `NOTSPEC` to identify deviations
+from the Matrix specification.
 
 ## Logging
 
