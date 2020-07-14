@@ -124,7 +124,8 @@ func (s *threepidStatements) insertThreePID(
 }
 
 func (s *threepidStatements) deleteThreePID(
-	ctx context.Context, threepid string, medium string) (err error) {
-	_, err = s.deleteThreePIDStmt.ExecContext(ctx, threepid, medium)
+	ctx context.Context, txn *sql.Tx, threepid string, medium string) (err error) {
+	stmt := sqlutil.TxStmt(txn, s.deleteThreePIDStmt)
+	_, err = stmt.ExecContext(ctx, threepid, medium)
 	return
 }

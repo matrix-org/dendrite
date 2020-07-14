@@ -93,15 +93,15 @@ func (s *profilesStatements) selectProfileByLocalpart(
 }
 
 func (s *profilesStatements) setAvatarURL(
-	ctx context.Context, localpart string, avatarURL string,
+	ctx context.Context, txn *sql.Tx, localpart string, avatarURL string,
 ) (err error) {
-	_, err = s.setAvatarURLStmt.ExecContext(ctx, avatarURL, localpart)
+	_, err = txn.Stmt(s.setAvatarURLStmt).ExecContext(ctx, avatarURL, localpart)
 	return
 }
 
 func (s *profilesStatements) setDisplayName(
-	ctx context.Context, localpart string, displayName string,
+	ctx context.Context, txn *sql.Tx, localpart string, displayName string,
 ) (err error) {
-	_, err = s.setDisplayNameStmt.ExecContext(ctx, displayName, localpart)
+	_, err = txn.Stmt(s.setDisplayNameStmt).ExecContext(ctx, displayName, localpart)
 	return
 }
