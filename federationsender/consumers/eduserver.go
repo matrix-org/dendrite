@@ -16,6 +16,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
@@ -106,13 +108,23 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) err
 		return nil
 	}
 
+	// Generate a random message ID for idempotency
+	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	messageID := make([]byte, 32)
+	for i := range messageID {
+		messageID[i] = chars[random.Intn(len(chars))]
+	}
+
+	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MDirectToDevice,
 		Origin: string(t.ServerName),
 	}
 	tdm := gomatrixserverlib.ToDeviceMessage{
-		Sender: ote.Sender,
-		Type:   ote.Type,
+		Sender:    ote.Sender,
+		Type:      ote.Type,
+		MessageID: string(messageID),
 		Messages: map[string]map[string]json.RawMessage{
 			ote.UserID: {
 				ote.DeviceID: ote.Content,
