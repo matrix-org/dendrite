@@ -113,6 +113,12 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 				Error: fmt.Sprintf("%s device %s : failed to store one-time keys: %s", key.UserID, key.DeviceID, err.Error()),
 			})
 		}
+		// collect counts
+		res.OneTimeKeyCounts = append(res.OneTimeKeyCounts, api.OneTimeKeysCount{
+			DeviceID: key.DeviceID,
+			UserID:   key.UserID,
+			KeyCount: nil,
+		})
 	}
 
 }

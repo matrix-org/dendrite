@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"strings"
 )
 
 type KeyInternalAPI interface {
@@ -50,6 +51,12 @@ type OneTimeKeys struct {
 	DeviceID string
 	// A map of algorithm:key_id => key JSON
 	KeyJSON map[string]json.RawMessage
+}
+
+// Split a key in KeyJSON into algorithm and key ID
+func (k *OneTimeKeys) Split(keyIDWithAlgo string) (algo string, keyID string) {
+	segments := strings.Split(keyIDWithAlgo, ":")
+	return segments[0], segments[1]
 }
 
 // OneTimeKeysCount represents the counts of one-time keys for a single device
