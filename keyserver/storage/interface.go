@@ -17,10 +17,22 @@ package storage
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/matrix-org/dendrite/keyserver/api"
 )
 
 type Database interface {
 	// ExistingOneTimeKeys returns a map of keyIDWithAlgorithm to key JSON for the given parameters. If no keys exist with this combination
 	// of user/device/key/algorithm 4-uple then it is omitted from the map. Returns an error when failing to communicate with the database.
 	ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
+
+	// StoreOneTimeKeys persists the given one-time keys.
+	StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) error
+
+	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` already then it will be replaced.
+	DeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error
+
+	// StoreDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced.
+	// Returns an error if there was a problem storing the keys.
+	StoreDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error
 }

@@ -80,6 +80,14 @@ type PerformUploadKeysResponse struct {
 	OneTimeKeyCounts []OneTimeKeysCount
 }
 
+// KeyError sets a key error field on KeyErrors
+func (r *PerformUploadKeysResponse) KeyError(userID, deviceID string, err *KeyError) {
+	if r.KeyErrors[userID] == nil {
+		r.KeyErrors[userID] = make(map[string]*KeyError)
+	}
+	r.KeyErrors[userID][deviceID] = err
+}
+
 type PerformClaimKeysRequest struct {
 }
 
