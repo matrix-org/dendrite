@@ -66,7 +66,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start room server consumer")
 	}
 
-	tsConsumer := consumers.NewOutputTypingEventConsumer(
+	tsConsumer := consumers.NewOutputEDUConsumer(
 		base.Cfg, base.KafkaConsumer, queues, federationSenderDB,
 	)
 	if err := tsConsumer.Start(); err != nil {
