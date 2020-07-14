@@ -174,7 +174,7 @@ func (oqs *OutgoingQueues) SendInvite(
 	return nil
 }
 
-// SendEDU sends an EDU event to the destinations
+// SendEDU sends an EDU event to the destinations.
 func (oqs *OutgoingQueues) SendEDU(
 	e *gomatrixserverlib.EDU, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
