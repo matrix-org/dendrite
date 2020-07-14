@@ -16,8 +16,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
@@ -26,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -91,7 +90,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) err
 		return nil
 	}
 
-	// only send typing events which originated from us
+	// only send send-to-device events which originated from us
 	_, originServerName, err := gomatrixserverlib.SplitID('@', ote.Sender)
 	if err != nil {
 		log.WithError(err).WithField("user_id", ote.Sender).Error("Failed to extract domain from send-to-device sender")
@@ -108,14 +107,6 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) err
 		return nil
 	}
 
-	// Generate a random message ID for idempotency
-	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	random := rand.New(rand.NewSource(time.Now().UnixNano()))
-	messageID := make([]byte, 32)
-	for i := range messageID {
-		messageID[i] = chars[random.Intn(len(chars))]
-	}
-
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MDirectToDevice,
@@ -124,7 +115,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) err
 	tdm := gomatrixserverlib.ToDeviceMessage{
 		Sender:    ote.Sender,
 		Type:      ote.Type,
-		MessageID: string(messageID),
+		MessageID: util.RandomString(32),
 		Messages: map[string]map[string]json.RawMessage{
 			ote.UserID: {
 				ote.DeviceID: ote.Content,
