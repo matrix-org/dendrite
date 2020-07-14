@@ -3,20 +3,21 @@
 Dendrite can be run in one of two configurations:
 
 * **Polylith mode**: A cluster of individual components, dealing with different
-  aspects of the Matrix protocol (see [WIRING.md](WIRING.md)). Components communicate with each other using internal HTTP APIs and [Apache Kafka](https://kafka.apache.org). This will almost certainly be the preferred model
-  for large-scale deployments.
+  aspects of the Matrix protocol (see [WIRING.md](WIRING-Current.md)). Components communicate
+  with each other using internal HTTP APIs and [Apache Kafka](https://kafka.apache.org).
+  This will almost certainly be the preferred model for large-scale deployments.
 
 * **Monolith mode**: All components run in the same process. In this mode,
    Kafka is completely optional and can instead be replaced with an in-process
-   lightweight implementation called [Naffka](https://github.com/matrix-org/naffka). This will usually be the preferred model for low-volume, low-user
-   or experimental deployments.
+   lightweight implementation called [Naffka](https://github.com/matrix-org/naffka). This
+   will usually be the preferred model for low-volume, low-user or experimental deployments.
 
-Regardless of whether you are running in polylith or monolith mode, each Dendrite component that requires storage has its own database. Both Postgres
-and SQLite are supported and can be mixed-and-matched across components as
-needed in the configuration file.
+Regardless of whether you are running in polylith or monolith mode, each Dendrite component that
+requires storage has its own database. Both Postgres and SQLite are supported and can be
+mixed-and-matched across components as needed in the configuration file.
 
-Be advised that Dendrite is still developmental and it's not recommended for
-use in production environments yet!
+Be advised that Dendrite is still in development and it's not recommended for
+use in production environments just yet!
 
 ## Requirements
 
@@ -119,16 +120,10 @@ Assuming that Postgres 9.5 (or later) is installed:
 
 Each Dendrite server requires unique server keys.
 
-Generate the self-signed SSL certificate for federation:
+Generate the self-signed SSL certificate for federation and the server signing key:
 
 ```bash
-test -f server.key || openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 3650 -nodes -subj /CN=localhost
-```
-
-Generate the server signing key:
-
-```
-test -f matrix_key.pem || ./bin/generate-keys -private-key matrix_key.pem
+./bin/generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 ```
 
 ### Configuration file
@@ -152,7 +147,8 @@ public keys for dead homeservers from somewhere else.
 ## Starting a monolith server
 
 It is possible to use Naffka as an in-process replacement to Kafka when using
-the monolith server. To do this, set `use_naffka: true` in your `dendrite.yaml` configuration and uncomment the relevant Naffka line in the `database` section.
+the monolith server. To do this, set `use_naffka: true` in your `dendrite.yaml`
+configuration and uncomment the relevant Naffka line in the `database` section.
 Be sure to update the database username and password if needed.
 
 The monolith server can be started as shown below. By default it listens for
@@ -166,60 +162,7 @@ as shown below, it will also listen for HTTPS connections on port 8448.
 
 ## Starting a polylith deployment
 
-The following contains scripts which will run all the required processes in order to point a Matrix client at Dendrite. Conceptually, you are wiring together to form the following diagram:
-
-```
-
-                                         /media   +---------------------------+
-                      +----------->+------------->| dendrite-media-api-server |
-                      ^            ^              +---------------------------+
-                      |            |            :7774
-                      |            |
-                      |            |
-                      |            |   
-                      |            |   
-                      |            |   
-                      |            |  
-                      |            |  
-                      |            |  
-                      |            |     /sync    +--------------------------+                 
-                      |            |   +--------->| dendrite-sync-api-server |<================++
-                      |            |   |          +--------------------------+                 ||
-                      |            |   |        :7773    |         ^^                          ||
-Matrix      +------------------+   |   |                 |         ||    client_data           ||
-Clients --->| client-api-proxy |-------+    +<-----------+         ++=============++           ||
-            +------------------+   |   |    |                                     ||           ||
-          :8008                    |   | CS API   +----------------------------+  ||           ||
-                                   |   +--------->| dendrite-client-api-server |==++           ||
-                                   |        |     +----------------------------+               ||
-                                   |        |   :7771    |                                     ||
-                                   |        |            |                                     ||
-                                   |        +<-----------+                                     ||
-                                   |        |                                                  ||
-                                   |        |                                                  ||
-                                   |        |           +----------------------+    room_event ||
-                                   |        +---------->| dendrite-room-server |===============++
-                                   |        |           +----------------------+               ||
-                                   |        |         :7770                                    ||
-                                   |        |                      ++==========================++
-                                   |        +<------------+        ||
-                                   |        |             |        VV
-                                   |        |     +-----------------------------------+              Matrix
-                                   |        |     | dendrite-federation-sender-server |------------> Servers
-                                   |        |     +-----------------------------------+
-                                   |        |   :7776
-                                   |        |
-                       +---------->+        +<-----------+
-                       |                                 |
-Matrix      +----------------------+  SS API  +--------------------------------+
-Servers --->| federation-api-proxy |--------->| dendrite-federation-api-server |
-            +----------------------+          +--------------------------------+
-          :8448                             :7772
-
-
-   A --> B  = HTTP requests (A = client, B = server)
-   A ==> B  = Kafka (A = producer, B = consumer)
-```
+The following contains scripts which will run all the required processes in order to point a Matrix client at Dendrite.
 
 ### Client proxy
 
@@ -248,19 +191,11 @@ to support federation.
 
 ### Client API server
 
-This is what implements message sending. Clients talk to this via the proxy in
-order to send messages.
+This is what implements CS API endpoints. Clients talk to this via the proxy in
+order to send messages, create and join rooms, etc.
 
 ```bash
 ./bin/dendrite-client-api-server --config=dendrite.yaml
-```
-
-### Room server
-
-This is what implements the room DAG. Clients do not talk to this.
-
-```bash
-./bin/dendrite-room-server --config=dendrite.yaml
 ```
 
 ### Sync server
@@ -283,7 +218,7 @@ order to upload and retrieve media.
 
 ### Federation API server
 
-This implements federation requests. Servers talk to this via the proxy in
+This implements the federation API. Servers talk to this via the proxy in
 order to send transactions.  This is only required if you want to support
 federation.
 
@@ -291,7 +226,30 @@ federation.
 ./bin/dendrite-federation-api-server --config dendrite.yaml
 ```
 
-### Federation sender
+### Internal components
+
+This refers to components that are not directly spoken to by clients. They are only
+contacted by other components. This includes the following components.
+
+#### Room server
+
+This is what implements the room DAG. Clients do not talk to this.
+
+```bash
+./bin/dendrite-room-server --config=dendrite.yaml
+```
+
+#### Current state server
+
+This tracks the current state of rooms which various components need to know. For example,
+`/publicRooms` implemented by client API asks this server for the room names, joined member
+counts, etc.
+
+```bash
+./bin/dendrite-current-state-server --config=dendrite.yaml
+```
+
+#### Federation sender
 
 This sends events from our users to other servers.  This is only required if
 you want to support federation.
@@ -300,7 +258,7 @@ you want to support federation.
 ./bin/dendrite-federation-sender-server --config dendrite.yaml
 ```
 
-### Appservice server
+#### Appservice server
 
 This sends events from the network to [application
 services](https://matrix.org/docs/spec/application_service/unstable.html)
@@ -311,16 +269,31 @@ application services on your homeserver.
 ./bin/dendrite-appservice-server --config dendrite.yaml
 ```
 
-### Key server
+#### Key server
 
-This manages end-to-end encryption keys (or rather, it will do when it's
-finished).
+This manages end-to-end encryption keys for users.
 
 ```bash
 ./bin/dendrite-key-server --config dendrite.yaml
 ```
 
-### User server
+#### Server Key server
+
+This manages signing keys for servers.
+
+```bash
+./bin/dendrite-server-key-api-server --config dendrite.yaml
+```
+
+#### EDU server
+
+This manages processing EDUs such as typing, send-to-device events and presence. Clients do not talk to
+
+```bash
+./bin/dendrite-edu-server --config dendrite.yaml
+```
+
+#### User server
 
 This manages user accounts, device access tokens and user account data,
 amongst other things.
