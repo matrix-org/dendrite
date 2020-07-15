@@ -23,7 +23,7 @@ import (
 
 type OneTimeKeys interface {
 	SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
-	InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) error
+	InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error)
 }
 
 type DeviceKeys interface {

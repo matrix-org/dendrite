@@ -49,10 +49,14 @@ const upsertKeysSQL = "" +
 const selectKeysSQL = "" +
 	"SELECT key_id, algorithm, key_json FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2"
 
+const selectKeysCountSQL = "" +
+	"SELECT algorithm, COUNT(key_id) FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2 GROUP BY algorithm"
+
 type oneTimeKeysStatements struct {
-	db             *sql.DB
-	upsertKeysStmt *sql.Stmt
-	selectKeysStmt *sql.Stmt
+	db                  *sql.DB
+	upsertKeysStmt      *sql.Stmt
+	selectKeysStmt      *sql.Stmt
+	selectKeysCountStmt *sql.Stmt
 }
 
 func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
@@ -67,6 +71,9 @@ func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
 		return nil, err
 	}
 	if s.selectKeysStmt, err = db.Prepare(selectKeysSQL); err != nil {
+		return nil, err
+	}
+	if s.selectKeysCountStmt, err = db.Prepare(selectKeysCountSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -100,9 +107,14 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 	return result, rows.Err()
 }
 
-func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) error {
+func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error) {
 	now := time.Now().Unix()
-	return sqlutil.WithTransaction(s.db, func(txn *sql.Tx) error {
+	counts := &api.OneTimeKeysCount{
+		DeviceID: keys.DeviceID,
+		UserID:   keys.UserID,
+		KeyCount: make(map[string]int),
+	}
+	return counts, sqlutil.WithTransaction(s.db, func(txn *sql.Tx) error {
 		for keyIDWithAlgo, keyJSON := range keys.KeyJSON {
 			algo, keyID := keys.Split(keyIDWithAlgo)
 			_, err := txn.Stmt(s.upsertKeysStmt).ExecContext(
@@ -112,6 +124,20 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, keys api.
 				return err
 			}
 		}
-		return nil
+		rows, err := txn.Stmt(s.selectKeysCountStmt).QueryContext(ctx, keys.UserID, keys.DeviceID)
+		if err != nil {
+			return err
+		}
+		defer internal.CloseAndLogIfError(ctx, rows, "selectKeysCountStmt: rows.close() failed")
+		for rows.Next() {
+			var algorithm string
+			var count int
+			if err = rows.Scan(&algorithm, &count); err != nil {
+				return err
+			}
+			counts.KeyCount[algorithm] = count
+		}
+
+		return rows.Err()
 	})
 }

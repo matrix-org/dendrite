@@ -33,7 +33,7 @@ func (d *Database) ExistingOneTimeKeys(ctx context.Context, userID, deviceID str
 	return d.OneTimeKeysTable.SelectOneTimeKeys(ctx, userID, deviceID, keyIDsWithAlgorithms)
 }
 
-func (d *Database) StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) error {
+func (d *Database) StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error) {
 	return d.OneTimeKeysTable.InsertOneTimeKeys(ctx, keys)
 }
 

@@ -27,7 +27,7 @@ type Database interface {
 	ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
 
 	// StoreOneTimeKeys persists the given one-time keys.
-	StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) error
+	StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error)
 
 	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` already then it will be replaced.
 	DeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error
