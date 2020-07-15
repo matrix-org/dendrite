@@ -93,8 +93,6 @@ func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName)
 func (d *Database) GetAccountByPassword(
 	ctx context.Context, localpart, plaintextPassword string,
 ) (*api.Account, error) {
-	d.accountsMu.Lock()
-	defer d.accountsMu.Unlock()
 	hash, err := d.accounts.selectPasswordHash(ctx, localpart)
 	if err != nil {
 		return nil, err
@@ -110,8 +108,6 @@ func (d *Database) GetAccountByPassword(
 func (d *Database) GetProfileByLocalpart(
 	ctx context.Context, localpart string,
 ) (*authtypes.Profile, error) {
-	d.profilesMu.Lock()
-	defer d.profilesMu.Unlock()
 	return d.profiles.selectProfileByLocalpart(ctx, localpart)
 }
 
@@ -240,8 +236,6 @@ func (d *Database) GetAccountData(ctx context.Context, localpart string) (
 	rooms map[string]map[string]json.RawMessage,
 	err error,
 ) {
-	d.accountDatasMu.Lock()
-	defer d.accountDatasMu.Unlock()
 	return d.accountDatas.selectAccountData(ctx, localpart)
 }
 
@@ -252,8 +246,6 @@ func (d *Database) GetAccountData(ctx context.Context, localpart string) (
 func (d *Database) GetAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
 ) (data json.RawMessage, err error) {
-	d.accountDatasMu.Lock()
-	defer d.accountDatasMu.Unlock()
 	return d.accountDatas.selectAccountDataByType(
 		ctx, localpart, roomID, dataType,
 	)
@@ -263,8 +255,6 @@ func (d *Database) GetAccountDataByType(
 func (d *Database) GetNewNumericLocalpart(
 	ctx context.Context,
 ) (int64, error) {
-	d.accountsMu.Lock()
-	defer d.accountsMu.Unlock()
 	return d.accounts.selectNewNumericLocalpart(ctx, nil)
 }
 
@@ -322,8 +312,6 @@ func (d *Database) RemoveThreePIDAssociation(
 func (d *Database) GetLocalpartForThreePID(
 	ctx context.Context, threepid string, medium string,
 ) (localpart string, err error) {
-	d.threepidsMu.Lock()
-	defer d.threepidsMu.Unlock()
 	return d.threepids.selectLocalpartForThreePID(ctx, nil, threepid, medium)
 }
 
@@ -334,8 +322,6 @@ func (d *Database) GetLocalpartForThreePID(
 func (d *Database) GetThreePIDsForLocalpart(
 	ctx context.Context, localpart string,
 ) (threepids []authtypes.ThreePID, err error) {
-	d.threepidsMu.Lock()
-	defer d.threepidsMu.Unlock()
 	return d.threepids.selectThreePIDsForLocalpart(ctx, localpart)
 }
 
@@ -343,8 +329,6 @@ func (d *Database) GetThreePIDsForLocalpart(
 // in the database.
 // If the DB returns sql.ErrNoRows the Localpart isn't taken.
 func (d *Database) CheckAccountAvailability(ctx context.Context, localpart string) (bool, error) {
-	d.accountsMu.Lock()
-	defer d.accountsMu.Unlock()
 	_, err := d.accounts.selectAccountByLocalpart(ctx, localpart)
 	if err == sql.ErrNoRows {
 		return true, nil
@@ -357,7 +341,5 @@ func (d *Database) CheckAccountAvailability(ctx context.Context, localpart strin
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
 func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string,
 ) (*api.Account, error) {
-	d.accountsMu.Lock()
-	defer d.accountsMu.Unlock()
 	return d.accounts.selectAccountByLocalpart(ctx, localpart)
 }
