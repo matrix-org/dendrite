@@ -41,6 +41,7 @@ func NewInternalAPI(cfg *config.Dendrite) api.KeyInternalAPI {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
 	return &internal.KeyInternalAPI{
-		DB: db,
+		DB:         db,
+		ThisServer: cfg.Matrix.ServerName,
 	}
 }

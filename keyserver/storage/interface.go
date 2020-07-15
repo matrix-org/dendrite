@@ -35,4 +35,8 @@ type Database interface {
 	// StoreDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced.
 	// Returns an error if there was a problem storing the keys.
 	StoreDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error
+
+	// DeviceKeysForUser returns the device keys for the device IDs given. If the length of deviceIDs is 0, all devices are selected.
+	// If there are some missing keys, they are omitted from the returned slice. There is no ordering on the returned slice.
+	DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error)
 }

@@ -17,15 +17,19 @@ package internal
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 type KeyInternalAPI struct {
-	DB storage.Database
+	DB         storage.Database
+	ThisServer gomatrixserverlib.ServerName
 }
 
 func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
@@ -37,7 +41,45 @@ func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformC
 
 }
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
-
+	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
+	res.Failures = make(map[string]interface{})
+	// make a map from domain to device keys
+	domainToUserToDevice := make(map[string][]api.DeviceKeys)
+	for userID, deviceIDs := range req.UserToDevices {
+		_, serverName, err := gomatrixserverlib.SplitID('@', userID)
+		if err != nil {
+			continue // ignore invalid users
+		}
+		domain := string(serverName)
+		// query local devices
+		if serverName == a.ThisServer {
+			deviceKeys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs)
+			if err != nil {
+				res.Error = &api.KeyError{
+					Err: fmt.Sprintf("failed to query local device keys: %s", err),
+				}
+				return
+			}
+			if res.DeviceKeys[userID] == nil {
+				res.DeviceKeys[userID] = make(map[string]json.RawMessage)
+			}
+			for _, dk := range deviceKeys {
+				// inject an empty 'unsigned' key which should be used for display names
+				// (but not via this API? unsure when they should be added)
+				dk.KeyJSON, _ = sjson.SetBytes(dk.KeyJSON, "unsigned", struct{}{})
+				res.DeviceKeys[userID][dk.DeviceID] = dk.KeyJSON
+			}
+		} else {
+			for _, deviceID := range deviceIDs {
+				domainToUserToDevice[domain] = append(domainToUserToDevice[domain], api.DeviceKeys{
+					UserID:   userID,
+					DeviceID: deviceID,
+				})
+			}
+		}
+	}
+	// TODO: set device display names when they are known
+	// TODO: perform key queries for remote devices
 }
 
 func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {

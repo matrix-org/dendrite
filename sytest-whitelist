@@ -121,6 +121,9 @@ local user can join room with version 1
 User can invite local user to room with version 1
 Can upload device keys
 Should reject keys claiming to belong to a different user
+Can query device keys using POST
+Can query specific device keys using POST
+query for user with no keys returns empty key dict
 Can add account data
 Can add account data to room
 Can get account data without syncing
