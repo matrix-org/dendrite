@@ -174,6 +174,9 @@ type Dendrite struct {
 		// The ServerKey database caches the public keys of remote servers.
 		// It may be accessed by the FederationAPI, the ClientAPI, and the MediaAPI.
 		ServerKey DataSource `yaml:"server_key"`
+		// The E2EKey database stores one-time public keys for devices in addition to
+		// signed device keys. Used for E2E.
+		E2EKey DataSource `yaml:"e2e_key"`
 		// The SyncAPI stores information used by the SyncAPI server.
 		// It is only accessed by the SyncAPI server.
 		SyncAPI DataSource `yaml:"sync_api"`
@@ -602,6 +605,7 @@ func (config *Dendrite) checkDatabase(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "database.sync_api", string(config.Database.SyncAPI))
 	checkNotEmpty(configErrs, "database.room_server", string(config.Database.RoomServer))
 	checkNotEmpty(configErrs, "database.current_state", string(config.Database.CurrentState))
+	checkNotEmpty(configErrs, "database.e2e_key", string(config.Database.E2EKey))
 }
 
 // checkListen verifies the parameters listen.* are valid.
@@ -615,6 +619,7 @@ func (config *Dendrite) checkListen(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "listen.server_key_api", string(config.Listen.EDUServer))
 	checkNotEmpty(configErrs, "listen.user_api", string(config.Listen.UserAPI))
 	checkNotEmpty(configErrs, "listen.current_state_server", string(config.Listen.CurrentState))
+	checkNotEmpty(configErrs, "listen.key_server", string(config.Listen.KeyServer))
 }
 
 // checkLogging verifies the parameters logging.* are valid.

@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/dendrite/userapi"
@@ -129,6 +130,7 @@ func main() {
 	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
+	cfg.Database.E2EKey = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -184,6 +186,7 @@ func main() {
 		ServerKeyAPI:           serverKeyAPI,
 		StateAPI:               stateAPI,
 		UserAPI:                userAPI,
+		KeyAPI:                 keyserver.NewInternalAPI(base.Base.Cfg),
 		ExtPublicRoomsProvider: provider,
 	}
 	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)

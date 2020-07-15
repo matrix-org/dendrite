@@ -63,7 +63,7 @@ func (h *httpKeyInternalAPI) PerformClaimKeys(
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.KeyError{
-			Error: err.Error(),
+			Err: err.Error(),
 		}
 	}
 }
@@ -80,7 +80,7 @@ func (h *httpKeyInternalAPI) PerformUploadKeys(
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.KeyError{
-			Error: err.Error(),
+			Err: err.Error(),
 		}
 	}
 }
@@ -97,7 +97,7 @@ func (h *httpKeyInternalAPI) QueryKeys(
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.KeyError{
-			Error: err.Error(),
+			Err: err.Error(),
 		}
 	}
 }
