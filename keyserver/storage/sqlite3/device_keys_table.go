@@ -17,9 +17,9 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
@@ -47,7 +47,7 @@ const selectDeviceKeysSQL = "" +
 	"SELECT key_json FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
 
 const selectBatchDeviceKeysSQL = "" +
-	"SELECT device_id, key_json FROM keyserver_device_keys WHERE user_id=$1 AND device_id IN ($2)"
+	"SELECT device_id, key_json FROM keyserver_device_keys WHERE user_id=$1"
 
 type deviceKeysStatements struct {
 	db                        *sql.DB
@@ -81,16 +81,11 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 	for _, d := range deviceIDs {
 		deviceIDMap[d] = true
 	}
-	iDeviceIDs := make([]interface{}, len(deviceIDs)+1)
-	iDeviceIDs[0] = userID
-	for i := range deviceIDs {
-		iDeviceIDs[i+1] = deviceIDs[i]
-	}
-	querySQL := strings.Replace(selectBatchDeviceKeysSQL, "($2)", sqlutil.QueryVariadic(len(deviceIDs)), 1)
-	rows, err := s.db.QueryContext(ctx, querySQL, iDeviceIDs...)
+	rows, err := s.selectBatchDeviceKeysStmt.QueryContext(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectBatchDeviceKeysStmt: rows.close() failed")
 	var result []api.DeviceKeys
 	for rows.Next() {
 		var dk api.DeviceKeys
