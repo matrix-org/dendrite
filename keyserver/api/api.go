@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 )
 
 type KeyInternalAPI interface {
@@ -108,8 +109,16 @@ type PerformClaimKeysResponse struct {
 }
 
 type QueryKeysRequest struct {
+	// Maps user IDs to a list of devices
+	UserToDevices map[string][]string
+	Timeout       time.Duration
 }
 
 type QueryKeysResponse struct {
+	// Map of remote server domain to error JSON
+	Failures map[string]interface{}
+	// Map of user_id to device_id to device_key
+	DeviceKeys map[string]map[string]json.RawMessage
+	// Set if there was a fatal error processing this query
 	Error *KeyError
 }

@@ -44,3 +44,7 @@ func (d *Database) DeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) er
 func (d *Database) StoreDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error {
 	return d.DeviceKeysTable.InsertDeviceKeys(ctx, keys)
 }
+
+func (d *Database) DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error) {
+	return d.DeviceKeysTable.SelectBatchDeviceKeys(ctx, userID, deviceIDs)
+}

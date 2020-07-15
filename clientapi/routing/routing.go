@@ -698,12 +698,6 @@ func Setup(
 		}),
 	).Methods(http.MethodGet)
 
-	r0mux.Handle("/keys/query",
-		httputil.MakeAuthAPI("queryKeys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return QueryKeys(req)
-		}),
-	).Methods(http.MethodPost, http.MethodOptions)
-
 	// Supplying a device ID is deprecated.
 	r0mux.Handle("/keys/upload/{deviceID}",
 		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -713,6 +707,11 @@ func Setup(
 	r0mux.Handle("/keys/upload",
 		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return UploadKeys(req, keyAPI, device)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/keys/query",
+		httputil.MakeAuthAPI("keys_query", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return QueryKeys(req, keyAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 }

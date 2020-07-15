@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
@@ -45,10 +46,14 @@ const upsertDeviceKeysSQL = "" +
 const selectDeviceKeysSQL = "" +
 	"SELECT key_json FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
 
+const selectBatchDeviceKeysSQL = "" +
+	"SELECT device_id, key_json FROM keyserver_device_keys WHERE user_id=$1"
+
 type deviceKeysStatements struct {
-	db                   *sql.DB
-	upsertDeviceKeysStmt *sql.Stmt
-	selectDeviceKeysStmt *sql.Stmt
+	db                        *sql.DB
+	upsertDeviceKeysStmt      *sql.Stmt
+	selectDeviceKeysStmt      *sql.Stmt
+	selectBatchDeviceKeysStmt *sql.Stmt
 }
 
 func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
@@ -63,6 +68,9 @@ func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 		return nil, err
 	}
 	if s.selectDeviceKeysStmt, err = db.Prepare(selectDeviceKeysSQL); err != nil {
+		return nil, err
+	}
+	if s.selectBatchDeviceKeysStmt, err = db.Prepare(selectBatchDeviceKeysSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -94,4 +102,31 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, keys []api.
 		}
 		return nil
 	})
+}
+
+func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error) {
+	rows, err := s.selectBatchDeviceKeysStmt.QueryContext(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectBatchDeviceKeysStmt: rows.close() failed")
+	deviceIDMap := make(map[string]bool)
+	for _, d := range deviceIDs {
+		deviceIDMap[d] = true
+	}
+	var result []api.DeviceKeys
+	for rows.Next() {
+		var dk api.DeviceKeys
+		dk.UserID = userID
+		var keyJSON string
+		if err := rows.Scan(&dk.DeviceID, &keyJSON); err != nil {
+			return nil, err
+		}
+		dk.KeyJSON = []byte(keyJSON)
+		// include the key if we want all keys (no device) or it was asked
+		if deviceIDMap[dk.DeviceID] || len(deviceIDs) == 0 {
+			result = append(result, dk)
+		}
+	}
+	return result, rows.Err()
 }

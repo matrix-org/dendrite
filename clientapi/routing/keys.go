@@ -17,6 +17,7 @@ package routing
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -24,18 +25,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
-
-func QueryKeys(
-	req *http.Request,
-) util.JSONResponse {
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: map[string]interface{}{
-			"failures":    map[string]interface{}{},
-			"device_keys": map[string]interface{}{},
-		},
-	}
-}
 
 type uploadKeysRequest struct {
 	DeviceKeys  json.RawMessage            `json:"device_keys"`
@@ -92,5 +81,39 @@ func UploadKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.De
 		JSON: struct {
 			OTKCounts interface{} `json:"one_time_key_counts"`
 		}{keyCount},
+	}
+}
+
+type queryKeysRequest struct {
+	Timeout    int                 `json:"timeout"`
+	Token      string              `json:"token"`
+	DeviceKeys map[string][]string `json:"device_keys"`
+}
+
+func (r *queryKeysRequest) GetTimeout() time.Duration {
+	if r.Timeout == 0 {
+		return 10 * time.Second
+	}
+	return time.Duration(r.Timeout) * time.Millisecond
+}
+
+func QueryKeys(req *http.Request, keyAPI api.KeyInternalAPI) util.JSONResponse {
+	var r queryKeysRequest
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return *resErr
+	}
+	queryRes := api.QueryKeysResponse{}
+	keyAPI.QueryKeys(req.Context(), &api.QueryKeysRequest{
+		UserToDevices: r.DeviceKeys,
+		Timeout:       r.GetTimeout(),
+		// TODO: Token?
+	}, &queryRes)
+	return util.JSONResponse{
+		Code: 200,
+		JSON: map[string]interface{}{
+			"device_keys": queryRes.DeviceKeys,
+			"failures":    queryRes.Failures,
+		},
 	}
 }

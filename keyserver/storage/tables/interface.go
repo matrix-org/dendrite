@@ -29,4 +29,5 @@ type OneTimeKeys interface {
 type DeviceKeys interface {
 	SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error
 	InsertDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error
+	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error)
 }
