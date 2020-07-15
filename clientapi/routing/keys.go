@@ -82,10 +82,15 @@ func UploadKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.De
 			JSON: uploadRes.KeyErrors,
 		}
 	}
+	keyCount := make(map[string]int)
+	// we only return key counts when the client uploads OTKs
+	if len(uploadRes.OneTimeKeyCounts) > 0 {
+		keyCount = uploadRes.OneTimeKeyCounts[0].KeyCount
+	}
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct {
 			OTKCounts interface{} `json:"one_time_key_counts"`
-		}{uploadRes.OneTimeKeyCounts[0].KeyCount},
+		}{keyCount},
 	}
 }
