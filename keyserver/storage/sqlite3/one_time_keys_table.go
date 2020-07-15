@@ -36,14 +36,14 @@ CREATE TABLE IF NOT EXISTS keyserver_one_time_keys (
 	ts_added_secs BIGINT NOT NULL,
 	key_json TEXT NOT NULL,
 	-- Clobber based on 4-uple of user/device/key/algorithm.
-    CONSTRAINT keyserver_one_time_keys_unique UNIQUE (user_id, device_id, key_id, algorithm)
+    UNIQUE (user_id, device_id, key_id, algorithm)
 );
 `
 
 const upsertKeysSQL = "" +
 	"INSERT INTO keyserver_one_time_keys (user_id, device_id, key_id, algorithm, ts_added_secs, key_json)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
-	" ON CONFLICT ON CONSTRAINT keyserver_one_time_keys_unique" +
+	" ON CONFLICT (user_id, device_id, key_id, algorithm)" +
 	" DO UPDATE SET key_json = $6"
 
 const selectKeysSQL = "" +

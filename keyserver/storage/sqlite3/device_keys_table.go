@@ -32,14 +32,14 @@ CREATE TABLE IF NOT EXISTS keyserver_device_keys (
 	ts_added_secs BIGINT NOT NULL,
 	key_json TEXT NOT NULL,
 	-- Clobber based on tuple of user/device.
-    CONSTRAINT keyserver_device_keys_unique UNIQUE (user_id, device_id)
+    UNIQUE (user_id, device_id)
 );
 `
 
 const upsertDeviceKeysSQL = "" +
 	"INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json)" +
 	" VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT ON CONSTRAINT keyserver_device_keys_unique" +
+	" ON CONFLICT (user_id, device_id)" +
 	" DO UPDATE SET key_json = $4"
 
 const selectDeviceKeysSQL = "" +
