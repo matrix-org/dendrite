@@ -28,7 +28,11 @@ type KeyInternalAPI interface {
 
 // KeyError is returned if there was a problem performing/querying the server
 type KeyError struct {
-	Error string
+	Err string
+}
+
+func (k *KeyError) Error() string {
+	return k.Err
 }
 
 // DeviceKeys represents a set of device keys for a single device
@@ -81,6 +85,7 @@ type PerformUploadKeysRequest struct {
 
 // PerformUploadKeysResponse is the response to PerformUploadKeys
 type PerformUploadKeysResponse struct {
+	// A fatal error when processing e.g database failures
 	Error *KeyError
 	// A map of user_id -> device_id -> Error for tracking failures.
 	KeyErrors        map[string]map[string]*KeyError

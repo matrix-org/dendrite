@@ -24,7 +24,7 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "KeyServer", true)
 	defer base.Close() // nolint: errcheck
 
-	intAPI := keyserver.NewInternalAPI()
+	intAPI := keyserver.NewInternalAPI(base.Cfg)
 
 	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 

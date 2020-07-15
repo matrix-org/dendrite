@@ -26,6 +26,7 @@ import (
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/transactions"
+	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -48,6 +49,7 @@ func AddPublicRoutes(
 	transactionsCache *transactions.Cache,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 	userAPI userapi.UserInternalAPI,
+	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
 	syncProducer := &producers.SyncAPIProducer{
@@ -58,6 +60,6 @@ func AddPublicRoutes(
 	routing.Setup(
 		router, cfg, eduInputAPI, rsAPI, asAPI,
 		accountsDB, deviceDB, userAPI, federation,
-		syncProducer, transactionsCache, fsAPI, stateAPI, extRoomsProvider,
+		syncProducer, transactionsCache, fsAPI, stateAPI, keyAPI, extRoomsProvider,
 	)
 }

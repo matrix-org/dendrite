@@ -68,7 +68,7 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 		publicMux, m.Config, m.KafkaProducer, m.DeviceDB, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, m.StateAPI, transactions.New(),
-		m.FederationSenderAPI, m.UserAPI, m.ExtPublicRoomsProvider,
+		m.FederationSenderAPI, m.UserAPI, m.KeyAPI, m.ExtPublicRoomsProvider,
 	)
 	federationapi.AddPublicRoutes(
 		publicMux, m.Config, m.UserAPI, m.FedClient,
