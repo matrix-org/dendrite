@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/userapi"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
@@ -172,6 +173,7 @@ func main() {
 	cfg.Database.ServerKey = "file:/idb/dendritejs_serverkey.db"
 	cfg.Database.SyncAPI = "file:/idb/dendritejs_syncapi.db"
 	cfg.Database.CurrentState = "file:/idb/dendritejs_currentstate.db"
+	cfg.Database.E2EKey = "file:/idb/dendritejs_e2ekey.db"
 	cfg.Kafka.Topics.OutputTypingEvent = "output_typing_event"
 	cfg.Kafka.Topics.OutputSendToDeviceEvent = "output_send_to_device_event"
 	cfg.Kafka.Topics.OutputClientData = "output_client_data"
@@ -231,6 +233,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
+		KeyAPI:              keyserver.NewInternalAPI(base.Cfg),
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}

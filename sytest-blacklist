@@ -52,5 +52,12 @@ Remote invited user can see room metadata
 # this test thinks it's all fine...
 Inbound federation accepts a second soft-failed event
 
+# Relies on a rejected PL event which will never be accepted into the DAG
+# Caused by https://github.com/matrix-org/sytest/pull/911
+Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
+
+# We don't implement device lists yet
+Device list doesn't change if remote server is down
+
 # We don't implement lazy membership loading yet.
 The only membership state included in a gapped incremental sync is for senders in the timeline

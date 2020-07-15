@@ -16,9 +16,12 @@ package keyserver
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/internal"
 	"github.com/matrix-org/dendrite/keyserver/inthttp"
+	"github.com/matrix-org/dendrite/keyserver/storage"
+	"github.com/sirupsen/logrus"
 )
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
@@ -29,6 +32,15 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
-func NewInternalAPI() api.KeyInternalAPI {
-	return &internal.KeyInternalAPI{}
+func NewInternalAPI(cfg *config.Dendrite) api.KeyInternalAPI {
+	db, err := storage.NewDatabase(
+		string(cfg.Database.E2EKey),
+		cfg.DbProperties(),
+	)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to key server database")
+	}
+	return &internal.KeyInternalAPI{
+		DB: db,
+	}
 }

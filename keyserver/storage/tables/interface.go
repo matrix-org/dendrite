@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package tables
 
 import (
-	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/keyserver"
+	"context"
+	"encoding/json"
+
+	"github.com/matrix-org/dendrite/keyserver/api"
 )
 
-func main() {
-	cfg := setup.ParseFlags(false)
-	base := setup.NewBaseDendrite(cfg, "KeyServer", true)
-	defer base.Close() // nolint: errcheck
+type OneTimeKeys interface {
+	SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
+	InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error)
+}
 
-	intAPI := keyserver.NewInternalAPI(base.Cfg)
-
-	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
-
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.KeyServer), string(base.Cfg.Listen.KeyServer))
-
+type DeviceKeys interface {
+	SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error
+	InsertDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error
 }

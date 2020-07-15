@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"strings"
 )
 
 type KeyInternalAPI interface {
@@ -27,7 +28,11 @@ type KeyInternalAPI interface {
 
 // KeyError is returned if there was a problem performing/querying the server
 type KeyError struct {
-	Error string
+	Err string
+}
+
+func (k *KeyError) Error() string {
+	return k.Err
 }
 
 // DeviceKeys represents a set of device keys for a single device
@@ -52,6 +57,12 @@ type OneTimeKeys struct {
 	KeyJSON map[string]json.RawMessage
 }
 
+// Split a key in KeyJSON into algorithm and key ID
+func (k *OneTimeKeys) Split(keyIDWithAlgo string) (algo string, keyID string) {
+	segments := strings.Split(keyIDWithAlgo, ":")
+	return segments[0], segments[1]
+}
+
 // OneTimeKeysCount represents the counts of one-time keys for a single device
 type OneTimeKeysCount struct {
 	// The user who owns this device
@@ -74,6 +85,7 @@ type PerformUploadKeysRequest struct {
 
 // PerformUploadKeysResponse is the response to PerformUploadKeys
 type PerformUploadKeysResponse struct {
+	// A fatal error when processing e.g database failures
 	Error *KeyError
 	// A map of user_id -> device_id -> Error for tracking failures.
 	KeyErrors        map[string]map[string]*KeyError

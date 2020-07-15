@@ -121,6 +121,7 @@ database:
     federation_sender: "postgres://dendrite:itsasecret@localhost/dendrite_federationsender?sslmode=disable"
     appservice: "postgres://dendrite:itsasecret@localhost/dendrite_appservice?sslmode=disable"
     current_state: "postgres://dendrite:itsasecret@localhost/dendrite_currentstate?sslmode=disable"
+    e2e_key: "postgres://dendrite:itsasecret@localhost/dendrite_e2ekey?sslmode=disable"
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1

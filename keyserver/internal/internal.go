@@ -25,7 +25,7 @@ import (
 )
 
 type KeyInternalAPI struct {
-	db storage.Database
+	DB storage.Database
 }
 
 func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
@@ -52,7 +52,7 @@ func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformU
 		}
 
 		res.KeyError(key.UserID, key.DeviceID, &api.KeyError{
-			Error: fmt.Sprintf(
+			Err: fmt.Sprintf(
 				"user_id or device_id mismatch: users: %s - %s, devices: %s - %s",
 				gotUserID, key.UserID, gotDeviceID, key.DeviceID,
 			),
@@ -66,16 +66,16 @@ func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformU
 			DeviceID: keysToStore[i].DeviceID,
 		}
 	}
-	if err := a.db.DeviceKeysJSON(ctx, existingKeys); err != nil {
+	if err := a.DB.DeviceKeysJSON(ctx, existingKeys); err != nil {
 		res.Error = &api.KeyError{
-			Error: fmt.Sprintf("failed to query existing device keys: %s", err.Error()),
+			Err: fmt.Sprintf("failed to query existing device keys: %s", err.Error()),
 		}
 		return
 	}
 	// store the device keys and emit changes
-	if err := a.db.StoreDeviceKeys(ctx, keysToStore); err != nil {
+	if err := a.DB.StoreDeviceKeys(ctx, keysToStore); err != nil {
 		res.Error = &api.KeyError{
-			Error: fmt.Sprintf("failed to store device keys: %s", err.Error()),
+			Err: fmt.Sprintf("failed to store device keys: %s", err.Error()),
 		}
 		return
 	}
@@ -91,10 +91,10 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 			keyIDsWithAlgorithms[i] = keyIDWithAlgo
 			i++
 		}
-		existingKeys, err := a.db.ExistingOneTimeKeys(ctx, key.UserID, key.DeviceID, keyIDsWithAlgorithms)
+		existingKeys, err := a.DB.ExistingOneTimeKeys(ctx, key.UserID, key.DeviceID, keyIDsWithAlgorithms)
 		if err != nil {
 			res.KeyError(key.UserID, key.DeviceID, &api.KeyError{
-				Error: "failed to query existing one-time keys: " + err.Error(),
+				Err: "failed to query existing one-time keys: " + err.Error(),
 			})
 			continue
 		}
@@ -102,17 +102,21 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 			// if keys exist and the JSON doesn't match, error out as the key already exists
 			if !bytes.Equal(existingKeys[keyIDWithAlgo], key.KeyJSON[keyIDWithAlgo]) {
 				res.KeyError(key.UserID, key.DeviceID, &api.KeyError{
-					Error: fmt.Sprintf("%s device %s: algorithm / key ID %s one-time key already exists", key.UserID, key.DeviceID, keyIDWithAlgo),
+					Err: fmt.Sprintf("%s device %s: algorithm / key ID %s one-time key already exists", key.UserID, key.DeviceID, keyIDWithAlgo),
 				})
 				continue
 			}
 		}
 		// store one-time keys
-		if err := a.db.StoreOneTimeKeys(ctx, key); err != nil {
+		counts, err := a.DB.StoreOneTimeKeys(ctx, key)
+		if err != nil {
 			res.KeyError(key.UserID, key.DeviceID, &api.KeyError{
-				Error: fmt.Sprintf("%s device %s : failed to store one-time keys: %s", key.UserID, key.DeviceID, err.Error()),
+				Err: fmt.Sprintf("%s device %s : failed to store one-time keys: %s", key.UserID, key.DeviceID, err.Error()),
 			})
+			continue
 		}
+		// collect counts
+		res.OneTimeKeyCounts = append(res.OneTimeKeyCounts, *counts)
 	}
 
 }

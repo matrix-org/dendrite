@@ -15,8 +15,13 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/keyserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
@@ -32,9 +37,55 @@ func QueryKeys(
 	}
 }
 
-func UploadKeys(req *http.Request) util.JSONResponse {
+type uploadKeysRequest struct {
+	DeviceKeys  json.RawMessage            `json:"device_keys"`
+	OneTimeKeys map[string]json.RawMessage `json:"one_time_keys"`
+}
+
+func UploadKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {
+	var r uploadKeysRequest
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return *resErr
+	}
+
+	uploadReq := &api.PerformUploadKeysRequest{}
+	if r.DeviceKeys != nil {
+		uploadReq.DeviceKeys = []api.DeviceKeys{
+			{
+				DeviceID: device.ID,
+				UserID:   device.UserID,
+				KeyJSON:  r.DeviceKeys,
+			},
+		}
+	}
+	if r.OneTimeKeys != nil {
+		uploadReq.OneTimeKeys = []api.OneTimeKeys{
+			{
+				DeviceID: device.ID,
+				UserID:   device.UserID,
+				KeyJSON:  r.OneTimeKeys,
+			},
+		}
+	}
+
+	var uploadRes api.PerformUploadKeysResponse
+	keyAPI.PerformUploadKeys(req.Context(), uploadReq, &uploadRes)
+	if uploadRes.Error != nil {
+		util.GetLogger(req.Context()).WithError(uploadRes.Error).Error("Failed to PerformUploadKeys")
+		return jsonerror.InternalServerError()
+	}
+	if len(uploadRes.KeyErrors) > 0 {
+		util.GetLogger(req.Context()).WithField("key_errors", uploadRes.KeyErrors).Error("Failed to upload one or more keys")
+		return util.JSONResponse{
+			Code: 400,
+			JSON: uploadRes.KeyErrors,
+		}
+	}
 	return util.JSONResponse{
 		Code: 200,
-		JSON: struct{}{},
+		JSON: struct {
+			OTKCounts interface{} `json:"one_time_key_counts"`
+		}{uploadRes.OneTimeKeyCounts[0].KeyCount},
 	}
 }

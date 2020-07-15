@@ -38,6 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -87,6 +88,7 @@ func main() {
 	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
 	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
+	cfg.Database.E2EKey = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -140,6 +142,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
+		KeyAPI:              keyserver.NewInternalAPI(base.Cfg),
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,
