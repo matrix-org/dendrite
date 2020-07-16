@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -56,9 +55,6 @@ type Node struct {
 }
 
 func (n *Node) Dialer(_, address string) (net.Conn, error) {
-	if len(n.core.GetSwitchPeers()) == 0 {
-		return nil, errors.New("no peer connections available")
-	}
 	tokens := strings.Split(address, ":")
 	raw, err := hex.DecodeString(tokens[0])
 	if err != nil {
