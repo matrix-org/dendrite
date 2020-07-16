@@ -181,12 +181,12 @@ func (m *DendriteMonolith) Start() {
 	}
 
 	go func() {
-		logger.Info("Listening on ", ygg.DerivedServerName())
-		logger.Fatal(httpServer.Serve(ygg))
+		m.logger.Info("Listening on ", ygg.DerivedServerName())
+		m.logger.Fatal(m.httpServer.Serve(ygg))
 	}()
 	go func() {
-		logger.Info("Listening on ", m.BaseURL())
-		logger.Fatal(httpServer.Serve(m.listener))
+		m.logger.Info("Listening on ", m.BaseURL())
+		m.logger.Fatal(m.httpServer.Serve(m.listener))
 	}()
 	go func() {
 		logrus.Info("Sending wake-up message to known nodes")
