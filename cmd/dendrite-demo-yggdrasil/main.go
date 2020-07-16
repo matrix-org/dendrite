@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
@@ -42,7 +41,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 
 	"github.com/sirupsen/logrus"
 )
@@ -158,31 +156,6 @@ func main() {
 		base.UseHTTPAPIs,
 	)
 
-	ygg.NewSession = func(serverName gomatrixserverlib.ServerName) {
-		logrus.Infof("Found new session %q", serverName)
-		req := &api.PerformServersAliveRequest{
-			Servers: []gomatrixserverlib.ServerName{serverName},
-		}
-		res := &api.PerformServersAliveResponse{}
-		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Warn("Failed to notify server alive due to new session")
-		}
-	}
-
-	ygg.NotifyLinkNew(func(_ crypto.BoxPubKey, sigPubKey crypto.SigPubKey, linkType, remote string) {
-		serverName := hex.EncodeToString(sigPubKey[:])
-		logrus.Infof("Found new peer %q", serverName)
-		req := &api.PerformServersAliveRequest{
-			Servers: []gomatrixserverlib.ServerName{
-				gomatrixserverlib.ServerName(serverName),
-			},
-		}
-		res := &api.PerformServersAliveResponse{}
-		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Warn("Failed to notify server alive due to new session")
-		}
-	})
-
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
 		Addr:         ":0",
@@ -204,6 +177,14 @@ func main() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
 		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.BaseMux))
+	}()
+	go func() {
+		logrus.Info("Sending wake-up message to known nodes")
+		req := &api.PerformBroadcastEDURequest{}
+		res := &api.PerformBroadcastEDUResponse{}
+		if err := fsAPI.PerformBroadcastEDU(context.TODO(), req, res); err != nil {
+			logrus.WithError(err).Error("Failed to send wake-up message to known nodes")
+		}
 	}()
 
 	select {}

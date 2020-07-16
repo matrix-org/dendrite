@@ -57,10 +57,14 @@ const selectJoinedHostsSQL = "" +
 	"SELECT event_id, server_name FROM federationsender_joined_hosts" +
 	" WHERE room_id = $1"
 
+const selectAllJoinedHostsSQL = "" +
+	"SELECT DISTINCT server_name FROM federationsender_joined_hosts"
+
 type joinedHostsStatements struct {
-	insertJoinedHostsStmt *sql.Stmt
-	deleteJoinedHostsStmt *sql.Stmt
-	selectJoinedHostsStmt *sql.Stmt
+	insertJoinedHostsStmt    *sql.Stmt
+	deleteJoinedHostsStmt    *sql.Stmt
+	selectJoinedHostsStmt    *sql.Stmt
+	selectAllJoinedHostsStmt *sql.Stmt
 }
 
 func (s *joinedHostsStatements) prepare(db *sql.DB) (err error) {
@@ -75,6 +79,9 @@ func (s *joinedHostsStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectJoinedHostsStmt, err = db.Prepare(selectJoinedHostsSQL); err != nil {
+		return
+	}
+	if s.selectAllJoinedHostsStmt, err = db.Prepare(selectAllJoinedHostsSQL); err != nil {
 		return
 	}
 	return
@@ -110,6 +117,27 @@ func (s *joinedHostsStatements) selectJoinedHosts(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
 	return joinedHostsFromStmt(ctx, s.selectJoinedHostsStmt, roomID)
+}
+
+func (s *joinedHostsStatements) selectAllJoinedHosts(
+	ctx context.Context,
+) ([]gomatrixserverlib.ServerName, error) {
+	rows, err := s.selectAllJoinedHostsStmt.QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectAllJoinedHosts: rows.close() failed")
+
+	var result []gomatrixserverlib.ServerName
+	for rows.Next() {
+		var serverName string
+		if err = rows.Scan(&serverName); err != nil {
+			return nil, err
+		}
+		result = append(result, gomatrixserverlib.ServerName(serverName))
+	}
+
+	return result, rows.Err()
 }
 
 func joinedHostsFromStmt(

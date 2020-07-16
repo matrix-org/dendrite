@@ -1,34 +1,12 @@
 package yggconn
 
 import (
-	"context"
-	"crypto/ed25519"
-	"encoding/hex"
-	"fmt"
-	"net"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/gomatrixserverlib"
 )
-
-func (n *Node) yggdialer(_, address string) (net.Conn, error) {
-	tokens := strings.Split(address, ":")
-	raw, err := hex.DecodeString(tokens[0])
-	if err != nil {
-		return nil, fmt.Errorf("hex.DecodeString: %w", err)
-	}
-	converted := convert.Ed25519PublicKeyToCurve25519(ed25519.PublicKey(raw))
-	convhex := hex.EncodeToString(converted)
-	return n.Dial("curve25519", convhex)
-}
-
-func (n *Node) yggdialerctx(ctx context.Context, network, address string) (net.Conn, error) {
-	return n.yggdialer(network, address)
-}
 
 type yggroundtripper struct {
 	inner *http.Transport
@@ -49,7 +27,7 @@ func (n *Node) CreateClient(
 				TLSHandshakeTimeout:   20 * time.Second,
 				ResponseHeaderTimeout: 10 * time.Second,
 				IdleConnTimeout:       60 * time.Second,
-				DialContext:           n.yggdialerctx,
+				DialContext:           n.DialerContext,
 			},
 		},
 	)
@@ -66,7 +44,8 @@ func (n *Node) CreateFederationClient(
 				TLSHandshakeTimeout:   20 * time.Second,
 				ResponseHeaderTimeout: 10 * time.Second,
 				IdleConnTimeout:       60 * time.Second,
-				DialContext:           n.yggdialerctx,
+				DialContext:           n.DialerContext,
+				TLSClientConfig:       n.tlsConfig,
 			},
 		},
 	)

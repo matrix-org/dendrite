@@ -19,6 +19,7 @@ const (
 	FederationSenderPerformJoinRequestPath            = "/federationsender/performJoinRequest"
 	FederationSenderPerformLeaveRequestPath           = "/federationsender/performLeaveRequest"
 	FederationSenderPerformServersAlivePath           = "/federationsender/performServersAlive"
+	FederationSenderPerformBroadcastEDUPath           = "/federationsender/performBroadcastEDU"
 )
 
 // NewFederationSenderClient creates a FederationSenderInternalAPI implemented by talking to a HTTP POST API.
@@ -103,5 +104,18 @@ func (h *httpFederationSenderInternalAPI) PerformDirectoryLookup(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformDirectoryLookupRequestPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// Handle an instruction to broadcast an EDU to all servers in rooms we are joined to.
+func (h *httpFederationSenderInternalAPI) PerformBroadcastEDU(
+	ctx context.Context,
+	request *api.PerformBroadcastEDURequest,
+	response *api.PerformBroadcastEDUResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformBroadcastEDU")
+	defer span.Finish()
+
+	apiURL := h.federationSenderURL + FederationSenderPerformBroadcastEDUPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

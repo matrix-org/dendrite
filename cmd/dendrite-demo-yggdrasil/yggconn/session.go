@@ -24,19 +24,19 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"time"
 
 	"github.com/lucas-clemente/quic-go"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 )
 
 func (n *Node) listenFromYgg() {
 	var err error
 	n.listener, err = quic.Listen(
-		n.packetConn, // yggdrasil.PacketConn
+		n.core,       // yggdrasil.PacketConn
 		n.tlsConfig,  // TLS config
 		n.quicConfig, // QUIC config
 	)
@@ -45,24 +45,25 @@ func (n *Node) listenFromYgg() {
 	}
 
 	for {
+		n.log.Infoln("Waiting to accept QUIC sessions")
 		session, err := n.listener.Accept(context.TODO())
 		if err != nil {
 			n.log.Println("n.listener.Accept:", err)
 			return
 		}
-		go n.listenFromQUIC(session)
+		if len(session.ConnectionState().PeerCertificates) != 1 {
+			_ = session.CloseWithError(0, "expected a peer certificate")
+			continue
+		}
+		address := session.ConnectionState().PeerCertificates[0].Subject.CommonName
+		n.log.Infoln("Accepted connection from", address)
+		go n.listenFromQUIC(session, address)
 	}
 }
 
-func (n *Node) listenFromQUIC(session quic.Session) {
-	n.sessions.Store(session.RemoteAddr().String(), session)
-	defer n.sessions.Delete(session.RemoteAddr())
-	if n.NewSession != nil {
-		if len(session.ConnectionState().PeerCertificates) == 1 {
-			subjectName := session.ConnectionState().PeerCertificates[0].Subject.CommonName
-			go n.NewSession(gomatrixserverlib.ServerName(subjectName))
-		}
-	}
+func (n *Node) listenFromQUIC(session quic.Session, address string) {
+	n.sessions.Store(address, session)
+	defer n.sessions.Delete(address)
 	for {
 		st, err := session.AcceptStream(context.TODO())
 		if err != nil {
@@ -107,10 +108,23 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 		}
 		var pubKey crypto.BoxPubKey
 		copy(pubKey[:], dest)
+		nodeID := crypto.GetNodeID(&pubKey)
+		nodeMask := &crypto.NodeID{}
+		for i := range nodeMask {
+			nodeMask[i] = 0xFF
+		}
+
+		fmt.Println("Resolving coords")
+		coords, err := n.core.Resolve(nodeID, nodeMask)
+		if err != nil {
+			return nil, fmt.Errorf("n.core.Resolve: %w", err)
+		}
+		fmt.Println("Found coords:", coords)
+		fmt.Println("Dialling")
 
 		session, err = quic.Dial(
-			n.packetConn, // yggdrasil.PacketConn
-			&pubKey,      // dial address
+			n.core,       // yggdrasil.PacketConn
+			coords,       // dial address
 			address,      // dial SNI
 			n.tlsConfig,  // TLS config
 			n.quicConfig, // QUIC config
@@ -119,7 +133,8 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 			n.log.Println("n.dialer.DialContext:", err)
 			return nil, err
 		}
-		go n.listenFromQUIC(session)
+		fmt.Println("Dial OK")
+		go n.listenFromQUIC(session, address)
 	}
 	st, err := session.OpenStream()
 	if err != nil {
@@ -157,5 +172,9 @@ func (n *Node) generateTLSConfig() *tls.Config {
 		Certificates:       []tls.Certificate{tlsCert},
 		NextProtos:         []string{"quic-matrix-ygg"},
 		InsecureSkipVerify: true,
+		ClientAuth:         tls.RequireAnyClientCert,
+		GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			return &tlsCert, nil
+		},
 	}
 }

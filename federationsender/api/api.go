@@ -42,6 +42,12 @@ type FederationSenderInternalAPI interface {
 		request *PerformServersAliveRequest,
 		response *PerformServersAliveResponse,
 	) error
+	// Broadcasts an EDU to all servers in rooms we are joined to.
+	PerformBroadcastEDU(
+		ctx context.Context,
+		request *PerformBroadcastEDURequest,
+		response *PerformBroadcastEDUResponse,
+	) error
 }
 
 type PerformDirectoryLookupRequest struct {
@@ -90,4 +96,10 @@ type QueryJoinedHostServerNamesInRoomRequest struct {
 // QueryJoinedHostServerNamesInRoomResponse is a response to QueryJoinedHostServerNames
 type QueryJoinedHostServerNamesInRoomResponse struct {
 	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
+}
+
+type PerformBroadcastEDURequest struct {
+}
+
+type PerformBroadcastEDUResponse struct {
 }

@@ -308,3 +308,25 @@ func (r *FederationSenderInternalAPI) PerformServersAlive(
 
 	return nil
 }
+
+// PerformServersAlive implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) PerformBroadcastEDU(
+	ctx context.Context,
+	request *api.PerformBroadcastEDURequest,
+	response *api.PerformBroadcastEDUResponse,
+) (err error) {
+	destinations, err := r.db.GetAllJoinedHosts(ctx)
+	if err != nil {
+		return fmt.Errorf("r.db.GetAllJoinedHosts: %w", err)
+	}
+
+	edu := &gomatrixserverlib.EDU{
+		Type:   "org.matrix.dendrite.wakeup",
+		Origin: string(r.cfg.Matrix.ServerName),
+	}
+	if err = r.queues.SendEDU(edu, r.cfg.Matrix.ServerName, destinations); err != nil {
+		return fmt.Errorf("r.queues.SendEDU: %w", err)
+	}
+
+	return nil
+}

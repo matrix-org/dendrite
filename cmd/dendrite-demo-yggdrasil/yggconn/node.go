@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -33,9 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
 	"github.com/matrix-org/gomatrixserverlib"
 
-	yggdrasiladmin "github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
-	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
 	"github.com/yggdrasil-network/yggdrasil-go/src/yggdrasil"
 
@@ -46,10 +45,8 @@ type Node struct {
 	core       *yggdrasil.Core
 	config     *yggdrasilconfig.NodeConfig
 	state      *yggdrasilconfig.NodeState
-	admin      *yggdrasiladmin.AdminSocket
 	multicast  *yggdrasilmulticast.Multicast
 	log        *gologme.Logger
-	packetConn *yggdrasil.PacketConn
 	listener   quic.Listener
 	tlsConfig  *tls.Config
 	quicConfig *quic.Config
@@ -58,15 +55,10 @@ type Node struct {
 	NewSession func(remote gomatrixserverlib.ServerName)
 }
 
-func (n *Node) BuildName() string {
-	return "dendrite"
-}
-
-func (n *Node) BuildVersion() string {
-	return "dev"
-}
-
 func (n *Node) Dialer(_, address string) (net.Conn, error) {
+	if len(n.core.GetSwitchPeers()) == 0 {
+		return nil, errors.New("no peer connections available")
+	}
 	tokens := strings.Split(address, ":")
 	raw, err := hex.DecodeString(tokens[0])
 	if err != nil {
@@ -86,12 +78,10 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasil.Core{},
 		config:    yggdrasilconfig.GenerateConfig(),
-		admin:     &yggdrasiladmin.AdminSocket{},
 		multicast: &yggdrasilmulticast.Multicast{},
 		log:       gologme.New(os.Stdout, "YGG ", log.Flags()),
 		incoming:  make(chan QUICStream),
 	}
-	n.core.SetBuildInfo(n)
 
 	yggfile := fmt.Sprintf("%s/%s-yggdrasil.conf", storageDirectory, instanceName)
 	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
@@ -132,20 +122,22 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		panic(err)
 	}
 
-	n.packetConn = n.core.PacketConn()
 	n.tlsConfig = n.generateTLSConfig()
 	n.quicConfig = &quic.Config{
 		MaxIncomingStreams:    0,
 		MaxIncomingUniStreams: 0,
 		KeepAlive:             true,
-		MaxIdleTimeout:        time.Minute * 15,
-		HandshakeTimeout:      time.Second * 15,
+		MaxIdleTimeout:        time.Minute * 30,
+		HandshakeTimeout:      time.Second * 30,
 	}
 
 	n.log.Println("Public curve25519:", n.core.EncryptionPublicKey())
 	n.log.Println("Public ed25519:", n.core.SigningPublicKey())
 
-	go n.listenFromYgg()
+	go func() {
+		time.Sleep(time.Second)
+		n.listenFromYgg()
+	}()
 
 	return n, nil
 }
@@ -193,9 +185,11 @@ func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
 	nodemap := map[string]struct{}{
 		"b5ae50589e50991dd9dd7d59c5c5f7a4521e8da5b603b7f57076272abc58b374": struct{}{},
 	}
-	for _, peer := range n.core.GetSwitchPeers() {
-		nodemap[hex.EncodeToString(peer.SigningKey[:])] = struct{}{}
-	}
+	/*
+		for _, peer := range n.core.GetSwitchPeers() {
+			nodemap[hex.EncodeToString(peer.SigningKey[:])] = struct{}{}
+		}
+	*/
 	n.sessions.Range(func(_, v interface{}) bool {
 		session, ok := v.(quic.Session)
 		if !ok {
@@ -265,12 +259,4 @@ func (n *Node) SetStaticPeer(uri string) error {
 		}
 	}
 	return nil
-}
-
-func (n *Node) NotifyLinkNew(f func(boxPubKey crypto.BoxPubKey, sigPubKey crypto.SigPubKey, linkType, remote string)) {
-	n.core.NotifyLinkNew(f)
-}
-
-func (n *Node) NotifyLinkGone(f func(boxPubKey crypto.BoxPubKey, sigPubKey crypto.SigPubKey, linkType, remote string)) {
-	n.core.NotifyLinkGone(f)
 }

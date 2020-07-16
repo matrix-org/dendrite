@@ -134,6 +134,13 @@ func (d *Database) GetJoinedHosts(
 	return d.selectJoinedHosts(ctx, roomID)
 }
 
+// GetAllJoinedHosts returns the currently joined hosts for
+// all rooms known to the federation sender.
+// Returns an error if something goes wrong.
+func (d *Database) GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error) {
+	return d.selectAllJoinedHosts(ctx)
+}
+
 // StoreJSON adds a JSON blob into the queue JSON table and returns
 // a NID. The NID will then be used when inserting the per-destination
 // metadata entries.
