@@ -18,6 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -42,8 +44,8 @@ const insertQueuePDUSQL = "" +
 	"INSERT INTO federationsender_queue_pdus (transaction_id, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
-const deleteQueueTransactionPDUsSQL = "" +
-	"DELETE FROM federationsender_queue_pdus WHERE server_name = $1 AND transaction_id = $2"
+const deleteQueuePDUsSQL = "" +
+	"DELETE FROM federationsender_queue_pdus WHERE server_name = $1 AND json_nid IN ($2)"
 
 const selectQueueNextTransactionIDSQL = "" +
 	"SELECT transaction_id FROM federationsender_queue_pdus" +
@@ -71,12 +73,12 @@ type queuePDUsStatements struct {
 	db                                *sql.DB
 	writer                            *sqlutil.TransactionWriter
 	insertQueuePDUStmt                *sql.Stmt
-	deleteQueueTransactionPDUsStmt    *sql.Stmt
 	selectQueueNextTransactionIDStmt  *sql.Stmt
 	selectQueuePDUsByTransactionStmt  *sql.Stmt
 	selectQueueReferenceJSONCountStmt *sql.Stmt
 	selectQueuePDUsCountStmt          *sql.Stmt
 	selectQueueServerNamesStmt        *sql.Stmt
+	// deleteQueuePDUsStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
 func NewSQLiteQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
@@ -91,9 +93,9 @@ func NewSQLiteQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
 	if s.insertQueuePDUStmt, err = db.Prepare(insertQueuePDUSQL); err != nil {
 		return
 	}
-	if s.deleteQueueTransactionPDUsStmt, err = db.Prepare(deleteQueueTransactionPDUsSQL); err != nil {
-		return
-	}
+	//if s.deleteQueuePDUsStmt, err = db.Prepare(deleteQueuePDUsSQL); err != nil {
+	//	return
+	//}
 	if s.selectQueueNextTransactionIDStmt, err = db.Prepare(selectQueueNextTransactionIDSQL); err != nil {
 		return
 	}
@@ -131,14 +133,27 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 	})
 }
 
-func (s *queuePDUsStatements) DeleteQueuePDUTransaction(
+func (s *queuePDUsStatements) DeleteQueuePDUs(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
-	transactionID gomatrixserverlib.TransactionID,
+	jsonNIDs []int64,
 ) error {
+	deleteSQL := strings.Replace(deleteQueuePDUsSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
+	fmt.Println(deleteSQL)
+	deleteStmt, err := txn.Prepare(deleteSQL)
+	if err != nil {
+		return fmt.Errorf("s.deleteQueueJSON s.db.Prepare: %w", err)
+	}
+
+	params := make([]interface{}, len(jsonNIDs)+1)
+	params[0] = serverName
+	for k, v := range jsonNIDs {
+		params[k+1] = v
+	}
+
 	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.deleteQueueTransactionPDUsStmt)
-		_, err := stmt.ExecContext(ctx, serverName, transactionID)
+		stmt := sqlutil.TxStmt(txn, deleteStmt)
+		_, err := stmt.ExecContext(ctx, params...)
 		return err
 	})
 }

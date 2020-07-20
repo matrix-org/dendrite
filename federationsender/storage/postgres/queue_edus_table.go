@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -42,9 +43,13 @@ const insertQueueEDUSQL = "" +
 	"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
+const deleteQueueEDUSQL = "" +
+	"DELETE FROM federationsender_queue_edus WHERE server_name = $1 AND json_nid = ANY($2)"
+
 const selectQueueEDUSQL = "" +
 	"SELECT json_nid FROM federationsender_queue_edus" +
-	" WHERE server_name = $1"
+	" WHERE server_name = $1" +
+	" LIMIT $2"
 
 const selectQueueEDUReferenceJSONCountSQL = "" +
 	"SELECT COUNT(*) FROM federationsender_queue_edus" +
@@ -60,6 +65,7 @@ const selectQueueServerNamesSQL = "" +
 type queueEDUsStatements struct {
 	db                                   *sql.DB
 	insertQueueEDUStmt                   *sql.Stmt
+	deleteQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUReferenceJSONCountStmt *sql.Stmt
 	selectQueueEDUCountStmt              *sql.Stmt
@@ -75,6 +81,9 @@ func NewPostgresQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 		return
 	}
 	if s.insertQueueEDUStmt, err = s.db.Prepare(insertQueueEDUSQL); err != nil {
+		return
+	}
+	if s.deleteQueueEDUStmt, err = s.db.Prepare(deleteQueueEDUSQL); err != nil {
 		return
 	}
 	if s.selectQueueEDUStmt, err = s.db.Prepare(selectQueueEDUSQL); err != nil {
@@ -95,26 +104,37 @@ func NewPostgresQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 func (s *queueEDUsStatements) InsertQueueEDU(
 	ctx context.Context,
 	txn *sql.Tx,
-	userID, deviceID string,
+	eduType string,
 	serverName gomatrixserverlib.ServerName,
 	nid int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
 	_, err := stmt.ExecContext(
 		ctx,
-		userID,     // destination user ID
-		deviceID,   // destination device ID
+		eduType,    // the EDU type
 		serverName, // destination server name
 		nid,        // JSON blob NID
 	)
 	return err
 }
 
-func (s *queueEDUsStatements) SelectQueueEDU(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+func (s *queueEDUsStatements) DeleteQueueEDUs(
+	ctx context.Context, txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName,
+	jsonNIDs []int64,
+) error {
+	stmt := sqlutil.TxStmt(txn, s.deleteQueueEDUStmt)
+	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(jsonNIDs))
+	return err
+}
+
+func (s *queueEDUsStatements) SelectQueueEDUs(
+	ctx context.Context, txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName,
+	limit int,
 ) ([]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUStmt)
-	rows, err := stmt.QueryContext(ctx)
+	rows, err := stmt.QueryContext(ctx, serverName, limit)
 	if err != nil {
 		return nil, err
 	}

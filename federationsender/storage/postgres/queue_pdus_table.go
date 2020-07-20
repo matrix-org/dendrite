@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -41,8 +42,8 @@ const insertQueuePDUSQL = "" +
 	"INSERT INTO federationsender_queue_pdus (transaction_id, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
-const deleteQueueTransactionPDUsSQL = "" +
-	"DELETE FROM federationsender_queue_pdus WHERE server_name = $1 AND transaction_id = $2"
+const deleteQueuePDUSQL = "" +
+	"DELETE FROM federationsender_queue_pdus WHERE server_name = $1 AND json_nid = ANY($2)"
 
 const selectQueuePDUNextTransactionIDSQL = "" +
 	"SELECT transaction_id FROM federationsender_queue_pdus" +
@@ -69,7 +70,7 @@ const selectQueuePDUServerNamesSQL = "" +
 type queuePDUsStatements struct {
 	db                                   *sql.DB
 	insertQueuePDUStmt                   *sql.Stmt
-	deleteQueueTransactionPDUsStmt       *sql.Stmt
+	deleteQueuePDUsStmt                  *sql.Stmt
 	selectQueuePDUNextTransactionIDStmt  *sql.Stmt
 	selectQueuePDUsByTransactionStmt     *sql.Stmt
 	selectQueuePDUReferenceJSONCountStmt *sql.Stmt
@@ -88,7 +89,7 @@ func NewPostgresQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
 	if s.insertQueuePDUStmt, err = s.db.Prepare(insertQueuePDUSQL); err != nil {
 		return
 	}
-	if s.deleteQueueTransactionPDUsStmt, err = s.db.Prepare(deleteQueueTransactionPDUsSQL); err != nil {
+	if s.deleteQueuePDUsStmt, err = s.db.Prepare(deleteQueuePDUSQL); err != nil {
 		return
 	}
 	if s.selectQueuePDUNextTransactionIDStmt, err = s.db.Prepare(selectQueuePDUNextTransactionIDSQL); err != nil {
@@ -126,13 +127,13 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 	return err
 }
 
-func (s *queuePDUsStatements) DeleteQueuePDUTransaction(
+func (s *queuePDUsStatements) DeleteQueuePDUs(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
-	transactionID gomatrixserverlib.TransactionID,
+	jsonNIDs []int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteQueueTransactionPDUsStmt)
-	_, err := stmt.ExecContext(ctx, serverName, transactionID)
+	stmt := sqlutil.TxStmt(txn, s.deleteQueuePDUsStmt)
+	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(jsonNIDs))
 	return err
 }
 

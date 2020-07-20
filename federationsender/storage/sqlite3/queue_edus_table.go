@@ -18,6 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -42,9 +44,13 @@ const insertQueueEDUSQL = "" +
 	"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
+const deleteQueueEDUsSQL = "" +
+	"DELETE FROM federationsender_queue_edus WHERE server_name = $1 AND json_nid IN ($2)"
+
 const selectQueueEDUSQL = "" +
 	"SELECT json_nid FROM federationsender_queue_edus" +
-	" WHERE server_name = $1"
+	" WHERE server_name = $1" +
+	" LIMIT $2"
 
 const selectQueueEDUReferenceJSONCountSQL = "" +
 	"SELECT COUNT(*) FROM federationsender_queue_edus" +
@@ -97,7 +103,7 @@ func NewSQLiteQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 func (s *queueEDUsStatements) InsertQueueEDU(
 	ctx context.Context,
 	txn *sql.Tx,
-	userID, deviceID string,
+	eduType string,
 	serverName gomatrixserverlib.ServerName,
 	nid int64,
 ) error {
@@ -105,8 +111,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 		stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
 		_, err := stmt.ExecContext(
 			ctx,
-			userID,     // destination user ID
-			deviceID,   // destination device ID
+			eduType,    // the EDU type
 			serverName, // destination server name
 			nid,        // JSON blob NID
 		)
@@ -114,11 +119,38 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 	})
 }
 
-func (s *queueEDUsStatements) SelectQueueEDU(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+func (s *queueEDUsStatements) DeleteQueueEDUs(
+	ctx context.Context, txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName,
+	jsonNIDs []int64,
+) error {
+	deleteSQL := strings.Replace(deleteQueueEDUsSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
+	fmt.Println(deleteSQL)
+	deleteStmt, err := txn.Prepare(deleteSQL)
+	if err != nil {
+		return fmt.Errorf("s.deleteQueueJSON s.db.Prepare: %w", err)
+	}
+
+	params := make([]interface{}, len(jsonNIDs)+1)
+	params[0] = serverName
+	for k, v := range jsonNIDs {
+		params[k+1] = v
+	}
+
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, deleteStmt)
+		_, err := stmt.ExecContext(ctx, params...)
+		return err
+	})
+}
+
+func (s *queueEDUsStatements) SelectQueueEDUs(
+	ctx context.Context, txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName,
+	limit int,
 ) ([]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUStmt)
-	rows, err := stmt.QueryContext(ctx)
+	rows, err := stmt.QueryContext(ctx, serverName, limit)
 	if err != nil {
 		return nil, err
 	}
