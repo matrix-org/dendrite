@@ -48,29 +48,33 @@ const selectJSONSQL = "" +
 	" WHERE json_nid = ANY($1)"
 
 type queueJSONStatements struct {
+	db             *sql.DB
 	insertJSONStmt *sql.Stmt
 	deleteJSONStmt *sql.Stmt
 	selectJSONStmt *sql.Stmt
 }
 
-func (s *queueJSONStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(queueJSONSchema)
+func NewPostgresQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
+	s = &queueJSONStatements{
+		db: db,
+	}
+	_, err = s.db.Exec(queueJSONSchema)
 	if err != nil {
 		return
 	}
-	if s.insertJSONStmt, err = db.Prepare(insertJSONSQL); err != nil {
+	if s.insertJSONStmt, err = s.db.Prepare(insertJSONSQL); err != nil {
 		return
 	}
-	if s.deleteJSONStmt, err = db.Prepare(deleteJSONSQL); err != nil {
+	if s.deleteJSONStmt, err = s.db.Prepare(deleteJSONSQL); err != nil {
 		return
 	}
-	if s.selectJSONStmt, err = db.Prepare(selectJSONSQL); err != nil {
+	if s.selectJSONStmt, err = s.db.Prepare(selectJSONSQL); err != nil {
 		return
 	}
 	return
 }
 
-func (s *queueJSONStatements) insertQueueJSON(
+func (s *queueJSONStatements) InsertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
 ) (int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
@@ -81,7 +85,7 @@ func (s *queueJSONStatements) insertQueueJSON(
 	return lastid, nil
 }
 
-func (s *queueJSONStatements) deleteQueueJSON(
+func (s *queueJSONStatements) DeleteQueueJSON(
 	ctx context.Context, txn *sql.Tx, nids []int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
@@ -89,7 +93,7 @@ func (s *queueJSONStatements) deleteQueueJSON(
 	return err
 }
 
-func (s *queueJSONStatements) selectQueueJSON(
+func (s *queueJSONStatements) SelectQueueJSON(
 	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
 	blobs := map[int64][]byte{}

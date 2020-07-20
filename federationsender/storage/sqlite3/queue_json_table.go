@@ -49,12 +49,16 @@ const selectJSONSQL = "" +
 	" WHERE json_nid IN ($1)"
 
 type queueJSONStatements struct {
+	db             *sql.DB
 	insertJSONStmt *sql.Stmt
 	//deleteJSONStmt *sql.Stmt - prepared at runtime due to variadic
 	//selectJSONStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
-func (s *queueJSONStatements) prepare(db *sql.DB) (err error) {
+func NewSQLiteQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
+	s = &queueJSONStatements{
+		db: db,
+	}
 	_, err = db.Exec(queueJSONSchema)
 	if err != nil {
 		return
@@ -65,7 +69,7 @@ func (s *queueJSONStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *queueJSONStatements) insertQueueJSON(
+func (s *queueJSONStatements) InsertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
 ) (int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
@@ -80,7 +84,7 @@ func (s *queueJSONStatements) insertQueueJSON(
 	return lastid, nil
 }
 
-func (s *queueJSONStatements) deleteQueueJSON(
+func (s *queueJSONStatements) DeleteQueueJSON(
 	ctx context.Context, txn *sql.Tx, nids []int64,
 ) error {
 	deleteSQL := strings.Replace(deleteJSONSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
@@ -99,7 +103,7 @@ func (s *queueJSONStatements) deleteQueueJSON(
 	return err
 }
 
-func (s *queueJSONStatements) selectQueueJSON(
+func (s *queueJSONStatements) SelectQueueJSON(
 	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
 	selectSQL := strings.Replace(selectJSONSQL, "($1)", sqlutil.QueryVariadic(len(jsonNIDs)), 1)

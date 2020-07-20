@@ -56,7 +56,7 @@ const selectQueuePDUsByTransactionSQL = "" +
 	" WHERE server_name = $1 AND transaction_id = $2" +
 	" LIMIT $3"
 
-const selectQueueReferenceJSONCountSQL = "" +
+const selectQueuePDUsReferenceJSONCountSQL = "" +
 	"SELECT COUNT(*) FROM federationsender_queue_pdus" +
 	" WHERE json_nid = $1"
 
@@ -64,10 +64,11 @@ const selectQueuePDUsCountSQL = "" +
 	"SELECT COUNT(*) FROM federationsender_queue_pdus" +
 	" WHERE server_name = $1"
 
-const selectQueueServerNamesSQL = "" +
+const selectQueuePDUsServerNamesSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_queue_pdus"
 
 type queuePDUsStatements struct {
+	db                                *sql.DB
 	insertQueuePDUStmt                *sql.Stmt
 	deleteQueueTransactionPDUsStmt    *sql.Stmt
 	selectQueueNextTransactionIDStmt  *sql.Stmt
@@ -77,7 +78,10 @@ type queuePDUsStatements struct {
 	selectQueueServerNamesStmt        *sql.Stmt
 }
 
-func (s *queuePDUsStatements) prepare(db *sql.DB) (err error) {
+func NewSQLiteQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
+	s = &queuePDUsStatements{
+		db: db,
+	}
 	_, err = db.Exec(queuePDUsSchema)
 	if err != nil {
 		return
@@ -94,19 +98,19 @@ func (s *queuePDUsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectQueuePDUsByTransactionStmt, err = db.Prepare(selectQueuePDUsByTransactionSQL); err != nil {
 		return
 	}
-	if s.selectQueueReferenceJSONCountStmt, err = db.Prepare(selectQueueReferenceJSONCountSQL); err != nil {
+	if s.selectQueueReferenceJSONCountStmt, err = db.Prepare(selectQueuePDUsReferenceJSONCountSQL); err != nil {
 		return
 	}
 	if s.selectQueuePDUsCountStmt, err = db.Prepare(selectQueuePDUsCountSQL); err != nil {
 		return
 	}
-	if s.selectQueueServerNamesStmt, err = db.Prepare(selectQueueServerNamesSQL); err != nil {
+	if s.selectQueueServerNamesStmt, err = db.Prepare(selectQueuePDUsServerNamesSQL); err != nil {
 		return
 	}
 	return
 }
 
-func (s *queuePDUsStatements) insertQueuePDU(
+func (s *queuePDUsStatements) InsertQueuePDU(
 	ctx context.Context,
 	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
@@ -123,7 +127,7 @@ func (s *queuePDUsStatements) insertQueuePDU(
 	return err
 }
 
-func (s *queuePDUsStatements) deleteQueueTransaction(
+func (s *queuePDUsStatements) DeleteQueuePDUTransaction(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
 	transactionID gomatrixserverlib.TransactionID,
@@ -133,7 +137,7 @@ func (s *queuePDUsStatements) deleteQueueTransaction(
 	return err
 }
 
-func (s *queuePDUsStatements) selectQueueNextTransactionID(
+func (s *queuePDUsStatements) SelectQueuePDUNextTransactionID(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) (gomatrixserverlib.TransactionID, error) {
 	var transactionID gomatrixserverlib.TransactionID
@@ -145,7 +149,7 @@ func (s *queuePDUsStatements) selectQueueNextTransactionID(
 	return transactionID, err
 }
 
-func (s *queuePDUsStatements) selectQueueReferenceJSONCount(
+func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
 	ctx context.Context, txn *sql.Tx, jsonNID int64,
 ) (int64, error) {
 	var count int64
@@ -157,7 +161,7 @@ func (s *queuePDUsStatements) selectQueueReferenceJSONCount(
 	return count, err
 }
 
-func (s *queuePDUsStatements) selectQueuePDUCount(
+func (s *queuePDUsStatements) SelectQueuePDUCount(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) (int64, error) {
 	var count int64
@@ -172,7 +176,7 @@ func (s *queuePDUsStatements) selectQueuePDUCount(
 	return count, err
 }
 
-func (s *queuePDUsStatements) selectQueuePDUs(
+func (s *queuePDUsStatements) SelectQueuePDUs(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
 	transactionID gomatrixserverlib.TransactionID,
@@ -196,7 +200,7 @@ func (s *queuePDUsStatements) selectQueuePDUs(
 	return result, rows.Err()
 }
 
-func (s *queuePDUsStatements) selectQueueServerNames(
+func (s *queuePDUsStatements) SelectQueuePDUServerNames(
 	ctx context.Context, txn *sql.Tx,
 ) ([]gomatrixserverlib.ServerName, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueueServerNamesStmt)

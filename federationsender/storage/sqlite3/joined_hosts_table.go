@@ -60,13 +60,17 @@ const selectAllJoinedHostsSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_joined_hosts"
 
 type joinedHostsStatements struct {
+	db                       *sql.DB
 	insertJoinedHostsStmt    *sql.Stmt
 	deleteJoinedHostsStmt    *sql.Stmt
 	selectJoinedHostsStmt    *sql.Stmt
 	selectAllJoinedHostsStmt *sql.Stmt
 }
 
-func (s *joinedHostsStatements) prepare(db *sql.DB) (err error) {
+func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
+	s = &joinedHostsStatements{
+		db: db,
+	}
 	_, err = db.Exec(joinedHostsSchema)
 	if err != nil {
 		return
@@ -86,7 +90,7 @@ func (s *joinedHostsStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *joinedHostsStatements) insertJoinedHosts(
+func (s *joinedHostsStatements) InsertJoinedHosts(
 	ctx context.Context,
 	txn *sql.Tx,
 	roomID, eventID string,
@@ -97,7 +101,7 @@ func (s *joinedHostsStatements) insertJoinedHosts(
 	return err
 }
 
-func (s *joinedHostsStatements) deleteJoinedHosts(
+func (s *joinedHostsStatements) DeleteJoinedHosts(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) error {
 	for _, eventID := range eventIDs {
@@ -109,20 +113,20 @@ func (s *joinedHostsStatements) deleteJoinedHosts(
 	return nil
 }
 
-func (s *joinedHostsStatements) selectJoinedHostsWithTx(
+func (s *joinedHostsStatements) SelectJoinedHostsWithTx(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) ([]types.JoinedHost, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectJoinedHostsStmt)
 	return joinedHostsFromStmt(ctx, stmt, roomID)
 }
 
-func (s *joinedHostsStatements) selectJoinedHosts(
+func (s *joinedHostsStatements) SelectJoinedHosts(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
 	return joinedHostsFromStmt(ctx, s.selectJoinedHostsStmt, roomID)
 }
 
-func (s *joinedHostsStatements) selectAllJoinedHosts(
+func (s *joinedHostsStatements) SelectAllJoinedHosts(
 	ctx context.Context,
 ) ([]gomatrixserverlib.ServerName, error) {
 	rows, err := s.selectAllJoinedHostsStmt.QueryContext(ctx)
