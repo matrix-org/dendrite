@@ -343,6 +343,7 @@ func (oq *destinationQueue) cleanPendingInvites() {
 // nextTransaction creates a new transaction from the pending event
 // queue and sends it. Returns true if a transaction was sent or
 // false otherwise.
+// nolint:gocyclo
 func (oq *destinationQueue) nextTransaction() (bool, error) {
 	// Before we do anything, we need to roll over the transaction
 	// ID that is being used to coalesce events into the next TX.
