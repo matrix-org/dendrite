@@ -131,14 +131,17 @@ func NewTransactionWriter() *TransactionWriter {
 // transactionWriterTask represents a specific task.
 type transactionWriterTask struct {
 	db   *sql.DB
+	txn  *sql.Tx
 	f    func(txn *sql.Tx) error
 	wait chan error
 }
 
 // Do queues a task to be run by a TransactionWriter. The function
 // provided will be ran within a transaction as supplied by the
-// database parameter. This will block until the task is finished.
-func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx) error) error {
+// txn parameter if one is supplied, and if not, will take out a
+// new transaction from the database supplied in the database
+// parameter. Either way, this will block until the task is done.
+func (w *TransactionWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
 	if w.todo == nil {
 		return errors.New("not initialised")
 	}
@@ -147,6 +150,7 @@ func (w *TransactionWriter) Do(db *sql.DB, f func(txn *sql.Tx) error) error {
 	}
 	task := transactionWriterTask{
 		db:   db,
+		txn:  txn,
 		f:    f,
 		wait: make(chan error, 1),
 	}
@@ -164,9 +168,15 @@ func (w *TransactionWriter) run() {
 	}
 	defer w.running.Store(false)
 	for task := range w.todo {
-		task.wait <- WithTransaction(task.db, func(txn *sql.Tx) error {
-			return task.f(txn)
-		})
+		if task.txn != nil {
+			task.wait <- task.f(task.txn)
+		} else if task.db != nil {
+			task.wait <- WithTransaction(task.db, func(txn *sql.Tx) error {
+				return task.f(txn)
+			})
+		} else {
+			panic("expected database or transaction but got neither")
+		}
 		close(task.wait)
 	}
 }

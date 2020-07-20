@@ -19,7 +19,7 @@ import (
 	"net/url"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3"
+	"github.com/matrix-org/dendrite/keyserver/storage/sqlite3"
 )
 
 func NewDatabase(

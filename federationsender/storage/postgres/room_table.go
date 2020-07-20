@@ -43,24 +43,27 @@ const updateRoomSQL = "" +
 	"UPDATE federationsender_rooms SET last_event_id = $2 WHERE room_id = $1"
 
 type roomStatements struct {
+	db                      *sql.DB
 	insertRoomStmt          *sql.Stmt
 	selectRoomForUpdateStmt *sql.Stmt
 	updateRoomStmt          *sql.Stmt
 }
 
-func (s *roomStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(roomSchema)
+func NewPostgresRoomsTable(db *sql.DB) (s *roomStatements, err error) {
+	s = &roomStatements{
+		db: db,
+	}
+	_, err = s.db.Exec(roomSchema)
 	if err != nil {
 		return
 	}
-
-	if s.insertRoomStmt, err = db.Prepare(insertRoomSQL); err != nil {
+	if s.insertRoomStmt, err = s.db.Prepare(insertRoomSQL); err != nil {
 		return
 	}
-	if s.selectRoomForUpdateStmt, err = db.Prepare(selectRoomForUpdateSQL); err != nil {
+	if s.selectRoomForUpdateStmt, err = s.db.Prepare(selectRoomForUpdateSQL); err != nil {
 		return
 	}
-	if s.updateRoomStmt, err = db.Prepare(updateRoomSQL); err != nil {
+	if s.updateRoomStmt, err = s.db.Prepare(updateRoomSQL); err != nil {
 		return
 	}
 	return
@@ -68,7 +71,7 @@ func (s *roomStatements) prepare(db *sql.DB) (err error) {
 
 // insertRoom inserts the room if it didn't already exist.
 // If the room didn't exist then last_event_id is set to the empty string.
-func (s *roomStatements) insertRoom(
+func (s *roomStatements) InsertRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.insertRoomStmt).ExecContext(ctx, roomID)
@@ -78,7 +81,7 @@ func (s *roomStatements) insertRoom(
 // selectRoomForUpdate locks the row for the room and returns the last_event_id.
 // The row must already exist in the table. Callers can ensure that the row
 // exists by calling insertRoom first.
-func (s *roomStatements) selectRoomForUpdate(
+func (s *roomStatements) SelectRoomForUpdate(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (string, error) {
 	var lastEventID string
@@ -92,7 +95,7 @@ func (s *roomStatements) selectRoomForUpdate(
 
 // updateRoom updates the last_event_id for the room. selectRoomForUpdate should
 // have already been called earlier within the transaction.
-func (s *roomStatements) updateRoom(
+func (s *roomStatements) UpdateRoom(
 	ctx context.Context, txn *sql.Tx, roomID, lastEventID string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.updateRoomStmt)

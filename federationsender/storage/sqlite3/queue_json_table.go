@@ -49,12 +49,18 @@ const selectJSONSQL = "" +
 	" WHERE json_nid IN ($1)"
 
 type queueJSONStatements struct {
+	db             *sql.DB
+	writer         *sqlutil.TransactionWriter
 	insertJSONStmt *sql.Stmt
 	//deleteJSONStmt *sql.Stmt - prepared at runtime due to variadic
 	//selectJSONStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
-func (s *queueJSONStatements) prepare(db *sql.DB) (err error) {
+func NewSQLiteQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
+	s = &queueJSONStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err = db.Exec(queueJSONSchema)
 	if err != nil {
 		return
@@ -65,22 +71,25 @@ func (s *queueJSONStatements) prepare(db *sql.DB) (err error) {
 	return
 }
 
-func (s *queueJSONStatements) insertQueueJSON(
+func (s *queueJSONStatements) InsertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
-) (int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
-	res, err := stmt.ExecContext(ctx, json)
-	if err != nil {
-		return 0, fmt.Errorf("stmt.QueryContext: %w", err)
-	}
-	lastid, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("res.LastInsertId: %w", err)
-	}
-	return lastid, nil
+) (lastid int64, err error) {
+	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
+		res, err := stmt.ExecContext(ctx, json)
+		if err != nil {
+			return fmt.Errorf("stmt.QueryContext: %w", err)
+		}
+		lastid, err = res.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("res.LastInsertId: %w", err)
+		}
+		return nil
+	})
+	return
 }
 
-func (s *queueJSONStatements) deleteQueueJSON(
+func (s *queueJSONStatements) DeleteQueueJSON(
 	ctx context.Context, txn *sql.Tx, nids []int64,
 ) error {
 	deleteSQL := strings.Replace(deleteJSONSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
@@ -94,12 +103,14 @@ func (s *queueJSONStatements) deleteQueueJSON(
 		iNIDs[k] = v
 	}
 
-	stmt := sqlutil.TxStmt(txn, deleteStmt)
-	_, err = stmt.ExecContext(ctx, iNIDs...)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, deleteStmt)
+		_, err = stmt.ExecContext(ctx, iNIDs...)
+		return err
+	})
 }
 
-func (s *queueJSONStatements) selectQueueJSON(
+func (s *queueJSONStatements) SelectQueueJSON(
 	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
 	selectSQL := strings.Replace(selectJSONSQL, "($1)", sqlutil.QueryVariadic(len(jsonNIDs)), 1)

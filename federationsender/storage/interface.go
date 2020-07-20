@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -24,13 +25,26 @@ import (
 
 type Database interface {
 	internal.PartitionStorer
+
 	UpdateRoom(ctx context.Context, roomID, oldEventID, newEventID string, addHosts []types.JoinedHost, removeHosts []string) (joinedHosts []types.JoinedHost, err error)
+
 	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 	GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
-	StoreJSON(ctx context.Context, js string) (int64, error)
-	AssociatePDUWithDestination(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, nids []int64) error
-	GetNextTransactionPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (gomatrixserverlib.TransactionID, []*gomatrixserverlib.HeaderedEvent, error)
-	CleanTransactionPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, transactionID gomatrixserverlib.TransactionID) error
+
+	StoreJSON(ctx context.Context, js string) (*shared.Receipt, error)
+
+	AssociatePDUWithDestination(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error
+	AssociateEDUWithDestination(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error
+
+	GetNextTransactionPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (gomatrixserverlib.TransactionID, []*gomatrixserverlib.HeaderedEvent, *shared.Receipt, error)
+	GetNextTransactionEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) ([]*gomatrixserverlib.EDU, *shared.Receipt, error)
+
+	CleanPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error
+	CleanEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error
+
 	GetPendingPDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error)
-	GetPendingServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
+	GetPendingEDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error)
+
+	GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
+	GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 }
