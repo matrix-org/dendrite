@@ -56,7 +56,6 @@ type destinationQueue struct {
 	transactionIDMutex sync.Mutex                              // protects transactionID
 	transactionID      gomatrixserverlib.TransactionID         // last transaction ID
 	transactionCount   atomic.Int32                            // how many events in this transaction so far
-	pendingEDUs        []*gomatrixserverlib.EDU                // owned by backgroundSend
 	pendingInvites     []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
 	notifyPDUs         chan bool                               // interrupts idle wait for PDUs
 	notifyEDUs         chan bool                               // interrupts idle wait for EDUs
