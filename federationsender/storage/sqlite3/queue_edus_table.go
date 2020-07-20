@@ -59,6 +59,7 @@ const selectQueueServerNamesSQL = "" +
 
 type queueEDUsStatements struct {
 	db                                   *sql.DB
+	writer                               *sqlutil.TransactionWriter
 	insertQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUReferenceJSONCountStmt *sql.Stmt
@@ -68,7 +69,8 @@ type queueEDUsStatements struct {
 
 func NewSQLiteQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 	s = &queueEDUsStatements{
-		db: db,
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err = db.Exec(queueEDUsSchema)
 	if err != nil {
@@ -99,15 +101,17 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 	serverName gomatrixserverlib.ServerName,
 	nid int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
-	_, err := stmt.ExecContext(
-		ctx,
-		userID,     // destination user ID
-		deviceID,   // destination device ID
-		serverName, // destination server name
-		nid,        // JSON blob NID
-	)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
+		_, err := stmt.ExecContext(
+			ctx,
+			userID,     // destination user ID
+			deviceID,   // destination device ID
+			serverName, // destination server name
+			nid,        // JSON blob NID
+		)
+		return err
+	})
 }
 
 func (s *queueEDUsStatements) SelectQueueEDU(

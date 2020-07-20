@@ -28,10 +28,7 @@ import (
 type Database struct {
 	shared.Database
 	sqlutil.PartitionOffsetStatements
-	db              *sql.DB
-	queuePDUsWriter *sqlutil.TransactionWriter
-	queueEDUsWriter *sqlutil.TransactionWriter
-	queueJSONWriter *sqlutil.TransactionWriter
+	db *sql.DB
 }
 
 // NewDatabase opens a new database

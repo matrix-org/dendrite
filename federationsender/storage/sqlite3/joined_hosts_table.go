@@ -61,6 +61,7 @@ const selectAllJoinedHostsSQL = "" +
 
 type joinedHostsStatements struct {
 	db                       *sql.DB
+	writer                   *sqlutil.TransactionWriter
 	insertJoinedHostsStmt    *sql.Stmt
 	deleteJoinedHostsStmt    *sql.Stmt
 	selectJoinedHostsStmt    *sql.Stmt
@@ -69,7 +70,8 @@ type joinedHostsStatements struct {
 
 func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
 	s = &joinedHostsStatements{
-		db: db,
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err = db.Exec(joinedHostsSchema)
 	if err != nil {
@@ -96,21 +98,25 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 	roomID, eventID string,
 	serverName gomatrixserverlib.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
-	_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
+		_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
+		return err
+	})
 }
 
 func (s *joinedHostsStatements) DeleteJoinedHosts(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) error {
-	for _, eventID := range eventIDs {
-		stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsStmt)
-		if _, err := stmt.ExecContext(ctx, eventID); err != nil {
-			return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		for _, eventID := range eventIDs {
+			stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsStmt)
+			if _, err := stmt.ExecContext(ctx, eventID); err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (s *joinedHostsStatements) SelectJoinedHostsWithTx(

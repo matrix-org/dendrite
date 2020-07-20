@@ -1114,7 +1114,7 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	}
 	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
 	// that we don't lock the table for writes in more than one place.
-	err = d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) error {
+	err = d.SendToDeviceWriter.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.AddSendToDeviceEvent(
 			ctx, txn, userID, deviceID, string(j),
 		)
@@ -1179,7 +1179,7 @@ func (d *Database) CleanSendToDeviceUpdates(
 	// If we need to write to the database then we'll ask the SendToDeviceWriter to
 	// do that for us. It'll guarantee that we don't lock the table for writes in
 	// more than one place.
-	err = d.SendToDeviceWriter.Do(d.DB, func(txn *sql.Tx) error {
+	err = d.SendToDeviceWriter.Do(d.DB, nil, func(txn *sql.Tx) error {
 		// Delete any send-to-device messages marked for deletion.
 		if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
 			return fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)

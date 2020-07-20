@@ -50,6 +50,7 @@ const selectJSONSQL = "" +
 
 type queueJSONStatements struct {
 	db             *sql.DB
+	writer         *sqlutil.TransactionWriter
 	insertJSONStmt *sql.Stmt
 	//deleteJSONStmt *sql.Stmt - prepared at runtime due to variadic
 	//selectJSONStmt *sql.Stmt - prepared at runtime due to variadic
@@ -57,7 +58,8 @@ type queueJSONStatements struct {
 
 func NewSQLiteQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
 	s = &queueJSONStatements{
-		db: db,
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err = db.Exec(queueJSONSchema)
 	if err != nil {
@@ -71,17 +73,20 @@ func NewSQLiteQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
 
 func (s *queueJSONStatements) InsertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
-) (int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
-	res, err := stmt.ExecContext(ctx, json)
-	if err != nil {
-		return 0, fmt.Errorf("stmt.QueryContext: %w", err)
-	}
-	lastid, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("res.LastInsertId: %w", err)
-	}
-	return lastid, nil
+) (lastid int64, err error) {
+	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
+		res, err := stmt.ExecContext(ctx, json)
+		if err != nil {
+			return fmt.Errorf("stmt.QueryContext: %w", err)
+		}
+		lastid, err = res.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("res.LastInsertId: %w", err)
+		}
+		return nil
+	})
+	return
 }
 
 func (s *queueJSONStatements) DeleteQueueJSON(
@@ -98,9 +103,11 @@ func (s *queueJSONStatements) DeleteQueueJSON(
 		iNIDs[k] = v
 	}
 
-	stmt := sqlutil.TxStmt(txn, deleteStmt)
-	_, err = stmt.ExecContext(ctx, iNIDs...)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, deleteStmt)
+		_, err = stmt.ExecContext(ctx, iNIDs...)
+		return err
+	})
 }
 
 func (s *queueJSONStatements) SelectQueueJSON(
