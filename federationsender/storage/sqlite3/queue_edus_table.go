@@ -124,7 +124,6 @@ func (s *queueEDUsStatements) DeleteQueueEDUs(
 	jsonNIDs []int64,
 ) error {
 	deleteSQL := strings.Replace(deleteQueueEDUsSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
-	fmt.Println(deleteSQL)
 	deleteStmt, err := txn.Prepare(deleteSQL)
 	if err != nil {
 		return fmt.Errorf("s.deleteQueueJSON s.db.Prepare: %w", err)
