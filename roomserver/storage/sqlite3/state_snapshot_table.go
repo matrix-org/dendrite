@@ -50,13 +50,16 @@ const bulkSelectStateBlockNIDsSQL = "" +
 
 type stateSnapshotStatements struct {
 	db                           *sql.DB
+	writer                       *sqlutil.TransactionWriter
 	insertStateStmt              *sql.Stmt
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 
 func NewSqliteStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
-	s := &stateSnapshotStatements{}
-	s.db = db
+	s := &stateSnapshotStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(stateSnapshotSchema)
 	if err != nil {
 		return nil, err
@@ -75,14 +78,19 @@ func (s *stateSnapshotStatements) InsertState(
 	if err != nil {
 		return
 	}
-	insertStmt := txn.Stmt(s.insertStateStmt)
-	if res, err2 := insertStmt.ExecContext(ctx, int64(roomNID), string(stateBlockNIDsJSON)); err2 == nil {
-		lastRowID, err3 := res.LastInsertId()
-		if err3 != nil {
-			err = err3
+	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		insertStmt := txn.Stmt(s.insertStateStmt)
+		res, err := insertStmt.ExecContext(ctx, int64(roomNID), string(stateBlockNIDsJSON))
+		if err != nil {
+			return err
+		}
+		lastRowID, err := res.LastInsertId()
+		if err != nil {
+			return err
 		}
 		stateNID = types.StateSnapshotNID(lastRowID)
-	}
+		return nil
+	})
 	return
 }
 

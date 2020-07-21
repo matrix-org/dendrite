@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
@@ -43,13 +44,18 @@ const selectPublishedSQL = "" +
 	"SELECT published FROM roomserver_published WHERE room_id = $1"
 
 type publishedStatements struct {
+	db                     *sql.DB
+	writer                 *sqlutil.TransactionWriter
 	upsertPublishedStmt    *sql.Stmt
 	selectAllPublishedStmt *sql.Stmt
 	selectPublishedStmt    *sql.Stmt
 }
 
 func NewSqlitePublishedTable(db *sql.DB) (tables.Published, error) {
-	s := &publishedStatements{}
+	s := &publishedStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(publishedSchema)
 	if err != nil {
 		return nil, err
@@ -64,8 +70,10 @@ func NewSqlitePublishedTable(db *sql.DB) (tables.Published, error) {
 func (s *publishedStatements) UpsertRoomPublished(
 	ctx context.Context, roomID string, published bool,
 ) (err error) {
-	_, err = s.upsertPublishedStmt.ExecContext(ctx, roomID, published)
-	return
+	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		_, err := s.upsertPublishedStmt.ExecContext(ctx, roomID, published)
+		return err
+	})
 }
 
 func (s *publishedStatements) SelectPublishedFromRoomID(

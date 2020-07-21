@@ -63,6 +63,8 @@ SELECT invite_event_id FROM roomserver_invites WHERE room_nid = $1 AND target_ni
 `
 
 type inviteStatements struct {
+	db                                  *sql.DB
+	writer                              *sqlutil.TransactionWriter
 	insertInviteEventStmt               *sql.Stmt
 	selectInviteActiveForUserInRoomStmt *sql.Stmt
 	updateInviteRetiredStmt             *sql.Stmt
@@ -70,7 +72,10 @@ type inviteStatements struct {
 }
 
 func NewSqliteInvitesTable(db *sql.DB) (tables.Invites, error) {
-	s := &inviteStatements{}
+	s := &inviteStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(inviteSchema)
 	if err != nil {
 		return nil, err
@@ -90,42 +95,48 @@ func (s *inviteStatements) InsertInviteEvent(
 	targetUserNID, senderUserNID types.EventStateKeyNID,
 	inviteEventJSON []byte,
 ) (bool, error) {
-	stmt := sqlutil.TxStmt(txn, s.insertInviteEventStmt)
-	result, err := stmt.ExecContext(
-		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
-	)
-	if err != nil {
-		return false, err
-	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	return count != 0, nil
+	var count int64
+	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.insertInviteEventStmt)
+		result, err := stmt.ExecContext(
+			ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
+		)
+		if err != nil {
+			return err
+		}
+		count, err = result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return count != 0, err
 }
 
 func (s *inviteStatements) UpdateInviteRetired(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventIDs []string, err error) {
-	// gather all the event IDs we will retire
-	stmt := sqlutil.TxStmt(txn, s.selectInvitesAboutToRetireStmt)
-	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
-	if err != nil {
-		return nil, err
-	}
-	defer (func() { err = rows.Close() })()
-	for rows.Next() {
-		var inviteEventID string
-		if err = rows.Scan(&inviteEventID); err != nil {
-			return nil, err
+	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		// gather all the event IDs we will retire
+		stmt := sqlutil.TxStmt(txn, s.selectInvitesAboutToRetireStmt)
+		rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
+		if err != nil {
+			return err
 		}
-		eventIDs = append(eventIDs, inviteEventID)
-	}
-
-	// now retire the invites
-	stmt = sqlutil.TxStmt(txn, s.updateInviteRetiredStmt)
-	_, err = stmt.ExecContext(ctx, roomNID, targetUserNID)
+		defer (func() { err = rows.Close() })()
+		for rows.Next() {
+			var inviteEventID string
+			if err = rows.Scan(&inviteEventID); err != nil {
+				return err
+			}
+			eventIDs = append(eventIDs, inviteEventID)
+		}
+		// now retire the invites
+		stmt = sqlutil.TxStmt(txn, s.updateInviteRetiredStmt)
+		_, err = stmt.ExecContext(ctx, roomNID, targetUserNID)
+		return err
+	})
 	return
 }
 

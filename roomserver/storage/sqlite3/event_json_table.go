@@ -49,13 +49,16 @@ const bulkSelectEventJSONSQL = `
 
 type eventJSONStatements struct {
 	db                      *sql.DB
+	writer                  *sqlutil.TransactionWriter
 	insertEventJSONStmt     *sql.Stmt
 	bulkSelectEventJSONStmt *sql.Stmt
 }
 
 func NewSqliteEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
-	s := &eventJSONStatements{}
-	s.db = db
+	s := &eventJSONStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(eventJSONSchema)
 	if err != nil {
 		return nil, err
@@ -69,8 +72,10 @@ func NewSqliteEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
 func (s *eventJSONStatements) InsertEventJSON(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, eventJSON []byte,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		_, err := sqlutil.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
+		return err
+	})
 }
 
 func (s *eventJSONStatements) BulkSelectEventJSON(

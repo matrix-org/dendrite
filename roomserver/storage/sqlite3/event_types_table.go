@@ -78,6 +78,7 @@ const bulkSelectEventTypeNIDSQL = `
 
 type eventTypeStatements struct {
 	db                           *sql.DB
+	writer                       *sqlutil.TransactionWriter
 	insertEventTypeNIDStmt       *sql.Stmt
 	insertEventTypeNIDResultStmt *sql.Stmt
 	selectEventTypeNIDStmt       *sql.Stmt
@@ -85,8 +86,10 @@ type eventTypeStatements struct {
 }
 
 func NewSqliteEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
-	s := &eventTypeStatements{}
-	s.db = db
+	s := &eventTypeStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(eventTypesSchema)
 	if err != nil {
 		return nil, err
@@ -104,12 +107,15 @@ func (s *eventTypeStatements) InsertEventTypeNID(
 	ctx context.Context, tx *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	var err error
-	insertStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDStmt)
-	resultStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDResultStmt)
-	if _, err = insertStmt.ExecContext(ctx, eventType); err == nil {
-		err = resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
-	}
+	err := s.writer.Do(s.db, tx, func(tx *sql.Tx) error {
+		insertStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDStmt)
+		resultStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDResultStmt)
+		_, err := insertStmt.ExecContext(ctx, eventType)
+		if err != nil {
+			return err
+		}
+		return resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
+	})
 	return types.EventTypeNID(eventTypeNID), err
 }
 

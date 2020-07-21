@@ -64,6 +64,8 @@ const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
 
 type roomStatements struct {
+	db                                 *sql.DB
+	writer                             *sqlutil.TransactionWriter
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
@@ -74,7 +76,10 @@ type roomStatements struct {
 }
 
 func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
-	s := &roomStatements{}
+	s := &roomStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(roomsSchema)
 	if err != nil {
 		return nil, err
@@ -94,9 +99,12 @@ func (s *roomStatements) InsertRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
-	var err error
-	insertStmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
-	if _, err = insertStmt.ExecContext(ctx, roomID, roomVersion); err == nil {
+	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		insertStmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
+		_, err := insertStmt.ExecContext(ctx, roomID, roomVersion)
+		return err
+	})
+	if err == nil {
 		return s.SelectRoomNID(ctx, txn, roomID)
 	} else {
 		return types.RoomNID(0), err
@@ -155,15 +163,17 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 	lastEventSentNID types.EventNID,
 	stateSnapshotNID types.StateSnapshotNID,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.updateLatestEventNIDsStmt)
-	_, err := stmt.ExecContext(
-		ctx,
-		eventNIDsAsArray(eventNIDs),
-		int64(lastEventSentNID),
-		int64(stateSnapshotNID),
-		roomNID,
-	)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.updateLatestEventNIDsStmt)
+		_, err := stmt.ExecContext(
+			ctx,
+			eventNIDsAsArray(eventNIDs),
+			int64(lastEventSentNID),
+			int64(stateSnapshotNID),
+			roomNID,
+		)
+		return err
+	})
 }
 
 func (s *roomStatements) SelectRoomVersionForRoomID(
