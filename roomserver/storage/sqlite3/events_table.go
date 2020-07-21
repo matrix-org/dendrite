@@ -287,7 +287,8 @@ func (s *eventStatements) UpdateEventState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
 	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		_, err := s.updateEventStateStmt.ExecContext(ctx, int64(stateNID), int64(eventNID))
+		stmt := sqlutil.TxStmt(txn, s.updateEventStateStmt)
+		_, err := stmt.ExecContext(ctx, int64(stateNID), int64(eventNID))
 		return err
 	})
 }
