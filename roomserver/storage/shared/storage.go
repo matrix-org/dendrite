@@ -412,12 +412,9 @@ func (d *Database) StoreEvent(
 			if err == sql.ErrNoRows {
 				// We've already inserted the event so select the numeric event ID
 				eventNID, stateNID, err = d.EventsTable.SelectEvent(ctx, txn, event.EventID())
-				if err != nil {
-					return fmt.Errorf("d.EventsTable.SelectEvent: %w", err)
-				}
 			}
 			if err != nil {
-				return fmt.Errorf("d.EventsTable.InsertEvent: %w", err)
+				return err
 			}
 		}
 
