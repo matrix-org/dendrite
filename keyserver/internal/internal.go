@@ -156,9 +156,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 			}
 		} else {
 			domainToDeviceKeys[domain] = make(map[string][]string)
-			for _, deviceID := range deviceIDs {
-				domainToDeviceKeys[domain][userID] = append(domainToDeviceKeys[domain][userID], deviceID)
-			}
+			domainToDeviceKeys[domain][userID] = append(domainToDeviceKeys[domain][userID], deviceIDs...)
 		}
 	}
 	// TODO: set device display names when they are known
