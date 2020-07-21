@@ -103,7 +103,7 @@ func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, content string,
 ) (err error) {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		_, err := sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
 		return err
 	})
@@ -163,7 +163,7 @@ func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(
 	for k, v := range nids {
 		params[k+1] = v
 	}
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		_, err := txn.ExecContext(ctx, query, params...)
 		return err
 	})
@@ -177,7 +177,7 @@ func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
 	for k, v := range nids {
 		params[k] = v
 	}
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		_, err := txn.ExecContext(ctx, query, params...)
 		return err
 	})

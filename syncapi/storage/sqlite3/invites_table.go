@@ -95,7 +95,7 @@ func NewSqliteInvitesTable(db *sql.DB, streamID *streamIDStatements) (tables.Inv
 func (s *inviteEventsStatements) InsertInviteEvent(
 	ctx context.Context, txn *sql.Tx, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
-	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		var err error
 		streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
 		if err != nil {

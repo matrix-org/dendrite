@@ -200,7 +200,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
 		_, err := stmt.ExecContext(ctx, eventID)
 		return err
@@ -225,7 +225,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	}
 
 	// upsert state event
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
 		_, err := stmt.ExecContext(
 			ctx,

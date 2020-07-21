@@ -107,7 +107,7 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
 ) (err error) {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		stmt := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt)
 		_, err := stmt.ExecContext(
 			ctx, event.EventID(), event.Depth(), event.RoomID(), pos,

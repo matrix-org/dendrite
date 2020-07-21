@@ -295,11 +295,6 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
-	if err != nil {
-		return 0, err
-	}
-
 	addStateJSON, err := json.Marshal(addState)
 	if err != nil {
 		return 0, err
@@ -309,7 +304,13 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 
-	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	var streamPos types.StreamPosition
+	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+		if err != nil {
+			return err
+		}
+
 		insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
 		_, ierr := insertStmt.ExecContext(
 			ctx,

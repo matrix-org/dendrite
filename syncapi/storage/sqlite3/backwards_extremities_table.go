@@ -79,7 +79,7 @@ func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities
 func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 	ctx context.Context, txn *sql.Tx, roomID, eventID string, prevEventID string,
 ) (err error) {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		_, err := txn.Stmt(s.insertBackwardExtremityStmt).ExecContext(ctx, roomID, eventID, prevEventID)
 		return err
 	})
@@ -110,7 +110,7 @@ func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
 func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 	ctx context.Context, txn *sql.Tx, roomID, knownEventID string,
 ) (err error) {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		_, err := txn.Stmt(s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
 		return err
 	})
