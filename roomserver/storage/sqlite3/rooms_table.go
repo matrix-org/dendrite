@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
@@ -98,17 +99,23 @@ func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
 func (s *roomStatements) InsertRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
-) (types.RoomNID, error) {
-	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+) (roomNID types.RoomNID, err error) {
+	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
 		insertStmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
-		_, err := insertStmt.ExecContext(ctx, roomID, roomVersion)
-		return err
+		_, err = insertStmt.ExecContext(ctx, roomID, roomVersion)
+		if err != nil {
+			return fmt.Errorf("insertStmt.ExecContext: %w", err)
+		}
+		roomNID, err = s.SelectRoomNID(ctx, txn, roomID)
+		if err != nil {
+			return fmt.Errorf("s.SelectRoomNID: %w", err)
+		}
+		return nil
 	})
-	if err == nil {
-		return s.SelectRoomNID(ctx, txn, roomID)
-	} else {
+	if err != nil {
 		return types.RoomNID(0), err
 	}
+	return
 }
 
 func (s *roomStatements) SelectRoomNID(
