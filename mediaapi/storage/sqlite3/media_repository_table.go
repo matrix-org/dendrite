@@ -68,6 +68,9 @@ type mediaStatements struct {
 }
 
 func (s *mediaStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
+	s.writer = sqlutil.NewTransactionWriter()
+
 	_, err = db.Exec(mediaSchema)
 	if err != nil {
 		return
