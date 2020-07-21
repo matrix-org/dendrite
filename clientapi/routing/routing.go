@@ -714,4 +714,9 @@ func Setup(
 			return QueryKeys(req, keyAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/keys/claim",
+		httputil.MakeAuthAPI("keys_claim", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return ClaimKeys(req, keyAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 }

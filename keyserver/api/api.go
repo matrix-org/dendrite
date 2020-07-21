@@ -23,6 +23,7 @@ import (
 
 type KeyInternalAPI interface {
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
+	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 }
@@ -102,9 +103,17 @@ func (r *PerformUploadKeysResponse) KeyError(userID, deviceID string, err *KeyEr
 }
 
 type PerformClaimKeysRequest struct {
+	// Map of user_id to device_id to algorithm name
+	OneTimeKeys map[string]map[string]string
+	Timeout     time.Duration
 }
 
 type PerformClaimKeysResponse struct {
+	// Map of user_id to device_id to algorithm:key_id to key JSON
+	OneTimeKeys map[string]map[string]map[string]json.RawMessage
+	// Map of remote server domain to error JSON
+	Failures map[string]interface{}
+	// Set if there was a fatal error processing this action
 	Error *KeyError
 }
 
