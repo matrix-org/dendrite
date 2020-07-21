@@ -18,6 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const txnIDSchema = `
@@ -35,10 +37,14 @@ const selectTxnIDSQL = `
 `
 
 type txnStatements struct {
+	db              *sql.DB
+	writer          *sqlutil.TransactionWriter
 	selectTxnIDStmt *sql.Stmt
 }
 
 func (s *txnStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(txnIDSchema)
 	if err != nil {
 		return
@@ -55,6 +61,9 @@ func (s *txnStatements) prepare(db *sql.DB) (err error) {
 func (s *txnStatements) selectTxnID(
 	ctx context.Context,
 ) (txnID int, err error) {
-	err = s.selectTxnIDStmt.QueryRowContext(ctx).Scan(&txnID)
+	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		err := s.selectTxnIDStmt.QueryRowContext(ctx).Scan(&txnID)
+		return err
+	})
 	return
 }

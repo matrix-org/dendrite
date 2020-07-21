@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const profilesSchema = `
@@ -46,6 +47,8 @@ const setDisplayNameSQL = "" +
 	"UPDATE account_profiles SET display_name = $1 WHERE localpart = $2"
 
 type profilesStatements struct {
+	db                           *sql.DB
+	writer                       *sqlutil.TransactionWriter
 	insertProfileStmt            *sql.Stmt
 	selectProfileByLocalpartStmt *sql.Stmt
 	setAvatarURLStmt             *sql.Stmt
@@ -53,6 +56,8 @@ type profilesStatements struct {
 }
 
 func (s *profilesStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(profilesSchema)
 	if err != nil {
 		return
@@ -75,8 +80,10 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 func (s *profilesStatements) insertProfile(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) (err error) {
-	_, err = txn.Stmt(s.insertProfileStmt).ExecContext(ctx, localpart, "", "")
-	return
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		_, err := txn.Stmt(s.insertProfileStmt).ExecContext(ctx, localpart, "", "")
+		return err
+	})
 }
 
 func (s *profilesStatements) selectProfileByLocalpart(

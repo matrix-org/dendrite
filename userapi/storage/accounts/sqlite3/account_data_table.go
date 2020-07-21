@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const accountDataSchema = `
@@ -48,12 +50,16 @@ const selectAccountDataByTypeSQL = "" +
 	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
 
 type accountDataStatements struct {
+	db                          *sql.DB
+	writer                      *sqlutil.TransactionWriter
 	insertAccountDataStmt       *sql.Stmt
 	selectAccountDataStmt       *sql.Stmt
 	selectAccountDataByTypeStmt *sql.Stmt
 }
 
 func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(accountDataSchema)
 	if err != nil {
 		return
@@ -73,8 +79,10 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 func (s *accountDataStatements) insertAccountData(
 	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType string, content json.RawMessage,
 ) (err error) {
-	_, err = txn.Stmt(s.insertAccountDataStmt).ExecContext(ctx, localpart, roomID, dataType, content)
-	return
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		_, err := txn.Stmt(s.insertAccountDataStmt).ExecContext(ctx, localpart, roomID, dataType, content)
+		return err
+	})
 }
 
 func (s *accountDataStatements) selectAccountData(

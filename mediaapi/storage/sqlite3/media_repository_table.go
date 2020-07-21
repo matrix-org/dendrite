@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -60,6 +61,8 @@ SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user
 `
 
 type mediaStatements struct {
+	db              *sql.DB
+	writer          *sqlutil.TransactionWriter
 	insertMediaStmt *sql.Stmt
 	selectMediaStmt *sql.Stmt
 }
@@ -80,18 +83,21 @@ func (s *mediaStatements) insertMedia(
 	ctx context.Context, mediaMetadata *types.MediaMetadata,
 ) error {
 	mediaMetadata.CreationTimestamp = types.UnixMs(time.Now().UnixNano() / 1000000)
-	_, err := s.insertMediaStmt.ExecContext(
-		ctx,
-		mediaMetadata.MediaID,
-		mediaMetadata.Origin,
-		mediaMetadata.ContentType,
-		mediaMetadata.FileSizeBytes,
-		mediaMetadata.CreationTimestamp,
-		mediaMetadata.UploadName,
-		mediaMetadata.Base64Hash,
-		mediaMetadata.UserID,
-	)
-	return err
+	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.insertMediaStmt)
+		_, err := stmt.ExecContext(
+			ctx,
+			mediaMetadata.MediaID,
+			mediaMetadata.Origin,
+			mediaMetadata.ContentType,
+			mediaMetadata.FileSizeBytes,
+			mediaMetadata.CreationTimestamp,
+			mediaMetadata.UploadName,
+			mediaMetadata.Base64Hash,
+			mediaMetadata.UserID,
+		)
+		return err
+	})
 }
 
 func (s *mediaStatements) selectMedia(
