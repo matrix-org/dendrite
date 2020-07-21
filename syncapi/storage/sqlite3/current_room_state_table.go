@@ -84,6 +84,8 @@ const selectEventsWithEventIDsSQL = "" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 type currentRoomStateStatements struct {
+	db                              *sql.DB
+	writer                          *sqlutil.TransactionWriter
 	streamIDStatements              *streamIDStatements
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
@@ -95,6 +97,8 @@ type currentRoomStateStatements struct {
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *streamIDStatements) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{
+		db:                 db,
+		writer:             sqlutil.NewTransactionWriter(),
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(currentRoomStateSchema)
@@ -196,9 +200,11 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
-	_, err := stmt.ExecContext(ctx, eventID)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
+		_, err := stmt.ExecContext(ctx, eventID)
+		return err
+	})
 }
 
 func (s *currentRoomStateStatements) UpsertRoomState(
@@ -219,20 +225,22 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	}
 
 	// upsert state event
-	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
-	_, err = stmt.ExecContext(
-		ctx,
-		event.RoomID(),
-		event.EventID(),
-		event.Type(),
-		event.Sender(),
-		containsURL,
-		*event.StateKey(),
-		headeredJSON,
-		membership,
-		addedAt,
-	)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
+		_, err := stmt.ExecContext(
+			ctx,
+			event.RoomID(),
+			event.EventID(),
+			event.Type(),
+			event.Sender(),
+			containsURL,
+			*event.StateKey(),
+			headeredJSON,
+			membership,
+			addedAt,
+		)
+		return err
+	})
 }
 
 func (s *currentRoomStateStatements) SelectEventsWithEventIDs(

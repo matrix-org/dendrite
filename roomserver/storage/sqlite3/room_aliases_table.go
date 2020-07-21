@@ -87,7 +87,8 @@ func (s *roomAliasesStatements) InsertRoomAlias(
 	ctx context.Context, alias string, roomID string, creatorUserID string,
 ) (err error) {
 	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		_, err := s.insertRoomAliasStmt.ExecContext(ctx, alias, roomID, creatorUserID)
+		stmt := sqlutil.TxStmt(txn, s.insertRoomAliasStmt)
+		_, err := stmt.ExecContext(ctx, alias, roomID, creatorUserID)
 		return err
 	})
 }
@@ -139,7 +140,8 @@ func (s *roomAliasesStatements) DeleteRoomAlias(
 	ctx context.Context, alias string,
 ) (err error) {
 	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		_, err := s.deleteRoomAliasStmt.ExecContext(ctx, alias)
+		stmt := sqlutil.TxStmt(txn, s.deleteRoomAliasStmt)
+		_, err := stmt.ExecContext(ctx, alias)
 		return err
 	})
 }

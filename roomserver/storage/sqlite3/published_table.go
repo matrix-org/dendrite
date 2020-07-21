@@ -71,7 +71,8 @@ func (s *publishedStatements) UpsertRoomPublished(
 	ctx context.Context, roomID string, published bool,
 ) (err error) {
 	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		_, err := s.upsertPublishedStmt.ExecContext(ctx, roomID, published)
+		stmt := sqlutil.TxStmt(txn, s.upsertPublishedStmt)
+		_, err := stmt.ExecContext(ctx, roomID, published)
 		return err
 	})
 }

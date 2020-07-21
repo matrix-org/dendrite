@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -362,7 +363,7 @@ func (d *Database) StoreEvent(
 				ctx, txn, txnAndSessionID.TransactionID,
 				txnAndSessionID.SessionID, event.Sender(), event.EventID(),
 			); err != nil {
-				return err
+				return fmt.Errorf("d.TransactionsTable.InsertTransaction: %w", err)
 			}
 		}
 
@@ -377,15 +378,15 @@ func (d *Database) StoreEvent(
 		// room.
 		var roomVersion gomatrixserverlib.RoomVersion
 		if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
-			return err
+			return fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 		}
 
 		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
-			return err
+			return fmt.Errorf("d.assignRoomNID: %w", err)
 		}
 
 		if eventTypeNID, err = d.assignEventTypeNID(ctx, txn, event.Type()); err != nil {
-			return err
+			return fmt.Errorf("d.assignEventTypeNID: %w", err)
 		}
 
 		eventStateKey := event.StateKey()
@@ -393,7 +394,7 @@ func (d *Database) StoreEvent(
 		// Otherwise set the numeric ID for the state_key to 0.
 		if eventStateKey != nil {
 			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, txn, *eventStateKey); err != nil {
-				return err
+				return fmt.Errorf("d.assignStateKeyNID: %w", err)
 			}
 		}
 
@@ -411,17 +412,20 @@ func (d *Database) StoreEvent(
 			if err == sql.ErrNoRows {
 				// We've already inserted the event so select the numeric event ID
 				eventNID, stateNID, err = d.EventsTable.SelectEvent(ctx, txn, event.EventID())
+				if err != nil {
+					return fmt.Errorf("d.EventsTable.SelectEvent: %w", err)
+				}
 			}
 			if err != nil {
-				return err
+				return fmt.Errorf("d.EventsTable.InsertEvent: %w", err)
 			}
 		}
 
 		if err = d.EventJSONTable.InsertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
-			return err
+			return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 		}
 		redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
-		return err
+		return nil
 	})
 	if err != nil {
 		return 0, types.StateAtEvent{}, nil, "", err

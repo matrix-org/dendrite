@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -52,7 +53,13 @@ func MustCreateEvent(t *testing.T, roomID string, prevs []gomatrixserverlib.Head
 }
 
 func MustCreateDatabase(t *testing.T) storage.Database {
-	db, err := sqlite3.NewDatabase("file::memory:")
+	dbname := fmt.Sprintf("test_%s.db", t.Name())
+	if _, err := os.Stat(dbname); err == nil {
+		if err = os.Remove(dbname); err != nil {
+			t.Fatalf("tried to delete stale test database but failed: %s", err)
+		}
+	}
+	db, err := sqlite3.NewDatabase(fmt.Sprintf("file:%s", dbname))
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}

@@ -104,6 +104,8 @@ const selectStateInRangeSQL = "" +
 	" LIMIT $8" // limit
 
 type outputRoomEventsStatements struct {
+	db                            *sql.DB
+	writer                        *sqlutil.TransactionWriter
 	streamIDStatements            *streamIDStatements
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -117,6 +119,8 @@ type outputRoomEventsStatements struct {
 
 func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
 	s := &outputRoomEventsStatements{
+		db:                 db,
+		writer:             sqlutil.NewTransactionWriter(),
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(outputRoomEventsSchema)
@@ -155,8 +159,10 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 	if err != nil {
 		return err
 	}
-	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
-	return err
+	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+		return err
+	})
 }
 
 // selectStateInRange returns the state events between the two given PDU stream positions, exclusive of oldPos, inclusive of newPos.
@@ -267,7 +273,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	ctx context.Context, txn *sql.Tx,
 	event *gomatrixserverlib.HeaderedEvent, addState, removeState []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
-) (streamPos types.StreamPosition, err error) {
+) (types.StreamPosition, error) {
 	var txnID *string
 	var sessionID *int64
 	if transactionID != nil {
@@ -284,43 +290,47 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	}
 
 	var headeredJSON []byte
-	headeredJSON, err = json.Marshal(event)
+	headeredJSON, err := json.Marshal(event)
 	if err != nil {
-		return
-	}
-
-	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
-	if err != nil {
-		return
+		return 0, err
 	}
 
 	addStateJSON, err := json.Marshal(addState)
 	if err != nil {
-		return
+		return 0, err
 	}
 	removeStateJSON, err := json.Marshal(removeState)
 	if err != nil {
-		return
+		return 0, err
 	}
 
-	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
-	_, err = insertStmt.ExecContext(
-		ctx,
-		streamPos,
-		event.RoomID(),
-		event.EventID(),
-		headeredJSON,
-		event.Type(),
-		event.Sender(),
-		containsURL,
-		string(addStateJSON),
-		string(removeStateJSON),
-		sessionID,
-		txnID,
-		excludeFromSync,
-		excludeFromSync,
-	)
-	return
+	var streamPos types.StreamPosition
+	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+		if err != nil {
+			return err
+		}
+
+		insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
+		_, ierr := insertStmt.ExecContext(
+			ctx,
+			streamPos,
+			event.RoomID(),
+			event.EventID(),
+			headeredJSON,
+			event.Type(),
+			event.Sender(),
+			containsURL,
+			string(addStateJSON),
+			string(removeStateJSON),
+			sessionID,
+			txnID,
+			excludeFromSync,
+			excludeFromSync,
+		)
+		return ierr
+	})
+	return streamPos, err
 }
 
 func (s *outputRoomEventsStatements) SelectRecentEvents(

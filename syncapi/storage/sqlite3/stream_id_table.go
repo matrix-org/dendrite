@@ -27,11 +27,15 @@ const selectStreamIDStmt = "" +
 	"SELECT stream_id FROM syncapi_stream_id WHERE stream_name = $1"
 
 type streamIDStatements struct {
+	db                   *sql.DB
+	writer               *sqlutil.TransactionWriter
 	increaseStreamIDStmt *sql.Stmt
 	selectStreamIDStmt   *sql.Stmt
 }
 
 func (s *streamIDStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(streamIDTableSchema)
 	if err != nil {
 		return
@@ -48,11 +52,14 @@ func (s *streamIDStatements) prepare(db *sql.DB) (err error) {
 func (s *streamIDStatements) nextStreamID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
 	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
 	selectStmt := sqlutil.TxStmt(txn, s.selectStreamIDStmt)
-	if _, err = increaseStmt.ExecContext(ctx, "global"); err != nil {
-		return
-	}
-	if err = selectStmt.QueryRowContext(ctx, "global").Scan(&pos); err != nil {
-		return
-	}
+	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		if _, ierr := increaseStmt.ExecContext(ctx, "global"); err != nil {
+			return ierr
+		}
+		if serr := selectStmt.QueryRowContext(ctx, "global").Scan(&pos); err != nil {
+			return serr
+		}
+		return nil
+	})
 	return
 }

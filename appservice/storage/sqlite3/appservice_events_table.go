@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -65,6 +66,8 @@ const (
 )
 
 type eventsStatements struct {
+	db                                     *sql.DB
+	writer                                 *sqlutil.TransactionWriter
 	selectEventsByApplicationServiceIDStmt *sql.Stmt
 	countEventsByApplicationServiceIDStmt  *sql.Stmt
 	insertEventStmt                        *sql.Stmt
@@ -73,6 +76,8 @@ type eventsStatements struct {
 }
 
 func (s *eventsStatements) prepare(db *sql.DB) (err error) {
+	s.db = db
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(appserviceEventsSchema)
 	if err != nil {
 		return
@@ -217,13 +222,15 @@ func (s *eventsStatements) insertEvent(
 		return err
 	}
 
-	_, err = s.insertEventStmt.ExecContext(
-		ctx,
-		appServiceID,
-		eventJSON,
-		-1, // No transaction ID yet
-	)
-	return
+	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		_, err := s.insertEventStmt.ExecContext(
+			ctx,
+			appServiceID,
+			eventJSON,
+			-1, // No transaction ID yet
+		)
+		return err
+	})
 }
 
 // updateTxnIDForEvents sets the transactionID for a collection of events. Done
@@ -234,8 +241,10 @@ func (s *eventsStatements) updateTxnIDForEvents(
 	appserviceID string,
 	maxID, txnID int,
 ) (err error) {
-	_, err = s.updateTxnIDForEventsStmt.ExecContext(ctx, txnID, appserviceID, maxID)
-	return
+	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		_, err := s.updateTxnIDForEventsStmt.ExecContext(ctx, txnID, appserviceID, maxID)
+		return err
+	})
 }
 
 // deleteEventsBeforeAndIncludingID removes events matching given IDs from the database.
@@ -244,6 +253,8 @@ func (s *eventsStatements) deleteEventsBeforeAndIncludingID(
 	appserviceID string,
 	eventTableID int,
 ) (err error) {
-	_, err = s.deleteEventsBeforeAndIncludingIDStmt.ExecContext(ctx, appserviceID, eventTableID)
-	return
+	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		_, err := s.deleteEventsBeforeAndIncludingIDStmt.ExecContext(ctx, appserviceID, eventTableID)
+		return err
+	})
 }

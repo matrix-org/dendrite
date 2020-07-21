@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 )
 
@@ -47,13 +48,18 @@ const deleteBackwardExtremitySQL = "" +
 	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND prev_event_id = $2"
 
 type backwardExtremitiesStatements struct {
+	db                                   *sql.DB
+	writer                               *sqlutil.TransactionWriter
 	insertBackwardExtremityStmt          *sql.Stmt
 	selectBackwardExtremitiesForRoomStmt *sql.Stmt
 	deleteBackwardExtremityStmt          *sql.Stmt
 }
 
 func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities, error) {
-	s := &backwardExtremitiesStatements{}
+	s := &backwardExtremitiesStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(backwardExtremitiesSchema)
 	if err != nil {
 		return nil, err
@@ -73,8 +79,10 @@ func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities
 func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 	ctx context.Context, txn *sql.Tx, roomID, eventID string, prevEventID string,
 ) (err error) {
-	_, err = txn.Stmt(s.insertBackwardExtremityStmt).ExecContext(ctx, roomID, eventID, prevEventID)
-	return
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		_, err := txn.Stmt(s.insertBackwardExtremityStmt).ExecContext(ctx, roomID, eventID, prevEventID)
+		return err
+	})
 }
 
 func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
@@ -102,6 +110,8 @@ func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
 func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 	ctx context.Context, txn *sql.Tx, roomID, knownEventID string,
 ) (err error) {
-	_, err = txn.Stmt(s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
-	return
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		_, err := txn.Stmt(s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
+		return err
+	})
 }

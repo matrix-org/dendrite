@@ -281,16 +281,16 @@ func (d *Database) WriteEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
 		}
 		pduPosition = pos
 
 		if err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
-			return err
+			return fmt.Errorf("d.Topology.InsertEventInTopology: %w", err)
 		}
 
 		if err = d.handleBackwardExtremities(ctx, txn, ev); err != nil {
-			return err
+			return fmt.Errorf("d.handleBackwardExtremities: %w", err)
 		}
 
 		if len(addStateEvents) == 0 && len(removeStateEventIDs) == 0 {
@@ -313,7 +313,7 @@ func (d *Database) updateRoomState(
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 	for _, eventID := range removedEventIDs {
 		if err := d.CurrentRoomState.DeleteRoomStateByEventID(ctx, txn, eventID); err != nil {
-			return err
+			return fmt.Errorf("d.CurrentRoomState.DeleteRoomStateByEventID: %w", err)
 		}
 	}
 
@@ -326,13 +326,13 @@ func (d *Database) updateRoomState(
 		if event.Type() == "m.room.member" {
 			value, err := event.Membership()
 			if err != nil {
-				return err
+				return fmt.Errorf("event.Membership: %w", err)
 			}
 			membership = &value
 		}
 
 		if err := d.CurrentRoomState.UpsertRoomState(ctx, txn, event, membership, pduPosition); err != nil {
-			return err
+			return fmt.Errorf("d.CurrentRoomState.UpsertRoomState: %w", err)
 		}
 	}
 
