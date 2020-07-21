@@ -18,6 +18,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -65,13 +66,13 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 	// Store the event.
 	roomNID, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
-		return
+		return "", fmt.Errorf("r.DB.StoreEvent: %w", err)
 	}
 	// if storing this event results in it being redacted then do so.
 	if redactedEventID == event.EventID() {
 		r, rerr := eventutil.RedactEvent(redactionEvent, &event)
 		if rerr != nil {
-			return "", rerr
+			return "", fmt.Errorf("eventutil.RedactEvent: %w", rerr)
 		}
 		event = *r
 	}
@@ -93,7 +94,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, input, roomNID, &stateAtEvent, event)
 		if err != nil {
-			return
+			return "", fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
 	}
 
@@ -105,7 +106,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 		input.SendAsServer,  // send as server
 		input.TransactionID, // transaction ID
 	); err != nil {
-		return
+		return "", fmt.Errorf("r.updateLatestEvents: %w", err)
 	}
 
 	// processing this event resulted in an event (which may not be the one we're processing)
@@ -123,7 +124,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 			},
 		})
 		if err != nil {
-			return
+			return "", fmt.Errorf("r.WriteOutputEvents: %w", err)
 		}
 	}
 

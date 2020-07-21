@@ -140,7 +140,7 @@ func (s *roomAliasesStatements) DeleteRoomAlias(
 	ctx context.Context, alias string,
 ) (err error) {
 	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertRoomAliasStmt)
+		stmt := sqlutil.TxStmt(txn, s.deleteRoomAliasStmt)
 		_, err := stmt.ExecContext(ctx, alias)
 		return err
 	})
