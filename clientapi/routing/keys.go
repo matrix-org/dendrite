@@ -117,3 +117,40 @@ func QueryKeys(req *http.Request, keyAPI api.KeyInternalAPI) util.JSONResponse {
 		},
 	}
 }
+
+type claimKeysRequest struct {
+	TimeoutMS int `json:"timeout"`
+	//  The keys to be claimed. A map from user ID, to a map from device ID to algorithm name.
+	OneTimeKeys map[string]map[string]string `json:"one_time_keys"`
+}
+
+func (r *claimKeysRequest) GetTimeout() time.Duration {
+	if r.TimeoutMS == 0 {
+		return 10 * time.Second
+	}
+	return time.Duration(r.TimeoutMS) * time.Millisecond
+}
+
+func ClaimKeys(req *http.Request, keyAPI api.KeyInternalAPI) util.JSONResponse {
+	var r claimKeysRequest
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return *resErr
+	}
+	claimRes := api.PerformClaimKeysResponse{}
+	keyAPI.PerformClaimKeys(req.Context(), &api.PerformClaimKeysRequest{
+		OneTimeKeys: r.OneTimeKeys,
+		Timeout:     r.GetTimeout(),
+	}, &claimRes)
+	if claimRes.Error != nil {
+		util.GetLogger(req.Context()).WithError(claimRes.Error).Error("failed to PerformClaimKeys")
+		return jsonerror.InternalServerError()
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: map[string]interface{}{
+			"one_time_keys": claimRes.OneTimeKeys,
+			"failures":      claimRes.Failures,
+		},
+	}
+}

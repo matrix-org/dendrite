@@ -16,6 +16,7 @@ package tables
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
@@ -24,6 +25,9 @@ import (
 type OneTimeKeys interface {
 	SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
 	InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error)
+	// SelectAndDeleteOneTimeKey selects a single one time key matching the user/device/algorithm specified and returns the algo:key_id => JSON.
+	// Returns an empty map if the key does not exist.
+	SelectAndDeleteOneTimeKey(ctx context.Context, txn *sql.Tx, userID, deviceID, algorithm string) (map[string]json.RawMessage, error)
 }
 
 type DeviceKeys interface {
