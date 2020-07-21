@@ -39,4 +39,8 @@ type Database interface {
 	// DeviceKeysForUser returns the device keys for the device IDs given. If the length of deviceIDs is 0, all devices are selected.
 	// If there are some missing keys, they are omitted from the returned slice. There is no ordering on the returned slice.
 	DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error)
+
+	// ClaimKeys based on the 3-uple of user_id, device_id and algorithm name. Returns the keys claimed. Returns no error if a key
+	// cannot be claimed or if none exist for this (user, device, algorithm), instead it is omitted from the returned slice.
+	ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[string]map[string]string) ([]api.OneTimeKeys, error)
 }

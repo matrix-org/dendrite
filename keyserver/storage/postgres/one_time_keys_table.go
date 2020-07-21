@@ -52,11 +52,19 @@ const selectKeysSQL = "" +
 const selectKeysCountSQL = "" +
 	"SELECT algorithm, COUNT(key_id) FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2 GROUP BY algorithm"
 
+const deleteOneTimeKeySQL = "" +
+	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 AND key_id = $4"
+
+const selectKeyByAlgorithmSQL = "" +
+	"SELECT key_id, key_json FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 LIMIT 1"
+
 type oneTimeKeysStatements struct {
-	db                  *sql.DB
-	upsertKeysStmt      *sql.Stmt
-	selectKeysStmt      *sql.Stmt
-	selectKeysCountStmt *sql.Stmt
+	db                       *sql.DB
+	upsertKeysStmt           *sql.Stmt
+	selectKeysStmt           *sql.Stmt
+	selectKeysCountStmt      *sql.Stmt
+	selectKeyByAlgorithmStmt *sql.Stmt
+	deleteOneTimeKeyStmt     *sql.Stmt
 }
 
 func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
@@ -74,6 +82,12 @@ func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
 		return nil, err
 	}
 	if s.selectKeysCountStmt, err = db.Prepare(selectKeysCountSQL); err != nil {
+		return nil, err
+	}
+	if s.selectKeyByAlgorithmStmt, err = db.Prepare(selectKeyByAlgorithmSQL); err != nil {
+		return nil, err
+	}
+	if s.deleteOneTimeKeyStmt, err = db.Prepare(deleteOneTimeKeySQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -140,4 +154,22 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, keys api.
 
 		return rows.Err()
 	})
+}
+
+func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
+	ctx context.Context, txn *sql.Tx, userID, deviceID, algorithm string,
+) (map[string]json.RawMessage, error) {
+	var keyID string
+	var keyJSON string
+	err := txn.StmtContext(ctx, s.selectKeyByAlgorithmStmt).QueryRowContext(ctx, userID, deviceID, algorithm).Scan(&keyID, &keyJSON)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	_, err = txn.StmtContext(ctx, s.deleteOneTimeKeyStmt).ExecContext(ctx, userID, deviceID, algorithm, keyID)
+	return map[string]json.RawMessage{
+		algorithm + ":" + keyID: json.RawMessage(keyJSON),
+	}, err
 }

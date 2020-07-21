@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 )
@@ -47,4 +48,27 @@ func (d *Database) StoreDeviceKeys(ctx context.Context, keys []api.DeviceKeys) e
 
 func (d *Database) DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error) {
 	return d.DeviceKeysTable.SelectBatchDeviceKeys(ctx, userID, deviceIDs)
+}
+
+func (d *Database) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[string]map[string]string) ([]api.OneTimeKeys, error) {
+	var result []api.OneTimeKeys
+	err := sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		for userID, deviceToAlgo := range userToDeviceToAlgorithm {
+			for deviceID, algo := range deviceToAlgo {
+				keyJSON, err := d.OneTimeKeysTable.SelectAndDeleteOneTimeKey(ctx, txn, userID, deviceID, algo)
+				if err != nil {
+					return err
+				}
+				if keyJSON != nil {
+					result = append(result, api.OneTimeKeys{
+						UserID:   userID,
+						DeviceID: deviceID,
+						KeyJSON:  keyJSON,
+					})
+				}
+			}
+		}
+		return nil
+	})
+	return result, err
 }
