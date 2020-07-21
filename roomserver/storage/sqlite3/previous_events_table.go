@@ -53,12 +53,17 @@ const selectPreviousEventExistsSQL = `
 `
 
 type previousEventStatements struct {
+	db                            *sql.DB
+	writer                        *sqlutil.TransactionWriter
 	insertPreviousEventStmt       *sql.Stmt
 	selectPreviousEventExistsStmt *sql.Stmt
 }
 
 func NewSqlitePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
-	s := &previousEventStatements{}
+	s := &previousEventStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(previousEventSchema)
 	if err != nil {
 		return nil, err
@@ -77,11 +82,13 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	previousEventReferenceSHA256 []byte,
 	eventNID types.EventNID,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
-	_, err := stmt.ExecContext(
-		ctx, previousEventID, previousEventReferenceSHA256, int64(eventNID),
-	)
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
+		_, err := stmt.ExecContext(
+			ctx, previousEventID, previousEventReferenceSHA256, int64(eventNID),
+		)
+		return err
+	})
 }
 
 // Check if the event reference exists

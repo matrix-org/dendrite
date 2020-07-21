@@ -44,12 +44,17 @@ const selectTransactionEventIDSQL = `
 `
 
 type transactionStatements struct {
+	db                           *sql.DB
+	writer                       *sqlutil.TransactionWriter
 	insertTransactionStmt        *sql.Stmt
 	selectTransactionEventIDStmt *sql.Stmt
 }
 
 func NewSqliteTransactionsTable(db *sql.DB) (tables.Transactions, error) {
-	s := &transactionStatements{}
+	s := &transactionStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(transactionsSchema)
 	if err != nil {
 		return nil, err
@@ -68,11 +73,13 @@ func (s *transactionStatements) InsertTransaction(
 	userID string,
 	eventID string,
 ) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.insertTransactionStmt)
-	_, err = stmt.ExecContext(
-		ctx, transactionID, sessionID, userID, eventID,
-	)
-	return
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		stmt := sqlutil.TxStmt(txn, s.insertTransactionStmt)
+		_, err := stmt.ExecContext(
+			ctx, transactionID, sessionID, userID, eventID,
+		)
+		return err
+	})
 }
 
 func (s *transactionStatements) SelectTransactionEventID(

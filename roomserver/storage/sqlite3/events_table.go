@@ -99,6 +99,7 @@ const selectRoomNIDForEventNIDSQL = "" +
 
 type eventStatements struct {
 	db                                     *sql.DB
+	writer                                 *sqlutil.TransactionWriter
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
 	bulkSelectStateEventByIDStmt           *sql.Stmt
@@ -115,8 +116,10 @@ type eventStatements struct {
 }
 
 func NewSqliteEventsTable(db *sql.DB) (tables.Events, error) {
-	s := &eventStatements{}
-	s.db = db
+	s := &eventStatements{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
 	_, err := db.Exec(eventsSchema)
 	if err != nil {
 		return nil, err
@@ -151,19 +154,23 @@ func (s *eventStatements) InsertEvent(
 	depth int64,
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	// attempt to insert: the last_row_id is the event NID
-	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
-	result, err := insertStmt.ExecContext(
-		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
-		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
-	)
-	if err != nil {
-		return 0, 0, err
-	}
-	modified, err := result.RowsAffected()
-	if modified == 0 && err == nil {
-		return 0, 0, sql.ErrNoRows
-	}
-	eventNID, err := result.LastInsertId()
+	var eventNID int64
+	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
+		result, err := insertStmt.ExecContext(
+			ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
+			eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
+		)
+		if err != nil {
+			return err
+		}
+		modified, err := result.RowsAffected()
+		if modified == 0 && err == nil {
+			return sql.ErrNoRows
+		}
+		eventNID, err = result.LastInsertId()
+		return err
+	})
 	return types.EventNID(eventNID), 0, err
 }
 
@@ -279,8 +286,10 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 func (s *eventStatements) UpdateEventState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	_, err := s.updateEventStateStmt.ExecContext(ctx, int64(stateNID), int64(eventNID))
-	return err
+	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		_, err := s.updateEventStateStmt.ExecContext(ctx, int64(stateNID), int64(eventNID))
+		return err
+	})
 }
 
 func (s *eventStatements) SelectEventSentToOutput(
@@ -288,17 +297,15 @@ func (s *eventStatements) SelectEventSentToOutput(
 ) (sentToOutput bool, err error) {
 	selectStmt := sqlutil.TxStmt(txn, s.selectEventSentToOutputStmt)
 	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
-	//err = s.selectEventSentToOutputStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
-	if err != nil {
-	}
 	return
 }
 
 func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
-	updateStmt := sqlutil.TxStmt(txn, s.updateEventSentToOutputStmt)
-	_, err := updateStmt.ExecContext(ctx, int64(eventNID))
-	//_, err := s.updateEventSentToOutputStmt.ExecContext(ctx, int64(eventNID))
-	return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		updateStmt := sqlutil.TxStmt(txn, s.updateEventSentToOutputStmt)
+		_, err := updateStmt.ExecContext(ctx, int64(eventNID))
+		return err
+	})
 }
 
 func (s *eventStatements) SelectEventID(
