@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/internal"
 	"github.com/matrix-org/dendrite/keyserver/inthttp"
 	"github.com/matrix-org/dendrite/keyserver/storage"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
@@ -32,7 +33,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
-func NewInternalAPI(cfg *config.Dendrite) api.KeyInternalAPI {
+func NewInternalAPI(cfg *config.Dendrite, fedClient *gomatrixserverlib.FederationClient) api.KeyInternalAPI {
 	db, err := storage.NewDatabase(
 		string(cfg.Database.E2EKey),
 		cfg.DbProperties(),
@@ -43,5 +44,6 @@ func NewInternalAPI(cfg *config.Dendrite) api.KeyInternalAPI {
 	return &internal.KeyInternalAPI{
 		DB:         db,
 		ThisServer: cfg.Matrix.ServerName,
+		FedClient:  fedClient,
 	}
 }
