@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -36,7 +36,7 @@ type OutgoingQueues struct {
 	rsAPI       api.RoomserverInternalAPI
 	origin      gomatrixserverlib.ServerName
 	client      *gomatrixserverlib.FederationClient
-	statistics  *types.Statistics
+	statistics  *statistics.Statistics
 	signing     *SigningInfo
 	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
@@ -48,7 +48,7 @@ func NewOutgoingQueues(
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
-	statistics *types.Statistics,
+	statistics *statistics.Statistics,
 	signing *SigningInfo,
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
@@ -77,7 +77,9 @@ func NewOutgoingQueues(
 		log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
 	}
 	for serverName := range serverNames {
-		queues.getQueue(serverName).wakeQueueIfNeeded()
+		if !queues.getQueue(serverName).statistics.Blacklisted() {
+			queues.getQueue(serverName).wakeQueueIfNeeded()
+		}
 	}
 	return queues
 }

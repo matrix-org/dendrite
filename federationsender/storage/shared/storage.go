@@ -33,6 +33,7 @@ type Database struct {
 	FederationSenderQueueJSON   tables.FederationSenderQueueJSON
 	FederationSenderJoinedHosts tables.FederationSenderJoinedHosts
 	FederationSenderRooms       tables.FederationSenderRooms
+	FederationSenderBlacklist   tables.FederationSenderBlacklist
 }
 
 // An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
@@ -135,4 +136,16 @@ func (d *Database) StoreJSON(
 	return &Receipt{
 		nids: []int64{nid},
 	}, nil
+}
+
+func (d *Database) AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error {
+	return d.FederationSenderBlacklist.InsertBlacklist(context.TODO(), nil, serverName)
+}
+
+func (d *Database) RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error {
+	return d.FederationSenderBlacklist.DeleteBlacklist(context.TODO(), nil, serverName)
+}
+
+func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
+	return d.FederationSenderBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
 }

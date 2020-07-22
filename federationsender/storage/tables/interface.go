@@ -60,3 +60,9 @@ type FederationSenderRooms interface {
 	SelectRoomForUpdate(ctx context.Context, txn *sql.Tx, roomID string) (string, error)
 	UpdateRoom(ctx context.Context, txn *sql.Tx, roomID, lastEventID string) error
 }
+
+type FederationSenderBlacklist interface {
+	InsertBlacklist(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
+	SelectBlacklist(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (bool, error)
+	DeleteBlacklist(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
+}

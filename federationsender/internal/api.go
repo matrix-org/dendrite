@@ -2,8 +2,8 @@ package internal
 
 import (
 	"github.com/matrix-org/dendrite/federationsender/queue"
+	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -13,7 +13,7 @@ import (
 type FederationSenderInternalAPI struct {
 	db         storage.Database
 	cfg        *config.Dendrite
-	statistics *types.Statistics
+	statistics *statistics.Statistics
 	rsAPI      api.RoomserverInternalAPI
 	federation *gomatrixserverlib.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
@@ -25,7 +25,7 @@ func NewFederationSenderInternalAPI(
 	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
-	statistics *types.Statistics,
+	statistics *statistics.Statistics,
 	queues *queue.OutgoingQueues,
 ) *FederationSenderInternalAPI {
 	return &FederationSenderInternalAPI{

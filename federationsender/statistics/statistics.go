@@ -1,27 +1,28 @@
-package types
+package statistics
 
 import (
 	"math"
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
-)
-
-const (
-	// How many times should we tolerate consecutive failures before we
-	// just blacklist the host altogether? Bear in mind that the backoff
-	// is exponential, so the max time here to attempt is 2**failures.
-	FailuresUntilBlacklist = 16 // 16 equates to roughly 18 hours.
 )
 
 // Statistics contains information about all of the remote federated
 // hosts that we have interacted with. It is basically a threadsafe
 // wrapper.
 type Statistics struct {
+	DB      storage.Database
 	servers map[gomatrixserverlib.ServerName]*ServerStatistics
 	mutex   sync.RWMutex
+
+	// How many times should we tolerate consecutive failures before we
+	// just blacklist the host altogether? The backoff is exponential,
+	// so the max time here to attempt is 2**failures seconds.
+	FailuresUntilBlacklist uint32
 }
 
 // ForServer returns server statistics for the given server name. If it
@@ -40,9 +41,18 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 	// If we don't, then make one.
 	if !found {
 		s.mutex.Lock()
-		server = &ServerStatistics{}
+		server = &ServerStatistics{
+			statistics: s,
+			serverName: serverName,
+		}
 		s.servers[serverName] = server
 		s.mutex.Unlock()
+		blacklisted, err := s.DB.IsServerBlacklisted(serverName)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to get blacklist entry %q", serverName)
+		} else {
+			server.blacklisted.Store(blacklisted)
+		}
 	}
 	return server
 }
@@ -52,10 +62,12 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 // many times we failed etc. It also manages the backoff time and black-
 // listing a remote host if it remains uncooperative.
 type ServerStatistics struct {
-	blacklisted    atomic.Bool   // is the remote side dead?
-	backoffUntil   atomic.Value  // time.Time to wait until before sending requests
-	failCounter    atomic.Uint32 // how many times have we failed?
-	successCounter atomic.Uint32 // how many times have we succeeded?
+	statistics     *Statistics                  //
+	serverName     gomatrixserverlib.ServerName //
+	blacklisted    atomic.Bool                  // is the node blacklisted
+	backoffUntil   atomic.Value                 // time.Time to wait until before sending requests
+	failCounter    atomic.Uint32                // how many times have we failed?
+	successCounter atomic.Uint32                // how many times have we succeeded?
 }
 
 // Success updates the server statistics with a new successful
@@ -66,6 +78,9 @@ func (s *ServerStatistics) Success() {
 	s.successCounter.Add(1)
 	s.failCounter.Store(0)
 	s.blacklisted.Store(false)
+	if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
+		logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
+	}
 }
 
 // Failure marks a failure and works out when to backoff until. It
@@ -77,12 +92,15 @@ func (s *ServerStatistics) Failure() bool {
 	failCounter := s.failCounter.Add(1)
 
 	// Check that we haven't failed more times than is acceptable.
-	if failCounter >= FailuresUntilBlacklist {
+	if failCounter >= s.statistics.FailuresUntilBlacklist {
 		// We've exceeded the maximum amount of times we're willing
 		// to back off, which is probably in the region of hours by
 		// now. Mark the host as blacklisted and tell the caller to
 		// give up.
 		s.blacklisted.Store(true)
+		if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
+			logrus.WithError(err).Errorf("Failed to add %q to blacklist", s.serverName)
+		}
 		return true
 	}
 
