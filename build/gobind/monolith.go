@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -85,6 +86,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
+	cfg.Matrix.FederationMaxRetries = 6
 	cfg.Kafka.UseNaffka = true
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
@@ -153,6 +155,7 @@ func (m *DendriteMonolith) Start() {
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
+		KeyAPI:              keyserver.NewInternalAPI(base.Cfg, federation),
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,
 		),

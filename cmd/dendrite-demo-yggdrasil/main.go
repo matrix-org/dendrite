@@ -72,6 +72,7 @@ func main() {
 	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
+	cfg.Matrix.FederationMaxRetries = 6
 	cfg.Kafka.UseNaffka = true
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
