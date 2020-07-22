@@ -49,8 +49,10 @@ func NewInternalAPI(
 	}
 
 	stats := &statistics.Statistics{
-		DB: federationSenderDB,
+		DB:                     federationSenderDB,
+		FailuresUntilBlacklist: base.Cfg.Matrix.FederationMaxRetries,
 	}
+
 	queues := queue.NewOutgoingQueues(
 		federationSenderDB, base.Cfg.Matrix.ServerName, federation, rsAPI, stats,
 		&queue.SigningInfo{

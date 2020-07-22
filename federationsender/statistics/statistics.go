@@ -11,13 +11,6 @@ import (
 	"go.uber.org/atomic"
 )
 
-const (
-	// How many times should we tolerate consecutive failures before we
-	// just blacklist the host altogether? Bear in mind that the backoff
-	// is exponential, so the max time here to attempt is 2**failures.
-	FailuresUntilBlacklist = 3 // 16 equates to roughly 18 hours.
-)
-
 // Statistics contains information about all of the remote federated
 // hosts that we have interacted with. It is basically a threadsafe
 // wrapper.
@@ -25,6 +18,11 @@ type Statistics struct {
 	DB      storage.Database
 	servers map[gomatrixserverlib.ServerName]*ServerStatistics
 	mutex   sync.RWMutex
+
+	// How many times should we tolerate consecutive failures before we
+	// just blacklist the host altogether? Bear in mind that the backoff
+	// is exponential, so the max time here to attempt is 2**failures.
+	FailuresUntilBlacklist uint32
 }
 
 // ForServer returns server statistics for the given server name. If it
@@ -95,7 +93,7 @@ func (s *ServerStatistics) Failure() bool {
 	failCounter := s.failCounter.Add(1)
 
 	// Check that we haven't failed more times than is acceptable.
-	if failCounter >= FailuresUntilBlacklist {
+	if failCounter >= s.statistics.FailuresUntilBlacklist {
 		// We've exceeded the maximum amount of times we're willing
 		// to back off, which is probably in the region of hours by
 		// now. Mark the host as blacklisted and tell the caller to

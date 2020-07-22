@@ -102,6 +102,11 @@ type Dendrite struct {
 		// Perspective keyservers, to use as a backup when direct key fetch
 		// requests don't succeed
 		KeyPerspectives KeyPerspectives `yaml:"key_perspectives"`
+		// Federation failure threshold. How many consecutive failures that we should
+		// tolerate when sending federation requests to a specific server. The backoff
+		// is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds, etc.
+		// The default value is 16 if not specified, which is circa 18 hours.
+		FederationMaxRetries uint32 `yaml:"federation_max_retries"`
 	} `yaml:"matrix"`
 
 	// The configuration specific to the media repostitory.
@@ -477,6 +482,10 @@ func (config *Dendrite) SetDefaults() {
 
 	if config.Matrix.TrustedIDServers == nil {
 		config.Matrix.TrustedIDServers = []string{}
+	}
+
+	if config.Matrix.FederationMaxRetries == 0 {
+		config.Matrix.FederationMaxRetries = 16
 	}
 
 	if config.Media.MaxThumbnailGenerators == 0 {
