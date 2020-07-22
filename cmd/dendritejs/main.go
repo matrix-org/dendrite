@@ -233,7 +233,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
-		KeyAPI:              keyserver.NewInternalAPI(base.Cfg, federation),
+		KeyAPI:              keyserver.NewInternalAPI(base.Cfg, federation, userAPI),
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}

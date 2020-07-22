@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
+// nolint: gocyclo
 func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 	internalAPIMux.Handle(PerformAccountCreationPath,
 		httputil.MakeInternalAPI("performAccountCreation", func(req *http.Request) util.JSONResponse {
@@ -98,6 +99,19 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.QueryAccountData(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QueryDeviceInfosPath,
+		httputil.MakeInternalAPI("queryDeviceInfos", func(req *http.Request) util.JSONResponse {
+			request := api.QueryDeviceInfosRequest{}
+			response := api.QueryDeviceInfosResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.QueryDeviceInfos(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

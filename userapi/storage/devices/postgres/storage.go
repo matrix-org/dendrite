@@ -71,6 +71,10 @@ func (d *Database) GetDevicesByLocalpart(
 	return d.devices.selectDevicesByLocalpart(ctx, localpart)
 }
 
+func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
+	return d.devices.selectDevicesByID(ctx, deviceIDs)
+}
+
 // CreateDevice makes a new device associated with the given user ID localpart.
 // If there is already a device with the same device ID for this user, that access token will be revoked
 // and replaced with the given accessToken. If the given accessToken is already in use for another device,

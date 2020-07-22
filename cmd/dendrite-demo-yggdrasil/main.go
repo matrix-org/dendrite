@@ -141,7 +141,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
-		KeyAPI:              keyserver.NewInternalAPI(base.Cfg, federation),
+		KeyAPI:              keyserver.NewInternalAPI(base.Cfg, federation, userAPI),
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,

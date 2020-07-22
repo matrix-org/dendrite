@@ -30,10 +30,11 @@ func main() {
 	keyRing := serverKeyAPI.KeyRing()
 	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
+	keyAPI := base.KeyServerHTTPClient()
 
 	federationapi.AddPublicRoutes(
 		base.PublicAPIMux, base.Cfg, userAPI, federation, keyRing,
-		rsAPI, fsAPI, base.EDUServerClient(), base.CurrentStateAPIClient(),
+		rsAPI, fsAPI, base.EDUServerClient(), base.CurrentStateAPIClient(), keyAPI,
 	)
 
 	base.SetupAndServeHTTP(string(base.Cfg.Bind.FederationAPI), string(base.Cfg.Listen.FederationAPI))

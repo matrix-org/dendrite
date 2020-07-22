@@ -125,6 +125,27 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfil
 	return nil
 }
 
+func (a *UserInternalAPI) QueryDeviceInfos(ctx context.Context, req *api.QueryDeviceInfosRequest, res *api.QueryDeviceInfosResponse) error {
+	devices, err := a.DeviceDB.GetDevicesByID(ctx, req.DeviceIDs)
+	if err != nil {
+		return err
+	}
+	res.DeviceInfo = make(map[string]struct {
+		DisplayName string
+		UserID      string
+	})
+	for _, d := range devices {
+		res.DeviceInfo[d.ID] = struct {
+			DisplayName string
+			UserID      string
+		}{
+			DisplayName: d.DisplayName,
+			UserID:      d.UserID,
+		}
+	}
+	return nil
+}
+
 func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevicesRequest, res *api.QueryDevicesResponse) error {
 	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
