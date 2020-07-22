@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -66,11 +67,25 @@ func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformC
 				Err: fmt.Sprintf("failed to ClaimKeys locally: %s", err),
 			}
 		}
-		mergeInto(res.OneTimeKeys, keys)
+		util.GetLogger(ctx).WithField("keys_claimed", len(keys)).WithField("num_users", len(local)).Info("Claimed local keys")
+		for _, key := range keys {
+			_, ok := res.OneTimeKeys[key.UserID]
+			if !ok {
+				res.OneTimeKeys[key.UserID] = make(map[string]map[string]json.RawMessage)
+			}
+			_, ok = res.OneTimeKeys[key.UserID][key.DeviceID]
+			if !ok {
+				res.OneTimeKeys[key.UserID][key.DeviceID] = make(map[string]json.RawMessage)
+			}
+			for keyID, keyJSON := range key.KeyJSON {
+				res.OneTimeKeys[key.UserID][key.DeviceID][keyID] = keyJSON
+			}
+		}
 		delete(domainToDeviceKeys, string(a.ThisServer))
 	}
-	// claim remote keys
-	a.claimRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
+	if len(domainToDeviceKeys) > 0 {
+		a.claimRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
+	}
 }
 
 func (a *KeyInternalAPI) claimRemoteKeys(
@@ -82,6 +97,7 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 	wg.Add(len(domainToDeviceKeys))
 	// mutex for failures
 	var failMu sync.Mutex
+	util.GetLogger(ctx).WithField("num_servers", len(domainToDeviceKeys)).Info("Claiming remote keys from servers")
 
 	// fan out
 	for d, k := range domainToDeviceKeys {
@@ -108,6 +124,7 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 		close(resultCh)
 	}()
 
+	keysClaimed := 0
 	for result := range resultCh {
 		for userID, nest := range result.OneTimeKeys {
 			res.OneTimeKeys[userID] = make(map[string]map[string]json.RawMessage)
@@ -119,10 +136,12 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 						continue
 					}
 					res.OneTimeKeys[userID][deviceID][keyIDWithAlgo] = keyJSON
+					keysClaimed++
 				}
 			}
 		}
 	}
+	util.GetLogger(ctx).WithField("num_keys", keysClaimed).Info("Claimed remote keys")
 }
 
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
@@ -297,20 +316,4 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 
 func (a *KeyInternalAPI) emitDeviceKeyChanges(existing, new []api.DeviceKeys) {
 	// TODO
-}
-
-func mergeInto(dst map[string]map[string]map[string]json.RawMessage, src []api.OneTimeKeys) {
-	for _, key := range src {
-		_, ok := dst[key.UserID]
-		if !ok {
-			dst[key.UserID] = make(map[string]map[string]json.RawMessage)
-		}
-		_, ok = dst[key.UserID][key.DeviceID]
-		if !ok {
-			dst[key.UserID][key.DeviceID] = make(map[string]json.RawMessage)
-		}
-		for keyID, keyJSON := range key.KeyJSON {
-			dst[key.UserID][key.DeviceID][keyID] = keyJSON
-		}
-	}
 }

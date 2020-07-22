@@ -73,7 +73,7 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 	federationapi.AddPublicRoutes(
 		publicMux, m.Config, m.UserAPI, m.FedClient,
 		m.KeyRing, m.RoomserverAPI, m.FederationSenderAPI,
-		m.EDUInternalAPI, m.StateAPI,
+		m.EDUInternalAPI, m.StateAPI, m.KeyAPI,
 	)
 	mediaapi.AddPublicRoutes(publicMux, m.Config, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(

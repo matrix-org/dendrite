@@ -24,6 +24,7 @@ import (
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -54,6 +55,7 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient,
 	userAPI userapi.UserInternalAPI,
 	stateAPI currentstateAPI.CurrentStateInternalAPI,
+	keyAPI keyserverAPI.KeyInternalAPI,
 ) {
 	v2keysmux := publicAPIMux.PathPrefix(pathPrefixV2Keys).Subrouter()
 	v1fedmux := publicAPIMux.PathPrefix(pathPrefixV1Federation).Subrouter()
@@ -299,4 +301,18 @@ func Setup(
 			return GetPostPublicRooms(req, rsAPI, stateAPI)
 		}),
 	).Methods(http.MethodGet)
+
+	v1fedmux.Handle("/user/keys/claim", httputil.MakeFedAPI(
+		"federation_keys_claim", cfg.Matrix.ServerName, keys, wakeup,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			return ClaimOneTimeKeys(httpReq, request, keyAPI, cfg.Matrix.ServerName)
+		},
+	)).Methods(http.MethodPost)
+
+	v1fedmux.Handle("/user/keys/query", httputil.MakeFedAPI(
+		"federation_keys_query", cfg.Matrix.ServerName, keys, wakeup,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			return QueryDeviceKeys(httpReq, request, keyAPI, cfg.Matrix.ServerName)
+		},
+	)).Methods(http.MethodPost)
 }

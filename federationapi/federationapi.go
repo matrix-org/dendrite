@@ -20,6 +20,7 @@ import (
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
+	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
@@ -38,11 +39,12 @@ func AddPublicRoutes(
 	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	stateAPI currentstateAPI.CurrentStateInternalAPI,
+	keyAPI keyserverAPI.KeyInternalAPI,
 ) {
 
 	routing.Setup(
 		router, cfg, rsAPI,
 		eduAPI, federationSenderAPI, keyRing,
-		federation, userAPI, stateAPI,
+		federation, userAPI, stateAPI, keyAPI,
 	)
 }

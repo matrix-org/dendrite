@@ -19,11 +19,105 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"golang.org/x/crypto/ed25519"
 )
+
+type queryKeysRequest struct {
+	DeviceKeys map[string][]string `json:"device_keys"`
+}
+
+// QueryDeviceKeys returns device keys for users on this server.
+// https://matrix.org/docs/spec/server_server/latest#post-matrix-federation-v1-user-keys-query
+func QueryDeviceKeys(
+	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.KeyInternalAPI, thisServer gomatrixserverlib.ServerName,
+) util.JSONResponse {
+	var qkr queryKeysRequest
+	err := json.Unmarshal(request.Content(), &qkr)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+	// make sure we only query users on our domain
+	for userID := range qkr.DeviceKeys {
+		_, serverName, err := gomatrixserverlib.SplitID('@', userID)
+		if err != nil {
+			delete(qkr.DeviceKeys, userID)
+			continue // ignore invalid users
+		}
+		if serverName != thisServer {
+			delete(qkr.DeviceKeys, userID)
+			continue
+		}
+	}
+
+	var queryRes api.QueryKeysResponse
+	keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
+		UserToDevices: qkr.DeviceKeys,
+	}, &queryRes)
+	if queryRes.Error != nil {
+		util.GetLogger(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
+		return jsonerror.InternalServerError()
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct {
+			DeviceKeys interface{} `json:"device_keys"`
+		}{queryRes.DeviceKeys},
+	}
+}
+
+type claimOTKsRequest struct {
+	OneTimeKeys map[string]map[string]string `json:"one_time_keys"`
+}
+
+// ClaimOneTimeKeys claims OTKs for users on this server.
+// https://matrix.org/docs/spec/server_server/latest#post-matrix-federation-v1-user-keys-claim
+func ClaimOneTimeKeys(
+	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.KeyInternalAPI, thisServer gomatrixserverlib.ServerName,
+) util.JSONResponse {
+	var cor claimOTKsRequest
+	err := json.Unmarshal(request.Content(), &cor)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+	// make sure we only claim users on our domain
+	for userID := range cor.OneTimeKeys {
+		_, serverName, err := gomatrixserverlib.SplitID('@', userID)
+		if err != nil {
+			delete(cor.OneTimeKeys, userID)
+			continue // ignore invalid users
+		}
+		if serverName != thisServer {
+			delete(cor.OneTimeKeys, userID)
+			continue
+		}
+	}
+
+	var claimRes api.PerformClaimKeysResponse
+	keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
+		OneTimeKeys: cor.OneTimeKeys,
+	}, &claimRes)
+	if claimRes.Error != nil {
+		util.GetLogger(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
+		return jsonerror.InternalServerError()
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct {
+			OneTimeKeys interface{} `json:"one_time_keys"`
+		}{claimRes.OneTimeKeys},
+	}
+}
 
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
