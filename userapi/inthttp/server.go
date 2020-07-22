@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
+// nolint: gocyclo
 func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 	internalAPIMux.Handle(PerformAccountCreationPath,
 		httputil.MakeInternalAPI("performAccountCreation", func(req *http.Request) util.JSONResponse {
