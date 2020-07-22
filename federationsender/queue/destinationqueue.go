@@ -66,11 +66,6 @@ type destinationQueue struct {
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
 func (oq *destinationQueue) sendEvent(receipt *shared.Receipt) {
-	if oq.statistics.Blacklisted() {
-		// If the destination is blacklisted then drop the event.
-		log.Infof("%s is blacklisted; dropping event", oq.destination)
-		return
-	}
 	// Create a transaction ID. We'll either do this if we don't have
 	// one made up yet, or if we've exceeded the number of maximum
 	// events allowed in a single tranaction. We'll reset the counter
@@ -97,13 +92,17 @@ func (oq *destinationQueue) sendEvent(receipt *shared.Receipt) {
 	// We've successfully added a PDU to the transaction so increase
 	// the counter.
 	oq.transactionCount.Add(1)
-	// Wake up the queue if it's asleep.
-	oq.wakeQueueIfNeeded()
-	// If we're blocking on waiting PDUs then tell the queue that we
-	// have work to do.
-	select {
-	case oq.notifyPDUs <- true:
-	default:
+	// Check if the destination is blacklisted. If it isn't then wake
+	// up the queue.
+	if !oq.statistics.Blacklisted() {
+		// Wake up the queue if it's asleep.
+		oq.wakeQueueIfNeeded()
+		// If we're blocking on waiting PDUs then tell the queue that we
+		// have work to do.
+		select {
+		case oq.notifyPDUs <- true:
+		default:
+		}
 	}
 }
 
@@ -111,11 +110,6 @@ func (oq *destinationQueue) sendEvent(receipt *shared.Receipt) {
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
 func (oq *destinationQueue) sendEDU(receipt *shared.Receipt) {
-	if oq.statistics.Blacklisted() {
-		// If the destination is blacklisted then drop the event.
-		log.Infof("%s is blacklisted; dropping ephemeral event", oq.destination)
-		return
-	}
 	// Create a database entry that associates the given PDU NID with
 	// this destination queue. We'll then be able to retrieve the PDU
 	// later.
@@ -130,13 +124,17 @@ func (oq *destinationQueue) sendEDU(receipt *shared.Receipt) {
 	// We've successfully added an EDU to the transaction so increase
 	// the counter.
 	oq.transactionCount.Add(1)
-	// Wake up the queue if it's asleep.
-	oq.wakeQueueIfNeeded()
-	// If we're blocking on waiting PDUs then tell the queue that we
-	// have work to do.
-	select {
-	case oq.notifyEDUs <- true:
-	default:
+	// Check if the destination is blacklisted. If it isn't then wake
+	// up the queue.
+	if !oq.statistics.Blacklisted() {
+		// Wake up the queue if it's asleep.
+		oq.wakeQueueIfNeeded()
+		// If we're blocking on waiting EDUs then tell the queue that we
+		// have work to do.
+		select {
+		case oq.notifyEDUs <- true:
+		default:
+		}
 	}
 }
 
