@@ -1,5 +1,4 @@
-// Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -94,6 +93,9 @@ func (s *blacklistStatements) SelectBlacklist(
 		return false, err
 	}
 	defer res.Close() // nolint:errcheck
+	// The query will return the server name if the server is blacklisted, and
+	// will return no rows if not. By calling Next, we find out if a row was
+	// returned or not - we don't care about the value itself.
 	return res.Next(), nil
 }
 

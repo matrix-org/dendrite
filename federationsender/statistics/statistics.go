@@ -20,8 +20,8 @@ type Statistics struct {
 	mutex   sync.RWMutex
 
 	// How many times should we tolerate consecutive failures before we
-	// just blacklist the host altogether? Bear in mind that the backoff
-	// is exponential, so the max time here to attempt is 2**failures.
+	// just blacklist the host altogether? The backoff is exponential,
+	// so the max time here to attempt is 2**failures seconds.
 	FailuresUntilBlacklist uint32
 }
 
@@ -77,10 +77,9 @@ type ServerStatistics struct {
 func (s *ServerStatistics) Success() {
 	s.successCounter.Add(1)
 	s.failCounter.Store(0)
+	s.blacklisted.Store(false)
 	if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
 		logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
-	} else {
-		s.blacklisted.Store(false)
 	}
 }
 
@@ -98,10 +97,9 @@ func (s *ServerStatistics) Failure() bool {
 		// to back off, which is probably in the region of hours by
 		// now. Mark the host as blacklisted and tell the caller to
 		// give up.
+		s.blacklisted.Store(true)
 		if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
 			logrus.WithError(err).Errorf("Failed to add %q to blacklist", s.serverName)
-		} else {
-			s.blacklisted.Store(true)
 		}
 		return true
 	}
