@@ -49,6 +49,12 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 		}
 		s.servers[serverName] = server
 		s.mutex.Unlock()
+		blacklisted, err := s.DB.IsServerBlacklisted(serverName)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to get blacklist entry %q", serverName)
+		} else {
+			server.blacklisted.Store(blacklisted)
+		}
 	}
 	return server
 }
@@ -60,6 +66,7 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 type ServerStatistics struct {
 	statistics     *Statistics                  //
 	serverName     gomatrixserverlib.ServerName //
+	blacklisted    atomic.Bool                  // is the node blacklisted
 	backoffUntil   atomic.Value                 // time.Time to wait until before sending requests
 	failCounter    atomic.Uint32                // how many times have we failed?
 	successCounter atomic.Uint32                // how many times have we succeeded?
@@ -74,6 +81,8 @@ func (s *ServerStatistics) Success() {
 	s.failCounter.Store(0)
 	if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
 		logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
+	} else {
+		s.blacklisted.Store(false)
 	}
 }
 
@@ -93,7 +102,8 @@ func (s *ServerStatistics) Failure() bool {
 		// give up.
 		if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
 			logrus.WithError(err).Errorf("Failed to add %q to blacklist", s.serverName)
-			return false
+		} else {
+			s.blacklisted.Store(true)
 		}
 		return true
 	}
@@ -124,13 +134,7 @@ func (s *ServerStatistics) BackoffDuration() (bool, time.Duration) {
 // Blacklisted returns true if the server is blacklisted and false
 // otherwise.
 func (s *ServerStatistics) Blacklisted() bool {
-	blacklisted, err := s.statistics.DB.IsServerBlacklisted(s.serverName)
-	if err != nil {
-		logrus.WithError(err).Errorf("Failed to get blacklist entry %q", s.serverName)
-		// why did this happen?
-		return false
-	}
-	return blacklisted
+	return s.blacklisted.Load()
 }
 
 // SuccessCount returns the number of successful requests. This is
