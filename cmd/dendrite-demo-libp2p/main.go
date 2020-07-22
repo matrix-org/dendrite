@@ -186,7 +186,7 @@ func main() {
 		ServerKeyAPI:           serverKeyAPI,
 		StateAPI:               stateAPI,
 		UserAPI:                userAPI,
-		KeyAPI:                 keyserver.NewInternalAPI(base.Base.Cfg, federation),
+		KeyAPI:                 keyserver.NewInternalAPI(base.Base.Cfg, federation, userAPI),
 		ExtPublicRoomsProvider: provider,
 	}
 	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)

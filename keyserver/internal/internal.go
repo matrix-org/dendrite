@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
@@ -34,6 +35,7 @@ type KeyInternalAPI struct {
 	DB         storage.Database
 	ThisServer gomatrixserverlib.ServerName
 	FedClient  *gomatrixserverlib.FederationClient
+	UserAPI    userapi.UserInternalAPI
 }
 
 func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
@@ -107,6 +109,7 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 			defer cancel()
 			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, gomatrixserverlib.ServerName(domain), keysToClaim)
 			if err != nil {
+				util.GetLogger(ctx).WithError(err).WithField("server", domain).Error("ClaimKeys failed")
 				failMu.Lock()
 				res.Failures[domain] = map[string]interface{}{
 					"message": err.Error(),
@@ -164,13 +167,28 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 				}
 				return
 			}
+
+			// pull out display names after we have the keys so we handle wildcards correctly
+			var dids []string
+			for _, dk := range deviceKeys {
+				dids = append(dids, dk.DeviceID)
+			}
+			var queryRes userapi.QueryDeviceInfosResponse
+			err = a.UserAPI.QueryDeviceInfos(ctx, &userapi.QueryDeviceInfosRequest{
+				DeviceIDs: dids,
+			}, &queryRes)
+			if err != nil {
+				util.GetLogger(ctx).Warnf("Failed to QueryDeviceInfos for device IDs, display names will be missing")
+			}
+
 			if res.DeviceKeys[userID] == nil {
 				res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 			}
 			for _, dk := range deviceKeys {
-				// inject an empty 'unsigned' key which should be used for display names
-				// (but not via this API? unsure when they should be added)
-				dk.KeyJSON, _ = sjson.SetBytes(dk.KeyJSON, "unsigned", struct{}{})
+				// inject display name if known
+				dk.KeyJSON, _ = sjson.SetBytes(dk.KeyJSON, "unsigned", struct {
+					DisplayName string `json:"device_display_name,omitempty"`
+				}{queryRes.DeviceInfo[dk.DeviceID].DisplayName})
 				res.DeviceKeys[userID][dk.DeviceID] = dk.KeyJSON
 			}
 		} else {

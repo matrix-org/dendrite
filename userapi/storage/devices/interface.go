@@ -24,6 +24,7 @@ type Database interface {
 	GetDeviceByAccessToken(ctx context.Context, token string) (*api.Device, error)
 	GetDeviceByID(ctx context.Context, localpart, deviceID string) (*api.Device, error)
 	GetDevicesByLocalpart(ctx context.Context, localpart string) ([]api.Device, error)
+	GetDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error)
 	// CreateDevice makes a new device associated with the given user ID localpart.
 	// If there is already a device with the same device ID for this user, that access token will be revoked
 	// and replaced with the given accessToken. If the given accessToken is already in use for another device,

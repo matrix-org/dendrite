@@ -30,6 +30,7 @@ type UserInternalAPI interface {
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 }
 
 // InputAccountDataRequest is the request for InputAccountData
@@ -42,6 +43,19 @@ type InputAccountDataRequest struct {
 
 // InputAccountDataResponse is the response for InputAccountData
 type InputAccountDataResponse struct {
+}
+
+// QueryDeviceInfosRequest is the request to QueryDeviceInfos
+type QueryDeviceInfosRequest struct {
+	DeviceIDs []string
+}
+
+// QueryDeviceInfosResponse is the response to QueryDeviceInfos
+type QueryDeviceInfosResponse struct {
+	DeviceInfo map[string]struct {
+		DisplayName string
+		UserID      string
+	}
 }
 
 // QueryAccessTokenRequest is the request for QueryAccessToken
