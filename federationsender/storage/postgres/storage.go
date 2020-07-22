@@ -56,6 +56,10 @@ func NewDatabase(dataSourceName string, dbProperties sqlutil.DbProperties) (*Dat
 	if err != nil {
 		return nil, err
 	}
+	blacklist, err := NewPostgresBlacklistTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                          d.db,
 		FederationSenderJoinedHosts: joinedHosts,
@@ -63,6 +67,7 @@ func NewDatabase(dataSourceName string, dbProperties sqlutil.DbProperties) (*Dat
 		FederationSenderQueueEDUs:   queueEDUs,
 		FederationSenderQueueJSON:   queueJSON,
 		FederationSenderRooms:       rooms,
+		FederationSenderBlacklist:   blacklist,
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "federationsender"); err != nil {
 		return nil, err

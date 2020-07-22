@@ -47,4 +47,8 @@ type Database interface {
 
 	GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
+
+	AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error
+	RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error
+	IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error)
 }

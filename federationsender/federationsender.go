@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/inthttp"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/federationsender/storage/statistics"
 	"github.com/matrix-org/dendrite/internal/setup"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -48,9 +48,11 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
-	statistics := &types.Statistics{}
+	stats := &statistics.Statistics{
+		DB: federationSenderDB,
+	}
 	queues := queue.NewOutgoingQueues(
-		federationSenderDB, base.Cfg.Matrix.ServerName, federation, rsAPI, statistics,
+		federationSenderDB, base.Cfg.Matrix.ServerName, federation, rsAPI, stats,
 		&queue.SigningInfo{
 			KeyID:      base.Cfg.Matrix.KeyID,
 			PrivateKey: base.Cfg.Matrix.PrivateKey,
@@ -73,5 +75,5 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 
-	return internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, rsAPI, federation, keyRing, statistics, queues)
+	return internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, rsAPI, federation, keyRing, stats, queues)
 }

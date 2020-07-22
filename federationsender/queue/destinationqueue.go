@@ -23,7 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
-	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/federationsender/storage/statistics"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -51,7 +51,7 @@ type destinationQueue struct {
 	destination        gomatrixserverlib.ServerName            // destination of requests
 	running            atomic.Bool                             // is the queue worker running?
 	backingOff         atomic.Bool                             // true if we're backing off
-	statistics         *types.ServerStatistics                 // statistics about this remote server
+	statistics         *statistics.ServerStatistics            // statistics about this remote server
 	incomingInvites    chan *gomatrixserverlib.InviteV2Request // invites to send
 	transactionIDMutex sync.Mutex                              // protects transactionID
 	transactionID      gomatrixserverlib.TransactionID         // last transaction ID

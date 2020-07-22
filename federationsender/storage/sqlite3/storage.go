@@ -62,6 +62,10 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	blacklist, err := NewSQLiteBlacklistTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                          d.db,
 		FederationSenderJoinedHosts: joinedHosts,
@@ -69,6 +73,7 @@ func NewDatabase(dataSourceName string) (*Database, error) {
 		FederationSenderQueueEDUs:   queueEDUs,
 		FederationSenderQueueJSON:   queueJSON,
 		FederationSenderRooms:       rooms,
+		FederationSenderBlacklist:   blacklist,
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "federationsender"); err != nil {
 		return nil, err

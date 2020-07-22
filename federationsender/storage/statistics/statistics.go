@@ -1,11 +1,13 @@
-package types
+package statistics
 
 import (
 	"math"
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 )
 
@@ -13,13 +15,14 @@ const (
 	// How many times should we tolerate consecutive failures before we
 	// just blacklist the host altogether? Bear in mind that the backoff
 	// is exponential, so the max time here to attempt is 2**failures.
-	FailuresUntilBlacklist = 16 // 16 equates to roughly 18 hours.
+	FailuresUntilBlacklist = 3 // 16 equates to roughly 18 hours.
 )
 
 // Statistics contains information about all of the remote federated
 // hosts that we have interacted with. It is basically a threadsafe
 // wrapper.
 type Statistics struct {
+	DB      storage.Database
 	servers map[gomatrixserverlib.ServerName]*ServerStatistics
 	mutex   sync.RWMutex
 }
@@ -40,7 +43,10 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 	// If we don't, then make one.
 	if !found {
 		s.mutex.Lock()
-		server = &ServerStatistics{}
+		server = &ServerStatistics{
+			statistics: s,
+			serverName: serverName,
+		}
 		s.servers[serverName] = server
 		s.mutex.Unlock()
 	}
@@ -52,10 +58,11 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 // many times we failed etc. It also manages the backoff time and black-
 // listing a remote host if it remains uncooperative.
 type ServerStatistics struct {
-	blacklisted    atomic.Bool   // is the remote side dead?
-	backoffUntil   atomic.Value  // time.Time to wait until before sending requests
-	failCounter    atomic.Uint32 // how many times have we failed?
-	successCounter atomic.Uint32 // how many times have we succeeded?
+	statistics     *Statistics                  //
+	serverName     gomatrixserverlib.ServerName //
+	backoffUntil   atomic.Value                 // time.Time to wait until before sending requests
+	failCounter    atomic.Uint32                // how many times have we failed?
+	successCounter atomic.Uint32                // how many times have we succeeded?
 }
 
 // Success updates the server statistics with a new successful
@@ -65,7 +72,9 @@ type ServerStatistics struct {
 func (s *ServerStatistics) Success() {
 	s.successCounter.Add(1)
 	s.failCounter.Store(0)
-	s.blacklisted.Store(false)
+	if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
+		logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
+	}
 }
 
 // Failure marks a failure and works out when to backoff until. It
@@ -82,7 +91,10 @@ func (s *ServerStatistics) Failure() bool {
 		// to back off, which is probably in the region of hours by
 		// now. Mark the host as blacklisted and tell the caller to
 		// give up.
-		s.blacklisted.Store(true)
+		if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
+			logrus.WithError(err).Errorf("Failed to add %q to blacklist", s.serverName)
+			return false
+		}
 		return true
 	}
 
@@ -112,7 +124,13 @@ func (s *ServerStatistics) BackoffDuration() (bool, time.Duration) {
 // Blacklisted returns true if the server is blacklisted and false
 // otherwise.
 func (s *ServerStatistics) Blacklisted() bool {
-	return s.blacklisted.Load()
+	blacklisted, err := s.statistics.DB.IsServerBlacklisted(s.serverName)
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to get blacklist entry %q", s.serverName)
+		// why did this happen?
+		return false
+	}
+	return blacklisted
 }
 
 // SuccessCount returns the number of successful requests. This is
