@@ -25,7 +25,8 @@ import (
 const blacklistSchema = `
 CREATE TABLE IF NOT EXISTS federationsender_blacklist (
     -- The blacklisted server name
-    server_name TEXT NOT NULL
+	server_name TEXT NOT NULL,
+	UNIQUE (server_name)
 );
 `
 
