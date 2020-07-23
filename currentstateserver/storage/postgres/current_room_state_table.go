@@ -77,14 +77,18 @@ const selectBulkStateContentSQL = "" +
 const selectBulkStateContentWildSQL = "" +
 	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id = ANY($1) AND type = ANY($2)"
 
+const selectJoinedUsersSetForRoomsSQL = "" +
+	"SELECT DISTINCT state_key FROM currentstate_current_room_state WHERE room_id = ANY($1) AND type = 'm.room.member' and content_value = 'join'"
+
 type currentRoomStateStatements struct {
-	upsertRoomStateStmt             *sql.Stmt
-	deleteRoomStateByEventIDStmt    *sql.Stmt
-	selectRoomIDsWithMembershipStmt *sql.Stmt
-	selectEventsWithEventIDsStmt    *sql.Stmt
-	selectStateEventStmt            *sql.Stmt
-	selectBulkStateContentStmt      *sql.Stmt
-	selectBulkStateContentWildStmt  *sql.Stmt
+	upsertRoomStateStmt              *sql.Stmt
+	deleteRoomStateByEventIDStmt     *sql.Stmt
+	selectRoomIDsWithMembershipStmt  *sql.Stmt
+	selectEventsWithEventIDsStmt     *sql.Stmt
+	selectStateEventStmt             *sql.Stmt
+	selectBulkStateContentStmt       *sql.Stmt
+	selectBulkStateContentWildStmt   *sql.Stmt
+	selectJoinedUsersSetForRoomsStmt *sql.Stmt
 }
 
 func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -114,7 +118,27 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	if s.selectBulkStateContentWildStmt, err = db.Prepare(selectBulkStateContentWildSQL); err != nil {
 		return nil, err
 	}
+	if s.selectJoinedUsersSetForRoomsStmt, err = db.Prepare(selectJoinedUsersSetForRoomsSQL); err != nil {
+		return nil, err
+	}
 	return s, nil
+}
+
+func (s *currentRoomStateStatements) SelectJoinedUsersSetForRooms(ctx context.Context, roomIDs []string) ([]string, error) {
+	rows, err := s.selectJoinedUsersSetForRoomsStmt.QueryContext(ctx, pq.StringArray(roomIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsersSetForRooms: rows.close() failed")
+	var userIDs []string
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		userIDs = append(userIDs, userID)
+	}
+	return userIDs, rows.Err()
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.

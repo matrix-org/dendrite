@@ -68,3 +68,16 @@ func (a *CurrentStateInternalAPI) QueryBulkStateContent(ctx context.Context, req
 	}
 	return nil
 }
+
+func (a *CurrentStateInternalAPI) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
+	roomIDs, err := a.DB.GetRoomsByMembership(ctx, req.UserID, "join")
+	if err != nil {
+		return err
+	}
+	users, err := a.DB.JoinedUsersSetInRooms(ctx, roomIDs)
+	if err != nil {
+		return err
+	}
+	res.UserIDs = users
+	return nil
+}

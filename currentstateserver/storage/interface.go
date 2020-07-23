@@ -37,4 +37,6 @@ type Database interface {
 	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
 	// Redact a state event
 	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause gomatrixserverlib.HeaderedEvent) error
+	// JoinedUsersSetInRooms returns all joined users in the rooms given.
+	JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) ([]string, error)
 }
