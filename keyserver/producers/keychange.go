@@ -41,15 +41,17 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceKeys) error {
 		m.Topic = string(p.Topic)
 		m.Key = sarama.StringEncoder(key.UserID)
 		m.Value = sarama.ByteEncoder(value)
-		logrus.WithFields(logrus.Fields{
-			"user_id":   key.UserID,
-			"device_id": key.DeviceID,
-		}).Infof("Producing to key change topic '%s'", p.Topic)
 
-		_, _, err = p.Producer.SendMessage(&m)
+		partition, offset, err := p.Producer.SendMessage(&m)
 		if err != nil {
 			return err
 		}
+		logrus.WithFields(logrus.Fields{
+			"user_id":   key.UserID,
+			"device_id": key.DeviceID,
+			"partition": partition,
+			"offset":    offset,
+		}).Infof("Produced to key change topic '%s'", p.Topic)
 	}
 	return nil
 }
