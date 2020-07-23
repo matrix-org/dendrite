@@ -66,13 +66,17 @@ const selectBulkStateContentSQL = "" +
 const selectBulkStateContentWildSQL = "" +
 	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id IN ($1) AND type IN ($2)"
 
+const selectJoinedUsersSetForRoomsSQL = "" +
+	"SELECT DISTINCT state_key FROM currentstate_current_room_state WHERE room_id IN ($1) AND type = 'm.room.member' and content_value = 'join'"
+
 type currentRoomStateStatements struct {
-	db                              *sql.DB
-	writer                          *sqlutil.TransactionWriter
-	upsertRoomStateStmt             *sql.Stmt
-	deleteRoomStateByEventIDStmt    *sql.Stmt
-	selectRoomIDsWithMembershipStmt *sql.Stmt
-	selectStateEventStmt            *sql.Stmt
+	db                               *sql.DB
+	writer                           *sqlutil.TransactionWriter
+	upsertRoomStateStmt              *sql.Stmt
+	deleteRoomStateByEventIDStmt     *sql.Stmt
+	selectRoomIDsWithMembershipStmt  *sql.Stmt
+	selectStateEventStmt             *sql.Stmt
+	selectJoinedUsersSetForRoomsStmt *sql.Stmt
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -96,7 +100,32 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error)
 	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
 		return nil, err
 	}
+	if s.selectJoinedUsersSetForRoomsStmt, err = db.Prepare(selectJoinedUsersSetForRoomsSQL); err != nil {
+		return nil, err
+	}
 	return s, nil
+}
+
+func (s *currentRoomStateStatements) SelectJoinedUsersSetForRooms(ctx context.Context, roomIDs []string) ([]string, error) {
+	iRoomIDs := make([]interface{}, len(roomIDs))
+	for i, v := range roomIDs {
+		iRoomIDs[i] = v
+	}
+	query := strings.Replace(selectJoinedUsersSetForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
+	rows, err := s.db.QueryContext(ctx, query, iRoomIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsersSetForRooms: rows.close() failed")
+	var userIDs []string
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		userIDs = append(userIDs, userID)
+	}
+	return userIDs, rows.Err()
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.

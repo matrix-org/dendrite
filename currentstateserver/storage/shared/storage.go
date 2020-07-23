@@ -85,3 +85,7 @@ func (d *Database) StoreStateEvents(ctx context.Context, addStateEvents []gomatr
 func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error) {
 	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, nil, userID, membership)
 }
+
+func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) ([]string, error) {
+	return d.CurrentRoomState.SelectJoinedUsersSetForRooms(ctx, roomIDs)
+}

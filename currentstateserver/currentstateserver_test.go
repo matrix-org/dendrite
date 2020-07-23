@@ -16,9 +16,11 @@ package currentstateserver
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"net/http"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -163,6 +165,115 @@ func TestQueryCurrentState(t *testing.T) {
 			}
 		}
 	}
+	t.Run("HTTP API", func(t *testing.T) {
+		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
+		AddInternalRoutes(router, currStateAPI)
+		apiURL, cancel := test.ListenAndServe(t, router, false)
+		defer cancel()
+		httpAPI, err := inthttp.NewCurrentStateAPIClient(apiURL, &http.Client{})
+		if err != nil {
+			t.Fatalf("failed to create HTTP client")
+		}
+		runCases(httpAPI)
+	})
+	t.Run("Monolith", func(t *testing.T) {
+		runCases(currStateAPI)
+	})
+}
+
+func mustMakeMembershipEvent(t *testing.T, roomID, userID, membership string) *roomserverAPI.OutputNewRoomEvent {
+	eb := gomatrixserverlib.EventBuilder{
+		RoomID:   roomID,
+		Sender:   userID,
+		StateKey: &userID,
+		Type:     "m.room.member",
+		Content:  []byte(`{"membership":"` + membership + `"}`),
+	}
+	_, pkey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to make ed25519 key: %s", err)
+	}
+	roomVer := gomatrixserverlib.RoomVersionV5
+	ev, err := eb.Build(
+		time.Now(), gomatrixserverlib.ServerName("localhost"), gomatrixserverlib.KeyID("ed25519:test"),
+		pkey, roomVer,
+	)
+	if err != nil {
+		t.Fatalf("mustMakeMembershipEvent failed: %s", err)
+	}
+
+	return &roomserverAPI.OutputNewRoomEvent{
+		Event:             ev.Headered(roomVer),
+		AddsStateEventIDs: []string{ev.EventID()},
+	}
+}
+
+// This test makes sure that QuerySharedUsers is returning the correct users for a range of sets.
+func TestQuerySharedUsers(t *testing.T) {
+	currStateAPI, producer := MustMakeInternalAPI(t)
+	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo:bar", "@alice:localhost", "join"))
+	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo:bar", "@bob:localhost", "join"))
+
+	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo2:bar", "@alice:localhost", "join"))
+	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo2:bar", "@charlie:localhost", "join"))
+
+	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo3:bar", "@alice:localhost", "join"))
+	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo3:bar", "@bob:localhost", "join"))
+	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo3:bar", "@dave:localhost", "leave"))
+
+	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo4:bar", "@alice:localhost", "join"))
+
+	testCases := []struct {
+		req     api.QuerySharedUsersRequest
+		wantRes api.QuerySharedUsersResponse
+	}{
+		// Simple case: sharing (A,B) (A,C) (A,B) (A) produces (A,B,C)
+		{
+			req: api.QuerySharedUsersRequest{
+				UserID: "@alice:localhost",
+			},
+			wantRes: api.QuerySharedUsersResponse{
+				UserIDs: []string{"@alice:localhost", "@bob:localhost", "@charlie:localhost"},
+			},
+		},
+
+		// Unknown user has no shared users
+		{
+			req: api.QuerySharedUsersRequest{
+				UserID: "@unknownuser:localhost",
+			},
+			wantRes: api.QuerySharedUsersResponse{
+				UserIDs: nil,
+			},
+		},
+
+		// left real user produces no shared users
+		{
+			req: api.QuerySharedUsersRequest{
+				UserID: "@dave:localhost",
+			},
+			wantRes: api.QuerySharedUsersResponse{
+				UserIDs: nil,
+			},
+		},
+	}
+
+	runCases := func(testAPI api.CurrentStateInternalAPI) {
+		for _, tc := range testCases {
+			var res api.QuerySharedUsersResponse
+			err := testAPI.QuerySharedUsers(context.Background(), &tc.req, &res)
+			if err != nil {
+				t.Errorf("QuerySharedUsers returned error: %s", err)
+				continue
+			}
+			sort.Strings(res.UserIDs)
+			sort.Strings(tc.wantRes.UserIDs)
+			if !reflect.DeepEqual(res.UserIDs, tc.wantRes.UserIDs) {
+				t.Errorf("QuerySharedUsers got users %+v want %+v", res.UserIDs, tc.wantRes.UserIDs)
+			}
+		}
+	}
+
 	t.Run("HTTP API", func(t *testing.T) {
 		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
 		AddInternalRoutes(router, currStateAPI)
