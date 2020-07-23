@@ -34,7 +34,7 @@ type OutputKeyChangeEventConsumer struct {
 	db                storage.Database
 	serverName        gomatrixserverlib.ServerName // our server name
 	currentStateAPI   currentstateAPI.CurrentStateInternalAPI
-	keyAPI            api.KeyInternalAPI
+	// keyAPI            api.KeyInternalAPI
 }
 
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.

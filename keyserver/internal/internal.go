@@ -292,7 +292,10 @@ func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformU
 		}
 		return
 	}
-	a.emitDeviceKeyChanges(existingKeys, keysToStore)
+	err := a.emitDeviceKeyChanges(existingKeys, keysToStore)
+	if err != nil {
+		util.GetLogger(ctx).Errorf("Failed to emitDeviceKeyChanges: %s", err)
+	}
 }
 
 func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
@@ -334,7 +337,7 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 
 }
 
-func (a *KeyInternalAPI) emitDeviceKeyChanges(existing, new []api.DeviceKeys) {
+func (a *KeyInternalAPI) emitDeviceKeyChanges(existing, new []api.DeviceKeys) error {
 	// find keys in new that are not in existing
 	var keysAdded []api.DeviceKeys
 	for _, newKey := range new {
@@ -349,5 +352,5 @@ func (a *KeyInternalAPI) emitDeviceKeyChanges(existing, new []api.DeviceKeys) {
 			keysAdded = append(keysAdded, newKey)
 		}
 	}
-	a.Producer.ProduceKeyChanges(keysAdded)
+	return a.Producer.ProduceKeyChanges(keysAdded)
 }
