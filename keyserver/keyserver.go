@@ -15,11 +15,13 @@
 package keyserver
 
 import (
+	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/internal"
 	"github.com/matrix-org/dendrite/keyserver/inthttp"
+	"github.com/matrix-org/dendrite/keyserver/producers"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -34,7 +36,9 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
-func NewInternalAPI(cfg *config.Dendrite, fedClient *gomatrixserverlib.FederationClient, userAPI userapi.UserInternalAPI) api.KeyInternalAPI {
+func NewInternalAPI(
+	cfg *config.Dendrite, fedClient *gomatrixserverlib.FederationClient, userAPI userapi.UserInternalAPI, producer sarama.SyncProducer,
+) api.KeyInternalAPI {
 	db, err := storage.NewDatabase(
 		string(cfg.Database.E2EKey),
 		cfg.DbProperties(),
@@ -42,10 +46,15 @@ func NewInternalAPI(cfg *config.Dendrite, fedClient *gomatrixserverlib.Federatio
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
+	keyChangeProducer := &producers.KeyChange{
+		Topic:    string(cfg.Kafka.Topics.OutputKeyChangeEvent),
+		Producer: producer,
+	}
 	return &internal.KeyInternalAPI{
 		DB:         db,
 		ThisServer: cfg.Matrix.ServerName,
 		FedClient:  fedClient,
 		UserAPI:    userAPI,
+		Producer:   keyChangeProducer,
 	}
 }

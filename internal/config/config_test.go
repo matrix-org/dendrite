@@ -46,6 +46,7 @@ kafka:
     output_room_event: output.room
     output_client_data: output.client
     output_typing_event: output.typing
+    output_key_change_event: output.key_change
     user_updates: output.user
 database:
   media_api: "postgresql:///media_api"

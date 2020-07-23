@@ -159,6 +159,8 @@ type Dendrite struct {
 			OutputTypingEvent Topic `yaml:"output_typing_event"`
 			// Topic for eduserver/api.OutputSendToDeviceEvent events.
 			OutputSendToDeviceEvent Topic `yaml:"output_send_to_device_event"`
+			// Topic for keyserver when new device keys are added.
+			OutputKeyChangeEvent Topic `yaml:"output_key_change_event"`
 		}
 	} `yaml:"kafka"`
 
@@ -603,6 +605,8 @@ func (config *Dendrite) checkKafka(configErrs *configErrors, monolithic bool) {
 	checkNotEmpty(configErrs, "kafka.topics.output_room_event", string(config.Kafka.Topics.OutputRoomEvent))
 	checkNotEmpty(configErrs, "kafka.topics.output_client_data", string(config.Kafka.Topics.OutputClientData))
 	checkNotEmpty(configErrs, "kafka.topics.output_typing_event", string(config.Kafka.Topics.OutputTypingEvent))
+	checkNotEmpty(configErrs, "kafka.topics.output_send_to_device_event", string(config.Kafka.Topics.OutputSendToDeviceEvent))
+	checkNotEmpty(configErrs, "kafka.topics.output_key_change_event", string(config.Kafka.Topics.OutputKeyChangeEvent))
 }
 
 // checkDatabase verifies the parameters database.* are valid.
