@@ -119,7 +119,7 @@ func main() {
 	rsImpl.SetFederationSenderAPI(fsAPI)
 
 	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
-	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, userAPI)
+	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, userAPI, base.KafkaProducer)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
