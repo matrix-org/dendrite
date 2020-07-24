@@ -11,7 +11,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const (
+var (
 	syncingUser = "@alice:localhost"
 )
 
