@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -99,32 +100,77 @@ func OnIncomingStateRequest(ctx context.Context, rsAPI api.RoomserverInternalAPI
 // state to see if there is an event with that type and state key, if there
 // is then (by default) we return the content, otherwise a 404.
 // If eventFormat=true, sends the whole event else just the content.
-func OnIncomingStateTypeRequest(ctx context.Context, rsAPI api.RoomserverInternalAPI, roomID, evType, stateKey string, eventFormat bool) util.JSONResponse {
+func OnIncomingStateTypeRequest(
+	ctx context.Context, device *userapi.Device, rsAPI api.RoomserverInternalAPI,
+	roomID, evType, stateKey string, eventFormat bool,
+) util.JSONResponse {
 	// TODO(#287): Auth request and handle the case where the user has left (where
 	// we should return the state at the poin they left)
-	util.GetLogger(ctx).WithFields(log.Fields{
-		"roomID":   roomID,
-		"evType":   evType,
-		"stateKey": stateKey,
-	}).Info("Fetching state")
 
-	stateReq := api.QueryLatestEventsAndStateRequest{
+	var membershipRes api.QueryMembershipForUserResponse
+	err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
 		RoomID: roomID,
-		StateToFetch: []gomatrixserverlib.StateKeyTuple{
-			gomatrixserverlib.StateKeyTuple{
-				EventType: evType,
-				StateKey:  stateKey,
-			},
-		},
-	}
-	stateRes := api.QueryLatestEventsAndStateResponse{}
-
-	if err := rsAPI.QueryLatestEventsAndState(ctx, &stateReq, &stateRes); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
+		UserID: device.UserID,
+	}, &membershipRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
 		return jsonerror.InternalServerError()
 	}
+	if !membershipRes.HasBeenInRoom {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Unknown room or user is not in room"),
+		}
+	}
 
-	if len(stateRes.StateEvents) == 0 {
+	util.GetLogger(ctx).WithFields(log.Fields{
+		"roomID":         roomID,
+		"evType":         evType,
+		"stateKey":       stateKey,
+		"state_at_event": !membershipRes.IsInRoom,
+	}).Info("Fetching state")
+
+	var event *gomatrixserverlib.HeaderedEvent
+	if membershipRes.IsInRoom {
+		stateRes := api.QueryLatestEventsAndStateResponse{}
+		if err := rsAPI.QueryLatestEventsAndState(ctx, &api.QueryLatestEventsAndStateRequest{
+			RoomID: roomID,
+			StateToFetch: []gomatrixserverlib.StateKeyTuple{
+				gomatrixserverlib.StateKeyTuple{
+					EventType: evType,
+					StateKey:  stateKey,
+				},
+			},
+		}, &stateRes); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
+			return jsonerror.InternalServerError()
+		}
+		if len(stateRes.StateEvents) > 0 {
+			event = &stateRes.StateEvents[0]
+		}
+	} else {
+		// fetch the state at the time they left
+		var stateAfterRes api.QueryStateAfterEventsResponse
+		err = rsAPI.QueryStateAfterEvents(ctx, &api.QueryStateAfterEventsRequest{
+			RoomID:       roomID,
+			PrevEventIDs: []string{membershipRes.EventID},
+			StateToFetch: []gomatrixserverlib.StateKeyTuple{
+				{
+					EventType: evType,
+					StateKey:  stateKey,
+				},
+			},
+		}, &stateAfterRes)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			return jsonerror.InternalServerError()
+		}
+		if len(stateAfterRes.StateEvents) > 0 {
+			event = &stateAfterRes.StateEvents[0]
+		}
+	}
+
+	if event == nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("cannot find state"),
@@ -132,7 +178,7 @@ func OnIncomingStateTypeRequest(ctx context.Context, rsAPI api.RoomserverInterna
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(stateRes.StateEvents[0], gomatrixserverlib.FormatAll),
+		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(*event, gomatrixserverlib.FormatAll),
 	}
 
 	var res interface{}
