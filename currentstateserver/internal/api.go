@@ -74,9 +74,7 @@ func (a *CurrentStateInternalAPI) QuerySharedUsers(ctx context.Context, req *api
 	if err != nil {
 		return err
 	}
-	for _, roomID := range req.IncludeRoomIDs {
-		roomIDs = append(roomIDs, roomID)
-	}
+	roomIDs = append(roomIDs, req.IncludeRoomIDs...)
 	excludeMap := make(map[string]bool)
 	for _, roomID := range req.ExcludeRoomIDs {
 		excludeMap[roomID] = true
