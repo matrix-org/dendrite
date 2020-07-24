@@ -302,6 +302,10 @@ type Response struct {
 	ToDevice struct {
 		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
 	} `json:"to_device"`
+	DeviceLists struct {
+		Changed []string `json:"changed,omitempty"`
+		Left    []string `json:"left,omitempty"`
+	} `json:"device_lists,omitempty"`
 }
 
 // NewResponse creates an empty response with initialised maps.
