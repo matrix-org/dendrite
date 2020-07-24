@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"reflect"
-	"sort"
 	"testing"
 	"time"
 
@@ -227,13 +226,31 @@ func TestQuerySharedUsers(t *testing.T) {
 		req     api.QuerySharedUsersRequest
 		wantRes api.QuerySharedUsersResponse
 	}{
-		// Simple case: sharing (A,B) (A,C) (A,B) (A) produces (A,B,C)
+		// Simple case: sharing (A,B) (A,C) (A,B) (A) produces (A:4,B:2,C:1)
 		{
 			req: api.QuerySharedUsersRequest{
 				UserID: "@alice:localhost",
 			},
 			wantRes: api.QuerySharedUsersResponse{
-				UserIDs: []string{"@alice:localhost", "@bob:localhost", "@charlie:localhost"},
+				UserIDsToCount: map[string]int{
+					"@alice:localhost":   4,
+					"@bob:localhost":     2,
+					"@charlie:localhost": 1,
+				},
+			},
+		},
+
+		// Exclude (A,C): sharing (A,B) (A,B) (A) produces (A:3,B:2)
+		{
+			req: api.QuerySharedUsersRequest{
+				UserID:         "@alice:localhost",
+				ExcludeRoomIDs: []string{"!foo2:bar"},
+			},
+			wantRes: api.QuerySharedUsersResponse{
+				UserIDsToCount: map[string]int{
+					"@alice:localhost": 3,
+					"@bob:localhost":   2,
+				},
 			},
 		},
 
@@ -243,7 +260,7 @@ func TestQuerySharedUsers(t *testing.T) {
 				UserID: "@unknownuser:localhost",
 			},
 			wantRes: api.QuerySharedUsersResponse{
-				UserIDs: nil,
+				UserIDsToCount: map[string]int{},
 			},
 		},
 
@@ -253,7 +270,35 @@ func TestQuerySharedUsers(t *testing.T) {
 				UserID: "@dave:localhost",
 			},
 			wantRes: api.QuerySharedUsersResponse{
-				UserIDs: nil,
+				UserIDsToCount: map[string]int{},
+			},
+		},
+
+		// left real user but with included room returns the included room member
+		{
+			req: api.QuerySharedUsersRequest{
+				UserID:         "@dave:localhost",
+				IncludeRoomIDs: []string{"!foo:bar"},
+			},
+			wantRes: api.QuerySharedUsersResponse{
+				UserIDsToCount: map[string]int{
+					"@alice:localhost": 1,
+					"@bob:localhost":   1,
+				},
+			},
+		},
+
+		// including a room more than once doesn't double counts
+		{
+			req: api.QuerySharedUsersRequest{
+				UserID:         "@dave:localhost",
+				IncludeRoomIDs: []string{"!foo:bar", "!foo:bar", "!foo:bar"},
+			},
+			wantRes: api.QuerySharedUsersResponse{
+				UserIDsToCount: map[string]int{
+					"@alice:localhost": 1,
+					"@bob:localhost":   1,
+				},
 			},
 		},
 	}
@@ -266,10 +311,8 @@ func TestQuerySharedUsers(t *testing.T) {
 				t.Errorf("QuerySharedUsers returned error: %s", err)
 				continue
 			}
-			sort.Strings(res.UserIDs)
-			sort.Strings(tc.wantRes.UserIDs)
-			if !reflect.DeepEqual(res.UserIDs, tc.wantRes.UserIDs) {
-				t.Errorf("QuerySharedUsers got users %+v want %+v", res.UserIDs, tc.wantRes.UserIDs)
+			if !reflect.DeepEqual(res.UserIDsToCount, tc.wantRes.UserIDsToCount) {
+				t.Errorf("QuerySharedUsers got users %+v want %+v", res.UserIDsToCount, tc.wantRes.UserIDsToCount)
 			}
 		}
 	}

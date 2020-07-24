@@ -36,11 +36,13 @@ type CurrentStateInternalAPI interface {
 }
 
 type QuerySharedUsersRequest struct {
-	UserID string
+	UserID         string
+	ExcludeRoomIDs []string
+	IncludeRoomIDs []string
 }
 
 type QuerySharedUsersResponse struct {
-	UserIDs []string
+	UserIDsToCount map[string]int
 }
 
 type QueryRoomsForUserRequest struct {

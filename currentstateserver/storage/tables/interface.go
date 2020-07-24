@@ -36,8 +36,9 @@ type CurrentRoomState interface {
 	// SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
 	SelectRoomIDsWithMembership(ctx context.Context, txn *sql.Tx, userID string, membership string) ([]string, error)
 	SelectBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]StrippedEvent, error)
-	// SelectJoinedUsersSetForRooms returns the set of all users in the rooms who are joined to any of these rooms.
-	SelectJoinedUsersSetForRooms(ctx context.Context, roomIDs []string) ([]string, error)
+	// SelectJoinedUsersSetForRooms returns the set of all users in the rooms who are joined to any of these rooms, along with the
+	// counts of how many rooms they are joined.
+	SelectJoinedUsersSetForRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
 }
 
 // StrippedEvent represents a stripped event for returning extracted content values.

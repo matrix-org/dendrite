@@ -78,7 +78,8 @@ const selectBulkStateContentWildSQL = "" +
 	"SELECT room_id, type, state_key, content_value FROM currentstate_current_room_state WHERE room_id = ANY($1) AND type = ANY($2)"
 
 const selectJoinedUsersSetForRoomsSQL = "" +
-	"SELECT DISTINCT state_key FROM currentstate_current_room_state WHERE room_id = ANY($1) AND type = 'm.room.member' and content_value = 'join'"
+	"SELECT state_key, COUNT(room_id) FROM currentstate_current_room_state WHERE room_id = ANY($1) AND" +
+	" type = 'm.room.member' and content_value = 'join' GROUP BY state_key"
 
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt              *sql.Stmt
@@ -124,21 +125,22 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	return s, nil
 }
 
-func (s *currentRoomStateStatements) SelectJoinedUsersSetForRooms(ctx context.Context, roomIDs []string) ([]string, error) {
+func (s *currentRoomStateStatements) SelectJoinedUsersSetForRooms(ctx context.Context, roomIDs []string) (map[string]int, error) {
 	rows, err := s.selectJoinedUsersSetForRoomsStmt.QueryContext(ctx, pq.StringArray(roomIDs))
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsersSetForRooms: rows.close() failed")
-	var userIDs []string
+	result := make(map[string]int)
 	for rows.Next() {
 		var userID string
-		if err := rows.Scan(&userID); err != nil {
+		var count int
+		if err := rows.Scan(&userID, &count); err != nil {
 			return nil, err
 		}
-		userIDs = append(userIDs, userID)
+		result[userID] = count
 	}
-	return userIDs, rows.Err()
+	return result, rows.Err()
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.

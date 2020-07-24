@@ -74,10 +74,27 @@ func (a *CurrentStateInternalAPI) QuerySharedUsers(ctx context.Context, req *api
 	if err != nil {
 		return err
 	}
+	roomIDs = append(roomIDs, req.IncludeRoomIDs...)
+	excludeMap := make(map[string]bool)
+	for _, roomID := range req.ExcludeRoomIDs {
+		excludeMap[roomID] = true
+	}
+	// filter out excluded rooms
+	j := 0
+	for i := range roomIDs {
+		// move elements to include to the beginning of the slice
+		// then trim elements on the right
+		if !excludeMap[roomIDs[i]] {
+			roomIDs[j] = roomIDs[i]
+			j++
+		}
+	}
+	roomIDs = roomIDs[:j]
+
 	users, err := a.DB.JoinedUsersSetInRooms(ctx, roomIDs)
 	if err != nil {
 		return err
 	}
-	res.UserIDs = users
+	res.UserIDsToCount = users
 	return nil
 }
