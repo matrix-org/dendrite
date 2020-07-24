@@ -22,7 +22,6 @@ import (
 	"github.com/Shopify/sarama"
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -44,14 +43,15 @@ type OutputKeyChangeEventConsumer struct {
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
 // Call Start() to begin consuming from the key server.
 func NewOutputKeyChangeEventConsumer(
-	cfg *config.Dendrite,
+	serverName gomatrixserverlib.ServerName,
+	topic string,
 	kafkaConsumer sarama.Consumer,
 	currentStateAPI currentstateAPI.CurrentStateInternalAPI,
 	store storage.Database,
 ) *OutputKeyChangeEventConsumer {
 
 	consumer := internal.ContinualConsumer{
-		Topic:          string(cfg.Kafka.Topics.OutputKeyChangeEvent),
+		Topic:          topic,
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
@@ -59,7 +59,7 @@ func NewOutputKeyChangeEventConsumer(
 	s := &OutputKeyChangeEventConsumer{
 		keyChangeConsumer:   &consumer,
 		db:                  store,
-		serverName:          cfg.Matrix.ServerName,
+		serverName:          serverName,
 		currentStateAPI:     currentStateAPI,
 		partitionToOffset:   make(map[int32]int64),
 		partitionToOffsetMu: sync.Mutex{},
@@ -126,6 +126,7 @@ func (s *OutputKeyChangeEventConsumer) Catchup(
 		}
 		res.DeviceLists.Changed = changed
 		res.DeviceLists.Left = left
+		hasNew = len(changed) > 0 || len(left) > 0
 	}
 
 	// TODO: now also track users who we already share rooms with but who have updated their devices between the two tokens
