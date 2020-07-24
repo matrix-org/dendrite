@@ -133,7 +133,7 @@ func OnIncomingStateTypeRequest(
 	var event *gomatrixserverlib.HeaderedEvent
 	if membershipRes.IsInRoom {
 		stateRes := api.QueryLatestEventsAndStateResponse{}
-		if err := rsAPI.QueryLatestEventsAndState(ctx, &api.QueryLatestEventsAndStateRequest{
+		if err = rsAPI.QueryLatestEventsAndState(ctx, &api.QueryLatestEventsAndStateRequest{
 			RoomID: roomID,
 			StateToFetch: []gomatrixserverlib.StateKeyTuple{
 				gomatrixserverlib.StateKeyTuple{
