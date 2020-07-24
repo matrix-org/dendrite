@@ -161,6 +161,7 @@ func (s *OutputKeyChangeEventConsumer) OnLeaveEvent(ev *gomatrixserverlib.Header
 
 }
 
+// nolint:gocyclo
 func (s *OutputKeyChangeEventConsumer) trackChangedUsers(
 	ctx context.Context, userID string, newlyJoinedRooms, newlyLeftRooms []string,
 ) (changed, left []string, err error) {
@@ -195,7 +196,7 @@ func (s *OutputKeyChangeEventConsumer) trackChangedUsers(
 	}
 	for _, state := range stateRes.Rooms {
 		for tuple, membership := range state {
-			if membership != "join" {
+			if membership != gomatrixserverlib.Join {
 				continue
 			}
 			queryRes.UserIDsToCount[tuple.StateKey]--
@@ -235,7 +236,7 @@ func (s *OutputKeyChangeEventConsumer) trackChangedUsers(
 	}
 	for _, state := range stateRes.Rooms {
 		for tuple, membership := range state {
-			if membership != "join" {
+			if membership != gomatrixserverlib.Join {
 				continue
 			}
 			// new user who we weren't previously sharing rooms with

@@ -11,6 +11,10 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+const (
+	syncingUser = "@alice:localhost"
+)
+
 type mockCurrentStateAPI struct {
 	roomIDToJoinedMembers map[string][]string
 }
@@ -134,9 +138,8 @@ func leaveResponseWithRooms(syncResponse *types.Response, userID string, roomIDs
 
 // tests that joining a room which results in sharing a new user includes that user in `changed`
 func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
-	syncingUser := "@alice:localhost"
 	newShareUser := "@bob:localhost"
-	newlyJoinedRoom := "!foo:bar"
+	newlyJoinedRoom := "!TestKeyChangeCatchupOnJoinShareNewUser:bar"
 	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, newShareUser},
@@ -158,9 +161,8 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 
 // tests that leaving a room which results in sharing no rooms with a user includes that user in `left`
 func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
-	syncingUser := "@alice:localhost"
 	removeUser := "@bob:localhost"
-	newlyLeftRoom := "!foo:bar"
+	newlyLeftRoom := "!TestKeyChangeCatchupOnLeaveShareLeftUser:bar"
 	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyLeftRoom:   {removeUser},
@@ -182,9 +184,8 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 
 // tests that joining a room which doesn't result in sharing a new user results in no changes.
 func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
-	syncingUser := "@alice:localhost"
 	existingUser := "@bob:localhost"
-	newlyJoinedRoom := "!foo:bar"
+	newlyJoinedRoom := "!TestKeyChangeCatchupOnJoinShareNoNewUsers:bar"
 	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, existingUser},
@@ -205,9 +206,8 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 
 // tests that leaving a room which doesn't result in sharing no rooms with a user results in no changes.
 func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
-	syncingUser := "@alice:localhost"
 	existingUser := "@bob:localhost"
-	newlyLeftRoom := "!foo:bar"
+	newlyLeftRoom := "!TestKeyChangeCatchupOnLeaveShareNoUsers:bar"
 	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyLeftRoom:   {existingUser},
@@ -228,9 +228,8 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 
 // tests that not joining any rooms (but having messages in the response) do not result in changes.
 func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
-	syncingUser := "@alice:localhost"
 	existingUser := "@bob:localhost"
-	roomID := "!foo:bar"
+	roomID := "!TestKeyChangeCatchupNoNewJoinsButMessages:bar"
 	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			roomID: {syncingUser, existingUser},
@@ -288,7 +287,6 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 
 // tests that joining/leaving multiple rooms can result in both `changed` and `left` and they are not duplicated.
 func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
-	syncingUser := "@alice:localhost"
 	newShareUser := "@berta:localhost"
 	newShareUser2 := "@bob:localhost"
 	newlyLeftUser := "@charlie:localhost"
@@ -328,7 +326,6 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 //   doesn't share any rooms with him.
 // Ergo, we put them in `left` as it is simpler.
 func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
-	syncingUser := "@alice:localhost"
 	newShareUser := "@berta:localhost"
 	newShareUser2 := "@bob:localhost"
 	roomID := "!join:bar"
