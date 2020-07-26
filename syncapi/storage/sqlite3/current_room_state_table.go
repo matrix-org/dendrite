@@ -243,6 +243,13 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	})
 }
 
+func minOfInts(a, b int) int {
+	if a <= b {
+		return a
+	}
+	return b
+}
+
 func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
@@ -250,13 +257,24 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
-	rows, err := txn.QueryContext(ctx, query, iEventIDs...)
-	if err != nil {
-		return nil, err
+	res := make([]types.StreamEvent, 0, len(eventIDs))
+	var start int
+	for start < len(eventIDs) {
+		n := minOfInts(len(eventIDs)-start, 999)
+		query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", sqlutil.QueryVariadic(n), 1)
+		rows, err := txn.QueryContext(ctx, query, iEventIDs[start:start+n]...)
+		if err != nil {
+			return nil, err
+		}
+		start = start + n
+		events, err := rowsToStreamEvents(rows)
+		internal.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, events...)
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
-	return rowsToStreamEvents(rows)
+	return res, nil
 }
 
 func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.HeaderedEvent, error) {
