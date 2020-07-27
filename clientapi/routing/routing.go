@@ -155,7 +155,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendKick(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
+			return SendKick(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI, stateAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/unban",
