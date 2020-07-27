@@ -585,6 +585,7 @@ func Setup(
 			}
 			return *SearchUserDirectory(
 				req.Context(),
+				device,
 				userAPI,
 				stateAPI,
 				cfg.Matrix.ServerName,

@@ -92,6 +92,7 @@ type QueryCurrentStateResponse struct {
 }
 
 type QueryKnownUsersRequest struct {
+	UserID       string `json:"user_id"`
 	SearchString string `json:"search_string"`
 	Limit        int    `json:"limit"`
 }

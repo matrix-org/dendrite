@@ -83,7 +83,9 @@ const selectJoinedUsersSetForRoomsSQL = "" +
 	" type = 'm.room.member' and content_value = 'join' GROUP BY state_key"
 
 const selectKnownUsersSQL = "" +
-	"SELECT DISTINCT state_key FROM currentstate_current_room_state WHERE type = 'm.room.member' AND state_key LIKE $1 LIMIT $2"
+	"SELECT DISTINCT state_key FROM currentstate_current_room_state WHERE room_id = ANY(" +
+	"  SELECT DISTINCT room_id FROM currentstate_current_room_state WHERE state_key=$1 AND TYPE='m.room.member' AND content_value='join'" +
+	") AND TYPE='m.room.member' AND content_value='join' AND state_key LIKE $2 LIMIT $3"
 
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt              *sql.Stmt
@@ -304,8 +306,8 @@ func (s *currentRoomStateStatements) SelectBulkStateContent(
 	return strippedEvents, rows.Err()
 }
 
-func (s *currentRoomStateStatements) SelectKnownUsers(ctx context.Context, searchString string, limit int) ([]string, error) {
-	rows, err := s.selectKnownUsersStmt.QueryContext(ctx, fmt.Sprintf("%%%s%%", searchString), limit)
+func (s *currentRoomStateStatements) SelectKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
+	rows, err := s.selectKnownUsersStmt.QueryContext(ctx, userID, fmt.Sprintf("%%%s%%", searchString), limit)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

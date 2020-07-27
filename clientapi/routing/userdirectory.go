@@ -32,6 +32,7 @@ type UserDirectoryResponse struct {
 
 func SearchUserDirectory(
 	ctx context.Context,
+	device *userapi.Device,
 	userAPI userapi.UserInternalAPI,
 	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	serverName gomatrixserverlib.ServerName,
@@ -81,6 +82,7 @@ func SearchUserDirectory(
 
 	if len(results) <= limit {
 		stateReq := &currentstateAPI.QueryKnownUsersRequest{
+			UserID:       device.UserID,
 			SearchString: searchString,
 			Limit:        limit - len(results),
 		}

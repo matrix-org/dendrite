@@ -90,6 +90,6 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) 
 	return d.CurrentRoomState.SelectJoinedUsersSetForRooms(ctx, roomIDs)
 }
 
-func (d *Database) GetKnownUsers(ctx context.Context, searchString string, limit int) ([]string, error) {
-	return d.CurrentRoomState.SelectKnownUsers(ctx, searchString, limit)
+func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
+	return d.CurrentRoomState.SelectKnownUsers(ctx, userID, searchString, limit)
 }

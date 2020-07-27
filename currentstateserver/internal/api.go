@@ -51,7 +51,7 @@ func (a *CurrentStateInternalAPI) QueryRoomsForUser(ctx context.Context, req *ap
 }
 
 func (a *CurrentStateInternalAPI) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
-	users, err := a.DB.GetKnownUsers(ctx, req.SearchString, req.Limit)
+	users, err := a.DB.GetKnownUsers(ctx, req.UserID, req.SearchString, req.Limit)
 	if err != nil {
 		return err
 	}
