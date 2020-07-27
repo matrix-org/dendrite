@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -31,6 +32,7 @@ type UserInternalAPI interface {
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
+	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 }
 
 // InputAccountDataRequest is the request for InputAccountData
@@ -110,6 +112,20 @@ type QueryProfileResponse struct {
 	DisplayName string
 	// The current avatar URL if set.
 	AvatarURL string
+}
+
+// QuerySearchProfilesRequest is the request for QueryProfile
+type QuerySearchProfilesRequest struct {
+	// The search string to match
+	SearchString string
+	// How many results to return
+	Limit int
+}
+
+// QuerySearchProfilesResponse is the response for QuerySearchProfilesRequest
+type QuerySearchProfilesResponse struct {
+	// Profiles matching the search
+	Profiles []authtypes.Profile
 }
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation

@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
@@ -45,11 +46,15 @@ const setAvatarURLSQL = "" +
 const setDisplayNameSQL = "" +
 	"UPDATE account_profiles SET display_name = $1 WHERE localpart = $2"
 
+const selectProfilesBySearchSQL = "" +
+	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
+
 type profilesStatements struct {
 	insertProfileStmt            *sql.Stmt
 	selectProfileByLocalpartStmt *sql.Stmt
 	setAvatarURLStmt             *sql.Stmt
 	setDisplayNameStmt           *sql.Stmt
+	selectProfilesBySearchStmt   *sql.Stmt
 }
 
 func (s *profilesStatements) prepare(db *sql.DB) (err error) {
@@ -67,6 +72,9 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.setDisplayNameStmt, err = db.Prepare(setDisplayNameSQL); err != nil {
+		return
+	}
+	if s.selectProfilesBySearchStmt, err = db.Prepare(selectProfilesBySearchSQL); err != nil {
 		return
 	}
 	return
@@ -104,4 +112,22 @@ func (s *profilesStatements) setDisplayName(
 ) (err error) {
 	_, err = s.setDisplayNameStmt.ExecContext(ctx, displayName, localpart)
 	return
+}
+
+func (s *profilesStatements) selectProfilesBySearch(
+	ctx context.Context, searchString string, limit int,
+) ([]authtypes.Profile, error) {
+	var profiles []authtypes.Profile
+	rows, err := s.selectProfilesBySearchStmt.QueryContext(ctx, fmt.Sprintf("%%%s%%", searchString), limit)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var profile authtypes.Profile
+		if err := rows.Scan(&profile.Localpart, &profile.DisplayName, &profile.AvatarURL); err != nil {
+			return nil, err
+		}
+		profiles = append(profiles, profile)
+	}
+	return profiles, nil
 }

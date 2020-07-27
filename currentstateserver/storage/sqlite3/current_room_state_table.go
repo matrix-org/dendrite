@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/currentstateserver/storage/tables"
@@ -69,6 +70,9 @@ const selectBulkStateContentWildSQL = "" +
 const selectJoinedUsersSetForRoomsSQL = "" +
 	"SELECT state_key, COUNT(room_id) FROM currentstate_current_room_state WHERE room_id IN ($1) AND type = 'm.room.member' and content_value = 'join' GROUP BY state_key"
 
+const selectKnownUsersSQL = "" +
+	"SELECT DISTINCT state_key FROM currentstate_current_room_state WHERE type = 'm.room.member' AND state_key LIKE $1 LIMIT $2"
+
 type currentRoomStateStatements struct {
 	db                               *sql.DB
 	writer                           *sqlutil.TransactionWriter
@@ -77,6 +81,7 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithMembershipStmt  *sql.Stmt
 	selectStateEventStmt             *sql.Stmt
 	selectJoinedUsersSetForRoomsStmt *sql.Stmt
+	selectKnownUsersStmt             *sql.Stmt
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -101,6 +106,9 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error)
 		return nil, err
 	}
 	if s.selectJoinedUsersSetForRoomsStmt, err = db.Prepare(selectJoinedUsersSetForRoomsSQL); err != nil {
+		return nil, err
+	}
+	if s.selectKnownUsersStmt, err = db.Prepare(selectKnownUsersSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -314,4 +322,23 @@ func (s *currentRoomStateStatements) SelectBulkStateContent(
 		})
 	}
 	return strippedEvents, rows.Err()
+}
+
+func (s *currentRoomStateStatements) SelectKnownUsers(ctx context.Context, searchString string, limit int) ([]string, error) {
+	rows, err := s.selectKnownUsersStmt.QueryContext(ctx, fmt.Sprintf("%%%s%%", searchString), limit)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	result := []string{}
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		result = append(result, userID)
+	}
+	return result, rows.Err()
 }

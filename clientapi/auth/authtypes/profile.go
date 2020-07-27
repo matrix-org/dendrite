@@ -16,7 +16,14 @@ package authtypes
 
 // Profile represents the profile for a Matrix account.
 type Profile struct {
-	Localpart   string
-	DisplayName string
-	AvatarURL   string
+	Localpart   string `json:"local_part"`
+	DisplayName string `json:"display_name"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
+// FullyQualifiedProfile represents the profile for a Matrix account.
+type FullyQualifiedProfile struct {
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	AvatarURL   string `json:"avatar_url"`
 }
