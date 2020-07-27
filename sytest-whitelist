@@ -415,3 +415,4 @@ We don't send redundant membership state across incremental syncs by default
 Typing notifications don't leak
 Users cannot kick users from a room they are not in
 Users cannot kick users who have already left a room
+Can get 'm.room.name' state for a departed room (SPEC-216)
