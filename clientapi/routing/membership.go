@@ -96,6 +96,7 @@ func SendKick(
 	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	roomID string, cfg *config.Dendrite,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
 ) util.JSONResponse {
 	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
 	if reqErr != nil {
@@ -108,6 +109,11 @@ func SendKick(
 		}
 	}
 
+	errRes := checkMemberInRoom(req.Context(), stateAPI, device.UserID, roomID)
+	if errRes != nil {
+		return *errRes
+	}
+
 	var queryRes roomserverAPI.QueryMembershipForUserResponse
 	err := rsAPI.QueryMembershipForUser(req.Context(), &roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: roomID,
@@ -116,11 +122,11 @@ func SendKick(
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	// kick is only valid if the user is not currently banned
-	if queryRes.Membership == "ban" {
+	// kick is only valid if the user is not currently banned or left (that is, they are joined or invited)
+	if queryRes.Membership != "join" && queryRes.Membership != "invite" {
 		return util.JSONResponse{
 			Code: 403,
-			JSON: jsonerror.Unknown("cannot /kick banned users"),
+			JSON: jsonerror.Unknown("cannot /kick banned or left users"),
 		}
 	}
 	// TODO: should we be using SendLeave instead?
