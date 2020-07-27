@@ -113,16 +113,16 @@ func OnIncomingStateTypeRequest(
 	// the latest events or the last event from when the user was joined.
 	// Then include the requested event type and state key, assuming it
 	// isn't for the same.
-	toFetch := []gomatrixserverlib.StateKeyTuple{
+	stateToFetch := []gomatrixserverlib.StateKeyTuple{
 		{
-			EventType: gomatrixserverlib.MRoomHistoryVisibility,
-			StateKey:  "",
+			EventType: evType,
+			StateKey:  stateKey,
 		},
 	}
 	if evType != gomatrixserverlib.MRoomHistoryVisibility && stateKey != "" {
-		toFetch = append(toFetch, gomatrixserverlib.StateKeyTuple{
-			EventType: evType,
-			StateKey:  stateKey,
+		stateToFetch = append(stateToFetch, gomatrixserverlib.StateKeyTuple{
+			EventType: gomatrixserverlib.MRoomHistoryVisibility,
+			StateKey:  "",
 		})
 	}
 
@@ -132,7 +132,7 @@ func OnIncomingStateTypeRequest(
 	stateRes := api.QueryLatestEventsAndStateResponse{}
 	if err := rsAPI.QueryLatestEventsAndState(ctx, &api.QueryLatestEventsAndStateRequest{
 		RoomID:       roomID,
-		StateToFetch: toFetch,
+		StateToFetch: stateToFetch,
 	}, &stateRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return jsonerror.InternalServerError()
@@ -141,7 +141,7 @@ func OnIncomingStateTypeRequest(
 	// Look at the room state and see if we have a history visibility event
 	// that marks the room as world-readable. If we don't then we assume that
 	// the room is not world-readable.
-	for i, ev := range stateRes.StateEvents {
+	for _, ev := range stateRes.StateEvents {
 		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
@@ -150,12 +150,6 @@ func OnIncomingStateTypeRequest(
 			}
 			if visibility, ok := content["history_visibility"]; ok {
 				worldReadable = visibility == "world_readable"
-				// If the request is for the history visibility of the room
-				// specifically then keep it in the response, otherwise discard
-				// it so that the later checks make sense.
-				if evType != gomatrixserverlib.MRoomHistoryVisibility && stateKey != "" {
-					stateRes.StateEvents = append(stateRes.StateEvents[:i], stateRes.StateEvents[i+1:]...)
-				}
 				break
 			}
 		}
@@ -209,9 +203,13 @@ func OnIncomingStateTypeRequest(
 	if wantLatestState {
 		// If we are happy to use the latest state, either because the user is
 		// still in the room, or because the room is world-readable, then just
-		// use the result of the previous QueryLatestEventsAndState response.
-		if len(stateRes.StateEvents) > 0 {
-			event = &stateRes.StateEvents[0]
+		// use the result of the previous QueryLatestEventsAndState response
+		// to find the state event, if provided.
+		for _, ev := range stateRes.StateEvents {
+			if ev.Type() == evType && ev.StateKeyEquals(stateKey) {
+				event = &ev
+				break
+			}
 		}
 	} else {
 		// Otherwise, take the event ID of their leave event and work out what
