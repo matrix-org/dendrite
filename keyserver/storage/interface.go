@@ -43,4 +43,12 @@ type Database interface {
 	// ClaimKeys based on the 3-uple of user_id, device_id and algorithm name. Returns the keys claimed. Returns no error if a key
 	// cannot be claimed or if none exist for this (user, device, algorithm), instead it is omitted from the returned slice.
 	ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[string]map[string]string) ([]api.OneTimeKeys, error)
+
+	// StoreKeyChange stores key change metadata after the change has been sent to Kafka. `userID` is the the user who has changed
+	// their keys in some way.
+	StoreKeyChange(ctx context.Context, partition int32, offset int64, userID string) error
+
+	// KeyChanges returns a list of user IDs who have modified their keys from the offset given.
+	// Returns the offset of the latest key change.
+	KeyChanges(ctx context.Context, partition int32, fromOffset int64) (userIDs []string, latestOffset int64, err error)
 }
