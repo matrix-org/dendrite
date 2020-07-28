@@ -343,3 +343,10 @@ func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string,
 ) (*api.Account, error) {
 	return d.accounts.selectAccountByLocalpart(ctx, localpart)
 }
+
+// SearchProfiles returns all profiles where the provided localpart or display name
+// match any part of the profiles in the database.
+func (d *Database) SearchProfiles(ctx context.Context, searchString string, limit int,
+) ([]authtypes.Profile, error) {
+	return d.profiles.selectProfilesBySearch(ctx, searchString, limit)
+}

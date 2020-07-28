@@ -125,6 +125,15 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfil
 	return nil
 }
 
+func (a *UserInternalAPI) QuerySearchProfiles(ctx context.Context, req *api.QuerySearchProfilesRequest, res *api.QuerySearchProfilesResponse) error {
+	profiles, err := a.AccountDB.SearchProfiles(ctx, req.SearchString, req.Limit)
+	if err != nil {
+		return err
+	}
+	res.Profiles = profiles
+	return nil
+}
+
 func (a *UserInternalAPI) QueryDeviceInfos(ctx context.Context, req *api.QueryDeviceInfosRequest, res *api.QueryDeviceInfosResponse) error {
 	devices, err := a.DeviceDB.GetDevicesByID(ctx, req.DeviceIDs)
 	if err != nil {

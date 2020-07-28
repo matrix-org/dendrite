@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/currentstateserver/storage/tables"
@@ -69,6 +70,14 @@ const selectBulkStateContentWildSQL = "" +
 const selectJoinedUsersSetForRoomsSQL = "" +
 	"SELECT state_key, COUNT(room_id) FROM currentstate_current_room_state WHERE room_id IN ($1) AND type = 'm.room.member' and content_value = 'join' GROUP BY state_key"
 
+// selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
+// joined to. Since this information is used to populate the user directory, we will
+// only return users that the user would ordinarily be able to see anyway.
+const selectKnownUsersSQL = "" +
+	"SELECT DISTINCT state_key FROM currentstate_current_room_state WHERE room_id IN (" +
+	"  SELECT DISTINCT room_id FROM currentstate_current_room_state WHERE state_key=$1 AND TYPE='m.room.member' AND content_value='join'" +
+	") AND TYPE='m.room.member' AND content_value='join' AND state_key LIKE $2 LIMIT $3"
+
 type currentRoomStateStatements struct {
 	db                               *sql.DB
 	writer                           *sqlutil.TransactionWriter
@@ -77,6 +86,7 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithMembershipStmt  *sql.Stmt
 	selectStateEventStmt             *sql.Stmt
 	selectJoinedUsersSetForRoomsStmt *sql.Stmt
+	selectKnownUsersStmt             *sql.Stmt
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -101,6 +111,9 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error)
 		return nil, err
 	}
 	if s.selectJoinedUsersSetForRoomsStmt, err = db.Prepare(selectJoinedUsersSetForRoomsSQL); err != nil {
+		return nil, err
+	}
+	if s.selectKnownUsersStmt, err = db.Prepare(selectKnownUsersSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -314,4 +327,21 @@ func (s *currentRoomStateStatements) SelectBulkStateContent(
 		})
 	}
 	return strippedEvents, rows.Err()
+}
+
+func (s *currentRoomStateStatements) SelectKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
+	rows, err := s.selectKnownUsersStmt.QueryContext(ctx, userID, fmt.Sprintf("%%%s%%", searchString), limit)
+	if err != nil {
+		return nil, err
+	}
+	result := []string{}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownUsers: rows.close() failed")
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		result = append(result, userID)
+	}
+	return result, rows.Err()
 }

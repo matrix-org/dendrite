@@ -415,4 +415,8 @@ We don't send redundant membership state across incremental syncs by default
 Typing notifications don't leak
 Users cannot kick users from a room they are not in
 Users cannot kick users who have already left a room
+User appears in user directory
+User directory correctly update on display name change
+User in shared private room does appear in user directory
+User in dir while user still shares private rooms
 Can get 'm.room.name' state for a departed room (SPEC-216)

@@ -31,11 +31,12 @@ const (
 	PerformDeviceCreationPath  = "/userapi/performDeviceCreation"
 	PerformAccountCreationPath = "/userapi/performAccountCreation"
 
-	QueryProfilePath     = "/userapi/queryProfile"
-	QueryAccessTokenPath = "/userapi/queryAccessToken"
-	QueryDevicesPath     = "/userapi/queryDevices"
-	QueryAccountDataPath = "/userapi/queryAccountData"
-	QueryDeviceInfosPath = "/userapi/queryDeviceInfos"
+	QueryProfilePath        = "/userapi/queryProfile"
+	QueryAccessTokenPath    = "/userapi/queryAccessToken"
+	QueryDevicesPath        = "/userapi/queryDevices"
+	QueryAccountDataPath    = "/userapi/queryAccountData"
+	QueryDeviceInfosPath    = "/userapi/queryDeviceInfos"
+	QuerySearchProfilesPath = "/userapi/querySearchProfiles"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -139,5 +140,13 @@ func (h *httpUserInternalAPI) QueryAccountData(ctx context.Context, req *api.Que
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryAccountDataPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) QuerySearchProfiles(ctx context.Context, req *api.QuerySearchProfilesRequest, res *api.QuerySearchProfilesResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QuerySearchProfiles")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QuerySearchProfilesPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

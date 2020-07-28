@@ -39,4 +39,6 @@ type Database interface {
 	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause gomatrixserverlib.HeaderedEvent) error
 	// JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
 	JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
+	// GetKnownUsers searches all users that userID knows about.
+	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
 }

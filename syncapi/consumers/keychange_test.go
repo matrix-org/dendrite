@@ -23,6 +23,10 @@ func (s *mockCurrentStateAPI) QueryCurrentState(ctx context.Context, req *api.Qu
 	return nil
 }
 
+func (s *mockCurrentStateAPI) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
+	return nil
+}
+
 // QueryRoomsForUser retrieves a list of room IDs matching the given query.
 func (s *mockCurrentStateAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
 	return nil

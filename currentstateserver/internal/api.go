@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/currentstateserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -46,6 +47,19 @@ func (a *CurrentStateInternalAPI) QueryRoomsForUser(ctx context.Context, req *ap
 		return err
 	}
 	res.RoomIDs = roomIDs
+	return nil
+}
+
+func (a *CurrentStateInternalAPI) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
+	users, err := a.DB.GetKnownUsers(ctx, req.UserID, req.SearchString, req.Limit)
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		res.Users = append(res.Users, authtypes.FullyQualifiedProfile{
+			UserID: user,
+		})
+	}
 	return nil
 }
 

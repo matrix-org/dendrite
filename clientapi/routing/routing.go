@@ -574,6 +574,27 @@ func Setup(
 		}),
 	).Methods(http.MethodGet)
 
+	r0mux.Handle("/user_directory/search",
+		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			postContent := struct {
+				SearchString string `json:"search_term"`
+				Limit        int    `json:"limit"`
+			}{}
+			if err := json.NewDecoder(req.Body).Decode(&postContent); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return *SearchUserDirectory(
+				req.Context(),
+				device,
+				userAPI,
+				stateAPI,
+				cfg.Matrix.ServerName,
+				postContent.SearchString,
+				postContent.Limit,
+			)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	r0mux.Handle("/rooms/{roomID}/members",
 		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))

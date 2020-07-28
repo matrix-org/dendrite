@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -33,6 +34,8 @@ type CurrentStateInternalAPI interface {
 	QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error
 	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
 	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
+	// QueryKnownUsers returns a list of users that we know about from our joined rooms.
+	QueryKnownUsers(ctx context.Context, req *QueryKnownUsersRequest, res *QueryKnownUsersResponse) error
 }
 
 type QuerySharedUsersRequest struct {
@@ -86,6 +89,16 @@ type QueryCurrentStateRequest struct {
 
 type QueryCurrentStateResponse struct {
 	StateEvents map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent
+}
+
+type QueryKnownUsersRequest struct {
+	UserID       string `json:"user_id"`
+	SearchString string `json:"search_string"`
+	Limit        int    `json:"limit"`
+}
+
+type QueryKnownUsersResponse struct {
+	Users []authtypes.FullyQualifiedProfile `json:"profiles"`
 }
 
 // MarshalJSON stringifies the StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
