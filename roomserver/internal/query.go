@@ -226,6 +226,7 @@ func (r *RoomserverInternalAPI) QueryMembershipForUser(
 	}
 
 	response.IsInRoom = stillInRoom
+	response.HasBeenInRoom = true
 
 	evs, err := r.DB.Events(ctx, []types.EventNID{membershipEventNID})
 	if err != nil {

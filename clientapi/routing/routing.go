@@ -216,7 +216,7 @@ func Setup(
 			eventType = eventType[:len(eventType)-1]
 		}
 		eventFormat := req.URL.Query().Get("format") == "event"
-		return OnIncomingStateTypeRequest(req.Context(), rsAPI, vars["roomID"], eventType, "", eventFormat)
+		return OnIncomingStateTypeRequest(req.Context(), device, rsAPI, vars["roomID"], eventType, "", eventFormat)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -225,7 +225,7 @@ func Setup(
 			return util.ErrorResponse(err)
 		}
 		eventFormat := req.URL.Query().Get("format") == "event"
-		return OnIncomingStateTypeRequest(req.Context(), rsAPI, vars["roomID"], vars["type"], vars["stateKey"], eventFormat)
+		return OnIncomingStateTypeRequest(req.Context(), device, rsAPI, vars["roomID"], vars["type"], vars["stateKey"], eventFormat)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
