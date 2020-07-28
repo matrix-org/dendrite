@@ -35,3 +35,8 @@ type DeviceKeys interface {
 	InsertDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error
 	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error)
 }
+
+type KeyChanges interface {
+	InsertKeyChange(ctx context.Context, partition int32, offset int64, userID string) error
+	SelectKeyChanges(ctx context.Context, partition int32, fromOffset int64) (userIDs []string, latestOffset int64, err error)
+}

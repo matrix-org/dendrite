@@ -15,10 +15,12 @@
 package producers
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,6 +28,7 @@ import (
 type KeyChange struct {
 	Topic    string
 	Producer sarama.SyncProducer
+	DB       storage.Database
 }
 
 // ProduceKeyChanges creates new change events for each key
@@ -43,6 +46,10 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceKeys) error {
 		m.Value = sarama.ByteEncoder(value)
 
 		partition, offset, err := p.Producer.SendMessage(&m)
+		if err != nil {
+			return err
+		}
+		err = p.DB.StoreKeyChange(context.Background(), partition, offset, key.UserID)
 		if err != nil {
 			return err
 		}
