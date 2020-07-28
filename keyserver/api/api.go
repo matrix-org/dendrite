@@ -26,6 +26,7 @@ type KeyInternalAPI interface {
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
+	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server
@@ -129,5 +130,21 @@ type QueryKeysResponse struct {
 	// Map of user_id to device_id to device_key
 	DeviceKeys map[string]map[string]json.RawMessage
 	// Set if there was a fatal error processing this query
+	Error *KeyError
+}
+
+type QueryKeyChangesRequest struct {
+	// The partition which had key events sent to
+	Partition int32
+	// The offset of the last received key event, or sarama.OffsetOldest if this is from the beginning
+	Offset int64
+}
+
+type QueryKeyChangesResponse struct {
+	// The set of users who have had their keys change.
+	UserIDs []string
+	// The latest offset represented in this response.
+	Offset int64
+	// Set if there was a problem handling the request.
 	Error *KeyError
 }
