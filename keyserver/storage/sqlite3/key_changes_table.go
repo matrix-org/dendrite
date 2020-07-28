@@ -83,15 +83,14 @@ func (s *keyChangesStatements) SelectKeyChanges(
 		return nil, 0, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectKeyChangesStmt: rows.close() failed")
-	var maxOffset int64
 	for rows.Next() {
 		var userID string
 		var offset int64
 		if err := rows.Scan(&userID, &offset); err != nil {
 			return nil, 0, err
 		}
-		if offset > maxOffset {
-			maxOffset = offset
+		if offset > latestOffset {
+			latestOffset = offset
 		}
 		userIDs = append(userIDs, userID)
 	}
