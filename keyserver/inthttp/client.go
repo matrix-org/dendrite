@@ -29,6 +29,7 @@ const (
 	PerformUploadKeysPath = "/keyserver/performUploadKeys"
 	PerformClaimKeysPath  = "/keyserver/performClaimKeys"
 	QueryKeysPath         = "/keyserver/queryKeys"
+	QueryKeyChangesPath   = "/keyserver/queryKeyChanges"
 )
 
 // NewKeyServerClient creates a KeyInternalAPI implemented by talking to a HTTP POST API.
@@ -94,6 +95,23 @@ func (h *httpKeyInternalAPI) QueryKeys(
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryKeysPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.KeyError{
+			Err: err.Error(),
+		}
+	}
+}
+
+func (h *httpKeyInternalAPI) QueryKeyChanges(
+	ctx context.Context,
+	request *api.QueryKeyChangesRequest,
+	response *api.QueryKeyChangesResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyChanges")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryKeyChangesPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.KeyError{

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/currentstateserver/api"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -14,6 +15,19 @@ import (
 var (
 	syncingUser = "@alice:localhost"
 )
+
+type mockKeyAPI struct{}
+
+func (k *mockKeyAPI) PerformUploadKeys(ctx context.Context, req *keyapi.PerformUploadKeysRequest, res *keyapi.PerformUploadKeysResponse) {
+}
+
+// PerformClaimKeys claims one-time keys for use in pre-key messages
+func (k *mockKeyAPI) PerformClaimKeys(ctx context.Context, req *keyapi.PerformClaimKeysRequest, res *keyapi.PerformClaimKeysResponse) {
+}
+func (k *mockKeyAPI) QueryKeys(ctx context.Context, req *keyapi.QueryKeysRequest, res *keyapi.QueryKeysResponse) {
+}
+func (k *mockKeyAPI) QueryKeyChanges(ctx context.Context, req *keyapi.QueryKeyChangesRequest, res *keyapi.QueryKeyChangesResponse) {
+}
 
 type mockCurrentStateAPI struct {
 	roomIDToJoinedMembers map[string][]string
@@ -144,7 +158,7 @@ func leaveResponseWithRooms(syncResponse *types.Response, userID string, roomIDs
 func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 	newShareUser := "@bill:localhost"
 	newlyJoinedRoom := "!TestKeyChangeCatchupOnJoinShareNewUser:bar"
-	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
+	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, newShareUser},
 			"!another:room": {syncingUser},
@@ -153,7 +167,7 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 
-	hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
+	_, hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -167,7 +181,7 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 	removeUser := "@bill:localhost"
 	newlyLeftRoom := "!TestKeyChangeCatchupOnLeaveShareLeftUser:bar"
-	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
+	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyLeftRoom:   {removeUser},
 			"!another:room": {syncingUser},
@@ -176,7 +190,7 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
+	_, hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -190,7 +204,7 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 	existingUser := "@bob:localhost"
 	newlyJoinedRoom := "!TestKeyChangeCatchupOnJoinShareNoNewUsers:bar"
-	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
+	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, existingUser},
 			"!another:room": {syncingUser, existingUser},
@@ -199,7 +213,7 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 
-	hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
+	_, hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -212,7 +226,7 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 	existingUser := "@bob:localhost"
 	newlyLeftRoom := "!TestKeyChangeCatchupOnLeaveShareNoUsers:bar"
-	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
+	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyLeftRoom:   {existingUser},
 			"!another:room": {syncingUser, existingUser},
@@ -221,7 +235,7 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
+	_, hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -234,7 +248,7 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 	existingUser := "@bob1:localhost"
 	roomID := "!TestKeyChangeCatchupNoNewJoinsButMessages:bar"
-	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
+	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			roomID: {syncingUser, existingUser},
 		},
@@ -280,7 +294,7 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 	jr.Timeline.Events = roomTimelineEvents
 	syncResponse.Rooms.Join[roomID] = jr
 
-	hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
+	_, hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -297,7 +311,7 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 	newlyLeftUser2 := "@debra:localhost"
 	newlyJoinedRoom := "!join:bar"
 	newlyLeftRoom := "!left:bar"
-	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
+	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, newShareUser, newShareUser2},
 			newlyLeftRoom:   {newlyLeftUser, newlyLeftUser2},
@@ -308,7 +322,7 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
+	_, hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -333,7 +347,7 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 	newShareUser := "@berta:localhost"
 	newShareUser2 := "@bobby:localhost"
 	roomID := "!join:bar"
-	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockCurrentStateAPI{
+	consumer := NewOutputKeyChangeEventConsumer(gomatrixserverlib.ServerName("localhost"), "some_topic", nil, &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			roomID:          {newShareUser, newShareUser2},
 			"!another:room": {syncingUser},
@@ -393,7 +407,7 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 	lr.Timeline.Events = roomEvents
 	syncResponse.Rooms.Leave[roomID] = lr
 
-	hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
+	_, hasNew, err := consumer.Catchup(context.Background(), syncingUser, syncResponse, types.NewStreamToken(0, 0))
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
