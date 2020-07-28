@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal"
 )
 
 const profilesSchema = `
@@ -118,10 +119,14 @@ func (s *profilesStatements) selectProfilesBySearch(
 	ctx context.Context, searchString string, limit int,
 ) ([]authtypes.Profile, error) {
 	var profiles []authtypes.Profile
+	// The fmt.Sprintf directive below is building a parameter for the
+	// "LIKE" condition in the SQL query. %% escapes the % char, so the
+	// statement in the end will look like "LIKE %searchString%".
 	rows, err := s.selectProfilesBySearchStmt.QueryContext(ctx, fmt.Sprintf("%%%s%%", searchString), limit)
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectProfilesBySearch: rows.close() failed")
 	for rows.Next() {
 		var profile authtypes.Profile
 		if err := rows.Scan(&profile.Localpart, &profile.DisplayName, &profile.AvatarURL); err != nil {
