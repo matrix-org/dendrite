@@ -34,7 +34,7 @@ func InviteV2(
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
 	eventID string,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	rsAPI api.RoomserverInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
@@ -56,7 +56,7 @@ func InviteV1(
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
 	eventID string,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	rsAPI api.RoomserverInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
@@ -86,7 +86,7 @@ func processInvite(
 	strippedState []gomatrixserverlib.InviteV2StrippedState,
 	roomID string,
 	eventID string,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	rsAPI api.RoomserverInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {

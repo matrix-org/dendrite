@@ -33,8 +33,11 @@ func getAccountByPassword(ctx context.Context, localpart, plaintextPassword stri
 }
 
 func setup() *UserInteractive {
-	cfg := &config.Dendrite{}
-	cfg.Matrix.ServerName = serverName
+	cfg := &config.ClientAPI{
+		Matrix: &config.Global{
+			ServerName: serverName,
+		},
+	}
 	return NewUserInteractive(getAccountByPassword, cfg)
 }
 

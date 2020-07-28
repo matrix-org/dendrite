@@ -54,11 +54,13 @@ func main() {
 		// the API endpoints. They'll listen on the same port as the monolith
 		// itself.
 		addr := config.Address(*httpBindAddr)
-		cfg.Listen.RoomServer = addr
-		cfg.Listen.EDUServer = addr
-		cfg.Listen.AppServiceAPI = addr
-		cfg.Listen.FederationSender = addr
-		cfg.Listen.ServerKeyAPI = addr
+		cfg.RoomServer.Listen = addr
+		cfg.EDUServer.Listen = addr
+		cfg.AppServiceAPI.Listen = addr
+		cfg.FederationSender.Listen = addr
+		cfg.ServerKeyAPI.Listen = addr
+		cfg.CurrentStateServer.Listen = addr
+		cfg.KeyServer.Listen = addr
 	}
 
 	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
@@ -69,14 +71,14 @@ func main() {
 	federation := base.CreateFederationClient()
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
-		base.Cfg, federation, base.Caches,
+		&base.Cfg.ServerKeyAPI, federation, base.Caches,
 	)
 	if base.UseHTTPAPIs {
 		serverkeyapi.AddInternalRoutes(base.InternalAPIMux, serverKeyAPI, base.Caches)
 		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, cfg.Derived.ApplicationServices)
 
 	rsImpl := roomserver.NewInternalAPI(
 		base, keyRing, federation,
@@ -118,8 +120,8 @@ func main() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsImpl.SetFederationSenderAPI(fsAPI)
 
-	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
-	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, userAPI, base.KafkaProducer)
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, userAPI, base.KafkaProducer)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -146,7 +148,7 @@ func main() {
 		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
-		cfg,
+		&cfg.Global,
 		base.UseHTTPAPIs,
 	)
 

@@ -51,7 +51,7 @@ const pathPrefixUnstable = "/client/unstable"
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux *mux.Router, cfg *config.Dendrite,
+	publicAPIMux *mux.Router, cfg *config.ClientAPI,
 	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,

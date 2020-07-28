@@ -53,7 +53,7 @@ type Credentials struct {
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
 func CreateSession(
-	ctx context.Context, req EmailAssociationRequest, cfg *config.Dendrite,
+	ctx context.Context, req EmailAssociationRequest, cfg *config.ClientAPI,
 ) (string, error) {
 	if err := isTrusted(req.IDServer, cfg); err != nil {
 		return "", err
@@ -101,7 +101,7 @@ func CreateSession(
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
 func CheckAssociation(
-	ctx context.Context, creds Credentials, cfg *config.Dendrite,
+	ctx context.Context, creds Credentials, cfg *config.ClientAPI,
 ) (bool, string, string, error) {
 	if err := isTrusted(creds.IDServer, cfg); err != nil {
 		return false, "", "", err
@@ -142,7 +142,7 @@ func CheckAssociation(
 // identifier and a Matrix ID.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
-func PublishAssociation(creds Credentials, userID string, cfg *config.Dendrite) error {
+func PublishAssociation(creds Credentials, userID string, cfg *config.ClientAPI) error {
 	if err := isTrusted(creds.IDServer, cfg); err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func PublishAssociation(creds Credentials, userID string, cfg *config.Dendrite) 
 // isTrusted checks if a given identity server is part of the list of trusted
 // identity servers in the configuration file.
 // Returns an error if the server isn't trusted.
-func isTrusted(idServer string, cfg *config.Dendrite) error {
+func isTrusted(idServer string, cfg *config.ClientAPI) error {
 	for _, server := range cfg.Matrix.TrustedIDServers {
 		if idServer == server {
 			return nil

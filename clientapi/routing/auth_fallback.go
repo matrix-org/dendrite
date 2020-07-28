@@ -101,7 +101,7 @@ func serveTemplate(w http.ResponseWriter, templateHTML string, data map[string]s
 // AuthFallback implements GET and POST /auth/{authType}/fallback/web?session={sessionID}
 func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 ) *util.JSONResponse {
 	sessionID := req.URL.Query().Get("session")
 
@@ -116,7 +116,7 @@ func AuthFallback(
 		data := map[string]string{
 			"myUrl":   req.URL.String(),
 			"session": sessionID,
-			"siteKey": cfg.Matrix.RecaptchaPublicKey,
+			"siteKey": cfg.RecaptchaPublicKey,
 		}
 		serveTemplate(w, recaptchaTemplate, data)
 	}
@@ -181,11 +181,11 @@ func AuthFallback(
 
 // checkRecaptchaEnabled creates an error response if recaptcha is not usable on homeserver.
 func checkRecaptchaEnabled(
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	w http.ResponseWriter,
 	req *http.Request,
 ) *util.JSONResponse {
-	if !cfg.Matrix.RecaptchaEnabled {
+	if !cfg.RecaptchaEnabled {
 		return writeHTTPMessage(w, req,
 			"Recaptcha login is disabled on this Homeserver",
 			http.StatusBadRequest,

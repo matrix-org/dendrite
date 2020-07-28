@@ -255,11 +255,11 @@ func validatePassword(password string) *util.JSONResponse {
 
 // validateRecaptcha returns an error response if the captcha response is invalid
 func validateRecaptcha(
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	response string,
 	clientip string,
 ) *util.JSONResponse {
-	if !cfg.Matrix.RecaptchaEnabled {
+	if !cfg.RecaptchaEnabled {
 		return &util.JSONResponse{
 			Code: http.StatusConflict,
 			JSON: jsonerror.Unknown("Captcha registration is disabled"),
@@ -274,9 +274,9 @@ func validateRecaptcha(
 	}
 
 	// Make a POST request to Google's API to check the captcha response
-	resp, err := http.PostForm(cfg.Matrix.RecaptchaSiteVerifyAPI,
+	resp, err := http.PostForm(cfg.RecaptchaSiteVerifyAPI,
 		url.Values{
-			"secret":   {cfg.Matrix.RecaptchaPrivateKey},
+			"secret":   {cfg.RecaptchaPrivateKey},
 			"response": {response},
 			"remoteip": {clientip},
 		},
@@ -324,7 +324,7 @@ func validateRecaptcha(
 // Application Service is given, it will check to see if it matches any
 // Application Service's namespace.
 func UserIDIsWithinApplicationServiceNamespace(
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	userID string,
 	appservice *config.ApplicationService,
 ) bool {
@@ -354,7 +354,7 @@ func UserIDIsWithinApplicationServiceNamespace(
 // UsernameMatchesMultipleExclusiveNamespaces will check if a given username matches
 // more than one exclusive namespace. More than one is not allowed
 func UsernameMatchesMultipleExclusiveNamespaces(
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	username string,
 ) bool {
 	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
@@ -374,7 +374,7 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 // UsernameMatchesExclusiveNamespaces will check if a given username matches any
 // application service's exclusive users namespace
 func UsernameMatchesExclusiveNamespaces(
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	username string,
 ) bool {
 	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
@@ -386,7 +386,7 @@ func UsernameMatchesExclusiveNamespaces(
 // username is within that application service's namespace. As long as these
 // two requirements are met, no error will be returned.
 func validateApplicationService(
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	username string,
 	accessToken string,
 ) (string, *util.JSONResponse) {
@@ -442,7 +442,7 @@ func Register(
 	req *http.Request,
 	userAPI userapi.UserInternalAPI,
 	accountDB accounts.Database,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var r registerRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
@@ -512,7 +512,7 @@ func Register(
 func handleGuestRegistration(
 	req *http.Request,
 	r registerRequest,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	var res userapi.PerformAccountCreationResponse
@@ -568,7 +568,7 @@ func handleRegistrationFlow(
 	req *http.Request,
 	r registerRequest,
 	sessionID string,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
@@ -580,7 +580,7 @@ func handleRegistrationFlow(
 
 	// TODO: email / msisdn auth types.
 
-	if cfg.Matrix.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
+	if cfg.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
 		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
 	}
 
@@ -666,7 +666,7 @@ func handleApplicationServiceRegistration(
 	tokenErr error,
 	req *http.Request,
 	r registerRequest,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
@@ -704,7 +704,7 @@ func checkAndCompleteFlow(
 	req *http.Request,
 	r registerRequest,
 	sessionID string,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
@@ -728,7 +728,7 @@ func checkAndCompleteFlow(
 func LegacyRegister(
 	req *http.Request,
 	userAPI userapi.UserInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var r legacyRegisterRequest
 	resErr := parseAndValidateLegacyLogin(req, &r)
@@ -742,13 +742,13 @@ func LegacyRegister(
 		"auth.type": r.Type,
 	}).Info("Processing registration request")
 
-	if cfg.Matrix.RegistrationDisabled && r.Type != authtypes.LoginTypeSharedSecret {
+	if cfg.RegistrationDisabled && r.Type != authtypes.LoginTypeSharedSecret {
 		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
 	}
 
 	switch r.Type {
 	case authtypes.LoginTypeSharedSecret:
-		if cfg.Matrix.RegistrationSharedSecret == "" {
+		if cfg.RegistrationSharedSecret == "" {
 			return util.MessageResponse(http.StatusBadRequest, "Shared secret registration is disabled")
 		}
 
@@ -902,15 +902,15 @@ func completeRegistration(
 // Used for shared secret registration.
 // Checks if the username, password and isAdmin flag matches the given mac.
 func isValidMacLogin(
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	username, password string,
 	isAdmin bool,
 	givenMac []byte,
 ) (bool, error) {
-	sharedSecret := cfg.Matrix.RegistrationSharedSecret
+	sharedSecret := cfg.RegistrationSharedSecret
 
 	// Check that shared secret registration isn't disabled.
-	if cfg.Matrix.RegistrationSharedSecret == "" {
+	if cfg.RegistrationSharedSecret == "" {
 		return false, errors.New("Shared secret registration is disabled")
 	}
 
@@ -1001,7 +1001,7 @@ type availableResponse struct {
 // RegisterAvailable checks if the username is already taken or invalid.
 func RegisterAvailable(
 	req *http.Request,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	accountDB accounts.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")

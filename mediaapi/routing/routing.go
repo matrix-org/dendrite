@@ -42,7 +42,7 @@ const pathPrefixV1 = "/media/v1" // TODO: remove when synapse is fixed
 // nolint: gocyclo
 func Setup(
 	publicAPIMux *mux.Router,
-	cfg *config.Dendrite,
+	cfg *config.MediaAPI,
 	db storage.Database,
 	userAPI userapi.UserInternalAPI,
 	client *gomatrixserverlib.Client,
@@ -81,7 +81,7 @@ func Setup(
 
 func makeDownloadAPI(
 	name string,
-	cfg *config.Dendrite,
+	cfg *config.MediaAPI,
 	db storage.Database,
 	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,

@@ -43,7 +43,7 @@ func SendEvent(
 	req *http.Request,
 	device *userapi.Device,
 	roomID, eventType string, txnID, stateKey *string,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
@@ -112,7 +112,7 @@ func generateSendEvent(
 	req *http.Request,
 	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request
@@ -146,7 +146,7 @@ func generateSendEvent(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := eventutil.BuildEvent(req.Context(), &builder, cfg, evTime, rsAPI, &queryRes)
+	e, err := eventutil.BuildEvent(req.Context(), &builder, cfg.Matrix, evTime, rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,

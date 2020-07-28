@@ -37,7 +37,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
 	router *mux.Router,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	producer sarama.SyncProducer,
 	deviceDB devices.Database,
 	accountsDB accounts.Database,
@@ -54,7 +54,7 @@ func AddPublicRoutes(
 ) {
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,
-		Topic:    string(cfg.Kafka.Topics.OutputClientData),
+		Topic:    string(cfg.Matrix.Kafka.Topics.OutputClientData),
 	}
 
 	routing.Setup(

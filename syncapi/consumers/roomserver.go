@@ -39,7 +39,7 @@ type OutputRoomEventConsumer struct {
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
-	cfg *config.Dendrite,
+	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
 	store storage.Database,
@@ -47,7 +47,7 @@ func NewOutputRoomEventConsumer(
 ) *OutputRoomEventConsumer {
 
 	consumer := internal.ContinualConsumer{
-		Topic:          string(cfg.Kafka.Topics.OutputRoomEvent),
+		Topic:          string(cfg.Matrix.Kafka.Topics.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

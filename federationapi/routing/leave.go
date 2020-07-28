@@ -28,7 +28,7 @@ import (
 func MakeLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	rsAPI api.RoomserverInternalAPI,
 	roomID, userID string,
 ) util.JSONResponse {
@@ -60,7 +60,7 @@ func MakeLeave(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	event, err := eventutil.BuildEvent(httpReq.Context(), &builder, cfg, time.Now(), rsAPI, &queryRes)
+	event, err := eventutil.BuildEvent(httpReq.Context(), &builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -102,7 +102,7 @@ func MakeLeave(
 func SendLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	rsAPI api.RoomserverInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,

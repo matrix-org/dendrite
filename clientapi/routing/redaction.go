@@ -40,7 +40,7 @@ type redactionResponse struct {
 }
 
 func SendRedaction(
-	req *http.Request, device *userapi.Device, roomID, eventID string, cfg *config.Dendrite,
+	req *http.Request, device *userapi.Device, roomID, eventID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
 ) util.JSONResponse {
 	resErr := checkMemberInRoom(req.Context(), stateAPI, device.UserID, roomID)
@@ -115,7 +115,7 @@ func SendRedaction(
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := eventutil.BuildEvent(req.Context(), &builder, cfg, time.Now(), rsAPI, &queryRes)
+	e, err := eventutil.BuildEvent(req.Context(), &builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

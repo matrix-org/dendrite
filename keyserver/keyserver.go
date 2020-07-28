@@ -37,17 +37,14 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	cfg *config.Dendrite, fedClient *gomatrixserverlib.FederationClient, userAPI userapi.UserInternalAPI, producer sarama.SyncProducer,
+	cfg *config.KeyServer, fedClient *gomatrixserverlib.FederationClient, userAPI userapi.UserInternalAPI, producer sarama.SyncProducer,
 ) api.KeyInternalAPI {
-	db, err := storage.NewDatabase(
-		string(cfg.Database.E2EKey),
-		cfg.DbProperties(),
-	)
+	db, err := storage.NewDatabase(string(cfg.Database), cfg.DatabaseOptions)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
 	keyChangeProducer := &producers.KeyChange{
-		Topic:    string(cfg.Kafka.Topics.OutputKeyChangeEvent),
+		Topic:    string(cfg.Matrix.Kafka.Topics.OutputKeyChangeEvent),
 		Producer: producer,
 	}
 	return &internal.KeyInternalAPI{

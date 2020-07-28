@@ -23,7 +23,7 @@ import (
 type server struct {
 	name      gomatrixserverlib.ServerName        // server name
 	validity  time.Duration                       // key validity duration from now
-	config    *config.Dendrite                    // skeleton config, from TestMain
+	config    *config.ServerKeyAPI                // skeleton config, from TestMain
 	fedclient *gomatrixserverlib.FederationClient // uses MockRoundTripper
 	cache     *caching.Caches                     // server-specific cache
 	api       api.ServerKeyInternalAPI            // server-specific server key API
@@ -69,13 +69,15 @@ func TestMain(m *testing.M) {
 
 		// Draw up just enough Dendrite config for the server key
 		// API to work.
-		s.config = &config.Dendrite{}
-		s.config.SetDefaults()
-		s.config.Matrix.ServerName = gomatrixserverlib.ServerName(s.name)
-		s.config.Matrix.PrivateKey = testPriv
-		s.config.Matrix.KeyID = serverKeyID
-		s.config.Matrix.KeyValidityPeriod = s.validity
-		s.config.Database.ServerKey = config.DataSource("file::memory:")
+		s.config = &config.ServerKeyAPI{
+			Matrix: &config.Global{
+				ServerName:        gomatrixserverlib.ServerName(s.name),
+				PrivateKey:        testPriv,
+				KeyID:             serverKeyID,
+				KeyValidityPeriod: s.validity,
+			},
+			Database: config.DataSource("file::memory:"),
+		}
 
 		// Create a transport which redirects federation requests to
 		// the mock round tripper. Since we're not *really* listening for

@@ -132,10 +132,10 @@ func startSyncServer() (*exec.Cmd, chan error) {
 		panic(err)
 	}
 	// TODO use the address assigned by the config generator rather than clobbering.
-	cfg.Matrix.ServerName = "localhost"
+	cfg.Global.ServerName = "localhost"
 	cfg.Listen.SyncAPI = config.Address(syncserverAddr)
-	cfg.Kafka.Topics.OutputRoomEvent = config.Topic(inputTopic)
-	cfg.Kafka.Topics.OutputClientData = config.Topic(clientTopic)
+	cfg.Global.Kafka.Topics.OutputRoomEvent = config.Topic(inputTopic)
+	cfg.Global.Kafka.Topics.OutputClientData = config.Topic(clientTopic)
 
 	if err := test.WriteConfig(cfg, dir); err != nil {
 		panic(err)

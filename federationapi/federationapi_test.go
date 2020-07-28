@@ -19,31 +19,37 @@ import (
 // Relevant for v3 rooms and a cause of flakey sytests as the IDs are randomly generated.
 func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	_, privKey, _ := ed25519.GenerateKey(nil)
-	cfg := &config.Dendrite{}
-	cfg.Matrix.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName("localhost")
-	cfg.Matrix.PrivateKey = privKey
-	cfg.Kafka.UseNaffka = true
-	cfg.Database.Naffka = "file::memory:"
-	cfg.SetDefaults()
+	cfg := &config.Dendrite{
+		Global: config.Global{
+			KeyID:      gomatrixserverlib.KeyID("ed25519:auto"),
+			ServerName: gomatrixserverlib.ServerName("localhost"),
+			PrivateKey: privKey,
+		},
+		FederationSender: config.FederationSender{
+			Database: "file::memory:",
+		},
+	}
+	cfg.FederationSender.Matrix = &cfg.Global
+	cfg.Global.Kafka.UseNaffka = true
+	// TODO: cfg.SetDefaults()
 	base := setup.NewBaseDendrite(cfg, "Test", false)
 	keyRing := &test.NopJSONVerifier{}
 	fsAPI := base.FederationSenderHTTPClient()
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(base.PublicAPIMux, cfg, nil, nil, keyRing, nil, fsAPI, nil, nil, nil)
+	federationapi.AddPublicRoutes(base.PublicAPIMux, &cfg.FederationAPI, nil, nil, keyRing, nil, fsAPI, nil, nil, nil)
 	httputil.SetupHTTPAPI(
 		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
-		cfg,
+		&cfg.Global,
 		base.UseHTTPAPIs,
 	)
 	baseURL, cancel := test.ListenAndServe(t, base.BaseMux, true)
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
 
-	fedCli := gomatrixserverlib.NewFederationClient(serverName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+	fedCli := gomatrixserverlib.NewFederationClient(serverName, cfg.Global.KeyID, cfg.Global.PrivateKey)
 
 	testCases := []struct {
 		roomVer   gomatrixserverlib.RoomVersion

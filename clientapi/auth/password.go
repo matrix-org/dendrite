@@ -35,7 +35,7 @@ type PasswordRequest struct {
 // LoginTypePassword implements https://matrix.org/docs/spec/client_server/r0.6.1#password-based
 type LoginTypePassword struct {
 	GetAccountByPassword GetAccountByPassword
-	Config               *config.Dendrite
+	Config               *config.ClientAPI
 }
 
 func (t *LoginTypePassword) Name() string {

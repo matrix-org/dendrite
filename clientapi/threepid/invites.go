@@ -86,7 +86,7 @@ var (
 // can be emitted.
 func CheckAndProcessInvite(
 	ctx context.Context,
-	device *userapi.Device, body *MembershipRequest, cfg *config.Dendrite,
+	device *userapi.Device, body *MembershipRequest, cfg *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI, db accounts.Database,
 	roomID string,
 	evTime time.Time,
@@ -137,7 +137,7 @@ func CheckAndProcessInvite(
 // Returns an error if a check or a request failed.
 func queryIDServer(
 	ctx context.Context,
-	db accounts.Database, cfg *config.Dendrite, device *userapi.Device,
+	db accounts.Database, cfg *config.ClientAPI, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	if err = isTrusted(body.IDServer, cfg); err != nil {
@@ -206,7 +206,7 @@ func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServe
 // Returns an error if the request failed to send or if the response couldn't be parsed.
 func queryIDServerStoreInvite(
 	ctx context.Context,
-	db accounts.Database, cfg *config.Dendrite, device *userapi.Device,
+	db accounts.Database, cfg *config.ClientAPI, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name
@@ -330,7 +330,7 @@ func checkIDServerSignatures(
 func emit3PIDInviteEvent(
 	ctx context.Context,
 	body *MembershipRequest, res *idServerStoreInviteResponse,
-	device *userapi.Device, roomID string, cfg *config.Dendrite,
+	device *userapi.Device, roomID string, cfg *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 	evTime time.Time,
 ) error {
@@ -354,7 +354,7 @@ func emit3PIDInviteEvent(
 	}
 
 	queryRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.BuildEvent(ctx, builder, cfg, evTime, rsAPI, &queryRes)
+	event, err := eventutil.BuildEvent(ctx, builder, cfg.Matrix, evTime, rsAPI, &queryRes)
 	if err != nil {
 		return err
 	}

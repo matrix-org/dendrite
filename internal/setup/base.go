@@ -16,7 +16,6 @@ package setup
 
 import (
 	"database/sql"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -96,7 +95,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 
 	var kafkaConsumer sarama.Consumer
 	var kafkaProducer sarama.SyncProducer
-	if cfg.Kafka.UseNaffka {
+	if cfg.Global.Kafka.UseNaffka {
 		kafkaConsumer, kafkaProducer = setupNaffka(cfg)
 	} else {
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
@@ -108,12 +107,15 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	}
 
 	client := http.Client{Timeout: HTTPClientTimeout}
-	if cfg.Proxy != nil {
-		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
-			Scheme: cfg.Proxy.Protocol,
-			Host:   fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
-		})}
-	}
+	// TODO: fix this
+	/*
+		if cfg.Proxy != nil {
+			client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
+				Scheme: cfg.Proxy.Protocol,
+				Host:   fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
+			})}
+		}
+	*/
 
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
 	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.
@@ -228,7 +230,7 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
 func (b *BaseDendrite) CreateDeviceDB() devices.Database {
-	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
+	db, err := devices.NewDatabase(string(b.Cfg.UserAPI.DeviceDatabase), &b.Cfg.UserAPI.DeviceDatabaseOptions, b.Cfg.Global.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to devices db")
 	}
@@ -239,7 +241,7 @@ func (b *BaseDendrite) CreateDeviceDB() devices.Database {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
-	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
+	db, err := accounts.NewDatabase(string(b.Cfg.UserAPI.AccountDatabase), &b.Cfg.UserAPI.AccountDatabaseOptions, b.Cfg.Global.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
@@ -251,7 +253,7 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
 	return gomatrixserverlib.NewFederationClient(
-		b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
+		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
 	)
 }
 
@@ -276,7 +278,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		b.BaseMux,
 		b.PublicAPIMux,
 		b.InternalAPIMux,
-		b.Cfg,
+		&b.Cfg.Global,
 		b.UseHTTPAPIs,
 	)
 	serv.Handler = b.BaseMux
@@ -292,12 +294,12 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 
 // setupKafka creates kafka consumer/producer pair from the config.
 func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	consumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
+	consumer, err := sarama.NewConsumer(cfg.Global.Kafka.Addresses, nil)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start kafka consumer")
 	}
 
-	producer, err := sarama.NewSyncProducer(cfg.Kafka.Addresses, nil)
+	producer, err := sarama.NewSyncProducer(cfg.Global.Kafka.Addresses, nil)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to setup kafka producers")
 	}
@@ -311,10 +313,10 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 	var db *sql.DB
 	var naffkaDB *naffka.DatabaseImpl
 
-	uri, err := url.Parse(string(cfg.Database.Naffka))
+	uri, err := url.Parse(string(cfg.Global.Kafka.Database))
 	if err != nil || uri.Scheme == "file" {
 		var cs string
-		cs, err = sqlutil.ParseFileURI(string(cfg.Database.Naffka))
+		cs, err = sqlutil.ParseFileURI(string(cfg.Global.Kafka.Database))
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to parse naffka database file URI")
 		}
@@ -328,7 +330,7 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
 	} else {
-		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka), nil)
+		db, err = sqlutil.Open("postgres", string(cfg.Global.Kafka.Database), nil)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to open naffka database")
 		}

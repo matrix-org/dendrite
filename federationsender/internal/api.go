@@ -12,7 +12,7 @@ import (
 // FederationSenderInternalAPI is an implementation of api.FederationSenderInternalAPI
 type FederationSenderInternalAPI struct {
 	db         storage.Database
-	cfg        *config.Dendrite
+	cfg        *config.FederationSender
 	statistics *statistics.Statistics
 	rsAPI      api.RoomserverInternalAPI
 	federation *gomatrixserverlib.FederationClient
@@ -21,7 +21,7 @@ type FederationSenderInternalAPI struct {
 }
 
 func NewFederationSenderInternalAPI(
-	db storage.Database, cfg *config.Dendrite,
+	db storage.Database, cfg *config.FederationSender,
 	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,

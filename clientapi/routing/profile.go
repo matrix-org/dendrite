@@ -37,7 +37,7 @@ import (
 
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
-	req *http.Request, accountDB accounts.Database, cfg *config.Dendrite,
+	req *http.Request, accountDB accounts.Database, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
@@ -66,7 +66,7 @@ func GetProfile(
 
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
-	req *http.Request, accountDB accounts.Database, cfg *config.Dendrite,
+	req *http.Request, accountDB accounts.Database, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
@@ -95,7 +95,7 @@ func GetAvatarURL(
 // nolint:gocyclo
 func SetAvatarURL(
 	req *http.Request, accountDB accounts.Database, stateAPI currentstateAPI.CurrentStateInternalAPI,
-	device *userapi.Device, userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
+	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -184,7 +184,7 @@ func SetAvatarURL(
 
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
-	req *http.Request, accountDB accounts.Database, cfg *config.Dendrite,
+	req *http.Request, accountDB accounts.Database, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
@@ -213,7 +213,7 @@ func GetDisplayName(
 // nolint:gocyclo
 func SetDisplayName(
 	req *http.Request, accountDB accounts.Database, stateAPI currentstateAPI.CurrentStateInternalAPI,
-	device *userapi.Device, userID string, cfg *config.Dendrite, rsAPI api.RoomserverInternalAPI,
+	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -305,7 +305,7 @@ func SetDisplayName(
 // Returns an error when something goes wrong or specifically
 // eventutil.ErrProfileNoExists when the profile doesn't exist.
 func getProfile(
-	ctx context.Context, accountDB accounts.Database, cfg *config.Dendrite,
+	ctx context.Context, accountDB accounts.Database, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
@@ -345,7 +345,7 @@ func getProfile(
 func buildMembershipEvents(
 	ctx context.Context,
 	roomIDs []string,
-	newProfile authtypes.Profile, userID string, cfg *config.Dendrite,
+	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
 	evTime time.Time, rsAPI api.RoomserverInternalAPI,
 ) ([]gomatrixserverlib.HeaderedEvent, error) {
 	evs := []gomatrixserverlib.HeaderedEvent{}
@@ -375,7 +375,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := eventutil.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
+		event, err := eventutil.BuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

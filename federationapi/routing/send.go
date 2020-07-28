@@ -34,7 +34,7 @@ func Send(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	txnID gomatrixserverlib.TransactionID,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	rsAPI api.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	keys gomatrixserverlib.JSONVerifier,

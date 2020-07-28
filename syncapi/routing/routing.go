@@ -39,7 +39,7 @@ func Setup(
 	publicAPIMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
 	userAPI userapi.UserInternalAPI, federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.SyncAPI,
 ) {
 	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
 

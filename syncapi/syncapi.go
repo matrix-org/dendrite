@@ -40,9 +40,9 @@ func AddPublicRoutes(
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	cfg *config.Dendrite,
+	cfg *config.SyncAPI,
 ) {
-	syncDB, err := storage.NewSyncServerDatasource(string(cfg.Database.SyncAPI), cfg.DbProperties())
+	syncDB, err := storage.NewSyncServerDatasource(string(cfg.Database), cfg.DatabaseOptions)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}

@@ -240,7 +240,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		panic(err)
 	}
 
-	outputTopic := string(cfg.Kafka.Topics.OutputRoomEvent)
+	outputTopic := string(cfg.Global.Kafka.Topics.OutputRoomEvent)
 
 	err = exe.DeleteTopic(outputTopic)
 	if err != nil {

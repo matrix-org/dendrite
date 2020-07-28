@@ -35,7 +35,7 @@ func Backfill(
 	request *gomatrixserverlib.FederationRequest,
 	rsAPI api.RoomserverInternalAPI,
 	roomID string,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 ) util.JSONResponse {
 	var res api.PerformBackfillResponse
 	var eIDs []string

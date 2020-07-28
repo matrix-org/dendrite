@@ -88,9 +88,9 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 	if err != nil {
 		panic(err)
 	}
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(proxyAddr)
-	cfg.Media.DynamicThumbnails = dynamicThumbnails
-	if err = yaml.Unmarshal([]byte(thumbnailSizes), &cfg.Media.ThumbnailSizes); err != nil {
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(proxyAddr)
+	cfg.MediaAPI.DynamicThumbnails = dynamicThumbnails
+	if err = yaml.Unmarshal([]byte(thumbnailSizes), &cfg.MediaAPI.ThumbnailSizes); err != nil {
 		panic(err)
 	}
 

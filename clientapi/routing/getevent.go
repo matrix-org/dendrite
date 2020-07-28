@@ -30,7 +30,7 @@ type getEventRequest struct {
 	device         *userapi.Device
 	roomID         string
 	eventID        string
-	cfg            *config.Dendrite
+	cfg            *config.ClientAPI
 	federation     *gomatrixserverlib.FederationClient
 	requestedEvent gomatrixserverlib.Event
 }
@@ -42,7 +42,7 @@ func GetEvent(
 	device *userapi.Device,
 	roomID string,
 	eventID string,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
