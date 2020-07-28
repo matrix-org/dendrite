@@ -92,9 +92,11 @@ func MustWriteOutputEvent(t *testing.T, producer sarama.SyncProducer, out *rooms
 }
 
 func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.SyncProducer) {
-	cfg := &config.Dendrite{}
-	cfg.Kafka.Topics.OutputRoomEvent = config.Topic(kafkaTopic)
-	cfg.Database.CurrentState = config.DataSource("file::memory:")
+	cfg := &config.CurrentStateServer{
+		Matrix: &config.Global{},
+	}
+	cfg.Matrix.Kafka.Topics.OutputRoomEvent = config.Topic(kafkaTopic)
+	cfg.Database = config.DataSource("file::memory:")
 	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), "file::memory:", nil)
 	if err != nil {
 		t.Fatalf("Failed to open naffka database: %s", err)

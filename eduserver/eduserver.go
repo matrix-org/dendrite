@@ -39,12 +39,13 @@ func NewInternalAPI(
 	eduCache *cache.EDUCache,
 	userAPI userapi.UserInternalAPI,
 ) api.EDUServerInputAPI {
+	cfg := &base.Cfg.EDUServer
 	return &input.EDUServerInputAPI{
 		Cache:                        eduCache,
 		UserAPI:                      userAPI,
 		Producer:                     base.KafkaProducer,
-		OutputTypingEventTopic:       string(base.Cfg.Kafka.Topics.OutputTypingEvent),
-		OutputSendToDeviceEventTopic: string(base.Cfg.Kafka.Topics.OutputSendToDeviceEvent),
-		ServerName:                   base.Cfg.Matrix.ServerName,
+		OutputTypingEventTopic:       string(cfg.Matrix.Kafka.Topics.OutputTypingEvent),
+		OutputSendToDeviceEventTopic: string(cfg.Matrix.Kafka.Topics.OutputSendToDeviceEvent),
+		ServerName:                   cfg.Matrix.ServerName,
 	}
 }
