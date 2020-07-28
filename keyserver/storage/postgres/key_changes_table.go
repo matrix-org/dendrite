@@ -26,10 +26,9 @@ var keyChangesSchema = `
 -- Stores key change information about users. Used to determine when to send updated device lists to clients.
 CREATE TABLE IF NOT EXISTS keyserver_key_changes (
 	partition BIGINT NOT NULL,
-	offset BIGINT NOT NULL,
-	-- The key owner
+	log_offset BIGINT NOT NULL,
     user_id TEXT NOT NULL,
-    CONSTRAINT keyserver_key_changes_unique UNIQUE (partition, offset)
+    CONSTRAINT keyserver_key_changes_unique UNIQUE (partition, log_offset)
 );
 `
 
@@ -37,7 +36,7 @@ CREATE TABLE IF NOT EXISTS keyserver_key_changes (
 // Rather than falling over, just overwrite (though this will mean clients with an existing sync token will
 // miss out on updates). TODO: Ideally we would detect when kafka logs are purged then purge this table too.
 const upsertKeyChangeSQL = "" +
-	"INSERT INTO keyserver_key_changes (partition, offset, user_id)" +
+	"INSERT INTO keyserver_key_changes (partition, log_offset, user_id)" +
 	" VALUES ($1, $2, $3)" +
 	" ON CONFLICT ON CONSTRAINT keyserver_key_changes_unique" +
 	" DO UPDATE SET user_id = $3"
@@ -45,7 +44,7 @@ const upsertKeyChangeSQL = "" +
 // select the highest offset for each user in the range. The grouping by user gives distinct entries and then we just
 // take the max offset value as the latest offset.
 const selectKeyChangesSQL = "" +
-	"SELECT user_id, MAX(offset) FROM keyserver_key_changes WHERE partition = $1 AND offset > $2 GROUP BY user_id"
+	"SELECT user_id, MAX(log_offset) FROM keyserver_key_changes WHERE partition = $1 AND log_offset > $2 GROUP BY user_id"
 
 type keyChangesStatements struct {
 	db                   *sql.DB
