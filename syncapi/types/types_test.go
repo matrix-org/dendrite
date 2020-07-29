@@ -1,11 +1,61 @@
 package types
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
+
+func TestNewSyncTokenWithLogs(t *testing.T) {
+	tests := map[string]*StreamingToken{
+		"s4_0": &StreamingToken{
+			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
+			logs:      make(map[string]*LogPosition),
+		},
+		"s4_0.dl-0-123": &StreamingToken{
+			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
+			logs: map[string]*LogPosition{
+				"dl": &LogPosition{
+					Partition: 0,
+					Offset:    123,
+				},
+			},
+		},
+		"s4_0.dl-0-123.ab-1-14419482332": &StreamingToken{
+			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
+			logs: map[string]*LogPosition{
+				"ab": &LogPosition{
+					Partition: 1,
+					Offset:    14419482332,
+				},
+				"dl": &LogPosition{
+					Partition: 0,
+					Offset:    123,
+				},
+			},
+		},
+	}
+	for tok, want := range tests {
+		got, err := NewStreamTokenFromString(tok)
+		if err != nil {
+			if want == nil {
+				continue // error expected
+			}
+			t.Errorf("%s errored: %s", tok, err)
+			continue
+		}
+		if !reflect.DeepEqual(got, *want) {
+			t.Errorf("%s mismatch: got %v want %v", tok, got, want)
+		}
+		if got.String() != tok {
+			t.Errorf("%s reserialisation mismatch: got %s want %s", tok, got.String(), tok)
+		}
+	}
+}
 
 func TestNewSyncTokenFromString(t *testing.T) {
 	shouldPass := map[string]syncToken{
-		"s4_0": NewStreamToken(4, 0).syncToken,
-		"s3_1": NewStreamToken(3, 1).syncToken,
+		"s4_0": NewStreamToken(4, 0, nil).syncToken,
+		"s3_1": NewStreamToken(3, 1, nil).syncToken,
 		"t3_1": NewTopologyToken(3, 1).syncToken,
 	}
 
@@ -21,7 +71,7 @@ func TestNewSyncTokenFromString(t *testing.T) {
 	}
 
 	for test, expected := range shouldPass {
-		result, err := newSyncTokenFromString(test)
+		result, _, err := newSyncTokenFromString(test)
 		if err != nil {
 			t.Error(err)
 		}
@@ -31,7 +81,7 @@ func TestNewSyncTokenFromString(t *testing.T) {
 	}
 
 	for _, test := range shouldFail {
-		if _, err := newSyncTokenFromString(test); err == nil {
+		if _, _, err := newSyncTokenFromString(test); err == nil {
 			t.Errorf("input '%v' should have errored but didn't", test)
 		}
 	}

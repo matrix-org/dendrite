@@ -138,7 +138,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
 	res = types.NewResponse()
 
-	since := types.NewStreamToken(0, 0)
+	since := types.NewStreamToken(0, 0, nil)
 	if req.since != nil {
 		since = *req.since
 	}
