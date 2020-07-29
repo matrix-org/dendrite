@@ -163,7 +163,7 @@ func TestSyncResponse(t *testing.T) {
 			Name: "IncrementalSync penultimate",
 			DoSync: func() (*types.Response, error) {
 				from := types.NewStreamToken( // pretend we are at the penultimate event
-					positions[len(positions)-2], types.StreamPosition(0),
+					positions[len(positions)-2], types.StreamPosition(0), nil,
 				)
 				res := types.NewResponse()
 				return db.IncrementalSync(ctx, res, testUserDeviceA, from, latest, 5, false)
@@ -176,7 +176,7 @@ func TestSyncResponse(t *testing.T) {
 			Name: "IncrementalSync limited",
 			DoSync: func() (*types.Response, error) {
 				from := types.NewStreamToken( // pretend we are 10 events behind
-					positions[len(positions)-11], types.StreamPosition(0),
+					positions[len(positions)-11], types.StreamPosition(0), nil,
 				)
 				res := types.NewResponse()
 				// limit is set to 5
@@ -219,7 +219,7 @@ func TestSyncResponse(t *testing.T) {
 			if err != nil {
 				st.Fatalf("failed to do sync: %s", err)
 			}
-			next := types.NewStreamToken(latest.PDUPosition(), latest.EDUPosition())
+			next := types.NewStreamToken(latest.PDUPosition(), latest.EDUPosition(), nil)
 			if res.NextBatch != next.String() {
 				st.Errorf("NextBatch got %s want %s", res.NextBatch, next.String())
 			}
@@ -243,7 +243,7 @@ func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
 		t.Fatalf("failed to get SyncPosition: %s", err)
 	}
 	from := types.NewStreamToken(
-		positions[len(positions)-2], types.StreamPosition(0),
+		positions[len(positions)-2], types.StreamPosition(0), nil,
 	)
 
 	res := types.NewResponse()
@@ -288,7 +288,7 @@ func TestGetEventsInRangeWithStreamToken(t *testing.T) {
 		t.Fatalf("failed to get SyncPosition: %s", err)
 	}
 	// head towards the beginning of time
-	to := types.NewStreamToken(0, 0)
+	to := types.NewStreamToken(0, 0, nil)
 
 	// backpaginate 5 messages starting at the latest position.
 	paginatedEvents, err := db.GetEventsInStreamingRange(ctx, &latest, &to, testRoomID, 5, true)
@@ -531,14 +531,14 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 
 	// At this point there should be no messages. We haven't sent anything
 	// yet.
-	events, updates, deletions, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, 0))
+	events, updates, deletions, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, 0, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(events) != 0 || len(updates) != 0 || len(deletions) != 0 {
 		t.Fatal("first call should have no updates")
 	}
-	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, 0))
+	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, 0, nil))
 	if err != nil {
 		return
 	}
@@ -556,14 +556,14 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	// At this point we should get exactly one message. We're sending the sync position
 	// that we were given from the update and the send-to-device update will be updated
 	// in the database to reflect that this was the sync position we sent the message at.
-	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
+	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(events) != 1 || len(updates) != 1 || len(deletions) != 0 {
 		t.Fatal("second call should have one update")
 	}
-	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos))
+	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos, nil))
 	if err != nil {
 		return
 	}
@@ -571,35 +571,35 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	// At this point we should still have one message because we haven't progressed the
 	// sync position yet. This is equivalent to the client failing to /sync and retrying
 	// with the same position.
-	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos))
+	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(events) != 1 || len(updates) != 0 || len(deletions) != 0 {
 		t.Fatal("third call should have one update still")
 	}
-	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos))
+	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos, nil))
 	if err != nil {
 		return
 	}
 
 	// At this point we should now have no updates, because we've progressed the sync
 	// position. Therefore the update from before will not be sent again.
-	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+1))
+	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+1, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(events) != 0 || len(updates) != 0 || len(deletions) != 1 {
 		t.Fatal("fourth call should have no updates")
 	}
-	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos+1))
+	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.NewStreamToken(0, streamPos+1, nil))
 	if err != nil {
 		return
 	}
 
 	// At this point we should still have no updates, because no new updates have been
 	// sent.
-	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+2))
+	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.NewStreamToken(0, streamPos+2, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -636,7 +636,7 @@ func TestInviteBehaviour(t *testing.T) {
 	}
 	// both invite events should appear in a new sync
 	beforeRetireRes := types.NewResponse()
-	beforeRetireRes, err = db.IncrementalSync(ctx, beforeRetireRes, testUserDeviceA, types.NewStreamToken(0, 0), latest, 0, false)
+	beforeRetireRes, err = db.IncrementalSync(ctx, beforeRetireRes, testUserDeviceA, types.NewStreamToken(0, 0, nil), latest, 0, false)
 	if err != nil {
 		t.Fatalf("IncrementalSync failed: %s", err)
 	}
@@ -651,7 +651,7 @@ func TestInviteBehaviour(t *testing.T) {
 		t.Fatalf("failed to get SyncPosition: %s", err)
 	}
 	res := types.NewResponse()
-	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, types.NewStreamToken(0, 0), latest, 0, false)
+	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, types.NewStreamToken(0, 0, nil), latest, 0, false)
 	if err != nil {
 		t.Fatalf("IncrementalSync failed: %s", err)
 	}
