@@ -70,15 +70,15 @@ func TestMain(m *testing.M) {
 
 		// Draw up just enough Dendrite config for the server key
 		// API to work.
-		s.config = &config.ServerKeyAPI{
-			Matrix: &config.Global{
-				ServerName:        gomatrixserverlib.ServerName(s.name),
-				PrivateKey:        testPriv,
-				KeyID:             serverKeyID,
-				KeyValidityPeriod: s.validity,
-			},
-			Database: config.DataSource("file::memory:"),
-		}
+		cfg := &config.Dendrite{}
+		cfg.Defaults()
+		cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
+		cfg.Global.PrivateKey = testPriv
+		cfg.Global.KeyID = serverKeyID
+		cfg.Global.KeyValidityPeriod = s.validity
+		cfg.ServerKeyAPI.Database = config.DataSource("file::memory:")
+		s.config = &cfg.ServerKeyAPI
+		s.fedconfig = &cfg.FederationAPI
 
 		// Create a transport which redirects federation requests to
 		// the mock round tripper. Since we're not *really* listening for
