@@ -132,6 +132,16 @@ func (n *Notifier) OnNewSendToDevice(
 	n.wakeupUserDevice(userID, deviceIDs, latestPos)
 }
 
+func (n *Notifier) OnNewKeyChange(
+	posUpdate types.StreamingToken, wakeUserID, keyChangeUserID string,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+	latestPos := n.currPos.WithUpdates(posUpdate)
+	n.currPos = latestPos
+	n.wakeupUsers([]string{wakeUserID}, latestPos)
+}
+
 // GetListener returns a UserStreamListener that can be used to wait for
 // updates for a user. Must be closed.
 // notify for anything before sincePos

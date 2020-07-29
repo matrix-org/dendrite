@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -32,9 +33,10 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db       storage.Database
-	userAPI  userapi.UserInternalAPI
-	notifier *Notifier
+	db         storage.Database
+	userAPI    userapi.UserInternalAPI
+	notifier   *Notifier
+	keyChanges *consumers.OutputKeyChangeEventConsumer
 }
 
 // NewRequestPool makes a new RequestPool
@@ -164,6 +166,10 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	if err != nil {
 		return
 	}
+	res, err = rp.appendDeviceLists(res, req.device.UserID, since, latestPos)
+	if err != nil {
+		return
+	}
 
 	// Before we return the sync response, make sure that we take action on
 	// any send-to-device database updates or deletions that we need to do.
@@ -190,6 +196,22 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	}
 
 	return
+}
+
+func (rp *RequestPool) appendDeviceLists(
+	data *types.Response, userID string, since, latest types.StreamingToken,
+) (*types.Response, error) {
+	// TODO: Currently this code will race which may result in duplicates but not missing data.
+	// This happens because, whilst we are told the range to fetch here (since / latest) the
+	// QueryKeyChanges API only exposes a "from" value (on purpose to avoid racing, which then
+	// returns the latest position with which the response has authority on). We'd need to tweak
+	// the API to expose a "to" value to fix this.
+	_, _, err := rp.keyChanges.Catchup(context.Background(), userID, data, since)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // nolint:gocyclo

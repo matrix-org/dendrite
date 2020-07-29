@@ -110,6 +110,10 @@ type StreamingToken struct {
 	logs map[string]*LogPosition
 }
 
+func (t *StreamingToken) SetLog(name string, lp *LogPosition) {
+	t.logs[name] = lp
+}
+
 func (t *StreamingToken) Log(name string) *LogPosition {
 	l, ok := t.logs[name]
 	if !ok {

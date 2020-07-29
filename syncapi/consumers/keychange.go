@@ -24,11 +24,14 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	syncapi "github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
+
+const deviceListLogName = "dl"
 
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.
 type OutputKeyChangeEventConsumer struct {
@@ -39,6 +42,7 @@ type OutputKeyChangeEventConsumer struct {
 	keyAPI              api.KeyInternalAPI
 	partitionToOffset   map[int32]int64
 	partitionToOffsetMu sync.Mutex
+	notifier            *syncapi.Notifier
 }
 
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
@@ -47,6 +51,7 @@ func NewOutputKeyChangeEventConsumer(
 	serverName gomatrixserverlib.ServerName,
 	topic string,
 	kafkaConsumer sarama.Consumer,
+	n *syncapi.Notifier,
 	keyAPI api.KeyInternalAPI,
 	currentStateAPI currentstateAPI.CurrentStateInternalAPI,
 	store storage.Database,
@@ -66,6 +71,7 @@ func NewOutputKeyChangeEventConsumer(
 		currentStateAPI:     currentStateAPI,
 		partitionToOffset:   make(map[int32]int64),
 		partitionToOffsetMu: sync.Mutex{},
+		notifier:            n,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -110,6 +116,15 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 		return err
 	}
 	// TODO: f.e queryRes.UserIDsToCount : notify users by waking up streams
+	posUpdate := types.NewStreamToken(0, 0, map[string]*types.LogPosition{
+		deviceListLogName: &types.LogPosition{
+			Offset:    msg.Offset,
+			Partition: msg.Partition,
+		},
+	})
+	for userID := range queryRes.UserIDsToCount {
+		s.notifier.OnNewKeyChange(posUpdate, userID, output.UserID)
+	}
 	return nil
 }
 
@@ -133,9 +148,19 @@ func (s *OutputKeyChangeEventConsumer) Catchup(
 	}
 
 	// now also track users who we already share rooms with but who have updated their devices between the two tokens
-	// TODO: Extract partition/offset from sync token
+
 	var partition int32
 	var offset int64
+	// Extract partition/offset from sync token
+	// TODO: In a world where keyserver is sharded there will be multiple partitions and hence multiple QueryKeyChanges to make.
+	logOffset := tok.Log(deviceListLogName)
+	if logOffset != nil {
+		partition = logOffset.Partition
+		offset = logOffset.Offset
+	} else {
+		partition = -1
+		offset = sarama.OffsetOldest
+	}
 	var queryRes api.QueryKeyChangesResponse
 	s.keyAPI.QueryKeyChanges(ctx, &api.QueryKeyChangesRequest{
 		Partition: partition,
@@ -144,18 +169,24 @@ func (s *OutputKeyChangeEventConsumer) Catchup(
 	if queryRes.Error != nil {
 		// don't fail the catchup because we may have got useful information by tracking membership
 		util.GetLogger(ctx).WithError(queryRes.Error).Error("QueryKeyChanges failed")
-	} else {
-		// TODO: Make a new streaming token using the new offset
-		userSet := make(map[string]bool)
-		for _, userID := range res.DeviceLists.Changed {
-			userSet[userID] = true
-		}
-		for _, userID := range queryRes.UserIDs {
-			if !userSet[userID] {
-				res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
-			}
+		return
+	}
+	userSet := make(map[string]bool)
+	for _, userID := range res.DeviceLists.Changed {
+		userSet[userID] = true
+	}
+	for _, userID := range queryRes.UserIDs {
+		if !userSet[userID] {
+			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
+			hasNew = true
 		}
 	}
+	// Make a new streaming token using the new offset
+	tok.SetLog(deviceListLogName, &types.LogPosition{
+		Offset:    queryRes.Offset,
+		Partition: queryRes.Partition,
+	})
+	newTok = &tok
 	return
 }
 
