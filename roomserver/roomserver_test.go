@@ -94,17 +94,11 @@ func mustLoadEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []js
 }
 
 func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) (api.RoomserverInternalAPI, *dummyProducer, []gomatrixserverlib.HeaderedEvent) {
-	cfg := &config.Dendrite{
-		Global: config.Global{
-			ServerName: testOrigin,
-			Kafka: config.Kafka{
-				UseNaffka: true,
-			},
-		},
-		RoomServer: config.RoomServer{},
-	}
+	cfg := &config.Dendrite{}
+	cfg.Defaults()
+	cfg.Global.ServerName = testOrigin
+	cfg.Global.Kafka.UseNaffka = true
 	cfg.RoomServer.Database = roomserverDBFileURI
-	cfg.Global.Kafka.Topics.OutputRoomEvent = "output_room_event"
 	dp := &dummyProducer{
 		topic: string(cfg.Global.Kafka.Topics.OutputRoomEvent),
 	}
