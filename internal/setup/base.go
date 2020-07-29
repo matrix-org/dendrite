@@ -16,6 +16,7 @@ package setup
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -107,15 +108,12 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	}
 
 	client := http.Client{Timeout: HTTPClientTimeout}
-	// TODO: fix this
-	/*
-		if cfg.Proxy != nil {
-			client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
-				Scheme: cfg.Proxy.Protocol,
-				Host:   fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
-			})}
-		}
-	*/
+	if cfg.FederationSender.Proxy.Enabled {
+		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
+			Scheme: cfg.FederationSender.Proxy.Protocol,
+			Host:   fmt.Sprintf("%s:%d", cfg.FederationSender.Proxy.Host, cfg.FederationSender.Proxy.Port),
+		})}
+	}
 
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
 	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.

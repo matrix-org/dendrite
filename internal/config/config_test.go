@@ -36,7 +36,7 @@ const testConfig = `
 version: 1
 global:
   server_name: localhost
-  private_key: matrix.pem
+  private_key: matrix_key.pem
   key_validity_period: 168h0m0s
   trusted_third_party_id_servers: []
   kafka:

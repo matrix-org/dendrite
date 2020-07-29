@@ -17,7 +17,7 @@ type FederationSender struct {
 	// The default value is 16 if not specified, which is circa 18 hours.
 	FederationMaxRetries uint32 `yaml:"federation_max_retries"`
 
-	Proxy Proxy `yaml:"proxy"`
+	Proxy Proxy `yaml:"proxy_outbound"`
 }
 
 func (c *FederationSender) Defaults() {
@@ -27,6 +27,8 @@ func (c *FederationSender) Defaults() {
 	c.DatabaseOptions.Defaults()
 
 	c.FederationMaxRetries = 16
+
+	c.Proxy.Defaults()
 }
 
 func (c *FederationSender) Verify(configErrs *configErrors) {
@@ -37,6 +39,8 @@ func (c *FederationSender) Verify(configErrs *configErrors) {
 
 // The config for setting a proxy to use for server->server requests
 type Proxy struct {
+	// Is the proxy enabled?
+	Enabled bool `yaml:"enabled"`
 	// The protocol for the proxy (http / https / socks5)
 	Protocol string `yaml:"protocol"`
 	// The host where the proxy is listening
@@ -46,9 +50,10 @@ type Proxy struct {
 }
 
 func (c *Proxy) Defaults() {
-	c.Protocol = ""
-	c.Host = ""
-	c.Port = 0
+	c.Enabled = false
+	c.Protocol = "http"
+	c.Host = "localhost"
+	c.Port = 8080
 }
 
 func (c *Proxy) Verify(configErrs *configErrors) {
