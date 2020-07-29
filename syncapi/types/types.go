@@ -132,8 +132,8 @@ func (t *StreamingToken) String() string {
 		logStr := fmt.Sprintf("%s-%d-%d", name, lp.Partition, lp.Offset)
 		logStrings = append(logStrings, logStr)
 	}
-	// E.g s11_22_33|dl0-134|ab1-441
-	return strings.Join(logStrings, "|")
+	// E.g s11_22_33.dl0-134.ab1-441
+	return strings.Join(logStrings, ".")
 }
 
 // IsAfter returns true if ANY position in this token is greater than `other`.
@@ -236,7 +236,7 @@ func newSyncTokenFromString(s string) (token *syncToken, categories []string, er
 	switch t := SyncTokenType(s[:1]); t {
 	case SyncTokenTypeStream, SyncTokenTypeTopology:
 		token.Type = t
-		categories = strings.Split(s[1:], "|")
+		categories = strings.Split(s[1:], ".")
 		positions = strings.Split(categories[0], "_")
 	default:
 		return nil, nil, ErrInvalidSyncTokenType
