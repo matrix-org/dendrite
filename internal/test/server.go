@@ -96,9 +96,9 @@ func InitDatabase(postgresDatabase, postgresContainerName string, databases []st
 func StartProxy(bindAddr string, cfg *config.Dendrite) (*exec.Cmd, chan error) {
 	proxyArgs := []string{
 		"--bind-address", bindAddr,
-		"--sync-api-server-url", "http://" + string(cfg.Listen.SyncAPI),
-		"--client-api-server-url", "http://" + string(cfg.Listen.ClientAPI),
-		"--media-api-server-url", "http://" + string(cfg.Listen.MediaAPI),
+		"--sync-api-server-url", "http://" + string(cfg.SyncAPI.Listen),
+		"--client-api-server-url", "http://" + string(cfg.ClientAPI.Listen),
+		"--media-api-server-url", "http://" + string(cfg.MediaAPI.Listen),
 		"--tls-cert", "server.crt",
 		"--tls-key", "server.key",
 	}

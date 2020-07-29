@@ -110,7 +110,7 @@ type UserInteractive struct {
 	Sessions map[string][]string
 }
 
-func NewUserInteractive(getAccByPass GetAccountByPassword, cfg *config.Dendrite) *UserInteractive {
+func NewUserInteractive(getAccByPass GetAccountByPassword, cfg *config.ClientAPI) *UserInteractive {
 	typePassword := &LoginTypePassword{
 		GetAccountByPassword: getAccByPass,
 		Config:               cfg,

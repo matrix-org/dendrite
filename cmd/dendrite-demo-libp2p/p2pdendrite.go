@@ -58,7 +58,7 @@ func NewP2PDendrite(cfg *config.Dendrite, componentName string) *P2PDendrite {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	privKey, err := crypto.UnmarshalEd25519PrivateKey(cfg.Matrix.PrivateKey[:])
+	privKey, err := crypto.UnmarshalEd25519PrivateKey(cfg.Global.PrivateKey[:])
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +97,7 @@ func NewP2PDendrite(cfg *config.Dendrite, componentName string) *P2PDendrite {
 	fmt.Println("Our node ID:", libp2p.ID())
 	fmt.Println("Our addresses:", libp2p.Addrs())
 
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(libp2p.ID().String())
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(libp2p.ID().String())
 
 	return &P2PDendrite{
 		Base:          *baseDendrite,

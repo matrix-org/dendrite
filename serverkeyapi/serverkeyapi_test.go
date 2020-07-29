@@ -24,6 +24,7 @@ type server struct {
 	name      gomatrixserverlib.ServerName        // server name
 	validity  time.Duration                       // key validity duration from now
 	config    *config.ServerKeyAPI                // skeleton config, from TestMain
+	fedconfig *config.FederationAPI               //
 	fedclient *gomatrixserverlib.FederationClient // uses MockRoundTripper
 	cache     *caching.Caches                     // server-specific cache
 	api       api.ServerKeyInternalAPI            // server-specific server key API
@@ -117,7 +118,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	}
 
 	// Get the keys and JSON-ify them.
-	keys := routing.LocalKeys(s.config)
+	keys := routing.LocalKeys(s.fedconfig)
 	body, err := json.MarshalIndent(keys.JSON, "", "  ")
 	if err != nil {
 		return nil, err

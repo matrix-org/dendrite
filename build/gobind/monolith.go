@@ -82,28 +82,28 @@ func (m *DendriteMonolith) Start() {
 	m.YggdrasilNode = ygg
 
 	cfg := &config.Dendrite{}
-	cfg.SetDefaults()
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
-	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
-	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Matrix.FederationMaxRetries = 6
-	cfg.Kafka.UseNaffka = true
-	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
-	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
-	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
-	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s/dendrite-account.db", m.StorageDirectory))
-	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s/dendrite-device.db", m.StorageDirectory))
-	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s/dendrite-mediaapi.db", m.StorageDirectory))
-	cfg.Database.SyncAPI = config.DataSource(fmt.Sprintf("file:%s/dendrite-syncapi.db", m.StorageDirectory))
-	cfg.Database.RoomServer = config.DataSource(fmt.Sprintf("file:%s/dendrite-roomserver.db", m.StorageDirectory))
-	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s/dendrite-serverkey.db", m.StorageDirectory))
-	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s/dendrite-federationsender.db", m.StorageDirectory))
-	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s/dendrite-appservice.db", m.StorageDirectory))
-	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s/dendrite-currentstate.db", m.StorageDirectory))
-	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s/dendrite-naffka.db", m.StorageDirectory))
-	cfg.Media.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
-	cfg.Media.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
+	cfg.Defaults()
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
+	cfg.Global.PrivateKey = ygg.SigningPrivateKey()
+	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
+	cfg.Global.Kafka.UseNaffka = true
+	cfg.Global.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
+	cfg.Global.Kafka.Topics.OutputClientData = "clientapiOutput"
+	cfg.Global.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
+	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
+	cfg.Global.Kafka.Database = config.DataSource(fmt.Sprintf("file:%s/dendrite-naffka.db", m.StorageDirectory))
+	cfg.UserAPI.AccountDatabase = config.DataSource(fmt.Sprintf("file:%s/dendrite-account.db", m.StorageDirectory))
+	cfg.UserAPI.DeviceDatabase = config.DataSource(fmt.Sprintf("file:%s/dendrite-device.db", m.StorageDirectory))
+	cfg.MediaAPI.Database = config.DataSource(fmt.Sprintf("file:%s/dendrite-mediaapi.db", m.StorageDirectory))
+	cfg.SyncAPI.Database = config.DataSource(fmt.Sprintf("file:%s/dendrite-syncapi.db", m.StorageDirectory))
+	cfg.RoomServer.Database = config.DataSource(fmt.Sprintf("file:%s/dendrite-roomserver.db", m.StorageDirectory))
+	cfg.ServerKeyAPI.Database = config.DataSource(fmt.Sprintf("file:%s/dendrite-serverkey.db", m.StorageDirectory))
+	cfg.FederationSender.Database = config.DataSource(fmt.Sprintf("file:%s/dendrite-federationsender.db", m.StorageDirectory))
+	cfg.AppServiceAPI.Database = config.DataSource(fmt.Sprintf("file:%s/dendrite-appservice.db", m.StorageDirectory))
+	cfg.CurrentStateServer.Database = config.DataSource(fmt.Sprintf("file:%s/dendrite-currentstate.db", m.StorageDirectory))
+	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
+	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
+	cfg.FederationSender.FederationMaxRetries = 6
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -117,7 +117,7 @@ func (m *DendriteMonolith) Start() {
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, cfg.Derived.ApplicationServices)
 
 	rsAPI := roomserver.NewInternalAPI(
 		base, keyRing, federation,
@@ -137,7 +137,7 @@ func (m *DendriteMonolith) Start() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
-	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -155,7 +155,7 @@ func (m *DendriteMonolith) Start() {
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
-		KeyAPI:              keyserver.NewInternalAPI(base.Cfg, federation, userAPI, base.KafkaProducer),
+		KeyAPI:              keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, userAPI, base.KafkaProducer),
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,
 		),
@@ -166,7 +166,7 @@ func (m *DendriteMonolith) Start() {
 		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
-		cfg,
+		&cfg.Global,
 		base.UseHTTPAPIs,
 	)
 

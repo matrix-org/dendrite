@@ -120,7 +120,7 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 		serverArgs,
 	)
 
-	fmt.Printf("==TESTSERVER== STARTED %v -> %v : %v\n", proxyAddr, cfg.Listen.MediaAPI, dir)
+	fmt.Printf("==TESTSERVER== STARTED %v -> %v : %v\n", proxyAddr, cfg.MediaAPI.Listen, dir)
 	return cmd, cmdChan, proxyCmd, proxyAddr, dir
 }
 
