@@ -46,6 +46,9 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 		if !reflect.DeepEqual(got, *want) {
 			t.Errorf("%s mismatch: got %v want %v", tok, got, want)
 		}
+		if got.String() != tok {
+			t.Errorf("%s reserialisation mismatch: got %s want %s", tok, got.String(), tok)
+		}
 	}
 }
 

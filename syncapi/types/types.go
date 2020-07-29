@@ -129,7 +129,7 @@ func (t *StreamingToken) String() string {
 		t.syncToken.String(),
 	}
 	for name, lp := range t.logs {
-		logStr := fmt.Sprintf("%s%d-%d", name, lp.Partition, lp.Offset)
+		logStr := fmt.Sprintf("%s-%d-%d", name, lp.Partition, lp.Offset)
 		logStrings = append(logStrings, logStr)
 	}
 	// E.g s11_22_33|dl0-134|ab1-441
