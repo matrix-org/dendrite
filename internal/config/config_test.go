@@ -33,48 +33,156 @@ func TestLoadConfigRelative(t *testing.T) {
 }
 
 const testConfig = `
-version: 0
-matrix:
+version: 1
+global:
   server_name: localhost
-  private_key: matrix_key.pem
-  federation_certificates: [tls_cert.pem]
-media:
-  base_path: media_store
-kafka:
-  addresses: ["localhost:9092"]
-  topics:
-    output_room_event: output.room
-    output_client_data: output.client
-    output_typing_event: output.typing
-    output_send_to_device_event: output.std
-    output_key_change_event: output.key_change
-    user_updates: output.user
-database:
-  media_api: "postgresql:///media_api"
-  account: "postgresql:///account"
-  device: "postgresql:///device"
-  server_key: "postgresql:///server_keys"
-  sync_api: "postgresql:///syn_api"
-  room_server: "postgresql:///room_server"
-  appservice: "postgresql:///appservice"
-  current_state: "postgresql:///current_state"
-  e2e_key: "postgresql:///e2e_key"
-listen:
-  room_server: "localhost:7770"
-  client_api: "localhost:7771"
-  federation_api: "localhost:7772"
-  sync_api: "localhost:7773"
-  media_api: "localhost:7774"
-  appservice_api: "localhost:7777"
-  edu_server: "localhost:7778"
-  user_api: "localhost:7779"
-  current_state_server: "localhost:7775"
-  key_server: "localhost:7776"
-logging:
-  - type: "file"
-    level: "info"
-    params:
-      path: "/my/log/dir"
+  private_key: matrix.pem
+  key_validity_period: 168h0m0s
+  trusted_third_party_id_servers: []
+  kafka:
+    addresses: []
+    use_naffka: true
+    naffka_database: file:naffka.db
+    naffka_database_options:
+      database_max_open_conns: 0
+      database_max_idle_conns: 0
+      database_conn_max_lifetime: -1
+    topics:
+      output_room_event: OutputRoomEventTopic
+      output_client_data: OutputClientDataTopic
+      output_typing_event: OutputTypingEventTopic
+      output_send_to_device_event: OutputSendToDeviceEventTopic
+      output_key_change_event: OutputKeyChangeEventTopic
+  metrics:
+    enabled: false
+    basic_auth:
+      username: metrics
+      password: metrics
+app_service_api:
+  listen: localhost:7777
+  bind: localhost:7777
+  database: file:appservice.db
+  database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+  config_files: []
+client_api:
+  listen: localhost:7771
+  bind: localhost:7771
+  registration_shared_secret: ""
+  recaptcha_public_key: ""
+  recaptcha_private_key: ""
+  enable_registration_captcha: false
+  captcha_bypass_secret: ""
+  recaptcha_siteverify_api: ""
+  registration_disabled: false
+  turn:
+    turn_user_lifetime: ""
+    turn_uris: []
+    turn_shared_secret: ""
+    turn_username: ""
+    turn_password: ""
+current_state_server:
+  listen: localhost:7782
+  bind: localhost:7782
+  database: file:currentstate.db
+  database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+edu_server:
+  listen: localhost:7778
+  bind: localhost:7778
+federation_api:
+  listen: localhost:7772
+  bind: localhost:7772
+  federation_certificates: []
+federation_sender:
+  listen: localhost:7775
+  bind: localhost:7775
+  database: file:federationsender.db
+  database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+  federation_max_retries: 16
+  proxy:
+    protocol: ""
+    host: ""
+    port: 0
+key_server:
+  listen: localhost:7779
+  bind: localhost:7779
+  database: file:keyserver.db
+  database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+media_api:
+  listen: localhost:7774
+  bind: localhost:7774
+  database: file:mediaapi.db
+  database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+  base_path: ""
+  max_file_size_bytes: 10485760
+  dynamic_thumbnails: false
+  max_thumbnail_generators: 10
+  thumbnail_sizes: []
+room_server:
+  listen: localhost:7770
+  bind: localhost:7770
+  database: file:roomserver.db
+  database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+server_key_api:
+  listen: localhost:7780
+  bind: localhost:7780
+  database: file:serverkeyapi.db
+  database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+  key_perspectives: []
+sync_api:
+  listen: localhost:7773
+  bind: localhost:7773
+  database: file:syncapi.db
+  database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+user_api:
+  listen: localhost:7781
+  bind: localhost:7781
+  account_database: file:userapi_accounts.db
+  account_database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+  device_database: file:userapi_devices.db
+  device_database_options:
+    database_max_open_conns: 0
+    database_max_idle_conns: 0
+    database_conn_max_lifetime: -1
+tracing:
+  enabled: false
+  jaeger:
+    serviceName: ""
+    disabled: false
+    rpc_metrics: false
+    tags: []
+    sampler: null
+    reporter: null
+    headers: null
+    baggage_restrictions: null
+    throttler: null
+logging: []
 `
 
 type mockReadFile map[string]string

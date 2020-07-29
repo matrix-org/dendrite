@@ -19,19 +19,14 @@ import (
 // Relevant for v3 rooms and a cause of flakey sytests as the IDs are randomly generated.
 func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	_, privKey, _ := ed25519.GenerateKey(nil)
-	cfg := &config.Dendrite{
-		Global: config.Global{
-			KeyID:      gomatrixserverlib.KeyID("ed25519:auto"),
-			ServerName: gomatrixserverlib.ServerName("localhost"),
-			PrivateKey: privKey,
-		},
-		FederationSender: config.FederationSender{
-			Database: "file::memory:",
-		},
-	}
-	cfg.FederationSender.Matrix = &cfg.Global
+	cfg := &config.Dendrite{}
+	cfg.Defaults()
+	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
+	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
+	cfg.Global.PrivateKey = privKey
 	cfg.Global.Kafka.UseNaffka = true
-	// TODO: cfg.SetDefaults()
+	cfg.Global.Kafka.Database = "file::memory:"
+	cfg.FederationSender.Database = "file::memory:"
 	base := setup.NewBaseDendrite(cfg, "Test", false)
 	keyRing := &test.NopJSONVerifier{}
 	fsAPI := base.FederationSenderHTTPClient()
