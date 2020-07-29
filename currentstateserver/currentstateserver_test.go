@@ -15,6 +15,7 @@
 package currentstateserver
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
@@ -160,8 +161,13 @@ func TestQueryCurrentState(t *testing.T) {
 					t.Errorf("QueryCurrentState want tuple %+v but it is missing from the response", tuple)
 					continue
 				}
-				if !reflect.DeepEqual(gotEvent.JSON(), wantEvent.JSON()) {
-					t.Errorf("QueryCurrentState tuple %+v got event JSON %s want %s", tuple, string(gotEvent.JSON()), string(wantEvent.JSON()))
+				gotCanon, err := gomatrixserverlib.CanonicalJSON(gotEvent.JSON())
+				if err != nil {
+					t.Errorf("CanonicalJSON failed: %w", err)
+					continue
+				}
+				if !bytes.Equal(gotCanon, wantEvent.JSON()) {
+					t.Errorf("QueryCurrentState tuple %+v got event JSON %s want %s", tuple, string(gotCanon), string(wantEvent.JSON()))
 				}
 			}
 		}
