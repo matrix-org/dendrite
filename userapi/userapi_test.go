@@ -32,7 +32,7 @@ func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database, 
 		t.Fatalf("failed to create device DB: %s", err)
 	}
 
-	return userapi.NewInternalAPI(accountDB, deviceDB, serverName, nil), accountDB, deviceDB
+	return userapi.NewInternalAPI(accountDB, deviceDB, serverName, nil, nil), accountDB, deviceDB
 }
 
 func TestQueryProfile(t *testing.T) {
