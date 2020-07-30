@@ -172,7 +172,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	if err != nil {
 		return
 	}
-	res, err = rp.appendDeviceLists(res, req.device.UserID, since, latestPos)
+	res, err = rp.appendDeviceLists(res, req.device.UserID, since)
 	if err != nil {
 		return
 	}
@@ -205,7 +205,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 }
 
 func (rp *RequestPool) appendDeviceLists(
-	data *types.Response, userID string, since, latest types.StreamingToken,
+	data *types.Response, userID string, since types.StreamingToken,
 ) (*types.Response, error) {
 	// TODO: Currently this code will race which may result in duplicates but not missing data.
 	// This happens because, whilst we are told the range to fetch here (since / latest) the
