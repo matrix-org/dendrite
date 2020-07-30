@@ -104,6 +104,17 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	return nil
 }
 
+func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.PerformDeviceDeletionRequest, res *api.PerformDeviceDeletionResponse) error {
+	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot PerformDeviceDeletion of remote users: got %s want %s", domain, a.ServerName)
+	}
+	return a.DeviceDB.RemoveDevices(ctx, local, req.DeviceIDs)
+}
+
 func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfileRequest, res *api.QueryProfileResponse) error {
 	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {

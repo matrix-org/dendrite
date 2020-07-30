@@ -654,13 +654,13 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DeleteDeviceById(req, userInteractiveAuth, deviceDB, device, vars["deviceID"])
+			return DeleteDeviceById(req, userInteractiveAuth, userAPI, device, vars["deviceID"])
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 
 	r0mux.Handle("/delete_devices",
 		httputil.MakeAuthAPI("delete_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return DeleteDevices(req, deviceDB, device)
+			return DeleteDevices(req, userAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

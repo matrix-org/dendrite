@@ -165,7 +165,7 @@ func UpdateDeviceByID(
 
 // DeleteDeviceById handles DELETE requests to /devices/{deviceId}
 func DeleteDeviceById(
-	req *http.Request, userInteractiveAuth *auth.UserInteractive, deviceDB devices.Database, device *api.Device,
+	req *http.Request, userInteractiveAuth *auth.UserInteractive, userAPI api.UserInternalAPI, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	ctx := req.Context()
@@ -197,8 +197,12 @@ func DeleteDeviceById(
 		}
 	}
 
-	if err := deviceDB.RemoveDevice(ctx, deviceID, localpart); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("deviceDB.RemoveDevice failed")
+	var res api.PerformDeviceDeletionResponse
+	if err := userAPI.PerformDeviceDeletion(ctx, &api.PerformDeviceDeletionRequest{
+		UserID:    device.UserID,
+		DeviceIDs: []string{deviceID},
+	}, &res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -210,26 +214,24 @@ func DeleteDeviceById(
 
 // DeleteDevices handles POST requests to /delete_devices
 func DeleteDevices(
-	req *http.Request, deviceDB devices.Database, device *api.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
-	}
-
 	ctx := req.Context()
 	payload := devicesDeleteJSON{}
 
 	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("json.NewDecoder.Decode failed")
+		util.GetLogger(ctx).WithError(err).Error("json.NewDecoder.Decode failed")
 		return jsonerror.InternalServerError()
 	}
 
 	defer req.Body.Close() // nolint: errcheck
 
-	if err := deviceDB.RemoveDevices(ctx, localpart, payload.Devices); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveDevices failed")
+	var res api.PerformDeviceDeletionResponse
+	if err := userAPI.PerformDeviceDeletion(ctx, &api.PerformDeviceDeletionRequest{
+		UserID:    device.UserID,
+		DeviceIDs: payload.Devices,
+	}, &res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
 		return jsonerror.InternalServerError()
 	}
 

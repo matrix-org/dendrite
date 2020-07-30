@@ -30,6 +30,7 @@ const (
 
 	PerformDeviceCreationPath  = "/userapi/performDeviceCreation"
 	PerformAccountCreationPath = "/userapi/performAccountCreation"
+	PerformDeviceDeletionPath  = "/userapi/performDeviceDeletion"
 
 	QueryProfilePath        = "/userapi/queryProfile"
 	QueryAccessTokenPath    = "/userapi/queryAccessToken"
@@ -88,6 +89,18 @@ func (h *httpUserInternalAPI) PerformDeviceCreation(
 	defer span.Finish()
 
 	apiURL := h.apiURL + PerformDeviceCreationPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) PerformDeviceDeletion(
+	ctx context.Context,
+	request *api.PerformDeviceDeletionRequest,
+	response *api.PerformDeviceDeletionResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformDeviceDeletion")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformDeviceDeletionPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
