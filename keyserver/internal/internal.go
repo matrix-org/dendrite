@@ -294,7 +294,7 @@ func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformU
 			),
 		})
 	}
-	util.GetLogger(ctx).Infof("upload device keys: %+v", keysToStore)
+
 	// get existing device keys so we can check for changes
 	existingKeys := make([]api.DeviceKeys, len(keysToStore))
 	for i := range keysToStore {
