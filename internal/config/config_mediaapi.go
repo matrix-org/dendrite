@@ -12,8 +12,7 @@ type MediaAPI struct {
 
 	// The MediaAPI database stores information about files uploaded and downloaded
 	// by local users. It is only accessed by the MediaAPI.
-	Database        DataSource      `yaml:"database"`
-	DatabaseOptions DatabaseOptions `yaml:"database_options"`
+	Database DatabaseOptions `yaml:"database"`
 
 	// The base path to where the media files will be stored. May be relative or absolute.
 	BasePath Path `yaml:"base_path"`
@@ -39,8 +38,8 @@ type MediaAPI struct {
 func (c *MediaAPI) Defaults() {
 	c.Listen = "localhost:7774"
 	c.Bind = "localhost:7774"
-	c.Database = "file:mediaapi.db"
-	c.DatabaseOptions.Defaults()
+	c.Database.Defaults()
+	c.Database.ConnectionString = "file:mediaapi.db"
 
 	defaultMaxFileSizeBytes := FileSizeBytes(10485760)
 	c.MaxFileSizeBytes = &defaultMaxFileSizeBytes
@@ -50,7 +49,7 @@ func (c *MediaAPI) Defaults() {
 func (c *MediaAPI) Verify(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "media_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "media_api.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "media_api.database", string(c.Database))
+	checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
 	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(*c.MaxFileSizeBytes))

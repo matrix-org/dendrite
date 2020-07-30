@@ -32,8 +32,7 @@ type AppServiceAPI struct {
 	Listen Address `yaml:"listen"`
 	Bind   Address `yaml:"bind"`
 
-	Database        DataSource      `yaml:"database"`
-	DatabaseOptions DatabaseOptions `yaml:"database_options"`
+	Database DatabaseOptions `yaml:"database"`
 
 	ConfigFiles []string `yaml:"config_files"`
 }
@@ -41,14 +40,14 @@ type AppServiceAPI struct {
 func (c *AppServiceAPI) Defaults() {
 	c.Listen = "localhost:7777"
 	c.Bind = "localhost:7777"
-	c.Database = "file:appservice.db"
-	c.DatabaseOptions.Defaults()
+	c.Database.Defaults()
+	c.Database.ConnectionString = "file:appservice.db"
 }
 
 func (c *AppServiceAPI) Verify(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "app_service_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "app_service_api.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "app_service_api.database", string(c.Database))
+	checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
 }
 
 // ApplicationServiceNamespace is the namespace that a specific application

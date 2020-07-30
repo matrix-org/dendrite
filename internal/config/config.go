@@ -131,6 +131,16 @@ type Path string
 // A DataSource for opening a postgresql database using lib/pq.
 type DataSource string
 
+func (d DataSource) IsSQLite() bool {
+	return strings.HasPrefix(string(d), "file:")
+}
+
+func (d DataSource) IsPostgres() bool {
+	// commented line may not always be true?
+	// return strings.HasPrefix(string(d), "postgres:")
+	return !d.IsSQLite()
+}
+
 // A Topic in kafka.
 type Topic string
 

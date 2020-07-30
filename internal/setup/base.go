@@ -15,7 +15,6 @@
 package setup
 
 import (
-	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -228,7 +227,7 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
 func (b *BaseDendrite) CreateDeviceDB() devices.Database {
-	db, err := devices.NewDatabase(string(b.Cfg.UserAPI.DeviceDatabase), &b.Cfg.UserAPI.DeviceDatabaseOptions, b.Cfg.Global.ServerName)
+	db, err := devices.NewDatabase(&b.Cfg.UserAPI.DeviceDatabase, b.Cfg.Global.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to devices db")
 	}
@@ -239,7 +238,7 @@ func (b *BaseDendrite) CreateDeviceDB() devices.Database {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
-	db, err := accounts.NewDatabase(string(b.Cfg.UserAPI.AccountDatabase), &b.Cfg.UserAPI.AccountDatabaseOptions, b.Cfg.Global.ServerName)
+	db, err := accounts.NewDatabase(&b.Cfg.UserAPI.AccountDatabase, b.Cfg.Global.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
@@ -307,36 +306,26 @@ func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 // setupNaffka creates kafka consumer/producer pair from the config.
 func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	var err error
-	var db *sql.DB
 	var naffkaDB *naffka.DatabaseImpl
 
-	uri, err := url.Parse(string(cfg.Global.Kafka.Database))
-	if err != nil || uri.Scheme == "file" {
-		var cs string
-		cs, err = sqlutil.ParseFileURI(string(cfg.Global.Kafka.Database))
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to parse naffka database file URI")
-		}
-		db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to open naffka database")
-		}
+	db, err := sqlutil.Open(&cfg.Global.Kafka.Database)
+	if err != nil {
+		logrus.WithError(err).Panic("Failed to open naffka database")
+	}
 
+	switch {
+	case cfg.Global.Kafka.Database.ConnectionString.IsSQLite():
 		naffkaDB, err = naffka.NewSqliteDatabase(db)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
-	} else {
-		db, err = sqlutil.Open("postgres", string(cfg.Global.Kafka.Database), nil)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to open naffka database")
-		}
-
+	case cfg.Global.Kafka.Database.ConnectionString.IsPostgres():
 		naffkaDB, err = naffka.NewPostgresqlDatabase(db)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
+	default:
+		panic("unknown naffka database type")
 	}
 
 	if naffkaDB == nil {

@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"time"
 
 	"go.uber.org/atomic"
 )
@@ -105,13 +104,6 @@ func SQLiteDriverName() string {
 		return "sqlite3_js"
 	}
 	return "sqlite3"
-}
-
-// DbProperties functions return properties used by database/sql/DB
-type DbProperties interface {
-	MaxIdleConns() int
-	MaxOpenConns() int
-	ConnMaxLifetime() time.Duration
 }
 
 // TransactionWriter allows queuing database writes so that you don't

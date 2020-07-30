@@ -42,7 +42,7 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
-	syncDB, err := storage.NewSyncServerDatasource(string(cfg.Database), cfg.DatabaseOptions)
+	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}

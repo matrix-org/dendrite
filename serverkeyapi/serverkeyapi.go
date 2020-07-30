@@ -30,8 +30,7 @@ func NewInternalAPI(
 	caches *caching.Caches,
 ) api.ServerKeyInternalAPI {
 	innerDB, err := storage.NewDatabase(
-		string(cfg.Database),
-		cfg.DatabaseOptions,
+		&cfg.Database,
 		cfg.Matrix.ServerName,
 		cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
 		cfg.Matrix.KeyID,

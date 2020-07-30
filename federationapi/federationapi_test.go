@@ -26,7 +26,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.Global.Kafka.Database = "file::memory:"
-	cfg.FederationSender.Database = "file::memory:"
+	cfg.FederationSender.Database.ConnectionString = config.DataSource("file::memory:")
 	base := setup.NewBaseDendrite(cfg, "Test", false)
 	keyRing := &test.NopJSONVerifier{}
 	fsAPI := base.FederationSenderHTTPClient()

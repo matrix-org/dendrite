@@ -17,25 +17,21 @@
 package storage
 
 import (
-	"net/url"
+	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
 )
 
 // Open opens a database connection.
-func Open(dataSourceName string, dbProperties sqlutil.DbProperties) (Database, error) {
-	uri, err := url.Parse(dataSourceName)
-	if err != nil {
-		return postgres.Open(dataSourceName, dbProperties)
-	}
-	switch uri.Scheme {
-	case "postgres":
-		return postgres.Open(dataSourceName, dbProperties)
-	case "file":
-		return sqlite3.Open(dataSourceName)
+func Open(dbProperties *config.DatabaseOptions) (Database, error) {
+	switch {
+	case dbProperties.ConnectionString.IsSQLite():
+		return sqlite3.Open(dbProperties)
+	case dbProperties.ConnectionString.IsPostgres():
+		return postgres.Open(dbProperties)
 	default:
-		return postgres.Open(dataSourceName, dbProperties)
+		return nil, fmt.Errorf("unexpected database type")
 	}
 }

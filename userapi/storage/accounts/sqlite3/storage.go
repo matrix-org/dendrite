@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -47,14 +48,9 @@ type Database struct {
 }
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dataSourceName string, serverName gomatrixserverlib.ServerName) (*Database, error) {
-	var db *sql.DB
-	var err error
-	cs, err := sqlutil.ParseFileURI(dataSourceName)
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (*Database, error) {
+	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
-		return nil, err
-	}
-	if db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
 		return nil, err
 	}
 	partitions := sqlutil.PartitionOffsetStatements{}

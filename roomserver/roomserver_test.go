@@ -98,7 +98,7 @@ func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []js
 	cfg.Defaults()
 	cfg.Global.ServerName = testOrigin
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.RoomServer.Database = roomserverDBFileURI
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(roomserverDBFileURI)
 	dp := &dummyProducer{
 		topic: string(cfg.Global.Kafka.Topics.OutputRoomEvent),
 	}

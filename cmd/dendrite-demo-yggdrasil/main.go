@@ -79,17 +79,17 @@ func main() {
 	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
 	cfg.Global.Kafka.Topics.OutputKeyChangeEvent = "keyChangeOutput"
 	cfg.FederationSender.FederationMaxRetries = 6
-	cfg.UserAPI.AccountDatabase = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-	cfg.UserAPI.DeviceDatabase = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
-	cfg.MediaAPI.Database = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
-	cfg.SyncAPI.Database = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
-	cfg.RoomServer.Database = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.ServerKeyAPI.Database = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
-	cfg.FederationSender.Database = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
-	cfg.AppServiceAPI.Database = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.CurrentStateServer.Database = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
-	cfg.Global.Kafka.Database = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
-	cfg.KeyServer.Database = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
+	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
+	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
+	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
+	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
+	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
+	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}

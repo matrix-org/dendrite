@@ -15,14 +15,15 @@
 package postgres
 
 import (
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
 )
 
 // NewDatabase creates a new sync server database
-func NewDatabase(dbDataSourceName string, dbProperties sqlutil.DbProperties) (*shared.Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
 	var err error
-	db, err := sqlutil.Open("postgres", dbDataSourceName, dbProperties)
+	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
 	}

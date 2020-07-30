@@ -21,6 +21,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
@@ -32,14 +33,10 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	var d Database
 	var err error
-	cs, err := sqlutil.ParseFileURI(dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	if d.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
+	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
 	joinedHosts, err := NewSQLiteJoinedHostsTable(d.db)

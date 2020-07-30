@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -63,7 +64,9 @@ func main() {
 
 	serverName := gomatrixserverlib.ServerName(*serverNameStr)
 
-	accountDB, err := accounts.NewDatabase(*database, nil, serverName)
+	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
+		ConnectionString: config.DataSource(*database),
+	}, serverName)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -75,7 +78,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	deviceDB, err := devices.NewDatabase(*database, nil, serverName)
+	deviceDB, err := devices.NewDatabase(&config.DatabaseOptions{
+		ConnectionString: config.DataSource(*database),
+	}, serverName)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

@@ -45,7 +45,7 @@ func NewInternalAPI(
 ) api.FederationSenderInternalAPI {
 	cfg := &base.Cfg.FederationSender
 
-	federationSenderDB, err := storage.NewDatabase(string(cfg.Database), cfg.DatabaseOptions)
+	federationSenderDB, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}

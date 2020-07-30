@@ -41,7 +41,7 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
-	roomserverDB, err := storage.Open(string(cfg.Database), cfg.DatabaseOptions)
+	roomserverDB, err := storage.Open(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}

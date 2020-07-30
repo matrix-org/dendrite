@@ -97,8 +97,8 @@ func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.Sync
 	cfg.Defaults()
 	cfg.Global.ServerName = "kaer.morhen"
 	cfg.Global.Kafka.Topics.OutputRoomEvent = config.Topic(kafkaTopic)
-	cfg.CurrentStateServer.Database = config.DataSource("file::memory:")
-	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), "file::memory:", nil)
+	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource("file::memory:")
+	db, err := sqlutil.Open(&cfg.CurrentStateServer.Database)
 	if err != nil {
 		t.Fatalf("Failed to open naffka database: %s", err)
 	}

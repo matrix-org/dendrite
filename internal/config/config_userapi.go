@@ -8,26 +8,24 @@ type UserAPI struct {
 
 	// The Account database stores the login details and account information
 	// for local users. It is accessed by the UserAPI.
-	AccountDatabase        DataSource      `yaml:"account_database"`
-	AccountDatabaseOptions DatabaseOptions `yaml:"account_database_options"`
+	AccountDatabase DatabaseOptions `yaml:"account_database"`
 	// The Device database stores session information for the devices of logged
 	// in local users. It is accessed by the UserAPI.
-	DeviceDatabase        DataSource      `yaml:"device_database"`
-	DeviceDatabaseOptions DatabaseOptions `yaml:"device_database_options"`
+	DeviceDatabase DatabaseOptions `yaml:"device_database"`
 }
 
 func (c *UserAPI) Defaults() {
 	c.Listen = "localhost:7781"
 	c.Bind = "localhost:7781"
-	c.AccountDatabase = "file:userapi_accounts.db"
-	c.DeviceDatabase = "file:userapi_devices.db"
-	c.AccountDatabaseOptions.Defaults()
-	c.DeviceDatabaseOptions.Defaults()
+	c.AccountDatabase.Defaults()
+	c.DeviceDatabase.Defaults()
+	c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
+	c.DeviceDatabase.ConnectionString = "file:userapi_devices.db"
 }
 
 func (c *UserAPI) Verify(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "user_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "user_api.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "user_api.account_database", string(c.AccountDatabase))
-	checkNotEmpty(configErrs, "user_api.device_database", string(c.DeviceDatabase))
+	checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
+	checkNotEmpty(configErrs, "user_api.device_database.connection_string", string(c.DeviceDatabase.ConnectionString))
 }

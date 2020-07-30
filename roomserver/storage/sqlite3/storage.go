@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
@@ -44,13 +45,10 @@ type Database struct {
 
 // Open a sqlite database.
 // nolint: gocyclo
-func Open(dataSourceName string) (*Database, error) {
+func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	var d Database
-	cs, err := sqlutil.ParseFileURI(dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	if d.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
+	var err error
+	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
 	//d.db.Exec("PRAGMA journal_mode=WAL;")

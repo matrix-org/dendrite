@@ -76,7 +76,7 @@ func TestMain(m *testing.M) {
 		cfg.Global.PrivateKey = testPriv
 		cfg.Global.KeyID = serverKeyID
 		cfg.Global.KeyValidityPeriod = s.validity
-		cfg.ServerKeyAPI.Database = config.DataSource("file::memory:")
+		cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource("file::memory:")
 		s.config = &cfg.ServerKeyAPI
 		s.fedconfig = &cfg.FederationAPI
 

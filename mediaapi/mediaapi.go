@@ -30,7 +30,7 @@ func AddPublicRoutes(
 	userAPI userapi.UserInternalAPI,
 	client *gomatrixserverlib.Client,
 ) {
-	mediaDB, err := storage.Open(string(cfg.Database), cfg.DatabaseOptions)
+	mediaDB, err := storage.Open(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to media db")
 	}

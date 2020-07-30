@@ -35,7 +35,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.CurrentStateInternalAPI) {
 // NewInternalAPI returns a concrete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(cfg *config.CurrentStateServer, consumer sarama.Consumer) api.CurrentStateInternalAPI {
-	csDB, err := storage.NewDatabase(string(cfg.Database), cfg.DatabaseOptions)
+	csDB, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to open database")
 	}

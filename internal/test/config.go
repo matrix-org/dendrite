@@ -86,16 +86,16 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	// Using the same database for every schema currently works because
 	// the table names are globally unique. But we might not want to
 	// rely on that in the future.
-	cfg.AppServiceAPI.Database = config.DataSource(database)
-	cfg.CurrentStateServer.Database = config.DataSource(database)
-	cfg.FederationSender.Database = config.DataSource(database)
-	cfg.KeyServer.Database = config.DataSource(database)
-	cfg.MediaAPI.Database = config.DataSource(database)
-	cfg.RoomServer.Database = config.DataSource(database)
-	cfg.ServerKeyAPI.Database = config.DataSource(database)
-	cfg.SyncAPI.Database = config.DataSource(database)
-	cfg.UserAPI.AccountDatabase = config.DataSource(database)
-	cfg.UserAPI.DeviceDatabase = config.DataSource(database)
+	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(database)
+	cfg.FederationSender.Database.ConnectionString = config.DataSource(database)
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(database)
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(database)
+	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(database)
+	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(database)
 
 	cfg.AppServiceAPI.Listen = assignAddress()
 	cfg.CurrentStateServer.Listen = assignAddress()

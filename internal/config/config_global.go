@@ -69,8 +69,7 @@ type Kafka struct {
 	// components as separate servers.
 	UseNaffka bool `yaml:"use_naffka"`
 	// The Naffka database is used internally by the naffka library, if used.
-	Database        DataSource      `yaml:"naffka_database"`
-	DatabaseOptions DatabaseOptions `yaml:"naffka_database_options"`
+	Database DatabaseOptions `yaml:"naffka_database"`
 	// The names of the topics to use when reading and writing from kafka.
 	Topics struct {
 		// Topic for roomserver/api.OutputRoomEvent events.
@@ -88,8 +87,8 @@ type Kafka struct {
 
 func (c *Kafka) Defaults() {
 	c.UseNaffka = true
-	c.Database = DataSource("file:naffka.db")
-	c.DatabaseOptions.Defaults()
+	c.Database.Defaults()
+	c.Database.ConnectionString = DataSource("file:naffka.db")
 	c.Topics.OutputRoomEvent = "OutputRoomEventTopic"
 	c.Topics.OutputClientData = "OutputClientDataTopic"
 	c.Topics.OutputTypingEvent = "OutputTypingEventTopic"
@@ -105,7 +104,7 @@ func (c *Kafka) Verify(configErrs *configErrors) {
 				configErrs.Add(fmt.Sprintf("naffka can only be used in a monolithic server"))
 			}
 		*/
-		checkNotEmpty(configErrs, "global.kafka.database", string(c.Database))
+		checkNotEmpty(configErrs, "global.kafka.database.connection_string", string(c.Database.ConnectionString))
 	} else {
 		// If we aren't using naffka then we need to have at least one kafka
 		// server to talk to.
@@ -141,12 +140,14 @@ func (c *Metrics) Verify(configErrs *configErrors) {
 }
 
 type DatabaseOptions struct {
+	// The connection string, file:filename.db or postgres://server....
+	ConnectionString DataSource `yaml:"connection_string"`
 	// Maximum open connections to the DB (0 = use default, negative means unlimited)
-	MaxOpenConnections int `yaml:"database_max_open_conns"`
+	MaxOpenConnections int `yaml:"max_open_conns"`
 	// Maximum idle connections to the DB (0 = use default, negative means unlimited)
-	MaxIdleConnections int `yaml:"database_max_idle_conns"`
+	MaxIdleConnections int `yaml:"max_idle_conns"`
 	// maximum amount of time (in seconds) a connection may be reused (<= 0 means unlimited)
-	ConnMaxLifetimeSeconds int `yaml:"database_conn_max_lifetime"`
+	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
 }
 
 func (c *DatabaseOptions) Defaults() {

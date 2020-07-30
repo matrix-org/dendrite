@@ -39,7 +39,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 func NewInternalAPI(
 	cfg *config.KeyServer, fedClient *gomatrixserverlib.FederationClient, userAPI userapi.UserInternalAPI, producer sarama.SyncProducer,
 ) api.KeyInternalAPI {
-	db, err := storage.NewDatabase(string(cfg.Database), cfg.DatabaseOptions)
+	db, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}

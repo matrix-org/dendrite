@@ -6,19 +6,18 @@ type RoomServer struct {
 	Listen Address `yaml:"listen"`
 	Bind   Address `yaml:"bind"`
 
-	Database        DataSource      `yaml:"database"`
-	DatabaseOptions DatabaseOptions `yaml:"database_options"`
+	Database DatabaseOptions `yaml:"database"`
 }
 
 func (c *RoomServer) Defaults() {
 	c.Listen = "localhost:7770"
 	c.Bind = "localhost:7770"
-	c.Database = "file:roomserver.db"
-	c.DatabaseOptions.Defaults()
+	c.Database.Defaults()
+	c.Database.ConnectionString = "file:roomserver.db"
 }
 
 func (c *RoomServer) Verify(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "room_server.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "room_server.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "room_server.database", string(c.Database))
+	checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))
 }

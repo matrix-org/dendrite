@@ -8,19 +8,18 @@ type CurrentStateServer struct {
 
 	// The CurrentState database stores the current state of all rooms.
 	// It is accessed by the CurrentStateServer.
-	Database        DataSource      `yaml:"database"`
-	DatabaseOptions DatabaseOptions `yaml:"database_options"`
+	Database DatabaseOptions `yaml:"database"`
 }
 
 func (c *CurrentStateServer) Defaults() {
 	c.Listen = "localhost:7782"
 	c.Bind = "localhost:7782"
-	c.Database = "file:currentstate.db"
-	c.DatabaseOptions.Defaults()
+	c.Database.Defaults()
+	c.Database.ConnectionString = "file:currentstate.db"
 }
 
 func (c *CurrentStateServer) Verify(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "current_state_server.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "current_state_server.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "current_state_server.database", string(c.Database))
+	checkNotEmpty(configErrs, "current_state_server.database.connection_string", string(c.Database.ConnectionString))
 }

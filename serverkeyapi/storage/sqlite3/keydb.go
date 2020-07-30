@@ -20,6 +20,7 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -37,16 +38,12 @@ type Database struct {
 // It prepares all the SQL statements that it will use.
 // Returns an error if there was a problem talking to the database.
 func NewDatabase(
-	dataSourceName string,
+	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (*Database, error) {
-	cs, err := sqlutil.ParseFileURI(dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil)
+	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
 	}

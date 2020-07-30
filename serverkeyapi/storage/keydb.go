@@ -17,11 +17,11 @@
 package storage
 
 import (
-	"net/url"
+	"fmt"
 
 	"golang.org/x/crypto/ed25519"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage/postgres"
 	"github.com/matrix-org/dendrite/serverkeyapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -29,22 +29,17 @@ import (
 
 // NewDatabase opens a database connection.
 func NewDatabase(
-	dataSourceName string,
-	dbProperties sqlutil.DbProperties,
+	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (Database, error) {
-	uri, err := url.Parse(dataSourceName)
-	if err != nil {
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName, serverKey, serverKeyID)
-	}
-	switch uri.Scheme {
-	case "postgres":
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName, serverKey, serverKeyID)
-	case "file":
-		return sqlite3.NewDatabase(dataSourceName, serverName, serverKey, serverKeyID)
+	switch {
+	case dbProperties.ConnectionString.IsSQLite():
+		return sqlite3.NewDatabase(dbProperties, serverName, serverKey, serverKeyID)
+	case dbProperties.ConnectionString.IsPostgres():
+		return postgres.NewDatabase(dbProperties, serverName, serverKey, serverKeyID)
 	default:
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName, serverKey, serverKeyID)
+		return nil, fmt.Errorf("unexpected database type")
 	}
 }

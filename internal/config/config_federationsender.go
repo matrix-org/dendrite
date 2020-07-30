@@ -8,8 +8,7 @@ type FederationSender struct {
 
 	// The FederationSender database stores information used by the FederationSender
 	// It is only accessed by the FederationSender.
-	Database        DataSource      `yaml:"database"`
-	DatabaseOptions DatabaseOptions `yaml:"database_options"`
+	Database DatabaseOptions `yaml:"database"`
 
 	// Federation failure threshold. How many consecutive failures that we should
 	// tolerate when sending federation requests to a specific server. The backoff
@@ -23,8 +22,8 @@ type FederationSender struct {
 func (c *FederationSender) Defaults() {
 	c.Listen = "localhost:7775"
 	c.Bind = "localhost:7775"
-	c.Database = "file:federationsender.db"
-	c.DatabaseOptions.Defaults()
+	c.Database.Defaults()
+	c.Database.ConnectionString = "file:federationsender.db"
 
 	c.FederationMaxRetries = 16
 
@@ -34,7 +33,7 @@ func (c *FederationSender) Defaults() {
 func (c *FederationSender) Verify(configErrs *configErrors) {
 	checkNotEmpty(configErrs, "federation_sender.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "federation_sender.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "federation_sender.database", string(c.Database))
+	checkNotEmpty(configErrs, "federation_sender.database.connection_string", string(c.Database.ConnectionString))
 }
 
 // The config for setting a proxy to use for server->server requests
