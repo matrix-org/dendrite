@@ -25,10 +25,12 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 type UserInternalAPI struct {
@@ -37,6 +39,7 @@ type UserInternalAPI struct {
 	ServerName gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
+	KeyAPI      keyapi.KeyInternalAPI
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -101,6 +104,42 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	}
 	res.DeviceCreated = true
 	res.Device = dev
+	return nil
+}
+
+func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.PerformDeviceDeletionRequest, res *api.PerformDeviceDeletionResponse) error {
+	util.GetLogger(ctx).WithField("user_id", req.UserID).WithField("devices", req.DeviceIDs).Info("PerformDeviceDeletion")
+	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot PerformDeviceDeletion of remote users: got %s want %s", domain, a.ServerName)
+	}
+	err = a.DeviceDB.RemoveDevices(ctx, local, req.DeviceIDs)
+	if err != nil {
+		return err
+	}
+	// create empty device keys and upload them to delete what was once there and trigger device list changes
+	deviceKeys := make([]keyapi.DeviceKeys, len(req.DeviceIDs))
+	for i, did := range req.DeviceIDs {
+		deviceKeys[i] = keyapi.DeviceKeys{
+			UserID:   req.UserID,
+			DeviceID: did,
+			KeyJSON:  nil,
+		}
+	}
+
+	var uploadRes keyapi.PerformUploadKeysResponse
+	a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+		DeviceKeys: deviceKeys,
+	}, &uploadRes)
+	if uploadRes.Error != nil {
+		return fmt.Errorf("Failed to delete device keys: %v", uploadRes.Error)
+	}
+	if len(uploadRes.KeyErrors) > 0 {
+		return fmt.Errorf("Failed to delete device keys, key errors: %+v", uploadRes.KeyErrors)
+	}
 	return nil
 }
 

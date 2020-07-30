@@ -103,7 +103,9 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
+	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil, keyAPI)
+	keyAPI.SetUserAPI(userAPI)
 
 	rsComponent := roomserver.NewInternalAPI(
 		base, keyRing, federation,
@@ -142,7 +144,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
-		KeyAPI:              keyserver.NewInternalAPI(base.Cfg, federation, userAPI, base.KafkaProducer),
+		KeyAPI:              keyAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,

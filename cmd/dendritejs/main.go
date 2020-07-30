@@ -196,7 +196,9 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := createFederationClient(cfg, node)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil)
+	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil, keyAPI)
+	keyAPI.SetUserAPI(userAPI)
 
 	fetcher := &libp2pKeyFetcher{}
 	keyRing := gomatrixserverlib.KeyRing{
@@ -233,7 +235,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
-		KeyAPI:              keyserver.NewInternalAPI(base.Cfg, federation, userAPI, base.KafkaProducer),
+		KeyAPI:              keyAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}

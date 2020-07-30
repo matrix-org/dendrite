@@ -64,8 +64,16 @@ func AddPublicRoutes(
 
 	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, currentStateAPI)
 
+	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
+		cfg.Matrix.ServerName, string(cfg.Kafka.Topics.OutputKeyChangeEvent),
+		consumer, notifier, keyAPI, currentStateAPI, syncDB,
+	)
+	if err = keyChangeConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start key change consumer")
+	}
+
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg, consumer, notifier, syncDB, rsAPI,
+		cfg, consumer, notifier, syncDB, rsAPI, keyChangeConsumer,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -90,14 +98,6 @@ func AddPublicRoutes(
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
-	}
-
-	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		cfg.Matrix.ServerName, string(cfg.Kafka.Topics.OutputKeyChangeEvent),
-		consumer, notifier, keyAPI, currentStateAPI, syncDB,
-	)
-	if err = keyChangeConsumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start key change consumer")
 	}
 
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)

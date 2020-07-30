@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -50,6 +51,10 @@ func NewKeyServerClient(
 type httpKeyInternalAPI struct {
 	apiURL     string
 	httpClient *http.Client
+}
+
+func (h *httpKeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
+	// no-op: doesn't need it
 }
 
 func (h *httpKeyInternalAPI) PerformClaimKeys(

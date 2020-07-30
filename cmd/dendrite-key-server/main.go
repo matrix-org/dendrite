@@ -24,7 +24,8 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "KeyServer", true)
 	defer base.Close() // nolint: errcheck
 
-	intAPI := keyserver.NewInternalAPI(base.Cfg, base.CreateFederationClient(), base.UserAPIClient(), base.KafkaProducer)
+	intAPI := keyserver.NewInternalAPI(base.Cfg, base.CreateFederationClient(), base.KafkaProducer)
+	intAPI.SetUserAPI(base.UserAPIClient())
 
 	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 

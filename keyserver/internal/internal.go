@@ -40,6 +40,10 @@ type KeyInternalAPI struct {
 	Producer   *producers.KeyChange
 }
 
+func (a *KeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
+	a.UserAPI = i
+}
+
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
 	if req.Partition < 0 {
 		req.Partition = a.Producer.DefaultPartition()
@@ -272,6 +276,10 @@ func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformU
 	var keysToStore []api.DeviceKeys
 	// assert that the user ID / device ID are not lying for each key
 	for _, key := range req.DeviceKeys {
+		if len(key.KeyJSON) == 0 {
+			keysToStore = append(keysToStore, key)
+			continue // deleted keys don't need sanity checking
+		}
 		gotUserID := gjson.GetBytes(key.KeyJSON, "user_id").Str
 		gotDeviceID := gjson.GetBytes(key.KeyJSON, "device_id").Str
 		if gotUserID == key.UserID && gotDeviceID == key.DeviceID {
@@ -286,6 +294,7 @@ func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformU
 			),
 		})
 	}
+
 	// get existing device keys so we can check for changes
 	existingKeys := make([]api.DeviceKeys, len(keysToStore))
 	for i := range keysToStore {
@@ -358,7 +367,9 @@ func (a *KeyInternalAPI) emitDeviceKeyChanges(existing, new []api.DeviceKeys) er
 	for _, newKey := range new {
 		exists := false
 		for _, existingKey := range existing {
-			if bytes.Equal(existingKey.KeyJSON, newKey.KeyJSON) {
+			// Do not treat the absence of keys as equal, or else we will not emit key changes
+			// when users delete devices which never had a key to begin with as both KeyJSONs are nil.
+			if bytes.Equal(existingKey.KeyJSON, newKey.KeyJSON) && len(existingKey.KeyJSON) > 0 {
 				exists = true
 				break
 			}
