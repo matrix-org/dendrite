@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -129,15 +130,14 @@ func (t *StreamingToken) EDUPosition() StreamPosition {
 	return t.Positions[1]
 }
 func (t *StreamingToken) String() string {
-	logStrings := []string{
-		t.syncToken.String(),
-	}
+	var logStrings []string
 	for name, lp := range t.logs {
 		logStr := fmt.Sprintf("%s-%d-%d", name, lp.Partition, lp.Offset)
 		logStrings = append(logStrings, logStr)
 	}
+	sort.Strings(logStrings)
 	// E.g s11_22_33.dl0-134.ab1-441
-	return strings.Join(logStrings, ".")
+	return strings.Join(append([]string{t.syncToken.String()}, logStrings...), ".")
 }
 
 // IsAfter returns true if ANY position in this token is greater than `other`.

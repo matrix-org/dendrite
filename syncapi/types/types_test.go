@@ -20,7 +20,7 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 				},
 			},
 		},
-		"s4_0.dl-0-123.ab-1-14419482332": &StreamingToken{
+		"s4_0.ab-1-14419482332.dl-0-123": &StreamingToken{
 			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
 			logs: map[string]*LogPosition{
 				"ab": &LogPosition{
@@ -46,8 +46,9 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 		if !reflect.DeepEqual(got, *want) {
 			t.Errorf("%s mismatch: got %v want %v", tok, got, want)
 		}
-		if got.String() != tok {
-			t.Errorf("%s reserialisation mismatch: got %s want %s", tok, got.String(), tok)
+		gotStr := got.String()
+		if gotStr != tok {
+			t.Errorf("%s reserialisation mismatch: got %s want %s", tok, gotStr, tok)
 		}
 	}
 }
