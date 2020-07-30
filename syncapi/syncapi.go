@@ -62,7 +62,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI)
+	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, currentStateAPI)
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		cfg, consumer, notifier, syncDB, rsAPI,

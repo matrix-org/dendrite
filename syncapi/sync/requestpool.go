@@ -22,7 +22,9 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/syncapi/consumers"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -33,15 +35,19 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db         storage.Database
-	userAPI    userapi.UserInternalAPI
-	notifier   *Notifier
-	keyChanges *consumers.OutputKeyChangeEventConsumer
+	db       storage.Database
+	userAPI  userapi.UserInternalAPI
+	notifier *Notifier
+	keyAPI   keyapi.KeyInternalAPI
+	stateAPI currentstateAPI.CurrentStateInternalAPI
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI) *RequestPool {
-	return &RequestPool{db, userAPI, n}
+func NewRequestPool(
+	db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
+) *RequestPool {
+	return &RequestPool{db, userAPI, n, keyAPI, stateAPI}
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -206,7 +212,7 @@ func (rp *RequestPool) appendDeviceLists(
 	// QueryKeyChanges API only exposes a "from" value (on purpose to avoid racing, which then
 	// returns the latest position with which the response has authority on). We'd need to tweak
 	// the API to expose a "to" value to fix this.
-	_, _, err := rp.keyChanges.Catchup(context.Background(), userID, data, since)
+	_, _, err := internal.DeviceListCatchup(context.Background(), rp.keyAPI, rp.stateAPI, userID, data, since)
 	if err != nil {
 		return nil, err
 	}
