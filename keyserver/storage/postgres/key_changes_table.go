@@ -17,7 +17,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"math"
 
+	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 )
@@ -44,7 +46,7 @@ const upsertKeyChangeSQL = "" +
 // select the highest offset for each user in the range. The grouping by user gives distinct entries and then we just
 // take the max offset value as the latest offset.
 const selectKeyChangesSQL = "" +
-	"SELECT user_id, MAX(log_offset) FROM keyserver_key_changes WHERE partition = $1 AND log_offset > $2 GROUP BY user_id"
+	"SELECT user_id, MAX(log_offset) FROM keyserver_key_changes WHERE partition = $1 AND log_offset > $2 AND log_offset <= $3 GROUP BY user_id"
 
 type keyChangesStatements struct {
 	db                   *sql.DB
@@ -75,9 +77,12 @@ func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, partition in
 }
 
 func (s *keyChangesStatements) SelectKeyChanges(
-	ctx context.Context, partition int32, fromOffset int64,
+	ctx context.Context, partition int32, fromOffset, toOffset int64,
 ) (userIDs []string, latestOffset int64, err error) {
-	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, partition, fromOffset)
+	if toOffset == sarama.OffsetNewest {
+		toOffset = math.MaxInt64
+	}
+	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, partition, fromOffset, toOffset)
 	if err != nil {
 		return nil, 0, err
 	}
