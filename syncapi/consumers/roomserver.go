@@ -158,7 +158,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0))
+	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
 
 	return nil
 }
@@ -176,7 +176,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&msg.Event, "", nil, types.NewStreamToken(pduPos, 0))
+	s.notifier.OnNewEvent(&msg.Event, "", nil, types.NewStreamToken(pduPos, 0, nil))
 	return nil
 }
 
@@ -194,7 +194,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	}
 	// Notify any active sync requests that the invite has been retired.
 	// Invites share the same stream counter as PDUs
-	s.notifier.OnNewEvent(nil, "", []string{msg.TargetUserID}, types.NewStreamToken(sp, 0))
+	s.notifier.OnNewEvent(nil, "", []string{msg.TargetUserID}, types.NewStreamToken(sp, 0, nil))
 	return nil
 }
 

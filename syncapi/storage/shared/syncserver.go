@@ -434,7 +434,7 @@ func (d *Database) syncPositionTx(
 	if maxInviteID > maxEventID {
 		maxEventID = maxInviteID
 	}
-	sp = types.NewStreamToken(types.StreamPosition(maxEventID), types.StreamPosition(d.EDUCache.GetLatestSyncPosition()))
+	sp = types.NewStreamToken(types.StreamPosition(maxEventID), types.StreamPosition(d.EDUCache.GetLatestSyncPosition()), nil)
 	return
 }
 
@@ -731,7 +731,7 @@ func (d *Database) CompleteSync(
 
 	// Use a zero value SyncPosition for fromPos so all EDU states are added.
 	err = d.addEDUDeltaToResponse(
-		types.NewStreamToken(0, 0), toPos, joinedRoomIDs, res,
+		types.NewStreamToken(0, 0, nil), toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
 		return nil, err

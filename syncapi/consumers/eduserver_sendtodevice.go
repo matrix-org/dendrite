@@ -106,7 +106,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 	s.notifier.OnNewSendToDevice(
 		output.UserID,
 		[]string{output.DeviceID},
-		types.NewStreamToken(0, streamPos),
+		types.NewStreamToken(0, streamPos, nil),
 	)
 
 	return nil

@@ -28,6 +28,7 @@ type Database struct {
 	DB               *sql.DB
 	OneTimeKeysTable tables.OneTimeKeys
 	DeviceKeysTable  tables.DeviceKeys
+	KeyChangesTable  tables.KeyChanges
 }
 
 func (d *Database) ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
@@ -71,4 +72,12 @@ func (d *Database) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[st
 		return nil
 	})
 	return result, err
+}
+
+func (d *Database) StoreKeyChange(ctx context.Context, partition int32, offset int64, userID string) error {
+	return d.KeyChangesTable.InsertKeyChange(ctx, partition, offset, userID)
+}
+
+func (d *Database) KeyChanges(ctx context.Context, partition int32, fromOffset int64) (userIDs []string, latestOffset int64, err error) {
+	return d.KeyChangesTable.SelectKeyChanges(ctx, partition, fromOffset)
 }

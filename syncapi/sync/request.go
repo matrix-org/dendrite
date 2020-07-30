@@ -65,7 +65,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		since = &tok
 	}
 	if since == nil {
-		tok := types.NewStreamToken(0, 0)
+		tok := types.NewStreamToken(0, 0, nil)
 		since = &tok
 	}
 	timelineLimit := DefaultTimelineLimit

@@ -46,6 +46,7 @@ func NewInternalAPI(
 	keyChangeProducer := &producers.KeyChange{
 		Topic:    string(cfg.Matrix.Kafka.Topics.OutputKeyChangeEvent),
 		Producer: producer,
+		DB:       db,
 	}
 	return &internal.KeyInternalAPI{
 		DB:         db,

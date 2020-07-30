@@ -15,10 +15,12 @@
 package producers
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,6 +28,16 @@ import (
 type KeyChange struct {
 	Topic    string
 	Producer sarama.SyncProducer
+	DB       storage.Database
+}
+
+// DefaultPartition returns the default partition this process is sending key changes to.
+// NB: A keyserver MUST send key changes to only 1 partition or else query operations will
+// become inconsistent. Partitions can be sharded (e.g by hash of user ID of key change) but
+// then all keyservers must be queried to calculate the entire set of key changes between
+// two sync tokens.
+func (p *KeyChange) DefaultPartition() int32 {
+	return 0
 }
 
 // ProduceKeyChanges creates new change events for each key
@@ -43,6 +55,10 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceKeys) error {
 		m.Value = sarama.ByteEncoder(value)
 
 		partition, offset, err := p.Producer.SendMessage(&m)
+		if err != nil {
+			return err
+		}
+		err = p.DB.StoreKeyChange(context.Background(), partition, offset, key.UserID)
 		if err != nil {
 			return err
 		}
