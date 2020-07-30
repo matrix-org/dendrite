@@ -4,6 +4,9 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal/config"
 )
 
 var ctx = context.Background()
@@ -17,14 +20,16 @@ func MustNotError(t *testing.T, err error) {
 }
 
 func TestKeyChanges(t *testing.T) {
-	db, err := NewDatabase("file::memory:", nil)
+	db, err := NewDatabase(&config.DatabaseOptions{
+		ConnectionString: config.DataSource("file::memory:"),
+	})
 	if err != nil {
 		t.Fatalf("Failed to NewDatabase: %s", err)
 	}
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 0, "@alice:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 1, "@bob:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 2, "@charlie:localhost"))
-	userIDs, latest, err := db.KeyChanges(ctx, 0, 1)
+	userIDs, latest, err := db.KeyChanges(ctx, 0, 1, sarama.OffsetNewest)
 	if err != nil {
 		t.Fatalf("Failed to KeyChanges: %s", err)
 	}
@@ -37,14 +42,16 @@ func TestKeyChanges(t *testing.T) {
 }
 
 func TestKeyChangesNoDupes(t *testing.T) {
-	db, err := NewDatabase("file::memory:", nil)
+	db, err := NewDatabase(&config.DatabaseOptions{
+		ConnectionString: config.DataSource("file::memory:"),
+	})
 	if err != nil {
 		t.Fatalf("Failed to NewDatabase: %s", err)
 	}
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 0, "@alice:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 1, "@alice:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 2, "@alice:localhost"))
-	userIDs, latest, err := db.KeyChanges(ctx, 0, 0)
+	userIDs, latest, err := db.KeyChanges(ctx, 0, 0, sarama.OffsetNewest)
 	if err != nil {
 		t.Fatalf("Failed to KeyChanges: %s", err)
 	}
@@ -52,6 +59,26 @@ func TestKeyChangesNoDupes(t *testing.T) {
 		t.Fatalf("KeyChanges: got latest=%d want 2", latest)
 	}
 	if !reflect.DeepEqual(userIDs, []string{"@alice:localhost"}) {
+		t.Fatalf("KeyChanges: wrong user_ids: %v", userIDs)
+	}
+}
+
+func TestKeyChangesUpperLimit(t *testing.T) {
+	db, err := NewDatabase("file::memory:", nil)
+	if err != nil {
+		t.Fatalf("Failed to NewDatabase: %s", err)
+	}
+	MustNotError(t, db.StoreKeyChange(ctx, 0, 0, "@alice:localhost"))
+	MustNotError(t, db.StoreKeyChange(ctx, 0, 1, "@bob:localhost"))
+	MustNotError(t, db.StoreKeyChange(ctx, 0, 2, "@charlie:localhost"))
+	userIDs, latest, err := db.KeyChanges(ctx, 0, 0, 1)
+	if err != nil {
+		t.Fatalf("Failed to KeyChanges: %s", err)
+	}
+	if latest != 1 {
+		t.Fatalf("KeyChanges: got latest=%d want 1", latest)
+	}
+	if !reflect.DeepEqual(userIDs, []string{"@bob:localhost"}) {
 		t.Fatalf("KeyChanges: wrong user_ids: %v", userIDs)
 	}
 }

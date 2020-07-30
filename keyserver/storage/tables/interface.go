@@ -38,5 +38,7 @@ type DeviceKeys interface {
 
 type KeyChanges interface {
 	InsertKeyChange(ctx context.Context, partition int32, offset int64, userID string) error
-	SelectKeyChanges(ctx context.Context, partition int32, fromOffset int64) (userIDs []string, latestOffset int64, err error)
+	// SelectKeyChanges returns the set (de-duplicated) of users who have changed their keys between the two offsets.
+	// Results are exclusive of fromOffset and inclusive of toOffset. A toOffset of sarama.OffsetNewest means no upper offset.
+	SelectKeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
 }

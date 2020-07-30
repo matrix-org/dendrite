@@ -75,4 +75,8 @@ func Setup(
 			return GetFilter(req, device, syncDB, vars["userId"], vars["filterId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/keys/changes", httputil.MakeAuthAPI("keys_changes", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		return srp.OnIncomingKeyChangeRequest(req, device)
+	})).Methods(http.MethodGet, http.MethodOptions)
 }

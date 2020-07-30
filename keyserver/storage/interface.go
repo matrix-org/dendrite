@@ -48,7 +48,8 @@ type Database interface {
 	// their keys in some way.
 	StoreKeyChange(ctx context.Context, partition int32, offset int64, userID string) error
 
-	// KeyChanges returns a list of user IDs who have modified their keys from the offset given.
+	// KeyChanges returns a list of user IDs who have modified their keys from the offset given (exclusive) to the offset given (inclusive).
+	// A to offset of sarama.OffsetNewest means no upper limit.
 	// Returns the offset of the latest key change.
-	KeyChanges(ctx context.Context, partition int32, fromOffset int64) (userIDs []string, latestOffset int64, err error)
+	KeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
 }
