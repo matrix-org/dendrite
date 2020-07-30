@@ -127,6 +127,7 @@ Can query specific device keys using POST
 query for user with no keys returns empty key dict
 Can claim one time key using POST
 Can claim remote one time key using POST
+Local device key changes appear in v2 /sync
 Can add account data
 Can add account data to room
 Can get account data without syncing

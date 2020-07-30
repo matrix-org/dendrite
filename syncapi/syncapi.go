@@ -21,7 +21,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	currentstateapi "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -39,6 +41,8 @@ func AddPublicRoutes(
 	consumer sarama.Consumer,
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
+	keyAPI keyapi.KeyInternalAPI,
+	currentStateAPI currentstateapi.CurrentStateInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.Dendrite,
 ) {
@@ -58,7 +62,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI)
+	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, currentStateAPI)
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		cfg, consumer, notifier, syncDB, rsAPI,
@@ -86,6 +90,14 @@ func AddPublicRoutes(
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
+	}
+
+	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
+		cfg.Matrix.ServerName, string(cfg.Kafka.Topics.OutputKeyChangeEvent),
+		consumer, notifier, keyAPI, currentStateAPI, syncDB,
+	)
+	if err = keyChangeConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start key change consumer")
 	}
 
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)

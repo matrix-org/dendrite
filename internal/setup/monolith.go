@@ -77,6 +77,7 @@ func (m *Monolith) AddAllPublicRoutes(publicMux *mux.Router) {
 	)
 	mediaapi.AddPublicRoutes(publicMux, m.Config, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(
-		publicMux, m.KafkaConsumer, m.UserAPI, m.RoomserverAPI, m.FedClient, m.Config,
+		publicMux, m.KafkaConsumer, m.UserAPI, m.RoomserverAPI,
+		m.KeyAPI, m.StateAPI, m.FedClient, m.Config,
 	)
 }

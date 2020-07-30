@@ -143,6 +143,8 @@ type QueryKeyChangesRequest struct {
 type QueryKeyChangesResponse struct {
 	// The set of users who have had their keys change.
 	UserIDs []string
+	// The partition being served - useful if the partition is unknown at request time
+	Partition int32
 	// The latest offset represented in this response.
 	Offset int64
 	// Set if there was a problem handling the request.

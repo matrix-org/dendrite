@@ -22,6 +22,9 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -35,11 +38,16 @@ type RequestPool struct {
 	db       storage.Database
 	userAPI  userapi.UserInternalAPI
 	notifier *Notifier
+	keyAPI   keyapi.KeyInternalAPI
+	stateAPI currentstateAPI.CurrentStateInternalAPI
 }
 
 // NewRequestPool makes a new RequestPool
-func NewRequestPool(db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI) *RequestPool {
-	return &RequestPool{db, userAPI, n}
+func NewRequestPool(
+	db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
+) *RequestPool {
+	return &RequestPool{db, userAPI, n, keyAPI, stateAPI}
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -164,6 +172,10 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	if err != nil {
 		return
 	}
+	res, err = rp.appendDeviceLists(res, req.device.UserID, since)
+	if err != nil {
+		return
+	}
 
 	// Before we return the sync response, make sure that we take action on
 	// any send-to-device database updates or deletions that we need to do.
@@ -190,6 +202,22 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	}
 
 	return
+}
+
+func (rp *RequestPool) appendDeviceLists(
+	data *types.Response, userID string, since types.StreamingToken,
+) (*types.Response, error) {
+	// TODO: Currently this code will race which may result in duplicates but not missing data.
+	// This happens because, whilst we are told the range to fetch here (since / latest) the
+	// QueryKeyChanges API only exposes a "from" value (on purpose to avoid racing, which then
+	// returns the latest position with which the response has authority on). We'd need to tweak
+	// the API to expose a "to" value to fix this.
+	_, _, err := internal.DeviceListCatchup(context.Background(), rp.keyAPI, rp.stateAPI, userID, data, since)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // nolint:gocyclo
