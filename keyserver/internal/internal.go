@@ -44,7 +44,7 @@ func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyC
 	if req.Partition < 0 {
 		req.Partition = a.Producer.DefaultPartition()
 	}
-	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Partition, req.Offset)
+	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Partition, req.Offset, req.ToOffset)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: err.Error(),

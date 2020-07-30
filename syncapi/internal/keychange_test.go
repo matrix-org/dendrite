@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/currentstateserver/api"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -15,6 +16,12 @@ import (
 var (
 	syncingUser = "@alice:localhost"
 	emptyToken  = types.NewStreamToken(0, 0, nil)
+	newestToken = types.NewStreamToken(0, 0, map[string]*types.LogPosition{
+		DeviceListLogName: &types.LogPosition{
+			Offset:    sarama.OffsetNewest,
+			Partition: 0,
+		},
+	})
 )
 
 type mockKeyAPI struct{}
@@ -162,12 +169,12 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
+	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, newShareUser},
 			"!another:room": {syncingUser},
 		},
-	}, syncingUser, syncResponse, emptyToken)
+	}, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -184,12 +191,12 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
+	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyLeftRoom:   {removeUser},
 			"!another:room": {syncingUser},
 		},
-	}, syncingUser, syncResponse, emptyToken)
+	}, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -206,12 +213,12 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
+	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, existingUser},
 			"!another:room": {syncingUser, existingUser},
 		},
-	}, syncingUser, syncResponse, emptyToken)
+	}, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -227,12 +234,12 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 	syncResponse := types.NewResponse()
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
+	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyLeftRoom:   {existingUser},
 			"!another:room": {syncingUser, existingUser},
 		},
-	}, syncingUser, syncResponse, emptyToken)
+	}, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -286,11 +293,11 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 	jr.Timeline.Events = roomTimelineEvents
 	syncResponse.Rooms.Join[roomID] = jr
 
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
+	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			roomID: {syncingUser, existingUser},
 		},
-	}, syncingUser, syncResponse, emptyToken)
+	}, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -311,13 +318,13 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 	syncResponse = joinResponseWithRooms(syncResponse, syncingUser, []string{newlyJoinedRoom})
 	syncResponse = leaveResponseWithRooms(syncResponse, syncingUser, []string{newlyLeftRoom})
 
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
+	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			newlyJoinedRoom: {syncingUser, newShareUser, newShareUser2},
 			newlyLeftRoom:   {newlyLeftUser, newlyLeftUser2},
 			"!another:room": {syncingUser},
 		},
-	}, syncingUser, syncResponse, emptyToken)
+	}, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -396,12 +403,12 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 	lr.Timeline.Events = roomEvents
 	syncResponse.Rooms.Leave[roomID] = lr
 
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
+	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, &mockCurrentStateAPI{
 		roomIDToJoinedMembers: map[string][]string{
 			roomID:          {newShareUser, newShareUser2},
 			"!another:room": {syncingUser},
 		},
-	}, syncingUser, syncResponse, emptyToken)
+	}, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}

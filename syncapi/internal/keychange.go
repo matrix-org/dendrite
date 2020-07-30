@@ -33,15 +33,15 @@ const DeviceListLogName = "dl"
 // be already filled in with join/leave information.
 func DeviceListCatchup(
 	ctx context.Context, keyAPI keyapi.KeyInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
-	userID string, res *types.Response, tok types.StreamingToken,
-) (newTok *types.StreamingToken, hasNew bool, err error) {
+	userID string, res *types.Response, from, to types.StreamingToken,
+) (hasNew bool, err error) {
 	// Track users who we didn't track before but now do by virtue of sharing a room with them, or not.
 	newlyJoinedRooms := joinedRooms(res, userID)
 	newlyLeftRooms := leftRooms(res)
 	if len(newlyJoinedRooms) > 0 || len(newlyLeftRooms) > 0 {
 		changed, left, err := TrackChangedUsers(ctx, stateAPI, userID, newlyJoinedRooms, newlyLeftRooms)
 		if err != nil {
-			return nil, false, err
+			return false, err
 		}
 		res.DeviceLists.Changed = changed
 		res.DeviceLists.Left = left
@@ -54,7 +54,7 @@ func DeviceListCatchup(
 	var offset int64
 	// Extract partition/offset from sync token
 	// TODO: In a world where keyserver is sharded there will be multiple partitions and hence multiple QueryKeyChanges to make.
-	logOffset := tok.Log(DeviceListLogName)
+	logOffset := from.Log(DeviceListLogName)
 	if logOffset != nil {
 		partition = logOffset.Partition
 		offset = logOffset.Offset
@@ -62,15 +62,23 @@ func DeviceListCatchup(
 		partition = -1
 		offset = sarama.OffsetOldest
 	}
+	var toOffset int64
+	toLog := to.Log(DeviceListLogName)
+	if toLog != nil {
+		toOffset = toLog.Offset
+	} else {
+		toOffset = sarama.OffsetNewest
+	}
 	var queryRes api.QueryKeyChangesResponse
 	keyAPI.QueryKeyChanges(ctx, &api.QueryKeyChangesRequest{
 		Partition: partition,
 		Offset:    offset,
+		ToOffset:  toOffset,
 	}, &queryRes)
 	if queryRes.Error != nil {
 		// don't fail the catchup because we may have got useful information by tracking membership
 		util.GetLogger(ctx).WithError(queryRes.Error).Error("QueryKeyChanges failed")
-		return
+		return hasNew, nil
 	}
 	userSet := make(map[string]bool)
 	for _, userID := range res.DeviceLists.Changed {
@@ -82,13 +90,7 @@ func DeviceListCatchup(
 			hasNew = true
 		}
 	}
-	// Make a new streaming token using the new offset
-	tok.SetLog(DeviceListLogName, &types.LogPosition{
-		Offset:    queryRes.Offset,
-		Partition: queryRes.Partition,
-	})
-	newTok = &tok
-	return
+	return hasNew, nil
 }
 
 // TrackChangedUsers calculates the values of device_lists.changed|left in the /sync response.

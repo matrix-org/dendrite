@@ -78,6 +78,6 @@ func (d *Database) StoreKeyChange(ctx context.Context, partition int32, offset i
 	return d.KeyChangesTable.InsertKeyChange(ctx, partition, offset, userID)
 }
 
-func (d *Database) KeyChanges(ctx context.Context, partition int32, fromOffset int64) (userIDs []string, latestOffset int64, err error) {
-	return d.KeyChangesTable.SelectKeyChanges(ctx, partition, fromOffset)
+func (d *Database) KeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
+	return d.KeyChangesTable.SelectKeyChanges(ctx, partition, fromOffset, toOffset)
 }
