@@ -27,7 +27,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices, base.KeyServerHTTPClient())
 
 	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
 

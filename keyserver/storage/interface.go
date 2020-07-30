@@ -32,7 +32,8 @@ type Database interface {
 	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` already then it will be replaced.
 	DeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error
 
-	// StoreDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced.
+	// StoreDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced. An empty KeyJSON removes the key
+	// for this (user, device).
 	// Returns an error if there was a problem storing the keys.
 	StoreDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error
 

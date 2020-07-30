@@ -76,7 +76,9 @@ func main() {
 		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices)
+	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices, keyAPI)
+	keyAPI.SetUserAPI(userAPI)
 
 	rsImpl := roomserver.NewInternalAPI(
 		base, keyRing, federation,
@@ -119,7 +121,6 @@ func main() {
 	rsImpl.SetFederationSenderAPI(fsAPI)
 
 	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
-	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, userAPI, base.KafkaProducer)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,

@@ -19,9 +19,13 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type KeyInternalAPI interface {
+	// SetUserAPI assigns a user API to query when extracting device names.
+	SetUserAPI(i userapi.UserInternalAPI)
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)

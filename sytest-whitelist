@@ -129,6 +129,7 @@ Can claim one time key using POST
 Can claim remote one time key using POST
 Local device key changes appear in v2 /sync
 Local device key changes appear in /keys/changes
+Local delete device changes appear in v2 /sync
 Get left notifs for other users in sync and /keys/changes when user leaves
 Can add account data
 Can add account data to room
