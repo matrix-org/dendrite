@@ -36,17 +36,17 @@ const testConfig = `
 version: 1
 global:
   server_name: localhost
-  private_key: matrix_key.pem
+  private_key: matrix.pem
   key_validity_period: 168h0m0s
   trusted_third_party_id_servers: []
   kafka:
     addresses: []
     use_naffka: true
-    naffka_database: file:naffka.db
-    naffka_database_options:
-      database_max_open_conns: 0
-      database_max_idle_conns: 0
-      database_conn_max_lifetime: -1
+    naffka_database:
+      connection_string: file:naffka.db
+      max_open_conns: 0
+      max_idle_conns: 0
+      conn_max_lifetime: -1
     topics:
       output_room_event: OutputRoomEventTopic
       output_client_data: OutputClientDataTopic
@@ -61,11 +61,11 @@ global:
 app_service_api:
   listen: localhost:7777
   bind: localhost:7777
-  database: file:appservice.db
-  database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  database:
+    connection_string: file:appservice.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
   config_files: []
 client_api:
   listen: localhost:7771
@@ -86,11 +86,11 @@ client_api:
 current_state_server:
   listen: localhost:7782
   bind: localhost:7782
-  database: file:currentstate.db
-  database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  database:
+    connection_string: file:currentstate.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
 edu_server:
   listen: localhost:7778
   bind: localhost:7778
@@ -101,32 +101,33 @@ federation_api:
 federation_sender:
   listen: localhost:7775
   bind: localhost:7775
-  database: file:federationsender.db
-  database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  database:
+    connection_string: file:federationsender.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
   federation_max_retries: 16
-  proxy:
-    protocol: ""
-    host: ""
-    port: 0
+  proxy_outbound:
+    enabled: false
+    protocol: http
+    host: localhost
+    port: 8080
 key_server:
   listen: localhost:7779
   bind: localhost:7779
-  database: file:keyserver.db
-  database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  database:
+    connection_string: file:keyserver.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
 media_api:
   listen: localhost:7774
   bind: localhost:7774
-  database: file:mediaapi.db
-  database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  database:
+    connection_string: file:mediaapi.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
   base_path: ""
   max_file_size_bytes: 10485760
   dynamic_thumbnails: false
@@ -135,41 +136,41 @@ media_api:
 room_server:
   listen: localhost:7770
   bind: localhost:7770
-  database: file:roomserver.db
-  database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  database:
+    connection_string: file:roomserver.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
 server_key_api:
   listen: localhost:7780
   bind: localhost:7780
-  database: file:serverkeyapi.db
-  database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  database:
+    connection_string: file:serverkeyapi.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
   key_perspectives: []
 sync_api:
   listen: localhost:7773
   bind: localhost:7773
-  database: file:syncapi.db
-  database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  database:
+    connection_string: file:syncapi.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
 user_api:
   listen: localhost:7781
   bind: localhost:7781
-  account_database: file:userapi_accounts.db
-  account_database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
-  device_database: file:userapi_devices.db
-  device_database_options:
-    database_max_open_conns: 0
-    database_max_idle_conns: 0
-    database_conn_max_lifetime: -1
+  account_database:
+    connection_string: file:userapi_accounts.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
+  device_database:
+    connection_string: file:userapi_devices.db
+    max_open_conns: 0
+    max_idle_conns: 0
+    conn_max_lifetime: -1
 tracing:
   enabled: false
   jaeger:
