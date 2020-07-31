@@ -644,7 +644,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return UpdateDeviceByID(req, deviceDB, device, vars["deviceID"])
+			return UpdateDeviceByID(req, userAPI, device, vars["deviceID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 

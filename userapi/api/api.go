@@ -28,6 +28,7 @@ type UserInternalAPI interface {
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
 	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
+	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
@@ -46,6 +47,16 @@ type InputAccountDataRequest struct {
 
 // InputAccountDataResponse is the response for InputAccountData
 type InputAccountDataResponse struct {
+}
+
+type PerformDeviceUpdateRequest struct {
+	RequestingUserID string
+	DeviceID         string
+	DisplayName      *string
+}
+type PerformDeviceUpdateResponse struct {
+	DeviceExists bool
+	Forbidden    bool
 }
 
 type PerformDeviceDeletionRequest struct {

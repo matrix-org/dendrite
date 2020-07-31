@@ -148,6 +148,35 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 	return nil
 }
 
+func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.PerformDeviceUpdateRequest, res *api.PerformDeviceUpdateResponse) error {
+	localpart, _, err := gomatrixserverlib.SplitID('@', req.RequestingUserID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return err
+	}
+	dev, err := a.DeviceDB.GetDeviceByID(ctx, localpart, req.DeviceID)
+	if err == sql.ErrNoRows {
+		res.DeviceExists = false
+		return nil
+	} else if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("deviceDB.GetDeviceByID failed")
+		return err
+	}
+	res.DeviceExists = true
+
+	if dev.UserID != req.RequestingUserID {
+		res.Forbidden = true
+		return nil
+	}
+
+	err = a.DeviceDB.UpdateDevice(ctx, localpart, req.DeviceID, req.DisplayName)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
+		return err
+	}
+	return nil
+}
+
 func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfileRequest, res *api.QueryProfileResponse) error {
 	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
