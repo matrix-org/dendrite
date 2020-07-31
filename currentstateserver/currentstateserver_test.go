@@ -230,6 +230,9 @@ func TestQuerySharedUsers(t *testing.T) {
 
 	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo4:bar", "@alice:localhost", "join"))
 
+	// we don't know when the server has processed the events
+	time.Sleep(10 * time.Millisecond)
+
 	testCases := []struct {
 		req     api.QuerySharedUsersRequest
 		wantRes api.QuerySharedUsersResponse
