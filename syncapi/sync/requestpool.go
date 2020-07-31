@@ -168,7 +168,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	// work out room joins/leaves
 	res, err := rp.db.IncrementalSync(
-		req.Context(), types.NewResponse(), *device, fromToken, toToken, 0, false,
+		req.Context(), types.NewResponse(), *device, fromToken, toToken, 10, false,
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("Failed to IncrementalSync")

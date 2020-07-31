@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Shopify/sarama"
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
@@ -88,6 +89,16 @@ func DeviceListCatchup(
 		if !userSet[userID] {
 			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
 			hasNew = true
+			userSet[userID] = true
+		}
+	}
+	// if the response has any join/leave events, add them now.
+	// TODO: This is sub-optimal because we will add users to `changed` even if we already shared a room with them.
+	for _, userID := range membershipEvents(res) {
+		if !userSet[userID] {
+			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
+			hasNew = true
+			userSet[userID] = true
 		}
 	}
 	return hasNew, nil
@@ -218,4 +229,26 @@ func membershipEventPresent(events []gomatrixserverlib.ClientEvent, userID strin
 		}
 	}
 	return false
+}
+
+// returns the user IDs of anyone joining or leaving a room in this response. These users will be added to
+// the 'changed' property because of https://matrix.org/docs/spec/client_server/r0.6.1#id84
+// "For optimal performance, Alice should be added to changed in Bob's sync only when she adds a new device,
+// or when Alice and Bob now share a room but didn't share any room previously. However, for the sake of simpler
+// logic, a server may add Alice to changed when Alice and Bob share a new room, even if they previously already shared a room."
+func membershipEvents(res *types.Response) (userIDs []string) {
+	for _, room := range res.Rooms.Join {
+		for _, ev := range room.Timeline.Events {
+			if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil {
+				if strings.Contains(string(ev.Content), `"join"`) {
+					userIDs = append(userIDs, *ev.StateKey)
+				} else if strings.Contains(string(ev.Content), `"leave"`) {
+					userIDs = append(userIDs, *ev.StateKey)
+				} else if strings.Contains(string(ev.Content), `"ban"`) {
+					userIDs = append(userIDs, *ev.StateKey)
+				}
+			}
+		}
+	}
+	return
 }
