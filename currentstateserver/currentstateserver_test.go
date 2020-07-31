@@ -19,6 +19,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"net/http"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -91,11 +92,13 @@ func MustWriteOutputEvent(t *testing.T, producer sarama.SyncProducer, out *rooms
 	return nil
 }
 
-func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.SyncProducer) {
+func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.SyncProducer, func()) {
 	cfg := &config.Dendrite{}
+	stateDBName := "test_state.db"
+	naffkaDBName := "test_naffka.db"
 	cfg.Kafka.Topics.OutputRoomEvent = config.Topic(kafkaTopic)
-	cfg.Database.CurrentState = config.DataSource("file::memory:")
-	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), "file::memory:", nil)
+	cfg.Database.CurrentState = config.DataSource("file:" + stateDBName)
+	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), "file:"+naffkaDBName, nil)
 	if err != nil {
 		t.Fatalf("Failed to open naffka database: %s", err)
 	}
@@ -107,11 +110,15 @@ func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.Sync
 	if err != nil {
 		t.Fatalf("Failed to create naffka consumer: %s", err)
 	}
-	return NewInternalAPI(cfg, naff), naff
+	return NewInternalAPI(cfg, naff), naff, func() {
+		os.Remove(naffkaDBName)
+		os.Remove(stateDBName)
+	}
 }
 
 func TestQueryCurrentState(t *testing.T) {
-	currStateAPI, producer := MustMakeInternalAPI(t)
+	currStateAPI, producer, cancel := MustMakeInternalAPI(t)
+	defer cancel()
 	plTuple := gomatrixserverlib.StateKeyTuple{
 		EventType: "m.room.power_levels",
 		StateKey:  "",
@@ -209,7 +216,8 @@ func mustMakeMembershipEvent(t *testing.T, roomID, userID, membership string) *r
 
 // This test makes sure that QuerySharedUsers is returning the correct users for a range of sets.
 func TestQuerySharedUsers(t *testing.T) {
-	currStateAPI, producer := MustMakeInternalAPI(t)
+	currStateAPI, producer, cancel := MustMakeInternalAPI(t)
+	defer cancel()
 	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo:bar", "@alice:localhost", "join"))
 	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo:bar", "@bob:localhost", "join"))
 
@@ -221,6 +229,9 @@ func TestQuerySharedUsers(t *testing.T) {
 	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo3:bar", "@dave:localhost", "leave"))
 
 	MustWriteOutputEvent(t, producer, mustMakeMembershipEvent(t, "!foo4:bar", "@alice:localhost", "join"))
+
+	// we don't know when the server has processed the events
+	time.Sleep(10 * time.Millisecond)
 
 	testCases := []struct {
 		req     api.QuerySharedUsersRequest

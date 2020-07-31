@@ -174,7 +174,7 @@ func (s *devicesStatements) deleteDevice(
 func (s *devicesStatements) deleteDevices(
 	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
 ) error {
-	orig := strings.Replace(deleteDevicesSQL, "($1)", sqlutil.QueryVariadic(len(devices)), 1)
+	orig := strings.Replace(deleteDevicesSQL, "($2)", sqlutil.QueryVariadicOffset(len(devices), 1), 1)
 	prep, err := s.db.Prepare(orig)
 	if err != nil {
 		return err
@@ -186,7 +186,6 @@ func (s *devicesStatements) deleteDevices(
 		for i, v := range devices {
 			params[i+1] = v
 		}
-		params = append(params, params...)
 		_, err = stmt.ExecContext(ctx, params...)
 		return err
 	})
