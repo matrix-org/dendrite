@@ -23,8 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/config"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -57,7 +57,7 @@ func passwordLogin() flows {
 
 // Login implements GET and POST /login
 func Login(
-	req *http.Request, accountDB accounts.Database, deviceDB devices.Database,
+	req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
 	cfg *config.Dendrite,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
@@ -81,7 +81,7 @@ func Login(
 			return *authErr
 		}
 		// make a device/access token
-		return completeAuth(req.Context(), cfg.Matrix.ServerName, deviceDB, login)
+		return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login)
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
@@ -90,7 +90,7 @@ func Login(
 }
 
 func completeAuth(
-	ctx context.Context, serverName gomatrixserverlib.ServerName, deviceDB devices.Database, login *auth.Login,
+	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI userapi.UserInternalAPI, login *auth.Login,
 ) util.JSONResponse {
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
@@ -104,9 +104,13 @@ func completeAuth(
 		return jsonerror.InternalServerError()
 	}
 
-	dev, err := deviceDB.CreateDevice(
-		ctx, localpart, login.DeviceID, token, login.InitialDisplayName,
-	)
+	var performRes userapi.PerformDeviceCreationResponse
+	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
+		DeviceDisplayName: login.InitialDisplayName,
+		DeviceID:          login.DeviceID,
+		AccessToken:       token,
+		Localpart:         localpart,
+	}, &performRes)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -117,10 +121,10 @@ func completeAuth(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: loginResponse{
-			UserID:      dev.UserID,
-			AccessToken: dev.AccessToken,
+			UserID:      performRes.Device.UserID,
+			AccessToken: performRes.Device.AccessToken,
 			HomeServer:  serverName,
-			DeviceID:    dev.ID,
+			DeviceID:    performRes.Device.ID,
 		},
 	}
 }

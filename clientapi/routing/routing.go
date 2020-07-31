@@ -387,7 +387,7 @@ func Setup(
 
 	r0mux.Handle("/login",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
-			return Login(req, accountDB, deviceDB, cfg)
+			return Login(req, accountDB, userAPI, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
