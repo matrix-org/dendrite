@@ -39,6 +39,10 @@ func (d *Database) StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (
 	return d.OneTimeKeysTable.InsertOneTimeKeys(ctx, keys)
 }
 
+func (d *Database) OneTimeKeysCount(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error) {
+	return d.OneTimeKeysTable.CountOneTimeKeys(ctx, userID, deviceID)
+}
+
 func (d *Database) DeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error {
 	return d.DeviceKeysTable.SelectDeviceKeysJSON(ctx, keys)
 }

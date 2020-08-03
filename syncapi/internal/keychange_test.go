@@ -39,6 +39,9 @@ func (k *mockKeyAPI) QueryKeys(ctx context.Context, req *keyapi.QueryKeysRequest
 }
 func (k *mockKeyAPI) QueryKeyChanges(ctx context.Context, req *keyapi.QueryKeyChangesRequest, res *keyapi.QueryKeyChangesResponse) {
 }
+func (k *mockKeyAPI) QueryOneTimeKeys(ctx context.Context, req *keyapi.QueryOneTimeKeysRequest, res *keyapi.QueryOneTimeKeysResponse) {
+
+}
 
 type mockCurrentStateAPI struct {
 	roomIDToJoinedMembers map[string][]string

@@ -168,6 +168,17 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 	util.GetLogger(ctx).WithField("num_keys", keysClaimed).Info("Claimed remote keys")
 }
 
+func (a *KeyInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOneTimeKeysRequest, res *api.QueryOneTimeKeysResponse) {
+	count, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
+	if err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("Failed to query OTK counts: %s", err),
+		}
+		return
+	}
+	res.Count = *count
+}
+
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.Failures = make(map[string]interface{})

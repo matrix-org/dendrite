@@ -192,8 +192,9 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 }
 
-func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (res *types.Response, err error) {
-	res = types.NewResponse()
+// nolint:gocyclo
+func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (*types.Response, error) {
+	res := types.NewResponse()
 
 	since := types.NewStreamToken(0, 0, nil)
 	if req.since != nil {
@@ -213,17 +214,21 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, *req.since, latestPos, req.limit, req.wantFullState)
 	}
 	if err != nil {
-		return
+		return res, err
 	}
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
 	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
 	if err != nil {
-		return
+		return res, err
 	}
 	res, err = rp.appendDeviceLists(res, req.device.UserID, since, latestPos)
 	if err != nil {
-		return
+		return res, err
+	}
+	err = internal.DeviceOTKCounts(req.ctx, rp.keyAPI, req.device.UserID, req.device.ID, res)
+	if err != nil {
+		return res, err
 	}
 
 	// Before we return the sync response, make sure that we take action on
@@ -233,7 +238,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		// Handle the updates and deletions in the database.
 		err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, since)
 		if err != nil {
-			return
+			return res, err
 		}
 	}
 	if len(events) > 0 {
@@ -250,7 +255,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		}
 	}
 
-	return
+	return res, err
 }
 
 func (rp *RequestPool) appendDeviceLists(

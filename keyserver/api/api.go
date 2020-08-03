@@ -31,6 +31,7 @@ type KeyInternalAPI interface {
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
+	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server
@@ -155,5 +156,18 @@ type QueryKeyChangesResponse struct {
 	// The latest offset represented in this response.
 	Offset int64
 	// Set if there was a problem handling the request.
+	Error *KeyError
+}
+
+type QueryOneTimeKeysRequest struct {
+	// The local user to query OTK counts for
+	UserID string
+	// The device to query OTK counts for
+	DeviceID string
+}
+
+type QueryOneTimeKeysResponse struct {
+	// OTK key counts, in the extended /sync form described by https://matrix.org/docs/spec/client_server/r0.6.1#id84
+	Count OneTimeKeysCount
 	Error *KeyError
 }

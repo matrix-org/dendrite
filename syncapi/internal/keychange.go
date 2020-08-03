@@ -29,6 +29,20 @@ import (
 
 const DeviceListLogName = "dl"
 
+// DeviceOTKCounts adds one-time key counts to the /sync response
+func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, deviceID string, res *types.Response) error {
+	var queryRes api.QueryOneTimeKeysResponse
+	keyAPI.QueryOneTimeKeys(ctx, &api.QueryOneTimeKeysRequest{
+		UserID:   userID,
+		DeviceID: deviceID,
+	}, &queryRes)
+	if queryRes.Error != nil {
+		return queryRes.Error
+	}
+	res.DeviceListsOTKCount = queryRes.Count.KeyCount
+	return nil
+}
+
 // DeviceListCatchup fills in the given response for the given user ID to bring it up-to-date with device lists. hasNew=true if the response
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
@@ -36,6 +50,7 @@ func DeviceListCatchup(
 	ctx context.Context, keyAPI keyapi.KeyInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
 	userID string, res *types.Response, from, to types.StreamingToken,
 ) (hasNew bool, err error) {
+
 	// Track users who we didn't track before but now do by virtue of sharing a room with them, or not.
 	newlyJoinedRooms := joinedRooms(res, userID)
 	newlyLeftRooms := leftRooms(res)
