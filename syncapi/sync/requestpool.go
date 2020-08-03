@@ -225,6 +225,10 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	if err != nil {
 		return
 	}
+	err = internal.DeviceOTKCounts(req.ctx, rp.keyAPI, req.device.UserID, req.device.ID, res)
+	if err != nil {
+		return
+	}
 
 	// Before we return the sync response, make sure that we take action on
 	// any send-to-device database updates or deletions that we need to do.
