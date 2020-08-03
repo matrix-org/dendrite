@@ -59,7 +59,7 @@ func (d *Database) StoreDeviceKeys(ctx context.Context, keys []api.DeviceMessage
 			if err != nil {
 				return err
 			}
-			userIDToStreamID[userID] = streamID
+			userIDToStreamID[userID] = int(streamID)
 		}
 		// set the stream IDs for each key
 		for i := range keys {

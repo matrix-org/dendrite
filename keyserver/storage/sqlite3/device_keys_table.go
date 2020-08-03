@@ -127,8 +127,16 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 	return nil
 }
 
-func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int, err error) {
-	err = txn.Stmt(s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&streamID)
+func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int32, err error) {
+	// nullable if there are no results
+	var nullStream sql.NullInt32
+	err = txn.Stmt(s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
+	if err == sql.ErrNoRows {
+		err = nil
+	}
+	if nullStream.Valid {
+		streamID = nullStream.Int32
+	}
 	return
 }
 
