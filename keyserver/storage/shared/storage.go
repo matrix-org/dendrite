@@ -43,15 +43,36 @@ func (d *Database) OneTimeKeysCount(ctx context.Context, userID, deviceID string
 	return d.OneTimeKeysTable.CountOneTimeKeys(ctx, userID, deviceID)
 }
 
-func (d *Database) DeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error {
+func (d *Database) DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
 	return d.DeviceKeysTable.SelectDeviceKeysJSON(ctx, keys)
 }
 
-func (d *Database) StoreDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error {
-	return d.DeviceKeysTable.InsertDeviceKeys(ctx, keys)
+func (d *Database) StoreDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+	// work out the latest stream IDs for each user
+	userIDToStreamID := make(map[string]int)
+	for _, k := range keys {
+		userIDToStreamID[k.UserID] = 0
+	}
+	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		for userID := range userIDToStreamID {
+			streamID, err := d.DeviceKeysTable.SelectMaxStreamIDForUser(ctx, txn, userID)
+			if err != nil {
+				return err
+			}
+			userIDToStreamID[userID] = int(streamID)
+		}
+		// set the stream IDs for each key
+		for i := range keys {
+			k := keys[i]
+			userIDToStreamID[k.UserID]++ // start stream from 1
+			k.StreamID = userIDToStreamID[k.UserID]
+			keys[i] = k
+		}
+		return d.DeviceKeysTable.InsertDeviceKeys(ctx, txn, keys)
+	})
 }
 
-func (d *Database) DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error) {
+func (d *Database) DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error) {
 	return d.DeviceKeysTable.SelectBatchDeviceKeys(ctx, userID, deviceIDs)
 }
 

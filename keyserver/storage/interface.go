@@ -32,17 +32,18 @@ type Database interface {
 	// OneTimeKeysCount returns a count of all OTKs for this device.
 	OneTimeKeysCount(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error)
 
-	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` already then it will be replaced.
-	DeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error
+	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` or `StreamID` already then it will be replaced.
+	DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error
 
 	// StoreDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced. An empty KeyJSON removes the key
 	// for this (user, device).
+	// The `StreamID` for each message is set on successful insertion. In the event the key already exists, the existing StreamID is set.
 	// Returns an error if there was a problem storing the keys.
-	StoreDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error
+	StoreDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error
 
 	// DeviceKeysForUser returns the device keys for the device IDs given. If the length of deviceIDs is 0, all devices are selected.
 	// If there are some missing keys, they are omitted from the returned slice. There is no ordering on the returned slice.
-	DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error)
+	DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error)
 
 	// ClaimKeys based on the 3-uple of user_id, device_id and algorithm name. Returns the keys claimed. Returns no error if a key
 	// cannot be claimed or if none exist for this (user, device, algorithm), instead it is omitted from the returned slice.

@@ -32,9 +32,10 @@ type OneTimeKeys interface {
 }
 
 type DeviceKeys interface {
-	SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error
-	InsertDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error
-	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error)
+	SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error
+	InsertDeviceKeys(ctx context.Context, txn *sql.Tx, keys []api.DeviceMessage) error
+	SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int32, err error)
+	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error)
 }
 
 type KeyChanges interface {

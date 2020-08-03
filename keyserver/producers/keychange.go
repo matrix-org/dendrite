@@ -41,7 +41,7 @@ func (p *KeyChange) DefaultPartition() int32 {
 }
 
 // ProduceKeyChanges creates new change events for each key
-func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceKeys) error {
+func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 	for _, key := range keys {
 		var m sarama.ProducerMessage
 

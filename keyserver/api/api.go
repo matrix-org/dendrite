@@ -43,6 +43,13 @@ func (k *KeyError) Error() string {
 	return k.Err
 }
 
+// DeviceMessage represents the message produced into Kafka by the key server.
+type DeviceMessage struct {
+	DeviceKeys
+	// A monotonically increasing number which represents device changes for this user.
+	StreamID int
+}
+
 // DeviceKeys represents a set of device keys for a single device
 // https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-keys-upload
 type DeviceKeys struct {
@@ -50,8 +57,18 @@ type DeviceKeys struct {
 	UserID string
 	// The device ID of this device
 	DeviceID string
+	// The device display name
+	DisplayName string
 	// The raw device key JSON
 	KeyJSON []byte
+}
+
+// WithStreamID returns a copy of this device message with the given stream ID
+func (k *DeviceKeys) WithStreamID(streamID int) DeviceMessage {
+	return DeviceMessage{
+		DeviceKeys: *k,
+		StreamID:   streamID,
+	}
 }
 
 // OneTimeKeys represents a set of one-time keys for a single device
