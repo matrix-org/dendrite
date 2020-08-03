@@ -29,6 +29,9 @@ type Database interface {
 	// StoreOneTimeKeys persists the given one-time keys.
 	StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error)
 
+	// OneTimeKeysCount returns a count of all OTKs for this device.
+	OneTimeKeysCount(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error)
+
 	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` already then it will be replaced.
 	DeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error
 

@@ -393,6 +393,7 @@ type Response struct {
 		Changed []string `json:"changed,omitempty"`
 		Left    []string `json:"left,omitempty"`
 	} `json:"device_lists,omitempty"`
+	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count"`
 }
 
 // NewResponse creates an empty response with initialised maps.
@@ -411,6 +412,7 @@ func NewResponse() *Response {
 	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
 	res.ToDevice.Events = make([]gomatrixserverlib.SendToDeviceEvent, 0)
+	res.DeviceListsOTKCount = make(map[string]int)
 
 	return &res
 }
