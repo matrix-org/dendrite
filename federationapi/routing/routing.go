@@ -186,7 +186,7 @@ func Setup(
 		"federation_user_devices", cfg.Matrix.ServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return GetUserDevices(
-				httpReq, userAPI, vars["userID"],
+				httpReq, keyAPI, vars["userID"],
 			)
 		},
 	)).Methods(http.MethodGet)
