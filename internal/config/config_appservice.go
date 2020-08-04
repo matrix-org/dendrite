@@ -194,7 +194,7 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 // setupRegexps will create regex objects for exclusive and non-exclusive
 // usernames, aliases and rooms of all application services, so that other
 // methods can quickly check if a particular string matches any of them.
-func setupRegexps(cfg *AppServiceAPI, derived *Derived) (err error) {
+func setupRegexps(_ *AppServiceAPI, derived *Derived) (err error) {
 	// Combine all exclusive namespaces for later string checking
 	var exclusiveUsernameStrings, exclusiveAliasStrings []string
 

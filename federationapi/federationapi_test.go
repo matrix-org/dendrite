@@ -25,7 +25,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Database = "file::memory:"
+	cfg.Global.Kafka.Database.ConnectionString = config.DataSource("file::memory:")
 	cfg.FederationSender.Database.ConnectionString = config.DataSource("file::memory:")
 	base := setup.NewBaseDendrite(cfg, "Test", false)
 	keyRing := &test.NopJSONVerifier{}

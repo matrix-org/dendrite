@@ -65,7 +65,9 @@ func TestKeyChangesNoDupes(t *testing.T) {
 }
 
 func TestKeyChangesUpperLimit(t *testing.T) {
-	db, err := NewDatabase("file::memory:", nil)
+	db, err := NewDatabase(&config.DatabaseOptions{
+		ConnectionString: "file::memory:",
+	})
 	if err != nil {
 		t.Fatalf("Failed to NewDatabase: %s", err)
 	}
@@ -87,7 +89,9 @@ func TestKeyChangesUpperLimit(t *testing.T) {
 // The purpose of this test is to make sure that the storage layer is generating sequential stream IDs per user,
 // and that they are returned correctly when querying for device keys.
 func TestDeviceKeysStreamIDGeneration(t *testing.T) {
-	db, err := NewDatabase("file::memory:", nil)
+	db, err := NewDatabase(&config.DatabaseOptions{
+		ConnectionString: "file::memory:",
+	})
 	if err != nil {
 		t.Fatalf("Failed to NewDatabase: %s", err)
 	}

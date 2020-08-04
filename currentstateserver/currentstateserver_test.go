@@ -95,12 +95,15 @@ func MustWriteOutputEvent(t *testing.T, producer sarama.SyncProducer, out *rooms
 
 func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.SyncProducer, func()) {
 	cfg := &config.Dendrite{}
+	cfg.Defaults()
 	stateDBName := "test_state.db"
 	naffkaDBName := "test_naffka.db"
 	cfg.Global.ServerName = "kaer.morhen"
 	cfg.Global.Kafka.Topics.OutputRoomEvent = config.Topic(kafkaTopic)
 	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource("file:" + stateDBName)
-	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), "file:"+naffkaDBName, nil)
+	db, err := sqlutil.Open(&config.DatabaseOptions{
+		ConnectionString: config.DataSource("file:" + naffkaDBName),
+	})
 	if err != nil {
 		t.Fatalf("Failed to open naffka database: %s", err)
 	}
@@ -112,7 +115,7 @@ func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.Sync
 	if err != nil {
 		t.Fatalf("Failed to create naffka consumer: %s", err)
 	}
-	return NewInternalAPI(cfg, naff), naff, func() {
+	return NewInternalAPI(&cfg.CurrentStateServer, naff), naff, func() {
 		os.Remove(naffkaDBName)
 		os.Remove(stateDBName)
 	}
