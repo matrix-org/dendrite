@@ -81,7 +81,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
-		base.Cfg, base.KafkaConsumer, queues, federationSenderDB, stateAPI,
+		&base.Cfg.KeyServer, base.KafkaConsumer, queues, federationSenderDB, stateAPI,
 	)
 	if err := keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")
