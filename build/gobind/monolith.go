@@ -131,7 +131,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, stateAPI, keyRing,
 	)
