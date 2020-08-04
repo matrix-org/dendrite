@@ -53,7 +53,7 @@ func GetUserDevices(
 		device := gomatrixserverlib.RespUserDevice{
 			DeviceID:    dev.DeviceID,
 			DisplayName: dev.DisplayName,
-			Keys:        []gomatrixserverlib.RespUserDeviceKeys{key},
+			Keys:        key,
 		}
 		response.Devices = append(response.Devices, device)
 	}
