@@ -44,6 +44,12 @@ func (a *KeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
 	a.UserAPI = i
 }
 
+func (a *KeyInternalAPI) InputDeviceListUpdate(
+	ctx context.Context, req *api.InputDeviceListUpdateRequest, res *api.InputDeviceListUpdateResponse,
+) {
+
+}
+
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
 	if req.Partition < 0 {
 		req.Partition = a.Producer.DefaultPartition()

@@ -21,11 +21,14 @@ import (
 	"time"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type KeyInternalAPI interface {
 	// SetUserAPI assigns a user API to query when extracting device names.
 	SetUserAPI(i userapi.UserInternalAPI)
+	// InputDeviceListUpdate from a federated server EDU
+	InputDeviceListUpdate(ctx context.Context, req *InputDeviceListUpdateRequest, res *InputDeviceListUpdateResponse)
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
@@ -199,4 +202,12 @@ type QueryDeviceMessagesResponse struct {
 	StreamID int
 	Devices  []DeviceMessage
 	Error    *KeyError
+}
+
+type InputDeviceListUpdateRequest struct {
+	Event gomatrixserverlib.DeviceListUpdateEvent
+}
+
+type InputDeviceListUpdateResponse struct {
+	Error *KeyError
 }
