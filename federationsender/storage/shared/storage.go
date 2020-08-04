@@ -123,6 +123,10 @@ func (d *Database) GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.S
 	return d.FederationSenderJoinedHosts.SelectAllJoinedHosts(ctx)
 }
 
+func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string) ([]gomatrixserverlib.ServerName, error) {
+	return d.FederationSenderJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs)
+}
+
 // StoreJSON adds a JSON blob into the queue JSON table and returns
 // a NID. The NID will then be used when inserting the per-destination
 // metadata entries.

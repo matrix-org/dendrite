@@ -13,10 +13,12 @@
 package consumers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/Shopify/sarama"
+	stateapi "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/internal"
@@ -32,6 +34,7 @@ type KeyChangeConsumer struct {
 	db         storage.Database
 	queues     *queue.OutgoingQueues
 	serverName gomatrixserverlib.ServerName
+	stateAPI   stateapi.CurrentStateInternalAPI
 }
 
 // NewKeyChangeConsumer creates a new KeyChangeConsumer. Call Start() to begin consuming from key servers.
@@ -40,6 +43,7 @@ func NewKeyChangeConsumer(
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
+	stateAPI stateapi.CurrentStateInternalAPI,
 ) *KeyChangeConsumer {
 	c := &KeyChangeConsumer{
 		consumer: &internal.ContinualConsumer{
@@ -50,6 +54,7 @@ func NewKeyChangeConsumer(
 		queues:     queues,
 		db:         store,
 		serverName: cfg.Matrix.ServerName,
+		stateAPI:   stateAPI,
 	}
 	c.consumer.ProcessMessage = c.onMessage
 
@@ -72,19 +77,33 @@ func (t *KeyChangeConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		log.WithError(err).Errorf("failed to read device message from key change topic")
 		return nil
 	}
+	logger := log.WithField("user_id", m.UserID)
 
 	// only send key change events which originated from us
 	_, originServerName, err := gomatrixserverlib.SplitID('@', m.UserID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", m.UserID).Error("Failed to extract domain from key change event")
+		logger.WithError(err).Error("Failed to extract domain from key change event")
 		return nil
 	}
 	if originServerName != t.serverName {
 		return nil
 	}
 
-	// TODO: send this key change to all users who share rooms with this user.
-	var destinations []gomatrixserverlib.ServerName
+	var queryRes stateapi.QueryRoomsForUserResponse
+	err = t.stateAPI.QueryRoomsForUser(context.Background(), &stateapi.QueryRoomsForUserRequest{
+		UserID:         m.UserID,
+		WantMembership: "join",
+	}, &queryRes)
+	if err != nil {
+		logger.WithError(err).Error("failed to calculate joined rooms for user")
+		return nil
+	}
+	// send this key change to all servers who share rooms with this user.
+	destinations, err := t.db.GetJoinedHostsForRooms(context.Background(), queryRes.RoomIDs)
+	if err != nil {
+		logger.WithError(err).Error("failed to calculate joined hosts for rooms user is in")
+		return nil
+	}
 
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
