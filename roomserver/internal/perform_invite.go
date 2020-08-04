@@ -171,6 +171,12 @@ func (r *RoomserverInternalAPI) processInviteEvent(
 			if err = event.SetUnsignedField("invite_room_state", irs); err != nil {
 				return nil, err
 			}
+		} else {
+			log.WithError(ierr).Error("failed to build invite stripped state")
+			// still set the field else synapse deployments don't process the invite
+			if err = event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
+				return nil, err
+			}
 		}
 	}
 

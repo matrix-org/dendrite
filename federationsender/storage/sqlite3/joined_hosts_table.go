@@ -59,13 +59,17 @@ const selectJoinedHostsSQL = "" +
 const selectAllJoinedHostsSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_joined_hosts"
 
+const selectJoinedHostsForRoomsSQL = "" +
+	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
+
 type joinedHostsStatements struct {
-	db                       *sql.DB
-	writer                   *sqlutil.TransactionWriter
-	insertJoinedHostsStmt    *sql.Stmt
-	deleteJoinedHostsStmt    *sql.Stmt
-	selectJoinedHostsStmt    *sql.Stmt
-	selectAllJoinedHostsStmt *sql.Stmt
+	db                            *sql.DB
+	writer                        *sqlutil.TransactionWriter
+	insertJoinedHostsStmt         *sql.Stmt
+	deleteJoinedHostsStmt         *sql.Stmt
+	selectJoinedHostsStmt         *sql.Stmt
+	selectAllJoinedHostsStmt      *sql.Stmt
+	selectJoinedHostsForRoomsStmt *sql.Stmt
 }
 
 func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
@@ -87,6 +91,9 @@ func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error)
 		return
 	}
 	if s.selectAllJoinedHostsStmt, err = db.Prepare(selectAllJoinedHostsSQL); err != nil {
+		return
+	}
+	if s.selectJoinedHostsForRoomsStmt, err = db.Prepare(selectJoinedHostsForRoomsSQL); err != nil {
 		return
 	}
 	return
@@ -140,6 +147,32 @@ func (s *joinedHostsStatements) SelectAllJoinedHosts(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAllJoinedHosts: rows.close() failed")
+
+	var result []gomatrixserverlib.ServerName
+	for rows.Next() {
+		var serverName string
+		if err = rows.Scan(&serverName); err != nil {
+			return nil, err
+		}
+		result = append(result, gomatrixserverlib.ServerName(serverName))
+	}
+
+	return result, rows.Err()
+}
+
+func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
+	ctx context.Context, roomIDs []string,
+) ([]gomatrixserverlib.ServerName, error) {
+	iRoomIDs := make([]interface{}, len(roomIDs))
+	for i := range roomIDs {
+		iRoomIDs[i] = roomIDs[i]
+	}
+
+	rows, err := s.selectJoinedHostsForRoomsStmt.QueryContext(ctx, iRoomIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedHostsForRoomsStmt: rows.close() failed")
 
 	var result []gomatrixserverlib.ServerName
 	for rows.Next() {

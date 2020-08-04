@@ -119,16 +119,14 @@ func main() {
 	)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+		base, federation, rsAPI, stateAPI, keyRing,
 	)
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
 	embed.Embed(base.BaseMux, *instancePort, "Yggdrasil Demo")
-
-	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,

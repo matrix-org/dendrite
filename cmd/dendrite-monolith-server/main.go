@@ -111,8 +111,10 @@ func main() {
 		asAPI = base.AppserviceHTTPClient()
 	}
 
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
+
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+		base, federation, rsAPI, stateAPI, keyRing,
 	)
 	if base.UseHTTPAPIs {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
@@ -121,8 +123,6 @@ func main() {
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsImpl.SetFederationSenderAPI(fsAPI)
-
-	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,

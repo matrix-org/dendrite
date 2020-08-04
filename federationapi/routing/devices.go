@@ -13,10 +13,11 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -24,30 +25,35 @@ import (
 // GetUserDevices for the given user id
 func GetUserDevices(
 	req *http.Request,
-	userAPI userapi.UserInternalAPI,
+	keyAPI keyapi.KeyInternalAPI,
 	userID string,
 ) util.JSONResponse {
-	response := gomatrixserverlib.RespUserDevices{
-		UserID: userID,
-		// TODO: we should return an incrementing stream ID each time the device
-		// list changes for delta changes to be recognised
-		StreamID: 0,
-	}
-
-	var res userapi.QueryDevicesResponse
-	err := userAPI.QueryDevices(req.Context(), &userapi.QueryDevicesRequest{
+	var res keyapi.QueryDeviceMessagesResponse
+	keyAPI.QueryDeviceMessages(req.Context(), &keyapi.QueryDeviceMessagesRequest{
 		UserID: userID,
 	}, &res)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryDevices failed")
+	if res.Error != nil {
+		util.GetLogger(req.Context()).WithError(res.Error).Error("keyAPI.QueryDeviceMessages failed")
 		return jsonerror.InternalServerError()
 	}
 
+	response := gomatrixserverlib.RespUserDevices{
+		UserID:   userID,
+		StreamID: res.StreamID,
+	}
+
 	for _, dev := range res.Devices {
+		var key gomatrixserverlib.RespUserDeviceKeys
+		err := json.Unmarshal(dev.DeviceKeys.KeyJSON, &key)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Warnf("malformed device key: %s", string(dev.DeviceKeys.KeyJSON))
+			continue
+		}
+
 		device := gomatrixserverlib.RespUserDevice{
-			DeviceID:    dev.ID,
+			DeviceID:    dev.DeviceID,
 			DisplayName: dev.DisplayName,
-			Keys:        []gomatrixserverlib.RespUserDeviceKeys{},
+			Keys:        key,
 		}
 		response.Devices = append(response.Devices, device)
 	}

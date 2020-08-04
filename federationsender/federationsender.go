@@ -16,6 +16,7 @@ package federationsender
 
 import (
 	"github.com/gorilla/mux"
+	stateapi "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/federationsender/consumers"
 	"github.com/matrix-org/dendrite/federationsender/internal"
@@ -41,6 +42,7 @@ func NewInternalAPI(
 	base *setup.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
+	stateAPI stateapi.CurrentStateInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 ) api.FederationSenderInternalAPI {
 	cfg := &base.Cfg.FederationSender
@@ -77,6 +79,12 @@ func NewInternalAPI(
 	)
 	if err := tsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start typing server consumer")
+	}
+	keyConsumer := consumers.NewKeyChangeConsumer(
+		base.Cfg, base.KafkaConsumer, queues, federationSenderDB, stateAPI,
+	)
+	if err := keyConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
 	return internal.NewFederationSenderInternalAPI(federationSenderDB, cfg, rsAPI, federation, keyRing, stats, queues)

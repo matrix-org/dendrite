@@ -156,6 +156,7 @@ func main() {
 		base, serverKeyAPI,
 	)
 
+	stateAPI := currentstateserver.NewInternalAPI(&base.Base.Cfg.CurrentStateServer, base.Base.KafkaConsumer)
 	rsAPI := roomserver.NewInternalAPI(
 		&base.Base, keyRing, federation,
 	)
@@ -164,10 +165,9 @@ func main() {
 	)
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	fsAPI := federationsender.NewInternalAPI(
-		&base.Base, federation, rsAPI, keyRing,
+		&base.Base, federation, rsAPI, stateAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
-	stateAPI := currentstateserver.NewInternalAPI(&base.Base.Cfg.CurrentStateServer, base.Base.KafkaConsumer)
 	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI, stateAPI)
 	err = provider.Start()
 	if err != nil {
