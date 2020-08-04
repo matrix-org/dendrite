@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -30,6 +31,7 @@ const (
 	PerformClaimKeysPath  = "/keyserver/performClaimKeys"
 	QueryKeysPath         = "/keyserver/queryKeys"
 	QueryKeyChangesPath   = "/keyserver/queryKeyChanges"
+	QueryOneTimeKeysPath  = "/keyserver/queryOneTimeKeys"
 )
 
 // NewKeyServerClient creates a KeyInternalAPI implemented by talking to a HTTP POST API.
@@ -50,6 +52,10 @@ func NewKeyServerClient(
 type httpKeyInternalAPI struct {
 	apiURL     string
 	httpClient *http.Client
+}
+
+func (h *httpKeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
+	// no-op: doesn't need it
 }
 
 func (h *httpKeyInternalAPI) PerformClaimKeys(
@@ -95,6 +101,23 @@ func (h *httpKeyInternalAPI) QueryKeys(
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryKeysPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.KeyError{
+			Err: err.Error(),
+		}
+	}
+}
+
+func (h *httpKeyInternalAPI) QueryOneTimeKeys(
+	ctx context.Context,
+	request *api.QueryOneTimeKeysRequest,
+	response *api.QueryOneTimeKeysResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryOneTimeKeys")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryOneTimeKeysPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.KeyError{

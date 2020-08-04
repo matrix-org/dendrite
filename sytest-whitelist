@@ -110,6 +110,7 @@ Rooms a user is invited to appear in an incremental sync
 Sync can be polled for updates
 Sync is woken up for leaves
 Newly left rooms appear in the leave section of incremental sync
+Rooms can be created with an initial invite list (SYN-205)
 We should see our own leave event, even if history_visibility is restricted (SYN-662)
 We should see our own leave event when rejecting an invite, even if history_visibility is restricted (riot-web/3462)
 Newly left rooms appear in the leave section of gapped sync
@@ -129,6 +130,11 @@ Can claim one time key using POST
 Can claim remote one time key using POST
 Local device key changes appear in v2 /sync
 Local device key changes appear in /keys/changes
+New users appear in /keys/changes
+Local delete device changes appear in v2 /sync
+Local new device changes appear in v2 /sync
+Local update device changes appear in v2 /sync
+Users receive device_list updates for their own devices
 Get left notifs for other users in sync and /keys/changes when user leaves
 Can add account data
 Can add account data to room

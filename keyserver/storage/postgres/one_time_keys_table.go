@@ -121,6 +121,28 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 	return result, rows.Err()
 }
 
+func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error) {
+	counts := &api.OneTimeKeysCount{
+		DeviceID: deviceID,
+		UserID:   userID,
+		KeyCount: make(map[string]int),
+	}
+	rows, err := s.selectKeysCountStmt.QueryContext(ctx, userID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectKeysCountStmt: rows.close() failed")
+	for rows.Next() {
+		var algorithm string
+		var count int
+		if err = rows.Scan(&algorithm, &count); err != nil {
+			return nil, err
+		}
+		counts.KeyCount[algorithm] = count
+	}
+	return counts, nil
+}
+
 func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error) {
 	now := time.Now().Unix()
 	counts := &api.OneTimeKeysCount{

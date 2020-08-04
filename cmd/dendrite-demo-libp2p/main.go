@@ -144,7 +144,9 @@ func main() {
 	accountDB := base.Base.CreateAccountsDB()
 	deviceDB := base.Base.CreateDeviceDB()
 	federation := createFederationClient(base)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, nil)
+	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation, base.Base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, nil, keyAPI)
+	keyAPI.SetUserAPI(userAPI)
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
 		&base.Base.Cfg.ServerKeyAPI, federation, base.Base.Caches,
@@ -189,7 +191,7 @@ func main() {
 		ServerKeyAPI:           serverKeyAPI,
 		StateAPI:               stateAPI,
 		UserAPI:                userAPI,
-		KeyAPI:                 keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation, userAPI, base.Base.KafkaProducer),
+		KeyAPI:                 keyAPI,
 		ExtPublicRoomsProvider: provider,
 	}
 	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)

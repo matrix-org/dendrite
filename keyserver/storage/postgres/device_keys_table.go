@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 )
@@ -32,28 +31,37 @@ CREATE TABLE IF NOT EXISTS keyserver_device_keys (
 	device_id TEXT NOT NULL,
 	ts_added_secs BIGINT NOT NULL,
 	key_json TEXT NOT NULL,
+	-- the stream ID of this key, scoped per-user. This gets updated when the device key changes.
+	-- This means we do not store an unbounded append-only log of device keys, which is not actually
+	-- required in the spec because in the event of a missed update the server fetches the entire
+	-- current set of keys rather than trying to 'fast-forward' or catchup missing stream IDs.
+	stream_id BIGINT NOT NULL,
 	-- Clobber based on tuple of user/device.
     CONSTRAINT keyserver_device_keys_unique UNIQUE (user_id, device_id)
 );
 `
 
 const upsertDeviceKeysSQL = "" +
-	"INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json)" +
-	" VALUES ($1, $2, $3, $4)" +
+	"INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json, stream_id)" +
+	" VALUES ($1, $2, $3, $4, $5)" +
 	" ON CONFLICT ON CONSTRAINT keyserver_device_keys_unique" +
-	" DO UPDATE SET key_json = $4"
+	" DO UPDATE SET key_json = $4, stream_id = $5"
 
 const selectDeviceKeysSQL = "" +
-	"SELECT key_json FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
+	"SELECT key_json, stream_id FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
 
 const selectBatchDeviceKeysSQL = "" +
-	"SELECT device_id, key_json FROM keyserver_device_keys WHERE user_id=$1"
+	"SELECT device_id, key_json, stream_id FROM keyserver_device_keys WHERE user_id=$1"
+
+const selectMaxStreamForUserSQL = "" +
+	"SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id=$1"
 
 type deviceKeysStatements struct {
-	db                        *sql.DB
-	upsertDeviceKeysStmt      *sql.Stmt
-	selectDeviceKeysStmt      *sql.Stmt
-	selectBatchDeviceKeysStmt *sql.Stmt
+	db                         *sql.DB
+	upsertDeviceKeysStmt       *sql.Stmt
+	selectDeviceKeysStmt       *sql.Stmt
+	selectBatchDeviceKeysStmt  *sql.Stmt
+	selectMaxStreamForUserStmt *sql.Stmt
 }
 
 func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
@@ -73,38 +81,54 @@ func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 	if s.selectBatchDeviceKeysStmt, err = db.Prepare(selectBatchDeviceKeysSQL); err != nil {
 		return nil, err
 	}
+	if s.selectMaxStreamForUserStmt, err = db.Prepare(selectMaxStreamForUserSQL); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
-func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceKeys) error {
+func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
 	for i, key := range keys {
 		var keyJSONStr string
-		err := s.selectDeviceKeysStmt.QueryRowContext(ctx, key.UserID, key.DeviceID).Scan(&keyJSONStr)
+		var streamID int
+		err := s.selectDeviceKeysStmt.QueryRowContext(ctx, key.UserID, key.DeviceID).Scan(&keyJSONStr, &streamID)
 		if err != nil && err != sql.ErrNoRows {
 			return err
 		}
 		// this will be '' when there is no device
 		keys[i].KeyJSON = []byte(keyJSONStr)
+		keys[i].StreamID = streamID
 	}
 	return nil
 }
 
-func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, keys []api.DeviceKeys) error {
-	now := time.Now().Unix()
-	return sqlutil.WithTransaction(s.db, func(txn *sql.Tx) error {
-		for _, key := range keys {
-			_, err := txn.Stmt(s.upsertDeviceKeysStmt).ExecContext(
-				ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON),
-			)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int32, err error) {
+	// nullable if there are no results
+	var nullStream sql.NullInt32
+	err = txn.Stmt(s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
+	if err == sql.ErrNoRows {
+		err = nil
+	}
+	if nullStream.Valid {
+		streamID = nullStream.Int32
+	}
+	return
 }
 
-func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceKeys, error) {
+func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx, keys []api.DeviceMessage) error {
+	for _, key := range keys {
+		now := time.Now().Unix()
+		_, err := txn.Stmt(s.upsertDeviceKeysStmt).ExecContext(
+			ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error) {
 	rows, err := s.selectBatchDeviceKeysStmt.QueryContext(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -114,15 +138,17 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 	for _, d := range deviceIDs {
 		deviceIDMap[d] = true
 	}
-	var result []api.DeviceKeys
+	var result []api.DeviceMessage
 	for rows.Next() {
-		var dk api.DeviceKeys
+		var dk api.DeviceMessage
 		dk.UserID = userID
 		var keyJSON string
-		if err := rows.Scan(&dk.DeviceID, &keyJSON); err != nil {
+		var streamID int
+		if err := rows.Scan(&dk.DeviceID, &keyJSON, &streamID); err != nil {
 			return nil, err
 		}
 		dk.KeyJSON = []byte(keyJSON)
+		dk.StreamID = streamID
 		// include the key if we want all keys (no device) or it was asked
 		if deviceIDMap[dk.DeviceID] || len(deviceIDs) == 0 {
 			result = append(result, dk)

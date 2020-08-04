@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Shopify/sarama"
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
@@ -28,6 +29,20 @@ import (
 
 const DeviceListLogName = "dl"
 
+// DeviceOTKCounts adds one-time key counts to the /sync response
+func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, deviceID string, res *types.Response) error {
+	var queryRes api.QueryOneTimeKeysResponse
+	keyAPI.QueryOneTimeKeys(ctx, &api.QueryOneTimeKeysRequest{
+		UserID:   userID,
+		DeviceID: deviceID,
+	}, &queryRes)
+	if queryRes.Error != nil {
+		return queryRes.Error
+	}
+	res.DeviceListsOTKCount = queryRes.Count.KeyCount
+	return nil
+}
+
 // DeviceListCatchup fills in the given response for the given user ID to bring it up-to-date with device lists. hasNew=true if the response
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
@@ -35,6 +50,7 @@ func DeviceListCatchup(
 	ctx context.Context, keyAPI keyapi.KeyInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
 	userID string, res *types.Response, from, to types.StreamingToken,
 ) (hasNew bool, err error) {
+
 	// Track users who we didn't track before but now do by virtue of sharing a room with them, or not.
 	newlyJoinedRooms := joinedRooms(res, userID)
 	newlyLeftRooms := leftRooms(res)
@@ -88,6 +104,16 @@ func DeviceListCatchup(
 		if !userSet[userID] {
 			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
 			hasNew = true
+			userSet[userID] = true
+		}
+	}
+	// if the response has any join/leave events, add them now.
+	// TODO: This is sub-optimal because we will add users to `changed` even if we already shared a room with them.
+	for _, userID := range membershipEvents(res) {
+		if !userSet[userID] {
+			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
+			hasNew = true
+			userSet[userID] = true
 		}
 	}
 	return hasNew, nil
@@ -218,4 +244,26 @@ func membershipEventPresent(events []gomatrixserverlib.ClientEvent, userID strin
 		}
 	}
 	return false
+}
+
+// returns the user IDs of anyone joining or leaving a room in this response. These users will be added to
+// the 'changed' property because of https://matrix.org/docs/spec/client_server/r0.6.1#id84
+// "For optimal performance, Alice should be added to changed in Bob's sync only when she adds a new device,
+// or when Alice and Bob now share a room but didn't share any room previously. However, for the sake of simpler
+// logic, a server may add Alice to changed when Alice and Bob share a new room, even if they previously already shared a room."
+func membershipEvents(res *types.Response) (userIDs []string) {
+	for _, room := range res.Rooms.Join {
+		for _, ev := range room.Timeline.Events {
+			if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil {
+				if strings.Contains(string(ev.Content), `"join"`) {
+					userIDs = append(userIDs, *ev.StateKey)
+				} else if strings.Contains(string(ev.Content), `"leave"`) {
+					userIDs = append(userIDs, *ev.StateKey)
+				} else if strings.Contains(string(ev.Content), `"ban"`) {
+					userIDs = append(userIDs, *ev.StateKey)
+				}
+			}
+		}
+	}
+	return
 }

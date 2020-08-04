@@ -40,6 +40,10 @@ type KeyInternalAPI struct {
 	Producer   *producers.KeyChange
 }
 
+func (a *KeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
+	a.UserAPI = i
+}
+
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
 	if req.Partition < 0 {
 		req.Partition = a.Producer.DefaultPartition()
@@ -57,7 +61,7 @@ func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyC
 
 func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
 	res.KeyErrors = make(map[string]map[string]*api.KeyError)
-	a.uploadDeviceKeys(ctx, req, res)
+	a.uploadLocalDeviceKeys(ctx, req, res)
 	a.uploadOneTimeKeys(ctx, req, res)
 }
 
@@ -164,6 +168,17 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 	util.GetLogger(ctx).WithField("num_keys", keysClaimed).Info("Claimed remote keys")
 }
 
+func (a *KeyInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOneTimeKeysRequest, res *api.QueryOneTimeKeysResponse) {
+	count, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
+	if err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("Failed to query OTK counts: %s", err),
+		}
+		return
+	}
+	res.Count = *count
+}
+
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.Failures = make(map[string]interface{})
@@ -202,6 +217,9 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 				res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 			}
 			for _, dk := range deviceKeys {
+				if len(dk.KeyJSON) == 0 {
+					continue // don't include blank keys
+				}
 				// inject display name if known
 				dk.KeyJSON, _ = sjson.SetBytes(dk.KeyJSON, "unsigned", struct {
 					DisplayName string `json:"device_display_name,omitempty"`
@@ -268,14 +286,25 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 	}
 }
 
-func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
-	var keysToStore []api.DeviceKeys
+func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
+	var keysToStore []api.DeviceMessage
 	// assert that the user ID / device ID are not lying for each key
 	for _, key := range req.DeviceKeys {
+		_, serverName, err := gomatrixserverlib.SplitID('@', key.UserID)
+		if err != nil {
+			continue // ignore invalid users
+		}
+		if serverName != a.ThisServer {
+			continue // ignore remote users
+		}
+		if len(key.KeyJSON) == 0 {
+			keysToStore = append(keysToStore, key.WithStreamID(0))
+			continue // deleted keys don't need sanity checking
+		}
 		gotUserID := gjson.GetBytes(key.KeyJSON, "user_id").Str
 		gotDeviceID := gjson.GetBytes(key.KeyJSON, "device_id").Str
 		if gotUserID == key.UserID && gotDeviceID == key.DeviceID {
-			keysToStore = append(keysToStore, key)
+			keysToStore = append(keysToStore, key.WithStreamID(0))
 			continue
 		}
 
@@ -286,12 +315,15 @@ func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformU
 			),
 		})
 	}
+
 	// get existing device keys so we can check for changes
-	existingKeys := make([]api.DeviceKeys, len(keysToStore))
+	existingKeys := make([]api.DeviceMessage, len(keysToStore))
 	for i := range keysToStore {
-		existingKeys[i] = api.DeviceKeys{
-			UserID:   keysToStore[i].UserID,
-			DeviceID: keysToStore[i].DeviceID,
+		existingKeys[i] = api.DeviceMessage{
+			DeviceKeys: api.DeviceKeys{
+				UserID:   keysToStore[i].UserID,
+				DeviceID: keysToStore[i].DeviceID,
+			},
 		}
 	}
 	if err := a.DB.DeviceKeysJSON(ctx, existingKeys); err != nil {
@@ -301,13 +333,14 @@ func (a *KeyInternalAPI) uploadDeviceKeys(ctx context.Context, req *api.PerformU
 		return
 	}
 	// store the device keys and emit changes
-	if err := a.DB.StoreDeviceKeys(ctx, keysToStore); err != nil {
+	err := a.DB.StoreDeviceKeys(ctx, keysToStore)
+	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("failed to store device keys: %s", err.Error()),
 		}
 		return
 	}
-	err := a.emitDeviceKeyChanges(existingKeys, keysToStore)
+	err = a.emitDeviceKeyChanges(existingKeys, keysToStore)
 	if err != nil {
 		util.GetLogger(ctx).Errorf("Failed to emitDeviceKeyChanges: %s", err)
 	}
@@ -352,13 +385,15 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 
 }
 
-func (a *KeyInternalAPI) emitDeviceKeyChanges(existing, new []api.DeviceKeys) error {
+func (a *KeyInternalAPI) emitDeviceKeyChanges(existing, new []api.DeviceMessage) error {
 	// find keys in new that are not in existing
-	var keysAdded []api.DeviceKeys
+	var keysAdded []api.DeviceMessage
 	for _, newKey := range new {
 		exists := false
 		for _, existingKey := range existing {
-			if bytes.Equal(existingKey.KeyJSON, newKey.KeyJSON) {
+			// Do not treat the absence of keys as equal, or else we will not emit key changes
+			// when users delete devices which never had a key to begin with as both KeyJSONs are nil.
+			if bytes.Equal(existingKey.KeyJSON, newKey.KeyJSON) && len(existingKey.KeyJSON) > 0 {
 				exists = true
 				break
 			}

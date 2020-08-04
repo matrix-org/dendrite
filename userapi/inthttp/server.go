@@ -52,6 +52,32 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(PerformDeviceUpdatePath,
+		httputil.MakeInternalAPI("performDeviceUpdate", func(req *http.Request) util.JSONResponse {
+			request := api.PerformDeviceUpdateRequest{}
+			response := api.PerformDeviceUpdateResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformDeviceUpdate(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(PerformDeviceDeletionPath,
+		httputil.MakeInternalAPI("performDeviceDeletion", func(req *http.Request) util.JSONResponse {
+			request := api.PerformDeviceDeletionRequest{}
+			response := api.PerformDeviceDeletionResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformDeviceDeletion(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(QueryProfilePath,
 		httputil.MakeInternalAPI("queryProfile", func(req *http.Request) util.JSONResponse {
 			request := api.QueryProfileRequest{}

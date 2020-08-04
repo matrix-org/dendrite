@@ -41,7 +41,7 @@ func (p *KeyChange) DefaultPartition() int32 {
 }
 
 // ProduceKeyChanges creates new change events for each key
-func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceKeys) error {
+func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 	for _, key := range keys {
 		var m sarama.ProducerMessage
 
@@ -63,10 +63,11 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceKeys) error {
 			return err
 		}
 		logrus.WithFields(logrus.Fields{
-			"user_id":   key.UserID,
-			"device_id": key.DeviceID,
-			"partition": partition,
-			"offset":    offset,
+			"user_id":       key.UserID,
+			"device_id":     key.DeviceID,
+			"partition":     partition,
+			"offset":        offset,
+			"len_key_bytes": len(key.KeyJSON),
 		}).Infof("Produced to key change topic '%s'", p.Topic)
 	}
 	return nil

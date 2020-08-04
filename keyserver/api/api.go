@@ -19,14 +19,19 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type KeyInternalAPI interface {
+	// SetUserAPI assigns a user API to query when extracting device names.
+	SetUserAPI(i userapi.UserInternalAPI)
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
+	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server
@@ -38,6 +43,13 @@ func (k *KeyError) Error() string {
 	return k.Err
 }
 
+// DeviceMessage represents the message produced into Kafka by the key server.
+type DeviceMessage struct {
+	DeviceKeys
+	// A monotonically increasing number which represents device changes for this user.
+	StreamID int
+}
+
 // DeviceKeys represents a set of device keys for a single device
 // https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-keys-upload
 type DeviceKeys struct {
@@ -45,8 +57,18 @@ type DeviceKeys struct {
 	UserID string
 	// The device ID of this device
 	DeviceID string
+	// The device display name
+	DisplayName string
 	// The raw device key JSON
 	KeyJSON []byte
+}
+
+// WithStreamID returns a copy of this device message with the given stream ID
+func (k *DeviceKeys) WithStreamID(streamID int) DeviceMessage {
+	return DeviceMessage{
+		DeviceKeys: *k,
+		StreamID:   streamID,
+	}
 }
 
 // OneTimeKeys represents a set of one-time keys for a single device
@@ -151,5 +173,18 @@ type QueryKeyChangesResponse struct {
 	// The latest offset represented in this response.
 	Offset int64
 	// Set if there was a problem handling the request.
+	Error *KeyError
+}
+
+type QueryOneTimeKeysRequest struct {
+	// The local user to query OTK counts for
+	UserID string
+	// The device to query OTK counts for
+	DeviceID string
+}
+
+type QueryOneTimeKeysResponse struct {
+	// OTK key counts, in the extended /sync form described by https://matrix.org/docs/spec/client_server/r0.6.1#id84
+	Count OneTimeKeysCount
 	Error *KeyError
 }
