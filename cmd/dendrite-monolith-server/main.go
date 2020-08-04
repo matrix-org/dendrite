@@ -54,13 +54,17 @@ func main() {
 		// the API endpoints. They'll listen on the same port as the monolith
 		// itself.
 		addr := config.Address(*httpBindAddr)
-		cfg.RoomServer.Listen = addr
-		cfg.EDUServer.Listen = addr
 		cfg.AppServiceAPI.Listen = addr
-		cfg.FederationSender.Listen = addr
-		cfg.ServerKeyAPI.Listen = addr
+		cfg.ClientAPI.Listen = addr
 		cfg.CurrentStateServer.Listen = addr
+		cfg.EDUServer.Listen = addr
+		cfg.FederationAPI.Listen = addr
+		cfg.FederationSender.Listen = addr
 		cfg.KeyServer.Listen = addr
+		cfg.MediaAPI.Listen = addr
+		cfg.RoomServer.Listen = addr
+		cfg.ServerKeyAPI.Listen = addr
+		cfg.SyncAPI.Listen = addr
 	}
 
 	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
