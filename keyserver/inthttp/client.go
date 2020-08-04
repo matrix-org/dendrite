@@ -27,11 +27,12 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
-	PerformUploadKeysPath = "/keyserver/performUploadKeys"
-	PerformClaimKeysPath  = "/keyserver/performClaimKeys"
-	QueryKeysPath         = "/keyserver/queryKeys"
-	QueryKeyChangesPath   = "/keyserver/queryKeyChanges"
-	QueryOneTimeKeysPath  = "/keyserver/queryOneTimeKeys"
+	PerformUploadKeysPath   = "/keyserver/performUploadKeys"
+	PerformClaimKeysPath    = "/keyserver/performClaimKeys"
+	QueryKeysPath           = "/keyserver/queryKeys"
+	QueryKeyChangesPath     = "/keyserver/queryKeyChanges"
+	QueryOneTimeKeysPath    = "/keyserver/queryOneTimeKeys"
+	QueryDeviceMessagesPath = "/keyserver/queryDeviceMessages"
 )
 
 // NewKeyServerClient creates a KeyInternalAPI implemented by talking to a HTTP POST API.
@@ -118,6 +119,23 @@ func (h *httpKeyInternalAPI) QueryOneTimeKeys(
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryOneTimeKeysPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.KeyError{
+			Err: err.Error(),
+		}
+	}
+}
+
+func (h *httpKeyInternalAPI) QueryDeviceMessages(
+	ctx context.Context,
+	request *api.QueryDeviceMessagesRequest,
+	response *api.QueryDeviceMessagesResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryDeviceMessages")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryDeviceMessagesPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.KeyError{

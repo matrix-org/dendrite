@@ -179,6 +179,24 @@ func (a *KeyInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOne
 	res.Count = *count
 }
 
+func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.QueryDeviceMessagesRequest, res *api.QueryDeviceMessagesResponse) {
+	msgs, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil)
+	if err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("failed to query DB for device keys: %s", err),
+		}
+		return
+	}
+	maxStreamID := 0
+	for _, m := range msgs {
+		if m.StreamID > maxStreamID {
+			maxStreamID = m.StreamID
+		}
+	}
+	res.Devices = msgs
+	res.StreamID = maxStreamID
+}
+
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.Failures = make(map[string]interface{})

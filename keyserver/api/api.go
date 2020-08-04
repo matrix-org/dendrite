@@ -32,6 +32,7 @@ type KeyInternalAPI interface {
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
 	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
+	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server
@@ -187,4 +188,15 @@ type QueryOneTimeKeysResponse struct {
 	// OTK key counts, in the extended /sync form described by https://matrix.org/docs/spec/client_server/r0.6.1#id84
 	Count OneTimeKeysCount
 	Error *KeyError
+}
+
+type QueryDeviceMessagesRequest struct {
+	UserID string
+}
+
+type QueryDeviceMessagesResponse struct {
+	// The latest stream ID
+	StreamID int
+	Devices  []DeviceMessage
+	Error    *KeyError
 }

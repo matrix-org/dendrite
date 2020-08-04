@@ -208,16 +208,15 @@ func main() {
 		KeyDatabase: fetcher,
 	}
 
+	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
 	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
 	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
 	)
-	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, &keyRing)
+	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, stateAPI, &keyRing)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
-
-	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
