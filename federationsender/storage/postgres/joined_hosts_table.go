@@ -154,7 +154,7 @@ func (s *joinedHostsStatements) SelectAllJoinedHosts(
 func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
 	ctx context.Context, roomIDs []string,
 ) ([]gomatrixserverlib.ServerName, error) {
-	rows, err := s.selectJoinedHostsForRoomsStmt.QueryContext(ctx)
+	rows, err := s.selectJoinedHostsForRoomsStmt.QueryContext(ctx, pq.StringArray(roomIDs))
 	if err != nil {
 		return nil, err
 	}
