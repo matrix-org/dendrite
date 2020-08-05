@@ -35,11 +35,18 @@ type Database interface {
 	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` or `StreamID` already then it will be replaced.
 	DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error
 
-	// StoreDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced. An empty KeyJSON removes the key
+	// StoreLocalDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced. An empty KeyJSON removes the key
 	// for this (user, device).
 	// The `StreamID` for each message is set on successful insertion. In the event the key already exists, the existing StreamID is set.
 	// Returns an error if there was a problem storing the keys.
-	StoreDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error
+	StoreLocalDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error
+
+	// StoreRemoteDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced. An empty KeyJSON removes the key
+	// for this (user, device). Does not modify the stream ID for keys.
+	StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error
+
+	// PrevIDsExists returns true if all prev IDs exist for this user.
+	PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error)
 
 	// DeviceKeysForUser returns the device keys for the device IDs given. If the length of deviceIDs is 0, all devices are selected.
 	// If there are some missing keys, they are omitted from the returned slice. There is no ordering on the returned slice.

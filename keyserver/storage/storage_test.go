@@ -126,15 +126,15 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 			// StreamID: 2 as this is a 2nd device key
 		},
 	}
-	MustNotError(t, db.StoreDeviceKeys(ctx, msgs))
+	MustNotError(t, db.StoreLocalDeviceKeys(ctx, msgs))
 	if msgs[0].StreamID != 1 {
-		t.Fatalf("Expected StoreDeviceKeys to set StreamID=1 but got %d", msgs[0].StreamID)
+		t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=1 but got %d", msgs[0].StreamID)
 	}
 	if msgs[1].StreamID != 1 {
-		t.Fatalf("Expected StoreDeviceKeys to set StreamID=1 (different user) but got %d", msgs[1].StreamID)
+		t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=1 (different user) but got %d", msgs[1].StreamID)
 	}
 	if msgs[2].StreamID != 2 {
-		t.Fatalf("Expected StoreDeviceKeys to set StreamID=2 (another device) but got %d", msgs[2].StreamID)
+		t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=2 (another device) but got %d", msgs[2].StreamID)
 	}
 
 	// updating a device sets the next stream ID for that user
@@ -148,9 +148,9 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 			// StreamID: 3
 		},
 	}
-	MustNotError(t, db.StoreDeviceKeys(ctx, msgs))
+	MustNotError(t, db.StoreLocalDeviceKeys(ctx, msgs))
 	if msgs[0].StreamID != 3 {
-		t.Fatalf("Expected StoreDeviceKeys to set StreamID=3 (new key same device) but got %d", msgs[0].StreamID)
+		t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=3 (new key same device) but got %d", msgs[0].StreamID)
 	}
 
 	// Querying for device keys returns the latest stream IDs

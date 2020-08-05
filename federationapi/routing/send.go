@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -37,6 +38,7 @@ func Send(
 	cfg *config.Dendrite,
 	rsAPI api.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
+	keyAPI keyapi.KeyInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
@@ -48,6 +50,7 @@ func Send(
 		federation: federation,
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
 		newEvents:  make(map[string]bool),
+		keyAPI:     keyAPI,
 	}
 
 	var txnEvents struct {
@@ -100,6 +103,7 @@ type txnReq struct {
 	context    context.Context
 	rsAPI      api.RoomserverInternalAPI
 	eduAPI     eduserverAPI.EDUServerInputAPI
+	keyAPI     keyapi.KeyInternalAPI
 	keys       gomatrixserverlib.JSONVerifier
 	federation txnFederationClient
 	// local cache of events for auth checks, etc - this may include events
@@ -308,9 +312,26 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 					}
 				}
 			}
+		case gomatrixserverlib.MDeviceListUpdate:
+			t.processDeviceListUpdate(e)
 		default:
 			util.GetLogger(t.context).WithField("type", e.Type).Warn("unhandled edu")
 		}
+	}
+}
+
+func (t *txnReq) processDeviceListUpdate(e gomatrixserverlib.EDU) {
+	var payload gomatrixserverlib.DeviceListUpdateEvent
+	if err := json.Unmarshal(e.Content, &payload); err != nil {
+		util.GetLogger(t.context).WithError(err).Error("Failed to unmarshal device list update event")
+		return
+	}
+	var inputRes keyapi.InputDeviceListUpdateResponse
+	t.keyAPI.InputDeviceListUpdate(context.Background(), &keyapi.InputDeviceListUpdateRequest{
+		Event: payload,
+	}, &inputRes)
+	if inputRes.Error != nil {
+		util.GetLogger(t.context).WithError(inputRes.Error).WithField("user_id", payload.UserID).Error("failed to InputDeviceListUpdate")
 	}
 }
 
