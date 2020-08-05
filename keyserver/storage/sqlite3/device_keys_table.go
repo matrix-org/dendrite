@@ -59,6 +59,7 @@ const countStreamIDsForUserSQL = "" +
 
 type deviceKeysStatements struct {
 	db                         *sql.DB
+	writer                     *sqlutil.TransactionWriter
 	upsertDeviceKeysStmt       *sql.Stmt
 	selectDeviceKeysStmt       *sql.Stmt
 	selectBatchDeviceKeysStmt  *sql.Stmt
@@ -67,7 +68,8 @@ type deviceKeysStatements struct {
 
 func NewSqliteDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 	s := &deviceKeysStatements{
-		db: db,
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err := db.Exec(deviceKeysSchema)
 	if err != nil {
@@ -165,14 +167,16 @@ func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID
 }
 
 func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx, keys []api.DeviceMessage) error {
-	for _, key := range keys {
-		now := time.Now().Unix()
-		_, err := txn.Stmt(s.upsertDeviceKeysStmt).ExecContext(
-			ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID,
-		)
-		if err != nil {
-			return err
+	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		for _, key := range keys {
+			now := time.Now().Unix()
+			_, err := txn.Stmt(s.upsertDeviceKeysStmt).ExecContext(
+				ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID,
+			)
+			if err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }

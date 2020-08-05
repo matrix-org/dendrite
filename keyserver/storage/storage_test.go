@@ -2,6 +2,10 @@ package storage
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 	"reflect"
 	"testing"
 
@@ -10,6 +14,21 @@ import (
 )
 
 var ctx = context.Background()
+
+func MustCreateDatabase(t *testing.T) (Database, func()) {
+	tmpfile, err := ioutil.TempFile("", "keyserver_storage_test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	t.Logf("Database %s", tmpfile.Name())
+	db, err := NewDatabase(fmt.Sprintf("file://%s", tmpfile.Name()), nil)
+	if err != nil {
+		t.Fatalf("Failed to NewDatabase: %s", err)
+	}
+	return db, func() {
+		os.Remove(tmpfile.Name())
+	}
+}
 
 func MustNotError(t *testing.T, err error) {
 	t.Helper()
@@ -20,10 +39,8 @@ func MustNotError(t *testing.T, err error) {
 }
 
 func TestKeyChanges(t *testing.T) {
-	db, err := NewDatabase("file::memory:", nil)
-	if err != nil {
-		t.Fatalf("Failed to NewDatabase: %s", err)
-	}
+	db, clean := MustCreateDatabase(t)
+	defer clean()
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 0, "@alice:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 1, "@bob:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 2, "@charlie:localhost"))
@@ -40,10 +57,8 @@ func TestKeyChanges(t *testing.T) {
 }
 
 func TestKeyChangesNoDupes(t *testing.T) {
-	db, err := NewDatabase("file::memory:", nil)
-	if err != nil {
-		t.Fatalf("Failed to NewDatabase: %s", err)
-	}
+	db, clean := MustCreateDatabase(t)
+	defer clean()
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 0, "@alice:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 1, "@alice:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 2, "@alice:localhost"))
@@ -60,10 +75,8 @@ func TestKeyChangesNoDupes(t *testing.T) {
 }
 
 func TestKeyChangesUpperLimit(t *testing.T) {
-	db, err := NewDatabase("file::memory:", nil)
-	if err != nil {
-		t.Fatalf("Failed to NewDatabase: %s", err)
-	}
+	db, clean := MustCreateDatabase(t)
+	defer clean()
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 0, "@alice:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 1, "@bob:localhost"))
 	MustNotError(t, db.StoreKeyChange(ctx, 0, 2, "@charlie:localhost"))
@@ -82,10 +95,9 @@ func TestKeyChangesUpperLimit(t *testing.T) {
 // The purpose of this test is to make sure that the storage layer is generating sequential stream IDs per user,
 // and that they are returned correctly when querying for device keys.
 func TestDeviceKeysStreamIDGeneration(t *testing.T) {
-	db, err := NewDatabase("file::memory:", nil)
-	if err != nil {
-		t.Fatalf("Failed to NewDatabase: %s", err)
-	}
+	var err error
+	db, clean := MustCreateDatabase(t)
+	defer clean()
 	alice := "@alice:TestDeviceKeysStreamIDGeneration"
 	bob := "@bob:TestDeviceKeysStreamIDGeneration"
 	msgs := []api.DeviceMessage{
