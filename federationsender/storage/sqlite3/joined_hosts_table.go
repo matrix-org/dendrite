@@ -166,7 +166,7 @@ func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
 		iRoomIDs[i] = roomIDs[i]
 	}
 
-	sql := strings.Replace(s.selectJoinedHostsForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
+	sql := strings.Replace(selectJoinedHostsForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
 	rows, err := s.db.QueryContext(ctx, sql, iRoomIDs...)
 	if err != nil {
 		return nil, err
