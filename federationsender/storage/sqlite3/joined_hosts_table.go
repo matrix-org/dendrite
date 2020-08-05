@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
@@ -63,13 +64,13 @@ const selectJoinedHostsForRoomsSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
 
 type joinedHostsStatements struct {
-	db                            *sql.DB
-	writer                        *sqlutil.TransactionWriter
-	insertJoinedHostsStmt         *sql.Stmt
-	deleteJoinedHostsStmt         *sql.Stmt
-	selectJoinedHostsStmt         *sql.Stmt
-	selectAllJoinedHostsStmt      *sql.Stmt
-	selectJoinedHostsForRoomsStmt *sql.Stmt
+	db                       *sql.DB
+	writer                   *sqlutil.TransactionWriter
+	insertJoinedHostsStmt    *sql.Stmt
+	deleteJoinedHostsStmt    *sql.Stmt
+	selectJoinedHostsStmt    *sql.Stmt
+	selectAllJoinedHostsStmt *sql.Stmt
+	// selectJoinedHostsForRoomsStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
 func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
@@ -91,9 +92,6 @@ func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error)
 		return
 	}
 	if s.selectAllJoinedHostsStmt, err = db.Prepare(selectAllJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.selectJoinedHostsForRoomsStmt, err = db.Prepare(selectJoinedHostsForRoomsSQL); err != nil {
 		return
 	}
 	return
@@ -168,7 +166,8 @@ func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
 		iRoomIDs[i] = roomIDs[i]
 	}
 
-	rows, err := s.selectJoinedHostsForRoomsStmt.QueryContext(ctx, iRoomIDs...)
+	sql := strings.Replace(selectJoinedHostsForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
+	rows, err := s.db.QueryContext(ctx, sql, iRoomIDs...)
 	if err != nil {
 		return nil, err
 	}
