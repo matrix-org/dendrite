@@ -337,7 +337,7 @@ func (r *FederationSenderInternalAPI) PerformBroadcastEDU(
 		Servers: destinations,
 	}
 	wakeRes := &api.PerformServersAliveResponse{}
-	if err := r.PerformServersAlive(ctx, &wakeReq, &wakeRes); err != nil {
+	if err := r.PerformServersAlive(ctx, wakeReq, wakeRes); err != nil {
 		return fmt.Errorf("r.PerformServersAlive: %w", err)
 	}
 
