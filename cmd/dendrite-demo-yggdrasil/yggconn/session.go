@@ -109,6 +109,7 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 		if v, ok := n.coords.Load(address); ok {
 			coords, ok := v.(yggdrasil.Coords)
 			if !ok {
+				n.coords.Delete(address)
 				return nil, errors.New("should have found yggdrasil.Coords but didn't")
 			}
 			n.log.Infof("Coords %s for %q cached, trying to dial", coords.String(), address)
@@ -132,7 +133,6 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 			// know about from our direct switch peers.
 			for _, peer := range n.core.GetSwitchPeers() {
 				if peer.PublicKey.String() == address {
-					fmt.Println("*", peer.PublicKey.String(), address)
 					coords = peer.Coords
 					n.log.Infof("%q is a direct peer, coords are %s", address, coords.String())
 					n.coords.Store(address, coords)
