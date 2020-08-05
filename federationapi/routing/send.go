@@ -313,21 +313,25 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 				}
 			}
 		case gomatrixserverlib.MDeviceListUpdate:
-			var payload gomatrixserverlib.DeviceListUpdateEvent
-			if err := json.Unmarshal(e.Content, &payload); err != nil {
-				util.GetLogger(t.context).WithError(err).Error("Failed to unmarshal device list update event")
-				continue
-			}
-			var inputRes keyapi.InputDeviceListUpdateResponse
-			t.keyAPI.InputDeviceListUpdate(context.Background(), &keyapi.InputDeviceListUpdateRequest{
-				Event: payload,
-			}, &inputRes)
-			if inputRes.Error != nil {
-				util.GetLogger(t.context).WithError(inputRes.Error).WithField("user_id", payload.UserID).Error("failed to InputDeviceListUpdate")
-			}
+			t.processDeviceListUpdate(e)
 		default:
 			util.GetLogger(t.context).WithField("type", e.Type).Warn("unhandled edu")
 		}
+	}
+}
+
+func (t *txnReq) processDeviceListUpdate(e gomatrixserverlib.EDU) {
+	var payload gomatrixserverlib.DeviceListUpdateEvent
+	if err := json.Unmarshal(e.Content, &payload); err != nil {
+		util.GetLogger(t.context).WithError(err).Error("Failed to unmarshal device list update event")
+		return
+	}
+	var inputRes keyapi.InputDeviceListUpdateResponse
+	t.keyAPI.InputDeviceListUpdate(context.Background(), &keyapi.InputDeviceListUpdateRequest{
+		Event: payload,
+	}, &inputRes)
+	if inputRes.Error != nil {
+		util.GetLogger(t.context).WithError(inputRes.Error).WithField("user_id", payload.UserID).Error("failed to InputDeviceListUpdate")
 	}
 }
 

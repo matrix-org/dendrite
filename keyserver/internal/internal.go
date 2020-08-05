@@ -95,7 +95,12 @@ func (a *KeyInternalAPI) InputDeviceListUpdate(
 		}
 		// ALWAYS emit key changes when we've been poked over federation just in case
 		// this poke is important for something.
-		a.Producer.ProduceKeyChanges(keys)
+		err = a.Producer.ProduceKeyChanges(keys)
+		if err != nil {
+			res.Error = &api.KeyError{
+				Err: fmt.Sprintf("failed to emit remote device key changes: %s", err),
+			}
+		}
 		return
 	}
 
