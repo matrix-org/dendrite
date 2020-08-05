@@ -122,6 +122,18 @@ func main() {
 		base, federation, rsAPI, stateAPI, keyRing,
 	)
 
+	ygg.SetSessionFunc(func(address string) {
+		req := &api.PerformServersAliveRequest{
+			Servers: []gomatrixserverlib.ServerName{
+				gomatrixserverlib.ServerName(address),
+			},
+		}
+		res := &api.PerformServersAliveResponse{}
+		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
+			logrus.WithError(err).Error("Failed to send wake-up message to newly connected node")
+		}
+	})
+
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
 	embed.Embed(base.BaseMux, *instancePort, "Yggdrasil Demo")

@@ -59,6 +59,7 @@ func (n *Node) listenFromYgg() {
 		address := session.ConnectionState().PeerCertificates[0].Subject.CommonName
 		n.log.Infoln("Accepted connection from", address)
 		go n.listenFromQUIC(session, address)
+		go n.sessionFunc(address)
 	}
 }
 
@@ -209,6 +210,7 @@ func (n *Node) tryDial(address string, coords yggdrasil.Coords) (quic.Session, e
 		return nil, fmt.Errorf("expected %q but dialled %q", address, gotAddress)
 	}
 	go n.listenFromQUIC(session, address)
+	go n.sessionFunc(address)
 	return session, nil
 }
 
