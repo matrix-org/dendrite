@@ -34,6 +34,26 @@ import (
 	"github.com/yggdrasil-network/yggdrasil-go/src/yggdrasil"
 )
 
+type session struct {
+	node    *Node
+	session quic.Session
+	address string
+	cancel  chan struct{}
+}
+
+func (n *Node) newSession(sess quic.Session, address string) *session {
+	return &session{
+		node:    n,
+		session: sess,
+		address: address,
+		cancel:  make(chan struct{}),
+	}
+}
+
+func (s *session) kill() {
+	close(s.cancel)
+}
+
 func (n *Node) listenFromYgg() {
 	var err error
 	n.listener, err = quic.Listen(
@@ -58,23 +78,36 @@ func (n *Node) listenFromYgg() {
 		}
 		address := session.ConnectionState().PeerCertificates[0].DNSNames[0]
 		n.log.Infoln("Accepted connection from", address)
-		go n.listenFromQUIC(session, address)
+		go n.newSession(session, address).listenFromQUIC()
 		go n.sessionFunc(address)
 	}
 }
 
-func (n *Node) listenFromQUIC(session quic.Session, address string) {
-	n.sessionCount.Inc()
-	n.sessions.Store(address, session)
-	defer n.sessions.Delete(address)
-	defer n.sessionCount.Dec()
-	for {
-		st, err := session.AcceptStream(context.TODO())
-		if err != nil {
-			n.log.Println("session.AcceptStream:", err)
-			return
+func (s *session) listenFromQUIC() {
+	if existing, ok := s.node.sessions.Load(s.address); ok {
+		if existingSession, ok := existing.(session); ok {
+			existingSession.kill()
 		}
-		n.incoming <- QUICStream{st, session}
+	}
+	s.node.sessionCount.Inc()
+	s.node.sessions.Store(s.address, s.session)
+	defer s.node.sessions.Delete(s.address)
+	defer s.node.sessionCount.Dec()
+	for {
+		select {
+		case <-s.cancel:
+			_ = s.session.CloseWithError(0, "killed")
+			return
+		default:
+			ctx, cancel := context.WithTimeout(context.TODO(), s.node.quicConfig.MaxIdleTimeout)
+			defer cancel()
+			st, err := s.session.AcceptStream(ctx)
+			if err != nil {
+				s.node.log.Println("session.AcceptStream:", err)
+				return
+			}
+			s.node.incoming <- QUICStream{st, s.session}
+		}
 	}
 }
 
@@ -205,11 +238,15 @@ func (n *Node) tryDial(address string, coords yggdrasil.Coords) (quic.Session, e
 		_ = session.CloseWithError(0, "expected a peer certificate")
 		return nil, errors.New("didn't receive a peer certificate")
 	}
+	if len(session.ConnectionState().PeerCertificates[0].DNSNames) != 1 {
+		_ = session.CloseWithError(0, "expected a DNS name")
+		return nil, errors.New("didn't receive a DNS name")
+	}
 	if gotAddress := session.ConnectionState().PeerCertificates[0].DNSNames[0]; address != gotAddress {
 		_ = session.CloseWithError(0, "you aren't the host I was hoping for")
 		return nil, fmt.Errorf("expected %q but dialled %q", address, gotAddress)
 	}
-	go n.listenFromQUIC(session, address)
+	go n.newSession(session, address).listenFromQUIC()
 	go n.sessionFunc(address)
 	return session, nil
 }

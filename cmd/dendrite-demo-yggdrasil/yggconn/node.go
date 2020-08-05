@@ -127,9 +127,10 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		MaxIncomingStreams:    0,
 		MaxIncomingUniStreams: 0,
 		KeepAlive:             true,
-		MaxIdleTimeout:        time.Minute * 30,
+		MaxIdleTimeout:        time.Minute * 5,
 		HandshakeTimeout:      time.Second * 15,
 	}
+	copy(n.quicConfig.StatelessResetKey, n.EncryptionPublicKey())
 
 	n.log.Println("Public curve25519:", n.core.EncryptionPublicKey())
 	n.log.Println("Public ed25519:", n.core.SigningPublicKey())
