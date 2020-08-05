@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -52,6 +53,9 @@ const selectBatchDeviceKeysSQL = "" +
 
 const selectMaxStreamForUserSQL = "" +
 	"SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id=$1"
+
+const countStreamIDsForUserSQL = "" +
+	"SELECT COUNT(*) FROM keyserver_device_keys WHERE user_id=$1 AND stream_id IN ($2)"
 
 type deviceKeysStatements struct {
 	db                         *sql.DB
@@ -141,6 +145,25 @@ func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn
 		streamID = nullStream.Int32
 	}
 	return
+}
+
+func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID string, streamIDs []int64) (int, error) {
+	iStreamIDs := make([]interface{}, len(streamIDs)+1)
+	iStreamIDs[0] = userID
+	for i := range streamIDs {
+		iStreamIDs[i+1] = streamIDs[i]
+	}
+	query := strings.Replace(countStreamIDsForUserSQL, "($2)", sqlutil.QueryVariadicOffset(len(streamIDs), 1), 1)
+	// nullable if there are no results
+	var count sql.NullInt32
+	err := s.db.QueryRowContext(ctx, query, iStreamIDs...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	if count.Valid {
+		return int(count.Int32), nil
+	}
+	return 0, nil
 }
 
 func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx, keys []api.DeviceMessage) error {
