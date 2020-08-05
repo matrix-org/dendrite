@@ -32,6 +32,7 @@ import (
 	"github.com/lucas-clemente/quic-go"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
 	"github.com/matrix-org/gomatrixserverlib"
+	"go.uber.org/atomic"
 
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
@@ -41,18 +42,19 @@ import (
 )
 
 type Node struct {
-	core       *yggdrasil.Core
-	config     *yggdrasilconfig.NodeConfig
-	state      *yggdrasilconfig.NodeState
-	multicast  *yggdrasilmulticast.Multicast
-	log        *gologme.Logger
-	listener   quic.Listener
-	tlsConfig  *tls.Config
-	quicConfig *quic.Config
-	sessions   sync.Map // string -> quic.Session
-	coords     sync.Map // string -> yggdrasil.Coords
-	incoming   chan QUICStream
-	NewSession func(remote gomatrixserverlib.ServerName)
+	core         *yggdrasil.Core
+	config       *yggdrasilconfig.NodeConfig
+	state        *yggdrasilconfig.NodeState
+	multicast    *yggdrasilmulticast.Multicast
+	log          *gologme.Logger
+	listener     quic.Listener
+	tlsConfig    *tls.Config
+	quicConfig   *quic.Config
+	sessions     sync.Map // string -> quic.Session
+	sessionCount atomic.Uint32
+	coords       sync.Map // string -> yggdrasil.Coords
+	incoming     chan QUICStream
+	NewSession   func(remote gomatrixserverlib.ServerName)
 }
 
 func (n *Node) Dialer(_, address string) (net.Conn, error) {
@@ -176,6 +178,10 @@ func (n *Node) SigningPrivateKey() ed25519.PrivateKey {
 
 func (n *Node) PeerCount() int {
 	return len(n.core.GetPeers()) - 1
+}
+
+func (n *Node) SessionCount() int {
+	return int(n.sessionCount.Load())
 }
 
 func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {

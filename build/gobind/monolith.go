@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 )
 
 type DendriteMonolith struct {
@@ -34,8 +33,6 @@ type DendriteMonolith struct {
 	StorageDirectory string
 	listener         net.Listener
 	httpServer       *http.Server
-	httpListening    atomic.Bool
-	yggListening     atomic.Bool
 }
 
 func (m *DendriteMonolith) BaseURL() string {
@@ -44,6 +41,10 @@ func (m *DendriteMonolith) BaseURL() string {
 
 func (m *DendriteMonolith) PeerCount() int {
 	return m.YggdrasilNode.PeerCount()
+}
+
+func (m *DendriteMonolith) SessionCount() int {
+	return m.YggdrasilNode.SessionCount()
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
@@ -86,7 +87,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Matrix.FederationMaxRetries = 6
+	cfg.Matrix.FederationMaxRetries = 8
 	cfg.Kafka.UseNaffka = true
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"

@@ -63,8 +63,10 @@ func (n *Node) listenFromYgg() {
 }
 
 func (n *Node) listenFromQUIC(session quic.Session, address string) {
+	n.sessionCount.Inc()
 	n.sessions.Store(address, session)
 	defer n.sessions.Delete(address)
+	defer n.sessionCount.Dec()
 	for {
 		st, err := session.AcceptStream(context.TODO())
 		if err != nil {
@@ -123,29 +125,48 @@ func (n *Node) DialContext(ctx context.Context, network, address string) (net.Co
 		// We either don't know the coords for the node, or we failed
 		// to dial it before, in which case try to resolve the coords.
 		if _, ok := n.coords.Load(address); !ok {
-			n.log.Infof("Searching for coords for %q", address)
-			dest, err := hex.DecodeString(address)
-			if err != nil {
-				return nil, err
-			}
-			if len(dest) != crypto.BoxPubKeyLen {
-				return nil, errors.New("invalid key length supplied")
-			}
-			var pubKey crypto.BoxPubKey
-			copy(pubKey[:], dest)
-			nodeID := crypto.GetNodeID(&pubKey)
-			nodeMask := &crypto.NodeID{}
-			for i := range nodeMask {
-				nodeMask[i] = 0xFF
+			var coords yggdrasil.Coords
+			var err error
+
+			// First look and see if the node is something that we already
+			// know about from our direct switch peers.
+			for _, peer := range n.core.GetSwitchPeers() {
+				if peer.PublicKey.String() == address {
+					fmt.Println("*", peer.PublicKey.String(), address)
+					coords = peer.Coords
+					n.log.Infof("%q is a direct peer, coords are %s", address, coords.String())
+					n.coords.Store(address, coords)
+					break
+				}
 			}
 
-			fmt.Println("Resolving coords")
-			coords, err := n.core.Resolve(nodeID, nodeMask)
-			if err != nil {
-				return nil, fmt.Errorf("n.core.Resolve: %w", err)
+			// If it isn' a node that we know directly then try to search
+			// the network.
+			if coords == nil {
+				n.log.Infof("Searching for coords for %q", address)
+				dest, derr := hex.DecodeString(address)
+				if derr != nil {
+					return nil, derr
+				}
+				if len(dest) != crypto.BoxPubKeyLen {
+					return nil, errors.New("invalid key length supplied")
+				}
+				var pubKey crypto.BoxPubKey
+				copy(pubKey[:], dest)
+				nodeID := crypto.GetNodeID(&pubKey)
+				nodeMask := &crypto.NodeID{}
+				for i := range nodeMask {
+					nodeMask[i] = 0xFF
+				}
+
+				fmt.Println("Resolving coords")
+				coords, err = n.core.Resolve(nodeID, nodeMask)
+				if err != nil {
+					return nil, fmt.Errorf("n.core.Resolve: %w", err)
+				}
+				fmt.Println("Found coords:", coords)
+				n.coords.Store(address, coords)
 			}
-			fmt.Println("Found coords:", coords)
-			n.coords.Store(address, coords)
 
 			// We now know the coords in theory. Let's try dialling the
 			// node again.
