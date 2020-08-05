@@ -15,6 +15,8 @@
 package keyserver
 
 import (
+	"sync"
+
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -51,9 +53,11 @@ func NewInternalAPI(
 		DB:       db,
 	}
 	return &internal.KeyInternalAPI{
-		DB:         db,
-		ThisServer: cfg.Matrix.ServerName,
-		FedClient:  fedClient,
-		Producer:   keyChangeProducer,
+		DB:            db,
+		ThisServer:    cfg.Matrix.ServerName,
+		FedClient:     fedClient,
+		Producer:      keyChangeProducer,
+		Mutex:         &sync.Mutex{},
+		UserIDToMutex: make(map[string]*sync.Mutex),
 	}
 }

@@ -47,7 +47,25 @@ func (d *Database) DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage)
 	return d.DeviceKeysTable.SelectDeviceKeysJSON(ctx, keys)
 }
 
-func (d *Database) StoreDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+func (d *Database) PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error) {
+	sids := make([]int64, len(prevIDs))
+	for i := range prevIDs {
+		sids[i] = int64(prevIDs[i])
+	}
+	count, err := d.DeviceKeysTable.CountStreamIDsForUser(ctx, userID, sids)
+	if err != nil {
+		return false, err
+	}
+	return count == len(prevIDs), nil
+}
+
+func (d *Database) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		return d.DeviceKeysTable.InsertDeviceKeys(ctx, txn, keys)
+	})
+}
+
+func (d *Database) StoreLocalDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
 	// work out the latest stream IDs for each user
 	userIDToStreamID := make(map[string]int)
 	for _, k := range keys {
