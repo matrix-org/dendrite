@@ -137,6 +137,18 @@ func (m *DendriteMonolith) Start() {
 		base, federation, rsAPI, stateAPI, keyRing,
 	)
 
+	ygg.SetSessionFunc(func(address string) {
+		req := &api.PerformServersAliveRequest{
+			Servers: []gomatrixserverlib.ServerName{
+				gomatrixserverlib.ServerName(address),
+			},
+		}
+		res := &api.PerformServersAliveResponse{}
+		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
+			logrus.WithError(err).Error("Failed to send wake-up message to newly connected node")
+		}
+	})
+
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsAPI.SetFederationSenderAPI(fsAPI)
@@ -176,8 +188,8 @@ func (m *DendriteMonolith) Start() {
 	m.httpServer = &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 45 * time.Second,
 		IdleTimeout:  60 * time.Second,
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
