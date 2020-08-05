@@ -31,6 +31,7 @@ import (
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
+	"github.com/yggdrasil-network/yggdrasil-go/src/yggdrasil"
 )
 
 func (n *Node) listenFromYgg() {
@@ -95,53 +96,99 @@ func (n *Node) Dial(network, address string) (net.Conn, error) {
 }
 
 // Implements http.Transport.DialContext
+// nolint:gocyclo
 func (n *Node) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	s, ok1 := n.sessions.Load(address)
 	session, ok2 := s.(quic.Session)
-	if !ok1 || !ok2 || (ok1 && ok2 && session.ConnectionState().HandshakeComplete) {
-		dest, err := hex.DecodeString(address)
-		if err != nil {
-			return nil, err
-		}
-		if len(dest) != crypto.BoxPubKeyLen {
-			return nil, errors.New("invalid key length supplied")
-		}
-		var pubKey crypto.BoxPubKey
-		copy(pubKey[:], dest)
-		nodeID := crypto.GetNodeID(&pubKey)
-		nodeMask := &crypto.NodeID{}
-		for i := range nodeMask {
-			nodeMask[i] = 0xFF
+	if !ok1 || !ok2 {
+		// First of all, check if we think we know the coords of this
+		// node. If we do then we'll try to dial to it directly. This
+		// will either succeed or fail.
+		if v, ok := n.coords.Load(address); ok {
+			coords, ok := v.(yggdrasil.Coords)
+			if !ok {
+				return nil, errors.New("should have found yggdrasil.Coords but didn't")
+			}
+			n.log.Infof("Coords %s for %q cached, trying to dial", coords.String(), address)
+			var err error
+			// We think we know the coords. Try to dial the node.
+			if session, err = n.tryDial(address, coords); err != nil {
+				// We thought we knew the coords but it didn't result
+				// in a successful dial. Nuke them from the cache.
+				n.coords.Delete(address)
+				n.log.Infof("Cached coords %s for %q failed", coords.String(), address)
+			}
 		}
 
-		fmt.Println("Resolving coords")
-		coords, err := n.core.Resolve(nodeID, nodeMask)
-		if err != nil {
-			return nil, fmt.Errorf("n.core.Resolve: %w", err)
-		}
-		fmt.Println("Found coords:", coords)
-		fmt.Println("Dialling")
+		// We either don't know the coords for the node, or we failed
+		// to dial it before, in which case try to resolve the coords.
+		if _, ok := n.coords.Load(address); !ok {
+			n.log.Infof("Searching for coords for %q", address)
+			dest, err := hex.DecodeString(address)
+			if err != nil {
+				return nil, err
+			}
+			if len(dest) != crypto.BoxPubKeyLen {
+				return nil, errors.New("invalid key length supplied")
+			}
+			var pubKey crypto.BoxPubKey
+			copy(pubKey[:], dest)
+			nodeID := crypto.GetNodeID(&pubKey)
+			nodeMask := &crypto.NodeID{}
+			for i := range nodeMask {
+				nodeMask[i] = 0xFF
+			}
 
-		session, err = quic.Dial(
-			n.core,       // yggdrasil.PacketConn
-			coords,       // dial address
-			address,      // dial SNI
-			n.tlsConfig,  // TLS config
-			n.quicConfig, // QUIC config
-		)
-		if err != nil {
-			n.log.Println("n.dialer.DialContext:", err)
-			return nil, err
+			fmt.Println("Resolving coords")
+			coords, err := n.core.Resolve(nodeID, nodeMask)
+			if err != nil {
+				return nil, fmt.Errorf("n.core.Resolve: %w", err)
+			}
+			fmt.Println("Found coords:", coords)
+			n.coords.Store(address, coords)
+
+			// We now know the coords in theory. Let's try dialling the
+			// node again.
+			if session, err = n.tryDial(address, coords); err != nil {
+				return nil, fmt.Errorf("n.tryDial: %w", err)
+			}
 		}
-		fmt.Println("Dial OK")
-		go n.listenFromQUIC(session, address)
 	}
+
+	if session == nil {
+		return nil, fmt.Errorf("should have found session but didn't")
+	}
+
 	st, err := session.OpenStream()
 	if err != nil {
 		n.log.Println("session.OpenStream:", err)
+		_ = session.CloseWithError(0, "expected to be able to open session")
 		return nil, err
 	}
 	return QUICStream{st, session}, nil
+}
+
+func (n *Node) tryDial(address string, coords yggdrasil.Coords) (quic.Session, error) {
+	session, err := quic.Dial(
+		n.core,       // yggdrasil.PacketConn
+		coords,       // dial address
+		address,      // dial SNI
+		n.tlsConfig,  // TLS config
+		n.quicConfig, // QUIC config
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(session.ConnectionState().PeerCertificates) != 1 {
+		_ = session.CloseWithError(0, "expected a peer certificate")
+		return nil, errors.New("didn't receive a peer certificate")
+	}
+	if gotAddress := session.ConnectionState().PeerCertificates[0].DNSNames[0]; address != gotAddress {
+		_ = session.CloseWithError(0, "you aren't the host I was hoping for")
+		return nil, fmt.Errorf("expected %q but dialled %q", address, gotAddress)
+	}
+	go n.listenFromQUIC(session, address)
+	return session, nil
 }
 
 func (n *Node) generateTLSConfig() *tls.Config {

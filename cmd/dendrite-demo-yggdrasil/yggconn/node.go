@@ -50,6 +50,7 @@ type Node struct {
 	tlsConfig  *tls.Config
 	quicConfig *quic.Config
 	sessions   sync.Map // string -> quic.Session
+	coords     sync.Map // string -> yggdrasil.Coords
 	incoming   chan QUICStream
 	NewSession func(remote gomatrixserverlib.ServerName)
 }
