@@ -32,6 +32,7 @@ import (
 	"github.com/lucas-clemente/quic-go"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"
 	"github.com/matrix-org/gomatrixserverlib"
+	"go.uber.org/atomic"
 
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
@@ -41,17 +42,20 @@ import (
 )
 
 type Node struct {
-	core       *yggdrasil.Core
-	config     *yggdrasilconfig.NodeConfig
-	state      *yggdrasilconfig.NodeState
-	multicast  *yggdrasilmulticast.Multicast
-	log        *gologme.Logger
-	listener   quic.Listener
-	tlsConfig  *tls.Config
-	quicConfig *quic.Config
-	sessions   sync.Map // string -> quic.Session
-	incoming   chan QUICStream
-	NewSession func(remote gomatrixserverlib.ServerName)
+	core         *yggdrasil.Core
+	config       *yggdrasilconfig.NodeConfig
+	state        *yggdrasilconfig.NodeState
+	multicast    *yggdrasilmulticast.Multicast
+	log          *gologme.Logger
+	listener     quic.Listener
+	tlsConfig    *tls.Config
+	quicConfig   *quic.Config
+	sessions     sync.Map // string -> *session
+	sessionCount atomic.Uint32
+	sessionFunc  func(address string)
+	coords       sync.Map // string -> yggdrasil.Coords
+	incoming     chan QUICStream
+	NewSession   func(remote gomatrixserverlib.ServerName)
 }
 
 func (n *Node) Dialer(_, address string) (net.Conn, error) {
@@ -90,6 +94,19 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		}
 	}
 
+	n.core.SetCoordChangeCallback(func(old, new yggdrasil.Coords) {
+		fmt.Println("COORDINATE CHANGE!")
+		fmt.Println("Old:", old)
+		fmt.Println("New:", new)
+		n.sessions.Range(func(k, v interface{}) bool {
+			if s, ok := v.(*session); ok {
+				fmt.Println("Killing session", k)
+				s.kill()
+			}
+			return true
+		})
+	})
+
 	n.config.Peers = []string{}
 	n.config.AdminListen = "none"
 	n.config.MulticastInterfaces = []string{}
@@ -124,8 +141,9 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		MaxIncomingUniStreams: 0,
 		KeepAlive:             true,
 		MaxIdleTimeout:        time.Minute * 30,
-		HandshakeTimeout:      time.Second * 30,
+		HandshakeTimeout:      time.Second * 15,
 	}
+	copy(n.quicConfig.StatelessResetKey, n.EncryptionPublicKey())
 
 	n.log.Println("Public curve25519:", n.core.EncryptionPublicKey())
 	n.log.Println("Public ed25519:", n.core.SigningPublicKey())
@@ -173,17 +191,25 @@ func (n *Node) SigningPrivateKey() ed25519.PrivateKey {
 	return ed25519.PrivateKey(privBytes)
 }
 
+func (n *Node) SetSessionFunc(f func(address string)) {
+	n.sessionFunc = f
+}
+
 func (n *Node) PeerCount() int {
 	return len(n.core.GetPeers()) - 1
 }
 
+func (n *Node) SessionCount() int {
+	return int(n.sessionCount.Load())
+}
+
 func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
 	nodemap := map[string]struct{}{
-		"b5ae50589e50991dd9dd7d59c5c5f7a4521e8da5b603b7f57076272abc58b374": struct{}{},
+		"b5ae50589e50991dd9dd7d59c5c5f7a4521e8da5b603b7f57076272abc58b374": {},
 	}
 	/*
 		for _, peer := range n.core.GetSwitchPeers() {
-			nodemap[hex.EncodeToString(peer.SigningKey[:])] = struct{}{}
+			nodemap[hex.EncodeToString(peer.PublicKey[:])] = struct{}{}
 		}
 	*/
 	n.sessions.Range(func(_, v interface{}) bool {

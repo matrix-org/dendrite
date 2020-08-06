@@ -72,7 +72,7 @@ func main() {
 	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Matrix.FederationMaxRetries = 6
+	cfg.Matrix.FederationMaxRetries = 8
 	cfg.Kafka.UseNaffka = true
 	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
 	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
@@ -83,7 +83,7 @@ func main() {
 	cfg.Database.SyncAPI = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.Database.RoomServer = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
 	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
-	cfg.Database.E2EKey = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
+	cfg.Database.E2EKey = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
 	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
 	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
@@ -121,6 +121,18 @@ func main() {
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, stateAPI, keyRing,
 	)
+
+	ygg.SetSessionFunc(func(address string) {
+		req := &api.PerformServersAliveRequest{
+			Servers: []gomatrixserverlib.ServerName{
+				gomatrixserverlib.ServerName(address),
+			},
+		}
+		res := &api.PerformServersAliveResponse{}
+		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
+			logrus.WithError(err).Error("Failed to send wake-up message to newly connected node")
+		}
+	})
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
@@ -162,9 +174,9 @@ func main() {
 	httpServer := &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 45 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
