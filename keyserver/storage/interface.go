@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
@@ -64,4 +65,11 @@ type Database interface {
 	// A to offset of sarama.OffsetNewest means no upper limit.
 	// Returns the offset of the latest key change.
 	KeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
+
+	// StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
+	// If no domains are given, all user IDs with stale device lists are returned.
+	StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error)
+
+	// MarkDeviceListStale sets the stale bit for this user to isStale.
+	MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error
 }

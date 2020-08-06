@@ -15,8 +15,6 @@
 package keyserver
 
 import (
-	"sync"
-
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -52,12 +50,16 @@ func NewInternalAPI(
 		Producer: producer,
 		DB:       db,
 	}
+	updater := internal.NewDeviceListUpdater(db, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
+	err = updater.Start()
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to start device list updater")
+	}
 	return &internal.KeyInternalAPI{
-		DB:            db,
-		ThisServer:    cfg.Matrix.ServerName,
-		FedClient:     fedClient,
-		Producer:      keyChangeProducer,
-		Mutex:         &sync.Mutex{},
-		UserIDToMutex: make(map[string]*sync.Mutex),
+		DB:         db,
+		ThisServer: cfg.Matrix.ServerName,
+		FedClient:  fedClient,
+		Producer:   keyChangeProducer,
+		Updater:    updater,
 	}
 }
