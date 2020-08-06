@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database struct {
@@ -123,4 +124,15 @@ func (d *Database) StoreKeyChange(ctx context.Context, partition int32, offset i
 
 func (d *Database) KeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
 	return d.KeyChangesTable.SelectKeyChanges(ctx, partition, fromOffset, toOffset)
+}
+
+// StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
+// If no domains are given, all user IDs with stale device lists are returned.
+func (d *Database) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
+	return nil, nil // TODO
+}
+
+// MarkDeviceListStale sets the stale bit for this user to isStale.
+func (d *Database) MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error {
+	return nil // TODO
 }

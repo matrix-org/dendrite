@@ -38,74 +38,22 @@ type KeyInternalAPI struct {
 	FedClient  *gomatrixserverlib.FederationClient
 	UserAPI    userapi.UserInternalAPI
 	Producer   *producers.KeyChange
-	// A map from user_id to a mutex. Used when we are missing prev IDs so we don't make more than 1
-	// request to the remote server and race.
-	// TODO: Put in an LRU cache to bound growth
-	UserIDToMutex map[string]*sync.Mutex
-	Mutex         *sync.Mutex // protects UserIDToMutex
+	Updater    *DeviceListUpdater
 }
 
 func (a *KeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
 	a.UserAPI = i
 }
 
-func (a *KeyInternalAPI) mutex(userID string) *sync.Mutex {
-	a.Mutex.Lock()
-	defer a.Mutex.Unlock()
-	if a.UserIDToMutex[userID] == nil {
-		a.UserIDToMutex[userID] = &sync.Mutex{}
-	}
-	return a.UserIDToMutex[userID]
-}
-
 func (a *KeyInternalAPI) InputDeviceListUpdate(
 	ctx context.Context, req *api.InputDeviceListUpdateRequest, res *api.InputDeviceListUpdateResponse,
 ) {
-	mu := a.mutex(req.Event.UserID)
-	mu.Lock()
-	defer mu.Unlock()
-	// check if we have the prev IDs
-	exists, err := a.DB.PrevIDsExists(ctx, req.Event.UserID, req.Event.PrevID)
+	err := a.Updater.Update(ctx, req.Event)
 	if err != nil {
 		res.Error = &api.KeyError{
-			Err: fmt.Sprintf("failed to check if prev ids exist: %s", err),
+			Err: fmt.Sprintf("failed to update device list: %s", err),
 		}
-		return
 	}
-
-	// if we haven't missed anything update the database and notify users
-	if exists {
-		keys := []api.DeviceMessage{
-			{
-				DeviceKeys: api.DeviceKeys{
-					DeviceID:    req.Event.DeviceID,
-					DisplayName: req.Event.DeviceDisplayName,
-					KeyJSON:     req.Event.Keys,
-					UserID:      req.Event.UserID,
-				},
-				StreamID: req.Event.StreamID,
-			},
-		}
-		err = a.DB.StoreRemoteDeviceKeys(ctx, keys)
-		if err != nil {
-			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("failed to store remote device keys: %s", err),
-			}
-			return
-		}
-		// ALWAYS emit key changes when we've been poked over federation just in case
-		// this poke is important for something.
-		err = a.Producer.ProduceKeyChanges(keys)
-		if err != nil {
-			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("failed to emit remote device key changes: %s", err),
-			}
-		}
-		return
-	}
-
-	// if we're missing an ID go and fetch it from the remote HS
-
 }
 
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
