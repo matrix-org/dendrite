@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type OneTimeKeys interface {
@@ -44,4 +45,9 @@ type KeyChanges interface {
 	// SelectKeyChanges returns the set (de-duplicated) of users who have changed their keys between the two offsets.
 	// Results are exclusive of fromOffset and inclusive of toOffset. A toOffset of sarama.OffsetNewest means no upper offset.
 	SelectKeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
+}
+
+type StaleDeviceLists interface {
+	InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error
+	SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error)
 }

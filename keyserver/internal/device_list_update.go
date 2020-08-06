@@ -87,6 +87,7 @@ type DeviceListUpdaterDatabase interface {
 	PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error)
 }
 
+// KeyChangeProducer is the interface for producers.KeyChange useful for testing.
 type KeyChangeProducer interface {
 	ProduceKeyChanges(keys []api.DeviceMessage) error
 }

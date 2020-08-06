@@ -263,8 +263,41 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 	}
 	// TODO: set device display names when they are known
 
+	// attempt to satisfy key queries from the local database first as we should get device updates pushed to us
+	domainToDeviceKeys = a.remoteKeysFromDatabase(ctx, res, domainToDeviceKeys)
+	if len(domainToDeviceKeys) == 0 {
+		return // nothing to query
+	}
+
 	// perform key queries for remote devices
 	a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
+}
+
+func (a *KeyInternalAPI) remoteKeysFromDatabase(
+	ctx context.Context, res *api.QueryKeysResponse, domainToDeviceKeys map[string]map[string][]string,
+) map[string]map[string][]string {
+	fetchRemote := make(map[string]map[string][]string)
+	for domain, userToDeviceMap := range domainToDeviceKeys {
+		for userID, deviceIDs := range userToDeviceMap {
+			keys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs)
+			// if we can't query the db or there are fewer keys than requested, fetch from remote.
+			// NB: requesting all keys (deviceIDs==0) will not trigger this, provided some devices exist.
+			if err != nil || len(keys) < len(deviceIDs) {
+				if _, ok := fetchRemote[domain]; !ok {
+					fetchRemote[domain] = make(map[string][]string)
+				}
+				fetchRemote[domain][userID] = append(fetchRemote[domain][userID], deviceIDs...)
+				continue
+			}
+			if res.DeviceKeys[userID] == nil {
+				res.DeviceKeys[userID] = make(map[string]json.RawMessage)
+			}
+			for _, key := range keys {
+				res.DeviceKeys[userID][key.DeviceID] = key.KeyJSON
+			}
+		}
+	}
+	return fetchRemote
 }
 
 func (a *KeyInternalAPI) queryRemoteKeys(
