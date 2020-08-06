@@ -188,9 +188,9 @@ func (m *DendriteMonolith) Start() {
 	m.httpServer = &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 45 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},

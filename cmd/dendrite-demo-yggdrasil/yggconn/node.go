@@ -98,11 +98,6 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		fmt.Println("COORDINATE CHANGE!")
 		fmt.Println("Old:", old)
 		fmt.Println("New:", new)
-		n.coords.Range(func(k, _ interface{}) bool {
-			fmt.Println("Deleting cached coords for", k)
-			n.coords.Delete(k)
-			return true
-		})
 		n.sessions.Range(func(k, v interface{}) bool {
 			if s, ok := v.(*session); ok {
 				fmt.Println("Killing session", k)
@@ -214,7 +209,7 @@ func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
 	}
 	/*
 		for _, peer := range n.core.GetSwitchPeers() {
-			nodemap[hex.EncodeToString(peer.SigningKey[:])] = struct{}{}
+			nodemap[hex.EncodeToString(peer.PublicKey[:])] = struct{}{}
 		}
 	*/
 	n.sessions.Range(func(_, v interface{}) bool {
