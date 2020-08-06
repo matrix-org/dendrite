@@ -50,7 +50,7 @@ type Node struct {
 	listener     quic.Listener
 	tlsConfig    *tls.Config
 	quicConfig   *quic.Config
-	sessions     sync.Map // string -> quic.Session
+	sessions     sync.Map // string -> *session
 	sessionCount atomic.Uint32
 	sessionFunc  func(address string)
 	coords       sync.Map // string -> yggdrasil.Coords
@@ -94,6 +94,24 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		}
 	}
 
+	n.core.SetCoordChangeCallback(func(old, new yggdrasil.Coords) {
+		fmt.Println("COORDINATE CHANGE!")
+		fmt.Println("Old:", old)
+		fmt.Println("New:", new)
+		n.coords.Range(func(k, _ interface{}) bool {
+			fmt.Println("Deleting cached coords for", k)
+			n.coords.Delete(k)
+			return true
+		})
+		n.sessions.Range(func(k, v interface{}) bool {
+			if s, ok := v.(*session); ok {
+				fmt.Println("Killing session", k)
+				s.kill()
+			}
+			return true
+		})
+	})
+
 	n.config.Peers = []string{}
 	n.config.AdminListen = "none"
 	n.config.MulticastInterfaces = []string{}
@@ -127,7 +145,7 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		MaxIncomingStreams:    0,
 		MaxIncomingUniStreams: 0,
 		KeepAlive:             true,
-		MaxIdleTimeout:        time.Minute * 5,
+		MaxIdleTimeout:        time.Minute * 30,
 		HandshakeTimeout:      time.Second * 15,
 	}
 	copy(n.quicConfig.StatelessResetKey, n.EncryptionPublicKey())
