@@ -290,5 +290,9 @@ func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *gomatrixs
 			},
 		}
 	}
-	return u.db.StoreRemoteDeviceKeys(ctx, keys)
+	err := u.db.StoreRemoteDeviceKeys(ctx, keys)
+	if err != nil {
+		return err
+	}
+	return u.db.MarkDeviceListStale(ctx, res.UserID, false)
 }
