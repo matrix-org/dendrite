@@ -267,7 +267,7 @@ func (oq *destinationQueue) backgroundSend() {
 			// has exceeded a maximum allowable value. Clean up the in-memory
 			// buffers at this point. The PDU clean-up is already on a defer.
 			oq.cleanPendingInvites()
-			log.Warnf("Blacklisting %q due to exceeding backoff threshold")
+			log.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
 			return
 		}
 
