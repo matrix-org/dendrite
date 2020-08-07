@@ -116,7 +116,7 @@ func (u *DeviceListUpdater) Start() error {
 		// This is important for sytest as when the /send transaction 200 OKs it assumes that
 		// keys have been fetched and will then issue requests to /keys/query which it expects
 		// to be satisfied from the cache (which it won't be if we haven't processed it yet).
-		ch := make(chan gomatrixserverlib.ServerName, 0)
+		ch := make(chan gomatrixserverlib.ServerName)
 		u.workerChans[i] = ch
 		go u.worker(ch)
 	}

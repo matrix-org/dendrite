@@ -116,6 +116,13 @@ func DeviceListCatchup(
 			userSet[userID] = true
 		}
 	}
+	// set the new token
+	to.SetLog(DeviceListLogName, &types.LogPosition{
+		Partition: queryRes.Partition,
+		Offset:    queryRes.Offset,
+	})
+	res.NextBatch = to.String()
+
 	return hasNew, nil
 }
 

@@ -112,6 +112,9 @@ type StreamingToken struct {
 }
 
 func (t *StreamingToken) SetLog(name string, lp *LogPosition) {
+	if t.logs == nil {
+		t.logs = make(map[string]*LogPosition)
+	}
 	t.logs[name] = lp
 }
 
