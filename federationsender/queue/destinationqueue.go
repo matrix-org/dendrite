@@ -262,31 +262,22 @@ func (oq *destinationQueue) backgroundSend() {
 		// If we are backing off this server then wait for the
 		// backoff duration to complete first, or until explicitly
 		// told to retry.
-		oq.statistics.BackoffIfRequired(oq.backingOff, oq.interruptBackoff)
+		if _, giveUp := oq.statistics.BackoffIfRequired(oq.backingOff, oq.interruptBackoff); giveUp {
+			// It's been suggested that we should give up because the backoff
+			// has exceeded a maximum allowable value. Clean up the in-memory
+			// buffers at this point. The PDU clean-up is already on a defer.
+			oq.cleanPendingInvites()
+			log.Warnf("Blacklisting %q due to exceeding backoff threshold")
+			return
+		}
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		if pendingPDUs || pendingEDUs {
 			// Try sending the next transaction and see what happens.
 			transaction, terr := oq.nextTransaction()
 			if terr != nil {
-				// We failed to send the transaction.
-				if giveUp := oq.statistics.Failure(); giveUp {
-					// It's been suggested that we should give up because the backoff
-					// has exceeded a maximum allowable value. Clean up the in-memory
-					// buffers at this point. The PDU clean-up is already on a defer.
-					oq.cleanPendingInvites()
-					log.WithError(terr).Warnf("Blacklisting %q due to error", oq.destination)
-					return
-				} else {
-					// We haven't been told to give up terminally yet but we still have
-					// PDUs waiting to be sent. By sending a message into the wake chan,
-					// the next loop iteration will try processing these PDUs again,
-					// subject to the backoff.
-					select {
-					case oq.notifyPDUs <- true:
-					default:
-					}
-				}
+				// We failed to send the transaction. Mark it as a failure.
+				oq.statistics.Failure()
 			} else if transaction {
 				// If we successfully sent the transaction then clear out
 				// the pending events and EDUs, and wipe our transaction ID.
@@ -298,14 +289,8 @@ func (oq *destinationQueue) backgroundSend() {
 		if len(oq.pendingInvites) > 0 {
 			sent, ierr := oq.nextInvites(oq.pendingInvites)
 			if ierr != nil {
-				// We failed to send the transaction so increase the
-				// backoff and give it another go shortly.
-				if giveUp := oq.statistics.Failure(); giveUp {
-					// It's been suggested that we should give up because
-					// the backoff has exceeded a maximum allowable value.
-					log.WithError(ierr).Warnf("Blacklisting %q due to error", oq.destination)
-					return
-				}
+				// We failed to send the transaction. Mark it as a failure.
+				oq.statistics.Failure()
 			} else if sent > 0 {
 				// If we successfully sent the invites then clear out
 				// the pending invites.

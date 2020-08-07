@@ -67,7 +67,6 @@ type ServerStatistics struct {
 	blacklisted    atomic.Bool                  // is the node blacklisted
 	backoffStarted atomic.Bool                  // is the backoff started
 	backoffCount   atomic.Uint32                // number of times BackoffDuration has been called
-	failCounter    atomic.Uint32                // how many times have we failed?
 	successCounter atomic.Uint32                // how many times have we succeeded?
 }
 
@@ -77,7 +76,6 @@ type ServerStatistics struct {
 // we will unblacklist it.
 func (s *ServerStatistics) Success() {
 	s.successCounter.Add(1)
-	s.failCounter.Store(0)
 	s.backoffStarted.Store(false)
 	s.backoffCount.Store(0)
 	s.blacklisted.Store(false)
@@ -88,16 +86,28 @@ func (s *ServerStatistics) Success() {
 	}
 }
 
-// Failure marks a failure and works out when to backoff until. It
-// returns true if the worker should give up altogether because of
-// too many consecutive failures. At this point the host is marked
-// as blacklisted.
-func (s *ServerStatistics) Failure() bool {
-	// Increase the fail counter.
-	failCounter := s.failCounter.Add(1)
+// Failure marks a failure and starts backing off if needed.
+// The next call to BackoffIfRequired will do the right thing
+// after this.
+func (s *ServerStatistics) Failure() {
+	if s.backoffStarted.CAS(false, true) {
+		s.backoffCount.Store(0)
+	}
+}
 
-	// Check that we haven't failed more times than is acceptable.
-	if failCounter >= s.statistics.FailuresUntilBlacklist {
+// BackoffIfRequired will block for as long as the current
+// backoff requires, if needed. Otherwise it will do nothing.
+func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <-chan bool) (time.Duration, bool) {
+	if started := s.backoffStarted.Load(); !started {
+		return 0, false
+	}
+
+	// Work out how many times we've backed off so far.
+	count := s.backoffCount.Inc()
+	duration := time.Second * time.Duration(math.Exp2(float64(count)))
+
+	// Work out if we should be blacklisting at this point.
+	if count >= s.statistics.FailuresUntilBlacklist {
 		// We've exceeded the maximum amount of times we're willing
 		// to back off, which is probably in the region of hours by
 		// now. Mark the host as blacklisted and tell the caller to
@@ -108,32 +118,14 @@ func (s *ServerStatistics) Failure() bool {
 				logrus.WithError(err).Errorf("Failed to add %q to blacklist", s.serverName)
 			}
 		}
-		return true
+		return duration, true
 	}
-
-	if s.backoffStarted.CAS(false, true) {
-		s.backoffCount.Store(0)
-	}
-
-	return false
-}
-
-// BackoffIfRequired will block for as long as the current
-// backoff requires, if needed. Otherwise it will do nothing.
-func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <-chan bool) time.Duration {
-	if started := s.backoffStarted.Load(); !started {
-		return 0
-	}
-
-	// Work out how many times we've backed off so far.
-	count := s.backoffCount.Inc()
 
 	// Notify the destination queue that we're backing off now.
 	backingOff.Store(true)
 	defer backingOff.Store(false)
 
 	// Work out how long we should be backing off for.
-	duration := time.Second * time.Duration(math.Exp2(float64(count)))
 	logrus.Warnf("Backing off %q for %s", s.serverName, duration)
 
 	// Wait for either an interruption or for the backoff to
@@ -144,7 +136,7 @@ func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <
 	case <-time.After(duration):
 	}
 
-	return duration
+	return duration, false
 }
 
 // Blacklisted returns true if the server is blacklisted and false

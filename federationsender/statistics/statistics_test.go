@@ -10,7 +10,7 @@ import (
 
 func TestBackoff(t *testing.T) {
 	stats := Statistics{
-		FailuresUntilBlacklist: 6,
+		FailuresUntilBlacklist: 5,
 	}
 	server := ServerStatistics{
 		statistics: &stats,
@@ -23,18 +23,10 @@ func TestBackoff(t *testing.T) {
 		t.Fatalf("Expected success count 1, got %d", successes)
 	}
 
-	// Now we want to cause a series of failures. We'll do this
-	// as many times as we need to blacklist. We'll check that we
-	// were blacklisted at the right time based on the threshold.
-	failures := stats.FailuresUntilBlacklist
-	for i := uint32(1); i <= failures; i++ {
-		if server.Failure() == (i < stats.FailuresUntilBlacklist) {
-			t.Fatalf("Failure %d resulted in blacklist too soon", i)
-		}
-	}
+	// Register a failure.
+	server.Failure()
 
-	t.Logf("Failure counter: %d", server.failCounter)
-	t.Logf("Backoff counter: %d", server.backoffCount)
+	t.Logf("Backoff counter: %d", server.backoffCount.Load())
 	backingOff := atomic.Bool{}
 
 	// Now we're going to simulate backing off a few times to see
@@ -47,12 +39,22 @@ func TestBackoff(t *testing.T) {
 		close(interrupt)
 
 		// Get the duration.
-		duration := server.BackoffIfRequired(backingOff, interrupt)
-		t.Logf("Backoff %d is for %s", i, duration)
+		duration, blacklist := server.BackoffIfRequired(backingOff, interrupt)
+
+		// Check if we should be blacklisted by now.
+		if i > stats.FailuresUntilBlacklist {
+			if !blacklist {
+				t.Fatalf("Backoff %d should have resulted in blacklist but didn't", i)
+			} else {
+				t.Logf("Backoff %d is blacklisted as expected", i)
+				continue
+			}
+		}
 
 		// Check if the duration is what we expect.
-		if wanted := time.Second * time.Duration(math.Exp2(float64(i))); duration != wanted {
-			t.Fatalf("Backoff should have been %s but was %s", wanted, duration)
+		t.Logf("Backoff %d is for %s", i, duration)
+		if wanted := time.Second * time.Duration(math.Exp2(float64(i))); !blacklist && duration != wanted {
+			t.Fatalf("Backoff %d should have been %s but was %s", i, wanted, duration)
 		}
 	}
 }
