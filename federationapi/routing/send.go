@@ -218,7 +218,9 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, *util.JSONRe
 	}
 
 	t.processEDUs(t.EDUs)
-	util.GetLogger(t.context).Infof("Processed %d PDUs from transaction %q", len(results), t.TransactionID)
+	if c := len(results); c > 0 {
+		util.GetLogger(t.context).Infof("Processed %d PDUs from transaction %q", c, t.TransactionID)
+	}
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
@@ -315,7 +317,7 @@ func (t *txnReq) processEDUs(edus []gomatrixserverlib.EDU) {
 		case gomatrixserverlib.MDeviceListUpdate:
 			t.processDeviceListUpdate(e)
 		default:
-			util.GetLogger(t.context).WithField("type", e.Type).Warn("unhandled edu")
+			util.GetLogger(t.context).WithField("type", e.Type).Debug("Unhandled EDU")
 		}
 	}
 }
