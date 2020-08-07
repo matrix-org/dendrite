@@ -118,8 +118,8 @@ func (s *ServerStatistics) Failure() bool {
 	return false
 }
 
-// BackoffIfRequired returns both a bool stating whether to wait,
-// and then if true, a duration to wait for.
+// BackoffIfRequired will block for as long as the current
+// backoff requires, if needed. Otherwise it will do nothing.
 func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <-chan bool) time.Duration {
 	if started := s.backoffStarted.Load(); !started {
 		return 0

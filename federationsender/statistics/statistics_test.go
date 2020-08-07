@@ -17,12 +17,17 @@ func TestBackoff(t *testing.T) {
 		serverName: "test.com",
 	}
 
+	// Start by checking that counting successes works.
 	server.Success()
 	if successes := server.SuccessCount(); successes != 1 {
 		t.Fatalf("Expected success count 1, got %d", successes)
 	}
 
-	for i := uint32(1); i <= stats.FailuresUntilBlacklist; i++ {
+	// Now we want to cause a series of failures. We'll do this
+	// as many times as we need to blacklist. We'll check that we
+	// were blacklisted at the right time based on the threshold.
+	failures := stats.FailuresUntilBlacklist
+	for i := uint32(1); i <= failures; i++ {
 		if server.Failure() == (i < stats.FailuresUntilBlacklist) {
 			t.Fatalf("Failure %d resulted in blacklist too soon", i)
 		}
@@ -30,21 +35,34 @@ func TestBackoff(t *testing.T) {
 
 	t.Logf("Failure counter: %d", server.failCounter)
 	t.Logf("Backoff counter: %d", server.backoffCount)
-
 	backingOff := atomic.Bool{}
 
+	// Now we're going to simulate backing off a few times to see
+	// what happens.
 	for i := uint32(1); i <= 10; i++ {
+		// Interrupt the backoff - it doesn't really matter if it
+		// completes but we will find out how long the backoff should
+		// have been.
 		interrupt := make(chan bool, 1)
 		close(interrupt)
 
+		// Get the duration.
 		duration := server.BackoffIfRequired(backingOff, interrupt)
 		t.Logf("Backoff %d is for %s", i, duration)
 
-		if i < stats.FailuresUntilBlacklist {
+		// If we were below the number of failures that we simulated
+		// then we should expect a backoff that is exponentially
+		// related. Otherwise, if we've gone beyond the number of
+		// failures then we should expect no backoff at all.
+		if i < failures {
+			// We're expecting backoff here because we're under the
+			// failure count.
 			if wanted := time.Second * time.Duration(math.Exp2(float64(i))); duration != wanted {
 				t.Fatalf("Backoff should have been %s but was %s", wanted, duration)
 			}
 		} else {
+			// We aren't expecting backoff here because we've exceeded
+			// the failure count, so our backoff is "complete".
 			if duration != 0 {
 				t.Fatalf("Backoff should have been zero but was %s", duration)
 			}
