@@ -204,16 +204,6 @@ func TestUpdateNoPrevID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Update returned an error: %s", err)
 	}
-	// At this point we show have this device list marked as stale and not store the keys or emitted anything
-	if !db.staleUsers[event.UserID] {
-		t.Errorf("%s not marked as stale", event.UserID)
-	}
-	if len(producer.events) > 0 {
-		t.Errorf("Update incorrect emitted %d device change events", len(producer.events))
-	}
-	if len(db.storedKeys) > 0 {
-		t.Errorf("Update incorrect stored %d device change events", len(db.storedKeys))
-	}
 	t.Log("waiting for /users/devices to be called...")
 	wg.Wait()
 	// wait a bit for db to be updated...
