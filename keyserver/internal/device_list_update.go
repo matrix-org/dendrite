@@ -110,13 +110,10 @@ func NewDeviceListUpdater(
 // Start the device list updater, which will try to refresh any stale device lists.
 func (u *DeviceListUpdater) Start() error {
 	for i := 0; i < len(u.workerChans); i++ {
-		// Allocate no buffer per channel.
+		// Allocate a small buffer per channel.
 		// If the buffer limit is reached, backpressure will cause the processing of EDUs
 		// to stop (in this transaction) until key requests can be made.
-		// This is important for sytest as when the /send transaction 200 OKs it assumes that
-		// keys have been fetched and will then issue requests to /keys/query which it expects
-		// to be satisfied from the cache (which it won't be if we haven't processed it yet).
-		ch := make(chan gomatrixserverlib.ServerName)
+		ch := make(chan gomatrixserverlib.ServerName, 10)
 		u.workerChans[i] = ch
 		go u.worker(ch)
 	}
