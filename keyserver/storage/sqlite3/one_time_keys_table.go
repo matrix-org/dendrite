@@ -196,6 +196,9 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 		_, err = txn.StmtContext(ctx, s.deleteOneTimeKeyStmt).ExecContext(ctx, userID, deviceID, algorithm, keyID)
 		return err
 	})
+	if keyJSON == "" {
+		return nil, nil
+	}
 	return map[string]json.RawMessage{
 		algorithm + ":" + keyID: json.RawMessage(keyJSON),
 	}, err

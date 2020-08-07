@@ -46,6 +46,7 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, 
 // DeviceListCatchup fills in the given response for the given user ID to bring it up-to-date with device lists. hasNew=true if the response
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
+// nolint:gocyclo
 func DeviceListCatchup(
 	ctx context.Context, keyAPI keyapi.KeyInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
 	userID string, res *types.Response, from, to types.StreamingToken,
@@ -68,22 +69,20 @@ func DeviceListCatchup(
 
 	var partition int32
 	var offset int64
+	partition = -1
+	offset = sarama.OffsetOldest
 	// Extract partition/offset from sync token
 	// TODO: In a world where keyserver is sharded there will be multiple partitions and hence multiple QueryKeyChanges to make.
 	logOffset := from.Log(DeviceListLogName)
 	if logOffset != nil {
 		partition = logOffset.Partition
 		offset = logOffset.Offset
-	} else {
-		partition = -1
-		offset = sarama.OffsetOldest
 	}
 	var toOffset int64
+	toOffset = sarama.OffsetNewest
 	toLog := to.Log(DeviceListLogName)
-	if toLog != nil {
+	if toLog != nil && toLog.Offset > 0 {
 		toOffset = toLog.Offset
-	} else {
-		toOffset = sarama.OffsetNewest
 	}
 	var queryRes api.QueryKeyChangesResponse
 	keyAPI.QueryKeyChanges(ctx, &api.QueryKeyChangesRequest{
@@ -96,6 +95,10 @@ func DeviceListCatchup(
 		util.GetLogger(ctx).WithError(queryRes.Error).Error("QueryKeyChanges failed")
 		return hasNew, nil
 	}
+	util.GetLogger(ctx).Debugf(
+		"QueryKeyChanges request p=%d,off=%d,to=%d response p=%d off=%d uids=%v",
+		partition, offset, toOffset, queryRes.Partition, queryRes.Offset, queryRes.UserIDs,
+	)
 	userSet := make(map[string]bool)
 	for _, userID := range res.DeviceLists.Changed {
 		userSet[userID] = true
@@ -116,6 +119,13 @@ func DeviceListCatchup(
 			userSet[userID] = true
 		}
 	}
+	// set the new token
+	to.SetLog(DeviceListLogName, &types.LogPosition{
+		Partition: queryRes.Partition,
+		Offset:    queryRes.Offset,
+	})
+	res.NextBatch = to.String()
+
 	return hasNew, nil
 }
 

@@ -41,10 +41,15 @@ func NewDatabase(dataSourceName string) (*shared.Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	sdl, err := NewSqliteStaleDeviceListsTable(db)
+	if err != nil {
+		return nil, err
+	}
 	return &shared.Database{
-		DB:               db,
-		OneTimeKeysTable: otk,
-		DeviceKeysTable:  dk,
-		KeyChangesTable:  kc,
+		DB:                    db,
+		OneTimeKeysTable:      otk,
+		DeviceKeysTable:       dk,
+		KeyChangesTable:       kc,
+		StaleDeviceListsTable: sdl,
 	}, nil
 }

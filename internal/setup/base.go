@@ -252,6 +252,7 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
 	return gomatrixserverlib.NewFederationClient(
 		b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
+		b.Cfg.Matrix.FederationDisableTLSValidation,
 	)
 }
 
