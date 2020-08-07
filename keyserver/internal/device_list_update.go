@@ -158,12 +158,17 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 	if err != nil {
 		return false, fmt.Errorf("failed to check prev IDs exist for %s (%s): %w", event.UserID, event.DeviceID, err)
 	}
+	// if this is the first time we're hearing about this user, sync the device list manually.
+	if len(event.PrevID) == 0 {
+		exists = false
+	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"prev_ids_exist": exists,
 		"user_id":        event.UserID,
 		"device_id":      event.DeviceID,
 		"stream_id":      event.StreamID,
 		"prev_ids":       event.PrevID,
+		"display_name":   event.DeviceDisplayName,
 	}).Info("DeviceListUpdater.Update")
 
 	// if we haven't missed anything update the database and notify users

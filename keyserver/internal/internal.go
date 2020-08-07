@@ -250,10 +250,14 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 				if len(dk.KeyJSON) == 0 {
 					continue // don't include blank keys
 				}
-				// inject display name if known
+				// inject display name if known (either locally or remotely)
+				displayName := dk.DisplayName
+				if queryRes.DeviceInfo[dk.DeviceID].DisplayName != "" {
+					displayName = queryRes.DeviceInfo[dk.DeviceID].DisplayName
+				}
 				dk.KeyJSON, _ = sjson.SetBytes(dk.KeyJSON, "unsigned", struct {
 					DisplayName string `json:"device_display_name,omitempty"`
-				}{queryRes.DeviceInfo[dk.DeviceID].DisplayName})
+				}{displayName})
 				res.DeviceKeys[userID][dk.DeviceID] = dk.KeyJSON
 			}
 		} else {
@@ -261,7 +265,6 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 			domainToDeviceKeys[domain][userID] = append(domainToDeviceKeys[domain][userID], deviceIDs...)
 		}
 	}
-	// TODO: set device display names when they are known
 
 	// attempt to satisfy key queries from the local database first as we should get device updates pushed to us
 	domainToDeviceKeys = a.remoteKeysFromDatabase(ctx, res, domainToDeviceKeys)
@@ -294,6 +297,10 @@ func (a *KeyInternalAPI) remoteKeysFromDatabase(
 				res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 			}
 			for _, key := range keys {
+				// inject the display name
+				key.KeyJSON, _ = sjson.SetBytes(key.KeyJSON, "unsigned", struct {
+					DisplayName string `json:"device_display_name,omitempty"`
+				}{key.DisplayName})
 				res.DeviceKeys[userID][key.DeviceID] = key.KeyJSON
 			}
 		}
