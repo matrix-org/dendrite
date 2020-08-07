@@ -37,22 +37,23 @@ CREATE TABLE IF NOT EXISTS keyserver_device_keys (
 	-- required in the spec because in the event of a missed update the server fetches the entire
 	-- current set of keys rather than trying to 'fast-forward' or catchup missing stream IDs.
 	stream_id BIGINT NOT NULL,
+	display_name TEXT,
 	-- Clobber based on tuple of user/device.
     CONSTRAINT keyserver_device_keys_unique UNIQUE (user_id, device_id)
 );
 `
 
 const upsertDeviceKeysSQL = "" +
-	"INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json, stream_id)" +
-	" VALUES ($1, $2, $3, $4, $5)" +
+	"INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json, stream_id, display_name)" +
+	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT ON CONSTRAINT keyserver_device_keys_unique" +
-	" DO UPDATE SET key_json = $4, stream_id = $5"
+	" DO UPDATE SET key_json = $4, stream_id = $5, display_name = $6"
 
 const selectDeviceKeysSQL = "" +
-	"SELECT key_json, stream_id FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
+	"SELECT key_json, stream_id, display_name FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
 
 const selectBatchDeviceKeysSQL = "" +
-	"SELECT device_id, key_json, stream_id FROM keyserver_device_keys WHERE user_id=$1"
+	"SELECT device_id, key_json, stream_id, display_name FROM keyserver_device_keys WHERE user_id=$1"
 
 const selectMaxStreamForUserSQL = "" +
 	"SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id=$1"
@@ -99,13 +100,17 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 	for i, key := range keys {
 		var keyJSONStr string
 		var streamID int
-		err := s.selectDeviceKeysStmt.QueryRowContext(ctx, key.UserID, key.DeviceID).Scan(&keyJSONStr, &streamID)
+		var displayName sql.NullString
+		err := s.selectDeviceKeysStmt.QueryRowContext(ctx, key.UserID, key.DeviceID).Scan(&keyJSONStr, &streamID, &displayName)
 		if err != nil && err != sql.ErrNoRows {
 			return err
 		}
 		// this will be '' when there is no device
 		keys[i].KeyJSON = []byte(keyJSONStr)
 		keys[i].StreamID = streamID
+		if displayName.Valid {
+			keys[i].DisplayName = displayName.String
+		}
 	}
 	return nil
 }
@@ -140,7 +145,7 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx
 	for _, key := range keys {
 		now := time.Now().Unix()
 		_, err := txn.Stmt(s.upsertDeviceKeysStmt).ExecContext(
-			ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID,
+			ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID, key.DisplayName,
 		)
 		if err != nil {
 			return err
@@ -165,11 +170,15 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 		dk.UserID = userID
 		var keyJSON string
 		var streamID int
-		if err := rows.Scan(&dk.DeviceID, &keyJSON, &streamID); err != nil {
+		var displayName sql.NullString
+		if err := rows.Scan(&dk.DeviceID, &keyJSON, &streamID, &displayName); err != nil {
 			return nil, err
 		}
 		dk.KeyJSON = []byte(keyJSON)
 		dk.StreamID = streamID
+		if displayName.Valid {
+			dk.DisplayName = displayName.String
+		}
 		// include the key if we want all keys (no device) or it was asked
 		if deviceIDMap[dk.DeviceID] || len(deviceIDs) == 0 {
 			result = append(result, dk)

@@ -26,10 +26,11 @@ import (
 )
 
 type Database struct {
-	DB               *sql.DB
-	OneTimeKeysTable tables.OneTimeKeys
-	DeviceKeysTable  tables.DeviceKeys
-	KeyChangesTable  tables.KeyChanges
+	DB                    *sql.DB
+	OneTimeKeysTable      tables.OneTimeKeys
+	DeviceKeysTable       tables.DeviceKeys
+	KeyChangesTable       tables.KeyChanges
+	StaleDeviceListsTable tables.StaleDeviceLists
 }
 
 func (d *Database) ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
@@ -129,10 +130,10 @@ func (d *Database) KeyChanges(ctx context.Context, partition int32, fromOffset, 
 // StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
 // If no domains are given, all user IDs with stale device lists are returned.
 func (d *Database) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
-	return nil, nil // TODO
+	return d.StaleDeviceListsTable.SelectUserIDsWithStaleDeviceLists(ctx, domains)
 }
 
 // MarkDeviceListStale sets the stale bit for this user to isStale.
 func (d *Database) MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error {
-	return nil // TODO
+	return d.StaleDeviceListsTable.InsertStaleDeviceList(ctx, userID, isStale)
 }
