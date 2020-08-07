@@ -255,7 +255,7 @@ func (oq *destinationQueue) backgroundSend() {
 			// The worker is idle so stop the goroutine. It'll get
 			// restarted automatically the next time we have an event to
 			// send.
-			log.Infof("Queue %q has been idle for %s, going to sleep", oq.destination, queueIdleTimeout)
+			log.Debugf("Queue %q has been idle for %s, going to sleep", oq.destination, queueIdleTimeout)
 			return
 		}
 
@@ -263,12 +263,12 @@ func (oq *destinationQueue) backgroundSend() {
 		// backoff duration to complete first, or until explicitly
 		// told to retry.
 		if backoff, duration := oq.statistics.BackoffDuration(); backoff {
-			log.WithField("duration", duration).Infof("Backing off %s", oq.destination)
+			log.WithField("duration", duration).Debugf("Backing off %s", oq.destination)
 			oq.backingOff.Store(true)
 			select {
 			case <-time.After(duration):
 			case <-oq.interruptBackoff:
-				log.Infof("Interrupting backoff for %q", oq.destination)
+				log.Debugf("Interrupting backoff for %q", oq.destination)
 			}
 			oq.backingOff.Store(false)
 		}
@@ -414,7 +414,7 @@ func (oq *destinationQueue) nextTransaction() (bool, error) {
 		t.EDUs = append(t.EDUs, *edu)
 	}
 
-	logrus.WithField("server_name", oq.destination).Infof("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
+	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
 
 	// Try to send the transaction to the destination server.
 	// TODO: we should check for 500-ish fails vs 400-ish here,

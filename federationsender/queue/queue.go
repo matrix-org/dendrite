@@ -136,7 +136,7 @@ func (oqs *OutgoingQueues) SendEvent(
 
 	log.WithFields(log.Fields{
 		"destinations": destinations, "event": ev.EventID(),
-	}).Info("Sending event")
+	}).Infof("Sending event")
 
 	headeredJSON, err := json.Marshal(ev)
 	if err != nil {
