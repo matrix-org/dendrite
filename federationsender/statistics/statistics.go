@@ -134,13 +134,13 @@ func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <
 
 	// Work out how long we should be backing off for.
 	duration := time.Second * time.Duration(math.Exp2(float64(count)))
-	logrus.Infof("Backing off %q for %s", s.serverName, duration)
+	logrus.Debugf("Backing off %q for %s", s.serverName, duration)
 
 	// Wait for either an interruption or for the backoff to
 	// complete.
 	select {
 	case <-interrupt:
-		logrus.Infof("Interrupting backoff for %q", s.serverName)
+		logrus.Debugf("Interrupting backoff for %q", s.serverName)
 	case <-time.After(duration):
 	}
 
