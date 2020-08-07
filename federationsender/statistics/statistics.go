@@ -125,14 +125,8 @@ func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <
 		return 0
 	}
 
-	// Work out how many times we've backed off so far. If we
-	// have passed the failure counter then we can stop backing
-	// off - we've done our time.
+	// Work out how many times we've backed off so far.
 	count := s.backoffCount.Inc()
-	if count >= s.failCounter.Load() {
-		s.backoffStarted.Store(false)
-		return 0
-	}
 
 	// Notify the destination queue that we're backing off now.
 	backingOff.Store(true)
@@ -140,7 +134,7 @@ func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <
 
 	// Work out how long we should be backing off for.
 	duration := time.Second * time.Duration(math.Exp2(float64(count)))
-	logrus.Debugf("Backing off %q for %d", s.serverName, duration)
+	logrus.Infof("Backing off %q for %s", s.serverName, duration)
 
 	// Wait for either an interruption or for the backoff to
 	// complete.

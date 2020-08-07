@@ -50,22 +50,9 @@ func TestBackoff(t *testing.T) {
 		duration := server.BackoffIfRequired(backingOff, interrupt)
 		t.Logf("Backoff %d is for %s", i, duration)
 
-		// If we were below the number of failures that we simulated
-		// then we should expect a backoff that is exponentially
-		// related. Otherwise, if we've gone beyond the number of
-		// failures then we should expect no backoff at all.
-		if i < failures {
-			// We're expecting backoff here because we're under the
-			// failure count.
-			if wanted := time.Second * time.Duration(math.Exp2(float64(i))); duration != wanted {
-				t.Fatalf("Backoff should have been %s but was %s", wanted, duration)
-			}
-		} else {
-			// We aren't expecting backoff here because we've exceeded
-			// the failure count, so our backoff is "complete".
-			if duration != 0 {
-				t.Fatalf("Backoff should have been zero but was %s", duration)
-			}
+		// Check if the duration is what we expect.
+		if wanted := time.Second * time.Duration(math.Exp2(float64(i))); duration != wanted {
+			t.Fatalf("Backoff should have been %s but was %s", wanted, duration)
 		}
 	}
 }
