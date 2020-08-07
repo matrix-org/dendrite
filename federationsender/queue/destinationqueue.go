@@ -262,16 +262,7 @@ func (oq *destinationQueue) backgroundSend() {
 		// If we are backing off this server then wait for the
 		// backoff duration to complete first, or until explicitly
 		// told to retry.
-		if backoff, duration := oq.statistics.BackoffDuration(); backoff {
-			log.WithField("duration", duration).Debugf("Backing off %s", oq.destination)
-			oq.backingOff.Store(true)
-			select {
-			case <-time.After(duration):
-			case <-oq.interruptBackoff:
-				log.Debugf("Interrupting backoff for %q", oq.destination)
-			}
-			oq.backingOff.Store(false)
-		}
+		oq.statistics.NextBackoff(oq.backingOff, oq.interruptBackoff)
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		if pendingPDUs || pendingEDUs {
