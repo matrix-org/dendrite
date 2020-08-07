@@ -281,8 +281,9 @@ func (a *KeyInternalAPI) remoteKeysFromDatabase(
 		for userID, deviceIDs := range userToDeviceMap {
 			keys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs)
 			// if we can't query the db or there are fewer keys than requested, fetch from remote.
-			// NB: requesting all keys (deviceIDs==0) will not trigger this, provided some devices exist.
-			if err != nil || len(keys) < len(deviceIDs) {
+			// Likewise, we can't safely return keys from the db when all devices are requested as we don't
+			// know if one has just been added.
+			if len(deviceIDs) == 0 || err != nil || len(keys) < len(deviceIDs) {
 				if _, ok := fetchRemote[domain]; !ok {
 					fetchRemote[domain] = make(map[string][]string)
 				}
