@@ -27,6 +27,9 @@ matrix:
     #        public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
     # Disables new users from registering (except via shared secrets)
     registration_disabled: false
+    # Whether to disable TLS certificate validation. Warning: this reduces federation
+    # security and should not be enabled in production!
+    federation_disable_tls_validation: false
 
 # The media repository config
 media:

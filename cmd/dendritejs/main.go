@@ -139,16 +139,16 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 	tr := go_http_js_libp2p.NewP2pTransport(node)
 
 	fed := gomatrixserverlib.NewFederationClient(
-		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, true,
 	)
-	fed.Client = *gomatrixserverlib.NewClientWithTransport(tr)
+	fed.Client = *gomatrixserverlib.NewClientWithTransport(true, tr)
 
 	return fed
 }
 
 func createClient(node *go_http_js_libp2p.P2pLocalNode) *gomatrixserverlib.Client {
 	tr := go_http_js_libp2p.NewP2pTransport(node)
-	return gomatrixserverlib.NewClientWithTransport(tr)
+	return gomatrixserverlib.NewClientWithTransport(true, tr)
 }
 
 func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
