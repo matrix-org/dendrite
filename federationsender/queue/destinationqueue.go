@@ -262,7 +262,7 @@ func (oq *destinationQueue) backgroundSend() {
 		// If we are backing off this server then wait for the
 		// backoff duration to complete first, or until explicitly
 		// told to retry.
-		oq.statistics.NextBackoff(oq.backingOff, oq.interruptBackoff)
+		oq.statistics.BackoffIfRequired(oq.backingOff, oq.interruptBackoff)
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		if pendingPDUs || pendingEDUs {
