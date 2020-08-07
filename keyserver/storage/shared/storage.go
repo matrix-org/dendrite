@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database struct {
@@ -47,7 +48,25 @@ func (d *Database) DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage)
 	return d.DeviceKeysTable.SelectDeviceKeysJSON(ctx, keys)
 }
 
-func (d *Database) StoreDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+func (d *Database) PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error) {
+	sids := make([]int64, len(prevIDs))
+	for i := range prevIDs {
+		sids[i] = int64(prevIDs[i])
+	}
+	count, err := d.DeviceKeysTable.CountStreamIDsForUser(ctx, userID, sids)
+	if err != nil {
+		return false, err
+	}
+	return count == len(prevIDs), nil
+}
+
+func (d *Database) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		return d.DeviceKeysTable.InsertDeviceKeys(ctx, txn, keys)
+	})
+}
+
+func (d *Database) StoreLocalDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
 	// work out the latest stream IDs for each user
 	userIDToStreamID := make(map[string]int)
 	for _, k := range keys {
@@ -105,4 +124,15 @@ func (d *Database) StoreKeyChange(ctx context.Context, partition int32, offset i
 
 func (d *Database) KeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
 	return d.KeyChangesTable.SelectKeyChanges(ctx, partition, fromOffset, toOffset)
+}
+
+// StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
+// If no domains are given, all user IDs with stale device lists are returned.
+func (d *Database) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
+	return nil, nil // TODO
+}
+
+// MarkDeviceListStale sets the stale bit for this user to isStale.
+func (d *Database) MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error {
+	return nil // TODO
 }

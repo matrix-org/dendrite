@@ -319,6 +319,11 @@ func (r *FederationSenderInternalAPI) PerformBroadcastEDU(
 	if err != nil {
 		return fmt.Errorf("r.db.GetAllJoinedHosts: %w", err)
 	}
+	if len(destinations) == 0 {
+		return nil
+	}
+
+	logrus.WithContext(ctx).Infof("Sending wake-up EDU to %d destination(s)", len(destinations))
 
 	edu := &gomatrixserverlib.EDU{
 		Type:   "org.matrix.dendrite.wakeup",
@@ -326,6 +331,14 @@ func (r *FederationSenderInternalAPI) PerformBroadcastEDU(
 	}
 	if err = r.queues.SendEDU(edu, r.cfg.Matrix.ServerName, destinations); err != nil {
 		return fmt.Errorf("r.queues.SendEDU: %w", err)
+	}
+
+	wakeReq := &api.PerformServersAliveRequest{
+		Servers: destinations,
+	}
+	wakeRes := &api.PerformServersAliveResponse{}
+	if err := r.PerformServersAlive(ctx, wakeReq, wakeRes); err != nil {
+		return fmt.Errorf("r.PerformServersAlive: %w", err)
 	}
 
 	return nil

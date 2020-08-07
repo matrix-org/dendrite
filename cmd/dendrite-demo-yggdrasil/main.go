@@ -78,19 +78,18 @@ func main() {
 	cfg.Global.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
 	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
 	cfg.Global.Kafka.Topics.OutputKeyChangeEvent = "keyChangeOutput"
-	cfg.FederationSender.FederationMaxRetries = 6
+	cfg.FederationSender.FederationMaxRetries = 8
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
 	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
 	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -123,6 +122,18 @@ func main() {
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, stateAPI, keyRing,
 	)
+
+	ygg.SetSessionFunc(func(address string) {
+		req := &api.PerformServersAliveRequest{
+			Servers: []gomatrixserverlib.ServerName{
+				gomatrixserverlib.ServerName(address),
+			},
+		}
+		res := &api.PerformServersAliveResponse{}
+		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
+			logrus.WithError(err).Error("Failed to send wake-up message to newly connected node")
+		}
+	})
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
@@ -163,9 +174,9 @@ func main() {
 	httpServer := &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 45 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},

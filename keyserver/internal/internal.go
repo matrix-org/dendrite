@@ -38,10 +38,22 @@ type KeyInternalAPI struct {
 	FedClient  *gomatrixserverlib.FederationClient
 	UserAPI    userapi.UserInternalAPI
 	Producer   *producers.KeyChange
+	Updater    *DeviceListUpdater
 }
 
 func (a *KeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
 	a.UserAPI = i
+}
+
+func (a *KeyInternalAPI) InputDeviceListUpdate(
+	ctx context.Context, req *api.InputDeviceListUpdateRequest, res *api.InputDeviceListUpdateResponse,
+) {
+	err := a.Updater.Update(ctx, req.Event)
+	if err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("failed to update device list: %s", err),
+		}
+	}
 }
 
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
@@ -351,7 +363,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		return
 	}
 	// store the device keys and emit changes
-	err := a.DB.StoreDeviceKeys(ctx, keysToStore)
+	err := a.DB.StoreLocalDeviceKeys(ctx, keysToStore)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("failed to store device keys: %s", err.Error()),

@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 )
 
 type DendriteMonolith struct {
@@ -34,8 +33,6 @@ type DendriteMonolith struct {
 	StorageDirectory string
 	listener         net.Listener
 	httpServer       *http.Server
-	httpListening    atomic.Bool
-	yggListening     atomic.Bool
 }
 
 func (m *DendriteMonolith) BaseURL() string {
@@ -44,6 +41,10 @@ func (m *DendriteMonolith) BaseURL() string {
 
 func (m *DendriteMonolith) PeerCount() int {
 	return m.YggdrasilNode.PeerCount()
+}
+
+func (m *DendriteMonolith) SessionCount() int {
+	return m.YggdrasilNode.SessionCount()
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
@@ -98,13 +99,13 @@ func (m *DendriteMonolith) Start() {
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-syncapi.db", m.StorageDirectory))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-roomserver.db", m.StorageDirectory))
 	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-serverkey.db", m.StorageDirectory))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-e2ekey.db", m.StorageDirectory))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-keyserver.db", m.StorageDirectory))
 	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-federationsender.db", m.StorageDirectory))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-appservice.db", m.StorageDirectory))
 	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-currentstate.db", m.StorageDirectory))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
-	cfg.FederationSender.FederationMaxRetries = 6
+	cfg.FederationSender.FederationMaxRetries = 8
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -135,6 +136,18 @@ func (m *DendriteMonolith) Start() {
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, stateAPI, keyRing,
 	)
+
+	ygg.SetSessionFunc(func(address string) {
+		req := &api.PerformServersAliveRequest{
+			Servers: []gomatrixserverlib.ServerName{
+				gomatrixserverlib.ServerName(address),
+			},
+		}
+		res := &api.PerformServersAliveResponse{}
+		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
+			logrus.WithError(err).Error("Failed to send wake-up message to newly connected node")
+		}
+	})
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
@@ -175,9 +188,9 @@ func (m *DendriteMonolith) Start() {
 	m.httpServer = &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
