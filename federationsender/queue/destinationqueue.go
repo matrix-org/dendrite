@@ -275,7 +275,7 @@ func (oq *destinationQueue) backgroundSend() {
 					// has exceeded a maximum allowable value. Clean up the in-memory
 					// buffers at this point. The PDU clean-up is already on a defer.
 					oq.cleanPendingInvites()
-					log.Infof("Blacklisting %q due to errors", oq.destination)
+					log.WithError(terr).Warnf("Blacklisting %q due to error", oq.destination)
 					return
 				} else {
 					// We haven't been told to give up terminally yet but we still have
@@ -303,7 +303,7 @@ func (oq *destinationQueue) backgroundSend() {
 				if giveUp := oq.statistics.Failure(); giveUp {
 					// It's been suggested that we should give up because
 					// the backoff has exceeded a maximum allowable value.
-					log.Infof("Blacklisting %q due to errors", oq.destination)
+					log.WithError(ierr).Warnf("Blacklisting %q due to error", oq.destination)
 					return
 				}
 			} else if sent > 0 {
