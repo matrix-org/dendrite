@@ -40,7 +40,7 @@ func NewInternalAPI(cfg *config.CurrentStateServer, consumer sarama.Consumer) ap
 		logrus.WithError(err).Panicf("failed to open database")
 	}
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		string(cfg.Matrix.Kafka.Topics.OutputRoomEvent), consumer, csDB,
+		cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent), consumer, csDB,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")

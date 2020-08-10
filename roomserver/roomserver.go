@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -50,7 +51,7 @@ func NewInternalAPI(
 		DB:                   roomserverDB,
 		Cfg:                  cfg,
 		Producer:             base.KafkaProducer,
-		OutputRoomEventTopic: string(cfg.Matrix.Kafka.Topics.OutputRoomEvent),
+		OutputRoomEventTopic: string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
 		Cache:                base.Caches,
 		ServerName:           cfg.Matrix.ServerName,
 		FedClient:            fedClient,

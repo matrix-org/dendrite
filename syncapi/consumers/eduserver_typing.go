@@ -44,7 +44,7 @@ func NewOutputTypingEventConsumer(
 ) *OutputTypingEventConsumer {
 
 	consumer := internal.ContinualConsumer{
-		Topic:          string(cfg.Matrix.Kafka.Topics.OutputTypingEvent),
+		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

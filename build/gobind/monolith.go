@@ -88,10 +88,6 @@ func (m *DendriteMonolith) Start() {
 	cfg.Global.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
-	cfg.Global.Kafka.Topics.OutputClientData = "clientapiOutput"
-	cfg.Global.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-naffka.db", m.StorageDirectory))
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-account.db", m.StorageDirectory))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-device.db", m.StorageDirectory))

@@ -44,7 +44,7 @@ func NewOutputClientDataConsumer(
 ) *OutputClientDataConsumer {
 
 	consumer := internal.ContinualConsumer{
-		Topic:          string(cfg.Matrix.Kafka.Topics.OutputClientData),
+		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

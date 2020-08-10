@@ -29,6 +29,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/inthttp"
@@ -240,7 +241,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 		panic(err)
 	}
 
-	outputTopic := string(cfg.Global.Kafka.Topics.OutputRoomEvent)
+	outputTopic := cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent)
 
 	err = exe.DeleteTopic(outputTopic)
 	if err != nil {

@@ -50,20 +50,20 @@ func NewOutputEDUConsumer(
 ) *OutputEDUConsumer {
 	c := &OutputEDUConsumer{
 		typingConsumer: &internal.ContinualConsumer{
-			Topic:          string(cfg.Matrix.Kafka.Topics.OutputTypingEvent),
+			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		sendToDeviceConsumer: &internal.ContinualConsumer{
-			Topic:          string(cfg.Matrix.Kafka.Topics.OutputSendToDeviceEvent),
+			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		queues:            queues,
 		db:                store,
 		ServerName:        cfg.Matrix.ServerName,
-		TypingTopic:       string(cfg.Matrix.Kafka.Topics.OutputTypingEvent),
-		SendToDeviceTopic: string(cfg.Matrix.Kafka.Topics.OutputSendToDeviceEvent),
+		TypingTopic:       string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
+		SendToDeviceTopic: string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
 	}
 	c.typingConsumer.ProcessMessage = c.onTypingEvent
 	c.sendToDeviceConsumer.ProcessMessage = c.onSendToDeviceEvent

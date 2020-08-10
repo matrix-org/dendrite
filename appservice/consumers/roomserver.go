@@ -48,7 +48,7 @@ func NewOutputRoomEventConsumer(
 	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
 	consumer := internal.ContinualConsumer{
-		Topic:          string(cfg.Global.Kafka.Topics.OutputRoomEvent),
+		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: appserviceDB,
 	}

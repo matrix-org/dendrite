@@ -118,11 +118,6 @@ func main() {
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
-	cfg.Global.Kafka.Topics.OutputClientData = "clientapiOutput"
-	cfg.Global.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
-	cfg.Global.Kafka.Topics.OutputKeyChangeEvent = "keyChangeOutput"
 	cfg.FederationSender.FederationMaxRetries = 6
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
