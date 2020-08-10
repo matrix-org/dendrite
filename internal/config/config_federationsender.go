@@ -3,8 +3,8 @@ package config
 type FederationSender struct {
 	Matrix *Global `json:"-"`
 
-	Listen               Address         `json:"listen"`
-	Bind                 Address         `json:"bind"`
+	Listen               Address         `json:"Listen" comment:"Listen address for this component."`
+	Bind                 Address         `json:"Bind" comment:"Bind address for this component."`
 	Database             DatabaseOptions `json:"Database" comment:"Database configuration for this component."`
 	FederationMaxRetries uint32          `json:"SendMaxRetries" comment:"How many times we will try to resend a failed transaction to a specific server. The\nbackoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc."`
 	DisableTLSValidation bool            `json:"DisableTLSValidation" comment:"Disable the validation of TLS certificates of remote federated homeservers. Do not\nenable this option in production as it presents a security risk!"`
