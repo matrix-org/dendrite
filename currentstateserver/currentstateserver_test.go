@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"reflect"
@@ -54,7 +55,8 @@ var (
 	testEvents      = []gomatrixserverlib.HeaderedEvent{}
 	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]gomatrixserverlib.HeaderedEvent)
 
-	kafkaTopic = "room_events"
+	kafkaPrefix = "Dendrite"
+	kafkaTopic  = fmt.Sprintf("%s%s", kafkaPrefix, "OutputRoomEvent")
 )
 
 func init() {
@@ -100,6 +102,7 @@ func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.Sync
 	naffkaDBName := "test_naffka.db"
 	cfg.Global.ServerName = "kaer.morhen"
 	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource("file:" + stateDBName)
+	cfg.Global.Kafka.TopicPrefix = kafkaPrefix
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource("file:" + naffkaDBName),
 	})
