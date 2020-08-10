@@ -8,10 +8,19 @@ import (
 )
 
 func main() {
-	config := &config.Dendrite{}
-	config.Defaults()
+	cfg := &config.Dendrite{}
+	cfg.Defaults()
+	cfg.Logging = []config.LogrusHook{
+		{
+			Type:  "file",
+			Level: "info",
+			Params: map[string]interface{}{
+				"path": "/var/log/dendrite",
+			},
+		},
+	}
 
-	j, err := yaml.Marshal(config)
+	j, err := yaml.Marshal(cfg)
 	if err != nil {
 		panic(err)
 	}
