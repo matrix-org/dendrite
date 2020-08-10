@@ -25,6 +25,31 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+type AppServiceAPI struct {
+	Matrix  *Global  `yaml:"-"`
+	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
+
+	Listen Address `yaml:"listen"`
+	Bind   Address `yaml:"bind"`
+
+	Database DatabaseOptions `yaml:"database"`
+
+	ConfigFiles []string `yaml:"config_files"`
+}
+
+func (c *AppServiceAPI) Defaults() {
+	c.Listen = "localhost:7777"
+	c.Bind = "localhost:7777"
+	c.Database.Defaults()
+	c.Database.ConnectionString = "file:appservice.db"
+}
+
+func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	checkNotEmpty(configErrs, "app_service_api.listen", string(c.Listen))
+	checkNotEmpty(configErrs, "app_service_api.bind", string(c.Bind))
+	checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
+}
+
 // ApplicationServiceNamespace is the namespace that a specific application
 // service has management over.
 type ApplicationServiceNamespace struct {
@@ -132,8 +157,8 @@ func (a *ApplicationService) IsInterestedInRoomAlias(
 
 // loadAppServices iterates through all application service config files
 // and loads their data into the config object for later access.
-func loadAppServices(config *Dendrite) error {
-	for _, configPath := range config.ApplicationServices.ConfigFiles {
+func loadAppServices(config *AppServiceAPI, derived *Derived) error {
+	for _, configPath := range config.ConfigFiles {
 		// Create a new application service with default options
 		appservice := ApplicationService{
 			RateLimited: true,
@@ -157,26 +182,26 @@ func loadAppServices(config *Dendrite) error {
 		}
 
 		// Append the parsed application service to the global config
-		config.Derived.ApplicationServices = append(
-			config.Derived.ApplicationServices, appservice,
+		derived.ApplicationServices = append(
+			derived.ApplicationServices, appservice,
 		)
 	}
 
 	// Check for any errors in the loaded application services
-	return checkErrors(config)
+	return checkErrors(config, derived)
 }
 
 // setupRegexps will create regex objects for exclusive and non-exclusive
 // usernames, aliases and rooms of all application services, so that other
 // methods can quickly check if a particular string matches any of them.
-func setupRegexps(cfg *Dendrite) (err error) {
+func setupRegexps(_ *AppServiceAPI, derived *Derived) (err error) {
 	// Combine all exclusive namespaces for later string checking
 	var exclusiveUsernameStrings, exclusiveAliasStrings []string
 
 	// If an application service's regex is marked as exclusive, add
 	// its contents to the overall exlusive regex string. Room regex
 	// not necessary as we aren't denying exclusive room ID creation
-	for _, appservice := range cfg.Derived.ApplicationServices {
+	for _, appservice := range derived.ApplicationServices {
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			switch key {
 			case "users":
@@ -204,10 +229,10 @@ func setupRegexps(cfg *Dendrite) (err error) {
 	}
 
 	// Store compiled Regex
-	if cfg.Derived.ExclusiveApplicationServicesUsernameRegexp, err = regexp.Compile(exclusiveUsernames); err != nil {
+	if derived.ExclusiveApplicationServicesUsernameRegexp, err = regexp.Compile(exclusiveUsernames); err != nil {
 		return err
 	}
-	if cfg.Derived.ExclusiveApplicationServicesAliasRegexp, err = regexp.Compile(exclusiveAliases); err != nil {
+	if derived.ExclusiveApplicationServicesAliasRegexp, err = regexp.Compile(exclusiveAliases); err != nil {
 		return err
 	}
 
@@ -234,7 +259,7 @@ func appendExclusiveNamespaceRegexs(
 
 // checkErrors checks for any configuration errors amongst the loaded
 // application services according to the application service spec.
-func checkErrors(config *Dendrite) (err error) {
+func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
 
@@ -242,7 +267,7 @@ func checkErrors(config *Dendrite) (err error) {
 	groupIDRegexp := regexp.MustCompile(`\+.*:.*`)
 
 	// Check each application service for any config errors
-	for _, appservice := range config.Derived.ApplicationServices {
+	for _, appservice := range derived.ApplicationServices {
 		// Namespace-related checks
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			for _, namespace := range namespaceSlice {
@@ -258,13 +283,13 @@ func checkErrors(config *Dendrite) (err error) {
 		// Check if we've already seen this ID. No two application services
 		// can have the same ID or token.
 		if idMap[appservice.ID] {
-			return configErrors([]string{fmt.Sprintf(
+			return ConfigErrors([]string{fmt.Sprintf(
 				"Application service ID %s must be unique", appservice.ID,
 			)})
 		}
 		// Check if we've already seen this token
 		if tokenMap[appservice.ASToken] {
-			return configErrors([]string{fmt.Sprintf(
+			return ConfigErrors([]string{fmt.Sprintf(
 				"Application service Token %s must be unique", appservice.ASToken,
 			)})
 		}
@@ -284,7 +309,7 @@ func checkErrors(config *Dendrite) (err error) {
 		}
 	}
 
-	return setupRegexps(config)
+	return setupRegexps(config, derived)
 }
 
 // validateNamespace returns nil or an error based on whether a given
@@ -298,7 +323,7 @@ func validateNamespace(
 ) error {
 	// Check that namespace(s) are valid regex
 	if !IsValidRegex(namespace.Regex) {
-		return configErrors([]string{fmt.Sprintf(
+		return ConfigErrors([]string{fmt.Sprintf(
 			"Invalid regex string for Application Service %s", appservice.ID,
 		)})
 	}
@@ -310,7 +335,7 @@ func validateNamespace(
 
 		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 		if !correctFormat {
-			return configErrors([]string{fmt.Sprintf(
+			return ConfigErrors([]string{fmt.Sprintf(
 				"Invalid user group_id field for application service %s.",
 				appservice.ID,
 			)})

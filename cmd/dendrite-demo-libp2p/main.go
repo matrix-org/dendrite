@@ -75,8 +75,8 @@ func createFederationClient(
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
 	return gomatrixserverlib.NewFederationClientWithTransport(
-		base.Base.Cfg.Matrix.ServerName, base.Base.Cfg.Matrix.KeyID,
-		base.Base.Cfg.Matrix.PrivateKey, true, tr,
+		base.Base.Cfg.Global.ServerName, base.Base.Cfg.Global.KeyID,
+		base.Base.Cfg.Global.PrivateKey, true, tr,
 	)
 }
 
@@ -113,25 +113,28 @@ func main() {
 	}
 
 	cfg := config.Dendrite{}
-	cfg.SetDefaults()
-	cfg.Matrix.ServerName = "p2p"
-	cfg.Matrix.PrivateKey = privKey
-	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))
-	cfg.Kafka.UseNaffka = true
-	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
-	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
-	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
-	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
-	cfg.Database.SyncAPI = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
-	cfg.Database.RoomServer = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
-	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
-	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
-	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
-	cfg.Database.E2EKey = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
+	cfg.Defaults()
+	cfg.Global.ServerName = "p2p"
+	cfg.Global.PrivateKey = privKey
+	cfg.Global.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))
+	cfg.Global.Kafka.UseNaffka = true
+	cfg.Global.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
+	cfg.Global.Kafka.Topics.OutputClientData = "clientapiOutput"
+	cfg.Global.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
+	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
+	cfg.Global.Kafka.Topics.OutputKeyChangeEvent = "keyChangeOutput"
+	cfg.FederationSender.FederationMaxRetries = 6
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
+	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
+	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
+	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
+	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
+	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
+	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -142,19 +145,19 @@ func main() {
 	accountDB := base.Base.CreateAccountsDB()
 	deviceDB := base.Base.CreateDeviceDB()
 	federation := createFederationClient(base)
-	keyAPI := keyserver.NewInternalAPI(base.Base.Cfg, federation, base.Base.KafkaProducer)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil, keyAPI)
+	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation, base.Base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
-		base.Base.Cfg, federation, base.Base.Caches,
+		&base.Base.Cfg.ServerKeyAPI, federation, base.Base.Caches,
 	)
 	keyRing := serverKeyAPI.KeyRing()
 	createKeyDB(
 		base, serverKeyAPI,
 	)
 
-	stateAPI := currentstateserver.NewInternalAPI(base.Base.Cfg, base.Base.KafkaConsumer)
+	stateAPI := currentstateserver.NewInternalAPI(&base.Base.Cfg.CurrentStateServer, base.Base.KafkaConsumer)
 	rsAPI := roomserver.NewInternalAPI(
 		&base.Base, keyRing, federation,
 	)
@@ -198,7 +201,7 @@ func main() {
 		base.Base.BaseMux,
 		base.Base.PublicAPIMux,
 		base.Base.InternalAPIMux,
-		&cfg,
+		&cfg.Global,
 		base.Base.UseHTTPAPIs,
 	)
 

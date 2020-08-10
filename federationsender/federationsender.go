@@ -45,27 +45,29 @@ func NewInternalAPI(
 	stateAPI stateapi.CurrentStateInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 ) api.FederationSenderInternalAPI {
-	federationSenderDB, err := storage.NewDatabase(string(base.Cfg.Database.FederationSender), base.Cfg.DbProperties())
+	cfg := &base.Cfg.FederationSender
+
+	federationSenderDB, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
 	stats := &statistics.Statistics{
 		DB:                     federationSenderDB,
-		FailuresUntilBlacklist: base.Cfg.Matrix.FederationMaxRetries,
+		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
 	queues := queue.NewOutgoingQueues(
-		federationSenderDB, base.Cfg.Matrix.ServerName, federation, rsAPI, stats,
+		federationSenderDB, cfg.Matrix.ServerName, federation, rsAPI, stats,
 		&queue.SigningInfo{
-			KeyID:      base.Cfg.Matrix.KeyID,
-			PrivateKey: base.Cfg.Matrix.PrivateKey,
-			ServerName: base.Cfg.Matrix.ServerName,
+			KeyID:      cfg.Matrix.KeyID,
+			PrivateKey: cfg.Matrix.PrivateKey,
+			ServerName: cfg.Matrix.ServerName,
 		},
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.Cfg, base.KafkaConsumer, queues,
+		cfg, base.KafkaConsumer, queues,
 		federationSenderDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
@@ -73,17 +75,17 @@ func NewInternalAPI(
 	}
 
 	tsConsumer := consumers.NewOutputEDUConsumer(
-		base.Cfg, base.KafkaConsumer, queues, federationSenderDB,
+		cfg, base.KafkaConsumer, queues, federationSenderDB,
 	)
 	if err := tsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
-		base.Cfg, base.KafkaConsumer, queues, federationSenderDB, stateAPI,
+		&base.Cfg.KeyServer, base.KafkaConsumer, queues, federationSenderDB, stateAPI,
 	)
 	if err := keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
-	return internal.NewFederationSenderInternalAPI(federationSenderDB, base.Cfg, rsAPI, federation, keyRing, stats, queues)
+	return internal.NewFederationSenderInternalAPI(federationSenderDB, cfg, rsAPI, federation, keyRing, stats, queues)
 }

@@ -73,7 +73,7 @@ func Download(
 	req *http.Request,
 	origin gomatrixserverlib.ServerName,
 	mediaID types.MediaID,
-	cfg *config.Dendrite,
+	cfg *config.MediaAPI,
 	db storage.Database,
 	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
@@ -203,7 +203,7 @@ func (r *downloadRequest) Validate() *util.JSONResponse {
 func (r *downloadRequest) doDownload(
 	ctx context.Context,
 	w http.ResponseWriter,
-	cfg *config.Dendrite,
+	cfg *config.MediaAPI,
 	db storage.Database,
 	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
@@ -233,9 +233,9 @@ func (r *downloadRequest) doDownload(
 		r.MediaMetadata = mediaMetadata
 	}
 	return r.respondFromLocalFile(
-		ctx, w, cfg.Media.AbsBasePath, activeThumbnailGeneration,
-		cfg.Media.MaxThumbnailGenerators, db,
-		cfg.Media.DynamicThumbnails, cfg.Media.ThumbnailSizes,
+		ctx, w, cfg.AbsBasePath, activeThumbnailGeneration,
+		cfg.MaxThumbnailGenerators, db,
+		cfg.DynamicThumbnails, cfg.ThumbnailSizes,
 	)
 }
 
@@ -514,7 +514,7 @@ func (r *downloadRequest) generateThumbnail(
 func (r *downloadRequest) getRemoteFile(
 	ctx context.Context,
 	client *gomatrixserverlib.Client,
-	cfg *config.Dendrite,
+	cfg *config.MediaAPI,
 	db storage.Database,
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
@@ -550,9 +550,9 @@ func (r *downloadRequest) getRemoteFile(
 			// If we do not have a record, we need to fetch the remote file first and then respond from the local file
 			err := r.fetchRemoteFileAndStoreMetadata(
 				ctx, client,
-				cfg.Media.AbsBasePath, *cfg.Media.MaxFileSizeBytes, db,
-				cfg.Media.ThumbnailSizes, activeThumbnailGeneration,
-				cfg.Media.MaxThumbnailGenerators,
+				cfg.AbsBasePath, *cfg.MaxFileSizeBytes, db,
+				cfg.ThumbnailSizes, activeThumbnailGeneration,
+				cfg.MaxThumbnailGenerators,
 			)
 			if err != nil {
 				return errors.Wrap(err, "error querying the database.")

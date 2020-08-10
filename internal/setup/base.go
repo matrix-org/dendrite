@@ -15,7 +15,6 @@
 package setup
 
 import (
-	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -85,6 +84,15 @@ const HTTPClientTimeout = time.Second * 30
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
 func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs bool) *BaseDendrite {
+	configErrors := &config.ConfigErrors{}
+	cfg.Verify(configErrors, componentName == "Monolith") // TODO: better way?
+	if len(*configErrors) > 0 {
+		for _, err := range *configErrors {
+			logrus.Errorf("Configuration error: %s", err)
+		}
+		logrus.Fatalf("Failed to start due to configuration errors")
+	}
+
 	internal.SetupStdLogging()
 	internal.SetupHookLogging(cfg.Logging, componentName)
 	internal.SetupPprof()
@@ -96,7 +104,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 
 	var kafkaConsumer sarama.Consumer
 	var kafkaProducer sarama.SyncProducer
-	if cfg.Kafka.UseNaffka {
+	if cfg.Global.Kafka.UseNaffka {
 		kafkaConsumer, kafkaProducer = setupNaffka(cfg)
 	} else {
 		kafkaConsumer, kafkaProducer = setupKafka(cfg)
@@ -108,10 +116,10 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	}
 
 	client := http.Client{Timeout: HTTPClientTimeout}
-	if cfg.Proxy != nil {
+	if cfg.FederationSender.Proxy.Enabled {
 		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
-			Scheme: cfg.Proxy.Protocol,
-			Host:   fmt.Sprintf("%s:%d", cfg.Proxy.Host, cfg.Proxy.Port),
+			Scheme: cfg.FederationSender.Proxy.Protocol,
+			Host:   fmt.Sprintf("%s:%d", cfg.FederationSender.Proxy.Host, cfg.FederationSender.Proxy.Port),
 		})}
 	}
 
@@ -228,7 +236,7 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 // CreateDeviceDB creates a new instance of the device database. Should only be
 // called once per component.
 func (b *BaseDendrite) CreateDeviceDB() devices.Database {
-	db, err := devices.NewDatabase(string(b.Cfg.Database.Device), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
+	db, err := devices.NewDatabase(&b.Cfg.UserAPI.DeviceDatabase, b.Cfg.Global.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to devices db")
 	}
@@ -239,7 +247,7 @@ func (b *BaseDendrite) CreateDeviceDB() devices.Database {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
-	db, err := accounts.NewDatabase(string(b.Cfg.Database.Account), b.Cfg.DbProperties(), b.Cfg.Matrix.ServerName)
+	db, err := accounts.NewDatabase(&b.Cfg.UserAPI.AccountDatabase, b.Cfg.Global.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
@@ -251,8 +259,8 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
 	return gomatrixserverlib.NewFederationClient(
-		b.Cfg.Matrix.ServerName, b.Cfg.Matrix.KeyID, b.Cfg.Matrix.PrivateKey,
-		b.Cfg.Matrix.FederationDisableTLSValidation,
+		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
+		b.Cfg.FederationSender.DisableTLSValidation,
 	)
 }
 
@@ -277,7 +285,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 		b.BaseMux,
 		b.PublicAPIMux,
 		b.InternalAPIMux,
-		b.Cfg,
+		&b.Cfg.Global,
 		b.UseHTTPAPIs,
 	)
 	serv.Handler = b.BaseMux
@@ -293,12 +301,12 @@ func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
 
 // setupKafka creates kafka consumer/producer pair from the config.
 func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	consumer, err := sarama.NewConsumer(cfg.Kafka.Addresses, nil)
+	consumer, err := sarama.NewConsumer(cfg.Global.Kafka.Addresses, nil)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start kafka consumer")
 	}
 
-	producer, err := sarama.NewSyncProducer(cfg.Kafka.Addresses, nil)
+	producer, err := sarama.NewSyncProducer(cfg.Global.Kafka.Addresses, nil)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to setup kafka producers")
 	}
@@ -308,36 +316,26 @@ func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 
 // setupNaffka creates kafka consumer/producer pair from the config.
 func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	var err error
-	var db *sql.DB
 	var naffkaDB *naffka.DatabaseImpl
 
-	uri, err := url.Parse(string(cfg.Database.Naffka))
-	if err != nil || uri.Scheme == "file" {
-		var cs string
-		cs, err = sqlutil.ParseFileURI(string(cfg.Database.Naffka))
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to parse naffka database file URI")
-		}
-		db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to open naffka database")
-		}
+	db, err := sqlutil.Open(&cfg.Global.Kafka.Database)
+	if err != nil {
+		logrus.WithError(err).Panic("Failed to open naffka database")
+	}
 
+	switch {
+	case cfg.Global.Kafka.Database.ConnectionString.IsSQLite():
 		naffkaDB, err = naffka.NewSqliteDatabase(db)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
-	} else {
-		db, err = sqlutil.Open("postgres", string(cfg.Database.Naffka), nil)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to open naffka database")
-		}
-
+	case cfg.Global.Kafka.Database.ConnectionString.IsPostgres():
 		naffkaDB, err = naffka.NewPostgresqlDatabase(db)
 		if err != nil {
 			logrus.WithError(err).Panic("Failed to setup naffka database")
 		}
+	default:
+		panic("unknown naffka database type")
 	}
 
 	if naffkaDB == nil {

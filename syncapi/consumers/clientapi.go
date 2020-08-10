@@ -37,14 +37,14 @@ type OutputClientDataConsumer struct {
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
 func NewOutputClientDataConsumer(
-	cfg *config.Dendrite,
+	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
 	store storage.Database,
 ) *OutputClientDataConsumer {
 
 	consumer := internal.ContinualConsumer{
-		Topic:          string(cfg.Kafka.Topics.OutputClientData),
+		Topic:          string(cfg.Matrix.Kafka.Topics.OutputClientData),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

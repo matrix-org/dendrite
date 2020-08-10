@@ -121,7 +121,7 @@ func ClaimOneTimeKeys(
 
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
-func LocalKeys(cfg *config.Dendrite) util.JSONResponse {
+func LocalKeys(cfg *config.FederationAPI) util.JSONResponse {
 	keys, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -129,7 +129,7 @@ func LocalKeys(cfg *config.Dendrite) util.JSONResponse {
 	return util.JSONResponse{Code: http.StatusOK, JSON: keys}
 }
 
-func localKeys(cfg *config.Dendrite, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
+func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
 
 	keys.ServerName = cfg.Matrix.ServerName
@@ -142,7 +142,7 @@ func localKeys(cfg *config.Dendrite, validUntil time.Time) (*gomatrixserverlib.S
 		},
 	}
 
-	keys.TLSFingerprints = cfg.Matrix.TLSFingerPrints
+	keys.TLSFingerprints = cfg.TLSFingerPrints
 	keys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
 	keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(validUntil)
 

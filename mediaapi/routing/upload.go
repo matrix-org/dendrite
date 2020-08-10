@@ -54,7 +54,7 @@ type uploadResponse struct {
 // This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
 // Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
 // TODO: We should time out requests if they have not received any data within a configured timeout period.
-func Upload(req *http.Request, cfg *config.Dendrite, db storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) util.JSONResponse {
+func Upload(req *http.Request, cfg *config.MediaAPI, db storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) util.JSONResponse {
 	r, resErr := parseAndValidateRequest(req, cfg)
 	if resErr != nil {
 		return *resErr
@@ -75,7 +75,7 @@ func Upload(req *http.Request, cfg *config.Dendrite, db storage.Database, active
 // parseAndValidateRequest parses the incoming upload request to validate and extract
 // all the metadata about the media being uploaded.
 // Returns either an uploadRequest or an error formatted as a util.JSONResponse
-func parseAndValidateRequest(req *http.Request, cfg *config.Dendrite) (*uploadRequest, *util.JSONResponse) {
+func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRequest, *util.JSONResponse) {
 	r := &uploadRequest{
 		MediaMetadata: &types.MediaMetadata{
 			Origin:        cfg.Matrix.ServerName,
@@ -86,7 +86,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.Dendrite) (*uploadRe
 		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName),
 	}
 
-	if resErr := r.Validate(*cfg.Media.MaxFileSizeBytes); resErr != nil {
+	if resErr := r.Validate(*cfg.MaxFileSizeBytes); resErr != nil {
 		return nil, resErr
 	}
 
@@ -96,7 +96,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.Dendrite) (*uploadRe
 func (r *uploadRequest) doUpload(
 	ctx context.Context,
 	reqReader io.Reader,
-	cfg *config.Dendrite,
+	cfg *config.MediaAPI,
 	db storage.Database,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) *util.JSONResponse {
@@ -110,10 +110,10 @@ func (r *uploadRequest) doUpload(
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	// Data is truncated to maxFileSizeBytes. Content-Length was reported as 0 < Content-Length <= maxFileSizeBytes so this is OK.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(reqReader, *cfg.Media.MaxFileSizeBytes, cfg.Media.AbsBasePath)
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(reqReader, *cfg.MaxFileSizeBytes, cfg.AbsBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
-			"MaxFileSizeBytes": *cfg.Media.MaxFileSizeBytes,
+			"MaxFileSizeBytes": *cfg.MaxFileSizeBytes,
 		}).Warn("Error while transferring file")
 		fileutils.RemoveDir(tmpDir, r.Logger)
 		return &util.JSONResponse{
@@ -159,8 +159,8 @@ func (r *uploadRequest) doUpload(
 	}
 
 	return r.storeFileAndMetadata(
-		ctx, tmpDir, cfg.Media.AbsBasePath, db, cfg.Media.ThumbnailSizes,
-		activeThumbnailGeneration, cfg.Media.MaxThumbnailGenerators,
+		ctx, tmpDir, cfg.AbsBasePath, db, cfg.ThumbnailSizes,
+		activeThumbnailGeneration, cfg.MaxThumbnailGenerators,
 	)
 }
 

@@ -68,27 +68,28 @@ func main() {
 	}
 
 	cfg := &config.Dendrite{}
-	cfg.SetDefaults()
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
-	cfg.Matrix.PrivateKey = ygg.SigningPrivateKey()
-	cfg.Matrix.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Matrix.FederationMaxRetries = 8
-	cfg.Kafka.UseNaffka = true
-	cfg.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
-	cfg.Kafka.Topics.OutputClientData = "clientapiOutput"
-	cfg.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Database.Account = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-	cfg.Database.Device = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
-	cfg.Database.MediaAPI = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
-	cfg.Database.SyncAPI = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
-	cfg.Database.RoomServer = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.Database.ServerKey = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
-	cfg.Database.E2EKey = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
-	cfg.Database.FederationSender = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
-	cfg.Database.AppService = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.Database.CurrentState = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
-	cfg.Database.Naffka = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
-	cfg.Database.E2EKey = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
+	cfg.Defaults()
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
+	cfg.Global.PrivateKey = ygg.SigningPrivateKey()
+	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
+	cfg.Global.Kafka.UseNaffka = true
+	cfg.Global.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
+	cfg.Global.Kafka.Topics.OutputClientData = "clientapiOutput"
+	cfg.Global.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
+	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
+	cfg.Global.Kafka.Topics.OutputKeyChangeEvent = "keyChangeOutput"
+	cfg.FederationSender.FederationMaxRetries = 8
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
+	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
+	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
+	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
+	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
+	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
+	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -103,8 +104,8 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, base.KafkaProducer)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil, keyAPI)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
 	rsComponent := roomserver.NewInternalAPI(
@@ -117,7 +118,7 @@ func main() {
 	)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, stateAPI, keyRing,
 	)
@@ -155,7 +156,6 @@ func main() {
 		UserAPI:             userAPI,
 		StateAPI:            stateAPI,
 		KeyAPI:              keyAPI,
-		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,
 		),
@@ -166,7 +166,7 @@ func main() {
 		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
-		cfg,
+		&cfg.Global,
 		base.UseHTTPAPIs,
 	)
 

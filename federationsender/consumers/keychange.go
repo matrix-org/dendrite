@@ -41,7 +41,7 @@ type KeyChangeConsumer struct {
 
 // NewKeyChangeConsumer creates a new KeyChangeConsumer. Call Start() to begin consuming from key servers.
 func NewKeyChangeConsumer(
-	cfg *config.Dendrite,
+	cfg *config.KeyServer,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
@@ -49,7 +49,7 @@ func NewKeyChangeConsumer(
 ) *KeyChangeConsumer {
 	c := &KeyChangeConsumer{
 		consumer: &internal.ContinualConsumer{
-			Topic:          string(cfg.Kafka.Topics.OutputKeyChangeEvent),
+			Topic:          string(cfg.Matrix.Kafka.Topics.OutputKeyChangeEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},

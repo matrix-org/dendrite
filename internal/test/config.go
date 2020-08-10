@@ -49,6 +49,7 @@ const (
 // Generates new matrix and TLS keys for the server.
 func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*config.Dendrite, int, error) {
 	var cfg config.Dendrite
+	cfg.Defaults()
 
 	port := startPort
 	assignAddress := func() config.Address {
@@ -72,51 +73,53 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 
 	cfg.Version = config.Version
 
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(assignAddress())
-	cfg.Matrix.PrivateKeyPath = config.Path(serverKeyPath)
-	cfg.Matrix.FederationCertificatePaths = []config.Path{config.Path(tlsCertPath)}
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(assignAddress())
+	cfg.Global.PrivateKeyPath = config.Path(serverKeyPath)
 
-	cfg.Media.BasePath = config.Path(mediaBasePath)
+	cfg.FederationAPI.FederationCertificatePaths = []config.Path{config.Path(tlsCertPath)}
 
-	cfg.Kafka.Addresses = []string{kafkaURI}
-	// TODO: Different servers should be using different topics.
-	// Make this configurable somehow?
-	cfg.Kafka.Topics.OutputRoomEvent = "test.room.output"
-	cfg.Kafka.Topics.OutputClientData = "test.clientapi.output"
-	cfg.Kafka.Topics.OutputTypingEvent = "test.typing.output"
+	cfg.MediaAPI.BasePath = config.Path(mediaBasePath)
+
+	cfg.Global.Kafka.Addresses = []string{kafkaURI}
 
 	// TODO: Use different databases for the different schemas.
 	// Using the same database for every schema currently works because
 	// the table names are globally unique. But we might not want to
 	// rely on that in the future.
-	cfg.Database.Account = config.DataSource(database)
-	cfg.Database.AppService = config.DataSource(database)
-	cfg.Database.Device = config.DataSource(database)
-	cfg.Database.MediaAPI = config.DataSource(database)
-	cfg.Database.RoomServer = config.DataSource(database)
-	cfg.Database.ServerKey = config.DataSource(database)
-	cfg.Database.SyncAPI = config.DataSource(database)
-	cfg.Database.CurrentState = config.DataSource(database)
+	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(database)
+	cfg.FederationSender.Database.ConnectionString = config.DataSource(database)
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(database)
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(database)
+	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(database)
+	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(database)
 
-	cfg.Listen.ClientAPI = assignAddress()
-	cfg.Listen.AppServiceAPI = assignAddress()
-	cfg.Listen.FederationAPI = assignAddress()
-	cfg.Listen.MediaAPI = assignAddress()
-	cfg.Listen.RoomServer = assignAddress()
-	cfg.Listen.SyncAPI = assignAddress()
-	cfg.Listen.CurrentState = assignAddress()
-	cfg.Listen.EDUServer = assignAddress()
+	cfg.AppServiceAPI.Listen = assignAddress()
+	cfg.CurrentStateServer.Listen = assignAddress()
+	cfg.EDUServer.Listen = assignAddress()
+	cfg.FederationAPI.Listen = assignAddress()
+	cfg.FederationSender.Listen = assignAddress()
+	cfg.KeyServer.Listen = assignAddress()
+	cfg.MediaAPI.Listen = assignAddress()
+	cfg.RoomServer.Listen = assignAddress()
+	cfg.ServerKeyAPI.Listen = assignAddress()
+	cfg.SyncAPI.Listen = assignAddress()
+	cfg.UserAPI.Listen = assignAddress()
 
-	// Bind to the same address as the listen address
-	// All microservices are run on the same host in testing
-	cfg.Bind.ClientAPI = cfg.Listen.ClientAPI
-	cfg.Bind.AppServiceAPI = cfg.Listen.AppServiceAPI
-	cfg.Bind.FederationAPI = cfg.Listen.FederationAPI
-	cfg.Bind.MediaAPI = cfg.Listen.MediaAPI
-	cfg.Bind.RoomServer = cfg.Listen.RoomServer
-	cfg.Bind.SyncAPI = cfg.Listen.SyncAPI
-	cfg.Bind.CurrentState = cfg.Listen.CurrentState
-	cfg.Bind.EDUServer = cfg.Listen.EDUServer
+	cfg.AppServiceAPI.Bind = cfg.AppServiceAPI.Listen
+	cfg.CurrentStateServer.Bind = cfg.CurrentStateServer.Listen
+	cfg.EDUServer.Bind = cfg.EDUServer.Listen
+	cfg.FederationAPI.Bind = cfg.FederationAPI.Listen
+	cfg.FederationSender.Bind = cfg.FederationSender.Listen
+	cfg.KeyServer.Bind = cfg.KeyServer.Listen
+	cfg.MediaAPI.Bind = cfg.MediaAPI.Listen
+	cfg.RoomServer.Bind = cfg.RoomServer.Listen
+	cfg.ServerKeyAPI.Bind = cfg.ServerKeyAPI.Listen
+	cfg.SyncAPI.Bind = cfg.SyncAPI.Listen
+	cfg.UserAPI.Bind = cfg.UserAPI.Listen
 
 	return &cfg, port, nil
 }

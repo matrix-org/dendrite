@@ -234,7 +234,7 @@ func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib
 }
 
 // SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics listener
-func SetupHTTPAPI(servMux, publicApiMux, internalApiMux *mux.Router, cfg *config.Dendrite, enableHTTPAPIs bool) {
+func SetupHTTPAPI(servMux, publicApiMux, internalApiMux *mux.Router, cfg *config.Global, enableHTTPAPIs bool) {
 	if cfg.Metrics.Enabled {
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}

@@ -16,27 +16,19 @@ package storage
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/config"
 )
 
 // NewDatabase opens a new database
-func NewDatabase(
-	dataSourceName string,
-	dbProperties sqlutil.DbProperties, // nolint:unparam
-) (Database, error) {
-	uri, err := url.Parse(dataSourceName)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot use postgres implementation")
-	}
-	switch uri.Scheme {
-	case "file":
-		return sqlite3.NewDatabase(dataSourceName)
-	case "postgres":
-		return nil, fmt.Errorf("Cannot use postgres implementation")
+func NewDatabase(dbProperties *config.DatabaseOptions) (Database, error) {
+	switch {
+	case dbProperties.ConnectionString.IsSQLite():
+		return sqlite3.NewDatabase(dbProperties)
+	case dbProperties.ConnectionString.IsPostgres():
+		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:
-		return nil, fmt.Errorf("Cannot use postgres implementation")
+		return nil, fmt.Errorf("unexpected database type")
 	}
 }

@@ -47,7 +47,7 @@ const (
 // nolint: gocyclo
 func Setup(
 	publicAPIMux *mux.Router,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	fsAPI federationSenderAPI.FederationSenderInternalAPI,

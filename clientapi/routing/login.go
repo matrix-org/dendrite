@@ -58,7 +58,7 @@ func passwordLogin() flows {
 // Login implements GET and POST /login
 func Login(
 	req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
 		// TODO: support other forms of login other than password, depending on config options

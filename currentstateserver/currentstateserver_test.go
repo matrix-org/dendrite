@@ -15,6 +15,7 @@
 package currentstateserver
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
@@ -94,11 +95,15 @@ func MustWriteOutputEvent(t *testing.T, producer sarama.SyncProducer, out *rooms
 
 func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.SyncProducer, func()) {
 	cfg := &config.Dendrite{}
+	cfg.Defaults()
 	stateDBName := "test_state.db"
 	naffkaDBName := "test_naffka.db"
-	cfg.Kafka.Topics.OutputRoomEvent = config.Topic(kafkaTopic)
-	cfg.Database.CurrentState = config.DataSource("file:" + stateDBName)
-	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), "file:"+naffkaDBName, nil)
+	cfg.Global.ServerName = "kaer.morhen"
+	cfg.Global.Kafka.Topics.OutputRoomEvent = config.Topic(kafkaTopic)
+	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource("file:" + stateDBName)
+	db, err := sqlutil.Open(&config.DatabaseOptions{
+		ConnectionString: config.DataSource("file:" + naffkaDBName),
+	})
 	if err != nil {
 		t.Fatalf("Failed to open naffka database: %s", err)
 	}
@@ -110,7 +115,7 @@ func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.Sync
 	if err != nil {
 		t.Fatalf("Failed to create naffka consumer: %s", err)
 	}
-	return NewInternalAPI(cfg, naff), naff, func() {
+	return NewInternalAPI(&cfg.CurrentStateServer, naff), naff, func() {
 		os.Remove(naffkaDBName)
 		os.Remove(stateDBName)
 	}
@@ -165,8 +170,13 @@ func TestQueryCurrentState(t *testing.T) {
 					t.Errorf("QueryCurrentState want tuple %+v but it is missing from the response", tuple)
 					continue
 				}
-				if !reflect.DeepEqual(gotEvent.JSON(), wantEvent.JSON()) {
-					t.Errorf("QueryCurrentState tuple %+v got event JSON %s want %s", tuple, string(gotEvent.JSON()), string(wantEvent.JSON()))
+				gotCanon, err := gomatrixserverlib.CanonicalJSON(gotEvent.JSON())
+				if err != nil {
+					t.Errorf("CanonicalJSON failed: %w", err)
+					continue
+				}
+				if !bytes.Equal(gotCanon, wantEvent.JSON()) {
+					t.Errorf("QueryCurrentState tuple %+v got event JSON %s want %s", tuple, string(gotCanon), string(wantEvent.JSON()))
 				}
 			}
 		}

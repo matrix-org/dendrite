@@ -34,13 +34,13 @@ func AddInternalRoutes(router *mux.Router, intAPI api.CurrentStateInternalAPI) {
 
 // NewInternalAPI returns a concrete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
-func NewInternalAPI(cfg *config.Dendrite, consumer sarama.Consumer) api.CurrentStateInternalAPI {
-	csDB, err := storage.NewDatabase(string(cfg.Database.CurrentState), cfg.DbProperties())
+func NewInternalAPI(cfg *config.CurrentStateServer, consumer sarama.Consumer) api.CurrentStateInternalAPI {
+	csDB, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to open database")
 	}
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		string(cfg.Kafka.Topics.OutputRoomEvent), consumer, csDB,
+		string(cfg.Matrix.Kafka.Topics.OutputRoomEvent), consumer, csDB,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")

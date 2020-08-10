@@ -16,28 +16,22 @@ package accounts
 
 import (
 	"fmt"
-	"net/url"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func NewDatabase(
-	dataSourceName string,
-	dbProperties sqlutil.DbProperties, // nolint:unparam
+	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 ) (Database, error) {
-	uri, err := url.Parse(dataSourceName)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot use postgres implementation")
-	}
-	switch uri.Scheme {
-	case "postgres":
-		return nil, fmt.Errorf("Cannot use postgres implementation")
-	case "file":
-		return sqlite3.NewDatabase(dataSourceName, serverName)
+	switch {
+	case dbProperties.ConnectionString.IsSQLite():
+		return sqlite3.NewDatabase(dbProperties, serverName)
+	case dbProperties.ConnectionString.IsPostgres():
+		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:
-		return nil, fmt.Errorf("Cannot use postgres implementation")
+		return nil, fmt.Errorf("unexpected database type")
 	}
 }

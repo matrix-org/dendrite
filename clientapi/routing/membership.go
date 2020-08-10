@@ -41,7 +41,7 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 
 func SendBan(
 	req *http.Request, accountDB accounts.Database, device *userapi.Device,
-	roomID string, cfg *config.Dendrite,
+	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
@@ -52,7 +52,7 @@ func SendBan(
 }
 
 func sendMembership(ctx context.Context, accountDB accounts.Database, device *userapi.Device,
-	roomID, membership, reason string, cfg *config.Dendrite, targetUserID string, evTime time.Time,
+	roomID, membership, reason string, cfg *config.ClientAPI, targetUserID string, evTime time.Time,
 	roomVer gomatrixserverlib.RoomVersion,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI) util.JSONResponse {
 
@@ -94,7 +94,7 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 
 func SendKick(
 	req *http.Request, accountDB accounts.Database, device *userapi.Device,
-	roomID string, cfg *config.Dendrite,
+	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 	stateAPI currentstateAPI.CurrentStateInternalAPI,
 ) util.JSONResponse {
@@ -135,7 +135,7 @@ func SendKick(
 
 func SendUnban(
 	req *http.Request, accountDB accounts.Database, device *userapi.Device,
-	roomID string, cfg *config.Dendrite,
+	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
@@ -170,7 +170,7 @@ func SendUnban(
 
 func SendInvite(
 	req *http.Request, accountDB accounts.Database, device *userapi.Device,
-	roomID string, cfg *config.Dendrite,
+	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
@@ -236,7 +236,7 @@ func buildMembershipEvent(
 	targetUserID, reason string, accountDB accounts.Database,
 	device *userapi.Device,
 	membership, roomID string, isDirect bool,
-	cfg *config.Dendrite, evTime time.Time,
+	cfg *config.ClientAPI, evTime time.Time,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
 	profile, err := loadProfile(ctx, targetUserID, cfg, accountDB, asAPI)
@@ -263,7 +263,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return eventutil.BuildEvent(ctx, &builder, cfg, evTime, rsAPI, nil)
+	return eventutil.BuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns
@@ -273,7 +273,7 @@ func buildMembershipEvent(
 func loadProfile(
 	ctx context.Context,
 	userID string,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	accountDB accounts.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*authtypes.Profile, error) {
@@ -326,7 +326,7 @@ func checkAndProcessThreepid(
 	req *http.Request,
 	device *userapi.Device,
 	body *threepid.MembershipRequest,
-	cfg *config.Dendrite,
+	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	accountDB accounts.Database,
 	roomID string,

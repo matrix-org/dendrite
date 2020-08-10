@@ -15,17 +15,13 @@
 package sqlite3
 
 import (
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
 )
 
-func NewDatabase(dataSourceName string) (*shared.Database, error) {
-	var err error
-	cs, err := sqlutil.ParseFileURI(dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	db, err := sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil)
+func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
 	}

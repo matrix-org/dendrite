@@ -36,7 +36,7 @@ type messagesReq struct {
 	db               storage.Database
 	rsAPI            api.RoomserverInternalAPI
 	federation       *gomatrixserverlib.FederationClient
-	cfg              *config.Dendrite
+	cfg              *config.SyncAPI
 	roomID           string
 	from             *types.TopologyToken
 	to               *types.TopologyToken
@@ -61,7 +61,7 @@ func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.SyncAPI,
 ) util.JSONResponse {
 	var err error
 

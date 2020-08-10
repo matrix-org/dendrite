@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -59,7 +60,9 @@ func MustCreateDatabase(t *testing.T) storage.Database {
 			t.Fatalf("tried to delete stale test database but failed: %s", err)
 		}
 	}
-	db, err := sqlite3.NewDatabase(fmt.Sprintf("file:%s", dbname))
+	db, err := sqlite3.NewDatabase(&config.DatabaseOptions{
+		ConnectionString: config.DataSource(fmt.Sprintf("file:%s", dbname)),
+	})
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}

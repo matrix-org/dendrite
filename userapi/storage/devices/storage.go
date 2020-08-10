@@ -17,9 +17,9 @@
 package devices
 
 import (
-	"net/url"
+	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/userapi/storage/devices/postgres"
 	"github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -27,17 +27,13 @@ import (
 
 // NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
 // and sets postgres connection parameters
-func NewDatabase(dataSourceName string, dbProperties sqlutil.DbProperties, serverName gomatrixserverlib.ServerName) (Database, error) {
-	uri, err := url.Parse(dataSourceName)
-	if err != nil {
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName)
-	}
-	switch uri.Scheme {
-	case "postgres":
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName)
-	case "file":
-		return sqlite3.NewDatabase(dataSourceName, serverName)
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (Database, error) {
+	switch {
+	case dbProperties.ConnectionString.IsSQLite():
+		return sqlite3.NewDatabase(dbProperties, serverName)
+	case dbProperties.ConnectionString.IsPostgres():
+		return postgres.NewDatabase(dbProperties, serverName)
 	default:
-		return postgres.NewDatabase(dataSourceName, dbProperties, serverName)
+		return nil, fmt.Errorf("unexpected database type")
 	}
 }

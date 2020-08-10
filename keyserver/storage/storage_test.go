@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/keyserver/api"
 )
 
@@ -21,7 +22,9 @@ func MustCreateDatabase(t *testing.T) (Database, func()) {
 		log.Fatal(err)
 	}
 	t.Logf("Database %s", tmpfile.Name())
-	db, err := NewDatabase(fmt.Sprintf("file://%s", tmpfile.Name()), nil)
+	db, err := NewDatabase(&config.DatabaseOptions{
+		ConnectionString: config.DataSource(fmt.Sprintf("file://%s", tmpfile.Name())),
+	})
 	if err != nil {
 		t.Fatalf("Failed to NewDatabase: %s", err)
 	}

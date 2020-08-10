@@ -22,6 +22,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
@@ -37,13 +38,10 @@ type SyncServerDatasource struct {
 
 // NewDatabase creates a new sync server database
 // nolint: gocyclo
-func NewDatabase(dataSourceName string) (*SyncServerDatasource, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
-	cs, err := sqlutil.ParseFileURI(dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	if d.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
+	var err error
+	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
 	if err = d.prepare(); err != nil {

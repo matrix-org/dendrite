@@ -99,12 +99,12 @@ func (r *RoomserverInternalAPI) performLeaveRoomByID(
 	// but everyone has since left. I suspect it does the wrong thing.
 	buildRes := api.QueryLatestEventsAndStateResponse{}
 	event, err := eventutil.BuildEvent(
-		ctx,        // the request context
-		&eb,        // the template leave event
-		r.Cfg,      // the server configuration
-		time.Now(), // the event timestamp to use
-		r,          // the roomserver API to use
-		&buildRes,  // the query response
+		ctx,          // the request context
+		&eb,          // the template leave event
+		r.Cfg.Matrix, // the server configuration
+		time.Now(),   // the event timestamp to use
+		r,            // the roomserver API to use
+		&buildRes,    // the query response
 	)
 	if err != nil {
 		return fmt.Errorf("eventutil.BuildEvent: %w", err)

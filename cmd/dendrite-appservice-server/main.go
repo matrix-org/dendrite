@@ -30,6 +30,6 @@ func main() {
 	intAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.AppServiceAPI), string(base.Cfg.Listen.AppServiceAPI))
+	base.SetupAndServeHTTP(string(base.Cfg.AppServiceAPI.Bind), string(base.Cfg.AppServiceAPI.Listen))
 
 }

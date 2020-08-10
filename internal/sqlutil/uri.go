@@ -15,14 +15,20 @@
 package sqlutil
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+
+	"github.com/matrix-org/dendrite/internal/config"
 )
 
 // ParseFileURI returns the filepath in the given file: URI. Specifically, this will handle
 // both relative (file:foo.db) and absolute (file:///path/to/foo) paths.
-func ParseFileURI(dataSourceName string) (string, error) {
-	uri, err := url.Parse(dataSourceName)
+func ParseFileURI(dataSourceName config.DataSource) (string, error) {
+	if !dataSourceName.IsSQLite() {
+		return "", errors.New("ParseFileURI expects SQLite connection string")
+	}
+	uri, err := url.Parse(string(dataSourceName))
 	if err != nil {
 		return "", err
 	}

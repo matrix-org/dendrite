@@ -56,7 +56,7 @@ var (
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
 	req *http.Request, rsAPI api.RoomserverInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	federation *gomatrixserverlib.FederationClient,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
@@ -106,7 +106,7 @@ func ExchangeThirdPartyInvite(
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
 	rsAPI api.RoomserverInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	var builder gomatrixserverlib.EventBuilder
@@ -196,7 +196,7 @@ func ExchangeThirdPartyInvite(
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
 	ctx context.Context, rsAPI api.RoomserverInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	inv invite, federation *gomatrixserverlib.FederationClient,
 	userAPI userapi.UserInternalAPI,
 ) (*gomatrixserverlib.Event, error) {
@@ -263,7 +263,7 @@ func createInviteFrom3PIDInvite(
 func buildMembershipEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, rsAPI api.RoomserverInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -327,7 +327,7 @@ func buildMembershipEvent(
 // them responded with an error.
 func sendToRemoteServer(
 	ctx context.Context, inv invite,
-	federation *gomatrixserverlib.FederationClient, _ *config.Dendrite,
+	federation *gomatrixserverlib.FederationClient, _ *config.FederationAPI,
 	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
 	remoteServers := make([]gomatrixserverlib.ServerName, 2)

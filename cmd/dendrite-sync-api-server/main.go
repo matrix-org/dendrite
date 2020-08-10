@@ -31,8 +31,8 @@ func main() {
 
 	syncapi.AddPublicRoutes(
 		base.PublicAPIMux, base.KafkaConsumer, userAPI, rsAPI, base.KeyServerHTTPClient(), base.CurrentStateAPIClient(),
-		federation, cfg)
+		federation, &cfg.SyncAPI)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.SyncAPI), string(base.Cfg.Listen.SyncAPI))
+	base.SetupAndServeHTTP(string(base.Cfg.SyncAPI.Bind), string(base.Cfg.SyncAPI.Listen))
 
 }

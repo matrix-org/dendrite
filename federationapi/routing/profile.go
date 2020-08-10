@@ -30,7 +30,7 @@ import (
 func GetProfile(
 	httpReq *http.Request,
 	userAPI userapi.UserInternalAPI,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 ) util.JSONResponse {
 	userID, field := httpReq.FormValue("user_id"), httpReq.FormValue("field")
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/userapi"
@@ -23,11 +24,15 @@ const (
 )
 
 func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database, devices.Database) {
-	accountDB, err := accounts.NewDatabase("file::memory:", nil, serverName)
+	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
+		ConnectionString: "file::memory:",
+	}, serverName)
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}
-	deviceDB, err := devices.NewDatabase("file::memory:", nil, serverName)
+	deviceDB, err := devices.NewDatabase(&config.DatabaseOptions{
+		ConnectionString: "file::memory:",
+	}, serverName)
 	if err != nil {
 		t.Fatalf("failed to create device DB: %s", err)
 	}

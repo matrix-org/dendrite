@@ -139,7 +139,7 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 	tr := go_http_js_libp2p.NewP2pTransport(node)
 
 	fed := gomatrixserverlib.NewFederationClient(
-		cfg.Matrix.ServerName, cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, true,
+		cfg.Global.ServerName, cfg.Global.KeyID, cfg.Global.PrivateKey, true,
 	)
 	fed.Client = *gomatrixserverlib.NewClientWithTransport(true, tr)
 
@@ -161,31 +161,31 @@ func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http
 
 func main() {
 	cfg := &config.Dendrite{}
-	cfg.SetDefaults()
-	cfg.Kafka.UseNaffka = true
-	cfg.Database.Account = "file:/idb/dendritejs_account.db"
-	cfg.Database.AppService = "file:/idb/dendritejs_appservice.db"
-	cfg.Database.Device = "file:/idb/dendritejs_device.db"
-	cfg.Database.FederationSender = "file:/idb/dendritejs_fedsender.db"
-	cfg.Database.MediaAPI = "file:/idb/dendritejs_mediaapi.db"
-	cfg.Database.Naffka = "file:/idb/dendritejs_naffka.db"
-	cfg.Database.RoomServer = "file:/idb/dendritejs_roomserver.db"
-	cfg.Database.ServerKey = "file:/idb/dendritejs_serverkey.db"
-	cfg.Database.SyncAPI = "file:/idb/dendritejs_syncapi.db"
-	cfg.Database.CurrentState = "file:/idb/dendritejs_currentstate.db"
-	cfg.Database.E2EKey = "file:/idb/dendritejs_e2ekey.db"
-	cfg.Kafka.Topics.OutputTypingEvent = "output_typing_event"
-	cfg.Kafka.Topics.OutputSendToDeviceEvent = "output_send_to_device_event"
-	cfg.Kafka.Topics.OutputClientData = "output_client_data"
-	cfg.Kafka.Topics.OutputRoomEvent = "output_room_event"
-	cfg.Matrix.TrustedIDServers = []string{
+	cfg.Defaults()
+	cfg.UserAPI.AccountDatabase.ConnectionString = "file:/idb/dendritejs_account.db"
+	cfg.AppServiceAPI.Database.ConnectionString = "file:/idb/dendritejs_appservice.db"
+	cfg.UserAPI.DeviceDatabase.ConnectionString = "file:/idb/dendritejs_device.db"
+	cfg.FederationSender.Database.ConnectionString = "file:/idb/dendritejs_fedsender.db"
+	cfg.MediaAPI.Database.ConnectionString = "file:/idb/dendritejs_mediaapi.db"
+	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"
+	cfg.ServerKeyAPI.Database.ConnectionString = "file:/idb/dendritejs_serverkey.db"
+	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
+	cfg.CurrentStateServer.Database.ConnectionString = "file:/idb/dendritejs_currentstate.db"
+	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
+	cfg.Global.Kafka.UseNaffka = true
+	cfg.Global.Kafka.Database.ConnectionString = "file:/idb/dendritejs_naffka.db"
+	cfg.Global.Kafka.Topics.OutputTypingEvent = "output_typing_event"
+	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "output_send_to_device_event"
+	cfg.Global.Kafka.Topics.OutputClientData = "output_client_data"
+	cfg.Global.Kafka.Topics.OutputRoomEvent = "output_room_event"
+	cfg.Global.TrustedIDServers = []string{
 		"matrix.org", "vector.im",
 	}
-	cfg.Matrix.KeyID = libp2pMatrixKeyID
-	cfg.Matrix.PrivateKey = generateKey()
+	cfg.Global.KeyID = libp2pMatrixKeyID
+	cfg.Global.PrivateKey = generateKey()
 
-	serverName, node := createP2PNode(cfg.Matrix.PrivateKey)
-	cfg.Matrix.ServerName = gomatrixserverlib.ServerName(serverName)
+	serverName, node := createP2PNode(cfg.Global.PrivateKey)
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(serverName)
 
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
@@ -196,8 +196,8 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	deviceDB := base.CreateDeviceDB()
 	federation := createFederationClient(cfg, node)
-	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, base.KafkaProducer)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, nil, keyAPI)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
 	fetcher := &libp2pKeyFetcher{}
@@ -208,7 +208,7 @@ func main() {
 		KeyDatabase: fetcher,
 	}
 
-	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
 	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
@@ -244,7 +244,7 @@ func main() {
 		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
-		cfg,
+		&cfg.Global,
 		base.UseHTTPAPIs,
 	)
 

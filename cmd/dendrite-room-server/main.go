@@ -33,6 +33,6 @@ func main() {
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 
-	base.SetupAndServeHTTP(string(base.Cfg.Bind.RoomServer), string(base.Cfg.Listen.RoomServer))
+	base.SetupAndServeHTTP(string(base.Cfg.RoomServer.Bind), string(base.Cfg.RoomServer.Listen))
 
 }

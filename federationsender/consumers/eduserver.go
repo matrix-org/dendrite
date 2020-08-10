@@ -43,27 +43,27 @@ type OutputEDUConsumer struct {
 
 // NewOutputEDUConsumer creates a new OutputEDUConsumer. Call Start() to begin consuming from EDU servers.
 func NewOutputEDUConsumer(
-	cfg *config.Dendrite,
+	cfg *config.FederationSender,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 ) *OutputEDUConsumer {
 	c := &OutputEDUConsumer{
 		typingConsumer: &internal.ContinualConsumer{
-			Topic:          string(cfg.Kafka.Topics.OutputTypingEvent),
+			Topic:          string(cfg.Matrix.Kafka.Topics.OutputTypingEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		sendToDeviceConsumer: &internal.ContinualConsumer{
-			Topic:          string(cfg.Kafka.Topics.OutputSendToDeviceEvent),
+			Topic:          string(cfg.Matrix.Kafka.Topics.OutputSendToDeviceEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		queues:            queues,
 		db:                store,
 		ServerName:        cfg.Matrix.ServerName,
-		TypingTopic:       string(cfg.Kafka.Topics.OutputTypingEvent),
-		SendToDeviceTopic: string(cfg.Kafka.Topics.OutputSendToDeviceEvent),
+		TypingTopic:       string(cfg.Matrix.Kafka.Topics.OutputTypingEvent),
+		SendToDeviceTopic: string(cfg.Matrix.Kafka.Topics.OutputSendToDeviceEvent),
 	}
 	c.typingConsumer.ProcessMessage = c.onTypingEvent
 	c.sendToDeviceConsumer.ProcessMessage = c.onSendToDeviceEvent

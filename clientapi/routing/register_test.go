@@ -179,30 +179,31 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	}
 
 	// Set up a config
-	fakeConfig := config.Dendrite{}
-	fakeConfig.Matrix.ServerName = "localhost"
-	fakeConfig.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
+	fakeConfig := &config.Dendrite{}
+	fakeConfig.Defaults()
+	fakeConfig.Global.ServerName = "localhost"
+	fakeConfig.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
 
 	// Access token is correct, user_id omitted so we are acting as SenderLocalpart
-	asID, resp := validateApplicationService(&fakeConfig, fakeSenderLocalpart, "1234")
+	asID, resp := validateApplicationService(&fakeConfig.ClientAPI, fakeSenderLocalpart, "1234")
 	if resp != nil || asID != fakeID {
 		t.Errorf("appservice should have validated and returned correct ID: %s", resp.JSON)
 	}
 
 	// Access token is incorrect, user_id omitted so we are acting as SenderLocalpart
-	asID, resp = validateApplicationService(&fakeConfig, fakeSenderLocalpart, "xxxx")
+	asID, resp = validateApplicationService(&fakeConfig.ClientAPI, fakeSenderLocalpart, "xxxx")
 	if resp == nil || asID == fakeID {
 		t.Errorf("access_token should have been marked as invalid")
 	}
 
 	// Access token is correct, acting as valid user_id
-	asID, resp = validateApplicationService(&fakeConfig, "_appservice_bob", "1234")
+	asID, resp = validateApplicationService(&fakeConfig.ClientAPI, "_appservice_bob", "1234")
 	if resp != nil || asID != fakeID {
 		t.Errorf("access_token and user_id should've been valid: %s", resp.JSON)
 	}
 
 	// Access token is correct, acting as invalid user_id
-	asID, resp = validateApplicationService(&fakeConfig, "_something_else", "1234")
+	asID, resp = validateApplicationService(&fakeConfig.ClientAPI, "_something_else", "1234")
 	if resp == nil || asID == fakeID {
 		t.Errorf("user_id should not have been valid: @_something_else:localhost")
 	}

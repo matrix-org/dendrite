@@ -14,7 +14,7 @@ import (
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
 type RoomserverInternalAPI struct {
 	DB                   storage.Database
-	Cfg                  *config.Dendrite
+	Cfg                  *config.RoomServer
 	Producer             sarama.SyncProducer
 	Cache                caching.RoomVersionCache
 	ServerName           gomatrixserverlib.ServerName

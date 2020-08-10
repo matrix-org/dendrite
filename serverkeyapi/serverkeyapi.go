@@ -25,13 +25,12 @@ func AddInternalRoutes(router *mux.Router, intAPI api.ServerKeyInternalAPI, cach
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	cfg *config.Dendrite,
+	cfg *config.ServerKeyAPI,
 	fedClient *gomatrixserverlib.FederationClient,
 	caches *caching.Caches,
 ) api.ServerKeyInternalAPI {
 	innerDB, err := storage.NewDatabase(
-		string(cfg.Database.ServerKey),
-		cfg.DbProperties(),
+		&cfg.Database,
 		cfg.Matrix.ServerName,
 		cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
 		cfg.Matrix.KeyID,
@@ -62,7 +61,7 @@ func NewInternalAPI(
 	}
 
 	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
-	for _, ps := range cfg.Matrix.KeyPerspectives {
+	for _, ps := range cfg.KeyPerspectives {
 		perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
 			PerspectiveServerName: ps.ServerName,
 			PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},

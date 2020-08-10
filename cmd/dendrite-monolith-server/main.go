@@ -54,11 +54,17 @@ func main() {
 		// the API endpoints. They'll listen on the same port as the monolith
 		// itself.
 		addr := config.Address(*httpBindAddr)
-		cfg.Listen.RoomServer = addr
-		cfg.Listen.EDUServer = addr
-		cfg.Listen.AppServiceAPI = addr
-		cfg.Listen.FederationSender = addr
-		cfg.Listen.ServerKeyAPI = addr
+		cfg.AppServiceAPI.Listen = addr
+		cfg.ClientAPI.Listen = addr
+		cfg.CurrentStateServer.Listen = addr
+		cfg.EDUServer.Listen = addr
+		cfg.FederationAPI.Listen = addr
+		cfg.FederationSender.Listen = addr
+		cfg.KeyServer.Listen = addr
+		cfg.MediaAPI.Listen = addr
+		cfg.RoomServer.Listen = addr
+		cfg.ServerKeyAPI.Listen = addr
+		cfg.SyncAPI.Listen = addr
 	}
 
 	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
@@ -69,15 +75,15 @@ func main() {
 	federation := base.CreateFederationClient()
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
-		base.Cfg, federation, base.Caches,
+		&base.Cfg.ServerKeyAPI, federation, base.Caches,
 	)
 	if base.UseHTTPAPIs {
 		serverkeyapi.AddInternalRoutes(base.InternalAPIMux, serverKeyAPI, base.Caches)
 		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
-	keyAPI := keyserver.NewInternalAPI(base.Cfg, federation, base.KafkaProducer)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Matrix.ServerName, cfg.Derived.ApplicationServices, keyAPI)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
 	rsImpl := roomserver.NewInternalAPI(
@@ -109,7 +115,7 @@ func main() {
 		asAPI = base.AppserviceHTTPClient()
 	}
 
-	stateAPI := currentstateserver.NewInternalAPI(base.Cfg, base.KafkaConsumer)
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, stateAPI, keyRing,
@@ -126,7 +132,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
-		Client:        gomatrixserverlib.NewClient(cfg.Matrix.FederationDisableTLSValidation),
+		Client:        gomatrixserverlib.NewClient(cfg.FederationSender.DisableTLSValidation),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,
@@ -147,7 +153,7 @@ func main() {
 		base.BaseMux,
 		base.PublicAPIMux,
 		base.InternalAPIMux,
-		cfg,
+		&cfg.Global,
 		base.UseHTTPAPIs,
 	)
 

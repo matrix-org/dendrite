@@ -48,7 +48,7 @@ type joinedMember struct {
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
 	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
-	_ *config.Dendrite,
+	_ *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	queryReq := api.QueryMembershipsForRoomRequest{

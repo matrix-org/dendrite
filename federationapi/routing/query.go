@@ -31,7 +31,7 @@ import (
 func RoomAliasToID(
 	httpReq *http.Request,
 	federation *gomatrixserverlib.FederationClient,
-	cfg *config.Dendrite,
+	cfg *config.FederationAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	senderAPI federationSenderAPI.FederationSenderInternalAPI,
 ) util.JSONResponse {

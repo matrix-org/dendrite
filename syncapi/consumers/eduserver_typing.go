@@ -37,14 +37,14 @@ type OutputTypingEventConsumer struct {
 // NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputTypingEventConsumer(
-	cfg *config.Dendrite,
+	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	n *sync.Notifier,
 	store storage.Database,
 ) *OutputTypingEventConsumer {
 
 	consumer := internal.ContinualConsumer{
-		Topic:          string(cfg.Kafka.Topics.OutputTypingEvent),
+		Topic:          string(cfg.Matrix.Kafka.Topics.OutputTypingEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

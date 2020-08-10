@@ -44,9 +44,9 @@ func AddPublicRoutes(
 	keyAPI keyapi.KeyInternalAPI,
 	currentStateAPI currentstateapi.CurrentStateInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	cfg *config.Dendrite,
+	cfg *config.SyncAPI,
 ) {
-	syncDB, err := storage.NewSyncServerDatasource(string(cfg.Database.SyncAPI), cfg.DbProperties())
+	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
@@ -65,7 +65,7 @@ func AddPublicRoutes(
 	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, currentStateAPI)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		cfg.Matrix.ServerName, string(cfg.Kafka.Topics.OutputKeyChangeEvent),
+		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.Topics.OutputKeyChangeEvent),
 		consumer, notifier, keyAPI, currentStateAPI, syncDB,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {

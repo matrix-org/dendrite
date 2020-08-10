@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	// Import SQLite database driver
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
@@ -34,14 +35,10 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dataSourceName string) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	var result Database
 	var err error
-	cs, err := sqlutil.ParseFileURI(dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	if result.db, err = sqlutil.Open(sqlutil.SQLiteDriverName(), cs, nil); err != nil {
+	if result.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
 	if err = result.prepare(); err != nil {
