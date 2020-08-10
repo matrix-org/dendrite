@@ -95,6 +95,8 @@ func DeviceListCatchup(
 		util.GetLogger(ctx).WithError(queryRes.Error).Error("QueryKeyChanges failed")
 		return hasNew, nil
 	}
+	// QueryKeyChanges gets ALL users who have changed keys, we want the ones who share rooms with the user.
+	queryRes.UserIDs = filterSharedUsers(ctx, stateAPI, userID, queryRes.UserIDs)
 	util.GetLogger(ctx).Debugf(
 		"QueryKeyChanges request p=%d,off=%d,to=%d response p=%d off=%d uids=%v",
 		partition, offset, toOffset, queryRes.Partition, queryRes.Offset, queryRes.UserIDs,
@@ -215,6 +217,31 @@ func TrackChangedUsers(
 		}
 	}
 	return changed, left, nil
+}
+
+func filterSharedUsers(
+	ctx context.Context, stateAPI currentstateAPI.CurrentStateInternalAPI, userID string, usersWithChangedKeys []string,
+) []string {
+	var result []string
+	var sharedUsersRes currentstateAPI.QuerySharedUsersResponse
+	err := stateAPI.QuerySharedUsers(ctx, &currentstateAPI.QuerySharedUsersRequest{
+		UserID: userID,
+	}, &sharedUsersRes)
+	if err != nil {
+		// default to all users so we do needless queries rather than miss some important device update
+		return usersWithChangedKeys
+	}
+	// We forcibly put ourselves in this list because we should be notified about our own device updates
+	// and if we are in 0 rooms then we don't technically share any room with ourselves so we wouldn't
+	// be notified about key changes.
+	sharedUsersRes.UserIDsToCount[userID] = 1
+
+	for _, uid := range usersWithChangedKeys {
+		if sharedUsersRes.UserIDsToCount[uid] > 0 {
+			result = append(result, uid)
+		}
+	}
+	return result
 }
 
 func joinedRooms(res *types.Response, userID string) []string {
