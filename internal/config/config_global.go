@@ -148,8 +148,8 @@ type DatabaseOptions struct {
 }
 
 func (c *DatabaseOptions) Defaults() {
-	c.MaxOpenConnections = 0
-	c.MaxIdleConnections = 0
+	c.MaxOpenConnections = 100
+	c.MaxIdleConnections = 2
 	c.ConnMaxLifetimeSeconds = -1
 }
 
