@@ -84,6 +84,15 @@ const HTTPClientTimeout = time.Second * 30
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
 func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs bool) *BaseDendrite {
+	configErrors := &config.ConfigErrors{}
+	cfg.Verify(configErrors, componentName == "Monolith") // TODO: better way?
+	if len(*configErrors) > 0 {
+		for _, err := range *configErrors {
+			logrus.Errorf("Configuration error: %s", err)
+		}
+		logrus.Fatalf("Failed to start due to configuration errors")
+	}
+
 	internal.SetupStdLogging()
 	internal.SetupHookLogging(cfg.Logging, componentName)
 	internal.SetupPprof()

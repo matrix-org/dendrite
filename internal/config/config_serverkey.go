@@ -22,7 +22,7 @@ func (c *ServerKeyAPI) Defaults() {
 	c.Database.ConnectionString = "file:serverkeyapi.db"
 }
 
-func (c *ServerKeyAPI) Verify(configErrs *configErrors) {
+func (c *ServerKeyAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "server_key_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "server_key_api.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "server_key_api.database.connection_string", string(c.Database.ConnectionString))

@@ -47,7 +47,7 @@ func (c *ClientAPI) Defaults() {
 	c.RegistrationDisabled = false
 }
 
-func (c *ClientAPI) Verify(configErrs *configErrors) {
+func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "client_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "client_api.bind", string(c.Bind))
 	if c.RecaptchaEnabled {
@@ -77,7 +77,7 @@ type TURN struct {
 	Password string `yaml:"turn_password"`
 }
 
-func (c *TURN) Verify(configErrs *configErrors) {
+func (c *TURN) Verify(configErrs *ConfigErrors) {
 	value := c.UserLifetime
 	if value != "" {
 		if _, err := time.ParseDuration(value); err != nil {

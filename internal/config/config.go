@@ -176,9 +176,9 @@ type LogrusHook struct {
 	Params map[string]interface{} `yaml:"params"`
 }
 
-// configErrors stores problems encountered when parsing a config file.
+// ConfigErrors stores problems encountered when parsing a config file.
 // It implements the error interface.
-type configErrors []string
+type ConfigErrors []string
 
 // Load a yaml config file for a server run as multiple processes or as a monolith.
 // Checks the config to ensure that it is valid.
@@ -298,9 +298,9 @@ func (c *Dendrite) Defaults() {
 	c.Wiring()
 }
 
-func (c *Dendrite) Verify(configErrs *configErrors) {
+func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	type verifiable interface {
-		Verify(configErrs *configErrors)
+		Verify(configErrs *ConfigErrors, isMonolith bool)
 	}
 	for _, c := range []verifiable{
 		&c.Global, &c.ClientAPI, &c.CurrentStateServer,
@@ -309,7 +309,7 @@ func (c *Dendrite) Verify(configErrs *configErrors) {
 		&c.ServerKeyAPI, &c.SyncAPI, &c.UserAPI,
 		&c.AppServiceAPI,
 	} {
-		c.Verify(configErrs)
+		c.Verify(configErrs, isMonolith)
 	}
 }
 
@@ -333,7 +333,7 @@ func (c *Dendrite) Wiring() {
 
 // Error returns a string detailing how many errors were contained within a
 // configErrors type.
-func (errs configErrors) Error() string {
+func (errs ConfigErrors) Error() string {
 	if len(errs) == 1 {
 		return errs[0]
 	}
@@ -347,13 +347,13 @@ func (errs configErrors) Error() string {
 // the client code.
 // This method is safe to use with an uninitialized configErrors because
 // if it is nil, it will be properly allocated.
-func (errs *configErrors) Add(str string) {
+func (errs *ConfigErrors) Add(str string) {
 	*errs = append(*errs, str)
 }
 
 // checkNotEmpty verifies the given value is not empty in the configuration.
 // If it is, adds an error to the list.
-func checkNotEmpty(configErrs *configErrors, key, value string) {
+func checkNotEmpty(configErrs *ConfigErrors, key, value string) {
 	if value == "" {
 		configErrs.Add(fmt.Sprintf("missing config key %q", key))
 	}
@@ -361,7 +361,7 @@ func checkNotEmpty(configErrs *configErrors, key, value string) {
 
 // checkNotZero verifies the given value is not zero in the configuration.
 // If it is, adds an error to the list.
-func checkNotZero(configErrs *configErrors, key string, value int64) {
+func checkNotZero(configErrs *ConfigErrors, key string, value int64) {
 	if value == 0 {
 		configErrs.Add(fmt.Sprintf("missing config key %q", key))
 	}
@@ -369,14 +369,14 @@ func checkNotZero(configErrs *configErrors, key string, value int64) {
 
 // checkPositive verifies the given value is positive (zero included)
 // in the configuration. If it is not, adds an error to the list.
-func checkPositive(configErrs *configErrors, key string, value int64) {
+func checkPositive(configErrs *ConfigErrors, key string, value int64) {
 	if value < 0 {
 		configErrs.Add(fmt.Sprintf("invalid value for config key %q: %d", key, value))
 	}
 }
 
 // checkLogging verifies the parameters logging.* are valid.
-func (config *Dendrite) checkLogging(configErrs *configErrors) {
+func (config *Dendrite) checkLogging(configErrs *ConfigErrors) {
 	for _, logrusHook := range config.Logging {
 		checkNotEmpty(configErrs, "logging.type", string(logrusHook.Type))
 		checkNotEmpty(configErrs, "logging.level", string(logrusHook.Level))
@@ -386,7 +386,7 @@ func (config *Dendrite) checkLogging(configErrs *configErrors) {
 // check returns an error type containing all errors found within the config
 // file.
 func (config *Dendrite) check(_ bool) error { // monolithic
-	var configErrs configErrors
+	var configErrs ConfigErrors
 
 	if config.Version != Version {
 		configErrs.Add(fmt.Sprintf(

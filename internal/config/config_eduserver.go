@@ -12,7 +12,7 @@ func (c *EDUServer) Defaults() {
 	c.Bind = "localhost:7778"
 }
 
-func (c *EDUServer) Verify(configErrs *configErrors) {
+func (c *EDUServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "edu_server.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "edu_server.bind", string(c.Bind))
 }

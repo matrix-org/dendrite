@@ -44,9 +44,10 @@ func (c *MediaAPI) Defaults() {
 	defaultMaxFileSizeBytes := FileSizeBytes(10485760)
 	c.MaxFileSizeBytes = &defaultMaxFileSizeBytes
 	c.MaxThumbnailGenerators = 10
+	c.BasePath = "./media_store"
 }
 
-func (c *MediaAPI) Verify(configErrs *configErrors) {
+func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "media_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "media_api.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))

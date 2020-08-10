@@ -44,7 +44,7 @@ func (c *AppServiceAPI) Defaults() {
 	c.Database.ConnectionString = "file:appservice.db"
 }
 
-func (c *AppServiceAPI) Verify(configErrs *configErrors) {
+func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "app_service_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "app_service_api.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
@@ -283,13 +283,13 @@ func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 		// Check if we've already seen this ID. No two application services
 		// can have the same ID or token.
 		if idMap[appservice.ID] {
-			return configErrors([]string{fmt.Sprintf(
+			return ConfigErrors([]string{fmt.Sprintf(
 				"Application service ID %s must be unique", appservice.ID,
 			)})
 		}
 		// Check if we've already seen this token
 		if tokenMap[appservice.ASToken] {
-			return configErrors([]string{fmt.Sprintf(
+			return ConfigErrors([]string{fmt.Sprintf(
 				"Application service Token %s must be unique", appservice.ASToken,
 			)})
 		}
@@ -323,7 +323,7 @@ func validateNamespace(
 ) error {
 	// Check that namespace(s) are valid regex
 	if !IsValidRegex(namespace.Regex) {
-		return configErrors([]string{fmt.Sprintf(
+		return ConfigErrors([]string{fmt.Sprintf(
 			"Invalid regex string for Application Service %s", appservice.ID,
 		)})
 	}
@@ -335,7 +335,7 @@ func validateNamespace(
 
 		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 		if !correctFormat {
-			return configErrors([]string{fmt.Sprintf(
+			return ConfigErrors([]string{fmt.Sprintf(
 				"Invalid user group_id field for application service %s.",
 				appservice.ID,
 			)})

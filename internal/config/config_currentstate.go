@@ -18,7 +18,7 @@ func (c *CurrentStateServer) Defaults() {
 	c.Database.ConnectionString = "file:currentstate.db"
 }
 
-func (c *CurrentStateServer) Verify(configErrs *configErrors) {
+func (c *CurrentStateServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "current_state_server.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "current_state_server.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "current_state_server.database.connection_string", string(c.Database.ConnectionString))

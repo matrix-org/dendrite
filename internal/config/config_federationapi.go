@@ -25,8 +25,9 @@ func (c *FederationAPI) Defaults() {
 	c.Bind = "localhost:7772"
 }
 
-func (c *FederationAPI) Verify(configErrs *configErrors) {
+func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "federation_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "federation_api.bind", string(c.Bind))
-	checkNotZero(configErrs, "federation_api.federation_certificates", int64(len(c.FederationCertificatePaths)))
+	// TODO: not applicable always, e.g. in demos
+	//checkNotZero(configErrs, "federation_api.federation_certificates", int64(len(c.FederationCertificatePaths)))
 }

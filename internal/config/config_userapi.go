@@ -23,7 +23,7 @@ func (c *UserAPI) Defaults() {
 	c.DeviceDatabase.ConnectionString = "file:userapi_devices.db"
 }
 
-func (c *UserAPI) Verify(configErrs *configErrors) {
+func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "user_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "user_api.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))

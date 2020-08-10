@@ -52,12 +52,12 @@ func (c *Global) Defaults() {
 	c.Metrics.Defaults()
 }
 
-func (c *Global) Verify(configErrs *configErrors) {
+func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
 
-	c.Kafka.Verify(configErrs)
-	c.Metrics.Verify(configErrs)
+	c.Kafka.Verify(configErrs, isMonolith)
+	c.Metrics.Verify(configErrs, isMonolith)
 }
 
 type Kafka struct {
@@ -96,14 +96,11 @@ func (c *Kafka) Defaults() {
 	c.Topics.OutputKeyChangeEvent = "OutputKeyChangeEventTopic"
 }
 
-func (c *Kafka) Verify(configErrs *configErrors) {
+func (c *Kafka) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if c.UseNaffka {
-		// TODO: monolithic check
-		/*
-			if !monolithic {
-				configErrs.Add(fmt.Sprintf("naffka can only be used in a monolithic server"))
-			}
-		*/
+		if !isMonolith {
+			configErrs.Add("naffka can only be used in a monolithic server")
+		}
 		checkNotEmpty(configErrs, "global.kafka.database.connection_string", string(c.Database.ConnectionString))
 	} else {
 		// If we aren't using naffka then we need to have at least one kafka
@@ -136,7 +133,7 @@ func (c *Metrics) Defaults() {
 	c.BasicAuth.Password = "metrics"
 }
 
-func (c *Metrics) Verify(configErrs *configErrors) {
+func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 type DatabaseOptions struct {
@@ -156,7 +153,7 @@ func (c *DatabaseOptions) Defaults() {
 	c.ConnMaxLifetimeSeconds = -1
 }
 
-func (c *DatabaseOptions) Verify(configErrs *configErrors) {
+func (c *DatabaseOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 // MaxIdleConns returns maximum idle connections to the DB

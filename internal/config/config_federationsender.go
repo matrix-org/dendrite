@@ -35,7 +35,7 @@ func (c *FederationSender) Defaults() {
 	c.Proxy.Defaults()
 }
 
-func (c *FederationSender) Verify(configErrs *configErrors) {
+func (c *FederationSender) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "federation_sender.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "federation_sender.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "federation_sender.database.connection_string", string(c.Database.ConnectionString))
@@ -60,5 +60,5 @@ func (c *Proxy) Defaults() {
 	c.Port = 8080
 }
 
-func (c *Proxy) Verify(configErrs *configErrors) {
+func (c *Proxy) Verify(configErrs *ConfigErrors) {
 }

@@ -16,7 +16,7 @@ func (c *RoomServer) Defaults() {
 	c.Database.ConnectionString = "file:roomserver.db"
 }
 
-func (c *RoomServer) Verify(configErrs *configErrors) {
+func (c *RoomServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "room_server.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "room_server.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))

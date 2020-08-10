@@ -16,7 +16,7 @@ func (c *KeyServer) Defaults() {
 	c.Database.ConnectionString = "file:keyserver.db"
 }
 
-func (c *KeyServer) Verify(configErrs *configErrors) {
+func (c *KeyServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "key_server.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "key_server.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "key_server.database.connection_string", string(c.Database.ConnectionString))
