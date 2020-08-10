@@ -14,7 +14,11 @@ type FederationSender struct {
 	// tolerate when sending federation requests to a specific server. The backoff
 	// is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds, etc.
 	// The default value is 16 if not specified, which is circa 18 hours.
-	FederationMaxRetries uint32 `yaml:"federation_max_retries"`
+	FederationMaxRetries uint32 `yaml:"send_max_retries"`
+
+	// FederationDisableTLSValidation disables the validation of X.509 TLS certs
+	// on remote federation endpoints. This is not recommended in production!
+	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 
 	Proxy Proxy `yaml:"proxy_outbound"`
 }
@@ -26,6 +30,7 @@ func (c *FederationSender) Defaults() {
 	c.Database.ConnectionString = "file:federationsender.db"
 
 	c.FederationMaxRetries = 16
+	c.DisableTLSValidation = false
 
 	c.Proxy.Defaults()
 }

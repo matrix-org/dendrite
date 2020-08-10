@@ -112,6 +112,9 @@ type StreamingToken struct {
 }
 
 func (t *StreamingToken) SetLog(name string, lp *LogPosition) {
+	if t.logs == nil {
+		t.logs = make(map[string]*LogPosition)
+	}
 	t.logs[name] = lp
 }
 
@@ -173,12 +176,14 @@ func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) 
 		}
 		ret.Positions[i] = other.Positions[i]
 	}
+	ret.logs = make(map[string]*LogPosition)
 	for name := range t.logs {
 		otherLog := other.Log(name)
 		if otherLog == nil {
 			continue
 		}
-		t.logs[name] = otherLog
+		copy := *otherLog
+		ret.logs[name] = &copy
 	}
 	return ret
 }

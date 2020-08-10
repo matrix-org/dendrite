@@ -250,10 +250,14 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 				if len(dk.KeyJSON) == 0 {
 					continue // don't include blank keys
 				}
-				// inject display name if known
+				// inject display name if known (either locally or remotely)
+				displayName := dk.DisplayName
+				if queryRes.DeviceInfo[dk.DeviceID].DisplayName != "" {
+					displayName = queryRes.DeviceInfo[dk.DeviceID].DisplayName
+				}
 				dk.KeyJSON, _ = sjson.SetBytes(dk.KeyJSON, "unsigned", struct {
 					DisplayName string `json:"device_display_name,omitempty"`
-				}{queryRes.DeviceInfo[dk.DeviceID].DisplayName})
+				}{displayName})
 				res.DeviceKeys[userID][dk.DeviceID] = dk.KeyJSON
 			}
 		} else {
@@ -261,10 +265,47 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 			domainToDeviceKeys[domain][userID] = append(domainToDeviceKeys[domain][userID], deviceIDs...)
 		}
 	}
-	// TODO: set device display names when they are known
+
+	// attempt to satisfy key queries from the local database first as we should get device updates pushed to us
+	domainToDeviceKeys = a.remoteKeysFromDatabase(ctx, res, domainToDeviceKeys)
+	if len(domainToDeviceKeys) == 0 {
+		return // nothing to query
+	}
 
 	// perform key queries for remote devices
 	a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
+}
+
+func (a *KeyInternalAPI) remoteKeysFromDatabase(
+	ctx context.Context, res *api.QueryKeysResponse, domainToDeviceKeys map[string]map[string][]string,
+) map[string]map[string][]string {
+	fetchRemote := make(map[string]map[string][]string)
+	for domain, userToDeviceMap := range domainToDeviceKeys {
+		for userID, deviceIDs := range userToDeviceMap {
+			keys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs)
+			// if we can't query the db or there are fewer keys than requested, fetch from remote.
+			// Likewise, we can't safely return keys from the db when all devices are requested as we don't
+			// know if one has just been added.
+			if len(deviceIDs) == 0 || err != nil || len(keys) < len(deviceIDs) {
+				if _, ok := fetchRemote[domain]; !ok {
+					fetchRemote[domain] = make(map[string][]string)
+				}
+				fetchRemote[domain][userID] = append(fetchRemote[domain][userID], deviceIDs...)
+				continue
+			}
+			if res.DeviceKeys[userID] == nil {
+				res.DeviceKeys[userID] = make(map[string]json.RawMessage)
+			}
+			for _, key := range keys {
+				// inject the display name
+				key.KeyJSON, _ = sjson.SetBytes(key.KeyJSON, "unsigned", struct {
+					DisplayName string `json:"device_display_name,omitempty"`
+				}{key.DisplayName})
+				res.DeviceKeys[userID][key.DeviceID] = key.KeyJSON
+			}
+		}
+	}
+	return fetchRemote
 }
 
 func (a *KeyInternalAPI) queryRemoteKeys(

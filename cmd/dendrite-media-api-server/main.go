@@ -26,7 +26,7 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	userAPI := base.UserAPIClient()
-	client := gomatrixserverlib.NewClient()
+	client := gomatrixserverlib.NewClient(cfg.FederationSender.DisableTLSValidation)
 
 	mediaapi.AddPublicRoutes(base.PublicAPIMux, &base.Cfg.MediaAPI, userAPI, client)
 

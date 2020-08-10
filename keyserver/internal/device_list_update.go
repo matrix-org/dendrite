@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
-	"github.com/matrix-org/dendrite/keyserver/producers"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -65,7 +64,7 @@ type DeviceListUpdater struct {
 	mu            *sync.Mutex // protects UserIDToMutex
 
 	db          DeviceListUpdaterDatabase
-	producer    *producers.KeyChange
+	producer    KeyChangeProducer
 	fedClient   *gomatrixserverlib.FederationClient
 	workerChans []chan gomatrixserverlib.ServerName
 }
@@ -88,9 +87,14 @@ type DeviceListUpdaterDatabase interface {
 	PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error)
 }
 
+// KeyChangeProducer is the interface for producers.KeyChange useful for testing.
+type KeyChangeProducer interface {
+	ProduceKeyChanges(keys []api.DeviceMessage) error
+}
+
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
-	db DeviceListUpdaterDatabase, producer *producers.KeyChange, fedClient *gomatrixserverlib.FederationClient,
+	db DeviceListUpdaterDatabase, producer KeyChangeProducer, fedClient *gomatrixserverlib.FederationClient,
 	numWorkers int,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
@@ -154,12 +158,17 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 	if err != nil {
 		return false, fmt.Errorf("failed to check prev IDs exist for %s (%s): %w", event.UserID, event.DeviceID, err)
 	}
+	// if this is the first time we're hearing about this user, sync the device list manually.
+	if len(event.PrevID) == 0 {
+		exists = false
+	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"prev_ids_exist": exists,
 		"user_id":        event.UserID,
 		"device_id":      event.DeviceID,
 		"stream_id":      event.StreamID,
 		"prev_ids":       event.PrevID,
+		"display_name":   event.DeviceDisplayName,
 	}).Info("DeviceListUpdater.Update")
 
 	// if we haven't missed anything update the database and notify users
@@ -263,16 +272,17 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 			hasFailures = true
 			continue
 		}
-		err = u.updateDeviceList(ctx, &res)
+		err = u.updateDeviceList(&res)
 		if err != nil {
-			logger.WithError(err).WithField("user_id", userID).Error("fetched device list but failed to store it")
+			logger.WithError(err).WithField("user_id", userID).Error("fetched device list but failed to store/emit it")
 			hasFailures = true
 		}
 	}
 	return hasFailures
 }
 
-func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *gomatrixserverlib.RespUserDevices) error {
+func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevices) error {
+	ctx := context.Background() // we've got the keys, don't time out when persisting them to the database.
 	keys := make([]api.DeviceMessage, len(res.Devices))
 	for i, device := range res.Devices {
 		keyJSON, err := json.Marshal(device.Keys)
@@ -292,7 +302,15 @@ func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *gomatrixs
 	}
 	err := u.db.StoreRemoteDeviceKeys(ctx, keys)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to store remote device keys: %w", err)
 	}
-	return u.db.MarkDeviceListStale(ctx, res.UserID, false)
+	err = u.db.MarkDeviceListStale(ctx, res.UserID, false)
+	if err != nil {
+		return fmt.Errorf("failed to mark device list as fresh: %w", err)
+	}
+	err = u.producer.ProduceKeyChanges(keys)
+	if err != nil {
+		return fmt.Errorf("failed to emit key changes for fresh device list: %w", err)
+	}
+	return nil
 }

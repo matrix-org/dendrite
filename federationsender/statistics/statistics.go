@@ -65,8 +65,8 @@ type ServerStatistics struct {
 	statistics     *Statistics                  //
 	serverName     gomatrixserverlib.ServerName //
 	blacklisted    atomic.Bool                  // is the node blacklisted
-	backoffUntil   atomic.Value                 // time.Time to wait until before sending requests
-	failCounter    atomic.Uint32                // how many times have we failed?
+	backoffStarted atomic.Bool                  // is the backoff started
+	backoffCount   atomic.Uint32                // number of times BackoffDuration has been called
 	successCounter atomic.Uint32                // how many times have we succeeded?
 }
 
@@ -76,55 +76,67 @@ type ServerStatistics struct {
 // we will unblacklist it.
 func (s *ServerStatistics) Success() {
 	s.successCounter.Add(1)
-	s.failCounter.Store(0)
+	s.backoffStarted.Store(false)
+	s.backoffCount.Store(0)
 	s.blacklisted.Store(false)
-	if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
-		logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
+	if s.statistics.DB != nil {
+		if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
+			logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
+		}
 	}
 }
 
-// Failure marks a failure and works out when to backoff until. It
-// returns true if the worker should give up altogether because of
-// too many consecutive failures. At this point the host is marked
-// as blacklisted.
-func (s *ServerStatistics) Failure() bool {
-	// Increase the fail counter.
-	failCounter := s.failCounter.Add(1)
+// Failure marks a failure and starts backing off if needed.
+// The next call to BackoffIfRequired will do the right thing
+// after this.
+func (s *ServerStatistics) Failure() {
+	if s.backoffStarted.CAS(false, true) {
+		s.backoffCount.Store(0)
+	}
+}
 
-	// Check that we haven't failed more times than is acceptable.
-	if failCounter >= s.statistics.FailuresUntilBlacklist {
+// BackoffIfRequired will block for as long as the current
+// backoff requires, if needed. Otherwise it will do nothing.
+func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <-chan bool) (time.Duration, bool) {
+	if started := s.backoffStarted.Load(); !started {
+		return 0, false
+	}
+
+	// Work out how many times we've backed off so far.
+	count := s.backoffCount.Inc()
+	duration := time.Second * time.Duration(math.Exp2(float64(count)))
+
+	// Work out if we should be blacklisting at this point.
+	if count >= s.statistics.FailuresUntilBlacklist {
 		// We've exceeded the maximum amount of times we're willing
 		// to back off, which is probably in the region of hours by
 		// now. Mark the host as blacklisted and tell the caller to
 		// give up.
 		s.blacklisted.Store(true)
-		if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
-			logrus.WithError(err).Errorf("Failed to add %q to blacklist", s.serverName)
+		if s.statistics.DB != nil {
+			if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
+				logrus.WithError(err).Errorf("Failed to add %q to blacklist", s.serverName)
+			}
 		}
-		return true
+		return duration, true
 	}
 
-	// We're still under the threshold so work out the exponential
-	// backoff based on how many times we have failed already. The
-	// worker goroutine will wait until this time before processing
-	// anything from the queue.
-	backoffSeconds := time.Second * time.Duration(math.Exp2(float64(failCounter)))
-	s.backoffUntil.Store(
-		time.Now().Add(backoffSeconds),
-	)
-	return false
-}
+	// Notify the destination queue that we're backing off now.
+	backingOff.Store(true)
+	defer backingOff.Store(false)
 
-// BackoffDuration returns both a bool stating whether to wait,
-// and then if true, a duration to wait for.
-func (s *ServerStatistics) BackoffDuration() (bool, time.Duration) {
-	backoff, until := false, time.Second
-	if b, ok := s.backoffUntil.Load().(time.Time); ok {
-		if b.After(time.Now()) {
-			backoff, until = true, time.Until(b)
-		}
+	// Work out how long we should be backing off for.
+	logrus.Warnf("Backing off %q for %s", s.serverName, duration)
+
+	// Wait for either an interruption or for the backoff to
+	// complete.
+	select {
+	case <-interrupt:
+		logrus.Debugf("Interrupting backoff for %q", s.serverName)
+	case <-time.After(duration):
 	}
-	return backoff, until
+
+	return duration, false
 }
 
 // Blacklisted returns true if the server is blacklisted and false

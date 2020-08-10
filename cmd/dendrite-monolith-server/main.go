@@ -132,7 +132,7 @@ func main() {
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
 		DeviceDB:      deviceDB,
-		Client:        gomatrixserverlib.NewClient(),
+		Client:        gomatrixserverlib.NewClient(cfg.FederationSender.DisableTLSValidation),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,

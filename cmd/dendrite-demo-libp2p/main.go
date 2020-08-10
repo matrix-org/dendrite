@@ -75,7 +75,8 @@ func createFederationClient(
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
 	return gomatrixserverlib.NewFederationClientWithTransport(
-		base.Base.Cfg.Global.ServerName, base.Base.Cfg.Global.KeyID, base.Base.Cfg.Global.PrivateKey, tr,
+		base.Base.Cfg.Global.ServerName, base.Base.Cfg.Global.KeyID,
+		base.Base.Cfg.Global.PrivateKey, true, tr,
 	)
 }
 
@@ -87,7 +88,7 @@ func createClient(
 		"matrix",
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
-	return gomatrixserverlib.NewClientWithTransport(tr)
+	return gomatrixserverlib.NewClientWithTransport(true, tr)
 }
 
 func main() {
