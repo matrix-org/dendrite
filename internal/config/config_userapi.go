@@ -1,17 +1,12 @@
 package config
 
 type UserAPI struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `json:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
-
-	// The Account database stores the login details and account information
-	// for local users. It is accessed by the UserAPI.
-	AccountDatabase DatabaseOptions `yaml:"account_database"`
-	// The Device database stores session information for the devices of logged
-	// in local users. It is accessed by the UserAPI.
-	DeviceDatabase DatabaseOptions `yaml:"device_database"`
+	Listen          Address         `json:"Listen" comment:"Listen address for this component."`
+	Bind            Address         `json:"Bind" comment:"Bind address for this component."`
+	AccountDatabase DatabaseOptions `json:"AccountDatabase" comment:"Database configuration for the account database."`
+	DeviceDatabase  DatabaseOptions `json:"DeviceDatabase" comment:"Database configuration for the device database."`
 }
 
 func (c *UserAPI) Defaults() {

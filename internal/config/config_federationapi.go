@@ -3,21 +3,12 @@ package config
 import "github.com/matrix-org/gomatrixserverlib"
 
 type FederationAPI struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `json:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
-
-	// List of paths to X509 certificates used by the external federation listeners.
-	// These are used to calculate the TLS fingerprints to publish for this server.
-	// Other matrix servers talking to this server will expect the x509 certificate
-	// to match one of these certificates.
-	// The certificates should be in PEM format.
-	FederationCertificatePaths []Path `yaml:"federation_certificates"`
-
-	// A list of SHA256 TLS fingerprints for the X509 certificates used by the
-	// federation listener for this server.
-	TLSFingerPrints []gomatrixserverlib.TLSFingerprint `yaml:"-"`
+	Listen                     Address                            `json:"Listen" comment:"Listen address for this component."`
+	Bind                       Address                            `json:"Bind" comment:"Bind address for this component."`
+	FederationCertificatePaths []Path                             `json:"FederationCertificates" comment:"List of paths to X.509 certificates to be used by the external federation listeners.\nThese certificates will be used to calculate the TLS fingerprints and other servers\nwill expect the certificate to match these fingerprints. Certificates must be in PEM\nformat."`
+	TLSFingerPrints            []gomatrixserverlib.TLSFingerprint `json:"-"`
 }
 
 func (c *FederationAPI) Defaults() {

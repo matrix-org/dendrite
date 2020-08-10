@@ -48,35 +48,35 @@ type Dendrite struct {
 	// to update their config file to the current version.
 	// The version of the file should only be different if there has
 	// been a breaking change to the config file format.
-	Version int `yaml:"version"`
+	Version int `json:"Version"`
 
-	Global             Global             `yaml:"global"`
-	AppServiceAPI      AppServiceAPI      `yaml:"app_service_api"`
-	ClientAPI          ClientAPI          `yaml:"client_api"`
-	CurrentStateServer CurrentStateServer `yaml:"current_state_server"`
-	EDUServer          EDUServer          `yaml:"edu_server"`
-	FederationAPI      FederationAPI      `yaml:"federation_api"`
-	FederationSender   FederationSender   `yaml:"federation_sender"`
-	KeyServer          KeyServer          `yaml:"key_server"`
-	MediaAPI           MediaAPI           `yaml:"media_api"`
-	RoomServer         RoomServer         `yaml:"room_server"`
-	ServerKeyAPI       ServerKeyAPI       `yaml:"server_key_api"`
-	SyncAPI            SyncAPI            `yaml:"sync_api"`
-	UserAPI            UserAPI            `yaml:"user_api"`
+	Global             Global             `json:"Global"`
+	AppServiceAPI      AppServiceAPI      `json:"AppServiceAPI"`
+	ClientAPI          ClientAPI          `json:"ClientAPI"`
+	CurrentStateServer CurrentStateServer `json:"CurrentStateServer"`
+	EDUServer          EDUServer          `json:"EDUServer"`
+	FederationAPI      FederationAPI      `json:"FederationAPI"`
+	FederationSender   FederationSender   `json:"FederationSender"`
+	KeyServer          KeyServer          `json:"KeyServer"`
+	MediaAPI           MediaAPI           `json:"MediaAPI"`
+	RoomServer         RoomServer         `json:"RoomServer"`
+	ServerKeyAPI       ServerKeyAPI       `json:"ServerKeyAPI"`
+	SyncAPI            SyncAPI            `json:"SyncAPI"`
+	UserAPI            UserAPI            `json:"UserAPI"`
 
 	// The config for tracing the dendrite servers.
 	Tracing struct {
 		// Set to true to enable tracer hooks. If false, no tracing is set up.
-		Enabled bool `yaml:"enabled"`
+		Enabled bool `json:"Enabled"`
 		// The config for the jaeger opentracing reporter.
-		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
-	} `yaml:"tracing"`
+		Jaeger jaegerconfig.Configuration `json:"Jaeger"`
+	} `json:"Tracing"`
 
 	// The config for logging informations. Each hook will be added to logrus.
-	Logging []LogrusHook `yaml:"logging"`
+	Logging []LogrusHook `json:"Logging"`
 
 	// Any information derived from the configuration options for later use.
-	Derived Derived `yaml:"-"`
+	Derived Derived `json:"-"`
 }
 
 // TODO: Kill Derived
@@ -86,11 +86,11 @@ type Derived struct {
 		// http://matrix.org/docs/spec/HEAD/client_server/r0.3.0.html#user-interactive-authentication-api
 		// As long as the generated flows only rely on config file options,
 		// we can generate them on startup and store them until needed
-		Flows []authtypes.Flow `json:"flows"`
+		Flows []authtypes.Flow `json:"Flows"`
 
 		// Params that need to be returned to the client during
 		// registration in order to complete registration stages.
-		Params map[string]interface{} `json:"params"`
+		Params map[string]interface{} `json:"Params"`
 	}
 
 	// Application services parsed from their config files
@@ -108,21 +108,6 @@ type Derived struct {
 	ExclusiveApplicationServicesAliasRegexp *regexp.Regexp
 	// Note: An Exclusive Regex for room ID isn't necessary as we aren't blocking
 	// servers from creating RoomIDs in exclusive application service namespaces
-}
-
-// KeyPerspectives are used to configure perspective key servers for
-// retrieving server keys.
-type KeyPerspectives []struct {
-	// The server name of the perspective key server
-	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
-	// Server keys for the perspective user, used to verify the
-	// keys have been signed by the perspective server
-	Keys []struct {
-		// The key ID, e.g. ed25519:auto
-		KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
-		// The public key in base64 unpadded format
-		PublicKey string `yaml:"public_key"`
-	} `yaml:"keys"`
 }
 
 // A Path on the filesystem.
@@ -153,13 +138,13 @@ type FileSizeBytes int64
 // ThumbnailSize contains a single thumbnail size configuration
 type ThumbnailSize struct {
 	// Maximum width of the thumbnail image
-	Width int `yaml:"width"`
+	Width int `json:"Width"`
 	// Maximum height of the thumbnail image
-	Height int `yaml:"height"`
+	Height int `json:"Height"`
 	// ResizeMethod is one of crop or scale.
 	// crop scales to fill the requested dimensions and crops the excess.
 	// scale scales to fit the requested dimensions and one dimension may be smaller than requested.
-	ResizeMethod string `yaml:"method,omitempty"`
+	ResizeMethod string `json:"Method,omitempty"`
 }
 
 // LogrusHook represents a single logrus hook. At this point, only parsing and
@@ -167,13 +152,13 @@ type ThumbnailSize struct {
 // Validity/integrity checks on the parameters are done when configuring logrus.
 type LogrusHook struct {
 	// The type of hook, currently only "file" is supported.
-	Type string `yaml:"type"`
+	Type string `json:"Type"`
 
 	// The level of the logs to produce. Will output only this level and above.
-	Level string `yaml:"level"`
+	Level string `json:"Level"`
 
 	// The parameters for this hook.
-	Params map[string]interface{} `yaml:"params"`
+	Params map[string]interface{} `json:"Params"`
 }
 
 // ConfigErrors stores problems encountered when parsing a config file.

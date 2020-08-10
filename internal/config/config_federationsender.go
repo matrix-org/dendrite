@@ -1,26 +1,14 @@
 package config
 
 type FederationSender struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `json:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
-
-	// The FederationSender database stores information used by the FederationSender
-	// It is only accessed by the FederationSender.
-	Database DatabaseOptions `yaml:"database"`
-
-	// Federation failure threshold. How many consecutive failures that we should
-	// tolerate when sending federation requests to a specific server. The backoff
-	// is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds, etc.
-	// The default value is 16 if not specified, which is circa 18 hours.
-	FederationMaxRetries uint32 `yaml:"send_max_retries"`
-
-	// FederationDisableTLSValidation disables the validation of X.509 TLS certs
-	// on remote federation endpoints. This is not recommended in production!
-	DisableTLSValidation bool `yaml:"disable_tls_validation"`
-
-	Proxy Proxy `yaml:"proxy_outbound"`
+	Listen               Address         `json:"listen"`
+	Bind                 Address         `json:"bind"`
+	Database             DatabaseOptions `json:"Database" comment:"Database configuration for this component."`
+	FederationMaxRetries uint32          `json:"SendMaxRetries" comment:"How many times we will try to resend a failed transaction to a specific server. The\nbackoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc."`
+	DisableTLSValidation bool            `json:"DisableTLSValidation" comment:"Disable the validation of TLS certificates of remote federated homeservers. Do not\nenable this option in production as it presents a security risk!"`
+	Proxy                Proxy           `json:"ProxyOutbound" comment:"Use the following proxy server for outbound federation traffic."`
 }
 
 func (c *FederationSender) Defaults() {
@@ -44,13 +32,13 @@ func (c *FederationSender) Verify(configErrs *ConfigErrors, isMonolith bool) {
 // The config for setting a proxy to use for server->server requests
 type Proxy struct {
 	// Is the proxy enabled?
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `json:"Enabled"`
 	// The protocol for the proxy (http / https / socks5)
-	Protocol string `yaml:"protocol"`
+	Protocol string `json:"Protocol"`
 	// The host where the proxy is listening
-	Host string `yaml:"host"`
+	Host string `json:"Host"`
 	// The port on which the proxy is listening
-	Port uint16 `yaml:"port"`
+	Port uint16 `json:"Port"`
 }
 
 func (c *Proxy) Defaults() {

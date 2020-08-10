@@ -40,12 +40,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// BasicAuth is used for authorization on /metrics handlers
-type BasicAuth struct {
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-}
-
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
 	metricsName string, userAPI userapi.UserInternalAPI,
@@ -245,7 +239,7 @@ func SetupHTTPAPI(servMux, publicApiMux, internalApiMux *mux.Router, cfg *config
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
-func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
+func WrapHandlerInBasicAuth(h http.Handler, b config.BasicAuth) http.HandlerFunc {
 	if b.Username == "" || b.Password == "" {
 		logrus.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
 	}

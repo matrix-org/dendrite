@@ -1,14 +1,11 @@
 package config
 
 type CurrentStateServer struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `json:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
-
-	// The CurrentState database stores the current state of all rooms.
-	// It is accessed by the CurrentStateServer.
-	Database DatabaseOptions `yaml:"database"`
+	Listen   Address         `json:"listen" comment:"Listen address for this component."`
+	Bind     Address         `json:"bind" comment:"Bind address for this component."`
+	Database DatabaseOptions `json:"Database" comment:"Database configuration for this component."`
 }
 
 func (c *CurrentStateServer) Defaults() {

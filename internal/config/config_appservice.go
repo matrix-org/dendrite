@@ -26,15 +26,13 @@ import (
 )
 
 type AppServiceAPI struct {
-	Matrix  *Global  `yaml:"-"`
-	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
+	Matrix  *Global  `json:"-"`
+	Derived *Derived `json:"-"` // TODO: Nuke Derived from orbit
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
-
-	Database DatabaseOptions `yaml:"database"`
-
-	ConfigFiles []string `yaml:"config_files"`
+	Listen      Address         `json:"Listen" comment:"Listen address for this component."`
+	Bind        Address         `json:"Bind" comment:"Bind address for this component."`
+	Database    DatabaseOptions `json:"Database" comment:"Database options for this component."`
+	ConfigFiles []string        `json:"ConfigFiles" comment:"List of paths to appservice configuration files."`
 }
 
 func (c *AppServiceAPI) Defaults() {
@@ -54,9 +52,9 @@ func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 // service has management over.
 type ApplicationServiceNamespace struct {
 	// Whether or not the namespace is managed solely by this application service
-	Exclusive bool `yaml:"exclusive"`
+	Exclusive bool `json:"Exclusive"`
 	// A regex pattern that represents the namespace
-	Regex string `yaml:"regex"`
+	Regex string `json:"Regex"`
 	// The ID of an existing group that all users of this application service will
 	// be added to. This field is only relevant to the `users` namespace.
 	// Note that users who are joined to this group through an application service
@@ -64,7 +62,7 @@ type ApplicationServiceNamespace struct {
 	// group should be listed when querying an application service user's groups.
 	// This is to prevent making spamming all users of an application service
 	// trivial.
-	GroupID string `yaml:"group_id"`
+	GroupID string `json:"GroupID"`
 	// Regex object representing our pattern. Saves having to recompile every time
 	RegexpObject *regexp.Regexp
 }
@@ -73,22 +71,22 @@ type ApplicationServiceNamespace struct {
 // https://matrix.org/docs/spec/application_service/unstable.html
 type ApplicationService struct {
 	// User-defined, unique, persistent ID of the application service
-	ID string `yaml:"id"`
+	ID string `json:"ID"`
 	// Base URL of the application service
-	URL string `yaml:"url"`
+	URL string `json:"URL"`
 	// Application service token provided in requests to a homeserver
-	ASToken string `yaml:"as_token"`
+	ASToken string `json:"ASToken"`
 	// Homeserver token provided in requests to an application service
-	HSToken string `yaml:"hs_token"`
+	HSToken string `json:"HSToken"`
 	// Localpart of application service user
-	SenderLocalpart string `yaml:"sender_localpart"`
+	SenderLocalpart string `json:"SenderLocalpart"`
 	// Information about an application service's namespaces. Key is either
 	// "users", "aliases" or "rooms"
-	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
+	NamespaceMap map[string][]ApplicationServiceNamespace `json:"Namespaces"`
 	// Whether rate limiting is applied to each application service user
-	RateLimited bool `yaml:"rate_limited"`
+	RateLimited bool `json:"RateLimited"`
 	// Any custom protocols that this application service provides (e.g. IRC)
-	Protocols []string `yaml:"protocols"`
+	Protocols []string `json:"Protocols"`
 }
 
 // IsInterestedInRoomID returns a bool on whether an application service's

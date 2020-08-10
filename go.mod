@@ -2,12 +2,11 @@ module github.com/matrix-org/dendrite
 
 require (
 	github.com/Shopify/sarama v1.26.1
-	github.com/circonus-labs/circonus-gometrics v2.3.1+incompatible
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/ghodss/yaml v1.0.0
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/hjson/hjson-go v3.0.2-0.20200316202735-d5d0e8b0617d+incompatible
 	github.com/lib/pq v1.2.0
 	github.com/libp2p/go-libp2p v0.6.0
 	github.com/libp2p/go-libp2p-circuit v0.1.4

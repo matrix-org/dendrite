@@ -9,36 +9,14 @@ import (
 )
 
 type Global struct {
-	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
-	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
-
-	// Path to the private key which will be used to sign requests and events.
-	PrivateKeyPath Path `yaml:"private_key"`
-
-	// The private key which will be used to sign requests and events.
-	PrivateKey ed25519.PrivateKey `yaml:"-"`
-
-	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
-	// prefix "ed25519:".
-	KeyID gomatrixserverlib.KeyID `yaml:"-"`
-
-	// How long a remote server can cache our server key for before requesting it again.
-	// Increasing this number will reduce the number of requests made by remote servers
-	// for our key, but increases the period a compromised key will be considered valid
-	// by remote servers.
-	// Defaults to 24 hours.
-	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
-
-	// List of domains that the server will trust as identity servers to
-	// verify third-party identifiers.
-	// Defaults to an empty array.
-	TrustedIDServers []string `yaml:"trusted_third_party_id_servers"`
-
-	// Kafka/Naffka configuration
-	Kafka Kafka `yaml:"kafka"`
-
-	// Metrics configuration
-	Metrics Metrics `yaml:"metrics"`
+	ServerName        gomatrixserverlib.ServerName `json:"ServerName" comment:"The domain name of this homeserver."`
+	PrivateKeyPath    Path                         `json:"PrivateKeyPath" comment:"The path to the signing private key file, used to sign requests and events."`
+	PrivateKey        ed25519.PrivateKey           `json:"-"`
+	KeyID             gomatrixserverlib.KeyID      `json:"KeyID" comment:"A unique identifier for this private key. Must start with the prefix \"ed25519:\"."`
+	KeyValidityPeriod time.Duration                `json:"KeyValidityPeriod" comment:"How long a remote server can cache our server signing key before requesting it\nagain. Increasing this number will reduce the number of requests made by other\nservers for our key but increases the period that a compromised key will be\nconsidered valid by other homeservers."`
+	TrustedIDServers  []string                     `json:"TrustedIDServers" comment:"Lists of domains that the server will trust as identity servers to verify third\nparty identifiers such as phone numbers and email addresses."`
+	Kafka             Kafka                        `json:"Kafka" comment:"Configuration for Kaffka/Naffka."`
+	Metrics           Metrics                      `json:"Metrics" comment:"Configuration for Prometheus metric collection."`
 }
 
 func (c *Global) Defaults() {
@@ -60,17 +38,15 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.Metrics.Verify(configErrs, isMonolith)
 }
 
+type BasicAuth struct {
+	Username string `json:"Username"`
+	Password string `json:"Password"`
+}
+
 // The configuration to use for Prometheus metrics
 type Metrics struct {
-	// Whether or not the metrics are enabled
-	Enabled bool `yaml:"enabled"`
-	// Use BasicAuth for Authorization
-	BasicAuth struct {
-		// Authorization via Static Username & Password
-		// Hardcoded Username and Password
-		Username string `yaml:"username"`
-		Password string `yaml:"password"`
-	} `yaml:"basic_auth"`
+	Enabled   bool      `json:"Enabled" comment:"Whether or not Prometheus metrics are enabled."`
+	BasicAuth BasicAuth `json:"BasicAuth" comment:"HTTP basic authentication to protect access to monitoring."`
 }
 
 func (c *Metrics) Defaults() {
@@ -83,14 +59,10 @@ func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 type DatabaseOptions struct {
-	// The connection string, file:filename.db or postgres://server....
-	ConnectionString DataSource `yaml:"connection_string"`
-	// Maximum open connections to the DB (0 = use default, negative means unlimited)
-	MaxOpenConnections int `yaml:"max_open_conns"`
-	// Maximum idle connections to the DB (0 = use default, negative means unlimited)
-	MaxIdleConnections int `yaml:"max_idle_conns"`
-	// maximum amount of time (in seconds) a connection may be reused (<= 0 means unlimited)
-	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
+	ConnectionString       DataSource `json:"ConnectionString" comment:"Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc."`
+	MaxOpenConnections     int        `json:"MaxOpenConnections" comment:"Maximum number of connections to open to the database (0 = use default,\nnegative = unlimited)."`
+	MaxIdleConnections     int        `json:"MaxIdleConnections" comment:"Maximum number of idle connections permitted to the database (0 = use default,\nnegative = unlimited)."`
+	ConnMaxLifetimeSeconds int        `json:"ConnMaxLifetimeSeconds" comment:"Maximum amount of time, in seconds, that a database connection may be reused\n(negative = unlimited)."`
 }
 
 func (c *DatabaseOptions) Defaults() {

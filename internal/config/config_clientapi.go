@@ -6,33 +6,19 @@ import (
 )
 
 type ClientAPI struct {
-	Matrix  *Global  `yaml:"-"`
-	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
+	Matrix  *Global  `json:"-"`
+	Derived *Derived `json:"-"` // TODO: Nuke Derived from orbit
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
-
-	// If set, allows registration by anyone who also has the shared
-	// secret, even if registration is otherwise disabled.
-	RegistrationSharedSecret string `yaml:"registration_shared_secret"`
-	// This Home Server's ReCAPTCHA public key.
-	RecaptchaPublicKey string `yaml:"recaptcha_public_key"`
-	// This Home Server's ReCAPTCHA private key.
-	RecaptchaPrivateKey string `yaml:"recaptcha_private_key"`
-	// Boolean stating whether catpcha registration is enabled
-	// and required
-	RecaptchaEnabled bool `yaml:"enable_registration_captcha"`
-	// Secret used to bypass the captcha registration entirely
-	RecaptchaBypassSecret string `yaml:"captcha_bypass_secret"`
-	// HTTP API endpoint used to verify whether the captcha response
-	// was successful
-	RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
-	// If set disables new users from registering (except via shared
-	// secrets)
-	RegistrationDisabled bool `yaml:"registration_disabled"`
-
-	// TURN options
-	TURN TURN `yaml:"turn"`
+	Listen                   Address `json:"listen" comment:"The listen address for this component."`
+	Bind                     Address `json:"bind" comment:"The bind address for this component."`
+	RegistrationDisabled     bool    `json:"RegistrationDisabled" comment:"Prevent new users from registering, except when using the shared secret from the\nRegistrationSharedSecret option below."`
+	RegistrationSharedSecret string  `json:"RegistrationSharedSecret" comment:"If set, allows registration by anyone who knows the shared secret, even if\nregistration is otherwise disabled."`
+	RecaptchaEnabled         bool    `json:"RecaptchaEnabled" comment:"Whether to require ReCAPTCHA for registration."`
+	RecaptchaPublicKey       string  `json:"RecaptchaPublicKey" comment:"This server's ReCAPTCHA public key."`
+	RecaptchaPrivateKey      string  `json:"RecaptchaPrivateKey" comment:"This server's ReCAPTCHA private key."`
+	RecaptchaBypassSecret    string  `json:"RecaptchaBypassSecret" comment:"Secret used to bypass ReCAPTCHA entirely."`
+	RecaptchaSiteVerifyAPI   string  `json:"RecaptchaSiteVerifyAPI" comment:"The URL to use for verifying if the ReCAPTCHA response was successful."`
+	TURN                     TURN    `json:"TURN"`
 }
 
 func (c *ClientAPI) Defaults() {
@@ -59,22 +45,13 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 type TURN struct {
+	UserLifetime string   `json:"UserLifetime" comment:"How long the TURN authorisation should last."`
+	URIs         []string `json:"URIs" comment:"The list of TURN URIs to pass to clients."`
+	SharedSecret string   `json:"SharedSecret" comment:"Authorisation shared secret from coturn."`
+	Username     string   `json:"Username" comment:"Authorisation static username."`
+	Password     string   `json:"Password" comment:"Authorisation static password."`
 	// TODO Guest Support
-	// Whether or not guests can request TURN credentials
-	// AllowGuests bool `yaml:"turn_allow_guests"`
-	// How long the authorization should last
-	UserLifetime string `yaml:"turn_user_lifetime"`
-	// The list of TURN URIs to pass to clients
-	URIs []string `yaml:"turn_uris"`
-
-	// Authorization via Shared Secret
-	// The shared secret from coturn
-	SharedSecret string `yaml:"turn_shared_secret"`
-
-	// Authorization via Static Username & Password
-	// Hardcoded Username and Password
-	Username string `yaml:"turn_username"`
-	Password string `yaml:"turn_password"`
+	// AllowGuests bool `json:"AllowGuests" comment:"Whether or not guests can request TURN credentials."`
 }
 
 func (c *TURN) Verify(configErrs *ConfigErrors) {

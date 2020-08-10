@@ -5,34 +5,17 @@ import (
 )
 
 type MediaAPI struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `json:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
-
-	// The MediaAPI database stores information about files uploaded and downloaded
-	// by local users. It is only accessed by the MediaAPI.
-	Database DatabaseOptions `yaml:"database"`
-
-	// The base path to where the media files will be stored. May be relative or absolute.
-	BasePath Path `yaml:"base_path"`
-
-	// The absolute base path to where media files will be stored.
-	AbsBasePath Path `yaml:"-"`
-
-	// The maximum file size in bytes that is allowed to be stored on this server.
-	// Note: if max_file_size_bytes is set to 0, the size is unlimited.
-	// Note: if max_file_size_bytes is not set, it will default to 10485760 (10MB)
-	MaxFileSizeBytes *FileSizeBytes `yaml:"max_file_size_bytes,omitempty"`
-
-	// Whether to dynamically generate thumbnails on-the-fly if the requested resolution is not already generated
-	DynamicThumbnails bool `yaml:"dynamic_thumbnails"`
-
-	// The maximum number of simultaneous thumbnail generators. default: 10
-	MaxThumbnailGenerators int `yaml:"max_thumbnail_generators"`
-
-	// A list of thumbnail sizes to be pre-generated for downloaded remote / uploaded content
-	ThumbnailSizes []ThumbnailSize `yaml:"thumbnail_sizes"`
+	Listen                 Address         `json:"Listen" comment:"Listen address for this component."`
+	Bind                   Address         `json:"Bind" comment:"Bind address for this component."`
+	Database               DatabaseOptions `json:"Database" comment:"Database configuration for this component."`
+	BasePath               Path            `json:"BasePath" comment:"Storage path for uploaded media. May be relative or absolute."`
+	AbsBasePath            Path            `json:"-"`
+	MaxFileSizeBytes       *FileSizeBytes  `json:"MaxFileSizeBytes" comment:"The maximum allowed file size (in bytes) for media uploads to this homeserver\n(0 = unlimited)."`
+	DynamicThumbnails      bool            `json:"DynamicThumbnails" comment:"Whether to dynamically generate thumbnails if needed."`
+	MaxThumbnailGenerators int             `json:"MaxThumbnailGenerators" comment:"The maximum number of simultaneous thumbnail generators to run."`
+	ThumbnailSizes         []ThumbnailSize `json:"ThumbnailSizes" comment:"A list of thumbnail sizes to be generated for media content."`
 }
 
 func (c *MediaAPI) Defaults() {

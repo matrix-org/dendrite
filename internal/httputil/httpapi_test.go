@@ -18,12 +18,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/matrix-org/dendrite/internal/config"
 )
 
 func TestWrapHandlerInBasicAuth(t *testing.T) {
 	type args struct {
 		h http.Handler
-		b BasicAuth
+		b config.BasicAuth
 	}
 
 	dummyHandler := http.HandlerFunc(func(h http.ResponseWriter, r *http.Request) {
@@ -46,7 +48,7 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 			name: "only user set",
 			args: args{
 				h: dummyHandler,
-				b: BasicAuth{Username: "test"}, // no basic auth
+				b: config.BasicAuth{Username: "test"}, // no basic auth
 			},
 			want:    http.StatusOK,
 			reqAuth: false,
@@ -55,7 +57,7 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 			name: "only pass set",
 			args: args{
 				h: dummyHandler,
-				b: BasicAuth{Password: "test"}, // no basic auth
+				b: config.BasicAuth{Password: "test"}, // no basic auth
 			},
 			want:    http.StatusOK,
 			reqAuth: false,
@@ -64,7 +66,7 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 			name: "credentials correct",
 			args: args{
 				h: dummyHandler,
-				b: BasicAuth{Username: "test", Password: "test"}, // basic auth enabled
+				b: config.BasicAuth{Username: "test", Password: "test"}, // basic auth enabled
 			},
 			want:    http.StatusOK,
 			reqAuth: true,
@@ -73,7 +75,7 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 			name: "credentials wrong",
 			args: args{
 				h: dummyHandler,
-				b: BasicAuth{Username: "test1", Password: "test"}, // basic auth enabled
+				b: config.BasicAuth{Username: "test1", Password: "test"}, // basic auth enabled
 			},
 			want:    http.StatusForbidden,
 			reqAuth: true,
@@ -82,7 +84,7 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 			name: "no basic auth in request",
 			args: args{
 				h: dummyHandler,
-				b: BasicAuth{Username: "test", Password: "test"}, // basic auth enabled
+				b: config.BasicAuth{Username: "test", Password: "test"}, // basic auth enabled
 			},
 			want:    http.StatusForbidden,
 			reqAuth: false,

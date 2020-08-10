@@ -12,18 +12,10 @@ const (
 )
 
 type Kafka struct {
-	// A list of kafka addresses to connect to.
-	Addresses []string `yaml:"addresses"`
-	// Whether to use naffka instead of kafka.
-	// Naffka can only be used when running dendrite as a single monolithic server.
-	// Kafka can be used both with a monolithic server and when running the
-	// components as separate servers.
-	UseNaffka bool `yaml:"use_naffka"`
-	// The Naffka database is used internally by the naffka library, if used.
-	Database DatabaseOptions `yaml:"naffka_database"`
-	// The prefix to use for Kafka topic names for this homeserver - really only
-	// useful if running more than one Dendrite on the same Kafka deployment.
-	TopicPrefix string `yaml:"topic_prefix"`
+	Addresses   []string        `json:"Addresses" comment:"List of Kafka addresses to connect to."`
+	TopicPrefix string          `json:"topic_prefix" comment:"The prefix to use for Kafka topic names for this homeserver. Change this only if\nyou are running more than one Dendrite homeserver on the same Kafka deployment."`
+	UseNaffka   bool            `json:"UseNaffka" comment:"Whether to use Naffka instead of Kafka. Only available in monolith mode."`
+	Database    DatabaseOptions `json:"NaffkaDatabase" comment:"Naffka database options. Not required when using Kafka."`
 }
 
 func (k *Kafka) TopicFor(name string) string {

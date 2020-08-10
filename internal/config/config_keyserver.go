@@ -1,12 +1,11 @@
 package config
 
 type KeyServer struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `json:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
-
-	Database DatabaseOptions `yaml:"database"`
+	Listen   Address         `json:"Listen" comment:"Listen address for this component."`
+	Bind     Address         `json:"Bind" comment:"Bind address for this component."`
+	Database DatabaseOptions `json:"Database" comment:"Database configuration for this component."`
 }
 
 func (c *KeyServer) Defaults() {
