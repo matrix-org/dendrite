@@ -43,7 +43,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
 	keyChangeProducer := &producers.KeyChange{
-		Topic:    string(cfg.Matrix.Kafka.Topics.OutputKeyChangeEvent),
+		Topic:    string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
 		Producer: producer,
 		DB:       db,
 	}

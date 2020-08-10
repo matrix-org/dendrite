@@ -174,10 +174,6 @@ func main() {
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.Global.Kafka.Database.ConnectionString = "file:/idb/dendritejs_naffka.db"
-	cfg.Global.Kafka.Topics.OutputTypingEvent = "output_typing_event"
-	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "output_send_to_device_event"
-	cfg.Global.Kafka.Topics.OutputClientData = "output_client_data"
-	cfg.Global.Kafka.Topics.OutputRoomEvent = "output_room_event"
 	cfg.Global.TrustedIDServers = []string{
 		"matrix.org", "vector.im",
 	}

@@ -99,7 +99,6 @@ func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, sarama.Sync
 	stateDBName := "test_state.db"
 	naffkaDBName := "test_naffka.db"
 	cfg.Global.ServerName = "kaer.morhen"
-	cfg.Global.Kafka.Topics.OutputRoomEvent = config.Topic(kafkaTopic)
 	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource("file:" + stateDBName)
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource("file:" + naffkaDBName),

@@ -54,7 +54,7 @@ func AddPublicRoutes(
 ) {
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,
-		Topic:    string(cfg.Matrix.Kafka.Topics.OutputClientData),
+		Topic:    cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData),
 	}
 
 	routing.Setup(

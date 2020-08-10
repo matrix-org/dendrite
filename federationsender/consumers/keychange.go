@@ -49,7 +49,7 @@ func NewKeyChangeConsumer(
 ) *KeyChangeConsumer {
 	c := &KeyChangeConsumer{
 		consumer: &internal.ContinualConsumer{
-			Topic:          string(cfg.Matrix.Kafka.Topics.OutputKeyChangeEvent),
+			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},

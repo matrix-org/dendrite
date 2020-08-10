@@ -73,11 +73,6 @@ func main() {
 	cfg.Global.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Topics.OutputRoomEvent = "roomserverOutput"
-	cfg.Global.Kafka.Topics.OutputClientData = "clientapiOutput"
-	cfg.Global.Kafka.Topics.OutputTypingEvent = "typingServerOutput"
-	cfg.Global.Kafka.Topics.OutputSendToDeviceEvent = "sendToDeviceOutput"
-	cfg.Global.Kafka.Topics.OutputKeyChangeEvent = "keyChangeOutput"
 	cfg.FederationSender.FederationMaxRetries = 8
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))

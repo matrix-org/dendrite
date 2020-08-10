@@ -100,7 +100,7 @@ func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []js
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(roomserverDBFileURI)
 	dp := &dummyProducer{
-		topic: string(cfg.Global.Kafka.Topics.OutputRoomEvent),
+		topic: cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
 	}
 	cache, err := caching.NewInMemoryLRUCache(true)
 	if err != nil {
