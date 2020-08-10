@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 type UserInternalAPI struct {
@@ -98,6 +99,11 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	return nil
 }
 func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.PerformDeviceCreationRequest, res *api.PerformDeviceCreationResponse) error {
+	util.GetLogger(ctx).WithFields(logrus.Fields{
+		"localpart":    req.Localpart,
+		"device_id":    req.DeviceID,
+		"display_name": req.DeviceDisplayName,
+	}).Info("PerformDeviceCreation")
 	dev, err := a.DeviceDB.CreateDevice(ctx, req.Localpart, req.DeviceID, req.AccessToken, req.DeviceDisplayName)
 	if err != nil {
 		return err
