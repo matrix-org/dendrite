@@ -43,6 +43,7 @@ func NewOutputRoomEventConsumer(topicName string, kafkaConsumer sarama.Consumer,
 	s := &OutputRoomEventConsumer{
 		rsConsumer: consumer,
 		db:         store,
+		acls:       acls,
 	}
 	consumer.ProcessMessage = s.onMessage
 

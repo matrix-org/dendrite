@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/currentstateserver/acls"
@@ -116,6 +117,9 @@ func (a *CurrentStateInternalAPI) QuerySharedUsers(ctx context.Context, req *api
 }
 
 func (a *CurrentStateInternalAPI) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse) error {
+	if a.ServerACLs == nil {
+		return errors.New("no server ACL tracking")
+	}
 	res.Banned = a.ServerACLs.IsServerBannedFromRoom(req.ServerName, req.RoomID)
 	return nil
 }

@@ -27,7 +27,10 @@ func GetEvent(ctx context.Context, stateAPI CurrentStateInternalAPI, roomID stri
 
 // IsServerBannedFromRoom returns whether the server is banned from a room by server ACLs.
 func IsServerBannedFromRoom(ctx context.Context, stateAPI CurrentStateInternalAPI, roomID string, serverName gomatrixserverlib.ServerName) bool {
-	req := &QueryServerBannedFromRoomRequest{}
+	req := &QueryServerBannedFromRoomRequest{
+		ServerName: serverName,
+		RoomID:     roomID,
+	}
 	res := &QueryServerBannedFromRoomResponse{}
 	if err := stateAPI.QueryServerBannedFromRoom(ctx, req, res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("Failed to QueryServerBannedFromRoom")

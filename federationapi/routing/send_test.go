@@ -318,6 +318,10 @@ func (t *testStateAPI) QueryKnownUsers(ctx context.Context, req *currentstateAPI
 	return fmt.Errorf("not implemented")
 }
 
+func (t *testStateAPI) QueryServerBannedFromRoom(ctx context.Context, req *currentstateAPI.QueryServerBannedFromRoomRequest, res *currentstateAPI.QueryServerBannedFromRoomResponse) error {
+	return nil
+}
+
 type txnFedClient struct {
 	state            map[string]gomatrixserverlib.RespState    // event_id to response
 	stateIDs         map[string]gomatrixserverlib.RespStateIDs // event_id to response

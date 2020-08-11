@@ -41,7 +41,6 @@ func AddPublicRoutes(
 	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 ) {
-
 	routing.Setup(
 		router, cfg, rsAPI,
 		eduAPI, federationSenderAPI, keyRing,
