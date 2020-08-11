@@ -37,22 +37,20 @@ version: 1
 global:
   server_name: localhost
   private_key: matrix_key.pem
+  key_id: ed25519:auto
   key_validity_period: 168h0m0s
-  trusted_third_party_id_servers: []
+  trusted_third_party_id_servers:
+  - matrix.org
+  - vector.im
   kafka:
     addresses: []
+    topic_prefix: Dendrite
     use_naffka: true
     naffka_database:
       connection_string: file:naffka.db
-      max_open_conns: 0
-      max_idle_conns: 0
+      max_open_conns: 100
+      max_idle_conns: 2
       conn_max_lifetime: -1
-    topics:
-      output_room_event: OutputRoomEventTopic
-      output_client_data: OutputClientDataTopic
-      output_typing_event: OutputTypingEventTopic
-      output_send_to_device_event: OutputSendToDeviceEventTopic
-      output_key_change_event: OutputKeyChangeEventTopic
   metrics:
     enabled: false
     basic_auth:
@@ -63,20 +61,20 @@ app_service_api:
   bind: localhost:7777
   database:
     connection_string: file:appservice.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
   config_files: []
 client_api:
   listen: localhost:7771
   bind: localhost:7771
+  registration_disabled: false
   registration_shared_secret: ""
+  enable_registration_captcha: false
   recaptcha_public_key: ""
   recaptcha_private_key: ""
-  enable_registration_captcha: false
-  captcha_bypass_secret: ""
+  recaptcha_bypass_secret: ""
   recaptcha_siteverify_api: ""
-  registration_disabled: false
   turn:
     turn_user_lifetime: ""
     turn_uris: []
@@ -88,8 +86,8 @@ current_state_server:
   bind: localhost:7782
   database:
     connection_string: file:currentstate.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
 edu_server:
   listen: localhost:7778
@@ -103,10 +101,11 @@ federation_sender:
   bind: localhost:7775
   database:
     connection_string: file:federationsender.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
-  federation_max_retries: 16
+  send_max_retries: 16
+  disable_tls_validation: false
   proxy_outbound:
     enabled: false
     protocol: http
@@ -117,59 +116,74 @@ key_server:
   bind: localhost:7779
   database:
     connection_string: file:keyserver.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
 media_api:
   listen: localhost:7774
   bind: localhost:7774
   database:
     connection_string: file:mediaapi.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
-  base_path: ""
+  base_path: ./media_store
   max_file_size_bytes: 10485760
   dynamic_thumbnails: false
   max_thumbnail_generators: 10
-  thumbnail_sizes: []
+  thumbnail_sizes:
+  - width: 32
+    height: 32
+    method: crop
+  - width: 96
+    height: 96
+    method: crop
+  - width: 640
+    height: 480
+    method: scale
 room_server:
   listen: localhost:7770
   bind: localhost:7770
   database:
     connection_string: file:roomserver.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
 server_key_api:
   listen: localhost:7780
   bind: localhost:7780
   database:
     connection_string: file:serverkeyapi.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
-  key_perspectives: []
+  key_perspectives:
+  - server_name: matrix.org
+    keys:
+    - key_id: ed25519:auto
+      public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+    - key_id: ed25519:a_RXGa
+      public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 sync_api:
   listen: localhost:7773
   bind: localhost:7773
   database:
     connection_string: file:syncapi.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
 user_api:
   listen: localhost:7781
   bind: localhost:7781
   account_database:
     connection_string: file:userapi_accounts.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
   device_database:
     connection_string: file:userapi_devices.db
-    max_open_conns: 0
-    max_idle_conns: 0
+    max_open_conns: 100
+    max_idle_conns: 2
     conn_max_lifetime: -1
 tracing:
   enabled: false
@@ -183,7 +197,11 @@ tracing:
     headers: null
     baggage_restrictions: null
     throttler: null
-logging: []
+logging:
+- type: file
+  level: info
+  params:
+    path: /var/log/dendrite
 `
 
 type mockReadFile map[string]string

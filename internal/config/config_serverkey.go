@@ -1,5 +1,7 @@
 package config
 
+import "github.com/matrix-org/gomatrixserverlib"
+
 type ServerKeyAPI struct {
 	Matrix *Global `yaml:"-"`
 
@@ -26,4 +28,23 @@ func (c *ServerKeyAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "server_key_api.listen", string(c.Listen))
 	checkNotEmpty(configErrs, "server_key_api.bind", string(c.Bind))
 	checkNotEmpty(configErrs, "server_key_api.database.connection_string", string(c.Database.ConnectionString))
+}
+
+// KeyPerspectives are used to configure perspective key servers for
+// retrieving server keys.
+type KeyPerspectives []KeyPerspective
+
+type KeyPerspective struct {
+	// The server name of the perspective key server
+	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
+	// Server keys for the perspective user, used to verify the
+	// keys have been signed by the perspective server
+	Keys []KeyPerspectiveTrustKey `yaml:"keys"`
+}
+
+type KeyPerspectiveTrustKey struct {
+	// The key ID, e.g. ed25519:auto
+	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
+	// The public key in base64 unpadded format
+	PublicKey string `yaml:"public_key"`
 }

@@ -110,21 +110,6 @@ type Derived struct {
 	// servers from creating RoomIDs in exclusive application service namespaces
 }
 
-// KeyPerspectives are used to configure perspective key servers for
-// retrieving server keys.
-type KeyPerspectives []struct {
-	// The server name of the perspective key server
-	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
-	// Server keys for the perspective user, used to verify the
-	// keys have been signed by the perspective server
-	Keys []struct {
-		// The key ID, e.g. ed25519:auto
-		KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
-		// The public key in base64 unpadded format
-		PublicKey string `yaml:"public_key"`
-	} `yaml:"keys"`
-}
-
 // A Path on the filesystem.
 type Path string
 
