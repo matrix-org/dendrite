@@ -83,7 +83,7 @@ const selectJoinedUsersSetForRoomsSQL = "" +
 	" type = 'm.room.member' and content_value = 'join' GROUP BY state_key"
 
 const selectKnownRoomsSQL = "" +
-	"SELECT DISTINCT room_id FROM currentsate_current_room_state"
+	"SELECT DISTINCT room_id FROM currentstate_current_room_state"
 
 // selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
 // joined to. Since this information is used to populate the user directory, we will
