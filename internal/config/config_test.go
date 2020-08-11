@@ -33,157 +33,493 @@ func TestLoadConfigRelative(t *testing.T) {
 }
 
 const testConfig = `
-version: 1
-global:
-  server_name: localhost
-  private_key: matrix_key.pem
-  key_validity_period: 168h0m0s
-  trusted_third_party_id_servers: []
-  kafka:
-    addresses: []
-    use_naffka: true
-    naffka_database:
-      connection_string: file:naffka.db
-      max_open_conns: 0
-      max_idle_conns: 0
-      conn_max_lifetime: -1
-    topics:
-      output_room_event: OutputRoomEventTopic
-      output_client_data: OutputClientDataTopic
-      output_typing_event: OutputTypingEventTopic
-      output_send_to_device_event: OutputSendToDeviceEventTopic
-      output_key_change_event: OutputKeyChangeEventTopic
-  metrics:
-    enabled: false
-    basic_auth:
-      username: metrics
-      password: metrics
-app_service_api:
-  listen: localhost:7777
-  bind: localhost:7777
-  database:
-    connection_string: file:appservice.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-  config_files: []
-client_api:
-  listen: localhost:7771
-  bind: localhost:7771
-  registration_shared_secret: ""
-  recaptcha_public_key: ""
-  recaptcha_private_key: ""
-  enable_registration_captcha: false
-  captcha_bypass_secret: ""
-  recaptcha_siteverify_api: ""
-  registration_disabled: false
-  turn:
-    turn_user_lifetime: ""
-    turn_uris: []
-    turn_shared_secret: ""
-    turn_username: ""
-    turn_password: ""
-current_state_server:
-  listen: localhost:7782
-  bind: localhost:7782
-  database:
-    connection_string: file:currentstate.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-edu_server:
-  listen: localhost:7778
-  bind: localhost:7778
-federation_api:
-  listen: localhost:7772
-  bind: localhost:7772
-  federation_certificates: []
-federation_sender:
-  listen: localhost:7775
-  bind: localhost:7775
-  database:
-    connection_string: file:federationsender.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-  federation_max_retries: 16
-  proxy_outbound:
-    enabled: false
-    protocol: http
-    host: localhost
-    port: 8080
-key_server:
-  listen: localhost:7779
-  bind: localhost:7779
-  database:
-    connection_string: file:keyserver.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-media_api:
-  listen: localhost:7774
-  bind: localhost:7774
-  database:
-    connection_string: file:mediaapi.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-  base_path: ""
-  max_file_size_bytes: 10485760
-  dynamic_thumbnails: false
-  max_thumbnail_generators: 10
-  thumbnail_sizes: []
-room_server:
-  listen: localhost:7770
-  bind: localhost:7770
-  database:
-    connection_string: file:roomserver.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-server_key_api:
-  listen: localhost:7780
-  bind: localhost:7780
-  database:
-    connection_string: file:serverkeyapi.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-  key_perspectives: []
-sync_api:
-  listen: localhost:7773
-  bind: localhost:7773
-  database:
-    connection_string: file:syncapi.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-user_api:
-  listen: localhost:7781
-  bind: localhost:7781
-  account_database:
-    connection_string: file:userapi_accounts.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-  device_database:
-    connection_string: file:userapi_devices.db
-    max_open_conns: 0
-    max_idle_conns: 0
-    conn_max_lifetime: -1
-tracing:
-  enabled: false
-  jaeger:
-    serviceName: ""
-    disabled: false
-    rpc_metrics: false
-    tags: []
-    sampler: null
-    reporter: null
-    headers: null
-    baggage_restrictions: null
-    throttler: null
-logging: []
+{
+Version: 1
+Global:
+{
+	# The domain name of this homeserver.
+	ServerName: localhost
+
+	# The path to the signing private key file, used to sign requests and events.
+	PrivateKeyPath: matrix.pem
+
+	# A unique identifier for this private key. Must start with the prefix "ed25519:".
+	KeyID: ed25519:auto
+
+	# How long a remote server can cache our server signing key before requesting it
+	# again. Increasing this number will reduce the number of requests made by other
+	# servers for our key but increases the period that a compromised key will be
+	# considered valid by other homeservers.
+	KeyValidityPeriod: 604800000000000
+
+	# Lists of domains that the server will trust as identity servers to verify third
+	# party identifiers such as phone numbers and email addresses.
+	TrustedIDServers: []
+
+	# Configuration for Kaffka/Naffka.
+	Kafka:
+	{
+	# List of Kafka addresses to connect to.
+	Addresses: []
+
+	# The prefix to use for Kafka topic names for this homeserver. Change this only if
+	# you are running more than one Dendrite homeserver on the same Kafka deployment.
+	TopicPrefix: Dendrite
+
+	# Whether to use Naffka instead of Kafka. Only available in monolith mode.
+	UseNaffka: true
+
+	# Naffka database options. Not required when using Kafka.
+	NaffkaDatabase:
+	{
+		# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+		ConnectionString: file:naffka.db
+
+		# Maximum number of connections to open to the database (0 = use default,
+		# negative = unlimited).
+		MaxOpenConnections: 100
+
+		# Maximum number of idle connections permitted to the database (0 = use default,
+		# negative = unlimited).
+		MaxIdleConnections: 2
+
+		# Maximum amount of time, in seconds, that a database connection may be reused
+		# (negative = unlimited).
+		ConnMaxLifetimeSeconds: -1
+	}
+	}
+
+	# Configuration for Prometheus metric collection.
+	Metrics:
+	{
+	# Whether or not Prometheus metrics are enabled.
+	Enabled: false
+
+	# HTTP basic authentication to protect access to monitoring.
+	BasicAuth:
+	{
+		Username: metrics
+		Password: metrics
+	}
+	}
+}
+AppServiceAPI:
+{
+	# Listen address for this component.
+	Listen: localhost:7777
+
+	# Bind address for this component.
+	Bind: localhost:7777
+
+	# Database options for this component.
+	Database:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:appservice.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+
+	# List of paths to appservice configuration files.
+	ConfigFiles: []
+}
+ClientAPI:
+{
+	# The listen address for this component.
+	Listen: localhost:7771
+
+	# The bind address for this component.
+	Bind: localhost:7771
+
+	# Prevent new users from registering, except when using the shared secret from the
+	# RegistrationSharedSecret option below.
+	RegistrationDisabled: false
+
+	# If set, allows registration by anyone who knows the shared secret, even if
+	# registration is otherwise disabled.
+	RegistrationSharedSecret: ""
+
+	# Whether to require ReCAPTCHA for registration.
+	RecaptchaEnabled: false
+
+	# This server's ReCAPTCHA public key.
+	RecaptchaPublicKey: ""
+
+	# This server's ReCAPTCHA private key.
+	RecaptchaPrivateKey: ""
+
+	# Secret used to bypass ReCAPTCHA entirely.
+	RecaptchaBypassSecret: ""
+
+	# The URL to use for verifying if the ReCAPTCHA response was successful.
+	RecaptchaSiteVerifyAPI: ""
+
+	TURN:
+	{
+	# How long the TURN authorisation should last.
+	UserLifetime: ""
+
+	# The list of TURN URIs to pass to clients.
+	URIs: []
+
+	# Authorisation shared secret from coturn.
+	SharedSecret: ""
+
+	# Authorisation static username.
+	Username: ""
+
+	# Authorisation static password.
+	Password: ""
+	}
+}
+CurrentStateServer:
+{
+	# Listen address for this component.
+	Listen: localhost:7782
+
+	# Bind address for this component.
+	Bind: localhost:7782
+
+	# Database configuration for this component.
+	Database:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:currentstate.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+}
+EDUServer:
+{
+	# Listen address for this component.
+	Listen: localhost:7778
+
+	# Bind address for this component.
+	Bind: localhost:7778
+}
+FederationAPI:
+{
+	# Listen address for this component.
+	Listen: localhost:7772
+
+	# Bind address for this component.
+	Bind: localhost:7772
+
+	# List of paths to X.509 certificates to be used by the external federation listeners.
+	# These certificates will be used to calculate the TLS fingerprints and other servers
+	# will expect the certificate to match these fingerprints. Certificates must be in PEM
+	# format.
+	FederationCertificates: []
+
+}
+FederationSender:
+{
+	# Listen address for this component.
+	Listen: localhost:7775
+
+	# Bind address for this component.
+	Bind: localhost:7775
+
+	# Database configuration for this component.
+	Database:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:federationsender.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+
+	# How many times we will try to resend a failed transaction to a specific server. The
+	# backoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc.
+	SendMaxRetries: 16
+
+	# Disable the validation of TLS certificates of remote federated homeservers. Do not
+	# enable this option in production as it presents a security risk!
+	DisableTLSValidation: false
+
+	# Use the following proxy server for outbound federation traffic.
+	ProxyOutbound:
+	{
+	Enabled: false
+	Protocol: http
+	Host: localhost
+	Port: 8080
+	}
+}
+KeyServer:
+{
+	# Listen address for this component.
+	Listen: localhost:7779
+
+	# Bind address for this component.
+	Bind: localhost:7779
+
+	# Database configuration for this component.
+	Database:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:keyserver.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+}
+MediaAPI:
+{
+	# Listen address for this component.
+	Listen: localhost:7774
+
+	# Bind address for this component.
+	Bind: localhost:7774
+
+	# Database configuration for this component.
+	Database:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:mediaapi.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+
+	# Storage path for uploaded media. May be relative or absolute.
+	BasePath: ./media_store
+
+	# The maximum allowed file size (in bytes) for media uploads to this homeserver
+	# (0 = unlimited).
+	MaxFileSizeBytes: 10485760
+
+	# Whether to dynamically generate thumbnails if needed.
+	DynamicThumbnails: false
+
+	# The maximum number of simultaneous thumbnail generators to run.
+	MaxThumbnailGenerators: 10
+
+	# A list of thumbnail sizes to be generated for media content.
+	ThumbnailSizes: []
+}
+RoomServer:
+{
+	# Listen address for this component.
+	Listen: localhost:7770
+
+	# Bind address for this component.
+	Bind: localhost:7770
+
+	# Database configuration for this component.
+	Database:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:roomserver.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+}
+ServerKeyAPI:
+{
+	# Listen address for this component.
+	Listen: localhost:7780
+
+	# Bind address for this component.
+	Bind: localhost:7780
+
+	# Database configuration for this component.
+	Database:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:serverkeyapi.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+
+	# Perspective keyservers to use as a backup when direct key fetches fail.
+	PerspectiveServers:
+	[
+	{
+		ServerName: matrix.org
+		TrustKeys:
+		[
+		{
+			KeyID: ed25519:auto
+			PublicKey: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+		}
+		{
+			KeyID: ed25519:a_RXGa
+			PublicKey: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+		}
+		]
+	}
+	]
+}
+SyncAPI:
+{
+	# Listen address for this component.
+	Listen: localhost:7773
+
+	# Bind address for this component.
+	Bind: localhost:7773
+
+	# Database configuration for this component.
+	Database:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:syncapi.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+}
+UserAPI:
+{
+	# Listen address for this component.
+	Listen: localhost:7781
+
+	# Bind address for this component.
+	Bind: localhost:7781
+
+	# Database configuration for the account database.
+	AccountDatabase:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:userapi_accounts.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+
+	# Database configuration for the device database.
+	DeviceDatabase:
+	{
+	# Connection string, e.g. file:filename.db or postgresql://user:pass@host/db etc.
+	ConnectionString: file:userapi_devices.db
+
+	# Maximum number of connections to open to the database (0 = use default,
+	# negative = unlimited).
+	MaxOpenConnections: 100
+
+	# Maximum number of idle connections permitted to the database (0 = use default,
+	# negative = unlimited).
+	MaxIdleConnections: 2
+
+	# Maximum amount of time, in seconds, that a database connection may be reused
+	# (negative = unlimited).
+	ConnMaxLifetimeSeconds: -1
+	}
+}
+Tracing:
+{
+	Enabled: false
+	Jaeger:
+	{
+	ServiceName: ""
+	Disabled: false
+	RPCMetrics: false
+	Tags: []
+	Sampler: null
+	Reporter: null
+	Headers: null
+	BaggageRestrictions: null
+	Throttler: null
+	}
+}
+Logging:
+[
+	{
+	Type: file
+	Level: info
+	Params:
+	{
+		path: /var/log/dendrite
+	}
+	}
+]
+}  
 `
 
 type mockReadFile map[string]string

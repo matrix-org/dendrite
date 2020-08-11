@@ -192,11 +192,11 @@ func loadConfig(
 
 	var err error
 	if err = hjson.Unmarshal(configData, &c); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hjson.Unmarshal: %w", err)
 	}
 
 	if err = c.check(monolithic); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("c.check: %w", err)
 	}
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
