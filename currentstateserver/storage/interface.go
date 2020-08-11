@@ -41,4 +41,6 @@ type Database interface {
 	JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
 	// GetKnownUsers searches all users that userID knows about.
 	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
+	// GetKnownRooms returns a list of all rooms we know about.
+	GetKnownRooms(ctx context.Context) ([]string, error)
 }

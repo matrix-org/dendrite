@@ -17,6 +17,7 @@ package currentstateserver
 import (
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/currentstateserver/acls"
 	"github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/currentstateserver/consumers"
 	"github.com/matrix-org/dendrite/currentstateserver/internal"
@@ -39,13 +40,15 @@ func NewInternalAPI(cfg *config.CurrentStateServer, consumer sarama.Consumer) ap
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to open database")
 	}
+	serverACLs := acls.NewServerACLs(csDB)
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent), consumer, csDB,
+		cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent), consumer, csDB, serverACLs,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 	return &internal.CurrentStateInternalAPI{
-		DB: csDB,
+		DB:         csDB,
+		ServerACLs: serverACLs,
 	}
 }
