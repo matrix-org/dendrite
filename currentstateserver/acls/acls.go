@@ -77,7 +77,7 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 	}
 	logrus.Infof("Update server ACLs for %q", state.RoomID())
 	s.aclsMutex.Lock()
-	defer s.aclsMutex.RUnlock()
+	defer s.aclsMutex.Unlock()
 	s.acls[state.RoomID()] = acls
 }
 
