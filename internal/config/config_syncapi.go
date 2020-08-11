@@ -16,7 +16,7 @@ func (c *SyncAPI) Defaults() {
 }
 
 func (c *SyncAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "sync_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "sync_api.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "SyncAPI.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "SyncAPI.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "SyncAPI.Database.ConnectionString", string(c.Database.ConnectionString))
 }

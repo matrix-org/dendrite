@@ -19,9 +19,9 @@ func (c *ServerKeyAPI) Defaults() {
 }
 
 func (c *ServerKeyAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "server_key_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "server_key_api.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "server_key_api.database.connection_string", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "ServerKeyAPI.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "ServerKeyAPI.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "ServerKeyAPI.Database.ConnectionString", string(c.Database.ConnectionString))
 }
 
 // KeyPerspectives are used to configure perspective key servers for

@@ -3,8 +3,8 @@ package config
 type CurrentStateServer struct {
 	Matrix *Global `json:"-"`
 
-	Listen   Address         `json:"listen" comment:"Listen address for this component."`
-	Bind     Address         `json:"bind" comment:"Bind address for this component."`
+	Listen   Address         `json:"Listen" comment:"Listen address for this component."`
+	Bind     Address         `json:"Bind" comment:"Bind address for this component."`
 	Database DatabaseOptions `json:"Database" comment:"Database configuration for this component."`
 }
 
@@ -16,7 +16,7 @@ func (c *CurrentStateServer) Defaults() {
 }
 
 func (c *CurrentStateServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "current_state_server.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "current_state_server.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "current_state_server.database.connection_string", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "CurrentStateServer.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "CurrentStateServer.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "CurrentStateServer.Database.ConnectionString", string(c.Database.ConnectionString))
 }

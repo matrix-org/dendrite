@@ -19,8 +19,8 @@ func (c *UserAPI) Defaults() {
 }
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "user_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "user_api.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
-	checkNotEmpty(configErrs, "user_api.device_database.connection_string", string(c.DeviceDatabase.ConnectionString))
+	checkNotEmpty(configErrs, "UserAPI.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "UserAPI.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "UserAPI.AccountDatabase.ConnectionString", string(c.AccountDatabase.ConnectionString))
+	checkNotEmpty(configErrs, "UserAPI.DeviceDatabase.ConnectionString", string(c.DeviceDatabase.ConnectionString))
 }

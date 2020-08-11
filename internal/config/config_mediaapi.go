@@ -31,16 +31,16 @@ func (c *MediaAPI) Defaults() {
 }
 
 func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "media_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "media_api.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "MediaAPI.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "MediaAPI.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "MediaAPI.Database.ConnectionString", string(c.Database.ConnectionString))
 
-	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
-	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(*c.MaxFileSizeBytes))
-	checkPositive(configErrs, "media_api.max_thumbnail_generators", int64(c.MaxThumbnailGenerators))
+	checkNotEmpty(configErrs, "MediaAPI.BasePath", string(c.BasePath))
+	checkPositive(configErrs, "MediaAPI.MaxFileSizeBytes", int64(*c.MaxFileSizeBytes))
+	checkPositive(configErrs, "MediaAPI.MaxThumbnailGenerators", int64(c.MaxThumbnailGenerators))
 
 	for i, size := range c.ThumbnailSizes {
-		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].width", i), int64(size.Width))
-		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].height", i), int64(size.Height))
+		checkPositive(configErrs, fmt.Sprintf("MediaAPI.ThumbnailSizes[%d].Width", i), int64(size.Width))
+		checkPositive(configErrs, fmt.Sprintf("MediaAPI.ThumbnailSizes[%d].Height", i), int64(size.Height))
 	}
 }

@@ -13,6 +13,6 @@ func (c *EDUServer) Defaults() {
 }
 
 func (c *EDUServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "edu_server.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "edu_server.bind", string(c.Bind))
+	checkNotEmpty(configErrs, "EDUServer.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "EDUServer.Bind", string(c.Bind))
 }

@@ -43,9 +43,9 @@ func (c *AppServiceAPI) Defaults() {
 }
 
 func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "app_service_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "app_service_api.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "AppServiceAPI.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "AppServiceAPI.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "AppServiceAPI.Database.ConnectionString", string(c.Database.ConnectionString))
 }
 
 // ApplicationServiceNamespace is the namespace that a specific application

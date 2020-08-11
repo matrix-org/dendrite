@@ -24,9 +24,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hjson/hjson-go"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/gomatrixserverlib"
-	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -45,22 +45,32 @@ var (
 	kafkaURI = test.Defaulting(os.Getenv("KAFKA_URIS"), "localhost:9092")
 )
 
-var thumbnailSizes = (`
-- width: 32
-  height: 32
-  method: crop
-- width: 96
-  height: 96
-  method: crop
-- width: 320
-  height: 240
-  method: scale
-- width: 640
-  height: 480
-  method: scale
-- width: 800
-  height: 600
-  method: scale
+var thumbnailSizes = (`[
+{
+  Width: 32
+  Height: 32
+  Method: crop
+}
+{
+  Width: 96
+  Height: 96
+  Method: crop
+}
+{
+  Width: 320
+  Height: 240
+  Method: scale
+}
+{
+  Width: 640
+  Height: 480
+  Method: scale
+}
+{
+  Width: 800
+  Height: 600
+  Method: scale
+}
 `)
 
 const serverType = "media-api"
@@ -90,7 +100,7 @@ func startMediaAPI(suffix string, dynamicThumbnails bool) (*exec.Cmd, chan error
 	}
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(proxyAddr)
 	cfg.MediaAPI.DynamicThumbnails = dynamicThumbnails
-	if err = yaml.Unmarshal([]byte(thumbnailSizes), &cfg.MediaAPI.ThumbnailSizes); err != nil {
+	if err = hjson.Unmarshal([]byte(thumbnailSizes), &cfg.MediaAPI.ThumbnailSizes); err != nil {
 		panic(err)
 	}
 

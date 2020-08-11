@@ -9,8 +9,8 @@ type ClientAPI struct {
 	Matrix  *Global  `json:"-"`
 	Derived *Derived `json:"-"` // TODO: Nuke Derived from orbit
 
-	Listen                   Address `json:"listen" comment:"The listen address for this component."`
-	Bind                     Address `json:"bind" comment:"The bind address for this component."`
+	Listen                   Address `json:"Listen" comment:"The listen address for this component."`
+	Bind                     Address `json:"Bind" comment:"The bind address for this component."`
 	RegistrationDisabled     bool    `json:"RegistrationDisabled" comment:"Prevent new users from registering, except when using the shared secret from the\nRegistrationSharedSecret option below."`
 	RegistrationSharedSecret string  `json:"RegistrationSharedSecret" comment:"If set, allows registration by anyone who knows the shared secret, even if\nregistration is otherwise disabled."`
 	RecaptchaEnabled         bool    `json:"RecaptchaEnabled" comment:"Whether to require ReCAPTCHA for registration."`
@@ -34,12 +34,12 @@ func (c *ClientAPI) Defaults() {
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "client_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "client_api.bind", string(c.Bind))
+	checkNotEmpty(configErrs, "ClientAPI.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "ClientAPI.Bind", string(c.Bind))
 	if c.RecaptchaEnabled {
-		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", string(c.RecaptchaPublicKey))
-		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", string(c.RecaptchaPrivateKey))
-		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", string(c.RecaptchaSiteVerifyAPI))
+		checkNotEmpty(configErrs, "ClientAPI.RecaptchaPublicKey", string(c.RecaptchaPublicKey))
+		checkNotEmpty(configErrs, "ClientAPI.RecaptchaPrivateKey", string(c.RecaptchaPrivateKey))
+		checkNotEmpty(configErrs, "ClientAPI.RecaptchaSiteVerifyAPI", string(c.RecaptchaSiteVerifyAPI))
 	}
 	c.TURN.Verify(configErrs)
 }
@@ -58,7 +58,7 @@ func (c *TURN) Verify(configErrs *ConfigErrors) {
 	value := c.UserLifetime
 	if value != "" {
 		if _, err := time.ParseDuration(value); err != nil {
-			configErrs.Add(fmt.Sprintf("invalid duration for config key %q: %s", "client_api.turn.turn_user_lifetime", value))
+			configErrs.Add(fmt.Sprintf("invalid duration for config key %q: %s", "ClientAPI.TURN.TURNUserLifetime", value))
 		}
 	}
 }

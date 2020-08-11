@@ -16,7 +16,7 @@ func (c *KeyServer) Defaults() {
 }
 
 func (c *KeyServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "key_server.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "key_server.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "key_server.database.connection_string", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "KeyServer.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "KeyServer.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "KeyServer.Database.ConnectionString", string(c.Database.ConnectionString))
 }

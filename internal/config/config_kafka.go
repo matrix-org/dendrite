@@ -13,7 +13,7 @@ const (
 
 type Kafka struct {
 	Addresses   []string        `json:"Addresses" comment:"List of Kafka addresses to connect to."`
-	TopicPrefix string          `json:"topic_prefix" comment:"The prefix to use for Kafka topic names for this homeserver. Change this only if\nyou are running more than one Dendrite homeserver on the same Kafka deployment."`
+	TopicPrefix string          `json:"TopicPrefix" comment:"The prefix to use for Kafka topic names for this homeserver. Change this only if\nyou are running more than one Dendrite homeserver on the same Kafka deployment."`
 	UseNaffka   bool            `json:"UseNaffka" comment:"Whether to use Naffka instead of Kafka. Only available in monolith mode."`
 	Database    DatabaseOptions `json:"NaffkaDatabase" comment:"Naffka database options. Not required when using Kafka."`
 }
@@ -34,11 +34,11 @@ func (c *Kafka) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		if !isMonolith {
 			configErrs.Add("naffka can only be used in a monolithic server")
 		}
-		checkNotEmpty(configErrs, "global.kafka.database.connection_string", string(c.Database.ConnectionString))
+		checkNotEmpty(configErrs, "Global.Kafka.Database.ConnectionString", string(c.Database.ConnectionString))
 	} else {
 		// If we aren't using naffka then we need to have at least one kafka
 		// server to talk to.
-		checkNotZero(configErrs, "global.kafka.addresses", int64(len(c.Addresses)))
+		checkNotZero(configErrs, "Global.Kafka.Addresses", int64(len(c.Addresses)))
 	}
-	checkNotEmpty(configErrs, "global.kafka.topic_prefix", string(c.TopicPrefix))
+	checkNotEmpty(configErrs, "Global.Kafka.TopicPrefix", string(c.TopicPrefix))
 }

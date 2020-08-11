@@ -17,8 +17,8 @@ func (c *FederationAPI) Defaults() {
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "federation_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "federation_api.bind", string(c.Bind))
+	checkNotEmpty(configErrs, "FederationAPI.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "FederationAPI.Bind", string(c.Bind))
 	// TODO: not applicable always, e.g. in demos
-	//checkNotZero(configErrs, "federation_api.federation_certificates", int64(len(c.FederationCertificatePaths)))
+	//checkNotZero(configErrs, "FederationAPI.FederationCertificates", int64(len(c.FederationCertificatePaths)))
 }

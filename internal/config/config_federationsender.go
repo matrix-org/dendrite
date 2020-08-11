@@ -24,9 +24,9 @@ func (c *FederationSender) Defaults() {
 }
 
 func (c *FederationSender) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "federation_sender.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "federation_sender.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "federation_sender.database.connection_string", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "FederationSender.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "FederationSender.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "FederationSender.Database.ConnectionString", string(c.Database.ConnectionString))
 }
 
 // The config for setting a proxy to use for server->server requests

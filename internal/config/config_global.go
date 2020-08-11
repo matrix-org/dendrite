@@ -31,8 +31,8 @@ func (c *Global) Defaults() {
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
-	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
+	checkNotEmpty(configErrs, "Global.ServerName", string(c.ServerName))
+	checkNotEmpty(configErrs, "Global.PrivateKeyPath", string(c.PrivateKeyPath))
 
 	c.Kafka.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)

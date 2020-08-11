@@ -25,11 +25,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/hjson/hjson-go"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -191,7 +191,7 @@ func loadConfig(
 	c.Defaults()
 
 	var err error
-	if err = yaml.Unmarshal(configData, &c); err != nil {
+	if err = hjson.Unmarshal(configData, &c); err != nil {
 		return nil, err
 	}
 

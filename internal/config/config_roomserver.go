@@ -16,7 +16,7 @@ func (c *RoomServer) Defaults() {
 }
 
 func (c *RoomServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "room_server.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "room_server.bind", string(c.Bind))
-	checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "RoomServer.Listen", string(c.Listen))
+	checkNotEmpty(configErrs, "RoomServer.Bind", string(c.Bind))
+	checkNotEmpty(configErrs, "RoomServer.Database.ConnectionString", string(c.Database.ConnectionString))
 }
