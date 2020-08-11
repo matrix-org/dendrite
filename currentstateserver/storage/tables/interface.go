@@ -41,6 +41,8 @@ type CurrentRoomState interface {
 	SelectJoinedUsersSetForRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
 	// SelectKnownUsers searches all users that userID knows about.
 	SelectKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
+	// SelectKnownRooms returns all rooms that we know about.
+	SelectKnownRooms(ctx context.Context) ([]string, error)
 }
 
 // StrippedEvent represents a stripped event for returning extracted content values.

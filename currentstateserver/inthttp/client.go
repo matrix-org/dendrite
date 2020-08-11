@@ -26,11 +26,12 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
-	QueryCurrentStatePath     = "/currentstateserver/queryCurrentState"
-	QueryRoomsForUserPath     = "/currentstateserver/queryRoomsForUser"
-	QueryBulkStateContentPath = "/currentstateserver/queryBulkStateContent"
-	QuerySharedUsersPath      = "/currentstateserver/querySharedUsers"
-	QueryKnownUsersPath       = "/currentstateserver/queryKnownUsers"
+	QueryCurrentStatePath         = "/currentstateserver/queryCurrentState"
+	QueryRoomsForUserPath         = "/currentstateserver/queryRoomsForUser"
+	QueryBulkStateContentPath     = "/currentstateserver/queryBulkStateContent"
+	QuerySharedUsersPath          = "/currentstateserver/querySharedUsers"
+	QueryKnownUsersPath           = "/currentstateserver/queryKnownUsers"
+	QueryServerBannedFromRoomPath = "/currentstateserver/queryServerBannedFromRoom"
 )
 
 // NewCurrentStateAPIClient creates a CurrentStateInternalAPI implemented by talking to a HTTP POST API.
@@ -106,5 +107,15 @@ func (h *httpCurrentStateInternalAPI) QueryKnownUsers(
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryKnownUsersPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpCurrentStateInternalAPI) QueryServerBannedFromRoom(
+	ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerBannedFromRoom")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryServerBannedFromRoomPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

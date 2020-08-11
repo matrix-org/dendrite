@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
@@ -39,6 +40,7 @@ func Send(
 	rsAPI api.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	keyAPI keyapi.KeyInternalAPI,
+	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
@@ -46,6 +48,7 @@ func Send(
 		context:    httpReq.Context(),
 		rsAPI:      rsAPI,
 		eduAPI:     eduAPI,
+		stateAPI:   stateAPI,
 		keys:       keys,
 		federation: federation,
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
@@ -104,6 +107,7 @@ type txnReq struct {
 	rsAPI      api.RoomserverInternalAPI
 	eduAPI     eduserverAPI.EDUServerInputAPI
 	keyAPI     keyapi.KeyInternalAPI
+	stateAPI   currentstateAPI.CurrentStateInternalAPI
 	keys       gomatrixserverlib.JSONVerifier
 	federation txnFederationClient
 	// local cache of events for auth checks, etc - this may include events
@@ -162,6 +166,12 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, *util.JSONRe
 				}
 			}
 			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %s", string(pdu))
+			continue
+		}
+		if currentstateAPI.IsServerBannedFromRoom(t.context, t.stateAPI, event.RoomID(), t.Origin) {
+			results[event.EventID()] = gomatrixserverlib.PDUResult{
+				Error: "Forbidden by server ACLs",
+			}
 			continue
 		}
 		if err = gomatrixserverlib.VerifyAllEventSignatures(t.context, []gomatrixserverlib.Event{event}, t.keys); err != nil {

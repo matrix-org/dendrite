@@ -36,6 +36,8 @@ type CurrentStateInternalAPI interface {
 	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
 	// QueryKnownUsers returns a list of users that we know about from our joined rooms.
 	QueryKnownUsers(ctx context.Context, req *QueryKnownUsersRequest, res *QueryKnownUsersResponse) error
+	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
+	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
 }
 
 type QuerySharedUsersRequest struct {
@@ -99,6 +101,15 @@ type QueryKnownUsersRequest struct {
 
 type QueryKnownUsersResponse struct {
 	Users []authtypes.FullyQualifiedProfile `json:"profiles"`
+}
+
+type QueryServerBannedFromRoomRequest struct {
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	RoomID     string                       `json:"room_id"`
+}
+
+type QueryServerBannedFromRoomResponse struct {
+	Banned bool `json:"banned"`
 }
 
 // MarshalJSON stringifies the StateKeyTuple keys so they can be sent over the wire in HTTP API mode.

@@ -436,3 +436,15 @@ User directory correctly update on display name change
 User in shared private room does appear in user directory
 User in dir while user still shares private rooms
 Can get 'm.room.name' state for a departed room (SPEC-216)
+Banned servers cannot send events
+Banned servers cannot /make_join
+Banned servers cannot /send_join
+Banned servers cannot /make_leave
+Banned servers cannot /send_leave
+Banned servers cannot /invite
+Banned servers cannot get room state
+Banned servers cannot /event_auth
+Banned servers cannot get missing events
+Banned servers cannot get room state ids
+Banned servers cannot backfill
+Inbound /v1/send_leave rejects leaves from other servers

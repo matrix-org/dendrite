@@ -70,6 +70,9 @@ const selectBulkStateContentWildSQL = "" +
 const selectJoinedUsersSetForRoomsSQL = "" +
 	"SELECT state_key, COUNT(room_id) FROM currentstate_current_room_state WHERE room_id IN ($1) AND type = 'm.room.member' and content_value = 'join' GROUP BY state_key"
 
+const selectKnownRoomsSQL = "" +
+	"SELECT DISTINCT room_id FROM currentstate_current_room_state"
+
 // selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
 // joined to. Since this information is used to populate the user directory, we will
 // only return users that the user would ordinarily be able to see anyway.
@@ -86,6 +89,7 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithMembershipStmt  *sql.Stmt
 	selectStateEventStmt             *sql.Stmt
 	selectJoinedUsersSetForRoomsStmt *sql.Stmt
+	selectKnownRoomsStmt             *sql.Stmt
 	selectKnownUsersStmt             *sql.Stmt
 }
 
@@ -111,6 +115,9 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error)
 		return nil, err
 	}
 	if s.selectJoinedUsersSetForRoomsStmt, err = db.Prepare(selectJoinedUsersSetForRoomsSQL); err != nil {
+		return nil, err
+	}
+	if s.selectKnownRoomsStmt, err = db.Prepare(selectKnownRoomsSQL); err != nil {
 		return nil, err
 	}
 	if s.selectKnownUsersStmt, err = db.Prepare(selectKnownUsersSQL); err != nil {
@@ -342,6 +349,23 @@ func (s *currentRoomStateStatements) SelectKnownUsers(ctx context.Context, userI
 			return nil, err
 		}
 		result = append(result, userID)
+	}
+	return result, rows.Err()
+}
+
+func (s *currentRoomStateStatements) SelectKnownRooms(ctx context.Context) ([]string, error) {
+	rows, err := s.selectKnownRoomsStmt.QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := []string{}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownRooms: rows.close() failed")
+	for rows.Next() {
+		var roomID string
+		if err := rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		result = append(result, roomID)
 	}
 	return result, rows.Err()
 }

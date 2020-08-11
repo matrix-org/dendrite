@@ -93,3 +93,7 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) 
 func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
 	return d.CurrentRoomState.SelectKnownUsers(ctx, userID, searchString, limit)
 }
+
+func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
+	return d.CurrentRoomState.SelectKnownRooms(ctx)
+}

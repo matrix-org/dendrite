@@ -1,3 +1,17 @@
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package api
 
 import (
@@ -23,6 +37,20 @@ func GetEvent(ctx context.Context, stateAPI CurrentStateInternalAPI, roomID stri
 		return ev
 	}
 	return nil
+}
+
+// IsServerBannedFromRoom returns whether the server is banned from a room by server ACLs.
+func IsServerBannedFromRoom(ctx context.Context, stateAPI CurrentStateInternalAPI, roomID string, serverName gomatrixserverlib.ServerName) bool {
+	req := &QueryServerBannedFromRoomRequest{
+		ServerName: serverName,
+		RoomID:     roomID,
+	}
+	res := &QueryServerBannedFromRoomResponse{}
+	if err := stateAPI.QueryServerBannedFromRoom(ctx, req, res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to QueryServerBannedFromRoom")
+		return true
+	}
+	return res.Banned
 }
 
 // PopulatePublicRooms extracts PublicRoom information for all the provided room IDs. The IDs are not checked to see if they are visible in the
