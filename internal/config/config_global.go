@@ -20,7 +20,7 @@ type Global struct {
 
 	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
 	// prefix "ed25519:".
-	KeyID gomatrixserverlib.KeyID `yaml:"-"`
+	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers
@@ -43,7 +43,7 @@ type Global struct {
 
 func (c *Global) Defaults() {
 	c.ServerName = "localhost"
-	c.PrivateKeyPath = "matrix.pem"
+	c.PrivateKeyPath = "matrix_key.pem"
 	_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
 	c.KeyID = "ed25519:auto"
 	c.KeyValidityPeriod = time.Hour * 24 * 7

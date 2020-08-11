@@ -12,24 +12,25 @@ type ClientAPI struct {
 	Listen Address `yaml:"listen"`
 	Bind   Address `yaml:"bind"`
 
+	// If set disables new users from registering (except via shared
+	// secrets)
+	RegistrationDisabled bool `yaml:"registration_disabled"`
 	// If set, allows registration by anyone who also has the shared
 	// secret, even if registration is otherwise disabled.
 	RegistrationSharedSecret string `yaml:"registration_shared_secret"`
+
+	// Boolean stating whether catpcha registration is enabled
+	// and required
+	RecaptchaEnabled bool `yaml:"enable_registration_captcha"`
 	// This Home Server's ReCAPTCHA public key.
 	RecaptchaPublicKey string `yaml:"recaptcha_public_key"`
 	// This Home Server's ReCAPTCHA private key.
 	RecaptchaPrivateKey string `yaml:"recaptcha_private_key"`
-	// Boolean stating whether catpcha registration is enabled
-	// and required
-	RecaptchaEnabled bool `yaml:"enable_registration_captcha"`
 	// Secret used to bypass the captcha registration entirely
-	RecaptchaBypassSecret string `yaml:"captcha_bypass_secret"`
+	RecaptchaBypassSecret string `yaml:"recaptcha_bypass_secret"`
 	// HTTP API endpoint used to verify whether the captcha response
 	// was successful
 	RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
-	// If set disables new users from registering (except via shared
-	// secrets)
-	RegistrationDisabled bool `yaml:"registration_disabled"`
 
 	// TURN options
 	TURN TURN `yaml:"turn"`

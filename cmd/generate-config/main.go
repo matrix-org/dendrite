@@ -10,6 +10,10 @@ import (
 func main() {
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
+	cfg.Global.TrustedIDServers = []string{
+		"matrix.org",
+		"vector.im",
+	}
 	cfg.Logging = []config.LogrusHook{
 		{
 			Type:  "file",
@@ -17,6 +21,38 @@ func main() {
 			Params: map[string]interface{}{
 				"path": "/var/log/dendrite",
 			},
+		},
+	}
+	cfg.ServerKeyAPI.KeyPerspectives = config.KeyPerspectives{
+		{
+			ServerName: "matrix.org",
+			Keys: []config.KeyPerspectiveTrustKey{
+				{
+					KeyID:     "ed25519:auto",
+					PublicKey: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
+				},
+				{
+					KeyID:     "ed25519:a_RXGa",
+					PublicKey: "l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ",
+				},
+			},
+		},
+	}
+	cfg.MediaAPI.ThumbnailSizes = []config.ThumbnailSize{
+		{
+			Width:        32,
+			Height:       32,
+			ResizeMethod: "crop",
+		},
+		{
+			Width:        96,
+			Height:       96,
+			ResizeMethod: "crop",
+		},
+		{
+			Width:        640,
+			Height:       480,
+			ResizeMethod: "scale",
 		},
 	}
 
