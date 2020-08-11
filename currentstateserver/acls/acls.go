@@ -85,10 +85,13 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 }
 
 func (s *ServerACLs) IsServerBannedFromRoom(serverNameAndPort gomatrixserverlib.ServerName, roomID string) bool {
+	s.aclsMutex.RLock()
 	acls, ok := s.acls[roomID]
 	if !ok {
+		s.aclsMutex.RUnlock()
 		return false
 	}
+	s.aclsMutex.RUnlock()
 	serverName, _, err := net.SplitHostPort(string(serverNameAndPort))
 	if err != nil {
 		return true
