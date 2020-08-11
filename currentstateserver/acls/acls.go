@@ -26,15 +26,16 @@ func NewServerACLs(db storage.Database) *ServerACLs {
 	}
 	rooms, err := db.GetKnownRooms(ctx)
 	if err != nil {
-		logrus.WithError(err).Errorf("Failed to get known rooms")
+		logrus.WithError(err).Fatalf("Failed to get known rooms")
 	}
 	for _, room := range rooms {
-		state, err := db.GetStateEvent(ctx, room, "m.room.server_acls", "")
+		state, err := db.GetStateEvent(ctx, room, "m.room.server_acl", "")
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get server ACLs for room %q", room)
 			continue
 		}
 		if state != nil {
+			logrus.Infof("Updating server ACLs for room %q", room)
 			acls.OnServerACLUpdate(&state.Event)
 		}
 	}
