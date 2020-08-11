@@ -24,10 +24,14 @@ func NewServerACLs(db storage.Database) *ServerACLs {
 	acls := &ServerACLs{
 		acls: make(map[string]*serverACL),
 	}
+	// Look up all of the rooms that the current state server knows about.
 	rooms, err := db.GetKnownRooms(ctx)
 	if err != nil {
 		logrus.WithError(err).Fatalf("Failed to get known rooms")
 	}
+	// For each room, let's see if we have a server ACL state event. If we
+	// do then we'll process it into memory so that we have the regexes to
+	// hand.
 	for _, room := range rooms {
 		state, err := db.GetStateEvent(ctx, room, "m.room.server_acl", "")
 		if err != nil {
@@ -59,6 +63,10 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 		logrus.WithError(err).Errorf("Failed to unmarshal state content for server ACLs")
 		return
 	}
+	// The spec calls only for * (zero or more chars) and ? (exactly one char)
+	// to be supported as wildcard components, so we will escape all of the regex
+	// special characters and then replace * and ? with their regex counterparts.
+	// https://matrix.org/docs/spec/client_server/r0.6.1#m-room-server-acl
 	for _, orig := range acls.Allowed {
 		escaped := regexp.QuoteMeta(orig)
 		escaped = strings.Replace(escaped, "\\?", "(.)", -1)
@@ -91,30 +99,44 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 
 func (s *ServerACLs) IsServerBannedFromRoom(serverNameAndPort gomatrixserverlib.ServerName, roomID string) bool {
 	s.aclsMutex.RLock()
+	// First of all check if we have an ACL for this room. If we don't then
+	// no servers are banned from the room.
 	acls, ok := s.acls[roomID]
 	if !ok {
 		s.aclsMutex.RUnlock()
 		return false
 	}
 	s.aclsMutex.RUnlock()
+	// Split the host and port apart. This is because the spec calls on us to
+	// validate the hostname only in cases where the port is also present.
 	serverName, _, err := net.SplitHostPort(string(serverNameAndPort))
 	if err != nil {
 		return true
 	}
+	// Check if the hostname is an IPv4 or IPv6 literal. We cheat here by adding
+	// a /0 prefix length just to trick ParseCIDR into working. If we find that
+	// the server is an IP literal and we don't allow those then stop straight
+	// away.
 	if _, _, err := net.ParseCIDR(fmt.Sprintf("%s/0", serverName)); err == nil {
 		if !acls.AllowIPLiterals {
 			return true
 		}
 	}
+	// Check if the hostname matches one of the denied regexes. If it does then
+	// the server is banned from the room.
 	for _, expr := range acls.deniedRegexes {
 		if expr.MatchString(string(serverName)) {
 			return true
 		}
 	}
+	// Check if the hostname matches one of the allowed regexes. If it does then
+	// the server is NOT banned from the room.
 	for _, expr := range acls.allowedRegexes {
 		if expr.MatchString(string(serverName)) {
 			return false
 		}
 	}
+	// If we've got to this point then we haven't matched any regexes or an IP
+	// hostname if disallowed. The spec calls for default-deny here.
 	return true
 }
