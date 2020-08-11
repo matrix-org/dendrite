@@ -168,7 +168,7 @@ func (t *txnReq) processTransaction() (*gomatrixserverlib.RespSend, *util.JSONRe
 			util.GetLogger(t.context).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %s", string(pdu))
 			continue
 		}
-		if currentstateAPI.IsServerBannedFromRoom(t.context, t.stateAPI, event.RoomID(), event.Origin()) {
+		if currentstateAPI.IsServerBannedFromRoom(t.context, t.stateAPI, event.RoomID(), t.Origin) {
 			results[event.EventID()] = gomatrixserverlib.PDUResult{
 				Error: "Forbidden by server ACLs",
 			}
