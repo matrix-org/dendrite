@@ -17,6 +17,9 @@
 # SQLite is embedded into Dendrite and therefore no further prerequisites are
 # needed for the database when using SQLite mode. However, performance with
 # PostgreSQL is significantly better and recommended for multi-user deployments.
+# SQLite is typically around 20-30% slower than PostgreSQL when tested with a
+# small number of users and likely will perform worse still with a higher volume
+# of users.
 #
 # The "max_open_conns" and "max_idle_conns" settings configure the maximum 
 # number of open/idle database connections. The value 0 will use the database
@@ -52,8 +55,10 @@ global:
 
   # Configuration for Kafka/Naffka.
   kafka:
-    # List of Kafka addresses to connect to. This is not needed if using Naffka.
-    addresses: []
+    # List of Kafka broker addresses to connect to. This is not needed if using
+    # Naffka in monolith mode.
+    addresses:
+      - localhost:2181
 
     # The prefix to use for Kafka topic names for this homeserver. Change this only if
     # you are running more than one Dendrite homeserver on the same Kafka deployment.
