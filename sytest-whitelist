@@ -445,3 +445,5 @@ Banned servers cannot /invite
 Banned servers cannot get room state
 Banned servers cannot /event_auth
 Banned servers cannot get missing events
+Banned servers cannot get room state ids
+Banned servers cannot backfill
