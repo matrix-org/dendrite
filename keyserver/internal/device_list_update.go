@@ -222,7 +222,8 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 	// last made a request to the server. If we get the server name during the cooloff
 	// period, we'll ignore the poke.
 	lastProcessed := make(map[gomatrixserverlib.ServerName]time.Time)
-	cooloffPeriod := time.Minute
+	// this can't be too long else sytest will give up trying to do a test
+	cooloffPeriod := 500 * time.Millisecond
 	shouldProcess := func(srv gomatrixserverlib.ServerName) bool {
 		// we should process requests when now is after the last process time + cooloff
 		return time.Now().After(lastProcessed[srv].Add(cooloffPeriod))
