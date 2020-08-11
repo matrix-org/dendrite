@@ -34,7 +34,9 @@ func NewServerACLs(db storage.Database) *ServerACLs {
 			logrus.WithError(err).Errorf("Failed to get server ACLs for room %q", room)
 			continue
 		}
-		acls.OnServerACLUpdate(&state.Event)
+		if state != nil {
+			acls.OnServerACLUpdate(&state.Event)
+		}
 	}
 	return acls
 }
