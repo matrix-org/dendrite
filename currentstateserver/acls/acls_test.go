@@ -46,7 +46,7 @@ func TestOpenACLsWithBlacklist(t *testing.T) {
 		t.Fatal("Expected 1.2.3.4 to be allowed but wasn't")
 	}
 	if acls.IsServerBannedFromRoom("1.2.3.4:2345", roomID) {
-		t.Fatal("Expected 1.2.3.4 to be allowed but wasn't")
+		t.Fatal("Expected 1.2.3.4:2345 to be allowed but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("foo.com", roomID) {
 		t.Fatal("Expected foo.com to be banned but wasn't")
@@ -58,7 +58,7 @@ func TestOpenACLsWithBlacklist(t *testing.T) {
 		t.Fatal("Expected bar.com to be allowed but wasn't")
 	}
 	if acls.IsServerBannedFromRoom("bar.com:4567", roomID) {
-		t.Fatal("Expected bar.com to be allowed but wasn't")
+		t.Fatal("Expected bar.com:4567 to be allowed but wasn't")
 	}
 }
 
@@ -85,7 +85,7 @@ func TestDefaultACLsWithWhitelist(t *testing.T) {
 		t.Fatal("Expected 1.2.3.4 to be banned but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("1.2.3.4:2345", roomID) {
-		t.Fatal("Expected 1.2.3.4 to be banned but wasn't")
+		t.Fatal("Expected 1.2.3.4:2345 to be banned but wasn't")
 	}
 	if acls.IsServerBannedFromRoom("foo.com", roomID) {
 		t.Fatal("Expected foo.com to be allowed but wasn't")
@@ -100,6 +100,6 @@ func TestDefaultACLsWithWhitelist(t *testing.T) {
 		t.Fatal("Expected baz.com to be allowed but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("qux.com:4567", roomID) {
-		t.Fatal("Expected baz.com to be allowed but wasn't")
+		t.Fatal("Expected qux.com:4567 to be allowed but wasn't")
 	}
 }
