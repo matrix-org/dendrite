@@ -35,7 +35,6 @@ func NewServerACLs(db storage.Database) *ServerACLs {
 			continue
 		}
 		if state != nil {
-			logrus.Infof("Updating server ACLs for room %q", room)
 			acls.OnServerACLUpdate(&state.Event)
 		}
 	}
@@ -75,7 +74,11 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 			acls.deniedRegexes = append(acls.deniedRegexes, expr)
 		}
 	}
-	logrus.Infof("Update server ACLs for %q", state.RoomID())
+	logrus.WithFields(logrus.Fields{
+		"allow_ip_literals": acls.AllowIPLiterals,
+		"num_allowed":       len(acls.allowedRegexes),
+		"num_denied":        len(acls.deniedRegexes),
+	}).Infof("Updating server ACLs for %q", state.RoomID())
 	s.aclsMutex.Lock()
 	defer s.aclsMutex.Unlock()
 	s.acls[state.RoomID()] = acls
