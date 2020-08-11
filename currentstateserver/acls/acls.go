@@ -1,3 +1,17 @@
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package acls
 
 import (
@@ -57,6 +71,13 @@ type serverACL struct {
 	deniedRegexes  []*regexp.Regexp
 }
 
+func compileACLRegex(orig string) (*regexp.Regexp, error) {
+	escaped := regexp.QuoteMeta(orig)
+	escaped = strings.Replace(escaped, "\\?", ".", -1)
+	escaped = strings.Replace(escaped, "\\*", ".*", -1)
+	return regexp.Compile(escaped)
+}
+
 func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 	acls := &serverACL{}
 	if err := json.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
@@ -68,20 +89,14 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 	// special characters and then replace * and ? with their regex counterparts.
 	// https://matrix.org/docs/spec/client_server/r0.6.1#m-room-server-acl
 	for _, orig := range acls.Allowed {
-		escaped := regexp.QuoteMeta(orig)
-		escaped = strings.Replace(escaped, "\\?", "(.)", -1)
-		escaped = strings.Replace(escaped, "\\*", "(.*)", -1)
-		if expr, err := regexp.Compile(escaped); err != nil {
+		if expr, err := compileACLRegex(orig); err != nil {
 			logrus.WithError(err).Errorf("Failed to compile allowed regex")
 		} else {
 			acls.allowedRegexes = append(acls.allowedRegexes, expr)
 		}
 	}
 	for _, orig := range acls.Denied {
-		escaped := regexp.QuoteMeta(orig)
-		escaped = strings.Replace(escaped, "\\?", "(.)", -1)
-		escaped = strings.Replace(escaped, "\\*", "(.*)", -1)
-		if expr, err := regexp.Compile(escaped); err != nil {
+		if expr, err := compileACLRegex(orig); err != nil {
 			logrus.WithError(err).Errorf("Failed to compile denied regex")
 		} else {
 			acls.deniedRegexes = append(acls.deniedRegexes, expr)
@@ -97,7 +112,7 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 	s.acls[state.RoomID()] = acls
 }
 
-func (s *ServerACLs) IsServerBannedFromRoom(serverNameAndPort gomatrixserverlib.ServerName, roomID string) bool {
+func (s *ServerACLs) IsServerBannedFromRoom(serverName gomatrixserverlib.ServerName, roomID string) bool {
 	s.aclsMutex.RLock()
 	// First of all check if we have an ACL for this room. If we don't then
 	// no servers are banned from the room.
@@ -109,9 +124,8 @@ func (s *ServerACLs) IsServerBannedFromRoom(serverNameAndPort gomatrixserverlib.
 	s.aclsMutex.RUnlock()
 	// Split the host and port apart. This is because the spec calls on us to
 	// validate the hostname only in cases where the port is also present.
-	serverName, _, err := net.SplitHostPort(string(serverNameAndPort))
-	if err != nil {
-		return true
+	if serverNameOnly, _, err := net.SplitHostPort(string(serverName)); err == nil {
+		serverName = gomatrixserverlib.ServerName(serverNameOnly)
 	}
 	// Check if the hostname is an IPv4 or IPv6 literal. We cheat here by adding
 	// a /0 prefix length just to trick ParseCIDR into working. If we find that

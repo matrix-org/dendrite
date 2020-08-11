@@ -79,7 +79,7 @@ func (c *OutputRoomEventConsumer) onNewRoomEvent(
 ) error {
 	ev := msg.Event
 
-	if ev.Type() == "m.room.server_acl" {
+	if ev.Type() == "m.room.server_acl" && ev.StateKeyEquals("") {
 		defer c.acls.OnServerACLUpdate(&ev.Event)
 	}
 

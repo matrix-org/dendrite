@@ -90,7 +90,7 @@ func AddRoutes(internalAPIMux *mux.Router, intAPI api.CurrentStateInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(QuerySharedUsersPath,
+	internalAPIMux.Handle(QueryServerBannedFromRoomPath,
 		httputil.MakeInternalAPI("queryServerBannedFromRoom", func(req *http.Request) util.JSONResponse {
 			request := api.QueryServerBannedFromRoomRequest{}
 			response := api.QueryServerBannedFromRoomResponse{}

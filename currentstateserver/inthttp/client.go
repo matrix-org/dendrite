@@ -113,7 +113,7 @@ func (h *httpCurrentStateInternalAPI) QueryKnownUsers(
 func (h *httpCurrentStateInternalAPI) QueryServerBannedFromRoom(
 	ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKnownUsers")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerBannedFromRoom")
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryServerBannedFromRoomPath
