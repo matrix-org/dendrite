@@ -334,7 +334,7 @@ func (s *currentRoomStateStatements) SelectKnownUsers(ctx context.Context, userI
 }
 
 func (s *currentRoomStateStatements) SelectKnownRooms(ctx context.Context) ([]string, error) {
-	rows, err := s.selectKnownUsersStmt.QueryContext(ctx)
+	rows, err := s.selectKnownRoomsStmt.QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
