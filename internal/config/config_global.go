@@ -43,7 +43,7 @@ type Global struct {
 
 func (c *Global) Defaults() {
 	c.ServerName = "localhost"
-	c.PrivateKeyPath = "matrix.pem"
+	c.PrivateKeyPath = "matrix_key.pem"
 	_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
 	c.KeyID = "ed25519:auto"
 	c.KeyValidityPeriod = time.Hour * 24 * 7
