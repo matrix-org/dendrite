@@ -84,10 +84,14 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 	s.acls[state.RoomID()] = acls
 }
 
-func (s *ServerACLs) IsServerBannedFromRoom(serverName gomatrixserverlib.ServerName, roomID string) bool {
+func (s *ServerACLs) IsServerBannedFromRoom(serverNameAndPort gomatrixserverlib.ServerName, roomID string) bool {
 	acls, ok := s.acls[roomID]
 	if !ok {
 		return false
+	}
+	serverName, _, err := net.SplitHostPort(string(serverNameAndPort))
+	if err != nil {
+		return true
 	}
 	if _, _, err := net.ParseCIDR(fmt.Sprintf("%s/0", serverName)); err == nil {
 		if !acls.AllowIPLiterals {
