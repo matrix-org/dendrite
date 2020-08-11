@@ -20,7 +20,7 @@ type Global struct {
 
 	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
 	// prefix "ed25519:".
-	KeyID gomatrixserverlib.KeyID `yaml:"-"`
+	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers

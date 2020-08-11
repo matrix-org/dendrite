@@ -37,19 +37,20 @@ version: 1
 global:
   server_name: localhost
   private_key: matrix_key.pem
+  key_id: ed25519:auto
   key_validity_period: 168h0m0s
   trusted_third_party_id_servers:
   - matrix.org
   - vector.im
   kafka:
     addresses: []
+    topic_prefix: Dendrite
     use_naffka: true
     naffka_database:
       connection_string: file:naffka.db
       max_open_conns: 100
       max_idle_conns: 2
       conn_max_lifetime: -1
-    topic_prefix: Dendrite
   metrics:
     enabled: false
     basic_auth:
@@ -72,7 +73,7 @@ client_api:
   enable_registration_captcha: false
   recaptcha_public_key: ""
   recaptcha_private_key: ""
-  captcha_bypass_secret: ""
+  recaptcha_bypass_secret: ""
   recaptcha_siteverify_api: ""
   turn:
     turn_user_lifetime: ""

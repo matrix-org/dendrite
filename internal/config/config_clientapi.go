@@ -27,7 +27,7 @@ type ClientAPI struct {
 	// This Home Server's ReCAPTCHA private key.
 	RecaptchaPrivateKey string `yaml:"recaptcha_private_key"`
 	// Secret used to bypass the captcha registration entirely
-	RecaptchaBypassSecret string `yaml:"captcha_bypass_secret"`
+	RecaptchaBypassSecret string `yaml:"recaptcha_bypass_secret"`
 	// HTTP API endpoint used to verify whether the captcha response
 	// was successful
 	RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
