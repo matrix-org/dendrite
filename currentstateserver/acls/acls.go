@@ -56,13 +56,16 @@ type serverACL struct {
 func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 	acls := &serverACL{}
 	if err := json.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
+		logrus.WithError(err).Errorf("Failed to unmarshal state content for server ACLs")
 		return
 	}
 	for _, orig := range acls.Allowed {
 		escaped := regexp.QuoteMeta(orig)
 		escaped = strings.Replace(escaped, "\\?", "(.)", -1)
 		escaped = strings.Replace(escaped, "\\*", "(.*)", -1)
-		if expr, err := regexp.Compile(escaped); err == nil {
+		if expr, err := regexp.Compile(escaped); err != nil {
+			logrus.WithError(err).Errorf("Failed to compile allowed regex")
+		} else {
 			acls.allowedRegexes = append(acls.allowedRegexes, expr)
 		}
 	}
@@ -70,7 +73,9 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 		escaped := regexp.QuoteMeta(orig)
 		escaped = strings.Replace(escaped, "\\?", "(.)", -1)
 		escaped = strings.Replace(escaped, "\\*", "(.*)", -1)
-		if expr, err := regexp.Compile(escaped); err == nil {
+		if expr, err := regexp.Compile(escaped); err != nil {
+			logrus.WithError(err).Errorf("Failed to compile denied regex")
+		} else {
 			acls.deniedRegexes = append(acls.deniedRegexes, expr)
 		}
 	}
@@ -78,7 +83,7 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 		"allow_ip_literals": acls.AllowIPLiterals,
 		"num_allowed":       len(acls.allowedRegexes),
 		"num_denied":        len(acls.deniedRegexes),
-	}).Infof("Updating server ACLs for %q", state.RoomID())
+	}).Debugf("Updating server ACLs for %q", state.RoomID())
 	s.aclsMutex.Lock()
 	defer s.aclsMutex.Unlock()
 	s.acls[state.RoomID()] = acls

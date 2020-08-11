@@ -79,6 +79,10 @@ func (c *OutputRoomEventConsumer) onNewRoomEvent(
 ) error {
 	ev := msg.Event
 
+	if ev.Type() == "m.room.server_acl" {
+		defer c.acls.OnServerACLUpdate(&ev.Event)
+	}
+
 	addsStateEvents := msg.AddsState()
 
 	ev, err := c.updateStateEvent(ev)
@@ -91,7 +95,6 @@ func (c *OutputRoomEventConsumer) onNewRoomEvent(
 		if err != nil {
 			return err
 		}
-		c.acls.OnServerACLUpdate(&addsStateEvents[i].Event)
 	}
 
 	err = c.db.StoreStateEvents(
