@@ -52,8 +52,8 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Defaults()
 
 	port := startPort
-	assignAddress := func() config.Address {
-		result := config.Address(fmt.Sprintf("%s:%d", host, port))
+	assignAddress := func() config.HTTPAddress {
+		result := config.HTTPAddress(fmt.Sprintf("http://%s:%d", host, port))
 		port++
 		return result
 	}
@@ -97,29 +97,29 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(database)
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(database)
 
-	cfg.AppServiceAPI.Listen = assignAddress()
-	cfg.CurrentStateServer.Listen = assignAddress()
-	cfg.EDUServer.Listen = assignAddress()
-	cfg.FederationAPI.Listen = assignAddress()
-	cfg.FederationSender.Listen = assignAddress()
-	cfg.KeyServer.Listen = assignAddress()
-	cfg.MediaAPI.Listen = assignAddress()
-	cfg.RoomServer.Listen = assignAddress()
-	cfg.ServerKeyAPI.Listen = assignAddress()
-	cfg.SyncAPI.Listen = assignAddress()
-	cfg.UserAPI.Listen = assignAddress()
+	cfg.AppServiceAPI.InternalAPI.Listen = assignAddress()
+	cfg.CurrentStateServer.InternalAPI.Listen = assignAddress()
+	cfg.EDUServer.InternalAPI.Listen = assignAddress()
+	cfg.FederationAPI.InternalAPI.Listen = assignAddress()
+	cfg.FederationSender.InternalAPI.Listen = assignAddress()
+	cfg.KeyServer.InternalAPI.Listen = assignAddress()
+	cfg.MediaAPI.InternalAPI.Listen = assignAddress()
+	cfg.RoomServer.InternalAPI.Listen = assignAddress()
+	cfg.ServerKeyAPI.InternalAPI.Listen = assignAddress()
+	cfg.SyncAPI.InternalAPI.Listen = assignAddress()
+	cfg.UserAPI.InternalAPI.Listen = assignAddress()
 
-	cfg.AppServiceAPI.Bind = cfg.AppServiceAPI.Listen
-	cfg.CurrentStateServer.Bind = cfg.CurrentStateServer.Listen
-	cfg.EDUServer.Bind = cfg.EDUServer.Listen
-	cfg.FederationAPI.Bind = cfg.FederationAPI.Listen
-	cfg.FederationSender.Bind = cfg.FederationSender.Listen
-	cfg.KeyServer.Bind = cfg.KeyServer.Listen
-	cfg.MediaAPI.Bind = cfg.MediaAPI.Listen
-	cfg.RoomServer.Bind = cfg.RoomServer.Listen
-	cfg.ServerKeyAPI.Bind = cfg.ServerKeyAPI.Listen
-	cfg.SyncAPI.Bind = cfg.SyncAPI.Listen
-	cfg.UserAPI.Bind = cfg.UserAPI.Listen
+	cfg.AppServiceAPI.InternalAPI.Connect = cfg.AppServiceAPI.InternalAPI.Listen
+	cfg.CurrentStateServer.InternalAPI.Connect = cfg.CurrentStateServer.InternalAPI.Listen
+	cfg.EDUServer.InternalAPI.Connect = cfg.EDUServer.InternalAPI.Listen
+	cfg.FederationAPI.InternalAPI.Connect = cfg.FederationAPI.InternalAPI.Listen
+	cfg.FederationSender.InternalAPI.Connect = cfg.FederationSender.InternalAPI.Listen
+	cfg.KeyServer.InternalAPI.Connect = cfg.KeyServer.InternalAPI.Listen
+	cfg.MediaAPI.InternalAPI.Connect = cfg.MediaAPI.InternalAPI.Listen
+	cfg.RoomServer.InternalAPI.Connect = cfg.RoomServer.InternalAPI.Listen
+	cfg.ServerKeyAPI.InternalAPI.Connect = cfg.ServerKeyAPI.InternalAPI.Listen
+	cfg.SyncAPI.InternalAPI.Connect = cfg.SyncAPI.InternalAPI.Listen
+	cfg.UserAPI.InternalAPI.Connect = cfg.UserAPI.InternalAPI.Listen
 
 	return &cfg, port, nil
 }

@@ -53,18 +53,18 @@ func main() {
 		// statements in the configuration so that we know where to find
 		// the API endpoints. They'll listen on the same port as the monolith
 		// itself.
-		addr := config.Address(*httpBindAddr)
-		cfg.AppServiceAPI.Listen = addr
-		cfg.ClientAPI.Listen = addr
-		cfg.CurrentStateServer.Listen = addr
-		cfg.EDUServer.Listen = addr
-		cfg.FederationAPI.Listen = addr
-		cfg.FederationSender.Listen = addr
-		cfg.KeyServer.Listen = addr
-		cfg.MediaAPI.Listen = addr
-		cfg.RoomServer.Listen = addr
-		cfg.ServerKeyAPI.Listen = addr
-		cfg.SyncAPI.Listen = addr
+		addr := config.HTTPAddress("http://" + *httpBindAddr)
+		cfg.AppServiceAPI.InternalAPI.Connect = addr
+		cfg.ClientAPI.InternalAPI.Connect = addr
+		cfg.CurrentStateServer.InternalAPI.Connect = addr
+		cfg.EDUServer.InternalAPI.Connect = addr
+		cfg.FederationAPI.InternalAPI.Connect = addr
+		cfg.FederationSender.InternalAPI.Connect = addr
+		cfg.KeyServer.InternalAPI.Connect = addr
+		cfg.MediaAPI.InternalAPI.Connect = addr
+		cfg.RoomServer.InternalAPI.Connect = addr
+		cfg.ServerKeyAPI.InternalAPI.Connect = addr
+		cfg.SyncAPI.InternalAPI.Connect = addr
 	}
 
 	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
@@ -159,14 +159,7 @@ func main() {
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		serv := http.Server{
-			Addr:         *httpBindAddr,
-			WriteTimeout: setup.HTTPServerTimeout,
-			Handler:      base.BaseMux,
-		}
-
-		logrus.Info("Listening on ", serv.Addr)
-		logrus.Fatal(serv.ListenAndServe())
+		base.SetupAndServeHTTP(*httpBindAddr, *httpBindAddr)
 	}()
 	// Handle HTTPS if certificate and key are provided
 	if *certFile != "" && *keyFile != "" {

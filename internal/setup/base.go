@@ -19,6 +19,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
@@ -266,37 +267,65 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
-func (b *BaseDendrite) SetupAndServeHTTP(bindaddr string, listenaddr string) {
-	// If a separate bind address is defined, listen on that. Otherwise use
-	// the listen address
-	var addr string
-	if bindaddr != "" {
-		addr = bindaddr
-	} else {
-		addr = listenaddr
+func (b *BaseDendrite) SetupAndServeHTTP(internaladdr, externaladdr string) {
+	var wg sync.WaitGroup
+
+	externalRouter := mux.NewRouter().SkipClean(true)
+	internalRouter := externalRouter
+	if internaladdr != externaladdr {
+		internalRouter = mux.NewRouter().SkipClean(true)
 	}
 
-	serv := http.Server{
-		Addr:         addr,
+	externalServ := &http.Server{
+		Addr:         externaladdr,
 		WriteTimeout: HTTPServerTimeout,
+		Handler:      externalRouter,
+	}
+	internalServ := externalServ
+	if internaladdr != externaladdr {
+		internalServ = &http.Server{
+			Addr:         internaladdr,
+			WriteTimeout: HTTPServerTimeout,
+			Handler:      internalRouter,
+		}
 	}
 
-	httputil.SetupHTTPAPI(
-		b.BaseMux,
+	httputil.SetupExternalHTTPAPI(
+		externalRouter,
 		b.PublicAPIMux,
+		&b.Cfg.Global,
+	)
+
+	httputil.SetupInternalHTTPAPI(
+		internalRouter,
 		b.InternalAPIMux,
 		&b.Cfg.Global,
 		b.UseHTTPAPIs,
 	)
-	serv.Handler = b.BaseMux
-	logrus.Infof("Starting %s server on %s", b.componentName, serv.Addr)
 
-	err := serv.ListenAndServe()
-	if err != nil {
-		logrus.WithError(err).Fatal("failed to serve http")
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		logrus.Infof("Starting %s external APIs on %s", b.componentName, externalServ.Addr)
+		if err := externalServ.ListenAndServe(); err != nil {
+			logrus.WithError(err).Fatal("failed to serve http")
+		}
+		logrus.Infof("Stopped %s external APIs on %s", b.componentName, externalServ.Addr)
+	}()
+
+	if internaladdr != externaladdr {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			logrus.Infof("Starting %s internal APIs on %s", b.componentName, internalServ.Addr)
+			if err := internalServ.ListenAndServe(); err != nil {
+				logrus.WithError(err).Fatal("failed to serve http")
+			}
+			logrus.Infof("Stopped %s internal APIs on %s", b.componentName, internalServ.Addr)
+		}()
 	}
 
-	logrus.Infof("Stopped %s server on %s", b.componentName, serv.Addr)
+	wg.Wait()
 }
 
 // setupKafka creates kafka consumer/producer pair from the config.

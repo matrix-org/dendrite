@@ -233,14 +233,24 @@ func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib
 	}
 }
 
-// SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics listener
+// SetupHTTPAPI registers both internal and external HTTP APIs.
 func SetupHTTPAPI(servMux, publicApiMux, internalApiMux *mux.Router, cfg *config.Global, enableHTTPAPIs bool) {
+	SetupInternalHTTPAPI(servMux, internalApiMux, cfg, enableHTTPAPIs)
+	SetupExternalHTTPAPI(servMux, publicApiMux, cfg)
+}
+
+// SetupInternalHTTPAPI registers internal APIs and metrics only.
+func SetupInternalHTTPAPI(servMux, internalApiMux *mux.Router, cfg *config.Global, enableHTTPAPIs bool) {
 	if cfg.Metrics.Enabled {
 		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
 	}
 	if enableHTTPAPIs {
 		servMux.Handle(InternalPathPrefix, internalApiMux)
 	}
+}
+
+// SetupExternalHTTPAPI registers public APIs only.
+func SetupExternalHTTPAPI(servMux, publicApiMux *mux.Router, cfg *config.Global) {
 	servMux.Handle(PublicPathPrefix, WrapHandlerInCORS(publicApiMux))
 }
 
