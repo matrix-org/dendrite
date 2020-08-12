@@ -144,6 +144,20 @@ func (u *DeviceListUpdater) mutex(userID string) *sync.Mutex {
 	return u.userIDToMutex[userID]
 }
 
+// ManualUpdate invalidates the device list for the given user and fetches the latest and tracks it.
+// Blocks until the device list is synced or the timeout is reached.
+func (u *DeviceListUpdater) ManualUpdate(ctx context.Context, serverName gomatrixserverlib.ServerName, userID string) error {
+	mu := u.mutex(userID)
+	mu.Lock()
+	err := u.db.MarkDeviceListStale(ctx, userID, true)
+	mu.Unlock()
+	if err != nil {
+		return fmt.Errorf("ManualUpdate: failed to mark device list for %s as stale: %w", userID, err)
+	}
+	u.notifyWorkers(userID)
+	return nil
+}
+
 // Update blocks until the update has been stored in the database. It blocks primarily for satisfying sytest,
 // which assumes when /send 200 OKs that the device lists have been updated.
 func (u *DeviceListUpdater) Update(ctx context.Context, event gomatrixserverlib.DeviceListUpdateEvent) error {
