@@ -142,6 +142,8 @@ Server correctly handles incoming m.device_list_update
 Device deletion propagates over federation
 If remote user leaves room, changes device and rejoins we see update in sync
 If remote user leaves room, changes device and rejoins we see update in /keys/changes
+If remote user leaves room we no longer receive device updates
+Get left notifs in sync and /keys/changes when other user leaves
 Can query remote device keys using POST after notification
 Can add account data
 Can add account data to room

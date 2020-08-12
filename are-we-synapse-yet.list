@@ -831,6 +831,7 @@ psh Trying to get push rules with unknown scope fails with 400
 psh Trying to get push rules with unknown template fails with 400 
 psh Trying to get push rules with unknown attribute fails with 400 
 psh Trying to get push rules with unknown rule_id fails with 404
+psh Rooms with names are correctly named in pushes
 v1s GET /initialSync with non-numeric 'limit' 
 v1s GET /events with non-numeric 'limit' 
 v1s GET /events with negative 'limit' 
@@ -839,7 +840,7 @@ ath Event size limits
 syn Check creating invalid filters returns 4xx 
 f,pre New federated private chats get full presence information (SYN-115) 
 pre Left room members do not cause problems for presence 
-crm Rooms can be created with an initial invite list (SYN-205) 
+crm Rooms can be created with an initial invite list (SYN-205) (1 subtests)
 typ Typing notifications don't leak 
 ban Non-present room members cannot ban others 
 psh Getting push rules doesn't corrupt the cache SYN-390 

@@ -230,6 +230,7 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 	}
 
 	// on failure, spin up a short-lived goroutine to inject the server name again.
+	scheduledRetries := make(map[gomatrixserverlib.ServerName]time.Time)
 	inject := func(srv gomatrixserverlib.ServerName, duration time.Duration) {
 		time.Sleep(duration)
 		ch <- srv
@@ -237,13 +238,20 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 
 	for serverName := range ch {
 		if !shouldProcess(serverName) {
-			// do not inject into the channel as we know there will be a sleeping goroutine
-			// which will do it after the cooloff period expires
-			continue
+			if time.Now().Before(scheduledRetries[serverName]) {
+				// do not inject into the channel as we know there will be a sleeping goroutine
+				// which will do it after the cooloff period expires
+				continue
+			} else {
+				scheduledRetries[serverName] = time.Now().Add(cooloffPeriod)
+				go inject(serverName, cooloffPeriod) // TODO: Backoff?
+				continue
+			}
 		}
 		lastProcessed[serverName] = time.Now()
 		shouldRetry := u.processServer(serverName)
 		if shouldRetry {
+			scheduledRetries[serverName] = time.Now().Add(cooloffPeriod)
 			go inject(serverName, cooloffPeriod) // TODO: Backoff?
 		}
 	}
