@@ -43,8 +43,9 @@ type Database interface {
 	StoreLocalDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error
 
 	// StoreRemoteDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced. An empty KeyJSON removes the key
-	// for this (user, device). Does not modify the stream ID for keys.
-	StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error
+	// for this (user, device). Does not modify the stream ID for keys. User IDs in `clearUserIDs` will have all their device keys deleted prior
+	// to insertion - use this when you have a complete snapshot of a user's keys in order to track device deletions correctly.
+	StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clearUserIDs []string) error
 
 	// PrevIDsExists returns true if all prev IDs exist for this user.
 	PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error)
