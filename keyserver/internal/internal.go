@@ -206,7 +206,15 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 			maxStreamID = m.StreamID
 		}
 	}
-	res.Devices = msgs
+	// remove deleted devices
+	var result []api.DeviceMessage
+	for _, m := range msgs {
+		if m.KeyJSON == nil {
+			continue
+		}
+		result = append(result, m)
+	}
+	res.Devices = result
 	res.StreamID = maxStreamID
 }
 
@@ -408,7 +416,11 @@ func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(
 	if res.DeviceKeys[userID] == nil {
 		res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 	}
+
 	for _, key := range keys {
+		if len(key.KeyJSON) == 0 {
+			continue // ignore deleted keys
+		}
 		// inject the display name
 		key.KeyJSON, _ = sjson.SetBytes(key.KeyJSON, "unsigned", struct {
 			DisplayName string `json:"device_display_name,omitempty"`

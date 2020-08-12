@@ -61,8 +61,14 @@ func (d *Database) PrevIDsExists(ctx context.Context, userID string, prevIDs []i
 	return count == len(prevIDs), nil
 }
 
-func (d *Database) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+func (d *Database) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clearUserIDs []string) error {
 	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		for _, userID := range clearUserIDs {
+			err := d.DeviceKeysTable.DeleteAllDeviceKeys(ctx, txn, userID)
+			if err != nil {
+				return err
+			}
+		}
 		return d.DeviceKeysTable.InsertDeviceKeys(ctx, txn, keys)
 	})
 }
