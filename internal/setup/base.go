@@ -287,7 +287,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	}
 	externalServ := internalServ
 
-	if externalAddr != "" && externalAddr != internalAddr {
+	if externalAddr != NoExternalListener && externalAddr != internalAddr {
 		externalRouter = mux.NewRouter()
 		externalServ = &http.Server{
 			Addr:         string(externalAddr),
@@ -307,32 +307,32 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 
 	go func() {
-		logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
+		logrus.Infof("Starting %s listener on %s", b.componentName, internalServ.Addr)
 		if certFile != nil && keyFile != nil {
-			if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+			if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
 				logrus.WithError(err).Fatal("failed to serve HTTPS")
 			}
 		} else {
-			if err := externalServ.ListenAndServe(); err != nil {
+			if err := internalServ.ListenAndServe(); err != nil {
 				logrus.WithError(err).Fatal("failed to serve HTTP")
 			}
 		}
-		logrus.Infof("Stopped %s listener on %s", b.componentName, externalServ.Addr)
+		logrus.Infof("Stopped %s listener on %s", b.componentName, internalServ.Addr)
 	}()
 
-	if internalAddr != "" && internalAddr != externalAddr {
+	if externalAddr != NoExternalListener && internalAddr != externalAddr {
 		go func() {
-			logrus.Infof("Starting %s listener on %s", b.componentName, internalServ.Addr)
+			logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
 			if certFile != nil && keyFile != nil {
-				if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+				if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
 					logrus.WithError(err).Fatal("failed to serve HTTPS")
 				}
 			} else {
-				if err := internalServ.ListenAndServe(); err != nil {
+				if err := externalServ.ListenAndServe(); err != nil {
 					logrus.WithError(err).Fatal("failed to serve HTTP")
 				}
 			}
-			logrus.Infof("Stopped %s listener on %s", b.componentName, internalServ.Addr)
+			logrus.Infof("Stopped %s listener on %s", b.componentName, externalServ.Addr)
 		}()
 	}
 

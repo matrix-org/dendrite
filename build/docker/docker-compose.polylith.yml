@@ -5,9 +5,9 @@ services:
     image: matrixdotorg/dendrite:clientproxy
     command: [
       "--bind-address=:8008",
-      "--client-api-server-url=http://client_api:7771",
-      "--sync-api-server-url=http://sync_api:7773",
-      "--media-api-server-url=http://media_api:7774"
+      "--client-api-server-url=http://client_api:8071",
+      "--sync-api-server-url=http://sync_api:8073",
+      "--media-api-server-url=http://media_api:8074"
     ]
     volumes:
       - ./config:/etc/dendrite
@@ -92,8 +92,8 @@ services:
     image: matrixdotorg/dendrite:federationproxy
     command: [
       "--bind-address=:8448",
-      "--federation-api-url=http://federation_api:7772",
-      "--media-api-server-url=http://media_api:7774"
+      "--federation-api-url=http://federation_api:8072",
+      "--media-api-server-url=http://media_api:8074"
     ]
     volumes:
       - ./config:/etc/dendrite
