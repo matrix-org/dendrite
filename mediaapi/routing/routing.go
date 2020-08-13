@@ -44,8 +44,8 @@ func Setup(
 	userAPI userapi.UserInternalAPI,
 	client *gomatrixserverlib.Client,
 ) {
-	r0mux := publicAPIMux.PathPrefix("/media/r0").Subrouter()
-	v1mux := publicAPIMux.PathPrefix("/media/v1").Subrouter()
+	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
+	v1mux := publicAPIMux.PathPrefix("/v1").Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
