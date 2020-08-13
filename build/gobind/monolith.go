@@ -18,7 +18,6 @@ import (
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -172,14 +171,6 @@ func (m *DendriteMonolith) Start() {
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
-	httputil.SetupHTTPAPI(
-		base.BaseMux,
-		base.PublicAPIMux,
-		base.InternalAPIMux,
-		&cfg.Global,
-		base.UseHTTPAPIs,
-	)
-
 	// Build both ends of a HTTP multiplex.
 	m.httpServer = &http.Server{
 		Addr:         ":0",
@@ -190,7 +181,7 @@ func (m *DendriteMonolith) Start() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
-		Handler: base.BaseMux,
+		Handler: base.PublicAPIMux,
 	}
 
 	go func() {

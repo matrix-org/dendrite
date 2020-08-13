@@ -35,7 +35,6 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -132,7 +131,7 @@ func main() {
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	embed.Embed(base.BaseMux, *instancePort, "Yggdrasil Demo")
+	embed.Embed(base.PublicAPIMux, *instancePort, "Yggdrasil Demo")
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -157,14 +156,6 @@ func main() {
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
-	httputil.SetupHTTPAPI(
-		base.BaseMux,
-		base.PublicAPIMux,
-		base.InternalAPIMux,
-		&cfg.Global,
-		base.UseHTTPAPIs,
-	)
-
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
 		Addr:         ":0",
@@ -175,7 +166,7 @@ func main() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
-		Handler: base.BaseMux,
+		Handler: base.PublicAPIMux,
 	}
 
 	go func() {
@@ -185,7 +176,7 @@ func main() {
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.BaseMux))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.PublicAPIMux))
 	}()
 	go func() {
 		logrus.Info("Sending wake-up message to known nodes")

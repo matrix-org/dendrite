@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -192,19 +191,11 @@ func main() {
 	}
 	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)
 
-	httputil.SetupHTTPAPI(
-		base.Base.BaseMux,
-		base.Base.PublicAPIMux,
-		base.Base.InternalAPIMux,
-		&cfg.Global,
-		base.Base.UseHTTPAPIs,
-	)
-
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.Base.BaseMux))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.Base.PublicAPIMux))
 	}()
 	// Expose the matrix APIs also via libp2p
 	if base.LibP2P != nil {
@@ -217,7 +208,7 @@ func main() {
 			defer func() {
 				logrus.Fatal(listener.Close())
 			}()
-			logrus.Fatal(http.Serve(listener, base.Base.BaseMux))
+			logrus.Fatal(http.Serve(listener, base.Base.PublicAPIMux))
 		}()
 	}
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/gomatrix"
@@ -33,14 +32,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
 	federationapi.AddPublicRoutes(base.PublicAPIMux, &cfg.FederationAPI, nil, nil, keyRing, nil, fsAPI, nil, nil, nil)
-	httputil.SetupHTTPAPI(
-		base.BaseMux,
-		base.PublicAPIMux,
-		base.InternalAPIMux,
-		&cfg.Global,
-		base.UseHTTPAPIs,
-	)
-	baseURL, cancel := test.ListenAndServe(t, base.BaseMux, true)
+	baseURL, cancel := test.ListenAndServe(t, base.PublicAPIMux, true)
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
 
