@@ -29,5 +29,9 @@ func main() {
 	intAPI := serverkeyapi.NewInternalAPI(&base.Cfg.ServerKeyAPI, federation, base.Caches)
 	serverkeyapi.AddInternalRoutes(base.InternalAPIMux, intAPI, base.Caches)
 
-	base.SetupAndServeHTTP(string(base.Cfg.ServerKeyAPI.Bind), string(base.Cfg.ServerKeyAPI.Listen))
+	base.SetupAndServeHTTP(
+		base.Cfg.ServerKeyAPI.InternalAPI.Listen,
+		setup.NoExternalListener,
+		nil, nil,
+	)
 }

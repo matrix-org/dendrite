@@ -29,6 +29,9 @@ func main() {
 
 	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
-	base.SetupAndServeHTTP(string(base.Cfg.KeyServer.Bind), string(base.Cfg.KeyServer.Listen))
-
+	base.SetupAndServeHTTP(
+		base.Cfg.KeyServer.InternalAPI.Listen,
+		setup.NoExternalListener,
+		nil, nil,
+	)
 }

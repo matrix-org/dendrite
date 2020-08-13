@@ -33,6 +33,9 @@ func main() {
 	intAPI := eduserver.NewInternalAPI(base, cache.New(), base.UserAPIClient())
 	eduserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
-	base.SetupAndServeHTTP(string(base.Cfg.EDUServer.Bind), string(base.Cfg.EDUServer.Listen))
-
+	base.SetupAndServeHTTP(
+		base.Cfg.EDUServer.InternalAPI.Listen,
+		setup.NoExternalListener,
+		nil, nil,
+	)
 }

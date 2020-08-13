@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/gorilla/mux"
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
@@ -190,21 +191,28 @@ func main() {
 		KeyAPI:                 keyAPI,
 		ExtPublicRoomsProvider: provider,
 	}
-	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)
-
-	httputil.SetupHTTPAPI(
-		base.Base.BaseMux,
-		base.Base.PublicAPIMux,
-		base.Base.InternalAPIMux,
-		&cfg.Global,
-		base.Base.UseHTTPAPIs,
+	monolith.AddAllPublicRoutes(
+		base.Base.PublicClientAPIMux,
+		base.Base.PublicFederationAPIMux,
+		base.Base.PublicKeyAPIMux,
+		base.Base.PublicMediaAPIMux,
 	)
+
+	httpRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.Base.InternalAPIMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.Base.PublicClientAPIMux)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Base.PublicMediaAPIMux)
+
+	libp2pRouter := mux.NewRouter()
+	libp2pRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.Base.PublicFederationAPIMux)
+	libp2pRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(base.Base.PublicKeyAPIMux)
+	libp2pRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.Base.PublicMediaAPIMux)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.Base.BaseMux))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, httpRouter))
 	}()
 	// Expose the matrix APIs also via libp2p
 	if base.LibP2P != nil {
@@ -217,7 +225,7 @@ func main() {
 			defer func() {
 				logrus.Fatal(listener.Close())
 			}()
-			logrus.Fatal(http.Serve(listener, base.Base.BaseMux))
+			logrus.Fatal(http.Serve(listener, libp2pRouter))
 		}()
 	}
 

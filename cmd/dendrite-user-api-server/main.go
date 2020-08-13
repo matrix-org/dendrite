@@ -31,5 +31,9 @@ func main() {
 
 	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
 
-	base.SetupAndServeHTTP(string(base.Cfg.UserAPI.Bind), string(base.Cfg.UserAPI.Listen))
+	base.SetupAndServeHTTP(
+		base.Cfg.UserAPI.InternalAPI.Listen,
+		setup.NoExternalListener,
+		nil, nil,
+	)
 }

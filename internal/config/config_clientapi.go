@@ -9,8 +9,8 @@ type ClientAPI struct {
 	Matrix  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api"`
+	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
 
 	// If set disables new users from registering (except via shared
 	// secrets)
@@ -37,8 +37,9 @@ type ClientAPI struct {
 }
 
 func (c *ClientAPI) Defaults() {
-	c.Listen = "localhost:7771"
-	c.Bind = "localhost:7771"
+	c.InternalAPI.Listen = "http://localhost:7771"
+	c.InternalAPI.Connect = "http://localhost:7771"
+	c.ExternalAPI.Listen = "http://[::]:8071"
 	c.RegistrationSharedSecret = ""
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""
@@ -49,8 +50,11 @@ func (c *ClientAPI) Defaults() {
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "client_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "client_api.bind", string(c.Bind))
+	checkURL(configErrs, "client_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "client_api.internal_api.connect", string(c.InternalAPI.Connect))
+	if !isMonolith {
+		checkURL(configErrs, "client_api.external_api.listen", string(c.ExternalAPI.Listen))
+	}
 	if c.RecaptchaEnabled {
 		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", string(c.RecaptchaPublicKey))
 		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", string(c.RecaptchaPrivateKey))

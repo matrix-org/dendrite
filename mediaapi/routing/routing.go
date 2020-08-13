@@ -32,9 +32,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const pathPrefixR0 = "/media/r0"
-const pathPrefixV1 = "/media/v1" // TODO: remove when synapse is fixed
-
 // Setup registers the media API HTTP handlers
 //
 // Due to Setup being used to call many other functions, a gocyclo nolint is
@@ -47,8 +44,8 @@ func Setup(
 	userAPI userapi.UserInternalAPI,
 	client *gomatrixserverlib.Client,
 ) {
-	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
-	v1mux := publicAPIMux.PathPrefix(pathPrefixV1).Subrouter()
+	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
+	v1mux := publicAPIMux.PathPrefix("/v1").Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},

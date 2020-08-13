@@ -43,7 +43,8 @@ global:
   - matrix.org
   - vector.im
   kafka:
-    addresses: []
+    addresses:
+    - localhost:2181
     topic_prefix: Dendrite
     use_naffka: true
     naffka_database:
@@ -57,8 +58,9 @@ global:
       username: metrics
       password: metrics
 app_service_api:
-  listen: localhost:7777
-  bind: localhost:7777
+  internal_api:
+    listen: http://localhost:7777
+    connect: http://localhost:7777
   database:
     connection_string: file:appservice.db
     max_open_conns: 100
@@ -66,8 +68,11 @@ app_service_api:
     conn_max_lifetime: -1
   config_files: []
 client_api:
-  listen: localhost:7771
-  bind: localhost:7771
+  internal_api:
+    listen: http://localhost:7771
+    connect: http://localhost:7771
+  external_api:
+    listen: http://[::]:8071
   registration_disabled: false
   registration_shared_secret: ""
   enable_registration_captcha: false
@@ -82,23 +87,29 @@ client_api:
     turn_username: ""
     turn_password: ""
 current_state_server:
-  listen: localhost:7782
-  bind: localhost:7782
+  internal_api:
+    listen: http://localhost:7782
+    connect: http://localhost:7782
   database:
     connection_string: file:currentstate.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 edu_server:
-  listen: localhost:7778
-  bind: localhost:7778
+  internal_api:
+    listen: http://localhost:7778
+    connect: http://localhost:7778
 federation_api:
-  listen: localhost:7772
-  bind: localhost:7772
+  internal_api:
+    listen: http://localhost:7772
+    connect: http://localhost:7772
+  external_api:
+    listen: http://[::]:8072
   federation_certificates: []
 federation_sender:
-  listen: localhost:7775
-  bind: localhost:7775
+  internal_api:
+    listen: http://localhost:7775
+    connect: http://localhost:7775
   database:
     connection_string: file:federationsender.db
     max_open_conns: 100
@@ -112,16 +123,20 @@ federation_sender:
     host: localhost
     port: 8080
 key_server:
-  listen: localhost:7779
-  bind: localhost:7779
+  internal_api:
+    listen: http://localhost:7779
+    connect: http://localhost:7779
   database:
     connection_string: file:keyserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 media_api:
-  listen: localhost:7774
-  bind: localhost:7774
+  internal_api:
+    listen: http://localhost:7774
+    connect: http://localhost:7774
+  external_api:
+    listen: http://[::]:8074
   database:
     connection_string: file:mediaapi.db
     max_open_conns: 100
@@ -142,16 +157,18 @@ media_api:
     height: 480
     method: scale
 room_server:
-  listen: localhost:7770
-  bind: localhost:7770
+  internal_api:
+    listen: http://localhost:7770
+    connect: http://localhost:7770
   database:
     connection_string: file:roomserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 server_key_api:
-  listen: localhost:7780
-  bind: localhost:7780
+  internal_api:
+    listen: http://localhost:7780
+    connect: http://localhost:7780
   database:
     connection_string: file:serverkeyapi.db
     max_open_conns: 100
@@ -165,16 +182,18 @@ server_key_api:
     - key_id: ed25519:a_RXGa
       public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 sync_api:
-  listen: localhost:7773
-  bind: localhost:7773
+  internal_api:
+    listen: http://localhost:7773
+    connect: http://localhost:7773
   database:
     connection_string: file:syncapi.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 user_api:
-  listen: localhost:7781
-  bind: localhost:7781
+  internal_api:
+    listen: http://localhost:7781
+    connect: http://localhost:7781
   account_database:
     connection_string: file:userapi_accounts.db
     max_open_conns: 100

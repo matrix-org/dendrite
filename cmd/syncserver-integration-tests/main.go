@@ -133,7 +133,8 @@ func startSyncServer() (*exec.Cmd, chan error) {
 	}
 	// TODO use the address assigned by the config generator rather than clobbering.
 	cfg.Global.ServerName = "localhost"
-	cfg.SyncAPI.Listen = config.Address(syncserverAddr)
+	cfg.SyncAPI.InternalAPI.Listen = config.HTTPAddress("http://" + syncserverAddr)
+	cfg.SyncAPI.InternalAPI.Connect = cfg.SyncAPI.InternalAPI.Listen
 
 	if err := test.WriteConfig(cfg, dir); err != nil {
 		panic(err)

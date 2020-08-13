@@ -28,7 +28,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -231,17 +230,6 @@ func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib
 	} else {
 		f.origins.Store(origin, time.Now())
 	}
-}
-
-// SetupHTTPAPI registers an HTTP API mux under /api and sets up a metrics listener
-func SetupHTTPAPI(servMux, publicApiMux, internalApiMux *mux.Router, cfg *config.Global, enableHTTPAPIs bool) {
-	if cfg.Metrics.Enabled {
-		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
-	}
-	if enableHTTPAPIs {
-		servMux.Handle(InternalPathPrefix, internalApiMux)
-	}
-	servMux.Handle(PublicPathPrefix, WrapHandlerInCORS(publicApiMux))
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics

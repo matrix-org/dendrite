@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
@@ -132,7 +133,7 @@ func main() {
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	embed.Embed(base.BaseMux, *instancePort, "Yggdrasil Demo")
+	embed.Embed(base.PublicClientAPIMux, *instancePort, "Yggdrasil Demo")
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -155,15 +156,21 @@ func main() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base.PublicAPIMux)
-
-	httputil.SetupHTTPAPI(
-		base.BaseMux,
-		base.PublicAPIMux,
-		base.InternalAPIMux,
-		&cfg.Global,
-		base.UseHTTPAPIs,
+	monolith.AddAllPublicRoutes(
+		base.PublicClientAPIMux,
+		base.PublicFederationAPIMux,
+		base.PublicKeyAPIMux,
+		base.PublicMediaAPIMux,
 	)
+
+	httpRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+
+	yggRouter := mux.NewRouter()
+	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
+	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
@@ -175,7 +182,7 @@ func main() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
-		Handler: base.BaseMux,
+		Handler: yggRouter,
 	}
 
 	go func() {
@@ -185,7 +192,7 @@ func main() {
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.BaseMux))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, httpRouter))
 	}()
 	go func() {
 		logrus.Info("Sending wake-up message to known nodes")

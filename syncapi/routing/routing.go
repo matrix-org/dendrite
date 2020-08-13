@@ -28,20 +28,18 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixR0 = "/client/r0"
-
 // Setup configures the given mux with sync-server listeners
 //
 // Due to Setup being used to call many other functions, a gocyclo nolint is
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
+	csMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
 	userAPI userapi.UserInternalAPI, federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
 ) {
-	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
+	r0mux := csMux.PathPrefix("/r0").Subrouter()
 
 	// TODO: Add AS support for all handlers below.
 	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

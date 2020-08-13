@@ -3,8 +3,7 @@ package config
 type CurrentStateServer struct {
 	Matrix *Global `yaml:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 
 	// The CurrentState database stores the current state of all rooms.
 	// It is accessed by the CurrentStateServer.
@@ -12,14 +11,14 @@ type CurrentStateServer struct {
 }
 
 func (c *CurrentStateServer) Defaults() {
-	c.Listen = "localhost:7782"
-	c.Bind = "localhost:7782"
+	c.InternalAPI.Listen = "http://localhost:7782"
+	c.InternalAPI.Connect = "http://localhost:7782"
 	c.Database.Defaults()
 	c.Database.ConnectionString = "file:currentstate.db"
 }
 
 func (c *CurrentStateServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "current_state_server.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "current_state_server.bind", string(c.Bind))
+	checkURL(configErrs, "current_state_server.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "current_state_server.internal_api.connect", string(c.InternalAPI.Connect))
 	checkNotEmpty(configErrs, "current_state_server.database.connection_string", string(c.Database.ConnectionString))
 }

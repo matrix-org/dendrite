@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
@@ -170,15 +171,21 @@ func (m *DendriteMonolith) Start() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base.PublicAPIMux)
-
-	httputil.SetupHTTPAPI(
-		base.BaseMux,
-		base.PublicAPIMux,
-		base.InternalAPIMux,
-		&cfg.Global,
-		base.UseHTTPAPIs,
+	monolith.AddAllPublicRoutes(
+		base.PublicClientAPIMux,
+		base.PublicFederationAPIMux,
+		base.PublicKeyAPIMux,
+		base.PublicMediaAPIMux,
 	)
+
+	httpRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+
+	yggRouter := mux.NewRouter()
+	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
+	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	// Build both ends of a HTTP multiplex.
 	m.httpServer = &http.Server{
@@ -190,7 +197,7 @@ func (m *DendriteMonolith) Start() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
-		Handler: base.BaseMux,
+		Handler: yggRouter,
 	}
 
 	go func() {
@@ -198,8 +205,8 @@ func (m *DendriteMonolith) Start() {
 		m.logger.Fatal(m.httpServer.Serve(ygg))
 	}()
 	go func() {
-		m.logger.Info("Listening on ", m.BaseURL())
-		m.logger.Fatal(m.httpServer.Serve(m.listener))
+		logrus.Info("Listening on ", m.listener.Addr())
+		logrus.Fatal(http.Serve(m.listener, httpRouter))
 	}()
 	go func() {
 		logrus.Info("Sending wake-up message to known nodes")

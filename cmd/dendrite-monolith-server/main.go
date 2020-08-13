@@ -16,7 +16,6 @@ package main
 
 import (
 	"flag"
-	"net/http"
 	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -25,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -33,8 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -48,23 +44,25 @@ var (
 
 func main() {
 	cfg := setup.ParseFlags(true)
+	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
+	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
+
 	if *enableHTTPAPIs {
 		// If the HTTP APIs are enabled then we need to update the Listen
 		// statements in the configuration so that we know where to find
 		// the API endpoints. They'll listen on the same port as the monolith
 		// itself.
-		addr := config.Address(*httpBindAddr)
-		cfg.AppServiceAPI.Listen = addr
-		cfg.ClientAPI.Listen = addr
-		cfg.CurrentStateServer.Listen = addr
-		cfg.EDUServer.Listen = addr
-		cfg.FederationAPI.Listen = addr
-		cfg.FederationSender.Listen = addr
-		cfg.KeyServer.Listen = addr
-		cfg.MediaAPI.Listen = addr
-		cfg.RoomServer.Listen = addr
-		cfg.ServerKeyAPI.Listen = addr
-		cfg.SyncAPI.Listen = addr
+		cfg.AppServiceAPI.InternalAPI.Connect = httpAddr
+		cfg.ClientAPI.InternalAPI.Connect = httpAddr
+		cfg.CurrentStateServer.InternalAPI.Connect = httpAddr
+		cfg.EDUServer.InternalAPI.Connect = httpAddr
+		cfg.FederationAPI.InternalAPI.Connect = httpAddr
+		cfg.FederationSender.InternalAPI.Connect = httpAddr
+		cfg.KeyServer.InternalAPI.Connect = httpAddr
+		cfg.MediaAPI.InternalAPI.Connect = httpAddr
+		cfg.RoomServer.InternalAPI.Connect = httpAddr
+		cfg.ServerKeyAPI.InternalAPI.Connect = httpAddr
+		cfg.SyncAPI.InternalAPI.Connect = httpAddr
 	}
 
 	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
@@ -147,38 +145,29 @@ func main() {
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
 	}
-	monolith.AddAllPublicRoutes(base.PublicAPIMux)
-
-	httputil.SetupHTTPAPI(
-		base.BaseMux,
-		base.PublicAPIMux,
-		base.InternalAPIMux,
-		&cfg.Global,
-		base.UseHTTPAPIs,
+	monolith.AddAllPublicRoutes(
+		base.PublicClientAPIMux,
+		base.PublicFederationAPIMux,
+		base.PublicKeyAPIMux,
+		base.PublicMediaAPIMux,
 	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
-		serv := http.Server{
-			Addr:         *httpBindAddr,
-			WriteTimeout: setup.HTTPServerTimeout,
-			Handler:      base.BaseMux,
-		}
-
-		logrus.Info("Listening on ", serv.Addr)
-		logrus.Fatal(serv.ListenAndServe())
+		base.SetupAndServeHTTP(
+			config.HTTPAddress(httpAddr), // internal API
+			config.HTTPAddress(httpAddr), // external API
+			nil, nil,                     // TLS settings
+		)
 	}()
 	// Handle HTTPS if certificate and key are provided
 	if *certFile != "" && *keyFile != "" {
 		go func() {
-			serv := http.Server{
-				Addr:         *httpsBindAddr,
-				WriteTimeout: setup.HTTPServerTimeout,
-				Handler:      base.BaseMux,
-			}
-
-			logrus.Info("Listening on ", serv.Addr)
-			logrus.Fatal(serv.ListenAndServeTLS(*certFile, *keyFile))
+			base.SetupAndServeHTTP(
+				config.HTTPAddress(httpsAddr), // internal API
+				config.HTTPAddress(httpsAddr), // external API
+				certFile, keyFile,             // TLS settings
+			)
 		}()
 	}
 

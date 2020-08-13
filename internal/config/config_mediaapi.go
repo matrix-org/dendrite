@@ -7,8 +7,8 @@ import (
 type MediaAPI struct {
 	Matrix *Global `yaml:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api"`
+	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
 
 	// The MediaAPI database stores information about files uploaded and downloaded
 	// by local users. It is only accessed by the MediaAPI.
@@ -36,8 +36,9 @@ type MediaAPI struct {
 }
 
 func (c *MediaAPI) Defaults() {
-	c.Listen = "localhost:7774"
-	c.Bind = "localhost:7774"
+	c.InternalAPI.Listen = "http://localhost:7774"
+	c.InternalAPI.Connect = "http://localhost:7774"
+	c.ExternalAPI.Listen = "http://[::]:8074"
 	c.Database.Defaults()
 	c.Database.ConnectionString = "file:mediaapi.db"
 
@@ -48,8 +49,11 @@ func (c *MediaAPI) Defaults() {
 }
 
 func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "media_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "media_api.bind", string(c.Bind))
+	checkURL(configErrs, "media_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "media_api.internal_api.connect", string(c.InternalAPI.Connect))
+	if !isMonolith {
+		checkURL(configErrs, "media_api.external_api.listen", string(c.ExternalAPI.Listen))
+	}
 	checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))

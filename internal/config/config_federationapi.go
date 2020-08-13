@@ -5,8 +5,8 @@ import "github.com/matrix-org/gomatrixserverlib"
 type FederationAPI struct {
 	Matrix *Global `yaml:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api"`
+	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
 
 	// List of paths to X509 certificates used by the external federation listeners.
 	// These are used to calculate the TLS fingerprints to publish for this server.
@@ -21,13 +21,17 @@ type FederationAPI struct {
 }
 
 func (c *FederationAPI) Defaults() {
-	c.Listen = "localhost:7772"
-	c.Bind = "localhost:7772"
+	c.InternalAPI.Listen = "http://localhost:7772"
+	c.InternalAPI.Connect = "http://localhost:7772"
+	c.ExternalAPI.Listen = "http://[::]:8072"
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "federation_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "federation_api.bind", string(c.Bind))
+	checkURL(configErrs, "federation_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "federation_api.internal_api.connect", string(c.InternalAPI.Connect))
+	if !isMonolith {
+		checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
+	}
 	// TODO: not applicable always, e.g. in demos
 	//checkNotZero(configErrs, "federation_api.federation_certificates", int64(len(c.FederationCertificatePaths)))
 }

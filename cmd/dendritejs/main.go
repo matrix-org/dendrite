@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"syscall/js"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
@@ -234,22 +235,28 @@ func main() {
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}
-	monolith.AddAllPublicRoutes(base.PublicAPIMux)
-
-	httputil.SetupHTTPAPI(
-		base.BaseMux,
-		base.PublicAPIMux,
-		base.InternalAPIMux,
-		&cfg.Global,
-		base.UseHTTPAPIs,
+	monolith.AddAllPublicRoutes(
+		base.PublicClientAPIMux,
+		base.PublicFederationAPIMux,
+		base.PublicKeyAPIMux,
+		base.PublicMediaAPIMux,
 	)
+
+	httpRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+
+	libp2pRouter := mux.NewRouter()
+	libp2pRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
+	libp2pRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	// Expose the matrix APIs via libp2p-js - for federation traffic
 	if node != nil {
 		go func() {
 			logrus.Info("Listening on libp2p-js host ID ", node.Id)
 			s := JSServer{
-				Mux: base.BaseMux,
+				Mux: libp2pRouter,
 			}
 			s.ListenAndServe("p2p")
 		}()
@@ -259,7 +266,7 @@ func main() {
 	go func() {
 		logrus.Info("Listening for service-worker fetch traffic")
 		s := JSServer{
-			Mux: base.BaseMux,
+			Mux: httpRouter,
 		}
 		s.ListenAndServe("fetch")
 	}()

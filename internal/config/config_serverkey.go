@@ -5,8 +5,7 @@ import "github.com/matrix-org/gomatrixserverlib"
 type ServerKeyAPI struct {
 	Matrix *Global `yaml:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 
 	// The ServerKey database caches the public keys of remote servers.
 	// It may be accessed by the FederationAPI, the ClientAPI, and the MediaAPI.
@@ -18,15 +17,15 @@ type ServerKeyAPI struct {
 }
 
 func (c *ServerKeyAPI) Defaults() {
-	c.Listen = "localhost:7780"
-	c.Bind = "localhost:7780"
+	c.InternalAPI.Listen = "http://localhost:7780"
+	c.InternalAPI.Connect = "http://localhost:7780"
 	c.Database.Defaults()
 	c.Database.ConnectionString = "file:serverkeyapi.db"
 }
 
 func (c *ServerKeyAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "server_key_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "server_key_api.bind", string(c.Bind))
+	checkURL(configErrs, "server_key_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "server_key_api.internal_api.bind", string(c.InternalAPI.Connect))
 	checkNotEmpty(configErrs, "server_key_api.database.connection_string", string(c.Database.ConnectionString))
 }
 

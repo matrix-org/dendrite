@@ -29,8 +29,7 @@ type AppServiceAPI struct {
 	Matrix  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 
 	Database DatabaseOptions `yaml:"database"`
 
@@ -38,15 +37,15 @@ type AppServiceAPI struct {
 }
 
 func (c *AppServiceAPI) Defaults() {
-	c.Listen = "localhost:7777"
-	c.Bind = "localhost:7777"
+	c.InternalAPI.Listen = "http://localhost:7777"
+	c.InternalAPI.Connect = "http://localhost:7777"
 	c.Database.Defaults()
 	c.Database.ConnectionString = "file:appservice.db"
 }
 
 func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "app_service_api.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "app_service_api.bind", string(c.Bind))
+	checkURL(configErrs, "app_service_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "app_service_api.internal_api.bind", string(c.InternalAPI.Connect))
 	checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
 }
 

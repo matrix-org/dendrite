@@ -3,8 +3,7 @@ package config
 type FederationSender struct {
 	Matrix *Global `yaml:"-"`
 
-	Listen Address `yaml:"listen"`
-	Bind   Address `yaml:"bind"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 
 	// The FederationSender database stores information used by the FederationSender
 	// It is only accessed by the FederationSender.
@@ -24,8 +23,8 @@ type FederationSender struct {
 }
 
 func (c *FederationSender) Defaults() {
-	c.Listen = "localhost:7775"
-	c.Bind = "localhost:7775"
+	c.InternalAPI.Listen = "http://localhost:7775"
+	c.InternalAPI.Connect = "http://localhost:7775"
 	c.Database.Defaults()
 	c.Database.ConnectionString = "file:federationsender.db"
 
@@ -36,8 +35,8 @@ func (c *FederationSender) Defaults() {
 }
 
 func (c *FederationSender) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "federation_sender.listen", string(c.Listen))
-	checkNotEmpty(configErrs, "federation_sender.bind", string(c.Bind))
+	checkURL(configErrs, "federation_sender.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "federation_sender.internal_api.connect", string(c.InternalAPI.Connect))
 	checkNotEmpty(configErrs, "federation_sender.database.connection_string", string(c.Database.ConnectionString))
 }
 

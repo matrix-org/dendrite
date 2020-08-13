@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -110,6 +111,15 @@ type Derived struct {
 	// servers from creating RoomIDs in exclusive application service namespaces
 }
 
+type InternalAPIOptions struct {
+	Listen  HTTPAddress `yaml:"listen"`
+	Connect HTTPAddress `yaml:"connect"`
+}
+
+type ExternalAPIOptions struct {
+	Listen HTTPAddress `yaml:"listen"`
+}
+
 // A Path on the filesystem.
 type Path string
 
@@ -131,6 +141,17 @@ type Topic string
 
 // An Address to listen on.
 type Address string
+
+// An HTTPAddress to listen on, starting with either http:// or https://.
+type HTTPAddress string
+
+func (h HTTPAddress) Address() (Address, error) {
+	url, err := url.Parse(string(h))
+	if err != nil {
+		return "", err
+	}
+	return Address(url.Host), nil
+}
 
 // FileSizeBytes is a file size in bytes
 type FileSizeBytes int64
@@ -360,6 +381,26 @@ func checkPositive(configErrs *ConfigErrors, key string, value int64) {
 	}
 }
 
+// checkURL verifies that the parameter is a valid URL
+func checkURL(configErrs *ConfigErrors, key, value string) {
+	if value == "" {
+		configErrs.Add(fmt.Sprintf("missing config key %q", key))
+		return
+	}
+	url, err := url.Parse(value)
+	if err != nil {
+		configErrs.Add(fmt.Sprintf("config key %q contains invalid URL (%s)", key, err.Error()))
+		return
+	}
+	switch url.Scheme {
+	case "http":
+	case "https":
+	default:
+		configErrs.Add(fmt.Sprintf("config key %q URL should be http:// or https://", key))
+		return
+	}
+}
+
 // checkLogging verifies the parameters logging.* are valid.
 func (config *Dendrite) checkLogging(configErrs *ConfigErrors) {
 	for _, logrusHook := range config.Logging {
@@ -450,7 +491,7 @@ func (config *Dendrite) AppServiceURL() string {
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.AppServiceAPI.Listen)
+	return string(config.AppServiceAPI.InternalAPI.Connect)
 }
 
 // RoomServerURL returns an HTTP URL for where the roomserver is listening.
@@ -459,7 +500,7 @@ func (config *Dendrite) RoomServerURL() string {
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.RoomServer.Listen)
+	return string(config.RoomServer.InternalAPI.Connect)
 }
 
 // UserAPIURL returns an HTTP URL for where the userapi is listening.
@@ -468,7 +509,7 @@ func (config *Dendrite) UserAPIURL() string {
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.UserAPI.Listen)
+	return string(config.UserAPI.InternalAPI.Connect)
 }
 
 // CurrentStateAPIURL returns an HTTP URL for where the currentstateserver is listening.
@@ -477,7 +518,7 @@ func (config *Dendrite) CurrentStateAPIURL() string {
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.CurrentStateServer.Listen)
+	return string(config.CurrentStateServer.InternalAPI.Connect)
 }
 
 // EDUServerURL returns an HTTP URL for where the EDU server is listening.
@@ -486,7 +527,7 @@ func (config *Dendrite) EDUServerURL() string {
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.EDUServer.Listen)
+	return string(config.EDUServer.InternalAPI.Connect)
 }
 
 // FederationSenderURL returns an HTTP URL for where the federation sender is listening.
@@ -495,7 +536,7 @@ func (config *Dendrite) FederationSenderURL() string {
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.FederationSender.Listen)
+	return string(config.FederationSender.InternalAPI.Connect)
 }
 
 // ServerKeyAPIURL returns an HTTP URL for where the server key API is listening.
@@ -504,7 +545,7 @@ func (config *Dendrite) ServerKeyAPIURL() string {
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.ServerKeyAPI.Listen)
+	return string(config.ServerKeyAPI.InternalAPI.Connect)
 }
 
 // KeyServerURL returns an HTTP URL for where the key server is listening.
@@ -513,7 +554,7 @@ func (config *Dendrite) KeyServerURL() string {
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return "http://" + string(config.KeyServer.Listen)
+	return string(config.KeyServer.InternalAPI.Connect)
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.

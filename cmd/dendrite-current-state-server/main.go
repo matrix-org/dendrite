@@ -28,6 +28,9 @@ func main() {
 
 	currentstateserver.AddInternalRoutes(base.InternalAPIMux, stateAPI)
 
-	base.SetupAndServeHTTP(string(base.Cfg.CurrentStateServer.Bind), string(base.Cfg.CurrentStateServer.Listen))
-
+	base.SetupAndServeHTTP(
+		base.Cfg.CurrentStateServer.InternalAPI.Listen,
+		setup.NoExternalListener,
+		nil, nil,
+	)
 }
