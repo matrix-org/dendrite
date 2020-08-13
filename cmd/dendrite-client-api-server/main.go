@@ -39,7 +39,7 @@ func main() {
 	keyAPI := base.KeyServerHTTPClient()
 
 	clientapi.AddPublicRoutes(
-		base.PublicAPIMux, &base.Cfg.ClientAPI, base.KafkaProducer, deviceDB, accountDB, federation,
+		base.ExternalClientAPIMux, &base.Cfg.ClientAPI, base.KafkaProducer, deviceDB, accountDB, federation,
 		rsAPI, eduInputAPI, asQuery, stateAPI, transactions.New(), fsAPI, userAPI, keyAPI, nil,
 	)
 

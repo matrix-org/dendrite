@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
@@ -18,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -169,7 +171,21 @@ func (m *DendriteMonolith) Start() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base.PublicAPIMux)
+	monolith.AddAllPublicRoutes(
+		base.ExternalClientAPIMux,
+		base.ExternalFederationAPIMux,
+		base.ExternalKeyAPIMux,
+		base.ExternalMediaAPIMux,
+	)
+
+	httpRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalClientPathPrefix).Handler(base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
+
+	yggRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
 
 	// Build both ends of a HTTP multiplex.
 	m.httpServer = &http.Server{
@@ -181,7 +197,7 @@ func (m *DendriteMonolith) Start() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
-		Handler: base.PublicAPIMux,
+		Handler: yggRouter,
 	}
 
 	go func() {
@@ -189,8 +205,8 @@ func (m *DendriteMonolith) Start() {
 		m.logger.Fatal(m.httpServer.Serve(ygg))
 	}()
 	go func() {
-		m.logger.Info("Listening on ", m.BaseURL())
-		m.logger.Fatal(m.httpServer.Serve(m.listener))
+		logrus.Info("Listening on ", m.listener.Addr())
+		logrus.Fatal(http.Serve(m.listener, httpRouter))
 	}()
 	go func() {
 		logrus.Info("Sending wake-up message to known nodes")

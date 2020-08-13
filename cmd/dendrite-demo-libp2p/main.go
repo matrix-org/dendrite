@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/gorilla/mux"
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
@@ -31,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -189,13 +191,28 @@ func main() {
 		KeyAPI:                 keyAPI,
 		ExtPublicRoomsProvider: provider,
 	}
-	monolith.AddAllPublicRoutes(base.Base.PublicAPIMux)
+	monolith.AddAllPublicRoutes(
+		base.Base.ExternalClientAPIMux,
+		base.Base.ExternalFederationAPIMux,
+		base.Base.ExternalKeyAPIMux,
+		base.Base.ExternalMediaAPIMux,
+	)
+
+	httpRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.Base.InternalAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalClientPathPrefix).Handler(base.Base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.Base.ExternalMediaAPIMux)
+
+	libp2pRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.Base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalKeyPathPrefix).Handler(base.Base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.Base.ExternalMediaAPIMux)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.Base.PublicAPIMux))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, httpRouter))
 	}()
 	// Expose the matrix APIs also via libp2p
 	if base.LibP2P != nil {
@@ -208,7 +225,7 @@ func main() {
 			defer func() {
 				logrus.Fatal(listener.Close())
 			}()
-			logrus.Fatal(http.Serve(listener, base.Base.PublicAPIMux))
+			logrus.Fatal(http.Serve(listener, libp2pRouter))
 		}()
 	}
 

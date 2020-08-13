@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
@@ -35,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -131,7 +133,7 @@ func main() {
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	embed.Embed(base.PublicAPIMux, *instancePort, "Yggdrasil Demo")
+	embed.Embed(base.ExternalClientAPIMux, *instancePort, "Yggdrasil Demo")
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -154,7 +156,21 @@ func main() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(base.PublicAPIMux)
+	monolith.AddAllPublicRoutes(
+		base.ExternalClientAPIMux,
+		base.ExternalFederationAPIMux,
+		base.ExternalKeyAPIMux,
+		base.ExternalMediaAPIMux,
+	)
+
+	httpRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalClientPathPrefix).Handler(base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
+
+	yggRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
@@ -166,7 +182,7 @@ func main() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
-		Handler: base.PublicAPIMux,
+		Handler: yggRouter,
 	}
 
 	go func() {
@@ -176,7 +192,7 @@ func main() {
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
-		logrus.Fatal(http.ListenAndServe(httpBindAddr, base.PublicAPIMux))
+		logrus.Fatal(http.ListenAndServe(httpBindAddr, httpRouter))
 	}()
 	go func() {
 		logrus.Info("Sending wake-up message to known nodes")

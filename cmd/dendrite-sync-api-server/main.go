@@ -30,8 +30,10 @@ func main() {
 	rsAPI := base.RoomserverHTTPClient()
 
 	syncapi.AddPublicRoutes(
-		base.PublicAPIMux, base.KafkaConsumer, userAPI, rsAPI, base.KeyServerHTTPClient(), base.CurrentStateAPIClient(),
-		federation, &cfg.SyncAPI)
+		base.ExternalClientAPIMux, base.KafkaConsumer, userAPI, rsAPI,
+		base.KeyServerHTTPClient(), base.CurrentStateAPIClient(),
+		federation, &cfg.SyncAPI,
+	)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.SyncAPI.InternalAPI.Listen,

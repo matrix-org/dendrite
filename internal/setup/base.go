@@ -62,18 +62,19 @@ import (
 // should only be used during start up.
 // Must be closed when shutting down.
 type BaseDendrite struct {
-	componentName string
-	tracerCloser  io.Closer
-
-	// PublicAPIMux should be used to register new public matrix api endpoints
-	PublicAPIMux   *mux.Router
-	InternalAPIMux *mux.Router
-	UseHTTPAPIs    bool
-	httpClient     *http.Client
-	Cfg            *config.Dendrite
-	Caches         *caching.Caches
-	KafkaConsumer  sarama.Consumer
-	KafkaProducer  sarama.SyncProducer
+	componentName            string
+	tracerCloser             io.Closer
+	ExternalClientAPIMux     *mux.Router
+	ExternalFederationAPIMux *mux.Router
+	ExternalKeyAPIMux        *mux.Router
+	ExternalMediaAPIMux      *mux.Router
+	InternalAPIMux           *mux.Router
+	UseHTTPAPIs              bool
+	httpClient               *http.Client
+	Cfg                      *config.Dendrite
+	Caches                   *caching.Caches
+	KafkaConsumer            sarama.Consumer
+	KafkaProducer            sarama.SyncProducer
 }
 
 const HTTPServerTimeout = time.Minute * 5
@@ -136,16 +137,19 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	// are not inadvertently reading paths without cleaning, else this could introduce a
 	// directory traversal attack e.g /../../../etc/passwd
 	return &BaseDendrite{
-		componentName:  componentName,
-		UseHTTPAPIs:    useHTTPAPIs,
-		tracerCloser:   closer,
-		Cfg:            cfg,
-		Caches:         cache,
-		PublicAPIMux:   mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicPathPrefix).Subrouter().UseEncodedPath(),
-		InternalAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
-		httpClient:     &client,
-		KafkaConsumer:  kafkaConsumer,
-		KafkaProducer:  kafkaProducer,
+		componentName:            componentName,
+		UseHTTPAPIs:              useHTTPAPIs,
+		tracerCloser:             closer,
+		Cfg:                      cfg,
+		Caches:                   cache,
+		ExternalClientAPIMux:     mux.NewRouter().SkipClean(true).PathPrefix(httputil.ExternalClientPathPrefix).Subrouter().UseEncodedPath(),
+		ExternalFederationAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.ExternalFederationPathPrefix).Subrouter().UseEncodedPath(),
+		ExternalKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.ExternalKeyPathPrefix).Subrouter().UseEncodedPath(),
+		ExternalMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.ExternalMediaPathPrefix).Subrouter().UseEncodedPath(),
+		InternalAPIMux:           mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
+		httpClient:               &client,
+		KafkaConsumer:            kafkaConsumer,
+		KafkaProducer:            kafkaProducer,
 	}
 }
 
@@ -293,7 +297,11 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	}
 
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
-	externalRouter.PathPrefix(httputil.PublicPathPrefix).Handler(b.PublicAPIMux)
+
+	externalRouter.PathPrefix(httputil.ExternalClientPathPrefix).Handler(b.ExternalClientAPIMux)
+	externalRouter.PathPrefix(httputil.ExternalKeyPathPrefix).Handler(b.ExternalKeyAPIMux)
+	externalRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(b.ExternalFederationAPIMux)
+	externalRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(b.ExternalMediaAPIMux)
 
 	go func() {
 		defer close(block)

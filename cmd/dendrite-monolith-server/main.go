@@ -145,7 +145,12 @@ func main() {
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
 	}
-	monolith.AddAllPublicRoutes(base.PublicAPIMux)
+	monolith.AddAllPublicRoutes(
+		base.ExternalClientAPIMux,
+		base.ExternalFederationAPIMux,
+		base.ExternalKeyAPIMux,
+		base.ExternalMediaAPIMux,
+	)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {

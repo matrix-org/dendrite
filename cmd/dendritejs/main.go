@@ -235,18 +235,28 @@ func main() {
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}
-	monolith.AddAllPublicRoutes(base.PublicAPIMux)
+	monolith.AddAllPublicRoutes(
+		base.ExternalClientAPIMux,
+		base.ExternalFederationAPIMux,
+		base.ExternalKeyAPIMux,
+		base.ExternalMediaAPIMux,
+	)
 
-	router := mux.NewRouter()
-	router.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
-	router.PathPrefix(httputil.PublicPathPrefix).Handler(base.PublicAPIMux)
+	httpRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalClientPathPrefix).Handler(base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
+
+	libp2pRouter := mux.NewRouter()
+	httpRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
 
 	// Expose the matrix APIs via libp2p-js - for federation traffic
 	if node != nil {
 		go func() {
 			logrus.Info("Listening on libp2p-js host ID ", node.Id)
 			s := JSServer{
-				Mux: base.PublicAPIMux,
+				Mux: libp2pRouter,
 			}
 			s.ListenAndServe("p2p")
 		}()
@@ -256,7 +266,7 @@ func main() {
 	go func() {
 		logrus.Info("Listening for service-worker fetch traffic")
 		s := JSServer{
-			Mux: router,
+			Mux: httpRouter,
 		}
 		s.ListenAndServe("fetch")
 	}()

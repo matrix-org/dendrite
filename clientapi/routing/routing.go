@@ -40,9 +40,9 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixV1 = "/client/api/v1"
-const pathPrefixR0 = "/client/r0"
-const pathPrefixUnstable = "/client/unstable"
+const pathPrefixV1 = "/api/v1"
+const pathPrefixR0 = "/r0"
+const pathPrefixUnstable = "/unstable"
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -68,7 +68,7 @@ func Setup(
 ) {
 	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
 
-	publicAPIMux.Handle("/client/versions",
+	publicAPIMux.Handle("/versions",
 		httputil.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
