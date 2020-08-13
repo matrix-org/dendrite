@@ -28,7 +28,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -231,27 +230,6 @@ func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib
 	} else {
 		f.origins.Store(origin, time.Now())
 	}
-}
-
-// SetupHTTPAPI registers both internal and external HTTP APIs.
-func SetupHTTPAPI(servMux, publicApiMux, internalApiMux *mux.Router, cfg *config.Global, enableHTTPAPIs bool) {
-	SetupInternalHTTPAPI(servMux, internalApiMux, cfg, enableHTTPAPIs)
-	SetupExternalHTTPAPI(servMux, publicApiMux, cfg)
-}
-
-// SetupInternalHTTPAPI registers internal APIs and metrics only.
-func SetupInternalHTTPAPI(servMux, internalApiMux *mux.Router, cfg *config.Global, enableHTTPAPIs bool) {
-	if cfg.Metrics.Enabled {
-		servMux.Handle("/metrics", WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Metrics.BasicAuth))
-	}
-	if enableHTTPAPIs {
-		servMux.Handle(InternalPathPrefix, internalApiMux)
-	}
-}
-
-// SetupExternalHTTPAPI registers public APIs only.
-func SetupExternalHTTPAPI(servMux, publicApiMux *mux.Router, cfg *config.Global) {
-	servMux.Handle(PublicPathPrefix, WrapHandlerInCORS(publicApiMux))
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics

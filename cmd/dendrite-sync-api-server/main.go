@@ -33,6 +33,8 @@ func main() {
 		base.PublicAPIMux, base.KafkaConsumer, userAPI, rsAPI, base.KeyServerHTTPClient(), base.CurrentStateAPIClient(),
 		federation, &cfg.SyncAPI)
 
-	base.SetupAndServeHTTP(string(base.Cfg.SyncAPI.Bind), string(base.Cfg.SyncAPI.Listen))
-
+	base.SetupAndServeHTTP(
+		base.Cfg.SyncAPI.InternalAPI.Listen,
+		setup.NoExternalListener,
+	)
 }

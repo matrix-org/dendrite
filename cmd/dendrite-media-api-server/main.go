@@ -30,6 +30,8 @@ func main() {
 
 	mediaapi.AddPublicRoutes(base.PublicAPIMux, &base.Cfg.MediaAPI, userAPI, client)
 
-	base.SetupAndServeHTTP(string(base.Cfg.MediaAPI.Bind), string(base.Cfg.MediaAPI.Listen))
-
+	base.SetupAndServeHTTP(
+		base.Cfg.MediaAPI.InternalAPI.Listen,
+		base.Cfg.MediaAPI.ExternalAPI.Listen,
+	)
 }

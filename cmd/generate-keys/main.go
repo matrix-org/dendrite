@@ -45,6 +45,11 @@ func main() {
 
 	flag.Parse()
 
+	if *tlsCertFile == "" && *tlsKeyFile == "" && *privateKeyFile == "" {
+		flag.Usage()
+		return
+	}
+
 	if *tlsCertFile != "" || *tlsKeyFile != "" {
 		if *tlsCertFile == "" || *tlsKeyFile == "" {
 			log.Fatal("Zero or both of --tls-key and --tls-cert must be supplied")

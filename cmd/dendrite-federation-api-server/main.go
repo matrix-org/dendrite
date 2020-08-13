@@ -37,6 +37,8 @@ func main() {
 		rsAPI, fsAPI, base.EDUServerClient(), base.CurrentStateAPIClient(), keyAPI,
 	)
 
-	base.SetupAndServeHTTP(string(base.Cfg.FederationAPI.Bind), string(base.Cfg.FederationAPI.Listen))
-
+	base.SetupAndServeHTTP(
+		base.Cfg.FederationAPI.InternalAPI.Listen,
+		base.Cfg.FederationAPI.ExternalAPI.Listen,
+	)
 }

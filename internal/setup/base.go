@@ -19,7 +19,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
@@ -69,7 +68,6 @@ type BaseDendrite struct {
 	// PublicAPIMux should be used to register new public matrix api endpoints
 	PublicAPIMux   *mux.Router
 	InternalAPIMux *mux.Router
-	BaseMux        *mux.Router // base router which created public/internal subrouters
 	UseHTTPAPIs    bool
 	httpClient     *http.Client
 	Cfg            *config.Dendrite
@@ -80,6 +78,8 @@ type BaseDendrite struct {
 
 const HTTPServerTimeout = time.Minute * 5
 const HTTPClientTimeout = time.Second * 30
+
+const NoExternalListener = ""
 
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
@@ -135,17 +135,14 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	// We need to be careful with media APIs if they read from a filesystem to make sure they
 	// are not inadvertently reading paths without cleaning, else this could introduce a
 	// directory traversal attack e.g /../../../etc/passwd
-	httpmux := mux.NewRouter().SkipClean(true)
-
 	return &BaseDendrite{
 		componentName:  componentName,
 		UseHTTPAPIs:    useHTTPAPIs,
 		tracerCloser:   closer,
 		Cfg:            cfg,
 		Caches:         cache,
-		BaseMux:        httpmux,
-		PublicAPIMux:   httpmux.PathPrefix(httputil.PublicPathPrefix).Subrouter().UseEncodedPath(),
-		InternalAPIMux: httpmux.PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
+		PublicAPIMux:   mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicPathPrefix).Subrouter().UseEncodedPath(),
+		InternalAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		httpClient:     &client,
 		KafkaConsumer:  kafkaConsumer,
 		KafkaProducer:  kafkaProducer,
@@ -267,65 +264,55 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
-func (b *BaseDendrite) SetupAndServeHTTP(internaladdr, externaladdr string) {
-	var wg sync.WaitGroup
+func (b *BaseDendrite) SetupAndServeHTTP(internalHTTPAddr, externalHTTPAddr config.HTTPAddress) {
+	block := make(chan struct{})
 
-	externalRouter := mux.NewRouter().SkipClean(true)
-	internalRouter := externalRouter
-	if internaladdr != externaladdr {
-		internalRouter = mux.NewRouter().SkipClean(true)
-	}
+	internalAddr, _ := internalHTTPAddr.Address()
+	externalAddr, _ := externalHTTPAddr.Address()
 
-	externalServ := &http.Server{
-		Addr:         externaladdr,
+	internalRouter := mux.NewRouter()
+	externalRouter := internalRouter
+
+	internalServ := &http.Server{
+		Addr:         string(internalAddr),
 		WriteTimeout: HTTPServerTimeout,
-		Handler:      externalRouter,
+		Handler:      internalRouter,
 	}
-	internalServ := externalServ
-	if internaladdr != externaladdr {
-		internalServ = &http.Server{
-			Addr:         internaladdr,
+	externalServ := internalServ
+
+	if externalAddr != internalAddr {
+		externalRouter = mux.NewRouter()
+		externalServ = &http.Server{
+			Addr:         string(externalAddr),
 			WriteTimeout: HTTPServerTimeout,
-			Handler:      internalRouter,
+			Handler:      externalRouter,
 		}
 	}
 
-	httputil.SetupExternalHTTPAPI(
-		externalRouter,
-		b.PublicAPIMux,
-		&b.Cfg.Global,
-	)
+	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
+	externalRouter.PathPrefix(httputil.PublicPathPrefix).Handler(b.PublicAPIMux)
 
-	httputil.SetupInternalHTTPAPI(
-		internalRouter,
-		b.InternalAPIMux,
-		&b.Cfg.Global,
-		b.UseHTTPAPIs,
-	)
-
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		logrus.Infof("Starting %s external APIs on %s", b.componentName, externalServ.Addr)
-		if err := externalServ.ListenAndServe(); err != nil {
-			logrus.WithError(err).Fatal("failed to serve http")
+		defer close(block)
+		logrus.Infof("Starting %s listener on %s", b.componentName, internalServ.Addr)
+		if err := internalServ.ListenAndServe(); err != nil {
+			logrus.WithError(err).Fatal("failed to serve HTTP")
 		}
-		logrus.Infof("Stopped %s external APIs on %s", b.componentName, externalServ.Addr)
+		logrus.Infof("Stopped %s listener on %s", b.componentName, internalServ.Addr)
 	}()
 
-	if internaladdr != externaladdr {
-		wg.Add(1)
+	if externalAddr != "" && internalAddr != externalAddr {
 		go func() {
-			defer wg.Done()
-			logrus.Infof("Starting %s internal APIs on %s", b.componentName, internalServ.Addr)
-			if err := internalServ.ListenAndServe(); err != nil {
-				logrus.WithError(err).Fatal("failed to serve http")
+			defer close(block)
+			logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
+			if err := externalServ.ListenAndServe(); err != nil {
+				logrus.WithError(err).Fatal("failed to serve HTTP")
 			}
-			logrus.Infof("Stopped %s internal APIs on %s", b.componentName, internalServ.Addr)
+			logrus.Infof("Stopped %s listener on %s", b.componentName, externalServ.Addr)
 		}()
 	}
 
-	wg.Wait()
+	<-block
 }
 
 // setupKafka creates kafka consumer/producer pair from the config.

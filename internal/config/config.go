@@ -145,7 +145,7 @@ type Address string
 // An HTTPAddress to listen on, starting with either http:// or https://.
 type HTTPAddress string
 
-func (h HTTPAddress) GetAddress() (Address, error) {
+func (h HTTPAddress) Address() (Address, error) {
 	url, err := url.Parse(string(h))
 	if err != nil {
 		return "", err

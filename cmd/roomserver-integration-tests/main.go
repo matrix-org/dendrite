@@ -278,7 +278,7 @@ func testRoomserver(input []string, wantOutput []string, checkQueries func(api.R
 	cmd.Args = []string{"dendrite-room-server", "--config", filepath.Join(dir, test.ConfigFile)}
 
 	gotOutput, err := runAndReadFromTopic(cmd, cfg.RoomServerURL()+"/metrics", doInput, outputTopic, len(wantOutput), func() {
-		queryAPI, _ := inthttp.NewRoomserverClient("http://"+string(cfg.RoomServer.Listen), &http.Client{Timeout: timeoutHTTP}, cache)
+		queryAPI, _ := inthttp.NewRoomserverClient("http://"+string(cfg.RoomServer.InternalAPI.Connect), &http.Client{Timeout: timeoutHTTP}, cache)
 		checkQueries(queryAPI)
 	})
 	if err != nil {

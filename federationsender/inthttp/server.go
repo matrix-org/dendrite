@@ -26,7 +26,8 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(FederationSenderPerformJoinRequestPath,
+	internalAPIMux.Handle(
+		FederationSenderPerformJoinRequestPath,
 		httputil.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
@@ -37,7 +38,8 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(FederationSenderPerformLeaveRequestPath,
+	internalAPIMux.Handle(
+		FederationSenderPerformLeaveRequestPath,
 		httputil.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse
@@ -50,7 +52,8 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(FederationSenderPerformDirectoryLookupRequestPath,
+	internalAPIMux.Handle(
+		FederationSenderPerformDirectoryLookupRequestPath,
 		httputil.MakeInternalAPI("PerformDirectoryLookupRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformDirectoryLookupRequest
 			var response api.PerformDirectoryLookupResponse
@@ -63,7 +66,8 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(FederationSenderPerformServersAlivePath,
+	internalAPIMux.Handle(
+		FederationSenderPerformServersAlivePath,
 		httputil.MakeInternalAPI("PerformServersAliveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformServersAliveRequest
 			var response api.PerformServersAliveResponse
@@ -76,7 +80,8 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(FederationSenderPerformBroadcastEDUPath,
+	internalAPIMux.Handle(
+		FederationSenderPerformBroadcastEDUPath,
 		httputil.MakeInternalAPI("PerformBroadcastEDU", func(req *http.Request) util.JSONResponse {
 			var request api.PerformBroadcastEDURequest
 			var response api.PerformBroadcastEDUResponse
