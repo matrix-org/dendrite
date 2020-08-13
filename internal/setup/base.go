@@ -280,7 +280,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(internalHTTPAddr, externalHTTPAddr conf
 	}
 	externalServ := internalServ
 
-	if externalAddr != internalAddr {
+	if externalAddr != "" && externalAddr != internalAddr {
 		externalRouter = mux.NewRouter()
 		externalServ = &http.Server{
 			Addr:         string(externalAddr),
