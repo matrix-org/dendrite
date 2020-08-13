@@ -277,6 +277,8 @@ sync_api:
   internal_api:
     listen: http://localhost:7773
     connect: http://localhost:7773
+  external_api:
+    listen: http://[::]:8073
   database:
     connection_string: file:syncapi.db
     max_open_conns: 100

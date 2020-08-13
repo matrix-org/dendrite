@@ -37,7 +37,7 @@ func main() {
 
 	base.SetupAndServeHTTP(
 		base.Cfg.SyncAPI.InternalAPI.Listen,
-		setup.NoExternalListener,
+		base.Cfg.SyncAPI.ExternalAPI.Listen,
 		nil, nil,
 	)
 }
