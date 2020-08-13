@@ -342,9 +342,11 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		if err != nil {
 			logger.WithError(err).WithField("user_id", userID).Error("fetched device list but failed to store/emit it")
 			hasFailures = true
-		} else {
-			u.clearChannel(userID)
 		}
+	}
+	for _, userID := range userIDs {
+		// always clear the channel to unblock Update calls regardless of success/failure
+		u.clearChannel(userID)
 	}
 	return hasFailures
 }
