@@ -169,8 +169,8 @@ func main() {
 	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
 
 	yggRouter := mux.NewRouter()
-	httpRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalFederationAPIMux)
-	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
+	yggRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalFederationAPIMux)
+	yggRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{

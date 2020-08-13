@@ -204,9 +204,9 @@ func main() {
 	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.Base.ExternalMediaAPIMux)
 
 	libp2pRouter := mux.NewRouter()
-	httpRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.Base.ExternalFederationAPIMux)
-	httpRouter.PathPrefix(httputil.ExternalKeyPathPrefix).Handler(base.Base.ExternalKeyAPIMux)
-	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.Base.ExternalMediaAPIMux)
+	libp2pRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.Base.ExternalFederationAPIMux)
+	libp2pRouter.PathPrefix(httputil.ExternalKeyPathPrefix).Handler(base.Base.ExternalKeyAPIMux)
+	libp2pRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.Base.ExternalMediaAPIMux)
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
