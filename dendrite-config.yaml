@@ -88,8 +88,9 @@ global:
 
 # Configuration for the Appservice API.
 app_service_api:
-  listen: localhost:7777
-  bind: localhost:7777
+  internal_api:
+    listen: http://localhost:7777
+    connect: http://localhost:7777
   database:
     connection_string: file:appservice.db
     max_open_conns: 100
@@ -101,8 +102,11 @@ app_service_api:
 
 # Configuration for the Client API.
 client_api:
-  listen: localhost:7771
-  bind: localhost:7771
+  internal_api:
+    listen: http://localhost:7771
+    connect: http://localhost:7771
+  external_api:
+    listen: http://[::]:8071
 
   # Prevents new users from being able to register on this homeserver, except when
   # using the registration shared secret below.
@@ -131,8 +135,9 @@ client_api:
 
 # Configuration for the Current State Server.
 current_state_server:
-  listen: localhost:7782
-  bind: localhost:7782
+  internal_api:
+    listen: http://localhost:7782
+    connect: http://localhost:7782
   database:
     connection_string: file:currentstate.db
     max_open_conns: 100
@@ -141,13 +146,17 @@ current_state_server:
 
 # Configuration for the EDU server.
 edu_server:
-  listen: localhost:7778
-  bind: localhost:7778
+  internal_api:
+    listen: http://localhost:7778
+    connect: http://localhost:7778
 
 # Configuration for the Federation API.
 federation_api:
-  listen: localhost:7772
-  bind: localhost:7772
+  internal_api:
+    listen: http://localhost:7772
+    connect: http://localhost:7772
+  external_api:
+    listen: http://[::]:8072
 
   # List of paths to X.509 certificates to be used by the external federation listeners.
   # These certificates will be used to calculate the TLS fingerprints and other servers
@@ -157,8 +166,9 @@ federation_api:
 
 # Configuration for the Federation Sender.
 federation_sender:
-  listen: localhost:7775
-  bind: localhost:7775
+  internal_api:
+    listen: http://localhost:7775
+    connect: http://localhost:7775
   database:
     connection_string: file:federationsender.db
     max_open_conns: 100
@@ -182,8 +192,9 @@ federation_sender:
 
 # Configuration for the Key Server (for end-to-end encryption).
 key_server:
-  listen: localhost:7779
-  bind: localhost:7779
+  internal_api:
+    listen: http://localhost:7779
+    connect: http://localhost:7779
   database:
     connection_string: file:keyserver.db
     max_open_conns: 100
@@ -192,8 +203,11 @@ key_server:
 
 # Configuration for the Media API.
 media_api:
-  listen: localhost:7774
-  bind: localhost:7774
+  internal_api:
+    listen: http://localhost:7774
+    connect: http://localhost:7774
+  external_api:
+    listen: http://[::]:8074
   database:
     connection_string: file:mediaapi.db
     max_open_conns: 100
@@ -227,8 +241,9 @@ media_api:
 
 # Configuration for the Room Server.
 room_server:
-  listen: localhost:7770
-  bind: localhost:7770
+  internal_api:
+    listen: http://localhost:7770
+    connect: http://localhost:7770
   database:
     connection_string: file:roomserver.db
     max_open_conns: 100
@@ -237,8 +252,9 @@ room_server:
 
 # Configuration for the Server Key API (for server signing keys).
 server_key_api:
-  listen: localhost:7780
-  bind: localhost:7780
+  internal_api:
+    listen: http://localhost:7780
+    connect: http://localhost:7780
   database:
     connection_string: file:serverkeyapi.db
     max_open_conns: 100
@@ -258,8 +274,9 @@ server_key_api:
 
 # Configuration for the Sync API.
 sync_api:
-  listen: localhost:7773
-  bind: localhost:7773
+  internal_api:
+    listen: http://localhost:7773
+    connect: http://localhost:7773
   database:
     connection_string: file:syncapi.db
     max_open_conns: 100
@@ -268,8 +285,9 @@ sync_api:
 
 # Configuration for the User API.
 user_api:
-  listen: localhost:7781
-  bind: localhost:7781
+  internal_api:
+    listen: http://localhost:7781
+    connect: http://localhost:7781
   account_database:
     connection_string: file:userapi_accounts.db
     max_open_conns: 100
