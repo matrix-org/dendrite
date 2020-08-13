@@ -318,65 +318,12 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 	// allows us to wait until all federation servers have been poked
 	var wg sync.WaitGroup
 	wg.Add(len(domainToDeviceKeys))
-	// mutex for failures
-	var failMu sync.Mutex
+	// mutex for writing directly to res (e.g failures)
+	var respMu sync.Mutex
 
 	// fan out
 	for domain, deviceKeys := range domainToDeviceKeys {
-		go func(serverName string, devKeys map[string][]string) {
-			defer wg.Done()
-			fedCtx, cancel := context.WithTimeout(ctx, timeout)
-			defer cancel()
-			// for users who we do not have any knowledge about, try to start doing device list updates for them
-			// by hitting /users/devices - otherwise fallback to /keys/query which has nicer bulk properties but
-			// lack a stream ID.
-			var userIDsForAllDevices []string
-			for userID, deviceIDs := range devKeys {
-				if len(deviceIDs) == 0 {
-					userIDsForAllDevices = append(userIDsForAllDevices, userID)
-					delete(devKeys, userID)
-				}
-			}
-			for _, userID := range userIDsForAllDevices {
-				err := a.Updater.ManualUpdate(context.Background(), gomatrixserverlib.ServerName(serverName), userID)
-				if err != nil {
-					logrus.WithFields(logrus.Fields{
-						logrus.ErrorKey: err,
-						"user_id":       userID,
-						"server":        serverName,
-					}).Error("Failed to manually update device lists for user")
-					// try to do it via /keys/query
-					devKeys[userID] = []string{}
-					continue
-				}
-				// refresh entries from DB: unlike remoteKeysFromDatabase we know we previously had no device info for this
-				// user so the fact that we're populating all devices here isn't a problem so long as we have devices.
-				err = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, userID, nil)
-				if err != nil {
-					logrus.WithFields(logrus.Fields{
-						logrus.ErrorKey: err,
-						"user_id":       userID,
-						"server":        serverName,
-					}).Error("Failed to manually update device lists for user")
-					// try to do it via /keys/query
-					devKeys[userID] = []string{}
-					continue
-				}
-			}
-			if len(devKeys) == 0 {
-				return
-			}
-			queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, gomatrixserverlib.ServerName(serverName), devKeys)
-			if err != nil {
-				failMu.Lock()
-				res.Failures[serverName] = map[string]interface{}{
-					"message": err.Error(),
-				}
-				failMu.Unlock()
-				return
-			}
-			resultCh <- &queryKeysResp
-		}(domain, deviceKeys)
+		go a.queryRemoteKeysOnServer(ctx, domain, deviceKeys, &wg, &respMu, timeout, resultCh, res)
 	}
 
 	// Close the result channel when the goroutines have quit so the for .. range exits
@@ -397,6 +344,76 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 			}
 		}
 	}
+}
+
+func (a *KeyInternalAPI) queryRemoteKeysOnServer(
+	ctx context.Context, serverName string, devKeys map[string][]string, wg *sync.WaitGroup,
+	respMu *sync.Mutex, timeout time.Duration, resultCh chan<- *gomatrixserverlib.RespQueryKeys,
+	res *api.QueryKeysResponse,
+) {
+	defer wg.Done()
+	fedCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	// for users who we do not have any knowledge about, try to start doing device list updates for them
+	// by hitting /users/devices - otherwise fallback to /keys/query which has nicer bulk properties but
+	// lack a stream ID.
+	var userIDsForAllDevices []string
+	for userID, deviceIDs := range devKeys {
+		if len(deviceIDs) == 0 {
+			userIDsForAllDevices = append(userIDsForAllDevices, userID)
+			delete(devKeys, userID)
+		}
+	}
+	for _, userID := range userIDsForAllDevices {
+		err := a.Updater.ManualUpdate(context.Background(), gomatrixserverlib.ServerName(serverName), userID)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				logrus.ErrorKey: err,
+				"user_id":       userID,
+				"server":        serverName,
+			}).Error("Failed to manually update device lists for user")
+			// try to do it via /keys/query
+			devKeys[userID] = []string{}
+			continue
+		}
+		// refresh entries from DB: unlike remoteKeysFromDatabase we know we previously had no device info for this
+		// user so the fact that we're populating all devices here isn't a problem so long as we have devices.
+		respMu.Lock()
+		err = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, userID, nil)
+		respMu.Unlock()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				logrus.ErrorKey: err,
+				"user_id":       userID,
+				"server":        serverName,
+			}).Error("Failed to manually update device lists for user")
+			// try to do it via /keys/query
+			devKeys[userID] = []string{}
+			continue
+		}
+	}
+	if len(devKeys) == 0 {
+		return
+	}
+	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, gomatrixserverlib.ServerName(serverName), devKeys)
+	if err == nil {
+		resultCh <- &queryKeysResp
+		return
+	}
+	respMu.Lock()
+	res.Failures[serverName] = map[string]interface{}{
+		"message": err.Error(),
+	}
+
+	// last ditch, use the cache only. This is good for when clients hit /keys/query and the remote server
+	// is down, better to return something than nothing at all. Clients can know about the failure by
+	// inspecting the failures map though so they can know it's a cached response.
+	for userID, dkeys := range devKeys {
+		// drop the error as it's already a failure at this point
+		_ = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, userID, dkeys)
+	}
+	respMu.Unlock()
+
 }
 
 func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(

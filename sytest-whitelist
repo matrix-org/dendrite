@@ -148,6 +148,7 @@ Get left notifs in sync and /keys/changes when other user leaves
 Can query remote device keys using POST after notification
 Server correctly resyncs when client query keys and there is no remote cache
 Server correctly resyncs when server leaves and rejoins a room
+Device list doesn't change if remote server is down
 Can add account data
 Can add account data to room
 Can get account data without syncing
