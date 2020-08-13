@@ -248,7 +248,7 @@ func main() {
 	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
 
 	libp2pRouter := mux.NewRouter()
-	httpRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalClientAPIMux)
+	httpRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalFederationAPIMux)
 	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
 
 	// Expose the matrix APIs via libp2p-js - for federation traffic

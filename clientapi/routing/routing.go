@@ -40,10 +40,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pathPrefixV1 = "/api/v1"
-const pathPrefixR0 = "/r0"
-const pathPrefixUnstable = "/unstable"
-
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
 //
@@ -84,9 +80,9 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux := publicAPIMux.PathPrefix(pathPrefixR0).Subrouter()
-	v1mux := publicAPIMux.PathPrefix(pathPrefixV1).Subrouter()
-	unstableMux := publicAPIMux.PathPrefix(pathPrefixUnstable).Subrouter()
+	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
+	v1mux := publicAPIMux.PathPrefix("/api/v1").Subrouter()
+	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
 
 	r0mux.Handle("/createRoom",
 		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

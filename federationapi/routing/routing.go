@@ -31,12 +31,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const (
-	pathPrefixV2Keys       = "/v2"
-	pathPrefixV1Federation = "/v1"
-	pathPrefixV2Federation = "/v2"
-)
-
 // Setup registers HTTP handlers with the given ServeMux.
 // The provided publicAPIMux MUST have `UseEncodedPath()` enabled or else routes will incorrectly
 // path unescape twice (once from the router, once from MakeFedAPI). We need to have this enabled
@@ -57,9 +51,9 @@ func Setup(
 	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 ) {
-	v2keysmux := keyMux.PathPrefix(pathPrefixV2Keys).Subrouter()
-	v1fedmux := fedMux.PathPrefix(pathPrefixV1Federation).Subrouter()
-	v2fedmux := fedMux.PathPrefix(pathPrefixV2Federation).Subrouter()
+	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
+	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
+	v2fedmux := fedMux.PathPrefix("/v2").Subrouter()
 
 	wakeup := &httputil.FederationWakeups{
 		FsAPI: fsAPI,
