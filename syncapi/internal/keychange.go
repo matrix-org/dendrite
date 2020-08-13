@@ -96,7 +96,8 @@ func DeviceListCatchup(
 		return hasNew, nil
 	}
 	// QueryKeyChanges gets ALL users who have changed keys, we want the ones who share rooms with the user.
-	queryRes.UserIDs = filterSharedUsers(ctx, stateAPI, userID, queryRes.UserIDs)
+	var sharedUsersMap map[string]int
+	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, stateAPI, userID, queryRes.UserIDs)
 	util.GetLogger(ctx).Debugf(
 		"QueryKeyChanges request p=%d,off=%d,to=%d response p=%d off=%d uids=%v",
 		partition, offset, toOffset, queryRes.Partition, queryRes.Offset, queryRes.UserIDs,
@@ -114,11 +115,18 @@ func DeviceListCatchup(
 	}
 	// if the response has any join/leave events, add them now.
 	// TODO: This is sub-optimal because we will add users to `changed` even if we already shared a room with them.
-	for _, userID := range membershipEvents(res) {
+	joinUserIDs, leaveUserIDs := membershipEvents(res)
+	for _, userID := range joinUserIDs {
 		if !userSet[userID] {
 			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
 			hasNew = true
 			userSet[userID] = true
+		}
+	}
+	for _, userID := range leaveUserIDs {
+		if sharedUsersMap[userID] == 0 {
+			// we no longer share a room with this user when they left, so add to left list.
+			res.DeviceLists.Left = append(res.DeviceLists.Left, userID)
 		}
 	}
 	// set the new token
@@ -221,7 +229,7 @@ func TrackChangedUsers(
 
 func filterSharedUsers(
 	ctx context.Context, stateAPI currentstateAPI.CurrentStateInternalAPI, userID string, usersWithChangedKeys []string,
-) []string {
+) (map[string]int, []string) {
 	var result []string
 	var sharedUsersRes currentstateAPI.QuerySharedUsersResponse
 	err := stateAPI.QuerySharedUsers(ctx, &currentstateAPI.QuerySharedUsersRequest{
@@ -229,7 +237,7 @@ func filterSharedUsers(
 	}, &sharedUsersRes)
 	if err != nil {
 		// default to all users so we do needless queries rather than miss some important device update
-		return usersWithChangedKeys
+		return nil, usersWithChangedKeys
 	}
 	// We forcibly put ourselves in this list because we should be notified about our own device updates
 	// and if we are in 0 rooms then we don't technically share any room with ourselves so we wouldn't
@@ -241,7 +249,7 @@ func filterSharedUsers(
 			result = append(result, uid)
 		}
 	}
-	return result
+	return sharedUsersRes.UserIDsToCount, result
 }
 
 func joinedRooms(res *types.Response, userID string) []string {
@@ -288,16 +296,16 @@ func membershipEventPresent(events []gomatrixserverlib.ClientEvent, userID strin
 // "For optimal performance, Alice should be added to changed in Bob's sync only when she adds a new device,
 // or when Alice and Bob now share a room but didn't share any room previously. However, for the sake of simpler
 // logic, a server may add Alice to changed when Alice and Bob share a new room, even if they previously already shared a room."
-func membershipEvents(res *types.Response) (userIDs []string) {
+func membershipEvents(res *types.Response) (joinUserIDs, leaveUserIDs []string) {
 	for _, room := range res.Rooms.Join {
 		for _, ev := range room.Timeline.Events {
 			if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil {
 				if strings.Contains(string(ev.Content), `"join"`) {
-					userIDs = append(userIDs, *ev.StateKey)
+					joinUserIDs = append(joinUserIDs, *ev.StateKey)
 				} else if strings.Contains(string(ev.Content), `"leave"`) {
-					userIDs = append(userIDs, *ev.StateKey)
+					leaveUserIDs = append(leaveUserIDs, *ev.StateKey)
 				} else if strings.Contains(string(ev.Content), `"ban"`) {
-					userIDs = append(userIDs, *ev.StateKey)
+					leaveUserIDs = append(leaveUserIDs, *ev.StateKey)
 				}
 			}
 		}

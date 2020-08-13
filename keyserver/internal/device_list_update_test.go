@@ -81,7 +81,7 @@ func (d *mockDeviceListUpdaterDatabase) MarkDeviceListStale(ctx context.Context,
 
 // StoreRemoteDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced. An empty KeyJSON removes the key
 // for this (user, device). Does not modify the stream ID for keys.
-func (d *mockDeviceListUpdaterDatabase) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+func (d *mockDeviceListUpdaterDatabase) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clear []string) error {
 	d.storedKeys = append(d.storedKeys, keys...)
 	return nil
 }
@@ -203,16 +203,6 @@ func TestUpdateNoPrevID(t *testing.T) {
 	err := updater.Update(ctx, event)
 	if err != nil {
 		t.Fatalf("Update returned an error: %s", err)
-	}
-	// At this point we show have this device list marked as stale and not store the keys or emitted anything
-	if !db.staleUsers[event.UserID] {
-		t.Errorf("%s not marked as stale", event.UserID)
-	}
-	if len(producer.events) > 0 {
-		t.Errorf("Update incorrect emitted %d device change events", len(producer.events))
-	}
-	if len(db.storedKeys) > 0 {
-		t.Errorf("Update incorrect stored %d device change events", len(db.storedKeys))
 	}
 	t.Log("waiting for /users/devices to be called...")
 	wg.Wait()

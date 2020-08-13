@@ -110,6 +110,11 @@ type OneTimeKeysCount struct {
 type PerformUploadKeysRequest struct {
 	DeviceKeys  []DeviceKeys
 	OneTimeKeys []OneTimeKeys
+	// OnlyDisplayNameUpdates should be `true` if ALL the DeviceKeys are present to update
+	// the display name for their respective device, and NOT to modify the keys. The key
+	// itself doesn't change but it's easier to pretend upload new keys and reuse the same code paths.
+	// Without this flag, requests to modify device display names would delete device keys.
+	OnlyDisplayNameUpdates bool
 }
 
 // PerformUploadKeysResponse is the response to PerformUploadKeys

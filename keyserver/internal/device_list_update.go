@@ -67,6 +67,11 @@ type DeviceListUpdater struct {
 	producer    KeyChangeProducer
 	fedClient   *gomatrixserverlib.FederationClient
 	workerChans []chan gomatrixserverlib.ServerName
+
+	// When device lists are stale for a user, they get inserted into this map with a channel which `Update` will
+	// block on or timeout via a select.
+	userIDToChan   map[string]chan bool
+	userIDToChanMu *sync.Mutex
 }
 
 // DeviceListUpdaterDatabase is the subset of functionality from storage.Database required for the updater.
@@ -80,8 +85,9 @@ type DeviceListUpdaterDatabase interface {
 	MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error
 
 	// StoreRemoteDeviceKeys persists the given keys. Keys with the same user ID and device ID will be replaced. An empty KeyJSON removes the key
-	// for this (user, device). Does not modify the stream ID for keys.
-	StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error
+	// for this (user, device). Does not modify the stream ID for keys. User IDs in `clearUserIDs` will have all their device keys deleted prior
+	// to insertion - use this when you have a complete snapshot of a user's keys in order to track device deletions correctly.
+	StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clearUserIDs []string) error
 
 	// PrevIDsExists returns true if all prev IDs exist for this user.
 	PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error)
@@ -98,12 +104,14 @@ func NewDeviceListUpdater(
 	numWorkers int,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
-		userIDToMutex: make(map[string]*sync.Mutex),
-		mu:            &sync.Mutex{},
-		db:            db,
-		producer:      producer,
-		fedClient:     fedClient,
-		workerChans:   make([]chan gomatrixserverlib.ServerName, numWorkers),
+		userIDToMutex:  make(map[string]*sync.Mutex),
+		mu:             &sync.Mutex{},
+		db:             db,
+		producer:       producer,
+		fedClient:      fedClient,
+		workerChans:    make([]chan gomatrixserverlib.ServerName, numWorkers),
+		userIDToChan:   make(map[string]chan bool),
+		userIDToChanMu: &sync.Mutex{},
 	}
 }
 
@@ -137,6 +145,22 @@ func (u *DeviceListUpdater) mutex(userID string) *sync.Mutex {
 	return u.userIDToMutex[userID]
 }
 
+// ManualUpdate invalidates the device list for the given user and fetches the latest and tracks it.
+// Blocks until the device list is synced or the timeout is reached.
+func (u *DeviceListUpdater) ManualUpdate(ctx context.Context, serverName gomatrixserverlib.ServerName, userID string) error {
+	mu := u.mutex(userID)
+	mu.Lock()
+	err := u.db.MarkDeviceListStale(ctx, userID, true)
+	mu.Unlock()
+	if err != nil {
+		return fmt.Errorf("ManualUpdate: failed to mark device list for %s as stale: %w", userID, err)
+	}
+	u.notifyWorkers(userID)
+	return nil
+}
+
+// Update blocks until the update has been stored in the database. It blocks primarily for satisfying sytest,
+// which assumes when /send 200 OKs that the device lists have been updated.
 func (u *DeviceListUpdater) Update(ctx context.Context, event gomatrixserverlib.DeviceListUpdateEvent) error {
 	isDeviceListStale, err := u.update(ctx, event)
 	if err != nil {
@@ -169,22 +193,27 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 		"stream_id":      event.StreamID,
 		"prev_ids":       event.PrevID,
 		"display_name":   event.DeviceDisplayName,
+		"deleted":        event.Deleted,
 	}).Info("DeviceListUpdater.Update")
 
 	// if we haven't missed anything update the database and notify users
 	if exists {
+		k := event.Keys
+		if event.Deleted {
+			k = nil
+		}
 		keys := []api.DeviceMessage{
 			{
 				DeviceKeys: api.DeviceKeys{
 					DeviceID:    event.DeviceID,
 					DisplayName: event.DeviceDisplayName,
-					KeyJSON:     event.Keys,
+					KeyJSON:     k,
 					UserID:      event.UserID,
 				},
 				StreamID: event.StreamID,
 			},
 		}
-		err = u.db.StoreRemoteDeviceKeys(ctx, keys)
+		err = u.db.StoreRemoteDeviceKeys(ctx, keys, nil)
 		if err != nil {
 			return false, fmt.Errorf("failed to store remote device keys for %s (%s): %w", event.UserID, event.DeviceID, err)
 		}
@@ -213,7 +242,35 @@ func (u *DeviceListUpdater) notifyWorkers(userID string) {
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(remoteServer))
 	index := int(hash.Sum32()) % len(u.workerChans)
+
+	ch := u.assignChannel(userID)
 	u.workerChans[index] <- remoteServer
+	select {
+	case <-ch:
+	case <-time.After(10 * time.Second):
+		// we don't return an error in this case as it's not a failure condition.
+		// we mainly block for the benefit of sytest anyway
+	}
+}
+
+func (u *DeviceListUpdater) assignChannel(userID string) chan bool {
+	u.userIDToChanMu.Lock()
+	defer u.userIDToChanMu.Unlock()
+	if ch, ok := u.userIDToChan[userID]; ok {
+		return ch
+	}
+	ch := make(chan bool)
+	u.userIDToChan[userID] = ch
+	return ch
+}
+
+func (u *DeviceListUpdater) clearChannel(userID string) {
+	u.userIDToChanMu.Lock()
+	defer u.userIDToChanMu.Unlock()
+	if ch, ok := u.userIDToChan[userID]; ok {
+		close(ch)
+		delete(u.userIDToChan, userID)
+	}
 }
 
 func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
@@ -230,6 +287,7 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 	}
 
 	// on failure, spin up a short-lived goroutine to inject the server name again.
+	scheduledRetries := make(map[gomatrixserverlib.ServerName]time.Time)
 	inject := func(srv gomatrixserverlib.ServerName, duration time.Duration) {
 		time.Sleep(duration)
 		ch <- srv
@@ -237,13 +295,20 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 
 	for serverName := range ch {
 		if !shouldProcess(serverName) {
-			// do not inject into the channel as we know there will be a sleeping goroutine
-			// which will do it after the cooloff period expires
-			continue
+			if time.Now().Before(scheduledRetries[serverName]) {
+				// do not inject into the channel as we know there will be a sleeping goroutine
+				// which will do it after the cooloff period expires
+				continue
+			} else {
+				scheduledRetries[serverName] = time.Now().Add(cooloffPeriod)
+				go inject(serverName, cooloffPeriod) // TODO: Backoff?
+				continue
+			}
 		}
 		lastProcessed[serverName] = time.Now()
 		shouldRetry := u.processServer(serverName)
 		if shouldRetry {
+			scheduledRetries[serverName] = time.Now().Add(cooloffPeriod)
 			go inject(serverName, cooloffPeriod) // TODO: Backoff?
 		}
 	}
@@ -277,6 +342,8 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		if err != nil {
 			logger.WithError(err).WithField("user_id", userID).Error("fetched device list but failed to store/emit it")
 			hasFailures = true
+		} else {
+			u.clearChannel(userID)
 		}
 	}
 	return hasFailures
@@ -301,7 +368,7 @@ func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevi
 			},
 		}
 	}
-	err := u.db.StoreRemoteDeviceKeys(ctx, keys)
+	err := u.db.StoreRemoteDeviceKeys(ctx, keys, []string{res.UserID})
 	if err != nil {
 		return fmt.Errorf("failed to store remote device keys: %w", err)
 	}

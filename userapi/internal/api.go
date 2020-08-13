@@ -180,6 +180,27 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		util.GetLogger(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
 		return err
 	}
+	if req.DisplayName != nil && dev.DisplayName != *req.DisplayName {
+		// display name has changed: update the device key
+		var uploadRes keyapi.PerformUploadKeysResponse
+		a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+			DeviceKeys: []keyapi.DeviceKeys{
+				{
+					DeviceID:    dev.ID,
+					DisplayName: *req.DisplayName,
+					KeyJSON:     nil,
+					UserID:      dev.UserID,
+				},
+			},
+			OnlyDisplayNameUpdates: true,
+		}, &uploadRes)
+		if uploadRes.Error != nil {
+			return fmt.Errorf("Failed to update device key display name: %v", uploadRes.Error)
+		}
+		if len(uploadRes.KeyErrors) > 0 {
+			return fmt.Errorf("Failed to update device key display name, key errors: %+v", uploadRes.KeyErrors)
+		}
+	}
 	return nil
 }
 

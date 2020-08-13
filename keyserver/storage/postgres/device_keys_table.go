@@ -61,6 +61,9 @@ const selectMaxStreamForUserSQL = "" +
 const countStreamIDsForUserSQL = "" +
 	"SELECT COUNT(*) FROM keyserver_device_keys WHERE user_id=$1 AND stream_id = ANY($2)"
 
+const deleteAllDeviceKeysSQL = "" +
+	"DELETE FROM keyserver_device_keys WHERE user_id=$1"
+
 type deviceKeysStatements struct {
 	db                         *sql.DB
 	upsertDeviceKeysStmt       *sql.Stmt
@@ -68,6 +71,7 @@ type deviceKeysStatements struct {
 	selectBatchDeviceKeysStmt  *sql.Stmt
 	selectMaxStreamForUserStmt *sql.Stmt
 	countStreamIDsForUserStmt  *sql.Stmt
+	deleteAllDeviceKeysStmt    *sql.Stmt
 }
 
 func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
@@ -91,6 +95,9 @@ func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 		return nil, err
 	}
 	if s.countStreamIDsForUserStmt, err = db.Prepare(countStreamIDsForUserSQL); err != nil {
+		return nil, err
+	}
+	if s.deleteAllDeviceKeysStmt, err = db.Prepare(deleteAllDeviceKeysSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -152,6 +159,11 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx
 		}
 	}
 	return nil
+}
+
+func (s *deviceKeysStatements) DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error {
+	_, err := txn.Stmt(s.deleteAllDeviceKeysStmt).ExecContext(ctx, userID)
+	return err
 }
 
 func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error) {
