@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -62,19 +63,19 @@ import (
 // should only be used during start up.
 // Must be closed when shutting down.
 type BaseDendrite struct {
-	componentName            string
-	tracerCloser             io.Closer
-	ExternalClientAPIMux     *mux.Router
-	ExternalFederationAPIMux *mux.Router
-	ExternalKeyAPIMux        *mux.Router
-	ExternalMediaAPIMux      *mux.Router
-	InternalAPIMux           *mux.Router
-	UseHTTPAPIs              bool
-	httpClient               *http.Client
-	Cfg                      *config.Dendrite
-	Caches                   *caching.Caches
-	KafkaConsumer            sarama.Consumer
-	KafkaProducer            sarama.SyncProducer
+	componentName          string
+	tracerCloser           io.Closer
+	PublicClientAPIMux     *mux.Router
+	PublicFederationAPIMux *mux.Router
+	PublicKeyAPIMux        *mux.Router
+	PublicMediaAPIMux      *mux.Router
+	InternalAPIMux         *mux.Router
+	UseHTTPAPIs            bool
+	httpClient             *http.Client
+	Cfg                    *config.Dendrite
+	Caches                 *caching.Caches
+	KafkaConsumer          sarama.Consumer
+	KafkaProducer          sarama.SyncProducer
 }
 
 const HTTPServerTimeout = time.Minute * 5
@@ -137,19 +138,19 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	// are not inadvertently reading paths without cleaning, else this could introduce a
 	// directory traversal attack e.g /../../../etc/passwd
 	return &BaseDendrite{
-		componentName:            componentName,
-		UseHTTPAPIs:              useHTTPAPIs,
-		tracerCloser:             closer,
-		Cfg:                      cfg,
-		Caches:                   cache,
-		ExternalClientAPIMux:     mux.NewRouter().SkipClean(true).PathPrefix(httputil.ExternalClientPathPrefix).Subrouter().UseEncodedPath(),
-		ExternalFederationAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.ExternalFederationPathPrefix).Subrouter().UseEncodedPath(),
-		ExternalKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.ExternalKeyPathPrefix).Subrouter().UseEncodedPath(),
-		ExternalMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.ExternalMediaPathPrefix).Subrouter().UseEncodedPath(),
-		InternalAPIMux:           mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
-		httpClient:               &client,
-		KafkaConsumer:            kafkaConsumer,
-		KafkaProducer:            kafkaProducer,
+		componentName:          componentName,
+		UseHTTPAPIs:            useHTTPAPIs,
+		tracerCloser:           closer,
+		Cfg:                    cfg,
+		Caches:                 cache,
+		PublicClientAPIMux:     mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicClientPathPrefix).Subrouter().UseEncodedPath(),
+		PublicFederationAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
+		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
+		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
+		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
+		httpClient:             &client,
+		KafkaConsumer:          kafkaConsumer,
+		KafkaProducer:          kafkaProducer,
 	}
 }
 
@@ -272,8 +273,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	internalHTTPAddr, externalHTTPAddr config.HTTPAddress,
 	certFile, keyFile *string,
 ) {
-	block := make(chan struct{})
-
 	internalAddr, _ := internalHTTPAddr.Address()
 	externalAddr, _ := externalHTTPAddr.Address()
 
@@ -297,14 +296,16 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	}
 
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
+	if b.Cfg.Global.Metrics.Enabled {
+		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
+	}
 
-	externalRouter.PathPrefix(httputil.ExternalClientPathPrefix).Handler(b.ExternalClientAPIMux)
-	externalRouter.PathPrefix(httputil.ExternalKeyPathPrefix).Handler(b.ExternalKeyAPIMux)
-	externalRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(b.ExternalFederationAPIMux)
-	externalRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(b.ExternalMediaAPIMux)
+	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(b.PublicClientAPIMux)
+	externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
+	externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(b.PublicFederationAPIMux)
+	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 
 	go func() {
-		defer close(block)
 		logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
 		if certFile != nil && keyFile != nil {
 			if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
@@ -320,7 +321,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	if internalAddr != "" && internalAddr != externalAddr {
 		go func() {
-			defer close(block)
 			logrus.Infof("Starting %s listener on %s", b.componentName, internalServ.Addr)
 			if certFile != nil && keyFile != nil {
 				if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
@@ -335,7 +335,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		}()
 	}
 
-	<-block
+	select {}
 }
 
 // setupKafka creates kafka consumer/producer pair from the config.

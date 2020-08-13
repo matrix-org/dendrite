@@ -236,20 +236,20 @@ func main() {
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}
 	monolith.AddAllPublicRoutes(
-		base.ExternalClientAPIMux,
-		base.ExternalFederationAPIMux,
-		base.ExternalKeyAPIMux,
-		base.ExternalMediaAPIMux,
+		base.PublicClientAPIMux,
+		base.PublicFederationAPIMux,
+		base.PublicKeyAPIMux,
+		base.PublicMediaAPIMux,
 	)
 
 	httpRouter := mux.NewRouter()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
-	httpRouter.PathPrefix(httputil.ExternalClientPathPrefix).Handler(base.ExternalClientAPIMux)
-	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	libp2pRouter := mux.NewRouter()
-	libp2pRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalFederationAPIMux)
-	libp2pRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
+	libp2pRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
+	libp2pRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	// Expose the matrix APIs via libp2p-js - for federation traffic
 	if node != nil {

@@ -15,9 +15,9 @@
 package httputil
 
 const (
-	ExternalClientPathPrefix     = "/_matrix/client/"
-	ExternalFederationPathPrefix = "/_matrix/federation/"
-	ExternalKeyPathPrefix        = "/_matrix/key/"
-	ExternalMediaPathPrefix      = "/_matrix/media/"
-	InternalPathPrefix           = "/api/"
+	PublicClientPathPrefix     = "/_matrix/client/"
+	PublicFederationPathPrefix = "/_matrix/federation/"
+	PublicKeyPathPrefix        = "/_matrix/key/"
+	PublicMediaPathPrefix      = "/_matrix/media/"
+	InternalPathPrefix         = "/api/"
 )

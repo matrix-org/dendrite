@@ -28,7 +28,7 @@ func main() {
 	userAPI := base.UserAPIClient()
 	client := gomatrixserverlib.NewClient(cfg.FederationSender.DisableTLSValidation)
 
-	mediaapi.AddPublicRoutes(base.ExternalMediaAPIMux, &base.Cfg.MediaAPI, userAPI, client)
+	mediaapi.AddPublicRoutes(base.PublicMediaAPIMux, &base.Cfg.MediaAPI, userAPI, client)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.MediaAPI.InternalAPI.Listen,

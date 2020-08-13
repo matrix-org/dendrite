@@ -133,7 +133,7 @@ func main() {
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	embed.Embed(base.ExternalClientAPIMux, *instancePort, "Yggdrasil Demo")
+	embed.Embed(base.PublicClientAPIMux, *instancePort, "Yggdrasil Demo")
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
@@ -157,20 +157,20 @@ func main() {
 		),
 	}
 	monolith.AddAllPublicRoutes(
-		base.ExternalClientAPIMux,
-		base.ExternalFederationAPIMux,
-		base.ExternalKeyAPIMux,
-		base.ExternalMediaAPIMux,
+		base.PublicClientAPIMux,
+		base.PublicFederationAPIMux,
+		base.PublicKeyAPIMux,
+		base.PublicMediaAPIMux,
 	)
 
 	httpRouter := mux.NewRouter()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
-	httpRouter.PathPrefix(httputil.ExternalClientPathPrefix).Handler(base.ExternalClientAPIMux)
-	httpRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
+	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
+	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	yggRouter := mux.NewRouter()
-	yggRouter.PathPrefix(httputil.ExternalFederationPathPrefix).Handler(base.ExternalFederationAPIMux)
-	yggRouter.PathPrefix(httputil.ExternalMediaPathPrefix).Handler(base.ExternalMediaAPIMux)
+	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
+	yggRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
