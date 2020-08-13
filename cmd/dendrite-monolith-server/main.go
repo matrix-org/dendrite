@@ -16,7 +16,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -148,42 +147,24 @@ func main() {
 	}
 	monolith.AddAllPublicRoutes(base.PublicAPIMux)
 
-	fmt.Printf("Public: %+v\n", base.PublicAPIMux)
-	fmt.Printf("Internal: %+v\n", base.InternalAPIMux)
-
-	/*
-		httputil.SetupHTTPAPI(
-			base.BaseMux,
-			base.PublicAPIMux,
-			base.InternalAPIMux,
-			&cfg.Global,
-			base.UseHTTPAPIs,
-		)
-	*/
-
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		base.SetupAndServeHTTP(
 			config.HTTPAddress(httpAddr), // internal API
 			config.HTTPAddress(httpAddr), // external API
+			nil, nil,                     // TLS settings
 		)
 	}()
 	// Handle HTTPS if certificate and key are provided
-	_ = httpsAddr
-	/*
-		if *certFile != "" && *keyFile != "" {
-			go func() {
-				serv := http.Server{
-					Addr:         config.HTTPAddress(httpsAddr).,
-					WriteTimeout: setup.HTTPServerTimeout,
-					Handler:      base.BaseMux,
-				}
-
-				logrus.Info("Listening on ", serv.Addr)
-				logrus.Fatal(serv.ListenAndServeTLS(*certFile, *keyFile))
-			}()
-		}
-	*/
+	if *certFile != "" && *keyFile != "" {
+		go func() {
+			base.SetupAndServeHTTP(
+				config.HTTPAddress(httpsAddr), // internal API
+				config.HTTPAddress(httpsAddr), // external API
+				certFile, keyFile,             // TLS settings
+			)
+		}()
+	}
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
 	select {}

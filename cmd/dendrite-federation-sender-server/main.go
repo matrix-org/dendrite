@@ -38,5 +38,6 @@ func main() {
 	base.SetupAndServeHTTP(
 		base.Cfg.FederationSender.InternalAPI.Listen,
 		setup.NoExternalListener,
+		nil, nil,
 	)
 }

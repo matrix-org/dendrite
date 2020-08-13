@@ -33,5 +33,6 @@ func main() {
 	base.SetupAndServeHTTP(
 		base.Cfg.MediaAPI.InternalAPI.Listen,
 		base.Cfg.MediaAPI.ExternalAPI.Listen,
+		nil, nil,
 	)
 }

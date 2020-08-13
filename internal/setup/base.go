@@ -264,7 +264,10 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
-func (b *BaseDendrite) SetupAndServeHTTP(internalHTTPAddr, externalHTTPAddr config.HTTPAddress) {
+func (b *BaseDendrite) SetupAndServeHTTP(
+	internalHTTPAddr, externalHTTPAddr config.HTTPAddress,
+	certFile, keyFile *string,
+) {
 	block := make(chan struct{})
 
 	internalAddr, _ := internalHTTPAddr.Address()
@@ -294,21 +297,33 @@ func (b *BaseDendrite) SetupAndServeHTTP(internalHTTPAddr, externalHTTPAddr conf
 
 	go func() {
 		defer close(block)
-		logrus.Infof("Starting %s listener on %s", b.componentName, internalServ.Addr)
-		if err := internalServ.ListenAndServe(); err != nil {
-			logrus.WithError(err).Fatal("failed to serve HTTP")
-		}
-		logrus.Infof("Stopped %s listener on %s", b.componentName, internalServ.Addr)
-	}()
-
-	if externalAddr != "" && internalAddr != externalAddr {
-		go func() {
-			defer close(block)
-			logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
+		logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
+		if certFile != nil && keyFile != nil {
+			if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+				logrus.WithError(err).Fatal("failed to serve HTTPS")
+			}
+		} else {
 			if err := externalServ.ListenAndServe(); err != nil {
 				logrus.WithError(err).Fatal("failed to serve HTTP")
 			}
-			logrus.Infof("Stopped %s listener on %s", b.componentName, externalServ.Addr)
+		}
+		logrus.Infof("Stopped %s listener on %s", b.componentName, externalServ.Addr)
+	}()
+
+	if internalAddr != "" && internalAddr != externalAddr {
+		go func() {
+			defer close(block)
+			logrus.Infof("Starting %s listener on %s", b.componentName, internalServ.Addr)
+			if certFile != nil && keyFile != nil {
+				if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+					logrus.WithError(err).Fatal("failed to serve HTTPS")
+				}
+			} else {
+				if err := internalServ.ListenAndServe(); err != nil {
+					logrus.WithError(err).Fatal("failed to serve HTTP")
+				}
+			}
+			logrus.Infof("Stopped %s listener on %s", b.componentName, internalServ.Addr)
 		}()
 	}
 

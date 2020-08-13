@@ -36,5 +36,6 @@ func main() {
 	base.SetupAndServeHTTP(
 		base.Cfg.RoomServer.InternalAPI.Listen,
 		setup.NoExternalListener,
+		nil, nil,
 	)
 }

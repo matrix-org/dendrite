@@ -34,5 +34,6 @@ func main() {
 	base.SetupAndServeHTTP(
 		base.Cfg.UserAPI.InternalAPI.Listen,
 		setup.NoExternalListener,
+		nil, nil,
 	)
 }
