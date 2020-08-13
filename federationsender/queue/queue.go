@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other
@@ -248,15 +249,12 @@ func (oqs *OutgoingQueues) SendEDU(
 	// (e.g. typing notifications) then we should try to make sure we don't
 	// bother sending them to servers that are prohibited by the server
 	// ACLs.
-	var header struct {
-		RoomID string `json:"room_id"`
-	}
-	if err := json.Unmarshal(e.Content, &header); err == nil {
+	if result := gjson.GetBytes(e.Content, "room_id"); result.Exists() {
 		for destination := range destmap {
 			if stateapi.IsServerBannedFromRoom(
 				context.TODO(),
 				oqs.stateAPI,
-				header.RoomID,
+				result.Str,
 				destination,
 			) {
 				delete(destmap, destination)
