@@ -411,6 +411,7 @@ PUT /rooms/:room_id/typing/:user_id sets typing notification
 Typing notification sent to local room members
 Typing notifications also sent to remote room members
 Typing can be explicitly stopped
+Banned user is kicked and may not rejoin until unbanned
 Inbound federation rejects attempts to join v1 rooms from servers without v1 support
 Inbound federation rejects attempts to join v2 rooms from servers lacking version support
 Inbound federation rejects attempts to join v2 rooms from servers only supporting v1
@@ -453,4 +454,4 @@ Banned servers cannot get room state ids
 Banned servers cannot backfill
 Inbound /v1/send_leave rejects leaves from other servers
 Guest users can accept invites to private rooms over federation
-
+AS user (not ghost) can join room without registering
