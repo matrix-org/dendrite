@@ -143,17 +143,24 @@ func processInvite(
 	)
 
 	// Add the invite event to the roomserver.
-	if err := api.SendInvite(
+	err = api.SendInvite(
 		ctx, rsAPI, signedEvent.Headered(roomVer), strippedState, api.DoNotSendToOtherServers, nil,
-	); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("producer.SendInvite failed")
-		return jsonerror.InternalServerError()
-	}
-
-	// Return the signed event to the originating server, it should then tell
-	// the other servers in the room that we have been invited.
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
+	)
+	switch e := err.(type) {
+	case *api.PerformError:
+		return e.JSONResponse()
+	case nil:
+		// Return the signed event to the originating server, it should then tell
+		// the other servers in the room that we have been invited.
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
+		}
+	default:
+		util.GetLogger(ctx).WithError(err).Error("api.SendInvite failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
 	}
 }

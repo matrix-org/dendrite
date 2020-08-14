@@ -221,16 +221,20 @@ func SendInvite(
 		cfg.Matrix.ServerName,
 		nil,
 	)
-	if err != nil {
+	switch e := err.(type) {
+	case *roomserverAPI.PerformError:
+		return e.JSONResponse()
+	case nil:
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
+		}
+	default:
 		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInvite failed")
 		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(err.Error()),
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
 		}
-	}
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: struct{}{},
 	}
 }
 

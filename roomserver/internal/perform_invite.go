@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -48,17 +47,17 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	}
 	if len(inviteState) == 0 {
 		if err := event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
-			return err
+			return fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	} else {
 		if err := event.SetUnsignedField("invite_room_state", inviteState); err != nil {
-			return err
+			return fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	}
 
 	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
 	if err != nil {
-		return err
+		return fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 	}
 	succeeded := false
 	defer func() {
@@ -96,7 +95,11 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		// For now we will implement option 2. Since in the abesence of a retry
 		// mechanism it will be equivalent to option 1, and we don't have a
 		// signalling mechanism to implement option 3.
-		return errors.New("The user is already in the room")
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorNoOperation,
+			Msg:  "User is already joined to room",
+		}
+		return res.Error
 	}
 
 	if isOriginLocal {
@@ -108,10 +111,11 @@ func (r *RoomserverInternalAPI) PerformInvite(
 				"processInviteEvent.checkAuthEvents failed for event",
 			)
 			if _, ok := err.(*gomatrixserverlib.NotAllowed); ok {
-				return &api.PerformError{
+				res.Error = &api.PerformError{
 					Msg:  err.Error(),
 					Code: api.PerformErrorNotAllowed,
 				}
+				return fmt.Errorf("checkAuthEvents: %w", err)
 			}
 			return err
 		}
@@ -128,6 +132,10 @@ func (r *RoomserverInternalAPI) PerformInvite(
 			}
 			fsRes := &federationSenderAPI.PerformInviteResponse{}
 			if err = r.fsAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
+				res.Error = &api.PerformError{
+					Msg:  err.Error(),
+					Code: api.PerformErrorNoOperation,
+				}
 				return fmt.Errorf("r.fsAPI.PerformInvite: %w", err)
 			}
 			event = fsRes.SignedEvent
@@ -137,11 +145,11 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	unwrapped := event.Unwrap()
 	outputUpdates, err := updateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
 	if err != nil {
-		return err
+		return fmt.Errorf("updateToInviteMembership: %w", err)
 	}
 
 	if err = r.WriteOutputEvents(roomID, outputUpdates); err != nil {
-		return err
+		return fmt.Errorf("r.WriteOutputEvents: %w", err)
 	}
 
 	succeeded = true

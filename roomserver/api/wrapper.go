@@ -112,6 +112,9 @@ func SendInvite(
 	}
 	response := &PerformInviteResponse{}
 	if err := rsAPI.PerformInvite(ctx, request, response); err != nil {
+		if response.Error != nil {
+			return response.Error
+		}
 		return fmt.Errorf("rsAPI.PerformInvite: %w", err)
 	}
 
