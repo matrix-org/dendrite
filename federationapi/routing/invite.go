@@ -144,7 +144,7 @@ func processInvite(
 
 	// Add the invite event to the roomserver.
 	if err := api.SendInvite(
-		ctx, rsAPI, signedEvent.Headered(roomVer), strippedState, event.Origin(), nil,
+		ctx, rsAPI, signedEvent.Headered(roomVer), strippedState, api.DoNotSendToOtherServers, nil,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("producer.SendInvite failed")
 		return jsonerror.InternalServerError()

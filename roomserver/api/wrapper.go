@@ -16,6 +16,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -100,6 +101,8 @@ func SendInvite(
 	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
 ) error {
+	// Start by sending the invite request into the roomserver. This will
+	// trigger the federation request amongst other things if needed.
 	request := &PerformInviteRequest{
 		Event:           inviteEvent,
 		InviteRoomState: inviteRoomState,
@@ -108,7 +111,28 @@ func SendInvite(
 		TransactionID:   txnID,
 	}
 	response := &PerformInviteResponse{}
-	return rsAPI.PerformInvite(ctx, request, response)
+	if err := rsAPI.PerformInvite(ctx, request, response); err != nil {
+		return fmt.Errorf("rsAPI.PerformInvite: %w", err)
+	}
+
+	// Now send the invite event into the roomserver. If the room is known
+	// locally then this will succeed, notifying existing users in the room
+	// about the new invite. If the room isn't known locally then this will
+	// fail - and that's also OK.
+	inputReq := &InputRoomEventsRequest{
+		InputRoomEvents: []InputRoomEvent{
+			{
+				Kind:         KindNew,
+				Event:        inviteEvent,
+				AuthEventIDs: inviteEvent.AuthEventIDs(),
+				SendAsServer: DoNotSendToOtherServers,
+			},
+		},
+	}
+	inputRes := &InputRoomEventsResponse{}
+	_ = rsAPI.InputRoomEvents(ctx, inputReq, inputRes)
+
+	return nil
 }
 
 // GetEvent returns the event or nil, even on errors.

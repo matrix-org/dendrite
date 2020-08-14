@@ -371,10 +371,7 @@ func createRoom(
 	}
 
 	// If this is a direct message then we should invite the participants.
-	fmt.Println("INVITEES:")
 	for _, invitee := range r.Invite {
-		fmt.Println("*", invitee)
-
 		// Build the invite event.
 		inviteEvent, err := buildMembershipEvent(
 			req.Context(), invitee, "", accountDB, device, gomatrixserverlib.Invite,
@@ -389,6 +386,10 @@ func createRoom(
 		var strippedState []gomatrixserverlib.InviteV2StrippedState
 		for _, event := range candidates {
 			switch event.Type() {
+			case gomatrixserverlib.MRoomName:
+				fallthrough
+			case gomatrixserverlib.MRoomCanonicalAlias:
+				fallthrough
 			case "m.room.encryption": // TODO: move this to gmsl
 				fallthrough
 			case gomatrixserverlib.MRoomMember:

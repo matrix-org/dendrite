@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -173,7 +172,6 @@ func SendInvite(
 	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
-	fsAPI federationSenderAPI.FederationSenderInternalAPI,
 ) util.JSONResponse {
 	body, evTime, _, reqErr := extractRequestData(req, roomID, rsAPI)
 	if reqErr != nil {

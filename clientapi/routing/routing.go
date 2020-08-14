@@ -142,7 +142,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendInvite(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI, federationSender)
+			return SendInvite(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/kick",
