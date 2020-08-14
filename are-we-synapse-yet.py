@@ -34,6 +34,7 @@ import sys
 test_mappings = {
     "nsp": "Non-Spec API",
     "unk": "Unknown API (no group specified)",
+    "app": "Application Services API",
     "f": "Federation", # flag to mark test involves federation
 
     "federation_apis": {
@@ -63,6 +64,8 @@ test_mappings = {
         "pro": "Profile",
         "dev": "Devices",
         "dvk": "Device Keys",
+        "dkb": "Device Key Backup",
+        "xsk": "Cross-signing Keys",
         "pre": "Presence",
         "crm": "Create Room",
         "syn": "Sync API",
@@ -100,7 +103,6 @@ test_mappings = {
         "adm": "Server Admin API",
         "ign": "Ignore Users",
         "udr": "User Directory APIs",
-        "app": "Application Services API",
 		"jso": "Enforced canonical JSON",
     },
 }
@@ -216,6 +218,9 @@ def main(results_tap_path, verbose):
             #   test_name: OK
             # }
         },
+        "appservice": {
+            "app": {},
+        },
         "nonspec": {
             "nsp": {},
             "unk": {}
@@ -232,6 +237,8 @@ def main(results_tap_path, verbose):
                 summary["nonspec"]["unk"][name] = test_result["ok"]
             if group_id == "nsp":
                 summary["nonspec"]["nsp"][name] = test_result["ok"]
+            elif group_id == "app":
+                summary["appservice"]["app"][name] = test_result["ok"]
             elif group_id in test_mappings["federation_apis"]:
                 group = summary["federation"].get(group_id, {})
                 group[name] = test_result["ok"]
@@ -247,6 +254,7 @@ def main(results_tap_path, verbose):
     print_stats("Non-Spec APIs", summary["nonspec"], test_mappings, verbose)
     print_stats("Client-Server APIs", summary["client"], test_mappings["client_apis"], verbose)
     print_stats("Federation APIs", summary["federation"], test_mappings["federation_apis"], verbose)
+    print_stats("Application Services APIs", summary["appservice"], test_mappings, verbose)
 
 
 

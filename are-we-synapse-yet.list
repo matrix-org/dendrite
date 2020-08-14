@@ -496,24 +496,24 @@ f,dvk If remote user leaves room, changes device and rejoins we see update in /k
 dvk Get left notifs in sync and /keys/changes when other user leaves 
 dvk Get left notifs for other users in sync and /keys/changes when user leaves 
 f,dvk If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes 
-dvk Can create backup version 
-dvk Can update backup version 
-dvk Responds correctly when backup is empty 
-dvk Can backup keys 
-dvk Can update keys with better versions 
-dvk Will not update keys with worse versions 
-dvk Will not back up to an old backup version 
-dvk Can delete backup 
-dvk Deleted & recreated backups are empty 
-dvk Can create more than 10 backup versions 
-dvk Can upload self-signing keys 
-dvk Fails to upload self-signing keys with no auth 
-dvk Fails to upload self-signing key without master key 
-dvk Changing master key notifies local users 
-dvk Changing user-signing key notifies local users 
-f,dvk can fetch self-signing keys over federation 
-f,dvk uploading self-signing key notifies over federation 
-f,dvk uploading signed devices gets propagated over federation 
+dkb Can create backup version 
+dkb Can update backup version 
+dkb Responds correctly when backup is empty 
+dkb Can backup keys 
+dkb Can update keys with better versions 
+dkb Will not update keys with worse versions 
+dkb Will not back up to an old backup version 
+dkb Can delete backup 
+dkb Deleted & recreated backups are empty 
+dkb Can create more than 10 backup versions 
+xsk Can upload self-signing keys 
+xsk Fails to upload self-signing keys with no auth 
+xsk Fails to upload self-signing key without master key 
+xsk Changing master key notifies local users 
+xsk Changing user-signing key notifies local users 
+f,xsk can fetch self-signing keys over federation 
+f,xsk uploading self-signing key notifies over federation 
+f,xsk uploading signed devices gets propagated over federation 
 tag Can add tag
 tag Can remove tag
 tag Can list tags for a room
