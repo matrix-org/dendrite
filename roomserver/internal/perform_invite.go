@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -95,10 +96,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		// For now we will implement option 2. Since in the abesence of a retry
 		// mechanism it will be equivalent to option 1, and we don't have a
 		// signalling mechanism to implement option 3.
-		return &api.PerformError{
-			Code: api.PerformErrorNoOperation,
-			Msg:  "user is already joined to room",
-		}
+		return errors.New("The user is already in the room")
 	}
 
 	if isOriginLocal {

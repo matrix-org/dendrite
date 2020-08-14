@@ -223,7 +223,10 @@ func SendInvite(
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInvite failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(err.Error()),
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,

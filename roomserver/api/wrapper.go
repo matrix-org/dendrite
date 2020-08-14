@@ -125,7 +125,7 @@ func SendInvite(
 				Kind:         KindNew,
 				Event:        inviteEvent,
 				AuthEventIDs: inviteEvent.AuthEventIDs(),
-				SendAsServer: DoNotSendToOtherServers,
+				SendAsServer: string(sendAsServer),
 			},
 		},
 	}
