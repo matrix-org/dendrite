@@ -96,10 +96,10 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		// mechanism it will be equivalent to option 1, and we don't have a
 		// signalling mechanism to implement option 3.
 		res.Error = &api.PerformError{
-			Code: api.PerformErrorNoOperation,
+			Code: api.PerformErrorNotAllowed,
 			Msg:  "User is already joined to room",
 		}
-		return res.Error
+		return nil
 	}
 
 	if isOriginLocal {
@@ -115,9 +115,9 @@ func (r *RoomserverInternalAPI) PerformInvite(
 					Msg:  err.Error(),
 					Code: api.PerformErrorNotAllowed,
 				}
-				return fmt.Errorf("checkAuthEvents: %w", err)
+				return nil
 			}
-			return err
+			return fmt.Errorf("checkAuthEvents: %w", err)
 		}
 
 		// If the invite originated from us and the target isn't local then we
@@ -136,7 +136,8 @@ func (r *RoomserverInternalAPI) PerformInvite(
 					Msg:  err.Error(),
 					Code: api.PerformErrorNoOperation,
 				}
-				return fmt.Errorf("r.fsAPI.PerformInvite: %w", err)
+				log.WithError(err).WithField("event_id", event.EventID()).Error("r.fsAPI.PerformInvite failed")
+				return nil
 			}
 			event = fsRes.SignedEvent
 		}
