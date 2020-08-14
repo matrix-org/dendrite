@@ -105,7 +105,7 @@ type PerformInviteRequest struct {
 }
 
 type PerformInviteResponse struct {
-	Error *PerformError `json:"error"`
+	Error *PerformError
 }
 
 // PerformBackfillRequest is a request to PerformBackfill.
