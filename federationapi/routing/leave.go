@@ -25,6 +25,7 @@ import (
 )
 
 // MakeLeave implements the /make_leave API
+// nolint:gocyclo
 func MakeLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
