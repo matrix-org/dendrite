@@ -11,6 +11,7 @@ import (
 )
 
 // AddRoutes adds the FederationSenderInternalAPI handlers to the http.ServeMux.
+// nolint:gocyclo
 func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(
 		FederationSenderQueryJoinedHostServerNamesInRoomPath,
