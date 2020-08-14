@@ -46,20 +46,18 @@ type destinationQueue struct {
 	db                 storage.Database
 	signing            *SigningInfo
 	rsAPI              api.RoomserverInternalAPI
-	client             *gomatrixserverlib.FederationClient     // federation client
-	origin             gomatrixserverlib.ServerName            // origin of requests
-	destination        gomatrixserverlib.ServerName            // destination of requests
-	running            atomic.Bool                             // is the queue worker running?
-	backingOff         atomic.Bool                             // true if we're backing off
-	statistics         *statistics.ServerStatistics            // statistics about this remote server
-	incomingInvites    chan *gomatrixserverlib.InviteV2Request // invites to send
-	transactionIDMutex sync.Mutex                              // protects transactionID
-	transactionID      gomatrixserverlib.TransactionID         // last transaction ID
-	transactionCount   atomic.Int32                            // how many events in this transaction so far
-	pendingInvites     []*gomatrixserverlib.InviteV2Request    // owned by backgroundSend
-	notifyPDUs         chan bool                               // interrupts idle wait for PDUs
-	notifyEDUs         chan bool                               // interrupts idle wait for EDUs
-	interruptBackoff   chan bool                               // interrupts backoff
+	client             *gomatrixserverlib.FederationClient // federation client
+	origin             gomatrixserverlib.ServerName        // origin of requests
+	destination        gomatrixserverlib.ServerName        // destination of requests
+	running            atomic.Bool                         // is the queue worker running?
+	backingOff         atomic.Bool                         // true if we're backing off
+	statistics         *statistics.ServerStatistics        // statistics about this remote server
+	transactionIDMutex sync.Mutex                          // protects transactionID
+	transactionID      gomatrixserverlib.TransactionID     // last transaction ID
+	transactionCount   atomic.Int32                        // how many events in this transaction so far
+	notifyPDUs         chan bool                           // interrupts idle wait for PDUs
+	notifyEDUs         chan bool                           // interrupts idle wait for EDUs
+	interruptBackoff   chan bool                           // interrupts backoff
 }
 
 // Send event adds the event to the pending queue for the destination.
@@ -136,18 +134,6 @@ func (oq *destinationQueue) sendEDU(receipt *shared.Receipt) {
 		default:
 		}
 	}
-}
-
-// sendInvite adds the invite event to the pending queue for the
-// destination. If the queue is empty then it starts a background
-// goroutine to start sending events to that destination.
-func (oq *destinationQueue) sendInvite(ev *gomatrixserverlib.InviteV2Request) {
-	if oq.statistics.Blacklisted() {
-		// If the destination is blacklisted then drop the event.
-		return
-	}
-	oq.wakeQueueIfNeeded()
-	oq.incomingInvites <- ev
 }
 
 // wakeQueueIfNeeded will wake up the destination queue if it is
@@ -234,23 +220,6 @@ func (oq *destinationQueue) backgroundSend() {
 			// We were woken up because there are new PDUs waiting in the
 			// database.
 			pendingEDUs = true
-		case invite := <-oq.incomingInvites:
-			// There's no strict ordering requirement for invites like
-			// there is for transactions, so we put the invite onto the
-			// front of the queue. This means that if an invite that is
-			// stuck failing already, that it won't block our new invite
-			// from being sent.
-			oq.pendingInvites = append(
-				[]*gomatrixserverlib.InviteV2Request{invite},
-				oq.pendingInvites...,
-			)
-			// If there are any more things waiting in the channel queue
-			// then read them. This is safe because we guarantee only
-			// having one goroutine per destination queue, so the channel
-			// isn't being consumed anywhere else.
-			for len(oq.incomingInvites) > 0 {
-				oq.pendingInvites = append(oq.pendingInvites, <-oq.incomingInvites)
-			}
 		case <-time.After(queueIdleTimeout):
 			// The worker is idle so stop the goroutine. It'll get
 			// restarted automatically the next time we have an event to
@@ -266,7 +235,6 @@ func (oq *destinationQueue) backgroundSend() {
 			// It's been suggested that we should give up because the backoff
 			// has exceeded a maximum allowable value. Clean up the in-memory
 			// buffers at this point. The PDU clean-up is already on a defer.
-			oq.cleanPendingInvites()
 			log.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
 			return
 		}
@@ -284,33 +252,7 @@ func (oq *destinationQueue) backgroundSend() {
 				oq.statistics.Success()
 			}
 		}
-
-		// Try sending the next invite and see what happens.
-		if len(oq.pendingInvites) > 0 {
-			sent, ierr := oq.nextInvites(oq.pendingInvites)
-			if ierr != nil {
-				// We failed to send the transaction. Mark it as a failure.
-				oq.statistics.Failure()
-			} else if sent > 0 {
-				// If we successfully sent the invites then clear out
-				// the pending invites.
-				oq.statistics.Success()
-				// Reallocate so that the underlying array can be GC'd, as
-				// opposed to growing forever.
-				oq.cleanPendingInvites()
-			}
-		}
 	}
-}
-
-// cleanPendingInvites cleans out the pending invite buffer,
-// removing all references so that the underlying objects can
-// be GC'd.
-func (oq *destinationQueue) cleanPendingInvites() {
-	for i := 0; i < len(oq.pendingInvites); i++ {
-		oq.pendingInvites[i] = nil
-	}
-	oq.pendingInvites = []*gomatrixserverlib.InviteV2Request{}
 }
 
 // nextTransaction creates a new transaction from the pending event
@@ -426,67 +368,4 @@ func (oq *destinationQueue) nextTransaction() (bool, error) {
 		}).Info("problem sending transaction")
 		return false, err
 	}
-}
-
-// nextInvite takes pending invite events from the queue and sends
-// them. Returns true if a transaction was sent or false otherwise.
-func (oq *destinationQueue) nextInvites(
-	pendingInvites []*gomatrixserverlib.InviteV2Request,
-) (int, error) {
-	done := 0
-	for _, inviteReq := range pendingInvites {
-		ev, roomVersion := inviteReq.Event(), inviteReq.RoomVersion()
-
-		log.WithFields(log.Fields{
-			"event_id":     ev.EventID(),
-			"room_version": roomVersion,
-			"destination":  oq.destination,
-		}).Info("sending invite")
-
-		inviteRes, err := oq.client.SendInviteV2(
-			context.TODO(),
-			oq.destination,
-			*inviteReq,
-		)
-		switch e := err.(type) {
-		case nil:
-			done++
-		case gomatrix.HTTPError:
-			log.WithFields(log.Fields{
-				"event_id":    ev.EventID(),
-				"state_key":   ev.StateKey(),
-				"destination": oq.destination,
-				"status_code": e.Code,
-			}).WithError(err).Error("failed to send invite due to HTTP error")
-			// Check whether we should do something about the error or
-			// just accept it as unavoidable.
-			if e.Code >= 400 && e.Code <= 499 {
-				// We tried but the remote side has sent back a client error.
-				// It's no use retrying because it will happen again.
-				done++
-				continue
-			}
-			return done, err
-		default:
-			log.WithFields(log.Fields{
-				"event_id":    ev.EventID(),
-				"state_key":   ev.StateKey(),
-				"destination": oq.destination,
-			}).WithError(err).Error("failed to send invite")
-			return done, err
-		}
-
-		invEv := inviteRes.Event.Sign(string(oq.signing.ServerName), oq.signing.KeyID, oq.signing.PrivateKey).Headered(roomVersion)
-		_, err = api.SendEvents(context.TODO(), oq.rsAPI, []gomatrixserverlib.HeaderedEvent{invEv}, oq.signing.ServerName, nil)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"event_id":    ev.EventID(),
-				"state_key":   ev.StateKey(),
-				"destination": oq.destination,
-			}).WithError(err).Error("failed to return signed invite to roomserver")
-			return done, err
-		}
-	}
-
-	return done, nil
 }

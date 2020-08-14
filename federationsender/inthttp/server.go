@@ -53,6 +53,20 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		}),
 	)
 	internalAPIMux.Handle(
+		FederationSenderPerformInviteRequestPath,
+		httputil.MakeInternalAPI("PerformInviteRequest", func(req *http.Request) util.JSONResponse {
+			var request api.PerformInviteRequest
+			var response api.PerformInviteResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := intAPI.PerformInvite(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(
 		FederationSenderPerformDirectoryLookupRequestPath,
 		httputil.MakeInternalAPI("PerformDirectoryLookupRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformDirectoryLookupRequest

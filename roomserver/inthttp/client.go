@@ -154,17 +154,12 @@ func (h *httpRoomserverInternalAPI) PerformInvite(
 	ctx context.Context,
 	request *api.PerformInviteRequest,
 	response *api.PerformInviteResponse,
-) {
+) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInvite")
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformInvitePath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.PerformError{
-			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
-		}
-	}
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpRoomserverInternalAPI) PerformJoin(

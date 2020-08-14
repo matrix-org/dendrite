@@ -99,22 +99,16 @@ func SendInvite(
 	rsAPI RoomserverInternalAPI, inviteEvent gomatrixserverlib.HeaderedEvent,
 	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
-) *PerformError {
-	request := PerformInviteRequest{
+) error {
+	request := &PerformInviteRequest{
 		Event:           inviteEvent,
 		InviteRoomState: inviteRoomState,
 		RoomVersion:     inviteEvent.RoomVersion,
 		SendAsServer:    string(sendAsServer),
 		TransactionID:   txnID,
 	}
-	var response PerformInviteResponse
-	rsAPI.PerformInvite(ctx, &request, &response)
-	// we need to do this because many places people will use `var err error` as the return
-	// arg and a nil interface != nil pointer to a concrete interface (in this case PerformError)
-	if response.Error != nil && response.Error.Msg != "" {
-		return response.Error
-	}
-	return nil
+	response := &PerformInviteResponse{}
+	return rsAPI.PerformInvite(ctx, request, response)
 }
 
 // GetEvent returns the event or nil, even on errors.

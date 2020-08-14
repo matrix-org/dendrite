@@ -371,7 +371,10 @@ func createRoom(
 	}
 
 	// If this is a direct message then we should invite the participants.
+	fmt.Println("INVITEES:")
 	for _, invitee := range r.Invite {
+		fmt.Println("*", invitee)
+
 		// Build the invite event.
 		inviteEvent, err := buildMembershipEvent(
 			req.Context(), invitee, "", accountDB, device, gomatrixserverlib.Invite,
@@ -386,8 +389,8 @@ func createRoom(
 		var strippedState []gomatrixserverlib.InviteV2StrippedState
 		for _, event := range candidates {
 			switch event.Type() {
-			// TODO: case gomatrixserverlib.MRoomEncryption:
-			//	fallthrough
+			case "m.room.encryption": // TODO: move this to gmsl
+				fallthrough
 			case gomatrixserverlib.MRoomMember:
 				fallthrough
 			case gomatrixserverlib.MRoomJoinRules:
@@ -398,15 +401,15 @@ func createRoom(
 			}
 		}
 		// Send the invite event to the roomserver.
-		if perr := roomserverAPI.SendInvite(
+		if err := roomserverAPI.SendInvite(
 			req.Context(), rsAPI,
 			inviteEvent.Headered(roomVersion),
 			strippedState,         // invite room state
 			cfg.Matrix.ServerName, // send as server
 			nil,                   // transaction ID
-		); perr != nil {
-			util.GetLogger(req.Context()).WithError(perr).Error("SendInvite failed")
-			return perr.JSONResponse()
+		); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("SendInvite failed")
+			return jsonerror.InternalServerError()
 		}
 	}
 

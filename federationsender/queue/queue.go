@@ -108,7 +108,6 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			destination:      destination,
 			client:           oqs.client,
 			statistics:       oqs.statistics.ForServer(destination),
-			incomingInvites:  make(chan *gomatrixserverlib.InviteV2Request, 128),
 			notifyPDUs:       make(chan bool, 1),
 			notifyEDUs:       make(chan bool, 1),
 			interruptBackoff: make(chan bool),
@@ -174,51 +173,6 @@ func (oqs *OutgoingQueues) SendEvent(
 	for destination := range destmap {
 		oqs.getQueue(destination).sendEvent(nid)
 	}
-
-	return nil
-}
-
-// SendEvent sends an event to the destinations
-func (oqs *OutgoingQueues) SendInvite(
-	inviteReq *gomatrixserverlib.InviteV2Request,
-) error {
-	ev := inviteReq.Event()
-	stateKey := ev.StateKey()
-	if stateKey == nil {
-		log.WithFields(log.Fields{
-			"event_id": ev.EventID(),
-		}).Info("Invite had no state key, dropping")
-		return nil
-	}
-
-	_, destination, err := gomatrixserverlib.SplitID('@', *stateKey)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"event_id":  ev.EventID(),
-			"state_key": stateKey,
-		}).Info("Failed to split destination from state key")
-		return nil
-	}
-
-	if stateapi.IsServerBannedFromRoom(
-		context.TODO(),
-		oqs.stateAPI,
-		ev.RoomID(),
-		destination,
-	) {
-		log.WithFields(log.Fields{
-			"room_id":     ev.RoomID(),
-			"destination": destination,
-		}).Info("Dropping invite to server which is prohibited by ACLs")
-		return nil
-	}
-
-	log.WithFields(log.Fields{
-		"event_id":    ev.EventID(),
-		"server_name": destination,
-	}).Info("Sending invite")
-
-	oqs.getQueue(destination).sendInvite(inviteReq)
 
 	return nil
 }
