@@ -95,8 +95,10 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	}
 
 	if isOriginLocal {
-		// check that the user is allowed to do this. We can only do this check if it is
-		// a local invite as we have the auth events, else we have to take it on trust.
+		// The invite originated locally. Therefore we have a responsibility to
+		// try and see if the user is allowed to make this invite. We can't do
+		// this for invites coming in over federation - we have to take those on
+		// trust.
 		_, err = checkAuthEvents(ctx, r.DB, event, event.AuthEventIDs())
 		if err != nil {
 			log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
@@ -133,27 +135,44 @@ func (r *RoomserverInternalAPI) PerformInvite(
 			}
 			event = fsRes.Event
 		}
-	}
 
-	// Send the invite event to the roomserver input stream. This will
-	// notify existing users in the room about the invite, update the
-	// membership table and ensure that the event is ready and available
-	// to use as an auth event when accepting the invite. We don't
-	// check the return value here because it may be possible that we
-	// don't know about this room yet if we received the invite over
-	// federation.
-	inputReq := &api.InputRoomEventsRequest{
-		InputRoomEvents: []api.InputRoomEvent{
-			{
-				Kind:         api.KindNew,
-				Event:        event,
-				AuthEventIDs: event.AuthEventIDs(),
-				SendAsServer: string(r.Cfg.Matrix.ServerName),
+		// Send the invite event to the roomserver input stream. This will
+		// notify existing users in the room about the invite, update the
+		// membership table and ensure that the event is ready and available
+		// to use as an auth event when accepting the invite.
+		inputReq := &api.InputRoomEventsRequest{
+			InputRoomEvents: []api.InputRoomEvent{
+				{
+					Kind:         api.KindNew,
+					Event:        event,
+					AuthEventIDs: event.AuthEventIDs(),
+					SendAsServer: string(r.Cfg.Matrix.ServerName),
+				},
 			},
-		},
+		}
+		inputRes := &api.InputRoomEventsResponse{}
+		if err = r.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
+			return fmt.Errorf("r.InputRoomEvents: %w", err)
+		}
+	} else {
+		// The invite originated over federation. Process the membership
+		// update, which will notify the sync API etc about the incoming
+		// invite.
+		updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
+		if err != nil {
+			return fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+		}
+
+		unwrapped := event.Unwrap()
+		outputUpdates, err := updateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
+		if err != nil {
+			return fmt.Errorf("updateToInviteMembership: %w", err)
+		}
+
+		if err = r.WriteOutputEvents(roomID, outputUpdates); err != nil {
+			return fmt.Errorf("r.WriteOutputEvents: %w", err)
+		}
 	}
-	inputRes := &api.InputRoomEventsResponse{}
-	go r.InputRoomEvents(context.Background(), inputReq, inputRes) // nolint:errcheck
 
 	return nil
 }
