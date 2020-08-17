@@ -158,7 +158,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	go r.InputRoomEvents(ctx, inputReq, inputRes) // nolint:errcheck
+	go r.InputRoomEvents(context.Background(), inputReq, inputRes) // nolint:errcheck
 
 	succeeded = true
 	return nil
