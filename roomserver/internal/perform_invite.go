@@ -169,6 +169,10 @@ func (r *RoomserverInternalAPI) PerformInvite(
 			return fmt.Errorf("updateToInviteMembership: %w", err)
 		}
 
+		if err = updater.Commit(); err != nil {
+			return fmt.Errorf("updater.Commit: %w", err)
+		}
+
 		if err = r.WriteOutputEvents(roomID, outputUpdates); err != nil {
 			return fmt.Errorf("r.WriteOutputEvents: %w", err)
 		}
