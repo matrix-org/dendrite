@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -55,19 +54,15 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		}
 	}
 
-	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
-	if err != nil {
-		return fmt.Errorf("r.DB.MembershipUpdater: %w", err)
-	}
-	succeeded := false
-	defer func() {
-		txerr := sqlutil.EndTransaction(updater, &succeeded)
-		if err == nil && txerr != nil {
-			err = txerr
+	var isAlreadyJoined bool
+	roomNID, err := r.DB.RoomNID(ctx, roomID)
+	if err == nil {
+		_, isAlreadyJoined, err = r.DB.GetMembership(ctx, roomNID, *event.StateKey())
+		if err != nil {
+			return fmt.Errorf("r.DB.GetMembership: %w", err)
 		}
-	}()
-
-	if updater.IsJoin() {
+	}
+	if isAlreadyJoined {
 		// If the user is joined to the room then that takes precedence over this
 		// invite event. It makes little sense to move a user that is already
 		// joined to the room into the invite state.
@@ -103,9 +98,11 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	}
 
 	if isOriginLocal {
-		// check that the user is allowed to do this. We can only do this check if it is
-		// a local invite as we have the auth events, else we have to take it on trust.
-		_, err = checkAuthEvents(ctx, r.DB, req.Event, req.Event.AuthEventIDs())
+		// The invite originated locally. Therefore we have a responsibility to
+		// try and see if the user is allowed to make this invite. We can't do
+		// this for invites coming in over federation - we have to take those on
+		// trust.
+		_, err = checkAuthEvents(ctx, r.DB, event, event.AuthEventIDs())
 		if err != nil {
 			log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
 				"processInviteEvent.checkAuthEvents failed for event",
@@ -127,7 +124,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		if req.SendAsServer != api.DoNotSendToOtherServers && !isTargetLocal {
 			fsReq := &federationSenderAPI.PerformInviteRequest{
 				RoomVersion:     req.RoomVersion,
-				Event:           req.Event,
+				Event:           event,
 				InviteRoomState: inviteState,
 			}
 			fsRes := &federationSenderAPI.PerformInviteResponse{}
@@ -141,19 +138,49 @@ func (r *RoomserverInternalAPI) PerformInvite(
 			}
 			event = fsRes.Event
 		}
+
+		// Send the invite event to the roomserver input stream. This will
+		// notify existing users in the room about the invite, update the
+		// membership table and ensure that the event is ready and available
+		// to use as an auth event when accepting the invite.
+		inputReq := &api.InputRoomEventsRequest{
+			InputRoomEvents: []api.InputRoomEvent{
+				{
+					Kind:         api.KindNew,
+					Event:        event,
+					AuthEventIDs: event.AuthEventIDs(),
+					SendAsServer: req.SendAsServer,
+				},
+			},
+		}
+		inputRes := &api.InputRoomEventsResponse{}
+		if err = r.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
+			return fmt.Errorf("r.InputRoomEvents: %w", err)
+		}
+	} else {
+		// The invite originated over federation. Process the membership
+		// update, which will notify the sync API etc about the incoming
+		// invite.
+		updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
+		if err != nil {
+			return fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+		}
+
+		unwrapped := event.Unwrap()
+		outputUpdates, err := updateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
+		if err != nil {
+			return fmt.Errorf("updateToInviteMembership: %w", err)
+		}
+
+		if err = updater.Commit(); err != nil {
+			return fmt.Errorf("updater.Commit: %w", err)
+		}
+
+		if err = r.WriteOutputEvents(roomID, outputUpdates); err != nil {
+			return fmt.Errorf("r.WriteOutputEvents: %w", err)
+		}
 	}
 
-	unwrapped := event.Unwrap()
-	outputUpdates, err := updateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
-	if err != nil {
-		return fmt.Errorf("updateToInviteMembership: %w", err)
-	}
-
-	if err = r.WriteOutputEvents(roomID, outputUpdates); err != nil {
-		return fmt.Errorf("r.WriteOutputEvents: %w", err)
-	}
-
-	succeeded = true
 	return nil
 }
 
