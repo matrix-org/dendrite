@@ -57,20 +57,24 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = partitions.Prepare(db, "account"); err != nil {
 		return nil, err
 	}
-	a := accountsStatements{}
-	if err = a.prepare(db, serverName); err != nil {
+	writer := sqlutil.NewTransactionWriter()
+	a := accountsStatements{
+		db:     db,
+		writer: writer,
+	}
+	if err = a.prepare(db, writer, serverName); err != nil {
 		return nil, err
 	}
 	p := profilesStatements{}
-	if err = p.prepare(db); err != nil {
+	if err = p.prepare(db, writer); err != nil {
 		return nil, err
 	}
 	ac := accountDataStatements{}
-	if err = ac.prepare(db); err != nil {
+	if err = ac.prepare(db, writer); err != nil {
 		return nil, err
 	}
 	t := threepidStatements{}
-	if err = t.prepare(db); err != nil {
+	if err = t.prepare(db, writer); err != nil {
 		return nil, err
 	}
 	return &Database{

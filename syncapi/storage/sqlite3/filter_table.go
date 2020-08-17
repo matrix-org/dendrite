@@ -58,14 +58,14 @@ type filterStatements struct {
 	insertFilterStmt            *sql.Stmt
 }
 
-func NewSqliteFilterTable(db *sql.DB) (tables.Filter, error) {
+func NewSqliteFilterTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Filter, error) {
 	_, err := db.Exec(filterSchema)
 	if err != nil {
 		return nil, err
 	}
 	s := &filterStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
 		return nil, err

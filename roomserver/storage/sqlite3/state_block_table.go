@@ -81,10 +81,10 @@ type stateBlockStatements struct {
 	bulkSelectFilteredStateBlockEntriesStmt *sql.Stmt
 }
 
-func NewSqliteStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+func NewSqliteStateBlockTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.StateBlock, error) {
 	s := &stateBlockStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(stateDataSchema)
 	if err != nil {

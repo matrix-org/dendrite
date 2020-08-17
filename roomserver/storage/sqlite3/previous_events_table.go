@@ -59,10 +59,10 @@ type previousEventStatements struct {
 	selectPreviousEventExistsStmt *sql.Stmt
 }
 
-func NewSqlitePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
+func NewSqlitePrevEventsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.PreviousEvents, error) {
 	s := &previousEventStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(previousEventSchema)
 	if err != nil {

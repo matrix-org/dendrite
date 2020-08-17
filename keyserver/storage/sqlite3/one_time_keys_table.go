@@ -68,10 +68,10 @@ type oneTimeKeysStatements struct {
 	deleteOneTimeKeyStmt     *sql.Stmt
 }
 
-func NewSqliteOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
+func NewSqliteOneTimeKeysTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.OneTimeKeys, error) {
 	s := &oneTimeKeysStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(oneTimeKeysSchema)
 	if err != nil {

@@ -71,10 +71,10 @@ type eventStateKeyStatements struct {
 	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
-func NewSqliteEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
+func NewSqliteEventStateKeysTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.EventStateKeys, error) {
 	s := &eventStateKeyStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(eventStateKeysSchema)
 	if err != nil {

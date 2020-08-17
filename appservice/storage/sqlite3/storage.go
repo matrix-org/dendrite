@@ -41,7 +41,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if result.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	if err = result.prepare(); err != nil {
+	writer := sqlutil.NewTransactionWriter()
+	if err = result.prepare(writer); err != nil {
 		return nil, err
 	}
 	if err = result.PartitionOffsetStatements.Prepare(result.db, "appservice"); err != nil {
@@ -50,12 +51,12 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	return &result, nil
 }
 
-func (d *Database) prepare() error {
-	if err := d.events.prepare(d.db); err != nil {
+func (d *Database) prepare(writer *sqlutil.TransactionWriter) error {
+	if err := d.events.prepare(d.db, writer); err != nil {
 		return err
 	}
 
-	return d.txnID.prepare(d.db)
+	return d.txnID.prepare(d.db, writer)
 }
 
 // StoreEvent takes in a gomatrixserverlib.HeaderedEvent and stores it in the database

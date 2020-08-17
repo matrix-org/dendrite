@@ -85,10 +85,10 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt   *sql.Stmt
 }
 
-func NewSqliteEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+func NewSqliteEventTypesTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.EventTypes, error) {
 	s := &eventTypeStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(eventTypesSchema)
 	if err != nil {

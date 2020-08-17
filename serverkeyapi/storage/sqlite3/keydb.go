@@ -17,6 +17,7 @@ package sqlite3
 
 import (
 	"context"
+	"database/sql"
 
 	"golang.org/x/crypto/ed25519"
 
@@ -30,6 +31,8 @@ import (
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store
 // the public keys for other matrix servers.
 type Database struct {
+	db         *sql.DB
+	writer     *sqlutil.TransactionWriter
 	statements serverKeyStatements
 }
 
@@ -47,8 +50,11 @@ func NewDatabase(
 	if err != nil {
 		return nil, err
 	}
-	d := &Database{}
-	err = d.statements.prepare(db)
+	d := &Database{
+		db:     db,
+		writer: sqlutil.NewTransactionWriter(),
+	}
+	err = d.statements.prepare(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}

@@ -33,9 +33,9 @@ type streamIDStatements struct {
 	selectStreamIDStmt   *sql.Stmt
 }
 
-func (s *streamIDStatements) prepare(db *sql.DB) (err error) {
+func (s *streamIDStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter) (err error) {
 	s.db = db
-	s.writer = sqlutil.NewTransactionWriter()
+	s.writer = writer
 	_, err = db.Exec(streamIDTableSchema)
 	if err != nil {
 		return

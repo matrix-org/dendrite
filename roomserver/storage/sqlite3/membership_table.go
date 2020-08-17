@@ -88,10 +88,10 @@ type membershipStatements struct {
 	updateMembershipStmt                            *sql.Stmt
 }
 
-func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
+func NewSqliteMembershipTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Membership, error) {
 	s := &membershipStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(membershipSchema)
 	if err != nil {

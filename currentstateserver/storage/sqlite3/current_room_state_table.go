@@ -93,10 +93,10 @@ type currentRoomStateStatements struct {
 	selectKnownUsersStmt             *sql.Stmt
 }
 
-func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
+func NewSqliteCurrentRoomStateTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(currentRoomStateSchema)
 	if err != nil {

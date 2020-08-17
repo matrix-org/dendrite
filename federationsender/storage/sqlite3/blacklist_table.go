@@ -48,10 +48,10 @@ type blacklistStatements struct {
 	deleteBlacklistStmt *sql.Stmt
 }
 
-func NewSQLiteBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
+func NewSQLiteBlacklistTable(db *sql.DB, writer *sqlutil.TransactionWriter) (s *blacklistStatements, err error) {
 	s = &blacklistStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err = db.Exec(blacklistSchema)
 	if err != nil {
