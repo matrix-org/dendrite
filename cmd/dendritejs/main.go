@@ -242,12 +242,12 @@ func main() {
 		base.PublicMediaAPIMux,
 	)
 
-	httpRouter := mux.NewRouter()
+	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	libp2pRouter := mux.NewRouter()
+	libp2pRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	libp2pRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	libp2pRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
