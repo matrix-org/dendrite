@@ -277,7 +277,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	internalAddr, _ := internalHTTPAddr.Address()
 	externalAddr, _ := externalHTTPAddr.Address()
 
-	internalRouter := mux.NewRouter()
+	internalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	externalRouter := internalRouter
 
 	internalServ := &http.Server{
@@ -288,7 +288,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalServ := internalServ
 
 	if externalAddr != NoExternalListener && externalAddr != internalAddr {
-		externalRouter = mux.NewRouter()
+		externalRouter = mux.NewRouter().SkipClean(true).UseEncodedPath()
 		externalServ = &http.Server{
 			Addr:         string(externalAddr),
 			WriteTimeout: HTTPServerTimeout,
