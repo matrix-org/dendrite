@@ -57,7 +57,10 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	var isAlreadyJoined bool
 	roomNID, err := r.DB.RoomNID(ctx, roomID)
 	if err == nil {
-		_, isAlreadyJoined, _ = r.DB.GetMembership(ctx, roomNID, *event.StateKey())
+		_, isAlreadyJoined, err = r.DB.GetMembership(ctx, roomNID, *event.StateKey())
+		if err != nil {
+			return fmt.Errorf("r.DB.GetMembership: %w", err)
+		}
 	}
 	if isAlreadyJoined {
 		// If the user is joined to the room then that takes precedence over this
@@ -146,7 +149,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 					Kind:         api.KindNew,
 					Event:        event,
 					AuthEventIDs: event.AuthEventIDs(),
-					SendAsServer: string(r.Cfg.Matrix.ServerName),
+					SendAsServer: req.SendAsServer,
 				},
 			},
 		}

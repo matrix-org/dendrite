@@ -373,23 +373,21 @@ func createRoom(
 	// If this is a direct message then we should invite the participants.
 	if len(r.Invite) > 0 {
 		// Build some stripped state for the invite.
-		var strippedState []gomatrixserverlib.InviteV2StrippedState
+		var globalStrippedState []gomatrixserverlib.InviteV2StrippedState
 		for _, event := range builtEvents {
 			switch event.Type() {
 			case gomatrixserverlib.MRoomName:
 				fallthrough
 			case gomatrixserverlib.MRoomCanonicalAlias:
 				fallthrough
-			case "m.room.avatar": // TODO: move this to gmsl
-				fallthrough
 			case "m.room.encryption": // TODO: move this to gmsl
 				fallthrough
 			case gomatrixserverlib.MRoomMember:
 				fallthrough
 			case gomatrixserverlib.MRoomJoinRules:
-				ev := event.Unwrap()
-				strippedState = append(
-					strippedState,
+				ev := event.Event
+				globalStrippedState = append(
+					globalStrippedState,
 					gomatrixserverlib.NewInviteV2StrippedState(&ev),
 				)
 			}
@@ -406,12 +404,16 @@ func createRoom(
 				util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvent failed")
 				continue
 			}
+			inviteStrippedState := append(
+				globalStrippedState,
+				gomatrixserverlib.NewInviteV2StrippedState(&inviteEvent.Event),
+			)
 			// Send the invite event to the roomserver.
 			err = roomserverAPI.SendInvite(
 				req.Context(),
 				rsAPI,
 				inviteEvent.Headered(roomVersion),
-				strippedState,         // invite room state
+				inviteStrippedState,   // invite room state
 				cfg.Matrix.ServerName, // send as server
 				nil,                   // transaction ID
 			)
