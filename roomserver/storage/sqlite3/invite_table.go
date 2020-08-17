@@ -71,10 +71,10 @@ type inviteStatements struct {
 	selectInvitesAboutToRetireStmt      *sql.Stmt
 }
 
-func NewSqliteInvitesTable(db *sql.DB) (tables.Invites, error) {
+func NewSqliteInvitesTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Invites, error) {
 	s := &inviteStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(inviteSchema)
 	if err != nil {
@@ -124,7 +124,7 @@ func (s *inviteStatements) UpdateInviteRetired(
 		if err != nil {
 			return err
 		}
-		defer (func() { err = rows.Close() })()
+		defer internal.CloseAndLogIfError(ctx, rows, "UpdateInviteRetired: rows.close() failed")
 		for rows.Next() {
 			var inviteEventID string
 			if err = rows.Scan(&inviteEventID); err != nil {

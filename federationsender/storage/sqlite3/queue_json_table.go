@@ -56,10 +56,10 @@ type queueJSONStatements struct {
 	//selectJSONStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
-func NewSQLiteQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
+func NewSQLiteQueueJSONTable(db *sql.DB, writer *sqlutil.TransactionWriter) (s *queueJSONStatements, err error) {
 	s = &queueJSONStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err = db.Exec(queueJSONSchema)
 	if err != nil {

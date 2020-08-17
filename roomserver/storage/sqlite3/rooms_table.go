@@ -76,10 +76,10 @@ type roomStatements struct {
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 }
 
-func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
+func NewSqliteRoomsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Rooms, error) {
 	s := &roomStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(roomsSchema)
 	if err != nil {

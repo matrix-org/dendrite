@@ -67,10 +67,10 @@ type inviteEventsStatements struct {
 	selectMaxInviteIDStmt         *sql.Stmt
 }
 
-func NewSqliteInvitesTable(db *sql.DB, streamID *streamIDStatements) (tables.Invites, error) {
+func NewSqliteInvitesTable(db *sql.DB, writer *sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.Invites, error) {
 	s := &inviteEventsStatements{
 		db:                 db,
-		writer:             sqlutil.NewTransactionWriter(),
+		writer:             writer,
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(inviteEventsSchema)

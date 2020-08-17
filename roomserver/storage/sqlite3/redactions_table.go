@@ -60,10 +60,10 @@ type redactionStatements struct {
 	markRedactionValidatedStmt                  *sql.Stmt
 }
 
-func NewSqliteRedactionsTable(db *sql.DB) (tables.Redactions, error) {
+func NewSqliteRedactionsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Redactions, error) {
 	s := &redactionStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(redactionsSchema)
 	if err != nil {

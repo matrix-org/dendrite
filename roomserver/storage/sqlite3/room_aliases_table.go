@@ -65,10 +65,10 @@ type roomAliasesStatements struct {
 	deleteRoomAliasStmt          *sql.Stmt
 }
 
-func NewSqliteRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
+func NewSqliteRoomAliasesTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.RoomAliases, error) {
 	s := &roomAliasesStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(roomAliasesSchema)
 	if err != nil {

@@ -115,10 +115,10 @@ type eventStatements struct {
 	selectRoomNIDForEventNIDStmt           *sql.Stmt
 }
 
-func NewSqliteEventsTable(db *sql.DB) (tables.Events, error) {
+func NewSqliteEventsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Events, error) {
 	s := &eventStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(eventsSchema)
 	if err != nil {

@@ -72,10 +72,10 @@ type queueEDUsStatements struct {
 	selectQueueEDUServerNamesStmt        *sql.Stmt
 }
 
-func NewSQLiteQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
+func NewSQLiteQueueEDUsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (s *queueEDUsStatements, err error) {
 	s = &queueEDUsStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err = db.Exec(queueEDUsSchema)
 	if err != nil {
