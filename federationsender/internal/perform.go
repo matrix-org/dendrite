@@ -329,12 +329,7 @@ func (r *FederationSenderInternalAPI) PerformInvite(
 		return fmt.Errorf("r.federation.SendInviteV2: %w", err)
 	}
 
-	response.SignedEvent = inviteRes.Event.Sign(
-		string(r.cfg.Matrix.ServerName),
-		r.cfg.Matrix.KeyID,
-		r.cfg.Matrix.PrivateKey,
-	).Headered(request.RoomVersion)
-
+	response.Event = inviteRes.Event.Headered(request.RoomVersion)
 	return nil
 }
 

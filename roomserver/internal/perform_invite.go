@@ -139,7 +139,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 				log.WithError(err).WithField("event_id", event.EventID()).Error("r.fsAPI.PerformInvite failed")
 				return nil
 			}
-			event = fsRes.SignedEvent
+			event = fsRes.Event
 		}
 	}
 

@@ -94,7 +94,7 @@ type PerformInviteRequest struct {
 }
 
 type PerformInviteResponse struct {
-	SignedEvent gomatrixserverlib.HeaderedEvent `json:"signed_event"`
+	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 type PerformServersAliveRequest struct {

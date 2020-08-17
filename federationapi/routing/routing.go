@@ -90,16 +90,10 @@ func Setup(
 					JSON: jsonerror.Forbidden("Forbidden by server ACLs"),
 				}
 			}
-			res := InviteV1(
+			return InviteV1(
 				httpReq, request, vars["roomID"], vars["eventID"],
 				cfg, rsAPI, keys,
 			)
-			return util.JSONResponse{
-				Code: res.Code,
-				JSON: []interface{}{
-					res.Code, res.JSON,
-				},
-			}
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 

@@ -46,7 +46,7 @@ func InviteV2(
 		}
 	}
 	return processInvite(
-		httpReq.Context(), inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
+		httpReq.Context(), true, inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
 	)
 }
 
@@ -75,12 +75,13 @@ func InviteV1(
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
 	}
 	return processInvite(
-		httpReq.Context(), event, roomVer, strippedState, roomID, eventID, cfg, rsAPI, keys,
+		httpReq.Context(), false, event, roomVer, strippedState, roomID, eventID, cfg, rsAPI, keys,
 	)
 }
 
 func processInvite(
 	ctx context.Context,
+	isInviteV2 bool,
 	event gomatrixserverlib.Event,
 	roomVer gomatrixserverlib.RoomVersion,
 	strippedState []gomatrixserverlib.InviteV2StrippedState,
@@ -152,9 +153,16 @@ func processInvite(
 	case nil:
 		// Return the signed event to the originating server, it should then tell
 		// the other servers in the room that we have been invited.
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
+		if isInviteV2 {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
+			}
+		} else {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: gomatrixserverlib.RespInvite{Event: signedEvent},
+			}
 		}
 	default:
 		util.GetLogger(ctx).WithError(err).Error("api.SendInvite failed")
