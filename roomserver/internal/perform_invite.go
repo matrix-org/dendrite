@@ -105,7 +105,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	if isOriginLocal {
 		// check that the user is allowed to do this. We can only do this check if it is
 		// a local invite as we have the auth events, else we have to take it on trust.
-		_, err = checkAuthEvents(ctx, r.DB, req.Event, req.Event.AuthEventIDs())
+		_, err = checkAuthEvents(ctx, r.DB, event, event.AuthEventIDs())
 		if err != nil {
 			log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
 				"processInviteEvent.checkAuthEvents failed for event",
@@ -127,7 +127,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		if req.SendAsServer != api.DoNotSendToOtherServers && !isTargetLocal {
 			fsReq := &federationSenderAPI.PerformInviteRequest{
 				RoomVersion:     req.RoomVersion,
-				Event:           req.Event,
+				Event:           event,
 				InviteRoomState: inviteState,
 			}
 			fsRes := &federationSenderAPI.PerformInviteResponse{}
@@ -158,7 +158,10 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	go r.InputRoomEvents(context.Background(), inputReq, inputRes) // nolint:errcheck
+	if err := r.InputRoomEvents(context.Background(), inputReq, inputRes); isOriginLocal && err != nil {
+		log.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+		return fmt.Errorf("r.InputRoomEvents: %w", err)
+	}
 
 	succeeded = true
 	return nil
