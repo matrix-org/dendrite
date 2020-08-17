@@ -28,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -97,22 +96,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			}).Panicf("roomserver output log: write room event failure")
 			return nil
 		}
-	case api.OutputTypeNewInviteEvent:
-		ev := &output.NewInviteEvent.Event
-		log.WithFields(log.Fields{
-			"event_id":  ev.EventID(),
-			"room_id":   ev.RoomID(),
-			"state_key": ev.StateKey(),
-		}).Info("received invite event from roomserver")
-
-		if err := s.processInvite(*output.NewInviteEvent); err != nil {
-			// panic rather than continue with an inconsistent database
-			log.WithFields(log.Fields{
-				"event":      string(ev.JSON()),
-				log.ErrorKey: err,
-			}).Panicf("roomserver output log: write invite event failure")
-			return nil
-		}
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -170,51 +153,6 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 	return s.queues.SendEvent(
 		&ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	)
-}
-
-// processInvite handles an invite event for sending over federation.
-func (s *OutputRoomEventConsumer) processInvite(oie api.OutputNewInviteEvent) error {
-	// Don't try to reflect and resend invites that didn't originate from us.
-	if s.cfg.Matrix.ServerName != oie.Event.Origin() {
-		return nil
-	}
-
-	// Ignore invites that don't have state keys - they are invalid.
-	if oie.Event.StateKey() == nil {
-		return fmt.Errorf("event %q doesn't have state key", oie.Event.EventID())
-	}
-
-	// Don't try to handle events that are actually destined for us.
-	stateKey := *oie.Event.StateKey()
-	_, destination, err := gomatrixserverlib.SplitID('@', stateKey)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"event_id":  oie.Event.EventID(),
-			"state_key": stateKey,
-		}).Info("failed to split destination from state key")
-		return nil
-	}
-	if s.cfg.Matrix.ServerName == destination {
-		return nil
-	}
-
-	// Try to extract the room invite state. The roomserver will have stashed
-	// this for us in invite_room_state if it didn't already exist.
-	strippedState := []gomatrixserverlib.InviteV2StrippedState{}
-	if inviteRoomState := gjson.GetBytes(oie.Event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		if err = json.Unmarshal([]byte(inviteRoomState.Raw), &strippedState); err != nil {
-			log.WithError(err).Warn("failed to extract invite_room_state from event unsigned")
-		}
-	}
-
-	// Build the invite request with the info we've got.
-	inviteReq, err := gomatrixserverlib.NewInviteV2Request(&oie.Event, strippedState)
-	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
-	}
-
-	// Send the event.
-	return s.queues.SendInvite(&inviteReq)
 }
 
 // joinedHostsAtEvent works out a list of matrix servers that were joined to

@@ -22,7 +22,7 @@ type RoomserverInternalAPI interface {
 		ctx context.Context,
 		req *PerformInviteRequest,
 		res *PerformInviteResponse,
-	)
+	) error
 
 	PerformJoin(
 		ctx context.Context,

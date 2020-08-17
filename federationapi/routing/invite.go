@@ -46,7 +46,7 @@ func InviteV2(
 		}
 	}
 	return processInvite(
-		httpReq.Context(), inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
+		httpReq.Context(), true, inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
 	)
 }
 
@@ -75,12 +75,13 @@ func InviteV1(
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
 	}
 	return processInvite(
-		httpReq.Context(), event, roomVer, strippedState, roomID, eventID, cfg, rsAPI, keys,
+		httpReq.Context(), false, event, roomVer, strippedState, roomID, eventID, cfg, rsAPI, keys,
 	)
 }
 
 func processInvite(
 	ctx context.Context,
+	isInviteV2 bool,
 	event gomatrixserverlib.Event,
 	roomVer gomatrixserverlib.RoomVersion,
 	strippedState []gomatrixserverlib.InviteV2StrippedState,
@@ -143,17 +144,31 @@ func processInvite(
 	)
 
 	// Add the invite event to the roomserver.
-	if perr := api.SendInvite(
-		ctx, rsAPI, signedEvent.Headered(roomVer), strippedState, event.Origin(), nil,
-	); perr != nil {
-		util.GetLogger(ctx).WithError(err).Error("producer.SendInvite failed")
-		return perr.JSONResponse()
-	}
-
-	// Return the signed event to the originating server, it should then tell
-	// the other servers in the room that we have been invited.
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
+	err = api.SendInvite(
+		ctx, rsAPI, signedEvent.Headered(roomVer), strippedState, api.DoNotSendToOtherServers, nil,
+	)
+	switch e := err.(type) {
+	case *api.PerformError:
+		return e.JSONResponse()
+	case nil:
+		// Return the signed event to the originating server, it should then tell
+		// the other servers in the room that we have been invited.
+		if isInviteV2 {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
+			}
+		} else {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: gomatrixserverlib.RespInvite{Event: signedEvent},
+			}
+		}
+	default:
+		util.GetLogger(ctx).WithError(err).Error("api.SendInvite failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
 	}
 }

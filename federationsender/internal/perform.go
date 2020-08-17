@@ -296,6 +296,43 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 	)
 }
 
+// PerformLeaveRequest implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) PerformInvite(
+	ctx context.Context,
+	request *api.PerformInviteRequest,
+	response *api.PerformInviteResponse,
+) (err error) {
+	if request.Event.StateKey() == nil {
+		return errors.New("invite must be a state event")
+	}
+
+	_, destination, err := gomatrixserverlib.SplitID('@', *request.Event.StateKey())
+	if err != nil {
+		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"event_id":     request.Event.EventID(),
+		"user_id":      *request.Event.StateKey(),
+		"room_id":      request.Event.RoomID(),
+		"room_version": request.RoomVersion,
+		"destination":  destination,
+	}).Info("Sending invite")
+
+	inviteReq, err := gomatrixserverlib.NewInviteV2Request(&request.Event, request.InviteRoomState)
+	if err != nil {
+		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
+	}
+
+	inviteRes, err := r.federation.SendInviteV2(ctx, destination, inviteReq)
+	if err != nil {
+		return fmt.Errorf("r.federation.SendInviteV2: %w", err)
+	}
+
+	response.Event = inviteRes.Event.Headered(request.RoomVersion)
+	return nil
+}
+
 // PerformServersAlive implements api.FederationSenderInternalAPI
 func (r *FederationSenderInternalAPI) PerformServersAlive(
 	ctx context.Context,

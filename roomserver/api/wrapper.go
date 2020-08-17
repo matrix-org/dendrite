@@ -16,6 +16,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -99,21 +100,41 @@ func SendInvite(
 	rsAPI RoomserverInternalAPI, inviteEvent gomatrixserverlib.HeaderedEvent,
 	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
-) *PerformError {
-	request := PerformInviteRequest{
+) error {
+	// Start by sending the invite request into the roomserver. This will
+	// trigger the federation request amongst other things if needed.
+	request := &PerformInviteRequest{
 		Event:           inviteEvent,
 		InviteRoomState: inviteRoomState,
 		RoomVersion:     inviteEvent.RoomVersion,
 		SendAsServer:    string(sendAsServer),
 		TransactionID:   txnID,
 	}
-	var response PerformInviteResponse
-	rsAPI.PerformInvite(ctx, &request, &response)
-	// we need to do this because many places people will use `var err error` as the return
-	// arg and a nil interface != nil pointer to a concrete interface (in this case PerformError)
-	if response.Error != nil && response.Error.Msg != "" {
+	response := &PerformInviteResponse{}
+	if err := rsAPI.PerformInvite(ctx, request, response); err != nil {
+		return fmt.Errorf("rsAPI.PerformInvite: %w", err)
+	}
+	if response.Error != nil {
 		return response.Error
 	}
+
+	// Now send the invite event into the roomserver. If the room is known
+	// locally then this will succeed, notifying existing users in the room
+	// about the new invite. If the room isn't known locally then this will
+	// fail - and that's also OK.
+	inputReq := &InputRoomEventsRequest{
+		InputRoomEvents: []InputRoomEvent{
+			{
+				Kind:         KindNew,
+				Event:        inviteEvent,
+				AuthEventIDs: inviteEvent.AuthEventIDs(),
+				SendAsServer: string(sendAsServer),
+			},
+		},
+	}
+	inputRes := &InputRoomEventsResponse{}
+	_ = rsAPI.InputRoomEvents(ctx, inputReq, inputRes)
+
 	return nil
 }
 

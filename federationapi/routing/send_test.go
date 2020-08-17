@@ -102,7 +102,8 @@ func (t *testRoomserverAPI) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 	res *api.PerformInviteResponse,
-) {
+) error {
+	return nil
 }
 
 func (t *testRoomserverAPI) PerformJoin(

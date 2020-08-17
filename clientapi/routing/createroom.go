@@ -386,8 +386,12 @@ func createRoom(
 		var strippedState []gomatrixserverlib.InviteV2StrippedState
 		for _, event := range candidates {
 			switch event.Type() {
-			// TODO: case gomatrixserverlib.MRoomEncryption:
-			//	fallthrough
+			case gomatrixserverlib.MRoomName:
+				fallthrough
+			case gomatrixserverlib.MRoomCanonicalAlias:
+				fallthrough
+			case "m.room.encryption": // TODO: move this to gmsl
+				fallthrough
 			case gomatrixserverlib.MRoomMember:
 				fallthrough
 			case gomatrixserverlib.MRoomJoinRules:
@@ -398,15 +402,23 @@ func createRoom(
 			}
 		}
 		// Send the invite event to the roomserver.
-		if perr := roomserverAPI.SendInvite(
+		err = roomserverAPI.SendInvite(
 			req.Context(), rsAPI,
 			inviteEvent.Headered(roomVersion),
 			strippedState,         // invite room state
 			cfg.Matrix.ServerName, // send as server
 			nil,                   // transaction ID
-		); perr != nil {
-			util.GetLogger(req.Context()).WithError(perr).Error("SendInvite failed")
-			return perr.JSONResponse()
+		)
+		switch e := err.(type) {
+		case *roomserverAPI.PerformError:
+			return e.JSONResponse()
+		case nil:
+		default:
+			util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInvite failed")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.InternalServerError(),
+			}
 		}
 	}
 

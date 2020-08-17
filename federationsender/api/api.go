@@ -36,6 +36,12 @@ type FederationSenderInternalAPI interface {
 		request *PerformLeaveRequest,
 		response *PerformLeaveResponse,
 	) error
+	// Handle sending an invite to a remote server.
+	PerformInvite(
+		ctx context.Context,
+		request *PerformInviteRequest,
+		response *PerformInviteResponse,
+	) error
 	// Notifies the federation sender that these servers may be online and to retry sending messages.
 	PerformServersAlive(
 		ctx context.Context,
@@ -79,6 +85,16 @@ type PerformLeaveRequest struct {
 }
 
 type PerformLeaveResponse struct {
+}
+
+type PerformInviteRequest struct {
+	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
+	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
+	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
+}
+
+type PerformInviteResponse struct {
+	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 type PerformServersAliveRequest struct {

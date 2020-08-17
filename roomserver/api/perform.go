@@ -105,7 +105,6 @@ type PerformInviteRequest struct {
 }
 
 type PerformInviteResponse struct {
-	// If non-nil, the invite request failed. Contains more information why it failed.
 	Error *PerformError
 }
 

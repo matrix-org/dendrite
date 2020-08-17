@@ -173,7 +173,7 @@ func SendInvite(
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
-	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
+	body, evTime, _, reqErr := extractRequestData(req, roomID, rsAPI)
 	if reqErr != nil {
 		return *reqErr
 	}
@@ -214,20 +214,27 @@ func SendInvite(
 		return jsonerror.InternalServerError()
 	}
 
-	perr := roomserverAPI.SendInvite(
+	err = roomserverAPI.SendInvite(
 		req.Context(), rsAPI,
-		event.Event.Headered(roomVer),
+		*event,
 		nil, // ask the roomserver to draw up invite room state for us
 		cfg.Matrix.ServerName,
 		nil,
 	)
-	if perr != nil {
-		util.GetLogger(req.Context()).WithError(perr).Error("producer.SendInvite failed")
-		return perr.JSONResponse()
-	}
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: struct{}{},
+	switch e := err.(type) {
+	case *roomserverAPI.PerformError:
+		return e.JSONResponse()
+	case nil:
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
+		}
+	default:
+		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInvite failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
 	}
 }
 

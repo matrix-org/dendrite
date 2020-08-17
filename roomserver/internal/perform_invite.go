@@ -2,9 +2,9 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -14,73 +14,50 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// PerformInvite handles inviting to matrix rooms, including over federation by talking to the federationsender.
+// nolint:gocyclo
 func (r *RoomserverInternalAPI) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 	res *api.PerformInviteResponse,
-) {
-	err := r.performInvite(ctx, req)
-	if err != nil {
-		perr, ok := err.(*api.PerformError)
-		if ok {
-			res.Error = perr
-		} else {
-			res.Error = &api.PerformError{
-				Msg: err.Error(),
-			}
-		}
-	}
-}
-
-func (r *RoomserverInternalAPI) performInvite(ctx context.Context,
-	req *api.PerformInviteRequest,
 ) error {
-	loopback, err := r.processInviteEvent(ctx, r, req)
-	if err != nil {
-		return err
-	}
-	// The processInviteEvent function can optionally return a
-	// loopback room event containing the invite, for local invites.
-	// If it does, we should process it with the room events below.
-	if loopback != nil {
-		var loopbackRes api.InputRoomEventsResponse
-		err := r.InputRoomEvents(ctx, &api.InputRoomEventsRequest{
-			InputRoomEvents: []api.InputRoomEvent{*loopback},
-		}, &loopbackRes)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// nolint:gocyclo
-func (r *RoomserverInternalAPI) processInviteEvent(
-	ctx context.Context,
-	ow *RoomserverInternalAPI,
-	input *api.PerformInviteRequest,
-) (*api.InputRoomEvent, error) {
-	if input.Event.StateKey() == nil {
-		return nil, fmt.Errorf("invite must be a state event")
+	event := req.Event
+	if event.StateKey() == nil {
+		return fmt.Errorf("invite must be a state event")
 	}
 
-	roomID := input.Event.RoomID()
-	targetUserID := *input.Event.StateKey()
+	roomID := event.RoomID()
+	targetUserID := *event.StateKey()
 
 	log.WithFields(log.Fields{
-		"event_id":       input.Event.EventID(),
+		"event_id":       event.EventID(),
 		"room_id":        roomID,
-		"room_version":   input.RoomVersion,
+		"room_version":   req.RoomVersion,
 		"target_user_id": targetUserID,
 	}).Info("processing invite event")
 
 	_, domain, _ := gomatrixserverlib.SplitID('@', targetUserID)
-	isTargetLocalUser := domain == r.Cfg.Matrix.ServerName
+	isTargetLocal := domain == r.Cfg.Matrix.ServerName
+	isOriginLocal := event.Origin() == r.Cfg.Matrix.ServerName
 
-	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocalUser, input.RoomVersion)
+	inviteState := req.InviteRoomState
+	if len(inviteState) == 0 {
+		if is, err := buildInviteStrippedState(ctx, r.DB, req); err == nil {
+			inviteState = is
+		}
+	}
+	if len(inviteState) == 0 {
+		if err := event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
+			return fmt.Errorf("event.SetUnsignedField: %w", err)
+		}
+	} else {
+		if err := event.SetUnsignedField("invite_room_state", inviteState); err != nil {
+			return fmt.Errorf("event.SetUnsignedField: %w", err)
+		}
+	}
+
+	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 	}
 	succeeded := false
 	defer func() {
@@ -118,109 +95,66 @@ func (r *RoomserverInternalAPI) processInviteEvent(
 		// For now we will implement option 2. Since in the abesence of a retry
 		// mechanism it will be equivalent to option 1, and we don't have a
 		// signalling mechanism to implement option 3.
-		return nil, &api.PerformError{
-			Code: api.PerformErrorNoOperation,
-			Msg:  "user is already joined to room",
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorNotAllowed,
+			Msg:  "User is already joined to room",
 		}
+		return nil
 	}
 
-	// Normally, with a federated invite, the federation sender would do
-	// the /v2/invite request (in which the remote server signs the invite)
-	// and then the signed event gets sent back to the roomserver as an input
-	// event. When the invite is local, we don't interact with the federation
-	// sender therefore we need to generate the loopback invite event for
-	// the room ourselves.
-	loopback, err := localInviteLoopback(ow, input)
-	if err != nil {
-		return nil, err
-	}
-
-	event := input.Event.Unwrap()
-
-	// check that the user is allowed to do this. We can only do this check if it is
-	// a local invite as we have the auth events, else we have to take it on trust.
-	if loopback != nil {
-		_, err = checkAuthEvents(ctx, r.DB, input.Event, input.Event.AuthEventIDs())
+	if isOriginLocal {
+		// check that the user is allowed to do this. We can only do this check if it is
+		// a local invite as we have the auth events, else we have to take it on trust.
+		_, err = checkAuthEvents(ctx, r.DB, req.Event, req.Event.AuthEventIDs())
 		if err != nil {
 			log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
 				"processInviteEvent.checkAuthEvents failed for event",
 			)
 			if _, ok := err.(*gomatrixserverlib.NotAllowed); ok {
-				return nil, &api.PerformError{
+				res.Error = &api.PerformError{
 					Msg:  err.Error(),
 					Code: api.PerformErrorNotAllowed,
 				}
+				return nil
 			}
-			return nil, err
+			return fmt.Errorf("checkAuthEvents: %w", err)
+		}
+
+		// If the invite originated from us and the target isn't local then we
+		// should try and send the invite over federation first. It might be
+		// that the remote user doesn't exist, in which case we can give up
+		// processing here.
+		if req.SendAsServer != api.DoNotSendToOtherServers && !isTargetLocal {
+			fsReq := &federationSenderAPI.PerformInviteRequest{
+				RoomVersion:     req.RoomVersion,
+				Event:           req.Event,
+				InviteRoomState: inviteState,
+			}
+			fsRes := &federationSenderAPI.PerformInviteResponse{}
+			if err = r.fsAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
+				res.Error = &api.PerformError{
+					Msg:  err.Error(),
+					Code: api.PerformErrorNoOperation,
+				}
+				log.WithError(err).WithField("event_id", event.EventID()).Error("r.fsAPI.PerformInvite failed")
+				return nil
+			}
+			event = fsRes.Event
 		}
 	}
 
-	if len(input.InviteRoomState) > 0 {
-		// If we were supplied with some invite room state already (which is
-		// most likely to be if the event came in over federation) then use
-		// that.
-		if err = event.SetUnsignedField("invite_room_state", input.InviteRoomState); err != nil {
-			return nil, err
-		}
-	} else {
-		// There's no invite room state, so let's have a go at building it
-		// up from local data (which is most likely to be if the event came
-		// from the CS API). If we know about the room then we can insert
-		// the invite room state, if we don't then we just fail quietly.
-		if irs, ierr := buildInviteStrippedState(ctx, r.DB, input); ierr == nil {
-			if err = event.SetUnsignedField("invite_room_state", irs); err != nil {
-				return nil, err
-			}
-		} else {
-			log.WithError(ierr).Error("failed to build invite stripped state")
-			// still set the field else synapse deployments don't process the invite
-			if err = event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	outputUpdates, err := updateToInviteMembership(updater, &event, nil, input.Event.RoomVersion)
+	unwrapped := event.Unwrap()
+	outputUpdates, err := updateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("updateToInviteMembership: %w", err)
 	}
 
-	if err = ow.WriteOutputEvents(roomID, outputUpdates); err != nil {
-		return nil, err
+	if err = r.WriteOutputEvents(roomID, outputUpdates); err != nil {
+		return fmt.Errorf("r.WriteOutputEvents: %w", err)
 	}
 
 	succeeded = true
-	return loopback, nil
-}
-
-func localInviteLoopback(
-	ow *RoomserverInternalAPI,
-	input *api.PerformInviteRequest,
-) (ire *api.InputRoomEvent, err error) {
-	if input.Event.StateKey() == nil {
-		return nil, errors.New("no state key on invite event")
-	}
-	ourServerName := string(ow.Cfg.Matrix.ServerName)
-	_, theirServerName, err := gomatrixserverlib.SplitID('@', *input.Event.StateKey())
-	if err != nil {
-		return nil, err
-	}
-	// Check if the invite originated locally and is destined locally.
-	if input.Event.Origin() == ow.Cfg.Matrix.ServerName && string(theirServerName) == ourServerName {
-		rsEvent := input.Event.Sign(
-			ourServerName,
-			ow.Cfg.Matrix.KeyID,
-			ow.Cfg.Matrix.PrivateKey,
-		).Headered(input.RoomVersion)
-		ire = &api.InputRoomEvent{
-			Kind:          api.KindNew,
-			Event:         rsEvent,
-			AuthEventIDs:  rsEvent.AuthEventIDs(),
-			SendAsServer:  ourServerName,
-			TransactionID: nil,
-		}
-	}
-	return ire, nil
+	return nil
 }
 
 func buildInviteStrippedState(
@@ -238,7 +172,7 @@ func buildInviteStrippedState(
 	for _, t := range []string{
 		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
 		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
-		"m.room.avatar",
+		"m.room.avatar", "m.room.encryption",
 	} {
 		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
 			EventType: t,

@@ -2,9 +2,7 @@ module github.com/matrix-org/dendrite
 
 require (
 	github.com/Shopify/sarama v1.26.1
-	github.com/circonus-labs/circonus-gometrics v2.3.1+incompatible
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/ghodss/yaml v1.0.0
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
@@ -23,7 +21,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20200807145008-79c173b65786
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20200817100842-9d02141812f2
 	github.com/matrix-org/naffka v0.0.0-20200422140631-181f1ee7401f
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible

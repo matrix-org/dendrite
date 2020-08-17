@@ -18,6 +18,7 @@ const (
 	FederationSenderPerformDirectoryLookupRequestPath = "/federationsender/performDirectoryLookup"
 	FederationSenderPerformJoinRequestPath            = "/federationsender/performJoinRequest"
 	FederationSenderPerformLeaveRequestPath           = "/federationsender/performLeaveRequest"
+	FederationSenderPerformInviteRequestPath          = "/federationsender/performInviteRequest"
 	FederationSenderPerformServersAlivePath           = "/federationsender/performServersAlive"
 	FederationSenderPerformBroadcastEDUPath           = "/federationsender/performBroadcastEDU"
 )
@@ -46,6 +47,19 @@ func (h *httpFederationSenderInternalAPI) PerformLeave(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformLeaveRequestPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// Handle sending an invite to a remote server.
+func (h *httpFederationSenderInternalAPI) PerformInvite(
+	ctx context.Context,
+	request *api.PerformInviteRequest,
+	response *api.PerformInviteResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInviteRequest")
+	defer span.Finish()
+
+	apiURL := h.federationSenderURL + FederationSenderPerformInviteRequestPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

@@ -33,9 +33,9 @@ func (t *RoomserverInternalAPITrace) PerformInvite(
 	ctx context.Context,
 	req *PerformInviteRequest,
 	res *PerformInviteResponse,
-) {
-	t.Impl.PerformInvite(ctx, req, res)
+) error {
 	util.GetLogger(ctx).Infof("PerformInvite req=%+v res=%+v", js(req), js(res))
+	return t.Impl.PerformInvite(ctx, req, res)
 }
 
 func (t *RoomserverInternalAPITrace) PerformJoin(
