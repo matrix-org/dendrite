@@ -118,23 +118,6 @@ func SendInvite(
 		return response.Error
 	}
 
-	// Now send the invite event into the roomserver. If the room is known
-	// locally then this will succeed, notifying existing users in the room
-	// about the new invite. If the room isn't known locally then this will
-	// fail - and that's also OK.
-	inputReq := &InputRoomEventsRequest{
-		InputRoomEvents: []InputRoomEvent{
-			{
-				Kind:         KindNew,
-				Event:        inviteEvent,
-				AuthEventIDs: inviteEvent.AuthEventIDs(),
-				SendAsServer: string(sendAsServer),
-			},
-		},
-	}
-	inputRes := &InputRoomEventsResponse{}
-	_ = rsAPI.InputRoomEvents(ctx, inputReq, inputRes)
-
 	return nil
 }
 

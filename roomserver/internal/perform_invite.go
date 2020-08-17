@@ -143,15 +143,22 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		}
 	}
 
-	unwrapped := event.Unwrap()
-	outputUpdates, err := updateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
-	if err != nil {
-		return fmt.Errorf("updateToInviteMembership: %w", err)
+	// Send the invite event to the roomserver input stream. This will
+	// notify existing users in the room about the invite, update the
+	// membership table and ensure that the event is ready and available
+	// to use as an auth event when accepting the invite.
+	inputReq := &api.InputRoomEventsRequest{
+		InputRoomEvents: []api.InputRoomEvent{
+			{
+				Kind:         api.KindNew,
+				Event:        event,
+				AuthEventIDs: event.AuthEventIDs(),
+				SendAsServer: string(r.Cfg.Matrix.ServerName),
+			},
+		},
 	}
-
-	if err = r.WriteOutputEvents(roomID, outputUpdates); err != nil {
-		return fmt.Errorf("r.WriteOutputEvents: %w", err)
-	}
+	inputRes := &api.InputRoomEventsResponse{}
+	_ = r.InputRoomEvents(ctx, inputReq, inputRes)
 
 	succeeded = true
 	return nil
