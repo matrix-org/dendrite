@@ -1,7 +1,5 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/matrix-org/gomatrixserverlib => /Users/neilalexander/Desktop/gomatrixserverlib/
-
 require (
 	github.com/Shopify/sarama v1.26.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
