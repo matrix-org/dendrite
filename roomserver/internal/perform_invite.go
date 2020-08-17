@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -55,19 +54,12 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		}
 	}
 
-	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
-	if err != nil {
-		return fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+	var isAlreadyJoined bool
+	roomNID, err := r.DB.RoomNID(ctx, roomID)
+	if err == nil {
+		_, isAlreadyJoined, _ = r.DB.GetMembership(ctx, roomNID, "")
 	}
-	succeeded := false
-	defer func() {
-		txerr := sqlutil.EndTransaction(updater, &succeeded)
-		if err == nil && txerr != nil {
-			err = txerr
-		}
-	}()
-
-	if updater.IsJoin() {
+	if isAlreadyJoined {
 		// If the user is joined to the room then that takes precedence over this
 		// invite event. It makes little sense to move a user that is already
 		// joined to the room into the invite state.
@@ -146,7 +138,10 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	// Send the invite event to the roomserver input stream. This will
 	// notify existing users in the room about the invite, update the
 	// membership table and ensure that the event is ready and available
-	// to use as an auth event when accepting the invite.
+	// to use as an auth event when accepting the invite. We don't
+	// check the return value here because it may be possible that we
+	// don't know about this room yet if we received the invite over
+	// federation.
 	inputReq := &api.InputRoomEventsRequest{
 		InputRoomEvents: []api.InputRoomEvent{
 			{
@@ -158,12 +153,8 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	if err := r.InputRoomEvents(context.Background(), inputReq, inputRes); isOriginLocal && err != nil {
-		log.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
-		return fmt.Errorf("r.InputRoomEvents: %w", err)
-	}
+	go r.InputRoomEvents(context.Background(), inputReq, inputRes) // nolint:errcheck
 
-	succeeded = true
 	return nil
 }
 
