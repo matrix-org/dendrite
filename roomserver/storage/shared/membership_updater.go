@@ -45,6 +45,7 @@ func NewMembershipUpdater(
 	}
 
 	if !useTxns {
+		txn.Commit() // nolint:errcheck
 		txn = nil
 	}
 
