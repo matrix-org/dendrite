@@ -68,9 +68,9 @@ type serverKeyStatements struct {
 	upsertServerKeysStmt     *sql.Stmt
 }
 
-func (s *serverKeyStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter) (err error) {
+func (s *serverKeyStatements) prepare(db *sql.DB) (err error) {
 	s.db = db
-	s.writer = writer
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(serverKeysSchema)
 	if err != nil {
 		return

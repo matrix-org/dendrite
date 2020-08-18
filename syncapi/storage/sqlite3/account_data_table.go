@@ -58,10 +58,10 @@ type accountDataStatements struct {
 	selectAccountDataInRangeStmt *sql.Stmt
 }
 
-func NewSqliteAccountDataTable(db *sql.DB, writer *sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.AccountData, error) {
+func NewSqliteAccountDataTable(db *sql.DB, streamID *streamIDStatements) (tables.AccountData, error) {
 	s := &accountDataStatements{
 		db:                 db,
-		writer:             writer,
+		writer:             sqlutil.NewTransactionWriter(),
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(accountDataSchema)

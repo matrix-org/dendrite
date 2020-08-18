@@ -71,10 +71,10 @@ type deviceKeysStatements struct {
 	deleteAllDeviceKeysStmt    *sql.Stmt
 }
 
-func NewSqliteDeviceKeysTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.DeviceKeys, error) {
+func NewSqliteDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 	s := &deviceKeysStatements{
 		db:     db,
-		writer: writer,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err := db.Exec(deviceKeysSchema)
 	if err != nil {

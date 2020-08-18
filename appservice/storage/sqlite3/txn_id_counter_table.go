@@ -42,9 +42,9 @@ type txnStatements struct {
 	selectTxnIDStmt *sql.Stmt
 }
 
-func (s *txnStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter) (err error) {
+func (s *txnStatements) prepare(db *sql.DB) (err error) {
 	s.db = db
-	s.writer = writer
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(txnIDSchema)
 	if err != nil {
 		return

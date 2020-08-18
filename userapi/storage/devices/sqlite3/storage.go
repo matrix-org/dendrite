@@ -34,7 +34,6 @@ var deviceIDByteLength = 6
 // Database represents a device database.
 type Database struct {
 	db      *sql.DB
-	writer  *sqlutil.TransactionWriter
 	devices devicesStatements
 }
 
@@ -44,12 +43,11 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err != nil {
 		return nil, err
 	}
-	writer := sqlutil.NewTransactionWriter()
 	d := devicesStatements{}
-	if err = d.prepare(db, writer, serverName); err != nil {
+	if err = d.prepare(db, serverName); err != nil {
 		return nil, err
 	}
-	return &Database{db, writer, d}, nil
+	return &Database{db, d}, nil
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.

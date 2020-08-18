@@ -57,9 +57,9 @@ type accountDataStatements struct {
 	selectAccountDataByTypeStmt *sql.Stmt
 }
 
-func (s *accountDataStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter) (err error) {
+func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 	s.db = db
-	s.writer = writer
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(accountDataSchema)
 	if err != nil {
 		return

@@ -171,7 +171,11 @@ func (d *Database) SyncStreamPosition(ctx context.Context) (types.StreamPosition
 func (d *Database) AddInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (sp types.StreamPosition, err error) {
-	return d.Invites.InsertInviteEvent(ctx, nil, inviteEvent)
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
+		return err
+	})
+	return
 }
 
 // RetireInviteEvent removes an old invite event from the database.

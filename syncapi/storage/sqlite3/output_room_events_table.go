@@ -117,10 +117,10 @@ type outputRoomEventsStatements struct {
 	updateEventJSONStmt           *sql.Stmt
 }
 
-func NewSqliteEventsTable(db *sql.DB, writer *sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.Events, error) {
+func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
 	s := &outputRoomEventsStatements{
 		db:                 db,
-		writer:             writer,
+		writer:             sqlutil.NewTransactionWriter(),
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(outputRoomEventsSchema)
@@ -304,11 +304,13 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
-	if err != nil {
-		return 0, err
-	}
+	var streamPos types.StreamPosition
 	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+		if err != nil {
+			return err
+		}
+
 		insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
 		_, ierr := insertStmt.ExecContext(
 			ctx,

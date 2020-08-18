@@ -75,9 +75,9 @@ type eventsStatements struct {
 	deleteEventsBeforeAndIncludingIDStmt   *sql.Stmt
 }
 
-func (s *eventsStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter) (err error) {
+func (s *eventsStatements) prepare(db *sql.DB) (err error) {
 	s.db = db
-	s.writer = writer
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(appserviceEventsSchema)
 	if err != nil {
 		return

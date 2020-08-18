@@ -61,9 +61,9 @@ type profilesStatements struct {
 	selectProfilesBySearchStmt   *sql.Stmt
 }
 
-func (s *profilesStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter) (err error) {
+func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 	s.db = db
-	s.writer = writer
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(profilesSchema)
 	if err != nil {
 		return

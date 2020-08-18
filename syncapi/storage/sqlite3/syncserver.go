@@ -31,8 +31,7 @@ import (
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	shared.Database
-	db     *sql.DB
-	writer *sqlutil.TransactionWriter
+	db *sql.DB
 	sqlutil.PartitionOffsetStatements
 	streamID streamIDStatements
 }
@@ -45,7 +44,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewTransactionWriter()
 	if err = d.prepare(); err != nil {
 		return nil, err
 	}
@@ -56,38 +54,38 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
 		return err
 	}
-	if err = d.streamID.prepare(d.db, d.writer); err != nil {
+	if err = d.streamID.prepare(d.db); err != nil {
 		return err
 	}
-	accountData, err := NewSqliteAccountDataTable(d.db, d.writer, &d.streamID)
+	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
-	events, err := NewSqliteEventsTable(d.db, d.writer, &d.streamID)
+	events, err := NewSqliteEventsTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
-	roomState, err := NewSqliteCurrentRoomStateTable(d.db, d.writer, &d.streamID)
+	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
-	invites, err := NewSqliteInvitesTable(d.db, d.writer, &d.streamID)
+	invites, err := NewSqliteInvitesTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
-	topology, err := NewSqliteTopologyTable(d.db, d.writer)
+	topology, err := NewSqliteTopologyTable(d.db)
 	if err != nil {
 		return err
 	}
-	bwExtrem, err := NewSqliteBackwardsExtremitiesTable(d.db, d.writer)
+	bwExtrem, err := NewSqliteBackwardsExtremitiesTable(d.db)
 	if err != nil {
 		return err
 	}
-	sendToDevice, err := NewSqliteSendToDeviceTable(d.db, d.writer)
+	sendToDevice, err := NewSqliteSendToDeviceTable(d.db)
 	if err != nil {
 		return err
 	}
-	filter, err := NewSqliteFilterTable(d.db, d.writer)
+	filter, err := NewSqliteFilterTable(d.db)
 	if err != nil {
 		return err
 	}
