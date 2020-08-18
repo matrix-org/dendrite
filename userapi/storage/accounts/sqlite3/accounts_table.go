@@ -59,7 +59,7 @@ const selectNewNumericLocalpartSQL = "" +
 
 type accountsStatements struct {
 	db                            *sql.DB
-	writer                        *sqlutil.TransactionWriter
+	writer                        sqlutil.TransactionWriter
 	insertAccountStmt             *sql.Stmt
 	selectAccountByLocalpartStmt  *sql.Stmt
 	selectPasswordHashStmt        *sql.Stmt

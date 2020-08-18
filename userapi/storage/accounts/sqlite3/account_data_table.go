@@ -51,7 +51,7 @@ const selectAccountDataByTypeSQL = "" +
 
 type accountDataStatements struct {
 	db                          *sql.DB
-	writer                      *sqlutil.TransactionWriter
+	writer                      sqlutil.TransactionWriter
 	insertAccountDataStmt       *sql.Stmt
 	selectAccountDataStmt       *sql.Stmt
 	selectAccountDataByTypeStmt *sql.Stmt

@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
@@ -57,7 +56,6 @@ const deleteRoomAliasSQL = `
 
 type roomAliasesStatements struct {
 	db                           *sql.DB
-	writer                       *sqlutil.TransactionWriter
 	insertRoomAliasStmt          *sql.Stmt
 	selectRoomIDFromAliasStmt    *sql.Stmt
 	selectAliasesFromRoomIDStmt  *sql.Stmt
@@ -65,10 +63,9 @@ type roomAliasesStatements struct {
 	deleteRoomAliasStmt          *sql.Stmt
 }
 
-func NewSqliteRoomAliasesTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.RoomAliases, error) {
+func NewSqliteRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
 	s := &roomAliasesStatements{
-		db:     db,
-		writer: writer,
+		db: db,
 	}
 	_, err := db.Exec(roomAliasesSchema)
 	if err != nil {
@@ -85,12 +82,9 @@ func NewSqliteRoomAliasesTable(db *sql.DB, writer *sqlutil.TransactionWriter) (t
 
 func (s *roomAliasesStatements) InsertRoomAlias(
 	ctx context.Context, alias string, roomID string, creatorUserID string,
-) (err error) {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertRoomAliasStmt)
-		_, err := stmt.ExecContext(ctx, alias, roomID, creatorUserID)
-		return err
-	})
+) error {
+	_, err := s.insertRoomAliasStmt.ExecContext(ctx, alias, roomID, creatorUserID)
+	return err
 }
 
 func (s *roomAliasesStatements) SelectRoomIDFromAlias(
@@ -138,10 +132,7 @@ func (s *roomAliasesStatements) SelectCreatorIDFromAlias(
 
 func (s *roomAliasesStatements) DeleteRoomAlias(
 	ctx context.Context, alias string,
-) (err error) {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.deleteRoomAliasStmt)
-		_, err := stmt.ExecContext(ctx, alias)
-		return err
-	})
+) error {
+	_, err := s.deleteRoomAliasStmt.ExecContext(ctx, alias)
+	return err
 }

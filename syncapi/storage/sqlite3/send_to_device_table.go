@@ -73,7 +73,7 @@ const deleteSendToDeviceMessagesSQL = `
 
 type sendToDeviceStatements struct {
 	db                             *sql.DB
-	writer                         *sqlutil.TransactionWriter
+	writer                         sqlutil.TransactionWriter
 	insertSendToDeviceMessageStmt  *sql.Stmt
 	selectSendToDeviceMessagesStmt *sql.Stmt
 	countSendToDeviceMessagesStmt  *sql.Stmt

@@ -27,6 +27,7 @@ const redactionsArePermanent = false
 
 type Database struct {
 	DB                  *sql.DB
+	Writer              sqlutil.TransactionWriter
 	EventsTable         tables.Events
 	EventJSONTable      tables.EventJSON
 	EventTypesTable     tables.EventTypes
@@ -83,20 +84,23 @@ func (d *Database) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if len(state) > 0 {
 			var stateBlockNID types.StateBlockNID
 			stateBlockNID, err = d.StateBlockTable.BulkInsertStateData(ctx, txn, state)
 			if err != nil {
-				return err
+				return fmt.Errorf("d.StateBlockTable.BulkInsertStateData: %w", err)
 			}
 			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
 		}
 		stateNID, err = d.StateSnapshotTable.InsertState(ctx, txn, roomNID, stateBlockNIDs)
-		return err
+		if err != nil {
+			return fmt.Errorf("d.StateSnapshotTable.InsertState: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("d.Writer.Do: %w", err)
 	}
 	return
 }
@@ -110,7 +114,9 @@ func (d *Database) EventNIDs(
 func (d *Database) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
+	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		return d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
+	})
 }
 
 func (d *Database) StateAtEventIDs(
@@ -221,7 +227,9 @@ func (d *Database) GetRoomVersionForRoomNID(
 }
 
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
-	return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
+	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
+	})
 }
 
 func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
@@ -239,15 +247,21 @@ func (d *Database) GetCreatorIDForAlias(
 }
 
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
-	return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
+	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
+	})
 }
 
 func (d *Database) GetMembership(
 	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
 ) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
-	requestSenderUserNID, err := d.assignStateKeyNID(ctx, nil, requestSenderUserID)
+	var requestSenderUserNID types.EventStateKeyNID
+	err = d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		requestSenderUserNID, err = d.assignStateKeyNID(ctx, nil, requestSenderUserID)
+		return err
+	})
 	if err != nil {
-		return
+		return 0, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
 	}
 
 	senderMembershipEventNID, senderMembership, err :=
@@ -342,6 +356,7 @@ func (d *Database) GetLatestEventsForUpdate(
 	return NewRoomRecentEventsUpdater(d, ctx, roomNID)
 }
 
+// nolint:gocyclo
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
@@ -357,16 +372,16 @@ func (d *Database) StoreEvent(
 		err              error
 	)
 
-	if txnAndSessionID != nil {
-		if err = d.TransactionsTable.InsertTransaction(
-			ctx, nil, txnAndSessionID.TransactionID,
-			txnAndSessionID.SessionID, event.Sender(), event.EventID(),
-		); err != nil {
-			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.TransactionsTable.InsertTransaction: %w", err)
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		if txnAndSessionID != nil {
+			if err = d.TransactionsTable.InsertTransaction(
+				ctx, nil, txnAndSessionID.TransactionID,
+				txnAndSessionID.SessionID, event.Sender(), event.EventID(),
+			); err != nil {
+				return fmt.Errorf("d.TransactionsTable.InsertTransaction: %w", err)
+			}
 		}
-	}
 
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		// TODO: Here we should aim to have two different code paths for new rooms
 		// vs existing ones.
 
@@ -432,7 +447,7 @@ func (d *Database) StoreEvent(
 		return nil
 	})
 	if err != nil {
-		return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("sqlutil.WithTransaction: %w", err)
+		return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.Writer.Do: %w", err)
 	}
 
 	return roomNID, types.StateAtEvent{
@@ -448,7 +463,9 @@ func (d *Database) StoreEvent(
 }
 
 func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
-	return d.PublishedTable.UpsertRoomPublished(ctx, roomID, publish)
+	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		return d.PublishedTable.UpsertRoomPublished(ctx, roomID, publish)
+	})
 }
 
 func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
@@ -459,12 +476,15 @@ func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
-	// Try to insert the room. If it's ineffectual then we have the
-	// room in the database already.
-	roomNID, err := d.RoomsTable.InsertRoomNID(ctx, txn, roomID, roomVersion)
+	// Check if we already have a numeric ID in the database.
+	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
-		// Look up the room NID that we already have.
-		roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
+		// We don't have a numeric ID so insert one into the database.
+		roomNID, err = d.RoomsTable.InsertRoomNID(ctx, txn, roomID, roomVersion)
+		if err == sql.ErrNoRows {
+			// We raced with another insert so run the select again.
+			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
+		}
 	}
 	return roomNID, err
 }
@@ -550,10 +570,12 @@ func (d *Database) handleRedactions(
 			return nil, "", nil
 		}
 
-		err = d.RedactionsTable.InsertRedaction(ctx, txn, tables.RedactionInfo{
-			Validated:        false,
-			RedactionEventID: event.EventID(),
-			RedactsEventID:   event.Redacts(),
+		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+			return d.RedactionsTable.InsertRedaction(ctx, txn, tables.RedactionInfo{
+				Validated:        false,
+				RedactionEventID: event.EventID(),
+				RedactsEventID:   event.Redacts(),
+			})
 		})
 		if err != nil {
 			return nil, "", err
@@ -582,7 +604,9 @@ func (d *Database) handleRedactions(
 		redactedEvent.Event = redactedEvent.Redact()
 	}
 	// overwrite the eventJSON table
-	err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
+	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+		return d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
+	})
 	if err != nil {
 		return nil, "", err
 	}

@@ -98,6 +98,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	}
 	d.Database = shared.Database{
 		DB:                  db,
+		Writer:              sqlutil.NewDummyTransactionWriter(),
 		EventTypesTable:     eventTypes,
 		EventStateKeysTable: eventStateKeys,
 		EventJSONTable:      eventJSON,

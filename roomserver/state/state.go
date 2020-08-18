@@ -558,7 +558,11 @@ func (v StateResolution) CalculateAndStoreStateAfterEvents(
 		// 2) There weren't any prev_events for this event so the state is
 		// empty.
 		metrics.algorithm = "empty_state"
-		return metrics.stop(v.db.AddState(ctx, roomNID, nil, nil))
+		stateNID, err := v.db.AddState(ctx, roomNID, nil, nil)
+		if err != nil {
+			err = fmt.Errorf("v.db.AddState: %w", err)
+		}
+		return metrics.stop(stateNID, err)
 	}
 
 	if len(prevStates) == 1 {
@@ -578,22 +582,30 @@ func (v StateResolution) CalculateAndStoreStateAfterEvents(
 		)
 		if err != nil {
 			metrics.algorithm = "_load_state_blocks"
-			return metrics.stop(0, err)
+			return metrics.stop(0, fmt.Errorf("v.db.StateBlockNIDs: %w", err))
 		}
 		stateBlockNIDs := stateBlockNIDLists[0].StateBlockNIDs
 		if len(stateBlockNIDs) < maxStateBlockNIDs {
 			// 4) The number of state data blocks is small enough that we can just
 			// add the state event as a block of size one to the end of the blocks.
 			metrics.algorithm = "single_delta"
-			return metrics.stop(v.db.AddState(
+			stateNID, err := v.db.AddState(
 				ctx, roomNID, stateBlockNIDs, []types.StateEntry{prevState.StateEntry},
-			))
+			)
+			if err != nil {
+				err = fmt.Errorf("v.db.AddState: %w", err)
+			}
+			return metrics.stop(stateNID, err)
 		}
 		// If there are too many deltas then we need to calculate the full state
 		// So fall through to calculateAndStoreStateAfterManyEvents
 	}
 
-	return v.calculateAndStoreStateAfterManyEvents(ctx, roomNID, prevStates, metrics)
+	stateNID, err := v.calculateAndStoreStateAfterManyEvents(ctx, roomNID, prevStates, metrics)
+	if err != nil {
+		return 0, fmt.Errorf("v.calculateAndStoreStateAfterManyEvents: %w", err)
+	}
+	return stateNID, nil
 }
 
 // maxStateBlockNIDs is the maximum number of state data blocks to use to encode a snapshot of room state.

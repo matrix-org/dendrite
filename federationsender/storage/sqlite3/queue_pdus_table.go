@@ -71,7 +71,7 @@ const selectQueuePDUsServerNamesSQL = "" +
 
 type queuePDUsStatements struct {
 	db                                *sql.DB
-	writer                            *sqlutil.TransactionWriter
+	writer                            sqlutil.TransactionWriter
 	insertQueuePDUStmt                *sql.Stmt
 	selectQueueNextTransactionIDStmt  *sql.Stmt
 	selectQueuePDUsByTransactionStmt  *sql.Stmt

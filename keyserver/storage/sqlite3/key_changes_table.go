@@ -52,7 +52,7 @@ const selectKeyChangesSQL = "" +
 
 type keyChangesStatements struct {
 	db                   *sql.DB
-	writer               *sqlutil.TransactionWriter
+	writer               sqlutil.TransactionWriter
 	upsertKeyChangeStmt  *sql.Stmt
 	selectKeyChangesStmt *sql.Stmt
 }

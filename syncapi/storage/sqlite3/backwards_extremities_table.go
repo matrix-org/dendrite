@@ -49,7 +49,7 @@ const deleteBackwardExtremitySQL = "" +
 
 type backwardExtremitiesStatements struct {
 	db                                   *sql.DB
-	writer                               *sqlutil.TransactionWriter
+	writer                               sqlutil.TransactionWriter
 	insertBackwardExtremityStmt          *sql.Stmt
 	selectBackwardExtremitiesForRoomStmt *sql.Stmt
 	deleteBackwardExtremityStmt          *sql.Stmt

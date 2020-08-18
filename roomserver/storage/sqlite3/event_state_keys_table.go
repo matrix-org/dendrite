@@ -64,17 +64,15 @@ const bulkSelectEventStateKeyNIDSQL = `
 
 type eventStateKeyStatements struct {
 	db                             *sql.DB
-	writer                         *sqlutil.TransactionWriter
 	insertEventStateKeyNIDStmt     *sql.Stmt
 	selectEventStateKeyNIDStmt     *sql.Stmt
 	bulkSelectEventStateKeyNIDStmt *sql.Stmt
 	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
-func NewSqliteEventStateKeysTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.EventStateKeys, error) {
+func NewSqliteEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
 	s := &eventStateKeyStatements{
-		db:     db,
-		writer: writer,
+		db: db,
 	}
 	_, err := db.Exec(eventStateKeysSchema)
 	if err != nil {
@@ -91,19 +89,15 @@ func NewSqliteEventStateKeysTable(db *sql.DB, writer *sqlutil.TransactionWriter)
 func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
-	var eventStateKeyNID int64
-	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		insertStmt := sqlutil.TxStmt(txn, s.insertEventStateKeyNIDStmt)
-		res, err := insertStmt.ExecContext(ctx, eventStateKey)
-		if err != nil {
-			return err
-		}
-		eventStateKeyNID, err = res.LastInsertId()
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	insertStmt := sqlutil.TxStmt(txn, s.insertEventStateKeyNIDStmt)
+	res, err := insertStmt.ExecContext(ctx, eventStateKey)
+	if err != nil {
+		return 0, err
+	}
+	eventStateKeyNID, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
