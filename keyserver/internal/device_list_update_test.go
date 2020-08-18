@@ -91,6 +91,10 @@ func (d *mockDeviceListUpdaterDatabase) PrevIDsExists(ctx context.Context, userI
 	return d.prevIDsExist(userID, prevIDs), nil
 }
 
+func (d *mockDeviceListUpdaterDatabase) DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
+	return nil
+}
+
 type roundTripper struct {
 	fn func(*http.Request) (*http.Response, error)
 }

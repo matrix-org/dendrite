@@ -91,6 +91,9 @@ type DeviceListUpdaterDatabase interface {
 
 	// PrevIDsExists returns true if all prev IDs exist for this user.
 	PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error)
+
+	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` or `StreamID` already then it will be replaced.
+	DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error
 }
 
 // KeyChangeProducer is the interface for producers.KeyChange useful for testing.
@@ -354,6 +357,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevices) error {
 	ctx := context.Background() // we've got the keys, don't time out when persisting them to the database.
 	keys := make([]api.DeviceMessage, len(res.Devices))
+	existingKeys := make([]api.DeviceMessage, len(res.Devices))
 	for i, device := range res.Devices {
 		keyJSON, err := json.Marshal(device.Keys)
 		if err != nil {
@@ -369,7 +373,21 @@ func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevi
 				KeyJSON:     keyJSON,
 			},
 		}
+		existingKeys[i] = api.DeviceMessage{
+			DeviceKeys: api.DeviceKeys{
+				UserID:   res.UserID,
+				DeviceID: device.DeviceID,
+			},
+		}
 	}
+	// fetch what keys we had already and only emit changes
+	if err := u.db.DeviceKeysJSON(ctx, existingKeys); err != nil {
+		// non-fatal, log and continue
+		util.GetLogger(ctx).WithError(err).WithField("user_id", res.UserID).Errorf(
+			"failed to query device keys json for calculating diffs",
+		)
+	}
+
 	err := u.db.StoreRemoteDeviceKeys(ctx, keys, []string{res.UserID})
 	if err != nil {
 		return fmt.Errorf("failed to store remote device keys: %w", err)
@@ -378,7 +396,7 @@ func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevi
 	if err != nil {
 		return fmt.Errorf("failed to mark device list as fresh: %w", err)
 	}
-	err = u.producer.ProduceKeyChanges(keys)
+	err = emitDeviceKeyChanges(u.producer, existingKeys, keys)
 	if err != nil {
 		return fmt.Errorf("failed to emit key changes for fresh device list: %w", err)
 	}
