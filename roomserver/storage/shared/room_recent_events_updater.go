@@ -18,7 +18,7 @@ type roomRecentEventsUpdater struct {
 	currentStateSnapshotNID types.StateSnapshotNID
 }
 
-func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, func() error, error) {
+func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.RoomNID, useTxns bool) (types.RoomRecentEventsUpdater, func() error, error) {
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, nil, roomNID)
 	if err != nil && err != sql.ErrNoRows {
@@ -40,13 +40,13 @@ func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.
 	}
 	var txn *sql.Tx
 	cancel := func() error { return nil }
-	/*
+	if useTxns {
 		txn, err := d.DB.Begin()
 		if err != nil {
 			return nil, nil, fmt.Errorf("d.DB.Begin: %w", err)
 		}
 		cancel = func() error { return txn.Commit() }
-	*/
+	}
 	return &roomRecentEventsUpdater{
 		transaction{ctx, txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
 	}, cancel, nil

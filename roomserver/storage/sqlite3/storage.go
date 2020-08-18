@@ -16,12 +16,14 @@
 package sqlite3
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -132,4 +134,10 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 		RedactionsTable:     redactions,
 	}
 	return &d, nil
+}
+
+func (d *Database) GetLatestEventsForUpdate(
+	ctx context.Context, roomNID types.RoomNID,
+) (types.RoomRecentEventsUpdater, func() error, error) {
+	return shared.NewRoomRecentEventsUpdater(d, ctx, roomNID, false)
 }

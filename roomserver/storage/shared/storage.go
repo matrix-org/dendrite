@@ -353,7 +353,7 @@ func (d *Database) MembershipUpdater(
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
 ) (types.RoomRecentEventsUpdater, func() error, error) {
-	return NewRoomRecentEventsUpdater(d, ctx, roomNID)
+	return NewRoomRecentEventsUpdater(d, ctx, roomNID, true)
 }
 
 // nolint:gocyclo
@@ -570,12 +570,10 @@ func (d *Database) handleRedactions(
 			return nil, "", nil
 		}
 
-		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			return d.RedactionsTable.InsertRedaction(ctx, txn, tables.RedactionInfo{
-				Validated:        false,
-				RedactionEventID: event.EventID(),
-				RedactsEventID:   event.Redacts(),
-			})
+		err = d.RedactionsTable.InsertRedaction(ctx, txn, tables.RedactionInfo{
+			Validated:        false,
+			RedactionEventID: event.EventID(),
+			RedactsEventID:   event.Redacts(),
 		})
 		if err != nil {
 			return nil, "", err
@@ -604,9 +602,7 @@ func (d *Database) handleRedactions(
 		redactedEvent.Event = redactedEvent.Redact()
 	}
 	// overwrite the eventJSON table
-	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-		return d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
-	})
+	err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
 	if err != nil {
 		return nil, "", err
 	}
