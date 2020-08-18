@@ -139,5 +139,5 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
 ) (types.RoomRecentEventsUpdater, func() error, error) {
-	return shared.NewRoomRecentEventsUpdater(d, ctx, roomNID, false)
+	return shared.NewRoomRecentEventsUpdater(&d.Database, ctx, roomNID, false)
 }
