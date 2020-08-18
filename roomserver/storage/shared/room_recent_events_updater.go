@@ -41,7 +41,7 @@ func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.
 	var txn *sql.Tx
 	cancel := func() error { return nil }
 	if useTxns {
-		txn, err := d.DB.Begin()
+		txn, err = d.DB.Begin()
 		if err != nil {
 			return nil, nil, fmt.Errorf("d.DB.Begin: %w", err)
 		}
