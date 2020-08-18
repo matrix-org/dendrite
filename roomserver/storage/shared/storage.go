@@ -347,7 +347,7 @@ func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.MembershipUpdater, func() error, error) {
-	return NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion)
+	return NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion, true)
 }
 
 func (d *Database) GetLatestEventsForUpdate(

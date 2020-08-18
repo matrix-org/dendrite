@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -140,4 +141,11 @@ func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
 ) (types.RoomRecentEventsUpdater, func() error, error) {
 	return shared.NewRoomRecentEventsUpdater(&d.Database, ctx, roomNID, false)
+}
+
+func (d *Database) MembershipUpdater(
+	ctx context.Context, roomID, targetUserID string,
+	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
+) (types.MembershipUpdater, func() error, error) {
+	return shared.NewMembershipUpdater(ctx, &d.Database, roomID, targetUserID, targetLocal, roomVersion, false)
 }

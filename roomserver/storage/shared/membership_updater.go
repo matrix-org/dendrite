@@ -21,6 +21,7 @@ type membershipUpdater struct {
 func NewMembershipUpdater(
 	ctx context.Context, d *Database, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
+	useTxns bool,
 ) (types.MembershipUpdater, func() error, error) {
 	txn, err := d.DB.Begin()
 	if err != nil {
@@ -41,6 +42,10 @@ func NewMembershipUpdater(
 	targetUserNID, err := d.assignStateKeyNID(ctx, txn, targetUserID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("d.AssignStateKeyNID: %w", err)
+	}
+
+	if !useTxns {
+		txn = nil
 	}
 
 	updater, cleanup, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
