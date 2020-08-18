@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -54,17 +53,11 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 	sendAsServer string,
 	transactionID *api.TransactionID,
 ) (err error) {
-	updater, err := r.DB.GetLatestEventsForUpdate(ctx, roomNID)
+	updater, cleanup, err := r.DB.GetLatestEventsForUpdate(ctx, roomNID)
 	if err != nil {
 		return
 	}
-	succeeded := false
-	defer func() {
-		txerr := sqlutil.EndTransaction(updater, &succeeded)
-		if err == nil && txerr != nil {
-			err = txerr
-		}
-	}()
+	defer cleanup() // nolint:errcheck
 
 	u := latestEventsUpdater{
 		ctx:           ctx,
@@ -81,7 +74,6 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 		return err
 	}
 
-	succeeded = true
 	return
 }
 

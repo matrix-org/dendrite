@@ -112,10 +112,11 @@ func (r *RoomserverInternalAPI) updateMembership(
 		return updates, nil
 	}
 
-	mu, err := updater.MembershipUpdater(targetUserNID, r.isLocalTarget(add))
+	mu, cleanup, err := updater.MembershipUpdater(targetUserNID, r.isLocalTarget(add))
 	if err != nil {
 		return nil, err
 	}
+	defer cleanup() // nolint:errcheck
 
 	switch newMembership {
 	case gomatrixserverlib.Invite:

@@ -20,11 +20,10 @@ type membershipUpdater struct {
 func NewMembershipUpdater(
 	ctx context.Context, d *Database, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-	useTxns bool,
-) (types.MembershipUpdater, error) {
+) (types.MembershipUpdater, func() error, error) {
 	txn, err := d.DB.Begin()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	succeeded := false
 	defer func() {
@@ -35,25 +34,21 @@ func NewMembershipUpdater(
 
 	roomNID, err := d.assignRoomNID(ctx, txn, roomID, roomVersion)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	targetUserNID, err := d.assignStateKeyNID(ctx, txn, targetUserID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	updater, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
+	updater, cleanup, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	succeeded = true
-	if !useTxns {
-		txn.Commit() // nolint: errcheck
-		updater.transaction.txn = nil
-	}
-	return updater, nil
+	return updater, cleanup, nil
 }
 
 func (d *Database) membershipUpdaterTxn(
@@ -62,20 +57,20 @@ func (d *Database) membershipUpdaterTxn(
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
 	targetLocal bool,
-) (*membershipUpdater, error) {
+) (*membershipUpdater, func() error, error) {
 
 	if err := d.MembershipTable.InsertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	membership, err := d.MembershipTable.SelectMembershipForUpdate(ctx, txn, roomNID, targetUserNID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &membershipUpdater{
 		transaction{ctx, txn}, d, roomNID, targetUserNID, membership,
-	}, nil
+	}, func() error { return txn.Commit() }, nil
 }
 
 // IsInvite implements types.MembershipUpdater

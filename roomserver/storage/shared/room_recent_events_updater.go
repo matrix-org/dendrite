@@ -18,16 +18,16 @@ type roomRecentEventsUpdater struct {
 	currentStateSnapshotNID types.StateSnapshotNID
 }
 
-func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.RoomNID, useTxns bool) (types.RoomRecentEventsUpdater, error) {
+func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, func() error, error) {
 	txn, err := d.DB.Begin()
 	if err != nil {
-		return nil, fmt.Errorf("d.DB.Begin: %w", err)
+		return nil, nil, fmt.Errorf("d.DB.Begin: %w", err)
 	}
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
 	if err != nil && err != sql.ErrNoRows {
 		txn.Rollback() // nolint: errcheck
-		return nil, fmt.Errorf("d.RoomsTable.SelectLatestEventsNIDsForUpdate: %w", err)
+		return nil, nil, fmt.Errorf("d.RoomsTable.SelectLatestEventsNIDsForUpdate: %w", err)
 	}
 	var stateAndRefs []types.StateAtEventAndReference
 	var lastEventIDSent string
@@ -35,23 +35,19 @@ func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.
 		stateAndRefs, err = d.EventsTable.BulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
 		if err != nil {
 			txn.Rollback() // nolint: errcheck
-			return nil, fmt.Errorf("d.EventsTable.BulkSelectStateAtEventAndReference: %w", err)
+			return nil, nil, fmt.Errorf("d.EventsTable.BulkSelectStateAtEventAndReference: %w", err)
 		}
 		if lastEventNIDSent != 0 {
 			lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, txn, lastEventNIDSent)
 			if err != nil {
 				txn.Rollback() // nolint: errcheck
-				return nil, fmt.Errorf("d.EventsTable.SelectEventID: %w", err)
+				return nil, nil, fmt.Errorf("d.EventsTable.SelectEventID: %w", err)
 			}
 		}
 	}
-	if !useTxns {
-		txn.Commit() // nolint: errcheck
-		txn = nil
-	}
 	return &roomRecentEventsUpdater{
 		transaction{ctx, txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
-	}, nil
+	}, func() error { return txn.Commit() }, nil
 }
 
 // RoomVersion implements types.RoomRecentEventsUpdater
@@ -119,6 +115,6 @@ func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error
 	return u.d.EventsTable.UpdateEventSentToOutput(u.ctx, u.txn, eventNID)
 }
 
-func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (types.MembershipUpdater, error) {
+func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (types.MembershipUpdater, func() error, error) {
 	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomNID, targetUserNID, targetLocal)
 }

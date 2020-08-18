@@ -161,10 +161,11 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		// The invite originated over federation. Process the membership
 		// update, which will notify the sync API etc about the incoming
 		// invite.
-		updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
+		updater, cleanup, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
 		if err != nil {
 			return fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 		}
+		defer cleanup() // nolint:errcheck
 
 		unwrapped := event.Unwrap()
 		outputUpdates, err := updateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)

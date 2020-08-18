@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -41,6 +42,7 @@ type Database struct {
 	invites        tables.Invites
 	membership     tables.Membership
 	db             *sql.DB
+	writer         *sqlutil.TransactionWriter
 }
 
 // Open a sqlite database.
@@ -51,7 +53,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	writer := sqlutil.NewTransactionWriter()
+	d.writer = sqlutil.NewTransactionWriter()
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
 	//d.db.Exec("PRAGMA read_uncommitted = true;")
 
@@ -61,59 +63,59 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	// which it will never obtain.
 	d.db.SetMaxOpenConns(20)
 
-	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db, writer)
+	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	d.eventTypes, err = NewSqliteEventTypesTable(d.db, writer)
+	d.eventTypes, err = NewSqliteEventTypesTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	d.eventJSON, err = NewSqliteEventJSONTable(d.db, writer)
+	d.eventJSON, err = NewSqliteEventJSONTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	d.events, err = NewSqliteEventsTable(d.db, writer)
+	d.events, err = NewSqliteEventsTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	d.rooms, err = NewSqliteRoomsTable(d.db, writer)
+	d.rooms, err = NewSqliteRoomsTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	d.transactions, err = NewSqliteTransactionsTable(d.db, writer)
+	d.transactions, err = NewSqliteTransactionsTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	stateBlock, err := NewSqliteStateBlockTable(d.db, writer)
+	stateBlock, err := NewSqliteStateBlockTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db, writer)
+	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	d.prevEvents, err = NewSqlitePrevEventsTable(d.db, writer)
+	d.prevEvents, err = NewSqlitePrevEventsTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	roomAliases, err := NewSqliteRoomAliasesTable(d.db, writer)
+	roomAliases, err := NewSqliteRoomAliasesTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	d.invites, err = NewSqliteInvitesTable(d.db, writer)
+	d.invites, err = NewSqliteInvitesTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	d.membership, err = NewSqliteMembershipTable(d.db, writer)
+	d.membership, err = NewSqliteMembershipTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	published, err := NewSqlitePublishedTable(d.db, writer)
+	published, err := NewSqlitePublishedTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
-	redactions, err := NewSqliteRedactionsTable(d.db, writer)
+	redactions, err := NewSqliteRedactionsTable(d.db, d.writer)
 	if err != nil {
 		return nil, err
 	}
@@ -137,27 +139,21 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	return &d, nil
 }
 
-func (d *Database) GetLatestEventsForUpdate(
-	ctx context.Context, roomNID types.RoomNID,
-) (types.RoomRecentEventsUpdater, error) {
-	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
-	// multiple write transactions on sqlite. The code will perform additional
-	// write transactions independent of this one which will consistently cause
-	// 'database is locked' errors. As sqlite doesn't support multi-process on the
-	// same DB anyway, and we only execute updates sequentially, the only worries
-	// are for rolling back when things go wrong. (atomicity)
-	return shared.NewRoomRecentEventsUpdater(&d.Database, ctx, roomNID, false)
+func (d *Database) StoreEvent(
+	ctx context.Context, event gomatrixserverlib.Event,
+	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
+) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
+	return d.Database.StoreEvent(ctx, event, txnAndSessionID, authEventNIDs)
 }
 
-func (d *Database) MembershipUpdater(
-	ctx context.Context, roomID, targetUserID string,
-	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-) (updater types.MembershipUpdater, err error) {
+func (d *Database) GetLatestEventsForUpdate(
+	ctx context.Context, roomNID types.RoomNID,
+) (types.RoomRecentEventsUpdater, func() error, error) {
 	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
 	// multiple write transactions on sqlite. The code will perform additional
 	// write transactions independent of this one which will consistently cause
 	// 'database is locked' errors. As sqlite doesn't support multi-process on the
 	// same DB anyway, and we only execute updates sequentially, the only worries
 	// are for rolling back when things go wrong. (atomicity)
-	return shared.NewMembershipUpdater(ctx, &d.Database, roomID, targetUserID, targetLocal, roomVersion, false)
+	return shared.NewRoomRecentEventsUpdater(&d.Database, ctx, roomNID)
 }
