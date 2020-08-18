@@ -73,10 +73,10 @@ type joinedHostsStatements struct {
 	// selectJoinedHostsForRoomsStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
-func NewSQLiteJoinedHostsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (s *joinedHostsStatements, err error) {
+func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
 	s = &joinedHostsStatements{
 		db:     db,
-		writer: writer,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err = db.Exec(joinedHostsSchema)
 	if err != nil {

@@ -61,9 +61,9 @@ type threepidStatements struct {
 	deleteThreePIDStmt              *sql.Stmt
 }
 
-func (s *threepidStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter) (err error) {
+func (s *threepidStatements) prepare(db *sql.DB) (err error) {
 	s.db = db
-	s.writer = writer
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(threepidSchema)
 	if err != nil {
 		return

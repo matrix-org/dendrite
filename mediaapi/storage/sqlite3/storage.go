@@ -31,7 +31,6 @@ import (
 type Database struct {
 	statements statements
 	db         *sql.DB
-	writer     *sqlutil.TransactionWriter
 }
 
 // Open opens a postgres database.
@@ -41,8 +40,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewTransactionWriter()
-	if err = d.statements.prepare(d.db, d.writer); err != nil {
+	if err = d.statements.prepare(d.db); err != nil {
 		return nil, err
 	}
 	return &d, nil

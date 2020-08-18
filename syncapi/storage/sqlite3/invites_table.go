@@ -67,10 +67,10 @@ type inviteEventsStatements struct {
 	selectMaxInviteIDStmt         *sql.Stmt
 }
 
-func NewSqliteInvitesTable(db *sql.DB, writer *sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.Invites, error) {
+func NewSqliteInvitesTable(db *sql.DB, streamID *streamIDStatements) (tables.Invites, error) {
 	s := &inviteEventsStatements{
 		db:                 db,
-		writer:             writer,
+		writer:             sqlutil.NewTransactionWriter(),
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(inviteEventsSchema)
@@ -95,12 +95,13 @@ func NewSqliteInvitesTable(db *sql.DB, writer *sqlutil.TransactionWriter, stream
 func (s *inviteEventsStatements) InsertInviteEvent(
 	ctx context.Context, txn *sql.Tx, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
-	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
-	if err != nil {
-		return
-	}
-
 	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
+		var err error
+		streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+		if err != nil {
+			return err
+		}
+
 		var headeredJSON []byte
 		headeredJSON, err = json.Marshal(inviteEvent)
 		if err != nil {
@@ -123,11 +124,13 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 func (s *inviteEventsStatements) DeleteInviteEvent(
 	ctx context.Context, inviteEventID string,
 ) (types.StreamPosition, error) {
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, nil)
-	if err != nil {
-		return streamPos, err
-	}
-	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+	var streamPos types.StreamPosition
+	err := s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		var err error
+		streamPos, err = s.streamIDStatements.nextStreamID(ctx, nil)
+		if err != nil {
+			return err
+		}
 		_, err = s.deleteInviteEventStmt.ExecContext(ctx, streamPos, inviteEventID)
 		return err
 	})

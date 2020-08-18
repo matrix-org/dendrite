@@ -79,10 +79,10 @@ type sendToDeviceStatements struct {
 	countSendToDeviceMessagesStmt  *sql.Stmt
 }
 
-func NewSqliteSendToDeviceTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.SendToDevice, error) {
+func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 	s := &sendToDeviceStatements{
 		db:     db,
-		writer: writer,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err := db.Exec(sendToDeviceSchema)
 	if err != nil {

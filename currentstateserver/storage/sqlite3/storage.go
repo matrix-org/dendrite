@@ -22,11 +22,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	writer := sqlutil.NewTransactionWriter()
 	if err = d.PartitionOffsetStatements.Prepare(d.db, "currentstate"); err != nil {
 		return nil, err
 	}
-	currRoomState, err := NewSqliteCurrentRoomStateTable(d.db, writer)
+	currRoomState, err := NewSqliteCurrentRoomStateTable(d.db)
 	if err != nil {
 		return nil, err
 	}

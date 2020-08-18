@@ -57,10 +57,10 @@ type keyChangesStatements struct {
 	selectKeyChangesStmt *sql.Stmt
 }
 
-func NewSqliteKeyChangesTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.KeyChanges, error) {
+func NewSqliteKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 	s := &keyChangesStatements{
 		db:     db,
-		writer: writer,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err := db.Exec(keyChangesSchema)
 	if err != nil {

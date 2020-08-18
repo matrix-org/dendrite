@@ -67,9 +67,9 @@ type accountsStatements struct {
 	serverName                    gomatrixserverlib.ServerName
 }
 
-func (s *accountsStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter, server gomatrixserverlib.ServerName) (err error) {
+func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
-	s.writer = writer
+	s.writer = sqlutil.NewTransactionWriter()
 	_, err = db.Exec(accountsSchema)
 	if err != nil {
 		return

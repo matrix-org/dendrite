@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -58,16 +57,12 @@ SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method 
 `
 
 type thumbnailStatements struct {
-	db                   *sql.DB
-	writer               *sqlutil.TransactionWriter
 	insertThumbnailStmt  *sql.Stmt
 	selectThumbnailStmt  *sql.Stmt
 	selectThumbnailsStmt *sql.Stmt
 }
 
-func (s *thumbnailStatements) prepare(db *sql.DB, writer *sqlutil.TransactionWriter) (err error) {
-	s.db = db
-	s.writer = writer
+func (s *thumbnailStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(thumbnailSchema)
 	if err != nil {
 		return
@@ -84,21 +79,18 @@ func (s *thumbnailStatements) insertThumbnail(
 	ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata,
 ) error {
 	thumbnailMetadata.MediaMetadata.CreationTimestamp = types.UnixMs(time.Now().UnixNano() / 1000000)
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertThumbnailStmt)
-		_, err := stmt.ExecContext(
-			ctx,
-			thumbnailMetadata.MediaMetadata.MediaID,
-			thumbnailMetadata.MediaMetadata.Origin,
-			thumbnailMetadata.MediaMetadata.ContentType,
-			thumbnailMetadata.MediaMetadata.FileSizeBytes,
-			thumbnailMetadata.MediaMetadata.CreationTimestamp,
-			thumbnailMetadata.ThumbnailSize.Width,
-			thumbnailMetadata.ThumbnailSize.Height,
-			thumbnailMetadata.ThumbnailSize.ResizeMethod,
-		)
-		return err
-	})
+	_, err := s.insertThumbnailStmt.ExecContext(
+		ctx,
+		thumbnailMetadata.MediaMetadata.MediaID,
+		thumbnailMetadata.MediaMetadata.Origin,
+		thumbnailMetadata.MediaMetadata.ContentType,
+		thumbnailMetadata.MediaMetadata.FileSizeBytes,
+		thumbnailMetadata.MediaMetadata.CreationTimestamp,
+		thumbnailMetadata.ThumbnailSize.Width,
+		thumbnailMetadata.ThumbnailSize.Height,
+		thumbnailMetadata.ThumbnailSize.ResizeMethod,
+	)
+	return err
 }
 
 func (s *thumbnailStatements) selectThumbnail(

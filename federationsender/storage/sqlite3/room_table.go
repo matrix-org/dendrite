@@ -50,10 +50,10 @@ type roomStatements struct {
 	updateRoomStmt          *sql.Stmt
 }
 
-func NewSQLiteRoomsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (s *roomStatements, err error) {
+func NewSQLiteRoomsTable(db *sql.DB) (s *roomStatements, err error) {
 	s = &roomStatements{
 		db:     db,
-		writer: writer,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err = db.Exec(roomSchema)
 	if err != nil {

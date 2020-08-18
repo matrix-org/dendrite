@@ -81,10 +81,10 @@ type queuePDUsStatements struct {
 	// deleteQueuePDUsStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
-func NewSQLiteQueuePDUsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (s *queuePDUsStatements, err error) {
+func NewSQLiteQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
 	s = &queuePDUsStatements{
 		db:     db,
-		writer: writer,
+		writer: sqlutil.NewTransactionWriter(),
 	}
 	_, err = db.Exec(queuePDUsSchema)
 	if err != nil {

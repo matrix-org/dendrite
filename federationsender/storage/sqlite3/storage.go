@@ -39,28 +39,27 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	writer := sqlutil.NewTransactionWriter()
-	joinedHosts, err := NewSQLiteJoinedHostsTable(d.db, writer)
+	joinedHosts, err := NewSQLiteJoinedHostsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	rooms, err := NewSQLiteRoomsTable(d.db, writer)
+	rooms, err := NewSQLiteRoomsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	queuePDUs, err := NewSQLiteQueuePDUsTable(d.db, writer)
+	queuePDUs, err := NewSQLiteQueuePDUsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	queueEDUs, err := NewSQLiteQueueEDUsTable(d.db, writer)
+	queueEDUs, err := NewSQLiteQueueEDUsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	queueJSON, err := NewSQLiteQueueJSONTable(d.db, writer)
+	queueJSON, err := NewSQLiteQueueJSONTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	blacklist, err := NewSQLiteBlacklistTable(d.db, writer)
+	blacklist, err := NewSQLiteBlacklistTable(d.db)
 	if err != nil {
 		return nil, err
 	}
