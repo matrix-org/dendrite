@@ -28,7 +28,7 @@ const selectStreamIDStmt = "" +
 
 type streamIDStatements struct {
 	db                   *sql.DB
-	writer               *sqlutil.TransactionWriter
+	writer               sqlutil.TransactionWriter
 	increaseStreamIDStmt *sql.Stmt
 	selectStreamIDStmt   *sql.Stmt
 }

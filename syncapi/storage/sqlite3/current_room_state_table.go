@@ -85,7 +85,7 @@ const selectEventsWithEventIDsSQL = "" +
 
 type currentRoomStateStatements struct {
 	db                              *sql.DB
-	writer                          *sqlutil.TransactionWriter
+	writer                          sqlutil.TransactionWriter
 	streamIDStatements              *streamIDStatements
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt

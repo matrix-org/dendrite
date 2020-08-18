@@ -52,7 +52,7 @@ const insertFilterSQL = "" +
 
 type filterStatements struct {
 	db                          *sql.DB
-	writer                      *sqlutil.TransactionWriter
+	writer                      sqlutil.TransactionWriter
 	selectFilterStmt            *sql.Stmt
 	selectFilterIDByContentStmt *sql.Stmt
 	insertFilterStmt            *sql.Stmt

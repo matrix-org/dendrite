@@ -63,7 +63,7 @@ const upsertServerKeysSQL = "" +
 
 type serverKeyStatements struct {
 	db                       *sql.DB
-	writer                   *sqlutil.TransactionWriter
+	writer                   sqlutil.TransactionWriter
 	bulkSelectServerKeysStmt *sql.Stmt
 	upsertServerKeysStmt     *sql.Stmt
 }

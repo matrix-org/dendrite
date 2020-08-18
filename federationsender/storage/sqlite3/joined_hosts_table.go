@@ -65,7 +65,7 @@ const selectJoinedHostsForRoomsSQL = "" +
 
 type joinedHostsStatements struct {
 	db                       *sql.DB
-	writer                   *sqlutil.TransactionWriter
+	writer                   sqlutil.TransactionWriter
 	insertJoinedHostsStmt    *sql.Stmt
 	deleteJoinedHostsStmt    *sql.Stmt
 	selectJoinedHostsStmt    *sql.Stmt

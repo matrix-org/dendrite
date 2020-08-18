@@ -64,7 +64,7 @@ const selectQueueServerNamesSQL = "" +
 
 type queueEDUsStatements struct {
 	db                                   *sql.DB
-	writer                               *sqlutil.TransactionWriter
+	writer                               sqlutil.TransactionWriter
 	insertQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUReferenceJSONCountStmt *sql.Stmt
