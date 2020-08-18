@@ -357,16 +357,16 @@ func (d *Database) StoreEvent(
 		err              error
 	)
 
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
-		if txnAndSessionID != nil {
-			if err = d.TransactionsTable.InsertTransaction(
-				ctx, txn, txnAndSessionID.TransactionID,
-				txnAndSessionID.SessionID, event.Sender(), event.EventID(),
-			); err != nil {
-				return fmt.Errorf("d.TransactionsTable.InsertTransaction: %w", err)
-			}
+	if txnAndSessionID != nil {
+		if err = d.TransactionsTable.InsertTransaction(
+			ctx, nil, txnAndSessionID.TransactionID,
+			txnAndSessionID.SessionID, event.Sender(), event.EventID(),
+		); err != nil {
+			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.TransactionsTable.InsertTransaction: %w", err)
 		}
+	}
 
+	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
 		// TODO: Here we should aim to have two different code paths for new rooms
 		// vs existing ones.
 
@@ -426,6 +426,9 @@ func (d *Database) StoreEvent(
 		}
 
 		redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
+		if err != nil {
+			return fmt.Errorf("d.handleRedactions: %w", err)
+		}
 		return nil
 	})
 	if err != nil {
@@ -456,15 +459,12 @@ func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
-	// Check if we already have a numeric ID in the database.
-	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
+	// Try to insert the room. If it's ineffectual then we have the
+	// room in the database already.
+	roomNID, err := d.RoomsTable.InsertRoomNID(ctx, txn, roomID, roomVersion)
 	if err == sql.ErrNoRows {
-		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.RoomsTable.InsertRoomNID(ctx, txn, roomID, roomVersion)
-		if err == sql.ErrNoRows {
-			// We raced with another insert so run the select again.
-			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
-		}
+		// Look up the room NID that we already have.
+		roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 	}
 	return roomNID, err
 }

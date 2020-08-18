@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -20,25 +21,28 @@ type roomRecentEventsUpdater struct {
 func NewRoomRecentEventsUpdater(d *Database, ctx context.Context, roomNID types.RoomNID, useTxns bool) (types.RoomRecentEventsUpdater, error) {
 	txn, err := d.DB.Begin()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("d.DB.Begin: %w", err)
 	}
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		txn.Rollback() // nolint: errcheck
-		return nil, err
+		return nil, fmt.Errorf("d.RoomsTable.SelectLatestEventsNIDsForUpdate: %w", err)
 	}
-	stateAndRefs, err := d.EventsTable.BulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
-	if err != nil {
-		txn.Rollback() // nolint: errcheck
-		return nil, err
-	}
+	var stateAndRefs []types.StateAtEventAndReference
 	var lastEventIDSent string
-	if lastEventNIDSent != 0 {
-		lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, txn, lastEventNIDSent)
+	if err == nil {
+		stateAndRefs, err = d.EventsTable.BulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
 		if err != nil {
 			txn.Rollback() // nolint: errcheck
-			return nil, err
+			return nil, fmt.Errorf("d.EventsTable.BulkSelectStateAtEventAndReference: %w", err)
+		}
+		if lastEventNIDSent != 0 {
+			lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, txn, lastEventNIDSent)
+			if err != nil {
+				txn.Rollback() // nolint: errcheck
+				return nil, fmt.Errorf("d.EventsTable.SelectEventID: %w", err)
+			}
 		}
 	}
 	if !useTxns {
