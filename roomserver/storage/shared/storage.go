@@ -398,34 +398,38 @@ func (d *Database) StoreEvent(
 			}
 		}
 
-		if eventNID, stateNID, err = d.EventsTable.InsertEvent(
-			ctx,
-			txn,
-			roomNID,
-			eventTypeNID,
-			eventStateKeyNID,
-			event.EventID(),
-			event.EventReference().EventSHA256,
-			authEventNIDs,
-			event.Depth(),
-		); err != nil {
+		if eventNID, stateNID, err = d.EventsTable.SelectEvent(ctx, txn, event.EventID()); err != nil {
 			if err == sql.ErrNoRows {
-				// We've already inserted the event so select the numeric event ID
-				eventNID, stateNID, err = d.EventsTable.SelectEvent(ctx, txn, event.EventID())
-			}
-			if err != nil {
-				return err
+				// The event doesn't already exist in the database so try to
+				// insert an event entry for it.
+				if eventNID, stateNID, err = d.EventsTable.InsertEvent(
+					ctx,
+					txn,
+					roomNID,
+					eventTypeNID,
+					eventStateKeyNID,
+					event.EventID(),
+					event.EventReference().EventSHA256,
+					authEventNIDs,
+					event.Depth(),
+				); err != nil {
+					return fmt.Errorf("d.EventsTable.InsertEvent: %w", err)
+				}
+
+				// Then insert the event JSON itself.
+				if err = d.EventJSONTable.InsertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
+					return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
+				}
+			} else {
+				return fmt.Errorf("d.EventsTable.SelectEvent: %w", err)
 			}
 		}
 
-		if err = d.EventJSONTable.InsertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
-			return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
-		}
 		redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
 		return nil
 	})
 	if err != nil {
-		return 0, types.StateAtEvent{}, nil, "", err
+		return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("sqlutil.WithTransaction: %w", err)
 	}
 
 	return roomNID, types.StateAtEvent{
