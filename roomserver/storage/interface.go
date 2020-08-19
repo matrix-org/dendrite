@@ -86,7 +86,7 @@ type Database interface {
 	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
 	// If this returns an error then no further action is required.
-	GetLatestEventsForUpdate(ctx context.Context, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error)
+	GetLatestEventsForUpdate(ctx context.Context, roomNID types.RoomNID) (types.LatestEventsUpdater, error)
 	// Look up event ID by transaction's info.
 	// This is used to determine if the room event is processed/processing already.
 	// Returns an empty string if no such event exists.

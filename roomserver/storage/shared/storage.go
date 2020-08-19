@@ -342,7 +342,7 @@ func (d *Database) MembershipUpdater(
 
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
-) (types.RoomRecentEventsUpdater, error) {
+) (types.LatestEventsUpdater, error) {
 	txn, err := d.DB.Begin()
 	if err != nil {
 		return nil, err

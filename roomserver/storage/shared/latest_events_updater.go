@@ -17,7 +17,7 @@ type latestEventsUpdater struct {
 	currentStateSnapshotNID types.StateSnapshotNID
 }
 
-func NewLatestEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error) {
+func NewLatestEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomNID types.RoomNID) (types.LatestEventsUpdater, error) {
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
 	if err != nil {

@@ -139,7 +139,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
-) (types.RoomRecentEventsUpdater, error) {
+) (types.LatestEventsUpdater, error) {
 	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
 	// multiple write transactions on sqlite. The code will perform additional
 	// write transactions independent of this one which will consistently cause

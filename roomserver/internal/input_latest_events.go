@@ -92,7 +92,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 type latestEventsUpdater struct {
 	ctx           context.Context
 	api           *RoomserverInternalAPI
-	updater       types.RoomRecentEventsUpdater
+	updater       types.LatestEventsUpdater
 	roomNID       types.RoomNID
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event

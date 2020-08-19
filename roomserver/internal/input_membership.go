@@ -29,7 +29,7 @@ import (
 // consumers about the invites added or retired by the change in current state.
 func (r *RoomserverInternalAPI) updateMemberships(
 	ctx context.Context,
-	updater types.RoomRecentEventsUpdater,
+	updater types.LatestEventsUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
 	changes := membershipChanges(removed, added)
@@ -77,7 +77,7 @@ func (r *RoomserverInternalAPI) updateMemberships(
 }
 
 func (r *RoomserverInternalAPI) updateMembership(
-	updater types.RoomRecentEventsUpdater,
+	updater types.LatestEventsUpdater,
 	targetUserNID types.EventStateKeyNID,
 	remove, add *gomatrixserverlib.Event,
 	updates []api.OutputEvent,

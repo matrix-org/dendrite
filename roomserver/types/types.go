@@ -140,10 +140,10 @@ type StateEntryList struct {
 	StateEntries  []StateEntry
 }
 
-// A RoomRecentEventsUpdater is used to update the recent events in a room.
+// A LatestEventsUpdater is used to update the recent events in a room.
 // (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
 //  lock on the row in the rooms table holding the latest events for the room.)
-type RoomRecentEventsUpdater interface {
+type LatestEventsUpdater interface {
 	// The room version of the room.
 	RoomVersion() gomatrixserverlib.RoomVersion
 	// The latest event IDs and state in the room.
