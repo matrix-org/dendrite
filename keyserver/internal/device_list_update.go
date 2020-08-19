@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	fedsenderapi "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -65,7 +66,7 @@ type DeviceListUpdater struct {
 
 	db          DeviceListUpdaterDatabase
 	producer    KeyChangeProducer
-	fedClient   *gomatrixserverlib.FederationClient
+	fedClient   fedsenderapi.FederationClient
 	workerChans []chan gomatrixserverlib.ServerName
 
 	// When device lists are stale for a user, they get inserted into this map with a channel which `Update` will
@@ -103,7 +104,7 @@ type KeyChangeProducer interface {
 
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
-	db DeviceListUpdaterDatabase, producer KeyChangeProducer, fedClient *gomatrixserverlib.FederationClient,
+	db DeviceListUpdaterDatabase, producer KeyChangeProducer, fedClient fedsenderapi.FederationClient,
 	numWorkers int,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
