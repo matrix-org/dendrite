@@ -146,7 +146,7 @@ func (d *Database) GetLatestEventsForUpdate(
 	// 'database is locked' errors. As sqlite doesn't support multi-process on the
 	// same DB anyway, and we only execute updates sequentially, the only worries
 	// are for rolling back when things go wrong. (atomicity)
-	return shared.NewRoomRecentEventsUpdater(ctx, &d.Database, nil, roomNID)
+	return shared.NewLatestEventsUpdater(ctx, &d.Database, nil, roomNID)
 }
 
 func (d *Database) MembershipUpdater(

@@ -8,7 +8,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type roomRecentEventsUpdater struct {
+type latestEventsUpdater struct {
 	transaction
 	d                       *Database
 	roomNID                 types.RoomNID
@@ -17,7 +17,7 @@ type roomRecentEventsUpdater struct {
 	currentStateSnapshotNID types.StateSnapshotNID
 }
 
-func NewRoomRecentEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error) {
+func NewLatestEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error) {
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
 	if err != nil {
@@ -37,34 +37,34 @@ func NewRoomRecentEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, r
 			return nil, err
 		}
 	}
-	return &roomRecentEventsUpdater{
+	return &latestEventsUpdater{
 		transaction{ctx, txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
 	}, nil
 }
 
 // RoomVersion implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) RoomVersion() (version gomatrixserverlib.RoomVersion) {
+func (u *latestEventsUpdater) RoomVersion() (version gomatrixserverlib.RoomVersion) {
 	version, _ = u.d.GetRoomVersionForRoomNID(u.ctx, u.roomNID)
 	return
 }
 
 // LatestEvents implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) LatestEvents() []types.StateAtEventAndReference {
+func (u *latestEventsUpdater) LatestEvents() []types.StateAtEventAndReference {
 	return u.latestEvents
 }
 
 // LastEventIDSent implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) LastEventIDSent() string {
+func (u *latestEventsUpdater) LastEventIDSent() string {
 	return u.lastEventIDSent
 }
 
 // CurrentStateSnapshotNID implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
+func (u *latestEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
 	return u.currentStateSnapshotNID
 }
 
 // StorePreviousEvents implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
+func (u *latestEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
 	for _, ref := range previousEventReferences {
 		if err := u.d.PrevEventsTable.InsertPreviousEvent(u.ctx, u.txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
 			return err
@@ -74,7 +74,7 @@ func (u *roomRecentEventsUpdater) StorePreviousEvents(eventNID types.EventNID, p
 }
 
 // IsReferenced implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
+func (u *latestEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
 	err := u.d.PrevEventsTable.SelectPreviousEventExists(u.ctx, u.txn, eventReference.EventID, eventReference.EventSHA256)
 	if err == nil {
 		return true, nil
@@ -86,7 +86,7 @@ func (u *roomRecentEventsUpdater) IsReferenced(eventReference gomatrixserverlib.
 }
 
 // SetLatestEvents implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) SetLatestEvents(
+func (u *latestEventsUpdater) SetLatestEvents(
 	roomNID types.RoomNID, latest []types.StateAtEventAndReference, lastEventNIDSent types.EventNID,
 	currentStateSnapshotNID types.StateSnapshotNID,
 ) error {
@@ -98,15 +98,15 @@ func (u *roomRecentEventsUpdater) SetLatestEvents(
 }
 
 // HasEventBeenSent implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (bool, error) {
+func (u *latestEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (bool, error) {
 	return u.d.EventsTable.SelectEventSentToOutput(u.ctx, u.txn, eventNID)
 }
 
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
-func (u *roomRecentEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
+func (u *latestEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
 	return u.d.EventsTable.UpdateEventSentToOutput(u.ctx, u.txn, eventNID)
 }
 
-func (u *roomRecentEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (types.MembershipUpdater, error) {
+func (u *latestEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (types.MembershipUpdater, error) {
 	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomNID, targetUserNID, targetLocal)
 }

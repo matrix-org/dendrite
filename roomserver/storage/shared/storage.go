@@ -347,7 +347,7 @@ func (d *Database) GetLatestEventsForUpdate(
 	if err != nil {
 		return nil, err
 	}
-	return NewRoomRecentEventsUpdater(ctx, d, txn, roomNID)
+	return NewLatestEventsUpdater(ctx, d, txn, roomNID)
 }
 
 func (d *Database) StoreEvent(
