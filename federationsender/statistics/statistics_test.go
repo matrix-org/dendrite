@@ -36,7 +36,10 @@ func TestBackoff(t *testing.T) {
 		// completes but we will find out how long the backoff should
 		// have been.
 		interrupt := make(chan bool, 1)
-		close(interrupt)
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			close(interrupt)
+		}()
 
 		// Get the duration.
 		duration, blacklist := server.BackoffIfRequired(backingOff, interrupt)
