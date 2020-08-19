@@ -66,9 +66,9 @@ func (u *LatestEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
 
 // StorePreviousEvents implements types.RoomRecentEventsUpdater
 func (u *LatestEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
-	return u.d.Writer.Do(u.d.DB, nil, func(txn *sql.Tx) error {
+	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
 		for _, ref := range previousEventReferences {
-			if err := u.d.PrevEventsTable.InsertPreviousEvent(u.ctx, u.txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			if err := u.d.PrevEventsTable.InsertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
 				return fmt.Errorf("u.d.PrevEventsTable.InsertPreviousEvent: %w", err)
 			}
 		}
@@ -97,8 +97,8 @@ func (u *LatestEventsUpdater) SetLatestEvents(
 	for i := range latest {
 		eventNIDs[i] = latest[i].EventNID
 	}
-	return u.d.Writer.Do(u.d.DB, nil, func(txn *sql.Tx) error {
-		if err := u.d.RoomsTable.UpdateLatestEventNIDs(u.ctx, u.txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
+	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
+		if err := u.d.RoomsTable.UpdateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
 			return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
 		}
 		return nil
@@ -112,8 +112,8 @@ func (u *LatestEventsUpdater) HasEventBeenSent(eventNID types.EventNID) (bool, e
 
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
 func (u *LatestEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
-	return u.d.Writer.Do(u.d.DB, nil, func(txn *sql.Tx) error {
-		return u.d.EventsTable.UpdateEventSentToOutput(u.ctx, u.txn, eventNID)
+	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
+		return u.d.EventsTable.UpdateEventSentToOutput(u.ctx, txn, eventNID)
 	})
 }
 
