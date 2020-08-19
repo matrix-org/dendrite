@@ -77,7 +77,7 @@ func failBlacklistableError(err error, stats *statistics.ServerStatistics) {
 		stats.Failure()
 		return
 	}
-	if mxerr.Code == 500 {
+	if mxerr.Code >= 500 || mxerr.Code < 600 {
 		stats.Failure()
 		return
 	}

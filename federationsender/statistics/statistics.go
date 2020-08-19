@@ -97,9 +97,20 @@ func (s *ServerStatistics) Failure() {
 
 // BackoffIfRequired will block for as long as the current
 // backoff requires, if needed. Otherwise it will do nothing.
+// Returns the amount of time to backoff for and whether to give up or not.
 func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <-chan bool) (time.Duration, bool) {
 	if started := s.backoffStarted.Load(); !started {
 		return 0, false
+	}
+
+	// Check if the interrupt channel is already closed. If it is
+	// then this call should have no side effects but still return
+	// the current duration.
+	select {
+	case <-interrupt:
+		count := s.backoffCount.Load()
+		return time.Second * time.Duration(math.Exp2(float64(count))), false
+	default:
 	}
 
 	// Work out how many times we've backed off so far.
