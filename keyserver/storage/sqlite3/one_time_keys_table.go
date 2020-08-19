@@ -60,7 +60,7 @@ const selectKeyByAlgorithmSQL = "" +
 
 type oneTimeKeysStatements struct {
 	db                       *sql.DB
-	writer                   *sqlutil.TransactionWriter
+	writer                   sqlutil.TransactionWriter
 	upsertKeysStmt           *sql.Stmt
 	selectKeysStmt           *sql.Stmt
 	selectKeysCountStmt      *sql.Stmt

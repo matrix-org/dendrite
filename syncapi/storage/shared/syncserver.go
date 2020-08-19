@@ -45,7 +45,7 @@ type Database struct {
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
 	Filter              tables.Filter
-	SendToDeviceWriter  *sqlutil.TransactionWriter
+	SendToDeviceWriter  sqlutil.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
 

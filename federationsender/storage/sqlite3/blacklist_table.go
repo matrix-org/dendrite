@@ -42,7 +42,7 @@ const deleteBlacklistSQL = "" +
 
 type blacklistStatements struct {
 	db                  *sql.DB
-	writer              *sqlutil.TransactionWriter
+	writer              sqlutil.TransactionWriter
 	insertBlacklistStmt *sql.Stmt
 	selectBlacklistStmt *sql.Stmt
 	deleteBlacklistStmt *sql.Stmt

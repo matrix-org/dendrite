@@ -50,7 +50,7 @@ const selectJSONSQL = "" +
 
 type queueJSONStatements struct {
 	db             *sql.DB
-	writer         *sqlutil.TransactionWriter
+	writer         sqlutil.TransactionWriter
 	insertJSONStmt *sql.Stmt
 	//deleteJSONStmt *sql.Stmt - prepared at runtime due to variadic
 	//selectJSONStmt *sql.Stmt - prepared at runtime due to variadic

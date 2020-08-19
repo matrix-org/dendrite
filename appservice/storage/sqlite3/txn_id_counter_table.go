@@ -38,7 +38,7 @@ const selectTxnIDSQL = `
 
 type txnStatements struct {
 	db              *sql.DB
-	writer          *sqlutil.TransactionWriter
+	writer          sqlutil.TransactionWriter
 	selectTxnIDStmt *sql.Stmt
 }
 

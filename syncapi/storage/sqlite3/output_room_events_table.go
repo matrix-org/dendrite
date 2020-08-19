@@ -105,7 +105,7 @@ const selectStateInRangeSQL = "" +
 
 type outputRoomEventsStatements struct {
 	db                            *sql.DB
-	writer                        *sqlutil.TransactionWriter
+	writer                        sqlutil.TransactionWriter
 	streamIDStatements            *streamIDStatements
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt

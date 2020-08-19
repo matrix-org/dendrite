@@ -54,7 +54,7 @@ const deleteThreePIDSQL = "" +
 
 type threepidStatements struct {
 	db                              *sql.DB
-	writer                          *sqlutil.TransactionWriter
+	writer                          sqlutil.TransactionWriter
 	selectLocalpartForThreePIDStmt  *sql.Stmt
 	selectThreePIDsForLocalpartStmt *sql.Stmt
 	insertThreePIDStmt              *sql.Stmt

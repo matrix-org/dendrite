@@ -74,17 +74,15 @@ const bulkSelectFilteredStateBlockEntriesSQL = "" +
 
 type stateBlockStatements struct {
 	db                                      *sql.DB
-	writer                                  *sqlutil.TransactionWriter
 	insertStateDataStmt                     *sql.Stmt
 	selectNextStateBlockNIDStmt             *sql.Stmt
 	bulkSelectStateBlockEntriesStmt         *sql.Stmt
 	bulkSelectFilteredStateBlockEntriesStmt *sql.Stmt
 }
 
-func NewSqliteStateBlockTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.StateBlock, error) {
+func NewSqliteStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{
-		db:     db,
-		writer: writer,
+		db: db,
 	}
 	_, err := db.Exec(stateDataSchema)
 	if err != nil {
@@ -107,25 +105,22 @@ func (s *stateBlockStatements) BulkInsertStateData(
 		return 0, nil
 	}
 	var stateBlockNID types.StateBlockNID
-	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		err := txn.Stmt(s.selectNextStateBlockNIDStmt).QueryRowContext(ctx).Scan(&stateBlockNID)
+	err := txn.Stmt(s.selectNextStateBlockNIDStmt).QueryRowContext(ctx).Scan(&stateBlockNID)
+	if err != nil {
+		return 0, err
+	}
+	for _, entry := range entries {
+		_, err = txn.Stmt(s.insertStateDataStmt).ExecContext(
+			ctx,
+			int64(stateBlockNID),
+			int64(entry.EventTypeNID),
+			int64(entry.EventStateKeyNID),
+			int64(entry.EventNID),
+		)
 		if err != nil {
-			return err
+			return 0, err
 		}
-		for _, entry := range entries {
-			_, err := txn.Stmt(s.insertStateDataStmt).ExecContext(
-				ctx,
-				int64(stateBlockNID),
-				int64(entry.EventTypeNID),
-				int64(entry.EventStateKeyNID),
-				int64(entry.EventNID),
-			)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	}
 	return stateBlockNID, err
 }
 

@@ -51,7 +51,7 @@ const selectMaxAccountDataIDSQL = "" +
 
 type accountDataStatements struct {
 	db                           *sql.DB
-	writer                       *sqlutil.TransactionWriter
+	writer                       sqlutil.TransactionWriter
 	streamIDStatements           *streamIDStatements
 	insertAccountDataStmt        *sql.Stmt
 	selectMaxAccountDataIDStmt   *sql.Stmt
