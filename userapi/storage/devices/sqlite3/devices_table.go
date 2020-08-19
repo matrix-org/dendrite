@@ -78,7 +78,7 @@ const selectDevicesByIDSQL = "" +
 
 type devicesStatements struct {
 	db                           *sql.DB
-	writer                       *sqlutil.TransactionWriter
+	writer                       sqlutil.TransactionWriter
 	insertDeviceStmt             *sql.Stmt
 	selectDevicesCountStmt       *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt

@@ -41,6 +41,7 @@ type Database struct {
 	invites        tables.Invites
 	membership     tables.Membership
 	db             *sql.DB
+	writer         sqlutil.TransactionWriter
 }
 
 // Open a sqlite database.
@@ -51,7 +52,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	writer := sqlutil.NewTransactionWriter()
+	d.writer = sqlutil.NewTransactionWriter()
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
 	//d.db.Exec("PRAGMA read_uncommitted = true;")
 
@@ -61,64 +62,65 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	// which it will never obtain.
 	d.db.SetMaxOpenConns(20)
 
-	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db, writer)
+	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	d.eventTypes, err = NewSqliteEventTypesTable(d.db, writer)
+	d.eventTypes, err = NewSqliteEventTypesTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	d.eventJSON, err = NewSqliteEventJSONTable(d.db, writer)
+	d.eventJSON, err = NewSqliteEventJSONTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	d.events, err = NewSqliteEventsTable(d.db, writer)
+	d.events, err = NewSqliteEventsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	d.rooms, err = NewSqliteRoomsTable(d.db, writer)
+	d.rooms, err = NewSqliteRoomsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	d.transactions, err = NewSqliteTransactionsTable(d.db, writer)
+	d.transactions, err = NewSqliteTransactionsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	stateBlock, err := NewSqliteStateBlockTable(d.db, writer)
+	stateBlock, err := NewSqliteStateBlockTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db, writer)
+	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	d.prevEvents, err = NewSqlitePrevEventsTable(d.db, writer)
+	d.prevEvents, err = NewSqlitePrevEventsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	roomAliases, err := NewSqliteRoomAliasesTable(d.db, writer)
+	roomAliases, err := NewSqliteRoomAliasesTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	d.invites, err = NewSqliteInvitesTable(d.db, writer)
+	d.invites, err = NewSqliteInvitesTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	d.membership, err = NewSqliteMembershipTable(d.db, writer)
+	d.membership, err = NewSqliteMembershipTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	published, err := NewSqlitePublishedTable(d.db, writer)
+	published, err := NewSqlitePublishedTable(d.db)
 	if err != nil {
 		return nil, err
 	}
-	redactions, err := NewSqliteRedactionsTable(d.db, writer)
+	redactions, err := NewSqliteRedactionsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
+		Writer:              sqlutil.NewTransactionWriter(),
 		EventsTable:         d.events,
 		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,

@@ -42,7 +42,6 @@ const deleteBlacklistSQL = "" +
 
 type blacklistStatements struct {
 	db                  *sql.DB
-	writer              *sqlutil.TransactionWriter
 	insertBlacklistStmt *sql.Stmt
 	selectBlacklistStmt *sql.Stmt
 	deleteBlacklistStmt *sql.Stmt
@@ -50,8 +49,7 @@ type blacklistStatements struct {
 
 func NewPostgresBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
 	s = &blacklistStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err = db.Exec(blacklistSchema)
 	if err != nil {
@@ -75,11 +73,9 @@ func NewPostgresBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
 func (s *blacklistStatements) InsertBlacklist(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertBlacklistStmt)
-		_, err := stmt.ExecContext(ctx, serverName)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.insertBlacklistStmt)
+	_, err := stmt.ExecContext(ctx, serverName)
+	return err
 }
 
 // selectRoomForUpdate locks the row for the room and returns the last_event_id.
@@ -105,9 +101,7 @@ func (s *blacklistStatements) SelectBlacklist(
 func (s *blacklistStatements) DeleteBlacklist(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.deleteBlacklistStmt)
-		_, err := stmt.ExecContext(ctx, serverName)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.deleteBlacklistStmt)
+	_, err := stmt.ExecContext(ctx, serverName)
+	return err
 }

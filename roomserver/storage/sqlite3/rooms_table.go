@@ -66,7 +66,6 @@ const selectRoomVersionForRoomNIDSQL = "" +
 
 type roomStatements struct {
 	db                                 *sql.DB
-	writer                             *sqlutil.TransactionWriter
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
 	selectLatestEventNIDsStmt          *sql.Stmt
@@ -76,10 +75,9 @@ type roomStatements struct {
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 }
 
-func NewSqliteRoomsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Rooms, error) {
+func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
 	s := &roomStatements{
-		db:     db,
-		writer: writer,
+		db: db,
 	}
 	_, err := db.Exec(roomsSchema)
 	if err != nil {
@@ -100,20 +98,14 @@ func (s *roomStatements) InsertRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (roomNID types.RoomNID, err error) {
-	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		insertStmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
-		_, err = insertStmt.ExecContext(ctx, roomID, roomVersion)
-		if err != nil {
-			return fmt.Errorf("insertStmt.ExecContext: %w", err)
-		}
-		roomNID, err = s.SelectRoomNID(ctx, txn, roomID)
-		if err != nil {
-			return fmt.Errorf("s.SelectRoomNID: %w", err)
-		}
-		return nil
-	})
+	insertStmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
+	_, err = insertStmt.ExecContext(ctx, roomID, roomVersion)
 	if err != nil {
-		return types.RoomNID(0), err
+		return 0, fmt.Errorf("insertStmt.ExecContext: %w", err)
+	}
+	roomNID, err = s.SelectRoomNID(ctx, txn, roomID)
+	if err != nil {
+		return 0, fmt.Errorf("s.SelectRoomNID: %w", err)
 	}
 	return
 }
@@ -170,17 +162,15 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 	lastEventSentNID types.EventNID,
 	stateSnapshotNID types.StateSnapshotNID,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.updateLatestEventNIDsStmt)
-		_, err := stmt.ExecContext(
-			ctx,
-			eventNIDsAsArray(eventNIDs),
-			int64(lastEventSentNID),
-			int64(stateSnapshotNID),
-			roomNID,
-		)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.updateLatestEventNIDsStmt)
+	_, err := stmt.ExecContext(
+		ctx,
+		eventNIDsAsArray(eventNIDs),
+		int64(lastEventSentNID),
+		int64(stateSnapshotNID),
+		roomNID,
+	)
+	return err
 }
 
 func (s *roomStatements) SelectRoomVersionForRoomID(
