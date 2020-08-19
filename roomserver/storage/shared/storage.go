@@ -332,7 +332,7 @@ func (d *Database) GetTransactionEventID(
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-) (types.MembershipUpdater, error) {
+) (*MembershipUpdater, error) {
 	txn, err := d.DB.Begin()
 	if err != nil {
 		return nil, err
@@ -342,7 +342,7 @@ func (d *Database) MembershipUpdater(
 
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
-) (types.LatestEventsUpdater, error) {
+) (*LatestEventsUpdater, error) {
 	txn, err := d.DB.Begin()
 	if err != nil {
 		return nil, err
