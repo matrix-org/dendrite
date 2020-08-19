@@ -51,6 +51,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
+	writer := sqlutil.NewTransactionWriter()
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
 	//d.db.Exec("PRAGMA read_uncommitted = true;")
 
@@ -60,59 +61,59 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	// which it will never obtain.
 	d.db.SetMaxOpenConns(20)
 
-	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db)
+	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	d.eventTypes, err = NewSqliteEventTypesTable(d.db)
+	d.eventTypes, err = NewSqliteEventTypesTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	d.eventJSON, err = NewSqliteEventJSONTable(d.db)
+	d.eventJSON, err = NewSqliteEventJSONTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	d.events, err = NewSqliteEventsTable(d.db)
+	d.events, err = NewSqliteEventsTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	d.rooms, err = NewSqliteRoomsTable(d.db)
+	d.rooms, err = NewSqliteRoomsTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	d.transactions, err = NewSqliteTransactionsTable(d.db)
+	d.transactions, err = NewSqliteTransactionsTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	stateBlock, err := NewSqliteStateBlockTable(d.db)
+	stateBlock, err := NewSqliteStateBlockTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db)
+	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	d.prevEvents, err = NewSqlitePrevEventsTable(d.db)
+	d.prevEvents, err = NewSqlitePrevEventsTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	roomAliases, err := NewSqliteRoomAliasesTable(d.db)
+	roomAliases, err := NewSqliteRoomAliasesTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	d.invites, err = NewSqliteInvitesTable(d.db)
+	d.invites, err = NewSqliteInvitesTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	d.membership, err = NewSqliteMembershipTable(d.db)
+	d.membership, err = NewSqliteMembershipTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	published, err := NewSqlitePublishedTable(d.db)
+	published, err := NewSqlitePublishedTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}
-	redactions, err := NewSqliteRedactionsTable(d.db)
+	redactions, err := NewSqliteRedactionsTable(d.db, writer)
 	if err != nil {
 		return nil, err
 	}

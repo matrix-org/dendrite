@@ -50,10 +50,10 @@ type transactionStatements struct {
 	selectTransactionEventIDStmt *sql.Stmt
 }
 
-func NewSqliteTransactionsTable(db *sql.DB) (tables.Transactions, error) {
+func NewSqliteTransactionsTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Transactions, error) {
 	s := &transactionStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(transactionsSchema)
 	if err != nil {

@@ -51,10 +51,10 @@ type publishedStatements struct {
 	selectPublishedStmt    *sql.Stmt
 }
 
-func NewSqlitePublishedTable(db *sql.DB) (tables.Published, error) {
+func NewSqlitePublishedTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.Published, error) {
 	s := &publishedStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(publishedSchema)
 	if err != nil {

@@ -54,10 +54,10 @@ type eventJSONStatements struct {
 	bulkSelectEventJSONStmt *sql.Stmt
 }
 
-func NewSqliteEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
+func NewSqliteEventJSONTable(db *sql.DB, writer *sqlutil.TransactionWriter) (tables.EventJSON, error) {
 	s := &eventJSONStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(eventJSONSchema)
 	if err != nil {
