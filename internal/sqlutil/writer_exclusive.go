@@ -7,16 +7,16 @@ import (
 	"go.uber.org/atomic"
 )
 
-// SQLiteTransactionWriter allows queuing database writes so that you don't
+// ExclusiveTransactionWriter allows queuing database writes so that you don't
 // contend on database locks in, e.g. SQLite. Only one task will run
-// at a time on a given SQLiteTransactionWriter.
-type SQLiteTransactionWriter struct {
+// at a time on a given ExclusiveTransactionWriter.
+type ExclusiveTransactionWriter struct {
 	running atomic.Bool
 	todo    chan transactionWriterTask
 }
 
 func NewTransactionWriter() TransactionWriter {
-	return &SQLiteTransactionWriter{
+	return &ExclusiveTransactionWriter{
 		todo: make(chan transactionWriterTask),
 	}
 }
@@ -34,7 +34,7 @@ type transactionWriterTask struct {
 // txn parameter if one is supplied, and if not, will take out a
 // new transaction from the database supplied in the database
 // parameter. Either way, this will block until the task is done.
-func (w *SQLiteTransactionWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
+func (w *ExclusiveTransactionWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
 	if w.todo == nil {
 		return errors.New("not initialised")
 	}
@@ -55,7 +55,7 @@ func (w *SQLiteTransactionWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx
 // of these goroutines will run at a time. A transaction will be
 // opened using the database object from the task and then this will
 // be passed as a parameter to the task function.
-func (w *SQLiteTransactionWriter) run() {
+func (w *ExclusiveTransactionWriter) run() {
 	if !w.running.CAS(false, true) {
 		return
 	}
