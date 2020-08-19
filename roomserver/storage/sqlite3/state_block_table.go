@@ -110,7 +110,7 @@ func (s *stateBlockStatements) BulkInsertStateData(
 		return 0, err
 	}
 	for _, entry := range entries {
-		_, err := txn.Stmt(s.insertStateDataStmt).ExecContext(
+		_, err = txn.Stmt(s.insertStateDataStmt).ExecContext(
 			ctx,
 			int64(stateBlockNID),
 			int64(entry.EventTypeNID),
