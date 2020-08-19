@@ -27,7 +27,7 @@ type FederationClientError struct {
 }
 
 func (e *FederationClientError) Error() string {
-	return fmt.Sprintf("%s - (retry_after=%d, blacklisted=%v", e.Err, e.RetryAfter, e.Blacklisted)
+	return fmt.Sprintf("%s - (retry_after=%d, blacklisted=%v)", e.Err, e.RetryAfter, e.Blacklisted)
 }
 
 // FederationSenderInternalAPI is used to query information from the federation sender.

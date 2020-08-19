@@ -159,7 +159,7 @@ func (h *httpFederationSenderInternalAPI) GetUserDevices(
 	}
 	var response getUserDevices
 	apiURL := h.federationSenderURL + FederationSenderGetUserDevicesPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return result, err
 	}
@@ -189,7 +189,7 @@ func (h *httpFederationSenderInternalAPI) ClaimKeys(
 	}
 	var response claimKeys
 	apiURL := h.federationSenderURL + FederationSenderClaimKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return result, err
 	}
@@ -219,7 +219,7 @@ func (h *httpFederationSenderInternalAPI) QueryKeys(
 	}
 	var response queryKeys
 	apiURL := h.federationSenderURL + FederationSenderQueryKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return result, err
 	}

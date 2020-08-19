@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"go.uber.org/atomic"
 )
@@ -67,6 +68,21 @@ func (a *FederationSenderInternalAPI) isBlacklistedOrBackingOff(s gomatrixserver
 	return stats, nil
 }
 
+func failBlacklistableError(err error, stats *statistics.ServerStatistics) {
+	if err == nil {
+		return
+	}
+	mxerr, ok := err.(gomatrix.HTTPError)
+	if !ok {
+		stats.Failure()
+		return
+	}
+	if mxerr.Code == 500 {
+		stats.Failure()
+		return
+	}
+}
+
 func (a *FederationSenderInternalAPI) GetUserDevices(
 	ctx context.Context, s gomatrixserverlib.ServerName, userID string,
 ) (gomatrixserverlib.RespUserDevices, error) {
@@ -77,7 +93,7 @@ func (a *FederationSenderInternalAPI) GetUserDevices(
 	}
 	res, err = a.federation.GetUserDevices(ctx, s, userID)
 	if err != nil {
-		stats.Failure()
+		failBlacklistableError(err, stats)
 		return res, &api.FederationClientError{
 			Err: err.Error(),
 		}
@@ -96,7 +112,7 @@ func (a *FederationSenderInternalAPI) ClaimKeys(
 	}
 	res, err = a.federation.ClaimKeys(ctx, s, oneTimeKeys)
 	if err != nil {
-		stats.Failure()
+		failBlacklistableError(err, stats)
 		return res, &api.FederationClientError{
 			Err: err.Error(),
 		}
@@ -115,7 +131,7 @@ func (a *FederationSenderInternalAPI) QueryKeys(
 	}
 	res, err = a.federation.QueryKeys(ctx, s, keys)
 	if err != nil {
-		stats.Failure()
+		failBlacklistableError(err, stats)
 		return res, &api.FederationClientError{
 			Err: err.Error(),
 		}
