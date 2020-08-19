@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -92,7 +93,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 type latestEventsUpdater struct {
 	ctx           context.Context
 	api           *RoomserverInternalAPI
-	updater       types.RoomRecentEventsUpdater
+	updater       *shared.LatestEventsUpdater
 	roomNID       types.RoomNID
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event

@@ -16,7 +16,6 @@
 package types
 
 import (
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -138,68 +137,6 @@ type StateBlockNIDList struct {
 type StateEntryList struct {
 	StateBlockNID StateBlockNID
 	StateEntries  []StateEntry
-}
-
-// A RoomRecentEventsUpdater is used to update the recent events in a room.
-// (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
-//  lock on the row in the rooms table holding the latest events for the room.)
-type RoomRecentEventsUpdater interface {
-	// The room version of the room.
-	RoomVersion() gomatrixserverlib.RoomVersion
-	// The latest event IDs and state in the room.
-	LatestEvents() []StateAtEventAndReference
-	// The event ID of the latest event written to the output log in the room.
-	LastEventIDSent() string
-	// The current state of the room.
-	CurrentStateSnapshotNID() StateSnapshotNID
-	// Store the previous events referenced by an event.
-	// This adds the event NID to an entry in the database for each of the previous events.
-	// If there isn't an entry for one of previous events then an entry is created.
-	// If the entry already lists the event NID as a referrer then the entry unmodified.
-	// (i.e. the operation is idempotent)
-	StorePreviousEvents(eventNID EventNID, previousEventReferences []gomatrixserverlib.EventReference) error
-	// Check whether the eventReference is already referenced by another matrix event.
-	IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error)
-	// Set the list of latest events for the room.
-	// This replaces the current list stored in the database with the given list
-	SetLatestEvents(
-		roomNID RoomNID, latest []StateAtEventAndReference, lastEventNIDSent EventNID,
-		currentStateSnapshotNID StateSnapshotNID,
-	) error
-	// Check if the event has already be written to the output logs.
-	HasEventBeenSent(eventNID EventNID) (bool, error)
-	// Mark the event as having been sent to the output logs.
-	MarkEventAsSent(eventNID EventNID) error
-	// Build a membership updater for the target user in this room.
-	// It will share the same transaction as this updater.
-	MembershipUpdater(targetUserNID EventStateKeyNID, isTargetLocalUser bool) (MembershipUpdater, error)
-	// Implements Transaction so it can be committed or rolledback
-	sqlutil.Transaction
-}
-
-// A MembershipUpdater is used to update the membership of a user in a room.
-// (On postgresql this wraps a database transaction that holds a "FOR UPDATE"
-//  lock on the row in the membership table for this user in the room)
-// The caller should call one of SetToInvite, SetToJoin or SetToLeave once to
-// make the update, or none of them if no update is required.
-type MembershipUpdater interface {
-	// True if the target user is invited to the room before updating.
-	IsInvite() bool
-	// True if the target user is joined to the room before updating.
-	IsJoin() bool
-	// True if the target user is not invited or joined to the room before updating.
-	IsLeave() bool
-	// Set the state to invite.
-	// Returns whether this invite needs to be sent
-	SetToInvite(event gomatrixserverlib.Event) (needsSending bool, err error)
-	// Set the state to join or updates the event ID in the database.
-	// Returns a list of invite event IDs that this state change retired.
-	SetToJoin(senderUserID string, eventID string, isUpdate bool) (inviteEventIDs []string, err error)
-	// Set the state to leave.
-	// Returns a list of invite event IDs that this state change retired.
-	SetToLeave(senderUserID string, eventID string) (inviteEventIDs []string, err error)
-	// Implements Transaction so it can be committed or rolledback.
-	sqlutil.Transaction
 }
 
 // A MissingEventError is an error that happened because the roomserver was

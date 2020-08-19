@@ -326,9 +326,13 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateAtEventAndReferenceSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
+	selectPrep, err := s.db.Prepare(selectOrig)
+	if err != nil {
+		return nil, err
+	}
 	//////////////
 
-	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
+	rows, err := sqlutil.TxStmt(txn, selectPrep).QueryContext(ctx, iEventNIDs...)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +376,7 @@ func (s *eventStatements) BulkSelectEventReference(
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventReferenceSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
-	selectPrep, err := txn.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +475,11 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 		iEventIDs[i] = v
 	}
 	sqlStr := strings.Replace(selectMaxEventDepthSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
-	err := txn.QueryRowContext(ctx, sqlStr, iEventIDs...).Scan(&result)
+	sqlPrep, err := s.db.Prepare(sqlStr)
+	if err != nil {
+		return 0, err
+	}
+	err = sqlutil.TxStmt(txn, sqlPrep).QueryRowContext(ctx, iEventIDs...).Scan(&result)
 	if err != nil {
 		return 0, err
 	}

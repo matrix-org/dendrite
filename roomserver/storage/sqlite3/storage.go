@@ -139,25 +139,25 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
-) (types.RoomRecentEventsUpdater, error) {
+) (*shared.LatestEventsUpdater, error) {
 	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
 	// multiple write transactions on sqlite. The code will perform additional
 	// write transactions independent of this one which will consistently cause
 	// 'database is locked' errors. As sqlite doesn't support multi-process on the
 	// same DB anyway, and we only execute updates sequentially, the only worries
 	// are for rolling back when things go wrong. (atomicity)
-	return shared.NewRoomRecentEventsUpdater(&d.Database, ctx, roomNID, false)
+	return shared.NewLatestEventsUpdater(ctx, &d.Database, nil, roomNID)
 }
 
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-) (updater types.MembershipUpdater, err error) {
+) (*shared.MembershipUpdater, error) {
 	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
 	// multiple write transactions on sqlite. The code will perform additional
 	// write transactions independent of this one which will consistently cause
 	// 'database is locked' errors. As sqlite doesn't support multi-process on the
 	// same DB anyway, and we only execute updates sequentially, the only worries
 	// are for rolling back when things go wrong. (atomicity)
-	return shared.NewMembershipUpdater(ctx, &d.Database, roomID, targetUserID, targetLocal, roomVersion, false)
+	return shared.NewMembershipUpdater(ctx, &d.Database, nil, roomID, targetUserID, targetLocal, roomVersion)
 }
