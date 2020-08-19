@@ -333,13 +333,21 @@ func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.MembershipUpdater, error) {
-	return NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion, true)
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	return NewMembershipUpdater(ctx, d, txn, roomID, targetUserID, targetLocal, roomVersion)
 }
 
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
 ) (types.RoomRecentEventsUpdater, error) {
-	return NewRoomRecentEventsUpdater(d, ctx, roomNID, true)
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	return NewRoomRecentEventsUpdater(ctx, d, txn, roomNID)
 }
 
 func (d *Database) StoreEvent(

@@ -18,21 +18,9 @@ type membershipUpdater struct {
 }
 
 func NewMembershipUpdater(
-	ctx context.Context, d *Database, roomID, targetUserID string,
+	ctx context.Context, d *Database, txn *sql.Tx, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-	useTxns bool,
 ) (types.MembershipUpdater, error) {
-	txn, err := d.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-	succeeded := false
-	defer func() {
-		if !succeeded {
-			txn.Rollback() // nolint: errcheck
-		}
-	}()
-
 	roomNID, err := d.assignRoomNID(ctx, txn, roomID, roomVersion)
 	if err != nil {
 		return nil, err
@@ -43,17 +31,7 @@ func NewMembershipUpdater(
 		return nil, err
 	}
 
-	updater, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
-	if err != nil {
-		return nil, err
-	}
-
-	succeeded = true
-	if !useTxns {
-		txn.Commit() // nolint: errcheck
-		updater.transaction.txn = nil
-	}
-	return updater, nil
+	return d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
 }
 
 func (d *Database) membershipUpdaterTxn(
