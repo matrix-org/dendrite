@@ -383,7 +383,7 @@ func (d *Database) StoreEvent(
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if txnAndSessionID != nil {
 			if err = d.TransactionsTable.InsertTransaction(
-				ctx, nil, txnAndSessionID.TransactionID,
+				ctx, txn, txnAndSessionID.TransactionID,
 				txnAndSessionID.SessionID, event.Sender(), event.EventID(),
 			); err != nil {
 				return fmt.Errorf("d.TransactionsTable.InsertTransaction: %w", err)
