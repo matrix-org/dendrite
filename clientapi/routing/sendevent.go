@@ -37,7 +37,7 @@ type sendEventResponse struct {
 }
 
 var (
-	mutexes sync.Map // (roomID+userID) -> mutex. mutexes to ensure correct ordering of sendEvents
+	userRoomSendMutexes sync.Map // (roomID+userID) -> mutex. mutexes to ensure correct ordering of sendEvents
 )
 
 // SendEvent implements:
@@ -68,6 +68,13 @@ func SendEvent(
 		}
 	}
 
+	// create a mutex for the specific user in the specific room
+	// this avoids a situation where events that are received in quick succession are sent to the roomserver in a jumbled order
+	userID := device.UserID
+	mutex, _ := userRoomSendMutexes.LoadOrStore(roomID+userID, &sync.Mutex{})
+	mutex.(*sync.Mutex).Lock()
+	defer mutex.(*sync.Mutex).Unlock()
+
 	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, rsAPI)
 	if resErr != nil {
 		return *resErr
@@ -81,12 +88,6 @@ func SendEvent(
 		}
 	}
 
-	// create a mutex for the specific user in the specific room
-	// this avoids a situation where events that are received in quick succession are sent to the roomserver in a jumbled order
-	userID := device.UserID
-	mutex, _ := mutexes.LoadOrStore(roomID+userID, &sync.Mutex{})
-	mutex.(*sync.Mutex).Lock()
-
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	eventID, err := api.SendEvents(
@@ -99,7 +100,6 @@ func SendEvent(
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
-		mutex.(*sync.Mutex).Unlock()
 		return jsonerror.InternalServerError()
 	}
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
@@ -107,8 +107,6 @@ func SendEvent(
 		"room_id":      roomID,
 		"room_version": verRes.RoomVersion,
 	}).Info("Sent event to roomserver")
-
-	mutex.(*sync.Mutex).Unlock()
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,
