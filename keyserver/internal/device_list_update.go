@@ -305,7 +305,7 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 				continue
 			} else {
 				scheduledRetries[serverName] = time.Now().Add(cooloffPeriod)
-				go inject(serverName, cooloffPeriod) // TODO: Backoff?
+				go inject(serverName, cooloffPeriod)
 				continue
 			}
 		}
@@ -313,7 +313,7 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 		shouldRetry := u.processServer(serverName)
 		if shouldRetry {
 			scheduledRetries[serverName] = time.Now().Add(cooloffPeriod)
-			go inject(serverName, cooloffPeriod) // TODO: Backoff?
+			go inject(serverName, cooloffPeriod)
 		}
 	}
 }
