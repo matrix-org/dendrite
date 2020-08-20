@@ -55,7 +55,7 @@ func (a *FederationSenderInternalAPI) isBlacklistedOrBackingOff(s gomatrixserver
 	now := time.Now()
 	if until != nil && now.Before(*until) {
 		return stats, &api.FederationClientError{
-			RetryAfter: until.Sub(now),
+			RetryAfter: time.Until(*until),
 		}
 	}
 
@@ -77,7 +77,7 @@ func failBlacklistableError(err error, stats *statistics.ServerStatistics) (unti
 }
 
 func (a *FederationSenderInternalAPI) doRequest(
-	ctx context.Context, s gomatrixserverlib.ServerName, request func() (interface{}, error),
+	s gomatrixserverlib.ServerName, request func() (interface{}, error),
 ) (interface{}, error) {
 	stats, err := a.isBlacklistedOrBackingOff(s)
 	if err != nil {
@@ -89,7 +89,7 @@ func (a *FederationSenderInternalAPI) doRequest(
 		now := time.Now()
 		var retryAfter time.Duration
 		if until.After(now) {
-			retryAfter = until.Sub(now)
+			retryAfter = time.Until(until)
 		}
 		return res, &api.FederationClientError{
 			Err:         err.Error(),
@@ -104,7 +104,7 @@ func (a *FederationSenderInternalAPI) doRequest(
 func (a *FederationSenderInternalAPI) GetUserDevices(
 	ctx context.Context, s gomatrixserverlib.ServerName, userID string,
 ) (gomatrixserverlib.RespUserDevices, error) {
-	ires, err := a.doRequest(ctx, s, func() (interface{}, error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
 		return a.federation.GetUserDevices(ctx, s, userID)
 	})
 	if err != nil {
@@ -116,7 +116,7 @@ func (a *FederationSenderInternalAPI) GetUserDevices(
 func (a *FederationSenderInternalAPI) ClaimKeys(
 	ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string,
 ) (gomatrixserverlib.RespClaimKeys, error) {
-	ires, err := a.doRequest(ctx, s, func() (interface{}, error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
 		return a.federation.ClaimKeys(ctx, s, oneTimeKeys)
 	})
 	if err != nil {
@@ -128,7 +128,7 @@ func (a *FederationSenderInternalAPI) ClaimKeys(
 func (a *FederationSenderInternalAPI) QueryKeys(
 	ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string,
 ) (gomatrixserverlib.RespQueryKeys, error) {
-	ires, err := a.doRequest(ctx, s, func() (interface{}, error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
 		return a.federation.QueryKeys(ctx, s, keys)
 	})
 	if err != nil {
