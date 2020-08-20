@@ -10,7 +10,7 @@ import (
 
 func TestBackoff(t *testing.T) {
 	stats := Statistics{
-		FailuresUntilBlacklist: 5,
+		FailuresUntilBlacklist: 7,
 	}
 	server := ServerStatistics{
 		statistics: &stats,
@@ -41,10 +41,20 @@ func TestBackoff(t *testing.T) {
 		// Get the duration.
 		duration, blacklist := server.BackoffIfRequired(backingOff, interrupt)
 
+		// Register another failure for good measure. This should have no
+		// side effects since a backoff is already in progress. If it does
+		// then we'll fail.
+		until, blacklisted := server.Failure()
+		if time.Until(until) > duration {
+			t.Fatal("Failure produced unexpected side effect when it shouldn't have")
+		}
+
 		// Check if we should be blacklisted by now.
-		if i > stats.FailuresUntilBlacklist {
+		if i >= stats.FailuresUntilBlacklist {
 			if !blacklist {
 				t.Fatalf("Backoff %d should have resulted in blacklist but didn't", i)
+			} else if blacklist != blacklisted {
+				t.Fatalf("BackoffIfRequired and Failure returned different blacklist values")
 			} else {
 				t.Logf("Backoff %d is blacklisted as expected", i)
 				continue
