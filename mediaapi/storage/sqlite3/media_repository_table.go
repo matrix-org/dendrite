@@ -67,9 +67,9 @@ type mediaStatements struct {
 	selectMediaStmt *sql.Stmt
 }
 
-func (s *mediaStatements) prepare(db *sql.DB) (err error) {
+func (s *mediaStatements) prepare(db *sql.DB, writer sqlutil.TransactionWriter) (err error) {
 	s.db = db
-	s.writer = sqlutil.NewTransactionWriter()
+	s.writer = writer
 
 	_, err = db.Exec(mediaSchema)
 	if err != nil {
