@@ -253,8 +253,8 @@ func (d *Database) GetMembership(
 	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
 ) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
-	err = d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
-		requestSenderUserNID, err = d.assignStateKeyNID(ctx, nil, requestSenderUserID)
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
 		return err
 	})
 	if err != nil {
