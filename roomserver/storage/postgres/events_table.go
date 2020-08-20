@@ -276,9 +276,10 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 }
 
 func (s *eventStatements) UpdateEventState(
-	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	_, err := s.updateEventStateStmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
+	stmt := sqlutil.TxStmt(txn, s.updateEventStateStmt)
+	_, err := stmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
 	return err
 }
 

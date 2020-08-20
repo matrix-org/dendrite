@@ -42,7 +42,7 @@ type Events interface {
 	// If any of the requested events are missing from the database it returns a types.MissingEventError.
 	// If we do not have the state for any of the requested events it returns a types.MissingEventError.
 	BulkSelectStateAtEventByID(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
-	UpdateEventState(ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID) error
+	UpdateEventState(ctx context.Context, txn *sql.Tx, eventNID types.EventNID, stateNID types.StateSnapshotNID) error
 	SelectEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) (sentToOutput bool, err error)
 	UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error
 	SelectEventID(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) (eventID string, err error)
@@ -84,11 +84,11 @@ type StateBlock interface {
 }
 
 type RoomAliases interface {
-	InsertRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) (err error)
+	InsertRoomAlias(ctx context.Context, txn *sql.Tx, alias string, roomID string, creatorUserID string) (err error)
 	SelectRoomIDFromAlias(ctx context.Context, alias string) (roomID string, err error)
 	SelectAliasesFromRoomID(ctx context.Context, roomID string) ([]string, error)
 	SelectCreatorIDFromAlias(ctx context.Context, alias string) (creatorID string, err error)
-	DeleteRoomAlias(ctx context.Context, alias string) (err error)
+	DeleteRoomAlias(ctx context.Context, txn *sql.Tx, alias string) (err error)
 }
 
 type PreviousEvents interface {
@@ -123,7 +123,7 @@ type Membership interface {
 }
 
 type Published interface {
-	UpsertRoomPublished(ctx context.Context, roomID string, published bool) (err error)
+	UpsertRoomPublished(ctx context.Context, txn *sql.Tx, roomID string, published bool) (err error)
 	SelectPublishedFromRoomID(ctx context.Context, roomID string) (published bool, err error)
 	SelectAllPublishedRooms(ctx context.Context, published bool) ([]string, error)
 }

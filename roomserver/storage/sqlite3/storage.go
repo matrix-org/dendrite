@@ -139,6 +139,14 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	return &d, nil
 }
 
+func (d *Database) SupportsConcurrentRoomInputs() bool {
+	// This isn't supported in SQLite mode yet because of issues with
+	// database locks.
+	// TODO: Look at this again - the problem is probably to do with
+	// the membership updaters and latest events updaters.
+	return false
+}
+
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
 ) (*shared.LatestEventsUpdater, error) {

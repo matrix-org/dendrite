@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
@@ -65,9 +66,10 @@ func NewSqlitePublishedTable(db *sql.DB) (tables.Published, error) {
 }
 
 func (s *publishedStatements) UpsertRoomPublished(
-	ctx context.Context, roomID string, published bool,
+	ctx context.Context, txn *sql.Tx, roomID string, published bool,
 ) error {
-	_, err := s.upsertPublishedStmt.ExecContext(ctx, roomID, published)
+	stmt := sqlutil.TxStmt(txn, s.upsertPublishedStmt)
+	_, err := stmt.ExecContext(ctx, roomID, published)
 	return err
 }
 
