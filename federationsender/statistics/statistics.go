@@ -126,8 +126,19 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 	return until, false
 }
 
+// BackoffInfo returns information about the current or previous backoff.
+// Returns the last backoffUntil time and whether the server is currently blacklisted or not.
+func (s *ServerStatistics) BackoffInfo() (*time.Time, bool) {
+	until, ok := s.backoffUntil.Load().(time.Time)
+	if ok {
+		return &until, s.blacklisted.Load()
+	}
+	return nil, s.blacklisted.Load()
+}
+
 // BackoffIfRequired will block for as long as the current
 // backoff requires, if needed. Otherwise it will do nothing.
+// Returns the amount of time to backoff for and whether to give up or not.
 func (s *ServerStatistics) BackoffIfRequired(backingOff atomic.Bool, interrupt <-chan bool) (time.Duration, bool) {
 	if started := s.backoffStarted.Load(); !started {
 		return 0, false

@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	fedsenderapi "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/producers"
 	"github.com/matrix-org/dendrite/keyserver/storage"
@@ -36,7 +37,7 @@ import (
 type KeyInternalAPI struct {
 	DB         storage.Database
 	ThisServer gomatrixserverlib.ServerName
-	FedClient  *gomatrixserverlib.FederationClient
+	FedClient  fedsenderapi.FederationClient
 	UserAPI    userapi.UserInternalAPI
 	Producer   *producers.KeyChange
 	Updater    *DeviceListUpdater

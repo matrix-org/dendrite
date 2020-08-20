@@ -109,4 +109,70 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(
+		FederationSenderGetUserDevicesPath,
+		httputil.MakeInternalAPI("GetUserDevices", func(req *http.Request) util.JSONResponse {
+			var request getUserDevices
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.GetUserDevices(req.Context(), request.S, request.UserID)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
+		FederationSenderClaimKeysPath,
+		httputil.MakeInternalAPI("ClaimKeys", func(req *http.Request) util.JSONResponse {
+			var request claimKeys
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.ClaimKeys(req.Context(), request.S, request.OneTimeKeys)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
+		FederationSenderQueryKeysPath,
+		httputil.MakeInternalAPI("QueryKeys", func(req *http.Request) util.JSONResponse {
+			var request queryKeys
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.QueryKeys(req.Context(), request.S, request.Keys)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
 }
