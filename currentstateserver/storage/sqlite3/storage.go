@@ -33,6 +33,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	}
 	d.Database = shared.Database{
 		DB:               d.db,
+		Writer:           d.writer,
 		CurrentRoomState: currRoomState,
 	}
 	return &d, nil
