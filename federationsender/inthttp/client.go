@@ -8,6 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -21,6 +22,10 @@ const (
 	FederationSenderPerformInviteRequestPath          = "/federationsender/performInviteRequest"
 	FederationSenderPerformServersAlivePath           = "/federationsender/performServersAlive"
 	FederationSenderPerformBroadcastEDUPath           = "/federationsender/performBroadcastEDU"
+
+	FederationSenderGetUserDevicesPath = "/federationsender/client/getUserDevices"
+	FederationSenderClaimKeysPath      = "/federationsender/client/claimKeys"
+	FederationSenderQueryKeysPath      = "/federationsender/client/queryKeys"
 )
 
 // NewFederationSenderClient creates a FederationSenderInternalAPI implemented by talking to a HTTP POST API.
@@ -132,4 +137,94 @@ func (h *httpFederationSenderInternalAPI) PerformBroadcastEDU(
 
 	apiURL := h.federationSenderURL + FederationSenderPerformBroadcastEDUPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+type getUserDevices struct {
+	S      gomatrixserverlib.ServerName
+	UserID string
+	Res    *gomatrixserverlib.RespUserDevices
+	Err    *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) GetUserDevices(
+	ctx context.Context, s gomatrixserverlib.ServerName, userID string,
+) (gomatrixserverlib.RespUserDevices, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetUserDevices")
+	defer span.Finish()
+
+	var result gomatrixserverlib.RespUserDevices
+	request := getUserDevices{
+		S:      s,
+		UserID: userID,
+	}
+	var response getUserDevices
+	apiURL := h.federationSenderURL + FederationSenderGetUserDevicesPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return result, err
+	}
+	if response.Err != nil {
+		return result, response.Err
+	}
+	return *response.Res, nil
+}
+
+type claimKeys struct {
+	S           gomatrixserverlib.ServerName
+	OneTimeKeys map[string]map[string]string
+	Res         *gomatrixserverlib.RespClaimKeys
+	Err         *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) ClaimKeys(
+	ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string,
+) (gomatrixserverlib.RespClaimKeys, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "ClaimKeys")
+	defer span.Finish()
+
+	var result gomatrixserverlib.RespClaimKeys
+	request := claimKeys{
+		S:           s,
+		OneTimeKeys: oneTimeKeys,
+	}
+	var response claimKeys
+	apiURL := h.federationSenderURL + FederationSenderClaimKeysPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return result, err
+	}
+	if response.Err != nil {
+		return result, response.Err
+	}
+	return *response.Res, nil
+}
+
+type queryKeys struct {
+	S    gomatrixserverlib.ServerName
+	Keys map[string][]string
+	Res  *gomatrixserverlib.RespQueryKeys
+	Err  *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) QueryKeys(
+	ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string,
+) (gomatrixserverlib.RespQueryKeys, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeys")
+	defer span.Finish()
+
+	var result gomatrixserverlib.RespQueryKeys
+	request := queryKeys{
+		S:    s,
+		Keys: keys,
+	}
+	var response queryKeys
+	apiURL := h.federationSenderURL + FederationSenderQueryKeysPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return result, err
+	}
+	if response.Err != nil {
+		return result, response.Err
+	}
+	return *response.Res, nil
 }

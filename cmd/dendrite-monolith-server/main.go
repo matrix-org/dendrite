@@ -80,9 +80,6 @@ func main() {
 		serverKeyAPI = base.ServerKeyAPIClient()
 	}
 	keyRing := serverKeyAPI.KeyRing()
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, cfg.Derived.ApplicationServices, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
 
 	rsImpl := roomserver.NewInternalAPI(
 		base, keyRing, federation,
@@ -99,6 +96,23 @@ func main() {
 		}
 	}
 
+	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
+
+	fsAPI := federationsender.NewInternalAPI(
+		base, federation, rsAPI, stateAPI, keyRing,
+	)
+	if base.UseHTTPAPIs {
+		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
+		fsAPI = base.FederationSenderHTTPClient()
+	}
+	// The underlying roomserver implementation needs to be able to call the fedsender.
+	// This is different to rsAPI which can be the http client which doesn't need this dependency
+	rsImpl.SetFederationSenderAPI(fsAPI)
+
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI, base.KafkaProducer)
+	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, cfg.Derived.ApplicationServices, keyAPI)
+	keyAPI.SetUserAPI(userAPI)
+
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,
 	)
@@ -112,19 +126,6 @@ func main() {
 		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
 	}
-
-	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
-
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, stateAPI, keyRing,
-	)
-	if base.UseHTTPAPIs {
-		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
-		fsAPI = base.FederationSenderHTTPClient()
-	}
-	// The underlying roomserver implementation needs to be able to call the fedsender.
-	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsImpl.SetFederationSenderAPI(fsAPI)
 
 	monolith := setup.Monolith{
 		Config:        base.Cfg,

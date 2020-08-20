@@ -2,14 +2,38 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// FederationClient is a subset of gomatrixserverlib.FederationClient functions which the fedsender
+// implements as proxy calls, with built-in backoff/retries/etc. Errors returned from functions in
+// this interface are of type FederationClientError
+type FederationClient interface {
+	GetUserDevices(ctx context.Context, s gomatrixserverlib.ServerName, userID string) (res gomatrixserverlib.RespUserDevices, err error)
+	ClaimKeys(ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (res gomatrixserverlib.RespClaimKeys, err error)
+	QueryKeys(ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string) (res gomatrixserverlib.RespQueryKeys, err error)
+}
+
+// FederationClientError is returned from FederationClient methods in the event of a problem.
+type FederationClientError struct {
+	Err         string
+	RetryAfter  time.Duration
+	Blacklisted bool
+}
+
+func (e *FederationClientError) Error() string {
+	return fmt.Sprintf("%s - (retry_after=%d, blacklisted=%v)", e.Err, e.RetryAfter, e.Blacklisted)
+}
+
 // FederationSenderInternalAPI is used to query information from the federation sender.
 type FederationSenderInternalAPI interface {
+	FederationClient
+
 	// PerformDirectoryLookup looks up a remote room ID from a room alias.
 	PerformDirectoryLookup(
 		ctx context.Context,
