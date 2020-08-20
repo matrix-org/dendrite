@@ -117,10 +117,10 @@ type outputRoomEventsStatements struct {
 	updateEventJSONStmt           *sql.Stmt
 }
 
-func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
+func NewSqliteEventsTable(db *sql.DB, writer sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.Events, error) {
 	s := &outputRoomEventsStatements{
 		db:                 db,
-		writer:             sqlutil.NewTransactionWriter(),
+		writer:             writer,
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(outputRoomEventsSchema)

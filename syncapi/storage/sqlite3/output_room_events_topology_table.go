@@ -75,10 +75,10 @@ type outputRoomEventsTopologyStatements struct {
 	selectMaxPositionInTopologyStmt *sql.Stmt
 }
 
-func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
+func NewSqliteTopologyTable(db *sql.DB, writer sqlutil.TransactionWriter) (tables.Topology, error) {
 	s := &outputRoomEventsTopologyStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(outputRoomEventsTopologySchema)
 	if err != nil {

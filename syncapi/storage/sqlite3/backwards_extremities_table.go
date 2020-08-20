@@ -55,10 +55,10 @@ type backwardExtremitiesStatements struct {
 	deleteBackwardExtremityStmt          *sql.Stmt
 }
 
-func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities, error) {
+func NewSqliteBackwardsExtremitiesTable(db *sql.DB, writer sqlutil.TransactionWriter) (tables.BackwardsExtremities, error) {
 	s := &backwardExtremitiesStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(backwardExtremitiesSchema)
 	if err != nil {
