@@ -16,6 +16,7 @@ package routing
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -34,6 +35,10 @@ import (
 type sendEventResponse struct {
 	EventID string `json:"event_id"`
 }
+
+var (
+	userRoomSendMutexes sync.Map // (roomID+userID) -> mutex. mutexes to ensure correct ordering of sendEvents
+)
 
 // SendEvent implements:
 //   /rooms/{roomID}/send/{eventType}
@@ -62,6 +67,13 @@ func SendEvent(
 			return *res
 		}
 	}
+
+	// create a mutex for the specific user in the specific room
+	// this avoids a situation where events that are received in quick succession are sent to the roomserver in a jumbled order
+	userID := device.UserID
+	mutex, _ := userRoomSendMutexes.LoadOrStore(roomID+userID, &sync.Mutex{})
+	mutex.(*sync.Mutex).Lock()
+	defer mutex.(*sync.Mutex).Unlock()
 
 	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, rsAPI)
 	if resErr != nil {
