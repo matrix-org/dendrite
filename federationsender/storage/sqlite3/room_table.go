@@ -44,7 +44,6 @@ const updateRoomSQL = "" +
 
 type roomStatements struct {
 	db                      *sql.DB
-	writer                  sqlutil.TransactionWriter
 	insertRoomStmt          *sql.Stmt
 	selectRoomForUpdateStmt *sql.Stmt
 	updateRoomStmt          *sql.Stmt
@@ -52,8 +51,7 @@ type roomStatements struct {
 
 func NewSQLiteRoomsTable(db *sql.DB) (s *roomStatements, err error) {
 	s = &roomStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err = db.Exec(roomSchema)
 	if err != nil {
@@ -77,10 +75,8 @@ func NewSQLiteRoomsTable(db *sql.DB) (s *roomStatements, err error) {
 func (s *roomStatements) InsertRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		_, err := sqlutil.TxStmt(txn, s.insertRoomStmt).ExecContext(ctx, roomID)
-		return err
-	})
+	_, err := sqlutil.TxStmt(txn, s.insertRoomStmt).ExecContext(ctx, roomID)
+	return err
 }
 
 // selectRoomForUpdate locks the row for the room and returns the last_event_id.
@@ -103,9 +99,7 @@ func (s *roomStatements) SelectRoomForUpdate(
 func (s *roomStatements) UpdateRoom(
 	ctx context.Context, txn *sql.Tx, roomID, lastEventID string,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.updateRoomStmt)
-		_, err := stmt.ExecContext(ctx, roomID, lastEventID)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.updateRoomStmt)
+	_, err := stmt.ExecContext(ctx, roomID, lastEventID)
+	return err
 }

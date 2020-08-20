@@ -67,6 +67,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	}
 	d.Database = shared.Database{
 		DB:                          d.db,
+		Writer:                      d.writer,
 		FederationSenderJoinedHosts: joinedHosts,
 		FederationSenderQueuePDUs:   queuePDUs,
 		FederationSenderQueueEDUs:   queueEDUs,
