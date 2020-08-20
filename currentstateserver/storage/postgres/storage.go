@@ -10,7 +10,8 @@ import (
 
 type Database struct {
 	shared.Database
-	db *sql.DB
+	db     *sql.DB
+	writer sqlutil.TransactionWriter
 	sqlutil.PartitionOffsetStatements
 }
 
@@ -21,7 +22,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	if err = d.PartitionOffsetStatements.Prepare(d.db, "currentstate"); err != nil {
+	d.writer = sqlutil.NewDummyTransactionWriter()
+	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "currentstate"); err != nil {
 		return nil, err
 	}
 	currRoomState, err := NewPostgresCurrentRoomStateTable(d.db)

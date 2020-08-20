@@ -30,7 +30,8 @@ import (
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	shared.Database
-	db *sql.DB
+	db     *sql.DB
+	writer sqlutil.TransactionWriter
 	sqlutil.PartitionOffsetStatements
 }
 
@@ -41,7 +42,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	if err = d.PartitionOffsetStatements.Prepare(d.db, "syncapi"); err != nil {
+	d.writer = sqlutil.NewDummyTransactionWriter()
+	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
 		return nil, err
 	}
 	accountData, err := NewPostgresAccountDataTable(d.db)
