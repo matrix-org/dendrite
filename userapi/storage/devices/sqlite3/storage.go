@@ -34,6 +34,7 @@ var deviceIDByteLength = 6
 // Database represents a device database.
 type Database struct {
 	db      *sql.DB
+	writer  sqlutil.TransactionWriter
 	devices devicesStatements
 }
 
@@ -43,11 +44,12 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err != nil {
 		return nil, err
 	}
+	writer := sqlutil.NewTransactionWriter()
 	d := devicesStatements{}
-	if err = d.prepare(db, serverName); err != nil {
+	if err = d.prepare(db, writer, serverName); err != nil {
 		return nil, err
 	}
-	return &Database{db, d}, nil
+	return &Database{db, writer, d}, nil
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.
@@ -88,7 +90,7 @@ func (d *Database) CreateDevice(
 	displayName *string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
-		returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		returnErr = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 			var err error
 			// Revoke existing tokens for this device
 			if err = d.devices.deleteDevice(ctx, txn, *deviceID, localpart); err != nil {
@@ -108,7 +110,7 @@ func (d *Database) CreateDevice(
 				return
 			}
 
-			returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+			returnErr = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 				var err error
 				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName)
 				return err

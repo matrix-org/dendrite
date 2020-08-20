@@ -91,9 +91,9 @@ type devicesStatements struct {
 	serverName                   gomatrixserverlib.ServerName
 }
 
-func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
+func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.TransactionWriter, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
-	s.writer = sqlutil.NewTransactionWriter()
+	s.writer = writer
 	_, err = db.Exec(devicesSchema)
 	if err != nil {
 		return

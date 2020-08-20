@@ -64,16 +64,16 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = partitions.Prepare(db, d.writer, "account"); err != nil {
 		return nil, err
 	}
-	if err = d.accounts.prepare(db, serverName); err != nil {
+	if err = d.accounts.prepare(db, d.writer, serverName); err != nil {
 		return nil, err
 	}
-	if err = d.profiles.prepare(db); err != nil {
+	if err = d.profiles.prepare(db, d.writer); err != nil {
 		return nil, err
 	}
-	if err = d.accountDatas.prepare(db); err != nil {
+	if err = d.accountDatas.prepare(db, d.writer); err != nil {
 		return nil, err
 	}
-	if err = d.threepids.prepare(db); err != nil {
+	if err = d.threepids.prepare(db, d.writer); err != nil {
 		return nil, err
 	}
 	return d, nil
