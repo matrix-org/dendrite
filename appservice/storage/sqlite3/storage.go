@@ -53,11 +53,11 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 }
 
 func (d *Database) prepare() error {
-	if err := d.events.prepare(d.db); err != nil {
+	if err := d.events.prepare(d.db, d.writer); err != nil {
 		return err
 	}
 
-	return d.txnID.prepare(d.db)
+	return d.txnID.prepare(d.db, d.writer)
 }
 
 // StoreEvent takes in a gomatrixserverlib.HeaderedEvent and stores it in the database
