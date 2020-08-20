@@ -59,7 +59,7 @@ const selectMaxInviteIDSQL = "" +
 
 type inviteEventsStatements struct {
 	db                            *sql.DB
-	writer                        *sqlutil.TransactionWriter
+	writer                        sqlutil.TransactionWriter
 	streamIDStatements            *streamIDStatements
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt

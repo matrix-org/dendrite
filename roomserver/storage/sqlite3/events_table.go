@@ -99,7 +99,6 @@ const selectRoomNIDForEventNIDSQL = "" +
 
 type eventStatements struct {
 	db                                     *sql.DB
-	writer                                 *sqlutil.TransactionWriter
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
 	bulkSelectStateEventByIDStmt           *sql.Stmt
@@ -117,8 +116,7 @@ type eventStatements struct {
 
 func NewSqliteEventsTable(db *sql.DB) (tables.Events, error) {
 	s := &eventStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err := db.Exec(eventsSchema)
 	if err != nil {
@@ -155,22 +153,19 @@ func (s *eventStatements) InsertEvent(
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	// attempt to insert: the last_row_id is the event NID
 	var eventNID int64
-	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
-		result, err := insertStmt.ExecContext(
-			ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
-			eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
-		)
-		if err != nil {
-			return err
-		}
-		modified, err := result.RowsAffected()
-		if modified == 0 && err == nil {
-			return sql.ErrNoRows
-		}
-		eventNID, err = result.LastInsertId()
-		return err
-	})
+	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
+	result, err := insertStmt.ExecContext(
+		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
+		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
+	)
+	if err != nil {
+		return 0, 0, err
+	}
+	modified, err := result.RowsAffected()
+	if modified == 0 && err == nil {
+		return 0, 0, sql.ErrNoRows
+	}
+	eventNID, err = result.LastInsertId()
 	return types.EventNID(eventNID), 0, err
 }
 
@@ -286,11 +281,8 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 func (s *eventStatements) UpdateEventState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.updateEventStateStmt)
-		_, err := stmt.ExecContext(ctx, int64(stateNID), int64(eventNID))
-		return err
-	})
+	_, err := s.updateEventStateStmt.ExecContext(ctx, int64(stateNID), int64(eventNID))
+	return err
 }
 
 func (s *eventStatements) SelectEventSentToOutput(
@@ -302,11 +294,9 @@ func (s *eventStatements) SelectEventSentToOutput(
 }
 
 func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		updateStmt := sqlutil.TxStmt(txn, s.updateEventSentToOutputStmt)
-		_, err := updateStmt.ExecContext(ctx, int64(eventNID))
-		return err
-	})
+	updateStmt := sqlutil.TxStmt(txn, s.updateEventSentToOutputStmt)
+	_, err := updateStmt.ExecContext(ctx, int64(eventNID))
+	return err
 }
 
 func (s *eventStatements) SelectEventID(
@@ -326,11 +316,15 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateAtEventAndReferenceSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
-	//////////////
-
-	rows, err := txn.QueryContext(ctx, selectOrig, iEventNIDs...)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
+	}
+	//////////////
+
+	rows, err := sqlutil.TxStmt(txn, selectPrep).QueryContext(ctx, iEventNIDs...)
+	if err != nil {
+		return nil, fmt.Errorf("sqlutil.TxStmt.QueryContext: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventAndReference: rows.close() failed")
 	results := make([]types.StateAtEventAndReference, len(eventNIDs))
@@ -372,7 +366,7 @@ func (s *eventStatements) BulkSelectEventReference(
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventReferenceSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
-	selectPrep, err := txn.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
@@ -471,9 +465,13 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 		iEventIDs[i] = v
 	}
 	sqlStr := strings.Replace(selectMaxEventDepthSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
-	err := txn.QueryRowContext(ctx, sqlStr, iEventIDs...).Scan(&result)
+	sqlPrep, err := s.db.Prepare(sqlStr)
 	if err != nil {
 		return 0, err
+	}
+	err = sqlutil.TxStmt(txn, sqlPrep).QueryRowContext(ctx, iEventIDs...).Scan(&result)
+	if err != nil {
+		return 0, fmt.Errorf("sqlutil.TxStmt.QueryRowContext: %w", err)
 	}
 	return result, nil
 }

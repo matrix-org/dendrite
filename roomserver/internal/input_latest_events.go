@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -56,7 +57,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 ) (err error) {
 	updater, err := r.DB.GetLatestEventsForUpdate(ctx, roomNID)
 	if err != nil {
-		return
+		return fmt.Errorf("r.DB.GetLatestEventsForUpdate: %w", err)
 	}
 	succeeded := false
 	defer func() {
@@ -78,7 +79,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 	}
 
 	if err = u.doUpdateLatestEvents(); err != nil {
-		return err
+		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
 	succeeded = true
@@ -92,7 +93,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 type latestEventsUpdater struct {
 	ctx           context.Context
 	api           *RoomserverInternalAPI
-	updater       types.RoomRecentEventsUpdater
+	updater       *shared.LatestEventsUpdater
 	roomNID       types.RoomNID
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event
@@ -136,7 +137,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// don't need to do anything, as we've handled it already.
 	hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID)
 	if err != nil {
-		return err
+		return fmt.Errorf("u.updater.HasEventBeenSent: %w", err)
 	} else if hasBeenSent {
 		return nil
 	}
@@ -144,7 +145,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// Update the roomserver_previous_events table with references. This
 	// is effectively tracking the structure of the DAG.
 	if err = u.updater.StorePreviousEvents(u.stateAtEvent.EventNID, prevEvents); err != nil {
-		return err
+		return fmt.Errorf("u.updater.StorePreviousEvents: %w", err)
 	}
 
 	// Get the event reference for our new event. This will be used when
@@ -155,7 +156,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// in the room. If it is then it isn't a latest event.
 	alreadyReferenced, err := u.updater.IsReferenced(eventReference)
 	if err != nil {
-		return err
+		return fmt.Errorf("u.updater.IsReferenced: %w", err)
 	}
 
 	// Work out what the latest events are.
@@ -172,19 +173,19 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// Now that we know what the latest events are, it's time to get the
 	// latest state.
 	if err = u.latestState(); err != nil {
-		return err
+		return fmt.Errorf("u.latestState: %w", err)
 	}
 
 	// If we need to generate any output events then here's where we do it.
 	// TODO: Move this!
 	updates, err := u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added)
 	if err != nil {
-		return err
+		return fmt.Errorf("u.api.updateMemberships: %w", err)
 	}
 
 	update, err := u.makeOutputNewRoomEvent()
 	if err != nil {
-		return err
+		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
 	}
 	updates = append(updates, *update)
 
@@ -197,14 +198,18 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
 	if err = u.api.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
-		return err
+		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 
 	if err = u.updater.SetLatestEvents(u.roomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
-		return err
+		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
-	return u.updater.MarkEventAsSent(u.stateAtEvent.EventNID)
+	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
+		return fmt.Errorf("u.updater.MarkEventAsSent: %w", err)
+	}
+
+	return nil
 }
 
 func (u *latestEventsUpdater) latestState() error {
@@ -224,7 +229,7 @@ func (u *latestEventsUpdater) latestState() error {
 		u.ctx, u.roomNID, latestStateAtEvents,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("roomState.CalculateAndStoreStateAfterEvents: %w", err)
 	}
 
 	// If we are overwriting the state then we should make sure that we
@@ -243,7 +248,7 @@ func (u *latestEventsUpdater) latestState() error {
 		u.ctx, u.oldStateNID, u.newStateNID,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
 	}
 
 	// Also work out the state before the event removes and the event
@@ -251,7 +256,11 @@ func (u *latestEventsUpdater) latestState() error {
 	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = roomState.DifferenceBetweeenStateSnapshots(
 		u.ctx, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("roomState.DifferenceBetweeenStateSnapshots: %w", err)
+	}
+
+	return nil
 }
 
 func calculateLatest(

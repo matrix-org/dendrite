@@ -53,7 +53,6 @@ const markRedactionValidatedSQL = "" +
 
 type redactionStatements struct {
 	db                                          *sql.DB
-	writer                                      *sqlutil.TransactionWriter
 	insertRedactionStmt                         *sql.Stmt
 	selectRedactionInfoByRedactionEventIDStmt   *sql.Stmt
 	selectRedactionInfoByEventBeingRedactedStmt *sql.Stmt
@@ -62,8 +61,7 @@ type redactionStatements struct {
 
 func NewSqliteRedactionsTable(db *sql.DB) (tables.Redactions, error) {
 	s := &redactionStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err := db.Exec(redactionsSchema)
 	if err != nil {
@@ -81,11 +79,9 @@ func NewSqliteRedactionsTable(db *sql.DB) (tables.Redactions, error) {
 func (s *redactionStatements) InsertRedaction(
 	ctx context.Context, txn *sql.Tx, info tables.RedactionInfo,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertRedactionStmt)
-		_, err := stmt.ExecContext(ctx, info.RedactionEventID, info.RedactsEventID, info.Validated)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.insertRedactionStmt)
+	_, err := stmt.ExecContext(ctx, info.RedactionEventID, info.RedactsEventID, info.Validated)
+	return err
 }
 
 func (s *redactionStatements) SelectRedactionInfoByRedactionEventID(
@@ -121,9 +117,7 @@ func (s *redactionStatements) SelectRedactionInfoByEventBeingRedacted(
 func (s *redactionStatements) MarkRedactionValidated(
 	ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.markRedactionValidatedStmt)
-		_, err := stmt.ExecContext(ctx, redactionEventID, validated)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.markRedactionValidatedStmt)
+	_, err := stmt.ExecContext(ctx, redactionEventID, validated)
+	return err
 }

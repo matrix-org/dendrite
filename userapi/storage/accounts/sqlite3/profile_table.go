@@ -53,7 +53,7 @@ const selectProfilesBySearchSQL = "" +
 
 type profilesStatements struct {
 	db                           *sql.DB
-	writer                       *sqlutil.TransactionWriter
+	writer                       sqlutil.TransactionWriter
 	insertProfileStmt            *sql.Stmt
 	selectProfileByLocalpartStmt *sql.Stmt
 	setAvatarURLStmt             *sql.Stmt

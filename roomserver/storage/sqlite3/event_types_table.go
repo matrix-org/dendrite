@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -78,7 +79,6 @@ const bulkSelectEventTypeNIDSQL = `
 
 type eventTypeStatements struct {
 	db                           *sql.DB
-	writer                       *sqlutil.TransactionWriter
 	insertEventTypeNIDStmt       *sql.Stmt
 	insertEventTypeNIDResultStmt *sql.Stmt
 	selectEventTypeNIDStmt       *sql.Stmt
@@ -87,8 +87,7 @@ type eventTypeStatements struct {
 
 func NewSqliteEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
 	s := &eventTypeStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err := db.Exec(eventTypesSchema)
 	if err != nil {
@@ -104,18 +103,18 @@ func NewSqliteEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
 }
 
 func (s *eventTypeStatements) InsertEventTypeNID(
-	ctx context.Context, tx *sql.Tx, eventType string,
+	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := s.writer.Do(s.db, tx, func(tx *sql.Tx) error {
-		insertStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDStmt)
-		resultStmt := sqlutil.TxStmt(tx, s.insertEventTypeNIDResultStmt)
-		_, err := insertStmt.ExecContext(ctx, eventType)
-		if err != nil {
-			return err
-		}
-		return resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID)
-	})
+	insertStmt := sqlutil.TxStmt(txn, s.insertEventTypeNIDStmt)
+	resultStmt := sqlutil.TxStmt(txn, s.insertEventTypeNIDResultStmt)
+	_, err := insertStmt.ExecContext(ctx, eventType)
+	if err != nil {
+		return 0, fmt.Errorf("insertStmt.ExecContext: %w", err)
+	}
+	if err = resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID); err != nil {
+		return 0, fmt.Errorf("resultStmt.QueryRowContext.Scan: %w", err)
+	}
 	return types.EventTypeNID(eventTypeNID), err
 }
 

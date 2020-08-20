@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -86,7 +87,7 @@ type Database interface {
 	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
 	// If this returns an error then no further action is required.
-	GetLatestEventsForUpdate(ctx context.Context, roomNID types.RoomNID) (types.RoomRecentEventsUpdater, error)
+	GetLatestEventsForUpdate(ctx context.Context, roomNID types.RoomNID) (*shared.LatestEventsUpdater, error)
 	// Look up event ID by transaction's info.
 	// This is used to determine if the room event is processed/processing already.
 	// Returns an empty string if no such event exists.
@@ -123,7 +124,7 @@ type Database interface {
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(ctx context.Context, alias string) error
 	// Build a membership updater for the target user in a room.
-	MembershipUpdater(ctx context.Context, roomID, targetUserID string, targetLocal bool, roomVersion gomatrixserverlib.RoomVersion) (types.MembershipUpdater, error)
+	MembershipUpdater(ctx context.Context, roomID, targetUserID string, targetLocal bool, roomVersion gomatrixserverlib.RoomVersion) (*shared.MembershipUpdater, error)
 	// Lookup the membership of a given user in a given room.
 	// Returns the numeric ID of the latest membership event sent from this user
 	// in this room, along a boolean set to true if the user is still in this room,

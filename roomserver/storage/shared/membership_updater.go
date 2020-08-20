@@ -3,13 +3,14 @@ package shared
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type membershipUpdater struct {
+type MembershipUpdater struct {
 	transaction
 	d             *Database
 	roomNID       types.RoomNID
@@ -18,21 +19,9 @@ type membershipUpdater struct {
 }
 
 func NewMembershipUpdater(
-	ctx context.Context, d *Database, roomID, targetUserID string,
+	ctx context.Context, d *Database, txn *sql.Tx, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-	useTxns bool,
-) (types.MembershipUpdater, error) {
-	txn, err := d.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-	succeeded := false
-	defer func() {
-		if !succeeded {
-			txn.Rollback() // nolint: errcheck
-		}
-	}()
-
+) (*MembershipUpdater, error) {
 	roomNID, err := d.assignRoomNID(ctx, txn, roomID, roomVersion)
 	if err != nil {
 		return nil, err
@@ -43,17 +32,7 @@ func NewMembershipUpdater(
 		return nil, err
 	}
 
-	updater, err := d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
-	if err != nil {
-		return nil, err
-	}
-
-	succeeded = true
-	if !useTxns {
-		txn.Commit() // nolint: errcheck
-		updater.transaction.txn = nil
-	}
-	return updater, nil
+	return d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
 }
 
 func (d *Database) membershipUpdaterTxn(
@@ -62,10 +41,15 @@ func (d *Database) membershipUpdaterTxn(
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
 	targetLocal bool,
-) (*membershipUpdater, error) {
-
-	if err := d.MembershipTable.InsertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
-		return nil, err
+) (*MembershipUpdater, error) {
+	err := d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+		if err := d.MembershipTable.InsertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
+			return fmt.Errorf("d.MembershipTable.InsertMembership: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("u.d.Writer.Do: %w", err)
 	}
 
 	membership, err := d.MembershipTable.SelectMembershipForUpdate(ctx, txn, roomNID, targetUserNID)
@@ -73,55 +57,55 @@ func (d *Database) membershipUpdaterTxn(
 		return nil, err
 	}
 
-	return &membershipUpdater{
+	return &MembershipUpdater{
 		transaction{ctx, txn}, d, roomNID, targetUserNID, membership,
 	}, nil
 }
 
 // IsInvite implements types.MembershipUpdater
-func (u *membershipUpdater) IsInvite() bool {
+func (u *MembershipUpdater) IsInvite() bool {
 	return u.membership == tables.MembershipStateInvite
 }
 
 // IsJoin implements types.MembershipUpdater
-func (u *membershipUpdater) IsJoin() bool {
+func (u *MembershipUpdater) IsJoin() bool {
 	return u.membership == tables.MembershipStateJoin
 }
 
 // IsLeave implements types.MembershipUpdater
-func (u *membershipUpdater) IsLeave() bool {
+func (u *MembershipUpdater) IsLeave() bool {
 	return u.membership == tables.MembershipStateLeaveOrBan
 }
 
 // SetToInvite implements types.MembershipUpdater
-func (u *membershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
+func (u *MembershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
 	senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, event.Sender())
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 	}
 	inserted, err := u.d.InvitesTable.InsertInviteEvent(
 		u.ctx, u.txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
 	)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("u.d.InvitesTable.InsertInviteEvent: %w", err)
 	}
 	if u.membership != tables.MembershipStateInvite {
 		if err = u.d.MembershipTable.UpdateMembership(
 			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateInvite, 0,
 		); err != nil {
-			return false, err
+			return false, fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 		}
 	}
 	return inserted, nil
 }
 
 // SetToJoin implements types.MembershipUpdater
-func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpdate bool) ([]string, error) {
+func (u *MembershipUpdater) SetToJoin(senderUserID string, eventID string, isUpdate bool) ([]string, error) {
 	var inviteEventIDs []string
 
 	senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, senderUserID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 	}
 
 	// If this is a join event update, there is no invite to update
@@ -130,14 +114,14 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 			u.ctx, u.txn, u.roomNID, u.targetUserNID,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("u.d.InvitesTables.UpdateInviteRetired: %w", err)
 		}
 	}
 
 	// Look up the NID of the new join event
 	nIDs, err := u.d.EventNIDs(u.ctx, []string{eventID})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("u.d.EventNIDs: %w", err)
 	}
 
 	if u.membership != tables.MembershipStateJoin || isUpdate {
@@ -145,7 +129,7 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID,
 			tables.MembershipStateJoin, nIDs[eventID],
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 		}
 	}
 
@@ -153,22 +137,22 @@ func (u *membershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 }
 
 // SetToLeave implements types.MembershipUpdater
-func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]string, error) {
+func (u *MembershipUpdater) SetToLeave(senderUserID string, eventID string) ([]string, error) {
 	senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, senderUserID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 	}
 	inviteEventIDs, err := u.d.InvitesTable.UpdateInviteRetired(
 		u.ctx, u.txn, u.roomNID, u.targetUserNID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("u.d.InvitesTable.updateInviteRetired: %w", err)
 	}
 
 	// Look up the NID of the new leave event
 	nIDs, err := u.d.EventNIDs(u.ctx, []string{eventID})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("u.d.EventNIDs: %w", err)
 	}
 
 	if u.membership != tables.MembershipStateLeaveOrBan {
@@ -176,7 +160,7 @@ func (u *membershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 			u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID,
 			tables.MembershipStateLeaveOrBan, nIDs[eventID],
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 		}
 	}
 	return inviteEventIDs, nil

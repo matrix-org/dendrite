@@ -67,7 +67,7 @@ const selectMaxPositionInTopologySQL = "" +
 
 type outputRoomEventsTopologyStatements struct {
 	db                              *sql.DB
-	writer                          *sqlutil.TransactionWriter
+	writer                          sqlutil.TransactionWriter
 	insertEventInTopologyStmt       *sql.Stmt
 	selectEventIDsInRangeASCStmt    *sql.Stmt
 	selectEventIDsInRangeDESCStmt   *sql.Stmt

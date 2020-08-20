@@ -63,7 +63,7 @@ const deleteAllDeviceKeysSQL = "" +
 
 type deviceKeysStatements struct {
 	db                         *sql.DB
-	writer                     *sqlutil.TransactionWriter
+	writer                     sqlutil.TransactionWriter
 	upsertDeviceKeysStmt       *sql.Stmt
 	selectDeviceKeysStmt       *sql.Stmt
 	selectBatchDeviceKeysStmt  *sql.Stmt

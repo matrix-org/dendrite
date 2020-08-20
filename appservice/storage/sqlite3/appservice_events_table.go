@@ -67,7 +67,7 @@ const (
 
 type eventsStatements struct {
 	db                                     *sql.DB
-	writer                                 *sqlutil.TransactionWriter
+	writer                                 sqlutil.TransactionWriter
 	selectEventsByApplicationServiceIDStmt *sql.Stmt
 	countEventsByApplicationServiceIDStmt  *sql.Stmt
 	insertEventStmt                        *sql.Stmt

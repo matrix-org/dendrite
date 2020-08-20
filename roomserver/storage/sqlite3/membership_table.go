@@ -77,7 +77,6 @@ const updateMembershipSQL = "" +
 
 type membershipStatements struct {
 	db                                              *sql.DB
-	writer                                          *sqlutil.TransactionWriter
 	insertMembershipStmt                            *sql.Stmt
 	selectMembershipForUpdateStmt                   *sql.Stmt
 	selectMembershipFromRoomAndTargetStmt           *sql.Stmt
@@ -90,8 +89,7 @@ type membershipStatements struct {
 
 func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
 	s := &membershipStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err := db.Exec(membershipSchema)
 	if err != nil {
@@ -115,11 +113,9 @@ func (s *membershipStatements) InsertMembership(
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 	localTarget bool,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertMembershipStmt)
-		_, err := stmt.ExecContext(ctx, roomNID, targetUserNID, localTarget)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.insertMembershipStmt)
+	_, err := stmt.ExecContext(ctx, roomNID, targetUserNID, localTarget)
+	return err
 }
 
 func (s *membershipStatements) SelectMembershipForUpdate(
@@ -201,11 +197,9 @@ func (s *membershipStatements) UpdateMembership(
 	senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
 	eventNID types.EventNID,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.updateMembershipStmt)
-		_, err := stmt.ExecContext(
-			ctx, senderUserNID, membership, eventNID, roomNID, targetUserNID,
-		)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.updateMembershipStmt)
+	_, err := stmt.ExecContext(
+		ctx, senderUserNID, membership, eventNID, roomNID, targetUserNID,
+	)
+	return err
 }

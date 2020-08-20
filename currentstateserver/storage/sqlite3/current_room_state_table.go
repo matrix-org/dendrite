@@ -83,7 +83,7 @@ const selectKnownUsersSQL = "" +
 
 type currentRoomStateStatements struct {
 	db                               *sql.DB
-	writer                           *sqlutil.TransactionWriter
+	writer                           sqlutil.TransactionWriter
 	upsertRoomStateStmt              *sql.Stmt
 	deleteRoomStateByEventIDStmt     *sql.Stmt
 	selectRoomIDsWithMembershipStmt  *sql.Stmt

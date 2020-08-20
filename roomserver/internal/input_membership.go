@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -29,7 +30,7 @@ import (
 // consumers about the invites added or retired by the change in current state.
 func (r *RoomserverInternalAPI) updateMemberships(
 	ctx context.Context,
-	updater types.RoomRecentEventsUpdater,
+	updater *shared.LatestEventsUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
 	changes := membershipChanges(removed, added)
@@ -77,7 +78,7 @@ func (r *RoomserverInternalAPI) updateMemberships(
 }
 
 func (r *RoomserverInternalAPI) updateMembership(
-	updater types.RoomRecentEventsUpdater,
+	updater *shared.LatestEventsUpdater,
 	targetUserNID types.EventStateKeyNID,
 	remove, add *gomatrixserverlib.Event,
 	updates []api.OutputEvent,
@@ -141,7 +142,7 @@ func (r *RoomserverInternalAPI) isLocalTarget(event *gomatrixserverlib.Event) bo
 }
 
 func updateToInviteMembership(
-	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
 	// We may have already sent the invite to the user, either because we are
@@ -171,7 +172,7 @@ func updateToInviteMembership(
 }
 
 func updateToJoinMembership(
-	mu types.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	// If the user is already marked as being joined, we call SetToJoin to update
 	// the event ID then we can return immediately. Retired is ignored as there
@@ -207,7 +208,7 @@ func updateToJoinMembership(
 }
 
 func updateToLeaveMembership(
-	mu types.MembershipUpdater, add *gomatrixserverlib.Event,
+	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event,
 	newMembership string, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	// If the user is already neither joined, nor invited to the room then we

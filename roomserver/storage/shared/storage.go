@@ -27,6 +27,7 @@ const redactionsArePermanent = false
 
 type Database struct {
 	DB                  *sql.DB
+	Writer              sqlutil.TransactionWriter
 	EventsTable         tables.Events
 	EventJSONTable      tables.EventJSON
 	EventTypesTable     tables.EventTypes
@@ -83,20 +84,23 @@ func (d *Database) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if len(state) > 0 {
 			var stateBlockNID types.StateBlockNID
 			stateBlockNID, err = d.StateBlockTable.BulkInsertStateData(ctx, txn, state)
 			if err != nil {
-				return err
+				return fmt.Errorf("d.StateBlockTable.BulkInsertStateData: %w", err)
 			}
 			stateBlockNIDs = append(stateBlockNIDs[:len(stateBlockNIDs):len(stateBlockNIDs)], stateBlockNID)
 		}
 		stateNID, err = d.StateSnapshotTable.InsertState(ctx, txn, roomNID, stateBlockNIDs)
-		return err
+		if err != nil {
+			return fmt.Errorf("d.StateSnapshotTable.InsertState: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("d.Writer.Do: %w", err)
 	}
 	return
 }
@@ -110,7 +114,9 @@ func (d *Database) EventNIDs(
 func (d *Database) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
+	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		return d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
+	})
 }
 
 func (d *Database) StateAtEventIDs(
@@ -173,22 +179,19 @@ func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (ro
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
 ) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
-		var eventNIDs []types.EventNID
-		eventNIDs, currentStateSnapshotNID, err = d.RoomsTable.SelectLatestEventNIDs(ctx, txn, roomNID)
-		if err != nil {
-			return err
-		}
-		references, err = d.EventsTable.BulkSelectEventReference(ctx, txn, eventNIDs)
-		if err != nil {
-			return err
-		}
-		depth, err = d.EventsTable.SelectMaxEventDepth(ctx, txn, eventNIDs)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	var eventNIDs []types.EventNID
+	eventNIDs, currentStateSnapshotNID, err = d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
+	if err != nil {
+		return
+	}
+	references, err = d.EventsTable.BulkSelectEventReference(ctx, nil, eventNIDs)
+	if err != nil {
+		return
+	}
+	depth, err = d.EventsTable.SelectMaxEventDepth(ctx, nil, eventNIDs)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -221,7 +224,9 @@ func (d *Database) GetRoomVersionForRoomNID(
 }
 
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
-	return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
+	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
+	})
 }
 
 func (d *Database) GetRoomIDForAlias(ctx context.Context, alias string) (string, error) {
@@ -239,15 +244,21 @@ func (d *Database) GetCreatorIDForAlias(
 }
 
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
-	return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
+	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
+	})
 }
 
 func (d *Database) GetMembership(
 	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
 ) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
-	requestSenderUserNID, err := d.assignStateKeyNID(ctx, nil, requestSenderUserID)
+	var requestSenderUserNID types.EventStateKeyNID
+	err = d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		requestSenderUserNID, err = d.assignStateKeyNID(ctx, nil, requestSenderUserID)
+		return err
+	})
 	if err != nil {
-		return
+		return 0, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
 	}
 
 	senderMembershipEventNID, senderMembership, err :=
@@ -332,16 +343,35 @@ func (d *Database) GetTransactionEventID(
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-) (types.MembershipUpdater, error) {
-	return NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion, true)
+) (*MembershipUpdater, error) {
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	var updater *MembershipUpdater
+	_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+		updater, err = NewMembershipUpdater(ctx, d, txn, roomID, targetUserID, targetLocal, roomVersion)
+		return nil
+	})
+	return updater, err
 }
 
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomNID types.RoomNID,
-) (types.RoomRecentEventsUpdater, error) {
-	return NewRoomRecentEventsUpdater(d, ctx, roomNID, true)
+) (*LatestEventsUpdater, error) {
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	var updater *LatestEventsUpdater
+	_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+		updater, err = NewLatestEventsUpdater(ctx, d, txn, roomNID)
+		return nil
+	})
+	return updater, err
 }
 
+// nolint:gocyclo
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
@@ -357,7 +387,7 @@ func (d *Database) StoreEvent(
 		err              error
 	)
 
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if txnAndSessionID != nil {
 			if err = d.TransactionsTable.InsertTransaction(
 				ctx, txn, txnAndSessionID.TransactionID,
@@ -425,7 +455,7 @@ func (d *Database) StoreEvent(
 		return nil
 	})
 	if err != nil {
-		return 0, types.StateAtEvent{}, nil, "", err
+		return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.Writer.Do: %w", err)
 	}
 
 	return roomNID, types.StateAtEvent{
@@ -441,7 +471,9 @@ func (d *Database) StoreEvent(
 }
 
 func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
-	return d.PublishedTable.UpsertRoomPublished(ctx, roomID, publish)
+	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
+		return d.PublishedTable.UpsertRoomPublished(ctx, roomID, publish)
+	})
 }
 
 func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {

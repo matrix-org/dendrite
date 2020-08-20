@@ -44,7 +44,7 @@ const updateRoomSQL = "" +
 
 type roomStatements struct {
 	db                      *sql.DB
-	writer                  *sqlutil.TransactionWriter
+	writer                  sqlutil.TransactionWriter
 	insertRoomStmt          *sql.Stmt
 	selectRoomForUpdateStmt *sql.Stmt
 	updateRoomStmt          *sql.Stmt
