@@ -12,7 +12,6 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // FederationSenderInternalAPI is an implementation of api.FederationSenderInternalAPI
@@ -82,7 +81,6 @@ func (a *FederationSenderInternalAPI) doRequest(
 ) (interface{}, error) {
 	stats, err := a.isBlacklistedOrBackingOff(s)
 	if err != nil {
-		util.GetLogger(ctx).Infof("isBlacklistedOrBackingOff %v", err)
 		return nil, err
 	}
 	res, err := request()
@@ -107,7 +105,6 @@ func (a *FederationSenderInternalAPI) GetUserDevices(
 	ctx context.Context, s gomatrixserverlib.ServerName, userID string,
 ) (gomatrixserverlib.RespUserDevices, error) {
 	ires, err := a.doRequest(ctx, s, func() (interface{}, error) {
-		util.GetLogger(ctx).Infof("GetUserDevices being called now")
 		return a.federation.GetUserDevices(ctx, s, userID)
 	})
 	if err != nil {
