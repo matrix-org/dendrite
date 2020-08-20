@@ -44,6 +44,10 @@ type Database struct {
 	RedactionsTable     tables.Redactions
 }
 
+func (d *Database) SupportsConcurrentRoomInputs() bool {
+	return true
+}
+
 func (d *Database) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {

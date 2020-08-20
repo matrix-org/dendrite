@@ -73,7 +73,11 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 	response *api.InputRoomEventsResponse,
 ) (err error) {
 	for i, e := range request.InputRoomEvents {
-		mutex, _ := r.mutexes.LoadOrStore(e.Event.RoomID(), &sync.Mutex{})
+		roomID := e.Event.RoomID()
+		if !r.DB.SupportsConcurrentRoomInputs() {
+			roomID = "global"
+		}
+		mutex, _ := r.mutexes.LoadOrStore(roomID, &sync.Mutex{})
 		mutex.(*sync.Mutex).Lock()
 		if response.EventID, err = r.processRoomEvent(ctx, request.InputRoomEvents[i]); err != nil {
 			mutex.(*sync.Mutex).Unlock()

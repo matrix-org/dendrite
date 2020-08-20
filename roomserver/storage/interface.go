@@ -24,6 +24,8 @@ import (
 )
 
 type Database interface {
+	// Do we support processing input events for more than one room at a time?
+	SupportsConcurrentRoomInputs() bool
 	// Store the room state at an event in the database
 	AddState(
 		ctx context.Context,
