@@ -114,8 +114,8 @@ func (d *Database) EventNIDs(
 func (d *Database) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
-		return d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.EventsTable.UpdateEventState(ctx, txn, eventNID, stateNID)
 	})
 }
 
@@ -224,8 +224,8 @@ func (d *Database) GetRoomVersionForRoomNID(
 }
 
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
-	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
-		return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.RoomAliasesTable.InsertRoomAlias(ctx, txn, alias, roomID, creatorUserID)
 	})
 }
 
@@ -244,8 +244,8 @@ func (d *Database) GetCreatorIDForAlias(
 }
 
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
-	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
-		return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.RoomAliasesTable.DeleteRoomAlias(ctx, txn, alias)
 	})
 }
 
@@ -471,8 +471,8 @@ func (d *Database) StoreEvent(
 }
 
 func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
-	return d.Writer.Do(d.DB, nil, func(_ *sql.Tx) error {
-		return d.PublishedTable.UpsertRoomPublished(ctx, roomID, publish)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, publish)
 	})
 }
 

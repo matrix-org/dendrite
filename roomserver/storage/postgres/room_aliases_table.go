@@ -20,6 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
@@ -77,9 +78,10 @@ func NewPostgresRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
 }
 
 func (s *roomAliasesStatements) InsertRoomAlias(
-	ctx context.Context, alias string, roomID string, creatorUserID string,
+	ctx context.Context, txn *sql.Tx, alias string, roomID string, creatorUserID string,
 ) (err error) {
-	_, err = s.insertRoomAliasStmt.ExecContext(ctx, alias, roomID, creatorUserID)
+	stmt := sqlutil.TxStmt(txn, s.insertRoomAliasStmt)
+	_, err = stmt.ExecContext(ctx, alias, roomID, creatorUserID)
 	return
 }
 
@@ -125,8 +127,9 @@ func (s *roomAliasesStatements) SelectCreatorIDFromAlias(
 }
 
 func (s *roomAliasesStatements) DeleteRoomAlias(
-	ctx context.Context, alias string,
+	ctx context.Context, txn *sql.Tx, alias string,
 ) (err error) {
-	_, err = s.deleteRoomAliasStmt.ExecContext(ctx, alias)
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomAliasStmt)
+	_, err = stmt.ExecContext(ctx, alias)
 	return
 }
