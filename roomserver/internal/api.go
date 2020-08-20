@@ -20,7 +20,7 @@ type RoomserverInternalAPI struct {
 	ServerName           gomatrixserverlib.ServerName
 	KeyRing              gomatrixserverlib.JSONVerifier
 	FedClient            *gomatrixserverlib.FederationClient
-	OutputRoomEventTopic string     // Kafka topic for new output room events
-	mutex                sync.Mutex // Protects calls to processRoomEvent
+	OutputRoomEventTopic string   // Kafka topic for new output room events
+	mutexes              sync.Map // room ID -> *sync.Mutex, protects calls to processRoomEvent
 	fsAPI                fsAPI.FederationSenderInternalAPI
 }

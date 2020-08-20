@@ -18,6 +18,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -71,13 +72,14 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) (err error) {
-	// We lock as processRoomEvent can only be called once at a time
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	for i := range request.InputRoomEvents {
+	for i, e := range request.InputRoomEvents {
+		mutex, _ := r.mutexes.LoadOrStore(e.Event.RoomID(), &sync.Mutex{})
+		mutex.(*sync.Mutex).Lock()
 		if response.EventID, err = r.processRoomEvent(ctx, request.InputRoomEvents[i]); err != nil {
+			mutex.(*sync.Mutex).Unlock()
 			return err
 		}
+		mutex.(*sync.Mutex).Unlock()
 	}
 	return nil
 }
