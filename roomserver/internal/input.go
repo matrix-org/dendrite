@@ -73,9 +73,9 @@ func (r *RoomserverInternalAPI) InputRoomEvents(
 	response *api.InputRoomEventsResponse,
 ) (err error) {
 	for i, e := range request.InputRoomEvents {
-		roomID := e.Event.RoomID()
-		if !r.DB.SupportsConcurrentRoomInputs() {
-			roomID = "global"
+		roomID := "global"
+		if r.DB.SupportsConcurrentRoomInputs() {
+			roomID = e.Event.RoomID()
 		}
 		mutex, _ := r.mutexes.LoadOrStore(roomID, &sync.Mutex{})
 		mutex.(*sync.Mutex).Lock()
