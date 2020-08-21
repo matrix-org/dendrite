@@ -133,8 +133,6 @@ func main() {
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
-	embed.Embed(base.PublicClientAPIMux, *instancePort, "Yggdrasil Demo")
-
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
@@ -167,6 +165,7 @@ func main() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	embed.Embed(httpRouter, *instancePort, "Yggdrasil Demo")
 
 	yggRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
