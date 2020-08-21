@@ -56,43 +56,44 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
 		return err
 	}
-	if err = d.streamID.prepare(d.db, d.writer); err != nil {
+	if err = d.streamID.prepare(d.db); err != nil {
 		return err
 	}
-	accountData, err := NewSqliteAccountDataTable(d.db, d.writer, &d.streamID)
+	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
-	events, err := NewSqliteEventsTable(d.db, d.writer, &d.streamID)
+	events, err := NewSqliteEventsTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
-	roomState, err := NewSqliteCurrentRoomStateTable(d.db, d.writer, &d.streamID)
+	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
-	invites, err := NewSqliteInvitesTable(d.db, d.writer, &d.streamID)
+	invites, err := NewSqliteInvitesTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
-	topology, err := NewSqliteTopologyTable(d.db, d.writer)
+	topology, err := NewSqliteTopologyTable(d.db)
 	if err != nil {
 		return err
 	}
-	bwExtrem, err := NewSqliteBackwardsExtremitiesTable(d.db, d.writer)
+	bwExtrem, err := NewSqliteBackwardsExtremitiesTable(d.db)
 	if err != nil {
 		return err
 	}
-	sendToDevice, err := NewSqliteSendToDeviceTable(d.db, d.writer)
+	sendToDevice, err := NewSqliteSendToDeviceTable(d.db)
 	if err != nil {
 		return err
 	}
-	filter, err := NewSqliteFilterTable(d.db, d.writer)
+	filter, err := NewSqliteFilterTable(d.db)
 	if err != nil {
 		return err
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
+		Writer:              sqlutil.NewExclusiveWriter(),
 		Invites:             invites,
 		AccountData:         accountData,
 		OutputEvents:        events,
@@ -101,7 +102,6 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		Topology:            topology,
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
-		SendToDeviceWriter:  sqlutil.NewExclusiveWriter(),
 		EDUCache:            cache.New(),
 	}
 	return nil

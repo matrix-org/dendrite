@@ -80,6 +80,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
+		Writer:              sqlutil.NewDummyWriter(),
 		Invites:             invites,
 		AccountData:         accountData,
 		OutputEvents:        events,
@@ -88,7 +89,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		BackwardExtremities: backwardExtremities,
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
-		SendToDeviceWriter:  sqlutil.NewExclusiveWriter(),
 		EDUCache:            cache.New(),
 	}
 	return &d, nil

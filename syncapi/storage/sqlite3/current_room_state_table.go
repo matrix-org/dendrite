@@ -85,7 +85,6 @@ const selectEventsWithEventIDsSQL = "" +
 
 type currentRoomStateStatements struct {
 	db                              *sql.DB
-	writer                          sqlutil.Writer
 	streamIDStatements              *streamIDStatements
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
@@ -95,10 +94,9 @@ type currentRoomStateStatements struct {
 	selectStateEventStmt            *sql.Stmt
 }
 
-func NewSqliteCurrentRoomStateTable(db *sql.DB, writer sqlutil.Writer, streamID *streamIDStatements) (tables.CurrentRoomState, error) {
+func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *streamIDStatements) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{
 		db:                 db,
-		writer:             writer,
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(currentRoomStateSchema)
@@ -200,11 +198,9 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
-		_, err := stmt.ExecContext(ctx, eventID)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
+	_, err := stmt.ExecContext(ctx, eventID)
+	return err
 }
 
 func (s *currentRoomStateStatements) UpsertRoomState(
@@ -225,22 +221,20 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	}
 
 	// upsert state event
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
-		_, err := stmt.ExecContext(
-			ctx,
-			event.RoomID(),
-			event.EventID(),
-			event.Type(),
-			event.Sender(),
-			containsURL,
-			*event.StateKey(),
-			headeredJSON,
-			membership,
-			addedAt,
-		)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
+	_, err = stmt.ExecContext(
+		ctx,
+		event.RoomID(),
+		event.EventID(),
+		event.Type(),
+		event.Sender(),
+		containsURL,
+		*event.StateKey(),
+		headeredJSON,
+		membership,
+		addedAt,
+	)
+	return err
 }
 
 func minOfInts(a, b int) int {

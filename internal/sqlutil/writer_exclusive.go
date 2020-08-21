@@ -68,7 +68,7 @@ func (w *ExclusiveWriter) run() {
 				return task.f(txn)
 			})
 		} else {
-			panic("expected database or transaction but got neither")
+			task.wait <- task.f(nil)
 		}
 		close(task.wait)
 	}

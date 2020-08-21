@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -51,17 +50,15 @@ const selectMaxAccountDataIDSQL = "" +
 
 type accountDataStatements struct {
 	db                           *sql.DB
-	writer                       sqlutil.Writer
 	streamIDStatements           *streamIDStatements
 	insertAccountDataStmt        *sql.Stmt
 	selectMaxAccountDataIDStmt   *sql.Stmt
 	selectAccountDataInRangeStmt *sql.Stmt
 }
 
-func NewSqliteAccountDataTable(db *sql.DB, writer sqlutil.Writer, streamID *streamIDStatements) (tables.AccountData, error) {
+func NewSqliteAccountDataTable(db *sql.DB, streamID *streamIDStatements) (tables.AccountData, error) {
 	s := &accountDataStatements{
 		db:                 db,
-		writer:             writer,
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(accountDataSchema)
@@ -84,15 +81,12 @@ func (s *accountDataStatements) InsertAccountData(
 	ctx context.Context, txn *sql.Tx,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
-	return pos, s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		var err error
-		pos, err = s.streamIDStatements.nextStreamID(ctx, txn)
-		if err != nil {
-			return err
-		}
-		_, err = txn.Stmt(s.insertAccountDataStmt).ExecContext(ctx, pos, userID, roomID, dataType)
-		return err
-	})
+	pos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	if err != nil {
+		return
+	}
+	_, err = txn.Stmt(s.insertAccountDataStmt).ExecContext(ctx, pos, userID, roomID, dataType)
+	return
 }
 
 func (s *accountDataStatements) SelectAccountDataInRange(

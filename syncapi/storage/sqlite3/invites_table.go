@@ -59,7 +59,6 @@ const selectMaxInviteIDSQL = "" +
 
 type inviteEventsStatements struct {
 	db                            *sql.DB
-	writer                        sqlutil.Writer
 	streamIDStatements            *streamIDStatements
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt
@@ -67,10 +66,9 @@ type inviteEventsStatements struct {
 	selectMaxInviteIDStmt         *sql.Stmt
 }
 
-func NewSqliteInvitesTable(db *sql.DB, writer sqlutil.Writer, streamID *streamIDStatements) (tables.Invites, error) {
+func NewSqliteInvitesTable(db *sql.DB, streamID *streamIDStatements) (tables.Invites, error) {
 	s := &inviteEventsStatements{
 		db:                 db,
-		writer:             writer,
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(inviteEventsSchema)
@@ -100,23 +98,21 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 		return
 	}
 
-	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		var headeredJSON []byte
-		headeredJSON, err = json.Marshal(inviteEvent)
-		if err != nil {
-			return err
-		}
+	var headeredJSON []byte
+	headeredJSON, err = json.Marshal(inviteEvent)
+	if err != nil {
+		return
+	}
 
-		_, err = txn.Stmt(s.insertInviteEventStmt).ExecContext(
-			ctx,
-			streamPos,
-			inviteEvent.RoomID(),
-			inviteEvent.EventID(),
-			*inviteEvent.StateKey(),
-			headeredJSON,
-		)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.insertInviteEventStmt)
+	_, err = stmt.ExecContext(
+		ctx,
+		streamPos,
+		inviteEvent.RoomID(),
+		inviteEvent.EventID(),
+		*inviteEvent.StateKey(),
+		headeredJSON,
+	)
 	return
 }
 
@@ -127,10 +123,7 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 	if err != nil {
 		return streamPos, err
 	}
-	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		_, err = s.deleteInviteEventStmt.ExecContext(ctx, streamPos, inviteEventID)
-		return err
-	})
+	_, err = s.deleteInviteEventStmt.ExecContext(ctx, streamPos, inviteEventID)
 	return streamPos, err
 }
 
