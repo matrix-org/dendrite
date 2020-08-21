@@ -34,7 +34,7 @@ import (
 // Database represents an account database
 type Database struct {
 	db     *sql.DB
-	writer sqlutil.TransactionWriter
+	writer sqlutil.Writer
 
 	sqlutil.PartitionOffsetStatements
 	accounts     accountsStatements
@@ -58,7 +58,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	d := &Database{
 		serverName: serverName,
 		db:         db,
-		writer:     sqlutil.NewTransactionWriter(),
+		writer:     sqlutil.NewExclusiveWriter(),
 	}
 	partitions := sqlutil.PartitionOffsetStatements{}
 	if err = partitions.Prepare(db, d.writer, "account"); err != nil {

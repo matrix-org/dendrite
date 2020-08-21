@@ -51,13 +51,13 @@ const selectStaleDeviceListsSQL = "" +
 
 type staleDeviceListsStatements struct {
 	db                                    *sql.DB
-	writer                                sqlutil.TransactionWriter
+	writer                                sqlutil.Writer
 	upsertStaleDeviceListStmt             *sql.Stmt
 	selectStaleDeviceListsWithDomainsStmt *sql.Stmt
 	selectStaleDeviceListsStmt            *sql.Stmt
 }
 
-func NewSqliteStaleDeviceListsTable(db *sql.DB, writer sqlutil.TransactionWriter) (tables.StaleDeviceLists, error) {
+func NewSqliteStaleDeviceListsTable(db *sql.DB, writer sqlutil.Writer) (tables.StaleDeviceLists, error) {
 	s := &staleDeviceListsStatements{
 		db:     db,
 		writer: writer,

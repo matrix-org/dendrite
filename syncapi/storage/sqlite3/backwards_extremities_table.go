@@ -49,13 +49,13 @@ const deleteBackwardExtremitySQL = "" +
 
 type backwardExtremitiesStatements struct {
 	db                                   *sql.DB
-	writer                               sqlutil.TransactionWriter
+	writer                               sqlutil.Writer
 	insertBackwardExtremityStmt          *sql.Stmt
 	selectBackwardExtremitiesForRoomStmt *sql.Stmt
 	deleteBackwardExtremityStmt          *sql.Stmt
 }
 
-func NewSqliteBackwardsExtremitiesTable(db *sql.DB, writer sqlutil.TransactionWriter) (tables.BackwardsExtremities, error) {
+func NewSqliteBackwardsExtremitiesTable(db *sql.DB, writer sqlutil.Writer) (tables.BackwardsExtremities, error) {
 	s := &backwardExtremitiesStatements{
 		db:     db,
 		writer: writer,

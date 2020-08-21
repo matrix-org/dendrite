@@ -53,7 +53,7 @@ const selectProfilesBySearchSQL = "" +
 
 type profilesStatements struct {
 	db                           *sql.DB
-	writer                       sqlutil.TransactionWriter
+	writer                       sqlutil.Writer
 	insertProfileStmt            *sql.Stmt
 	selectProfileByLocalpartStmt *sql.Stmt
 	setAvatarURLStmt             *sql.Stmt
@@ -61,7 +61,7 @@ type profilesStatements struct {
 	selectProfilesBySearchStmt   *sql.Stmt
 }
 
-func (s *profilesStatements) prepare(db *sql.DB, writer sqlutil.TransactionWriter) (err error) {
+func (s *profilesStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	s.db = db
 	s.writer = writer
 	_, err = db.Exec(profilesSchema)

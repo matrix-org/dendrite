@@ -59,13 +59,13 @@ SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method 
 
 type thumbnailStatements struct {
 	db                   *sql.DB
-	writer               sqlutil.TransactionWriter
+	writer               sqlutil.Writer
 	insertThumbnailStmt  *sql.Stmt
 	selectThumbnailStmt  *sql.Stmt
 	selectThumbnailsStmt *sql.Stmt
 }
 
-func (s *thumbnailStatements) prepare(db *sql.DB, writer sqlutil.TransactionWriter) (err error) {
+func (s *thumbnailStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	_, err = db.Exec(thumbnailSchema)
 	if err != nil {
 		return

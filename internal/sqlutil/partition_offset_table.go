@@ -54,7 +54,7 @@ const upsertPartitionOffsetsSQL = "" +
 // PartitionOffsetStatements represents a set of statements that can be run on a partition_offsets table.
 type PartitionOffsetStatements struct {
 	db                         *sql.DB
-	writer                     TransactionWriter
+	writer                     Writer
 	selectPartitionOffsetsStmt *sql.Stmt
 	upsertPartitionOffsetStmt  *sql.Stmt
 }
@@ -62,7 +62,7 @@ type PartitionOffsetStatements struct {
 // Prepare converts the raw SQL statements into prepared statements.
 // Takes a prefix to prepend to the table name used to store the partition offsets.
 // This allows multiple components to share the same database schema.
-func (s *PartitionOffsetStatements) Prepare(db *sql.DB, writer TransactionWriter, prefix string) (err error) {
+func (s *PartitionOffsetStatements) Prepare(db *sql.DB, writer Writer, prefix string) (err error) {
 	s.db = db
 	s.writer = writer
 	_, err = db.Exec(strings.Replace(partitionOffsetsSchema, "${prefix}", prefix, -1))

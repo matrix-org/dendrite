@@ -51,13 +51,13 @@ const selectAccountDataByTypeSQL = "" +
 
 type accountDataStatements struct {
 	db                          *sql.DB
-	writer                      sqlutil.TransactionWriter
+	writer                      sqlutil.Writer
 	insertAccountDataStmt       *sql.Stmt
 	selectAccountDataStmt       *sql.Stmt
 	selectAccountDataByTypeStmt *sql.Stmt
 }
 
-func (s *accountDataStatements) prepare(db *sql.DB, writer sqlutil.TransactionWriter) (err error) {
+func (s *accountDataStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	s.db = db
 	s.writer = writer
 	_, err = db.Exec(accountDataSchema)

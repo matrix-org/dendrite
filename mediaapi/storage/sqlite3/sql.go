@@ -26,7 +26,7 @@ type statements struct {
 	thumbnail thumbnailStatements
 }
 
-func (s *statements) prepare(db *sql.DB, writer sqlutil.TransactionWriter) (err error) {
+func (s *statements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	if err = s.media.prepare(db, writer); err != nil {
 		return
 	}

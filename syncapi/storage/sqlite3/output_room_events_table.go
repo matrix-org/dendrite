@@ -105,7 +105,7 @@ const selectStateInRangeSQL = "" +
 
 type outputRoomEventsStatements struct {
 	db                            *sql.DB
-	writer                        sqlutil.TransactionWriter
+	writer                        sqlutil.Writer
 	streamIDStatements            *streamIDStatements
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -117,7 +117,7 @@ type outputRoomEventsStatements struct {
 	updateEventJSONStmt           *sql.Stmt
 }
 
-func NewSqliteEventsTable(db *sql.DB, writer sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.Events, error) {
+func NewSqliteEventsTable(db *sql.DB, writer sqlutil.Writer, streamID *streamIDStatements) (tables.Events, error) {
 	s := &outputRoomEventsStatements{
 		db:                 db,
 		writer:             writer,

@@ -31,13 +31,13 @@ import (
 type Database struct {
 	statements statements
 	db         *sql.DB
-	writer     sqlutil.TransactionWriter
+	writer     sqlutil.Writer
 }
 
 // Open opens a postgres database.
 func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	d := Database{
-		writer: sqlutil.NewTransactionWriter(),
+		writer: sqlutil.NewExclusiveWriter(),
 	}
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {

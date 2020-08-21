@@ -11,7 +11,7 @@ import (
 type Database struct {
 	shared.Database
 	db     *sql.DB
-	writer sqlutil.TransactionWriter
+	writer sqlutil.Writer
 	sqlutil.PartitionOffsetStatements
 }
 
@@ -23,7 +23,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewTransactionWriter()
+	d.writer = sqlutil.NewExclusiveWriter()
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "currentstate"); err != nil {
 		return nil, err
 	}

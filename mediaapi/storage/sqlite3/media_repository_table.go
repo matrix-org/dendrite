@@ -62,12 +62,12 @@ SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user
 
 type mediaStatements struct {
 	db              *sql.DB
-	writer          sqlutil.TransactionWriter
+	writer          sqlutil.Writer
 	insertMediaStmt *sql.Stmt
 	selectMediaStmt *sql.Stmt
 }
 
-func (s *mediaStatements) prepare(db *sql.DB, writer sqlutil.TransactionWriter) (err error) {
+func (s *mediaStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	s.db = db
 	s.writer = writer
 

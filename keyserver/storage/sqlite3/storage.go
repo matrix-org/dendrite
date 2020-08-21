@@ -25,7 +25,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 	if err != nil {
 		return nil, err
 	}
-	writer := sqlutil.NewTransactionWriter()
+	writer := sqlutil.NewExclusiveWriter()
 	otk, err := NewSqliteOneTimeKeysTable(db, writer)
 	if err != nil {
 		return nil, err

@@ -27,7 +27,7 @@ import (
 
 type Database struct {
 	DB               *sql.DB
-	Writer           sqlutil.TransactionWriter
+	Writer           sqlutil.Writer
 	CurrentRoomState tables.CurrentRoomState
 }
 

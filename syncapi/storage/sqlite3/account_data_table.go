@@ -51,14 +51,14 @@ const selectMaxAccountDataIDSQL = "" +
 
 type accountDataStatements struct {
 	db                           *sql.DB
-	writer                       sqlutil.TransactionWriter
+	writer                       sqlutil.Writer
 	streamIDStatements           *streamIDStatements
 	insertAccountDataStmt        *sql.Stmt
 	selectMaxAccountDataIDStmt   *sql.Stmt
 	selectAccountDataInRangeStmt *sql.Stmt
 }
 
-func NewSqliteAccountDataTable(db *sql.DB, writer sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.AccountData, error) {
+func NewSqliteAccountDataTable(db *sql.DB, writer sqlutil.Writer, streamID *streamIDStatements) (tables.AccountData, error) {
 	s := &accountDataStatements{
 		db:                 db,
 		writer:             writer,

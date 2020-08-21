@@ -52,13 +52,13 @@ const insertFilterSQL = "" +
 
 type filterStatements struct {
 	db                          *sql.DB
-	writer                      sqlutil.TransactionWriter
+	writer                      sqlutil.Writer
 	selectFilterStmt            *sql.Stmt
 	selectFilterIDByContentStmt *sql.Stmt
 	insertFilterStmt            *sql.Stmt
 }
 
-func NewSqliteFilterTable(db *sql.DB, writer sqlutil.TransactionWriter) (tables.Filter, error) {
+func NewSqliteFilterTable(db *sql.DB, writer sqlutil.Writer) (tables.Filter, error) {
 	_, err := db.Exec(filterSchema)
 	if err != nil {
 		return nil, err

@@ -60,7 +60,7 @@ const selectKeyByAlgorithmSQL = "" +
 
 type oneTimeKeysStatements struct {
 	db                       *sql.DB
-	writer                   sqlutil.TransactionWriter
+	writer                   sqlutil.Writer
 	upsertKeysStmt           *sql.Stmt
 	selectKeysStmt           *sql.Stmt
 	selectKeysCountStmt      *sql.Stmt
@@ -68,7 +68,7 @@ type oneTimeKeysStatements struct {
 	deleteOneTimeKeyStmt     *sql.Stmt
 }
 
-func NewSqliteOneTimeKeysTable(db *sql.DB, writer sqlutil.TransactionWriter) (tables.OneTimeKeys, error) {
+func NewSqliteOneTimeKeysTable(db *sql.DB, writer sqlutil.Writer) (tables.OneTimeKeys, error) {
 	s := &oneTimeKeysStatements{
 		db:     db,
 		writer: writer,

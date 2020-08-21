@@ -59,7 +59,7 @@ const selectMaxInviteIDSQL = "" +
 
 type inviteEventsStatements struct {
 	db                            *sql.DB
-	writer                        sqlutil.TransactionWriter
+	writer                        sqlutil.Writer
 	streamIDStatements            *streamIDStatements
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt
@@ -67,7 +67,7 @@ type inviteEventsStatements struct {
 	selectMaxInviteIDStmt         *sql.Stmt
 }
 
-func NewSqliteInvitesTable(db *sql.DB, writer sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.Invites, error) {
+func NewSqliteInvitesTable(db *sql.DB, writer sqlutil.Writer, streamID *streamIDStatements) (tables.Invites, error) {
 	s := &inviteEventsStatements{
 		db:                 db,
 		writer:             writer,

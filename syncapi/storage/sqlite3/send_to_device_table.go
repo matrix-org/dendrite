@@ -73,13 +73,13 @@ const deleteSendToDeviceMessagesSQL = `
 
 type sendToDeviceStatements struct {
 	db                             *sql.DB
-	writer                         sqlutil.TransactionWriter
+	writer                         sqlutil.Writer
 	insertSendToDeviceMessageStmt  *sql.Stmt
 	selectSendToDeviceMessagesStmt *sql.Stmt
 	countSendToDeviceMessagesStmt  *sql.Stmt
 }
 
-func NewSqliteSendToDeviceTable(db *sql.DB, writer sqlutil.TransactionWriter) (tables.SendToDevice, error) {
+func NewSqliteSendToDeviceTable(db *sql.DB, writer sqlutil.Writer) (tables.SendToDevice, error) {
 	s := &sendToDeviceStatements{
 		db:     db,
 		writer: writer,

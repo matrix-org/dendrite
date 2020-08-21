@@ -78,7 +78,7 @@ const selectDevicesByIDSQL = "" +
 
 type devicesStatements struct {
 	db                           *sql.DB
-	writer                       sqlutil.TransactionWriter
+	writer                       sqlutil.Writer
 	insertDeviceStmt             *sql.Stmt
 	selectDevicesCountStmt       *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
@@ -91,7 +91,7 @@ type devicesStatements struct {
 	serverName                   gomatrixserverlib.ServerName
 }
 
-func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.TransactionWriter, server gomatrixserverlib.ServerName) (err error) {
+func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
 	s.writer = writer
 	_, err = db.Exec(devicesSchema)

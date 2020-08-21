@@ -31,7 +31,7 @@ import (
 type SyncServerDatasource struct {
 	shared.Database
 	db     *sql.DB
-	writer sqlutil.TransactionWriter
+	writer sqlutil.Writer
 	sqlutil.PartitionOffsetStatements
 }
 
@@ -42,7 +42,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewDummyTransactionWriter()
+	d.writer = sqlutil.NewDummyWriter()
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		BackwardExtremities: backwardExtremities,
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
-		SendToDeviceWriter:  sqlutil.NewTransactionWriter(),
+		SendToDeviceWriter:  sqlutil.NewExclusiveWriter(),
 		EDUCache:            cache.New(),
 	}
 	return &d, nil

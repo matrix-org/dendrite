@@ -83,7 +83,7 @@ const selectKnownUsersSQL = "" +
 
 type currentRoomStateStatements struct {
 	db                               *sql.DB
-	writer                           sqlutil.TransactionWriter
+	writer                           sqlutil.Writer
 	upsertRoomStateStmt              *sql.Stmt
 	deleteRoomStateByEventIDStmt     *sql.Stmt
 	selectRoomIDsWithMembershipStmt  *sql.Stmt
@@ -96,7 +96,7 @@ type currentRoomStateStatements struct {
 func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: sqlutil.NewExclusiveWriter(),
 	}
 	_, err := db.Exec(currentRoomStateSchema)
 	if err != nil {

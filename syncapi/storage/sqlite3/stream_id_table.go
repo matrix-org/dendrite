@@ -28,12 +28,12 @@ const selectStreamIDStmt = "" +
 
 type streamIDStatements struct {
 	db                   *sql.DB
-	writer               sqlutil.TransactionWriter
+	writer               sqlutil.Writer
 	increaseStreamIDStmt *sql.Stmt
 	selectStreamIDStmt   *sql.Stmt
 }
 
-func (s *streamIDStatements) prepare(db *sql.DB, writer sqlutil.TransactionWriter) (err error) {
+func (s *streamIDStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	s.db = db
 	s.writer = writer
 	_, err = db.Exec(streamIDTableSchema)

@@ -30,7 +30,7 @@ type Database struct {
 	shared.Database
 	sqlutil.PartitionOffsetStatements
 	db     *sql.DB
-	writer sqlutil.TransactionWriter
+	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
@@ -40,7 +40,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewTransactionWriter()
+	d.writer = sqlutil.NewExclusiveWriter()
 	joinedHosts, err := NewSQLiteJoinedHostsTable(d.db)
 	if err != nil {
 		return nil, err

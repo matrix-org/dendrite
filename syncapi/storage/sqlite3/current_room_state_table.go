@@ -85,7 +85,7 @@ const selectEventsWithEventIDsSQL = "" +
 
 type currentRoomStateStatements struct {
 	db                              *sql.DB
-	writer                          sqlutil.TransactionWriter
+	writer                          sqlutil.Writer
 	streamIDStatements              *streamIDStatements
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
@@ -95,7 +95,7 @@ type currentRoomStateStatements struct {
 	selectStateEventStmt            *sql.Stmt
 }
 
-func NewSqliteCurrentRoomStateTable(db *sql.DB, writer sqlutil.TransactionWriter, streamID *streamIDStatements) (tables.CurrentRoomState, error) {
+func NewSqliteCurrentRoomStateTable(db *sql.DB, writer sqlutil.Writer, streamID *streamIDStatements) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{
 		db:                 db,
 		writer:             writer,

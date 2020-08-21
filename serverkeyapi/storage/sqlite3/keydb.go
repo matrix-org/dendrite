@@ -30,7 +30,7 @@ import (
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store
 // the public keys for other matrix servers.
 type Database struct {
-	writer     sqlutil.TransactionWriter
+	writer     sqlutil.Writer
 	statements serverKeyStatements
 }
 
@@ -49,7 +49,7 @@ func NewDatabase(
 		return nil, err
 	}
 	d := &Database{
-		writer: sqlutil.NewTransactionWriter(),
+		writer: sqlutil.NewExclusiveWriter(),
 	}
 	err = d.statements.prepare(db, d.writer)
 	if err != nil {

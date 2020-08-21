@@ -27,7 +27,7 @@ const redactionsArePermanent = false
 
 type Database struct {
 	DB                  *sql.DB
-	Writer              sqlutil.TransactionWriter
+	Writer              sqlutil.Writer
 	EventsTable         tables.Events
 	EventJSONTable      tables.EventJSON
 	EventTypesTable     tables.EventTypes

@@ -67,7 +67,7 @@ const selectMaxPositionInTopologySQL = "" +
 
 type outputRoomEventsTopologyStatements struct {
 	db                              *sql.DB
-	writer                          sqlutil.TransactionWriter
+	writer                          sqlutil.Writer
 	insertEventInTopologyStmt       *sql.Stmt
 	selectEventIDsInRangeASCStmt    *sql.Stmt
 	selectEventIDsInRangeDESCStmt   *sql.Stmt
@@ -75,7 +75,7 @@ type outputRoomEventsTopologyStatements struct {
 	selectMaxPositionInTopologyStmt *sql.Stmt
 }
 
-func NewSqliteTopologyTable(db *sql.DB, writer sqlutil.TransactionWriter) (tables.Topology, error) {
+func NewSqliteTopologyTable(db *sql.DB, writer sqlutil.Writer) (tables.Topology, error) {
 	s := &outputRoomEventsTopologyStatements{
 		db:     db,
 		writer: writer,

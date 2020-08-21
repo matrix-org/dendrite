@@ -4,15 +4,15 @@ import (
 	"database/sql"
 )
 
-type DummyTransactionWriter struct {
+type DummyWriter struct {
 }
 
-func NewDummyTransactionWriter() TransactionWriter {
-	return &DummyTransactionWriter{}
+func NewDummyWriter() Writer {
+	return &DummyWriter{}
 }
 
-func (w *DummyTransactionWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
-	if txn == nil {
+func (w *DummyWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
+	if db != nil && txn == nil {
 		return WithTransaction(db, func(txn *sql.Tx) error {
 			return f(txn)
 		})

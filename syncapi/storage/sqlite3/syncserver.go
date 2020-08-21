@@ -32,7 +32,7 @@ import (
 type SyncServerDatasource struct {
 	shared.Database
 	db     *sql.DB
-	writer sqlutil.TransactionWriter
+	writer sqlutil.Writer
 	sqlutil.PartitionOffsetStatements
 	streamID streamIDStatements
 }
@@ -45,7 +45,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewTransactionWriter()
+	d.writer = sqlutil.NewExclusiveWriter()
 	if err = d.prepare(); err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		Topology:            topology,
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
-		SendToDeviceWriter:  sqlutil.NewTransactionWriter(),
+		SendToDeviceWriter:  sqlutil.NewExclusiveWriter(),
 		EDUCache:            cache.New(),
 	}
 	return nil
