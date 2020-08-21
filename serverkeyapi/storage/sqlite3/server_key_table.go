@@ -63,14 +63,14 @@ const upsertServerKeysSQL = "" +
 
 type serverKeyStatements struct {
 	db                       *sql.DB
-	writer                   sqlutil.TransactionWriter
+	writer                   sqlutil.Writer
 	bulkSelectServerKeysStmt *sql.Stmt
 	upsertServerKeysStmt     *sql.Stmt
 }
 
-func (s *serverKeyStatements) prepare(db *sql.DB) (err error) {
+func (s *serverKeyStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	s.db = db
-	s.writer = sqlutil.NewTransactionWriter()
+	s.writer = writer
 	_, err = db.Exec(serverKeysSchema)
 	if err != nil {
 		return

@@ -71,7 +71,6 @@ const selectQueuePDUsServerNamesSQL = "" +
 
 type queuePDUsStatements struct {
 	db                                *sql.DB
-	writer                            sqlutil.TransactionWriter
 	insertQueuePDUStmt                *sql.Stmt
 	selectQueueNextTransactionIDStmt  *sql.Stmt
 	selectQueuePDUsByTransactionStmt  *sql.Stmt
@@ -83,8 +82,7 @@ type queuePDUsStatements struct {
 
 func NewSQLiteQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
 	s = &queuePDUsStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err = db.Exec(queuePDUsSchema)
 	if err != nil {
@@ -121,16 +119,14 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 	serverName gomatrixserverlib.ServerName,
 	nid int64,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertQueuePDUStmt)
-		_, err := stmt.ExecContext(
-			ctx,
-			transactionID, // the transaction ID that we initially attempted
-			serverName,    // destination server name
-			nid,           // JSON blob NID
-		)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.insertQueuePDUStmt)
+	_, err := stmt.ExecContext(
+		ctx,
+		transactionID, // the transaction ID that we initially attempted
+		serverName,    // destination server name
+		nid,           // JSON blob NID
+	)
+	return err
 }
 
 func (s *queuePDUsStatements) DeleteQueuePDUs(
@@ -150,11 +146,9 @@ func (s *queuePDUsStatements) DeleteQueuePDUs(
 		params[k+1] = v
 	}
 
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, deleteStmt)
-		_, err := stmt.ExecContext(ctx, params...)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, deleteStmt)
+	_, err = stmt.ExecContext(ctx, params...)
+	return err
 }
 
 func (s *queuePDUsStatements) SelectQueuePDUNextTransactionID(

@@ -17,6 +17,8 @@ package sqlite3
 
 import (
 	"database/sql"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 type statements struct {
@@ -24,11 +26,11 @@ type statements struct {
 	thumbnail thumbnailStatements
 }
 
-func (s *statements) prepare(db *sql.DB) (err error) {
-	if err = s.media.prepare(db); err != nil {
+func (s *statements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
+	if err = s.media.prepare(db, writer); err != nil {
 		return
 	}
-	if err = s.thumbnail.prepare(db); err != nil {
+	if err = s.thumbnail.prepare(db, writer); err != nil {
 		return
 	}
 

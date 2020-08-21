@@ -64,7 +64,6 @@ const selectQueueServerNamesSQL = "" +
 
 type queueEDUsStatements struct {
 	db                                   *sql.DB
-	writer                               sqlutil.TransactionWriter
 	insertQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUReferenceJSONCountStmt *sql.Stmt
@@ -74,8 +73,7 @@ type queueEDUsStatements struct {
 
 func NewSQLiteQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 	s = &queueEDUsStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err = db.Exec(queueEDUsSchema)
 	if err != nil {
@@ -106,16 +104,14 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 	serverName gomatrixserverlib.ServerName,
 	nid int64,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
-		_, err := stmt.ExecContext(
-			ctx,
-			eduType,    // the EDU type
-			serverName, // destination server name
-			nid,        // JSON blob NID
-		)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
+	_, err := stmt.ExecContext(
+		ctx,
+		eduType,    // the EDU type
+		serverName, // destination server name
+		nid,        // JSON blob NID
+	)
+	return err
 }
 
 func (s *queueEDUsStatements) DeleteQueueEDUs(
@@ -135,11 +131,9 @@ func (s *queueEDUsStatements) DeleteQueueEDUs(
 		params[k+1] = v
 	}
 
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, deleteStmt)
-		_, err := stmt.ExecContext(ctx, params...)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, deleteStmt)
+	_, err = stmt.ExecContext(ctx, params...)
+	return err
 }
 
 func (s *queueEDUsStatements) SelectQueueEDUs(

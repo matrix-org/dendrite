@@ -27,7 +27,8 @@ import (
 type Database struct {
 	shared.Database
 	sqlutil.PartitionOffsetStatements
-	db *sql.DB
+	db     *sql.DB
+	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
@@ -37,6 +38,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
+	d.writer = sqlutil.NewDummyWriter()
 	joinedHosts, err := NewPostgresJoinedHostsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -63,6 +65,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	}
 	d.Database = shared.Database{
 		DB:                          d.db,
+		Writer:                      d.writer,
 		FederationSenderJoinedHosts: joinedHosts,
 		FederationSenderQueuePDUs:   queuePDUs,
 		FederationSenderQueueEDUs:   queueEDUs,
@@ -70,7 +73,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 		FederationSenderRooms:       rooms,
 		FederationSenderBlacklist:   blacklist,
 	}
-	if err = d.PartitionOffsetStatements.Prepare(d.db, "federationsender"); err != nil {
+	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
 		return nil, err
 	}
 	return &d, nil

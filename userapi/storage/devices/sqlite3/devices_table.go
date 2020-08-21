@@ -78,7 +78,7 @@ const selectDevicesByIDSQL = "" +
 
 type devicesStatements struct {
 	db                           *sql.DB
-	writer                       sqlutil.TransactionWriter
+	writer                       sqlutil.Writer
 	insertDeviceStmt             *sql.Stmt
 	selectDevicesCountStmt       *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
@@ -91,9 +91,9 @@ type devicesStatements struct {
 	serverName                   gomatrixserverlib.ServerName
 }
 
-func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
+func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
-	s.writer = sqlutil.NewTransactionWriter()
+	s.writer = writer
 	_, err = db.Exec(devicesSchema)
 	if err != nil {
 		return
@@ -138,19 +138,13 @@ func (s *devicesStatements) insertDevice(
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
-	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		countStmt := sqlutil.TxStmt(txn, s.selectDevicesCountStmt)
-		insertStmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
-		if err := countStmt.QueryRowContext(ctx).Scan(&sessionID); err != nil {
-			return err
-		}
-		sessionID++
-		if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
+	countStmt := sqlutil.TxStmt(txn, s.selectDevicesCountStmt)
+	insertStmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
+	if err := countStmt.QueryRowContext(ctx).Scan(&sessionID); err != nil {
+		return nil, err
+	}
+	sessionID++
+	if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID); err != nil {
 		return nil, err
 	}
 	return &api.Device{
@@ -164,11 +158,9 @@ func (s *devicesStatements) insertDevice(
 func (s *devicesStatements) deleteDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart string,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.deleteDeviceStmt)
-		_, err := stmt.ExecContext(ctx, id, localpart)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.deleteDeviceStmt)
+	_, err := stmt.ExecContext(ctx, id, localpart)
+	return err
 }
 
 func (s *devicesStatements) deleteDevices(
@@ -179,36 +171,30 @@ func (s *devicesStatements) deleteDevices(
 	if err != nil {
 		return err
 	}
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, prep)
-		params := make([]interface{}, len(devices)+1)
-		params[0] = localpart
-		for i, v := range devices {
-			params[i+1] = v
-		}
-		_, err = stmt.ExecContext(ctx, params...)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, prep)
+	params := make([]interface{}, len(devices)+1)
+	params[0] = localpart
+	for i, v := range devices {
+		params[i+1] = v
+	}
+	_, err = stmt.ExecContext(ctx, params...)
+	return err
 }
 
 func (s *devicesStatements) deleteDevicesByLocalpart(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
-		_, err := stmt.ExecContext(ctx, localpart)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
+	_, err := stmt.ExecContext(ctx, localpart)
+	return err
 }
 
 func (s *devicesStatements) updateDeviceName(
 	ctx context.Context, txn *sql.Tx, localpart, deviceID string, displayName *string,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.updateDeviceNameStmt)
-		_, err := stmt.ExecContext(ctx, displayName, localpart, deviceID)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.updateDeviceNameStmt)
+	_, err := stmt.ExecContext(ctx, displayName, localpart, deviceID)
+	return err
 }
 
 func (s *devicesStatements) selectDeviceByToken(

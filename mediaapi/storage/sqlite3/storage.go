@@ -31,16 +31,19 @@ import (
 type Database struct {
 	statements statements
 	db         *sql.DB
+	writer     sqlutil.Writer
 }
 
 // Open opens a postgres database.
 func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
-	var d Database
+	d := Database{
+		writer: sqlutil.NewExclusiveWriter(),
+	}
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	if err = d.statements.prepare(d.db); err != nil {
+	if err = d.statements.prepare(d.db, d.writer); err != nil {
 		return nil, err
 	}
 	return &d, nil

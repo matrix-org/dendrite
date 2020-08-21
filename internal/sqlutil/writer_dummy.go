@@ -4,15 +4,21 @@ import (
 	"database/sql"
 )
 
-type DummyTransactionWriter struct {
+// DummyWriter implements sqlutil.Writer.
+// The DummyWriter is designed to allow reuse of the sqlutil.Writer
+// interface but, unlike ExclusiveWriter, it will not guarantee
+// writer exclusivity. This is fine in PostgreSQL where overlapping
+// transactions and writes are acceptable.
+type DummyWriter struct {
 }
 
-func NewDummyTransactionWriter() TransactionWriter {
-	return &DummyTransactionWriter{}
+// NewDummyWriter returns a new dummy writer.
+func NewDummyWriter() Writer {
+	return &DummyWriter{}
 }
 
-func (w *DummyTransactionWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
-	if txn == nil {
+func (w *DummyWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
+	if db != nil && txn == nil {
 		return WithTransaction(db, func(txn *sql.Tx) error {
 			return f(txn)
 		})

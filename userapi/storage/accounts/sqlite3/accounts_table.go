@@ -59,7 +59,7 @@ const selectNewNumericLocalpartSQL = "" +
 
 type accountsStatements struct {
 	db                            *sql.DB
-	writer                        sqlutil.TransactionWriter
+	writer                        sqlutil.Writer
 	insertAccountStmt             *sql.Stmt
 	selectAccountByLocalpartStmt  *sql.Stmt
 	selectPasswordHashStmt        *sql.Stmt
@@ -67,9 +67,9 @@ type accountsStatements struct {
 	serverName                    gomatrixserverlib.ServerName
 }
 
-func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
+func (s *accountsStatements) prepare(db *sql.DB, writer sqlutil.Writer, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
-	s.writer = sqlutil.NewTransactionWriter()
+	s.writer = writer
 	_, err = db.Exec(accountsSchema)
 	if err != nil {
 		return

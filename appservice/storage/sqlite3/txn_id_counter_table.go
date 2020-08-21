@@ -38,13 +38,13 @@ const selectTxnIDSQL = `
 
 type txnStatements struct {
 	db              *sql.DB
-	writer          sqlutil.TransactionWriter
+	writer          sqlutil.Writer
 	selectTxnIDStmt *sql.Stmt
 }
 
-func (s *txnStatements) prepare(db *sql.DB) (err error) {
+func (s *txnStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	s.db = db
-	s.writer = sqlutil.NewTransactionWriter()
+	s.writer = writer
 	_, err = db.Exec(txnIDSchema)
 	if err != nil {
 		return

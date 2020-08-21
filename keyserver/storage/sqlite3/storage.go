@@ -25,19 +25,20 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 	if err != nil {
 		return nil, err
 	}
-	otk, err := NewSqliteOneTimeKeysTable(db)
+	writer := sqlutil.NewExclusiveWriter()
+	otk, err := NewSqliteOneTimeKeysTable(db, writer)
 	if err != nil {
 		return nil, err
 	}
-	dk, err := NewSqliteDeviceKeysTable(db)
+	dk, err := NewSqliteDeviceKeysTable(db, writer)
 	if err != nil {
 		return nil, err
 	}
-	kc, err := NewSqliteKeyChangesTable(db)
+	kc, err := NewSqliteKeyChangesTable(db, writer)
 	if err != nil {
 		return nil, err
 	}
-	sdl, err := NewSqliteStaleDeviceListsTable(db)
+	sdl, err := NewSqliteStaleDeviceListsTable(db, writer)
 	if err != nil {
 		return nil, err
 	}

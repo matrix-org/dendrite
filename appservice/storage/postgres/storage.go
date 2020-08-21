@@ -32,6 +32,7 @@ type Database struct {
 	events eventsStatements
 	txnID  txnStatements
 	db     *sql.DB
+	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
@@ -41,10 +42,11 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if result.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
+	result.writer = sqlutil.NewDummyWriter()
 	if err = result.prepare(); err != nil {
 		return nil, err
 	}
-	if err = result.PartitionOffsetStatements.Prepare(result.db, "appservice"); err != nil {
+	if err = result.PartitionOffsetStatements.Prepare(result.db, result.writer, "appservice"); err != nil {
 		return nil, err
 	}
 	return &result, nil

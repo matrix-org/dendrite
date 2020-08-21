@@ -27,6 +27,7 @@ import (
 
 type Database struct {
 	DB               *sql.DB
+	Writer           sqlutil.Writer
 	CurrentRoomState tables.CurrentRoomState
 }
 
@@ -59,7 +60,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 
 func (d *Database) StoreStateEvents(ctx context.Context, addStateEvents []gomatrixserverlib.HeaderedEvent,
 	removeStateEventIDs []string) error {
-	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 		for _, eventID := range removeStateEventIDs {
 			if err := d.CurrentRoomState.DeleteRoomStateByEventID(ctx, txn, eventID); err != nil {

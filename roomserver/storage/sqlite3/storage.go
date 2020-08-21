@@ -41,7 +41,7 @@ type Database struct {
 	invites        tables.Invites
 	membership     tables.Membership
 	db             *sql.DB
-	writer         sqlutil.TransactionWriter
+	writer         sqlutil.Writer
 }
 
 // Open a sqlite database.
@@ -52,7 +52,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewTransactionWriter()
+	d.writer = sqlutil.NewExclusiveWriter()
 	//d.db.Exec("PRAGMA journal_mode=WAL;")
 	//d.db.Exec("PRAGMA read_uncommitted = true;")
 
@@ -120,7 +120,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
-		Writer:              sqlutil.NewTransactionWriter(),
+		Writer:              sqlutil.NewExclusiveWriter(),
 		EventsTable:         d.events,
 		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,

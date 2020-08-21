@@ -67,7 +67,6 @@ const selectMaxPositionInTopologySQL = "" +
 
 type outputRoomEventsTopologyStatements struct {
 	db                              *sql.DB
-	writer                          sqlutil.TransactionWriter
 	insertEventInTopologyStmt       *sql.Stmt
 	selectEventIDsInRangeASCStmt    *sql.Stmt
 	selectEventIDsInRangeDESCStmt   *sql.Stmt
@@ -77,8 +76,7 @@ type outputRoomEventsTopologyStatements struct {
 
 func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 	s := &outputRoomEventsTopologyStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err := db.Exec(outputRoomEventsTopologySchema)
 	if err != nil {
@@ -107,13 +105,11 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
 ) (err error) {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt)
-		_, err := stmt.ExecContext(
-			ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
-		)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt)
+	_, err = stmt.ExecContext(
+		ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
+	)
+	return
 }
 
 func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(

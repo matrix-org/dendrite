@@ -73,7 +73,6 @@ const deleteSendToDeviceMessagesSQL = `
 
 type sendToDeviceStatements struct {
 	db                             *sql.DB
-	writer                         sqlutil.TransactionWriter
 	insertSendToDeviceMessageStmt  *sql.Stmt
 	selectSendToDeviceMessagesStmt *sql.Stmt
 	countSendToDeviceMessagesStmt  *sql.Stmt
@@ -81,8 +80,7 @@ type sendToDeviceStatements struct {
 
 func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 	s := &sendToDeviceStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	_, err := db.Exec(sendToDeviceSchema)
 	if err != nil {
@@ -103,10 +101,8 @@ func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, content string,
 ) (err error) {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		_, err := sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
-		return err
-	})
+	_, err = sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
+	return
 }
 
 func (s *sendToDeviceStatements) CountSendToDeviceMessages(
@@ -163,10 +159,8 @@ func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(
 	for k, v := range nids {
 		params[k+1] = v
 	}
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		_, err := txn.ExecContext(ctx, query, params...)
-		return err
-	})
+	_, err = txn.ExecContext(ctx, query, params...)
+	return
 }
 
 func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
@@ -177,8 +171,6 @@ func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
 	for k, v := range nids {
 		params[k] = v
 	}
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		_, err := txn.ExecContext(ctx, query, params...)
-		return err
-	})
+	_, err = txn.ExecContext(ctx, query, params...)
+	return
 }

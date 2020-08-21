@@ -53,6 +53,8 @@ const upsertPartitionOffsetsSQL = "" +
 
 // PartitionOffsetStatements represents a set of statements that can be run on a partition_offsets table.
 type PartitionOffsetStatements struct {
+	db                         *sql.DB
+	writer                     Writer
 	selectPartitionOffsetsStmt *sql.Stmt
 	upsertPartitionOffsetStmt  *sql.Stmt
 }
@@ -60,7 +62,9 @@ type PartitionOffsetStatements struct {
 // Prepare converts the raw SQL statements into prepared statements.
 // Takes a prefix to prepend to the table name used to store the partition offsets.
 // This allows multiple components to share the same database schema.
-func (s *PartitionOffsetStatements) Prepare(db *sql.DB, prefix string) (err error) {
+func (s *PartitionOffsetStatements) Prepare(db *sql.DB, writer Writer, prefix string) (err error) {
+	s.db = db
+	s.writer = writer
 	_, err = db.Exec(strings.Replace(partitionOffsetsSchema, "${prefix}", prefix, -1))
 	if err != nil {
 		return
@@ -121,6 +125,9 @@ func (s *PartitionOffsetStatements) selectPartitionOffsets(
 func (s *PartitionOffsetStatements) upsertPartitionOffset(
 	ctx context.Context, topic string, partition int32, offset int64,
 ) error {
-	_, err := s.upsertPartitionOffsetStmt.ExecContext(ctx, topic, partition, offset)
-	return err
+	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
+		stmt := TxStmt(txn, s.upsertPartitionOffsetStmt)
+		_, err := stmt.ExecContext(ctx, topic, partition, offset)
+		return err
+	})
 }

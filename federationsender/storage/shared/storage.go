@@ -28,6 +28,7 @@ import (
 
 type Database struct {
 	DB                          *sql.DB
+	Writer                      sqlutil.Writer
 	FederationSenderQueuePDUs   tables.FederationSenderQueuePDUs
 	FederationSenderQueueEDUs   tables.FederationSenderQueueEDUs
 	FederationSenderQueueJSON   tables.FederationSenderQueueJSON
@@ -64,7 +65,7 @@ func (d *Database) UpdateRoom(
 	addHosts []types.JoinedHost,
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		err = d.FederationSenderRooms.InsertRoom(ctx, txn, roomID)
 		if err != nil {
 			return err
@@ -133,7 +134,12 @@ func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string)
 func (d *Database) StoreJSON(
 	ctx context.Context, js string,
 ) (*Receipt, error) {
-	nid, err := d.FederationSenderQueueJSON.InsertQueueJSON(ctx, nil, js)
+	var nid int64
+	var err error
+	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		nid, err = d.FederationSenderQueueJSON.InsertQueueJSON(ctx, txn, js)
+		return nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
@@ -143,11 +149,15 @@ func (d *Database) StoreJSON(
 }
 
 func (d *Database) AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error {
-	return d.FederationSenderBlacklist.InsertBlacklist(context.TODO(), nil, serverName)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderBlacklist.InsertBlacklist(context.TODO(), txn, serverName)
+	})
 }
 
 func (d *Database) RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error {
-	return d.FederationSenderBlacklist.DeleteBlacklist(context.TODO(), nil, serverName)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderBlacklist.DeleteBlacklist(context.TODO(), txn, serverName)
+	})
 }
 
 func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {

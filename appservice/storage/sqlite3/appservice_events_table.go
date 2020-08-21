@@ -67,7 +67,7 @@ const (
 
 type eventsStatements struct {
 	db                                     *sql.DB
-	writer                                 sqlutil.TransactionWriter
+	writer                                 sqlutil.Writer
 	selectEventsByApplicationServiceIDStmt *sql.Stmt
 	countEventsByApplicationServiceIDStmt  *sql.Stmt
 	insertEventStmt                        *sql.Stmt
@@ -75,9 +75,9 @@ type eventsStatements struct {
 	deleteEventsBeforeAndIncludingIDStmt   *sql.Stmt
 }
 
-func (s *eventsStatements) prepare(db *sql.DB) (err error) {
+func (s *eventsStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 	s.db = db
-	s.writer = sqlutil.NewTransactionWriter()
+	s.writer = writer
 	_, err = db.Exec(appserviceEventsSchema)
 	if err != nil {
 		return

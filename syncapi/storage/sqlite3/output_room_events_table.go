@@ -105,7 +105,6 @@ const selectStateInRangeSQL = "" +
 
 type outputRoomEventsStatements struct {
 	db                            *sql.DB
-	writer                        sqlutil.TransactionWriter
 	streamIDStatements            *streamIDStatements
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -120,7 +119,6 @@ type outputRoomEventsStatements struct {
 func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
 	s := &outputRoomEventsStatements{
 		db:                 db,
-		writer:             sqlutil.NewTransactionWriter(),
 		streamIDStatements: streamID,
 	}
 	_, err := db.Exec(outputRoomEventsSchema)
@@ -159,10 +157,8 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 	if err != nil {
 		return err
 	}
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
-		return err
-	})
+	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+	return err
 }
 
 // selectStateInRange returns the state events between the two given PDU stream positions, exclusive of oldPos, inclusive of newPos.
@@ -304,32 +300,27 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 
-	var streamPos types.StreamPosition
-	err = s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
-		if err != nil {
-			return err
-		}
-
-		insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
-		_, ierr := insertStmt.ExecContext(
-			ctx,
-			streamPos,
-			event.RoomID(),
-			event.EventID(),
-			headeredJSON,
-			event.Type(),
-			event.Sender(),
-			containsURL,
-			string(addStateJSON),
-			string(removeStateJSON),
-			sessionID,
-			txnID,
-			excludeFromSync,
-			excludeFromSync,
-		)
-		return ierr
-	})
+	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
+	if err != nil {
+		return 0, err
+	}
+	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
+	_, err = insertStmt.ExecContext(
+		ctx,
+		streamPos,
+		event.RoomID(),
+		event.EventID(),
+		headeredJSON,
+		event.Type(),
+		event.Sender(),
+		containsURL,
+		string(addStateJSON),
+		string(removeStateJSON),
+		sessionID,
+		txnID,
+		excludeFromSync,
+		excludeFromSync,
+	)
 	return streamPos, err
 }
 

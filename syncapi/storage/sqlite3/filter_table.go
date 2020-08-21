@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -52,7 +51,6 @@ const insertFilterSQL = "" +
 
 type filterStatements struct {
 	db                          *sql.DB
-	writer                      sqlutil.TransactionWriter
 	selectFilterStmt            *sql.Stmt
 	selectFilterIDByContentStmt *sql.Stmt
 	insertFilterStmt            *sql.Stmt
@@ -64,8 +62,7 @@ func NewSqliteFilterTable(db *sql.DB) (tables.Filter, error) {
 		return nil, err
 	}
 	s := &filterStatements{
-		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		db: db,
 	}
 	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
 		return nil, err
@@ -114,33 +111,30 @@ func (s *filterStatements) InsertFilter(
 		return "", err
 	}
 
-	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		// Check if filter already exists in the database using its localpart and content
-		//
-		// This can result in a race condition when two clients try to insert the
-		// same filter and localpart at the same time, however this is not a
-		// problem as both calls will result in the same filterID
-		err = s.selectFilterIDByContentStmt.QueryRowContext(ctx,
-			localpart, filterJSON).Scan(&existingFilterID)
-		if err != nil && err != sql.ErrNoRows {
-			return err
-		}
-		// If it does, return the existing ID
-		if existingFilterID != "" {
-			return nil
-		}
+	// Check if filter already exists in the database using its localpart and content
+	//
+	// This can result in a race condition when two clients try to insert the
+	// same filter and localpart at the same time, however this is not a
+	// problem as both calls will result in the same filterID
+	err = s.selectFilterIDByContentStmt.QueryRowContext(ctx,
+		localpart, filterJSON).Scan(&existingFilterID)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+	// If it does, return the existing ID
+	if existingFilterID != "" {
+		return existingFilterID, nil
+	}
 
-		// Otherwise insert the filter and return the new ID
-		res, err := s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart)
-		if err != nil {
-			return err
-		}
-		rowid, err := res.LastInsertId()
-		if err != nil {
-			return err
-		}
-		filterID = fmt.Sprintf("%d", rowid)
-		return nil
-	})
+	// Otherwise insert the filter and return the new ID
+	res, err := s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart)
+	if err != nil {
+		return "", err
+	}
+	rowid, err := res.LastInsertId()
+	if err != nil {
+		return "", err
+	}
+	filterID = fmt.Sprintf("%d", rowid)
 	return
 }

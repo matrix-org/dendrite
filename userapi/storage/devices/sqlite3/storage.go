@@ -34,6 +34,7 @@ var deviceIDByteLength = 6
 // Database represents a device database.
 type Database struct {
 	db      *sql.DB
+	writer  sqlutil.Writer
 	devices devicesStatements
 }
 
@@ -43,11 +44,12 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err != nil {
 		return nil, err
 	}
+	writer := sqlutil.NewExclusiveWriter()
 	d := devicesStatements{}
-	if err = d.prepare(db, serverName); err != nil {
+	if err = d.prepare(db, writer, serverName); err != nil {
 		return nil, err
 	}
-	return &Database{db, d}, nil
+	return &Database{db, writer, d}, nil
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.
@@ -88,7 +90,7 @@ func (d *Database) CreateDevice(
 	displayName *string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
-		returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		returnErr = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 			var err error
 			// Revoke existing tokens for this device
 			if err = d.devices.deleteDevice(ctx, txn, *deviceID, localpart); err != nil {
@@ -108,7 +110,7 @@ func (d *Database) CreateDevice(
 				return
 			}
 
-			returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+			returnErr = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 				var err error
 				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName)
 				return err
@@ -138,7 +140,7 @@ func generateDeviceID() (string, error) {
 func (d *Database) UpdateDevice(
 	ctx context.Context, localpart, deviceID string, displayName *string,
 ) error {
-	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		return d.devices.updateDeviceName(ctx, txn, localpart, deviceID, displayName)
 	})
 }
@@ -150,7 +152,7 @@ func (d *Database) UpdateDevice(
 func (d *Database) RemoveDevice(
 	ctx context.Context, deviceID, localpart string,
 ) error {
-	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		if err := d.devices.deleteDevice(ctx, txn, deviceID, localpart); err != sql.ErrNoRows {
 			return err
 		}
@@ -165,7 +167,7 @@ func (d *Database) RemoveDevice(
 func (d *Database) RemoveDevices(
 	ctx context.Context, localpart string, devices []string,
 ) error {
-	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		if err := d.devices.deleteDevices(ctx, txn, localpart, devices); err != sql.ErrNoRows {
 			return err
 		}
@@ -179,7 +181,7 @@ func (d *Database) RemoveDevices(
 func (d *Database) RemoveAllDevices(
 	ctx context.Context, localpart string,
 ) error {
-	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		if err := d.devices.deleteDevicesByLocalpart(ctx, txn, localpart); err != sql.ErrNoRows {
 			return err
 		}

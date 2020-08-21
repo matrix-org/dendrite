@@ -52,15 +52,15 @@ const selectKeyChangesSQL = "" +
 
 type keyChangesStatements struct {
 	db                   *sql.DB
-	writer               sqlutil.TransactionWriter
+	writer               sqlutil.Writer
 	upsertKeyChangeStmt  *sql.Stmt
 	selectKeyChangesStmt *sql.Stmt
 }
 
-func NewSqliteKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
+func NewSqliteKeyChangesTable(db *sql.DB, writer sqlutil.Writer) (tables.KeyChanges, error) {
 	s := &keyChangesStatements{
 		db:     db,
-		writer: sqlutil.NewTransactionWriter(),
+		writer: writer,
 	}
 	_, err := db.Exec(keyChangesSchema)
 	if err != nil {

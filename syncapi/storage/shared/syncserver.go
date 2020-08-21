@@ -37,6 +37,7 @@ import (
 // For now this contains the shared functions
 type Database struct {
 	DB                  *sql.DB
+	Writer              sqlutil.Writer
 	Invites             tables.Invites
 	AccountData         tables.AccountData
 	OutputEvents        tables.Events
@@ -45,7 +46,6 @@ type Database struct {
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
 	Filter              tables.Filter
-	SendToDeviceWriter  sqlutil.TransactionWriter
 	EDUCache            *cache.EDUCache
 }
 
@@ -129,10 +129,7 @@ func (d *Database) GetStateEvent(
 func (d *Database) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *gomatrixserverlib.StateFilter,
 ) (stateEvents []gomatrixserverlib.HeaderedEvent, err error) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
-		stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
-		return err
-	})
+	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilter)
 	return
 }
 
@@ -171,9 +168,9 @@ func (d *Database) SyncStreamPosition(ctx context.Context) (types.StreamPosition
 func (d *Database) AddInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (sp types.StreamPosition, err error) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
-		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
-		return err
+	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+		sp, err = d.Invites.InsertInviteEvent(ctx, nil, inviteEvent)
+		return nil
 	})
 	return
 }
@@ -182,8 +179,12 @@ func (d *Database) AddInviteEvent(
 // Returns an error if there was a problem communicating with the database.
 func (d *Database) RetireInviteEvent(
 	ctx context.Context, inviteEventID string,
-) (types.StreamPosition, error) {
-	return d.Invites.DeleteInviteEvent(ctx, inviteEventID)
+) (sp types.StreamPosition, err error) {
+	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+		sp, err = d.Invites.DeleteInviteEvent(ctx, inviteEventID)
+		return nil
+	})
+	return
 }
 
 // GetAccountDataInRange returns all account data for a given user inserted or
@@ -207,7 +208,7 @@ func (d *Database) GetAccountDataInRange(
 func (d *Database) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (sp types.StreamPosition, err error) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.AccountData.InsertAccountData(ctx, txn, userID, roomID, dataType)
 		return err
 	})
@@ -237,6 +238,7 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 // handleBackwardExtremities adds this event as a backwards extremity if and only if we do not have all of
 // the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
+// This function should always be called within a sqlutil.Writer for safety in SQLite.
 func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *gomatrixserverlib.HeaderedEvent) error {
 	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID(), ev.EventID()); err != nil {
 		return err
@@ -275,7 +277,7 @@ func (d *Database) WriteEvent(
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
 ) (pduPosition types.StreamPosition, returnErr error) {
-	returnErr = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.OutputEvents.InsertEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
@@ -304,6 +306,7 @@ func (d *Database) WriteEvent(
 	return pduPosition, returnErr
 }
 
+// This function should always be called within a sqlutil.Writer for safety in SQLite.
 func (d *Database) updateRoomState(
 	ctx context.Context, txn *sql.Tx,
 	removedEventIDs []string,
@@ -1114,7 +1117,7 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	}
 	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
 	// that we don't lock the table for writes in more than one place.
-	err = d.SendToDeviceWriter.Do(d.DB, nil, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.AddSendToDeviceEvent(
 			ctx, txn, userID, deviceID, string(j),
 		)
@@ -1179,7 +1182,7 @@ func (d *Database) CleanSendToDeviceUpdates(
 	// If we need to write to the database then we'll ask the SendToDeviceWriter to
 	// do that for us. It'll guarantee that we don't lock the table for writes in
 	// more than one place.
-	err = d.SendToDeviceWriter.Do(d.DB, nil, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		// Delete any send-to-device messages marked for deletion.
 		if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
 			return fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)

@@ -7,16 +7,17 @@ import (
 	"go.uber.org/atomic"
 )
 
-// ExclusiveTransactionWriter allows queuing database writes so that you don't
+// ExclusiveWriter implements sqlutil.Writer.
+// ExclusiveWriter allows queuing database writes so that you don't
 // contend on database locks in, e.g. SQLite. Only one task will run
-// at a time on a given ExclusiveTransactionWriter.
-type ExclusiveTransactionWriter struct {
+// at a time on a given ExclusiveWriter.
+type ExclusiveWriter struct {
 	running atomic.Bool
 	todo    chan transactionWriterTask
 }
 
-func NewTransactionWriter() TransactionWriter {
-	return &ExclusiveTransactionWriter{
+func NewExclusiveWriter() Writer {
+	return &ExclusiveWriter{
 		todo: make(chan transactionWriterTask),
 	}
 }
@@ -34,7 +35,7 @@ type transactionWriterTask struct {
 // txn parameter if one is supplied, and if not, will take out a
 // new transaction from the database supplied in the database
 // parameter. Either way, this will block until the task is done.
-func (w *ExclusiveTransactionWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
+func (w *ExclusiveWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
 	if w.todo == nil {
 		return errors.New("not initialised")
 	}
@@ -55,20 +56,20 @@ func (w *ExclusiveTransactionWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql
 // of these goroutines will run at a time. A transaction will be
 // opened using the database object from the task and then this will
 // be passed as a parameter to the task function.
-func (w *ExclusiveTransactionWriter) run() {
+func (w *ExclusiveWriter) run() {
 	if !w.running.CAS(false, true) {
 		return
 	}
 	defer w.running.Store(false)
 	for task := range w.todo {
-		if task.txn != nil {
+		if task.db != nil && task.txn != nil {
 			task.wait <- task.f(task.txn)
-		} else if task.db != nil {
+		} else if task.db != nil && task.txn == nil {
 			task.wait <- WithTransaction(task.db, func(txn *sql.Tx) error {
 				return task.f(txn)
 			})
 		} else {
-			panic("expected database or transaction but got neither")
+			task.wait <- task.f(nil)
 		}
 		close(task.wait)
 	}
