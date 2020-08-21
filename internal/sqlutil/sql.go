@@ -103,7 +103,3 @@ func SQLiteDriverName() string {
 	}
 	return "sqlite3"
 }
-
-type Writer interface {
-	Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error
-}

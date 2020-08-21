@@ -7,6 +7,7 @@ import (
 	"go.uber.org/atomic"
 )
 
+// ExclusiveWriter implements sqlutil.Writer.
 // ExclusiveWriter allows queuing database writes so that you don't
 // contend on database locks in, e.g. SQLite. Only one task will run
 // at a time on a given ExclusiveWriter.
