@@ -36,6 +36,9 @@ import "database/sql"
 // will ALWAYS be nil in this mode. This is useful if you just
 // want to perform a single query on an already-prepared statement
 // without the overhead of opening a new transaction to do it in.
+//
+// You MUST take particular care not to call Do() from within f()
+// on the same Writer, or it will likely result in a deadlock.
 type Writer interface {
 	// Queue up one or more database write operations within the
 	// provided function to be executed when it is safe to do so.
