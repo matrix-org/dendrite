@@ -34,11 +34,11 @@ import (
 	"github.com/matrix-org/dendrite/currentstateserver/storage"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/internal/test"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/naffka"
+	naffkaStorage "github.com/matrix-org/naffka/storage"
 )
 
 var (
@@ -122,13 +122,7 @@ func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, storage.Dat
 	cfg.Global.ServerName = "kaer.morhen"
 	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource("file:" + stateDBName)
 	cfg.Global.Kafka.TopicPrefix = kafkaPrefix
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource("file:" + naffkaDBName),
-	})
-	if err != nil {
-		t.Fatalf("Failed to open naffka database: %s", err)
-	}
-	naffkaDB, err := naffka.NewSqliteDatabase(db)
+	naffkaDB, err := naffkaStorage.NewDatabase("file:" + naffkaDBName)
 	if err != nil {
 		t.Fatalf("Failed to setup naffka database: %s", err)
 	}
