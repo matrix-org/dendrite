@@ -22,7 +22,7 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20200817100842-9d02141812f2
-	github.com/matrix-org/naffka v0.0.0-20200422140631-181f1ee7401f
+	github.com/matrix-org/naffka v0.0.0-20200824124823-ed1d3c8c35f5
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible
 	github.com/nfnt/resize v0.0.0-20160724205520-891127d8d1b5
