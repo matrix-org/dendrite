@@ -38,9 +38,18 @@ type Transaction interface {
 // was applied correctly. For example, 'database is locked' errors in sqlite will happen here.
 func EndTransaction(txn Transaction, succeeded *bool) error {
 	if *succeeded {
-		return txn.Commit() // nolint: errcheck
+		return txn.Commit()
 	} else {
-		return txn.Rollback() // nolint: errcheck
+		return txn.Rollback()
+	}
+}
+
+// EndTransactionWithCheck ends a transaction and overwrites the error pointer if its value was nil.
+// If the transaction succeeded then it is committed, otherwise it is rolledback.
+// Designed to be used with defer (see EndTransaction otherwise).
+func EndTransactionWithCheck(txn Transaction, succeeded *bool, err *error) {
+	if e := EndTransaction(txn, succeeded); e != nil && *err == nil {
+		*err = e
 	}
 }
 
@@ -53,12 +62,7 @@ func WithTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 		return fmt.Errorf("sqlutil.WithTransaction.Begin: %w", err)
 	}
 	succeeded := false
-	defer func() {
-		err2 := EndTransaction(txn, &succeeded)
-		if err == nil && err2 != nil { // failed to commit/rollback
-			err = err2
-		}
-	}()
+	defer EndTransactionWithCheck(txn, &succeeded, &err)
 
 	err = fn(txn)
 	if err != nil {
