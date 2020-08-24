@@ -10,9 +10,9 @@ passes.
 
 ## Finding out which tests to add
 
-We recommend you run the tests locally by using the SyTest docker image or
-manually setting up SyTest. After running the tests, a script will print the
-tests you need to add to `sytest-whitelist`.
+We recommend you run the tests locally by using the SyTest docker image.
+After running the tests, a script will print the tests you need to add to
+`sytest-whitelist`.
 
 You should proceed after you see no build problems for dendrite after running:
 
@@ -20,7 +20,15 @@ You should proceed after you see no build problems for dendrite after running:
 ./build.sh
 ```
 
+If you are fixing an issue marked with
+[Are We Synapse Yet](https://github.com/matrix-org/dendrite/labels/are-we-synapse-yet)
+then there will be a list of Sytests that you should add to the whitelist when you
+have fixed that issue. This MUST be included in your PR to ensure that the issue
+is fully resolved.
+
 ### Using the SyTest Docker image
+
+**We strongly recommend using the Docker image to run Sytest.**
 
 Use the following commands to pull the latest SyTest image and run the tests:
 
@@ -38,11 +46,28 @@ When debugging, the following Docker `run` options may also be useful:
 * `-v /path/to/sytest/:/sytest/`: Use your local SyTest repository at
   `/path/to/sytest` instead of pulling from GitHub. This is useful when you want
   to speed things up or make modifications to SyTest.
+* `-v "/path/to/gopath/:/gopath"`: Use your local `GOPATH` so you don't need to
+  re-download packages on every run.
 * `--entrypoint bash`: Prevent the container from automatically starting the
   tests.  When used, you need to manually run `/bootstrap.sh dendrite` inside
   the container to start them.
+* `-e "DENDRITE_TRACE_HTTP=1"`: Adds HTTP tracing to server logs.
+* `-e "DENDRITE_TRACE_INTERNAL=1"`: Adds roomserver internal API tracing to
+  server logs.
+* `-e "DENDRITE_TRACE_SQL=1"`: Adds tracing to all SQL statements to server logs.
+
+The docker command also supports a single positional argument for the test file to
+run, so you can run a single `.pl` file rather than the whole test suite. For example:
+```
+docker run --rm --name sytest -v "/Users/kegan/github/sytest:/sytest"
+-v "/Users/kegan/github/dendrite:/src" -v "/Users/kegan/logs:/logs"
+-v "/Users/kegan/go/:/gopath" -e "POSTGRES=1" -e "DENDRITE_TRACE_HTTP=1"
+matrixdotorg/sytest-dendrite:latest tests/50federation/40devicelists.pl
+```
 
 ### Manually Setting up SyTest
+
+**We advise AGAINST using manual SyTest setups.**
 
 If you don't want to use the Docker image, you can also run SyTest by hand. Make
 sure you have Perl 5 or above, and get SyTest with:
