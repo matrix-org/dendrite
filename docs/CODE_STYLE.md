@@ -12,9 +12,9 @@ directive](https://github.com/golangci/golangci-lint#nolint), e.g.  `var
 bad_name int //nolint:golint,unused`. This should be used sparingly and only
 when its clear that the lint warning is spurious.
 
-The linters can be run using [scripts/find-lint.sh](scripts/find-lint.sh)
+The linters can be run using [build/scripts/find-lint.sh](/build/scripts/find-lint.sh)
 (see file for docs) or as part of a build/test/lint cycle using
-[scripts/build-test-lint.sh](scripts/build-test-lint.sh).
+[build/scripts/build-test-lint.sh](/build/scripts/build-test-lint.sh).
 
 
 ## Labels
