@@ -65,7 +65,9 @@ all have related Sytests which need to pass in order for the issue to be closed.
 code, you can quickly run Sytest to ensure that the test names are now passing.
 
 For example, if the test `Local device key changes get to remote servers` was marked as failing, find the
-test file (e.g via `grep`, it's `tests/50federation/40devicelists.pl` ) then to run Sytest:
+test file (e.g via `grep` or via the
+[CI log output](https://buildkite.com/matrix-dot-org/dendrite/builds/2826#39cff5de-e032-4ad0-ad26-f819e6919c42)
+it's `tests/50federation/40devicelists.pl` ) then to run Sytest:
 ```
 docker run --rm --name sytest
 -v "/Users/kegan/github/sytest:/sytest"
