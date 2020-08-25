@@ -150,6 +150,14 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 			return nil, nil, err
 		}
 
+		// if we have seen this room before, it has a higher stream position and hence takes priority
+		// because the query is ORDER BY id DESC so drop them
+		_, isRetired := retired[roomID]
+		_, isInvited := result[roomID]
+		if isRetired || isInvited {
+			continue
+		}
+
 		var event gomatrixserverlib.HeaderedEvent
 		if err := json.Unmarshal(eventJSON, &event); err != nil {
 			return nil, nil, err
