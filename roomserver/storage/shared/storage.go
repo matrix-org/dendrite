@@ -209,13 +209,9 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 }
 
 func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
-	if nid, ok := d.Cache.GetRoomServerRoomNID(roomID); ok {
-		roomNID = nid
-	} else {
-		roomNID, err = d.RoomNID(ctx, roomID)
-		if err != nil {
-			return
-		}
+	roomNID, err = d.RoomNID(ctx, roomID)
+	if err != nil {
+		return
 	}
 	latestEvents, _, err := d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
 	if err != nil {
