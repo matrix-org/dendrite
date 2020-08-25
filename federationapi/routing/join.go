@@ -165,7 +165,7 @@ func SendJoin(
 	}
 
 	// Check that a state key is provided.
-	if event.StateKey() == nil || (event.StateKey() != nil && *event.StateKey() == "") {
+	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(
@@ -253,11 +253,12 @@ func SendJoin(
 	// there isn't much point in sending another join event into the room.
 	alreadyJoined := false
 	for _, se := range stateAndAuthChainResponse.StateEvents {
+		if !se.StateKeyEquals(*event.StateKey()) {
+			continue
+		}
 		if membership, merr := se.Membership(); merr == nil {
-			if se.StateKey() != nil && *se.StateKey() == *event.StateKey() {
-				alreadyJoined = (membership == "join")
-				break
-			}
+			alreadyJoined = (membership == gomatrixserverlib.Join)
+			break
 		}
 	}
 

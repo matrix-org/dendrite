@@ -104,17 +104,18 @@ func GetEvent(
 	}
 
 	for _, stateEvent := range stateResp.StateEvents {
-		if stateEvent.StateKeyEquals(r.device.UserID) {
-			membership, err := stateEvent.Membership()
-			if err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("stateEvent.Membership failed")
-				return jsonerror.InternalServerError()
-			}
-			if membership == gomatrixserverlib.Join {
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
-				}
+		if !stateEvent.StateKeyEquals(device.UserID) {
+			continue
+		}
+		membership, err := stateEvent.Membership()
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("stateEvent.Membership failed")
+			return jsonerror.InternalServerError()
+		}
+		if membership == gomatrixserverlib.Join {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
 			}
 		}
 	}

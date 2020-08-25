@@ -126,10 +126,8 @@ func (c *OutputRoomEventConsumer) Start() error {
 }
 
 func (c *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.HeaderedEvent) (gomatrixserverlib.HeaderedEvent, error) {
-	var stateKey string
-	if event.StateKey() == nil {
-		stateKey = ""
-	} else {
+	stateKey := ""
+	if event.StateKey() != nil {
 		stateKey = *event.StateKey()
 	}
 

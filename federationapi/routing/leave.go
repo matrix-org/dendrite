@@ -81,15 +81,16 @@ func MakeLeave(
 	// event. This means that /send_leave will be a no-op, which helps
 	// to reject invites multiple times - hopefully.
 	for _, state := range queryRes.StateEvents {
-		if state.Type() == gomatrixserverlib.MRoomMember && state.StateKeyEquals(userID) {
-			if mem, merr := state.Membership(); merr == nil && mem == gomatrixserverlib.Leave {
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: map[string]interface{}{
-						"room_version": event.RoomVersion,
-						"event":        state,
-					},
-				}
+		if !state.StateKeyEquals(userID) {
+			continue
+		}
+		if mem, merr := state.Membership(); merr == nil && mem == gomatrixserverlib.Leave {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: map[string]interface{}{
+					"room_version": event.RoomVersion,
+					"event":        state,
+				},
 			}
 		}
 	}

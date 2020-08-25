@@ -1216,14 +1216,14 @@ func removeDuplicates(stateEvents, recentEvents []gomatrixserverlib.HeaderedEven
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
 func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) string {
-	if ev.Type() == "m.room.member" && ev.StateKeyEquals(userID) {
-		membership, err := ev.Membership()
-		if err != nil {
-			return ""
-		}
-		return membership
+	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(userID) {
+		return ""
 	}
-	return ""
+	membership, err := ev.Membership()
+	if err != nil {
+		return ""
+	}
+	return membership
 }
 
 type stateDelta struct {
