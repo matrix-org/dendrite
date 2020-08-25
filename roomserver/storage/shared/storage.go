@@ -69,6 +69,7 @@ func (d *Database) EventTypeNIDs(
 		}
 		for eventType, nid := range nids {
 			result[eventType] = nid
+			d.Cache.StoreRoomServerEventTypeNID(eventType, nid)
 		}
 	}
 	return result, nil
@@ -99,6 +100,7 @@ func (d *Database) EventStateKeyNIDs(
 		}
 		for eventStateKey, nid := range nids {
 			result[eventStateKey] = nid
+			d.Cache.StoreRoomServerStateKeyNID(eventStateKey, nid)
 		}
 	}
 	return result, nil
@@ -202,6 +204,7 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
+	d.Cache.StoreRoomServerRoomNID(roomID, roomNID)
 	return roomNID, err
 }
 
@@ -213,6 +216,7 @@ func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (ro
 		if err != nil {
 			return
 		}
+		d.Cache.StoreRoomServerRoomNID(roomID, roomNID)
 	}
 	latestEvents, _, err := d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
 	if err != nil {
