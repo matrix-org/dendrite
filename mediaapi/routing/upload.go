@@ -155,9 +155,9 @@ func (r *uploadRequest) doUpload(
 	}
 	if existingMetadata != nil {
 		// The file already exists. Make a new media ID up for it.
-		mediaID, err := r.generateMediaID(ctx, db)
-		if err != nil {
-			r.Logger.WithError(err).Error("Failed to generate media ID for existing file")
+		mediaID, merr := r.generateMediaID(ctx, db)
+		if merr != nil {
+			r.Logger.WithError(merr).Error("Failed to generate media ID for existing file")
 			resErr := jsonerror.InternalServerError()
 			return &resErr
 		}
