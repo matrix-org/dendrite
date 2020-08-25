@@ -96,19 +96,27 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 
 func (r *uploadRequest) generateMediaID(ctx context.Context, db storage.Database) (types.MediaID, error) {
 	for {
+		// First try generating a meda ID. We'll do this by
+		// generating some random bytes and then hex-encoding.
 		mediaIDBytes := make([]byte, 32)
 		_, err := rand.Read(mediaIDBytes)
 		if err != nil {
 			return "", fmt.Errorf("rand.Read: %w", err)
 		}
 		mediaID := types.MediaID(hex.EncodeToString(mediaIDBytes))
+		// Then we will check if this media ID already exists in
+		// our database. If it does then we had best generate a
+		// new one.
 		existingMetadata, err := db.GetMediaMetadata(ctx, mediaID, r.MediaMetadata.Origin)
 		if err != nil {
 			return "", fmt.Errorf("db.GetMediaMetadata: %w", err)
 		}
 		if existingMetadata != nil {
+			// The media ID was already used - repeat the process
+			// and generate a new one instead.
 			continue
 		}
+		// The media ID was not already used - let's return that.
 		return mediaID, nil
 	}
 }
