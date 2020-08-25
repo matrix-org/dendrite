@@ -201,7 +201,7 @@ func Setup(
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingStateRequest(req.Context(), rsAPI, vars["roomID"])
+		return OnIncomingStateRequest(req.Context(), device, rsAPI, vars["roomID"])
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{type:[^/]+/?}", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
