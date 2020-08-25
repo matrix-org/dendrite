@@ -16,7 +16,7 @@ type RoomserverInternalAPI struct {
 	DB                   storage.Database
 	Cfg                  *config.RoomServer
 	Producer             sarama.SyncProducer
-	Cache                caching.RoomVersionCache
+	Cache                caching.RoomServerCaches
 	ServerName           gomatrixserverlib.ServerName
 	KeyRing              gomatrixserverlib.JSONVerifier
 	FedClient            *gomatrixserverlib.FederationClient

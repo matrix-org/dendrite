@@ -27,9 +27,49 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
+	roomServerStateKeyNIDs, err := NewInMemoryLRUCachePartition(
+		RoomServerStateKeyNIDsCacheName,
+		RoomServerStateKeyNIDsCacheMutable,
+		RoomServerStateKeyNIDsCacheMaxEntries,
+		enablePrometheus,
+	)
+	if err != nil {
+		return nil, err
+	}
+	roomServerEventTypeNIDs, err := NewInMemoryLRUCachePartition(
+		RoomServerEventTypeNIDsCacheName,
+		RoomServerEventTypeNIDsCacheMutable,
+		RoomServerEventTypeNIDsCacheMaxEntries,
+		enablePrometheus,
+	)
+	if err != nil {
+		return nil, err
+	}
+	roomServerRoomNIDs, err := NewInMemoryLRUCachePartition(
+		RoomServerRoomNIDsCacheName,
+		RoomServerRoomNIDsCacheMutable,
+		RoomServerRoomNIDsCacheMaxEntries,
+		enablePrometheus,
+	)
+	if err != nil {
+		return nil, err
+	}
+	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
+		RoomServerRoomIDsCacheName,
+		RoomServerRoomIDsCacheMutable,
+		RoomServerRoomIDsCacheMaxEntries,
+		enablePrometheus,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &Caches{
-		RoomVersions: roomVersions,
-		ServerKeys:   serverKeys,
+		RoomVersions:            roomVersions,
+		ServerKeys:              serverKeys,
+		RoomServerStateKeyNIDs:  roomServerStateKeyNIDs,
+		RoomServerEventTypeNIDs: roomServerEventTypeNIDs,
+		RoomServerRoomNIDs:      roomServerRoomNIDs,
+		RoomServerRoomIDs:       roomServerRoomIDs,
 	}, nil
 }
 

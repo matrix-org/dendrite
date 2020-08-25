@@ -3,6 +3,8 @@
 Dendrite is a second-generation Matrix homeserver written in Go. It is not recommended to use Dendrite as
 a production homeserver at this time as there is no stable release.
 
+Dendrite will start to receive versioned releases stable enough to run [once we enter beta](https://github.com/matrix-org/dendrite/milestone/8).
+
 # Quick start
 
 Requires Go 1.13+ and SQLite3 (Postgres is also supported):

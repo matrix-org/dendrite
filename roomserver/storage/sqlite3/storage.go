@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
@@ -46,7 +47,7 @@ type Database struct {
 
 // Open a sqlite database.
 // nolint: gocyclo
-func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
+func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
@@ -120,6 +121,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
+		Cache:               cache,
 		Writer:              sqlutil.NewExclusiveWriter(),
 		EventsTable:         d.events,
 		EventTypesTable:     d.eventTypes,

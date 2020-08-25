@@ -19,18 +19,19 @@ package storage
 import (
 	"fmt"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
 )
 
 // Open opens a database connection.
-func Open(dbProperties *config.DatabaseOptions) (Database, error) {
+func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.Open(dbProperties)
+		return sqlite3.Open(dbProperties, cache)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.Open(dbProperties)
+		return postgres.Open(dbProperties, cache)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

@@ -18,6 +18,7 @@ package postgres
 import (
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
@@ -33,7 +34,7 @@ type Database struct {
 
 // Open a postgres database.
 // nolint: gocyclo
-func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
+func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 	var db *sql.DB
 	var err error
@@ -98,6 +99,7 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	}
 	d.Database = shared.Database{
 		DB:                  db,
+		Cache:               cache,
 		Writer:              sqlutil.NewDummyWriter(),
 		EventTypesTable:     eventTypes,
 		EventStateKeysTable: eventStateKeys,
