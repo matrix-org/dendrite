@@ -16,7 +16,8 @@ package routing
 
 import (
 	"context"
-	"encoding/base64"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -93,6 +94,33 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRe
 	return r, nil
 }
 
+func (r *uploadRequest) generateMediaID(ctx context.Context, db storage.Database) (types.MediaID, error) {
+	for {
+		// First try generating a meda ID. We'll do this by
+		// generating some random bytes and then hex-encoding.
+		mediaIDBytes := make([]byte, 32)
+		_, err := rand.Read(mediaIDBytes)
+		if err != nil {
+			return "", fmt.Errorf("rand.Read: %w", err)
+		}
+		mediaID := types.MediaID(hex.EncodeToString(mediaIDBytes))
+		// Then we will check if this media ID already exists in
+		// our database. If it does then we had best generate a
+		// new one.
+		existingMetadata, err := db.GetMediaMetadata(ctx, mediaID, r.MediaMetadata.Origin)
+		if err != nil {
+			return "", fmt.Errorf("db.GetMediaMetadata: %w", err)
+		}
+		if existingMetadata != nil {
+			// The media ID was already used - repeat the process
+			// and generate a new one instead.
+			continue
+		}
+		// The media ID was not already used - let's return that.
+		return mediaID, nil
+	}
+}
+
 func (r *uploadRequest) doUpload(
 	ctx context.Context,
 	reqReader io.Reader,
@@ -122,41 +150,59 @@ func (r *uploadRequest) doUpload(
 		}
 	}
 
-	r.MediaMetadata.FileSizeBytes = bytesWritten
-	r.MediaMetadata.Base64Hash = hash
-	r.MediaMetadata.MediaID = types.MediaID(base64.RawURLEncoding.EncodeToString(
-		[]byte(string(r.MediaMetadata.UploadName) + string(r.MediaMetadata.Base64Hash)),
-	))
+	// Look up the media by the file hash. If we already have the file but under a
+	// different media ID then we won't upload the file again - instead we'll just
+	// add a new metadata entry that refers to the same file.
+	existingMetadata, err := db.GetMediaMetadataByHash(
+		ctx, hash, r.MediaMetadata.Origin,
+	)
+	if err != nil {
+		r.Logger.WithError(err).Error("Error querying the database by hash.")
+		resErr := jsonerror.InternalServerError()
+		return &resErr
+	}
+	if existingMetadata != nil {
+		// The file already exists. Make a new media ID up for it.
+		mediaID, merr := r.generateMediaID(ctx, db)
+		if merr != nil {
+			r.Logger.WithError(merr).Error("Failed to generate media ID for existing file")
+			resErr := jsonerror.InternalServerError()
+			return &resErr
+		}
 
-	r.Logger = r.Logger.WithField("MediaID", r.MediaMetadata.MediaID)
+		// Then amend the upload metadata.
+		r.MediaMetadata = &types.MediaMetadata{
+			MediaID:           mediaID,
+			Origin:            r.MediaMetadata.Origin,
+			ContentType:       r.MediaMetadata.ContentType,
+			FileSizeBytes:     r.MediaMetadata.FileSizeBytes,
+			CreationTimestamp: r.MediaMetadata.CreationTimestamp,
+			UploadName:        r.MediaMetadata.UploadName,
+			Base64Hash:        hash,
+			UserID:            r.MediaMetadata.UserID,
+		}
 
+		// Clean up the uploaded temporary file.
+		fileutils.RemoveDir(tmpDir, r.Logger)
+	} else {
+		// The file doesn't exist. Update the request metadata.
+		r.MediaMetadata.FileSizeBytes = bytesWritten
+		r.MediaMetadata.Base64Hash = hash
+		r.MediaMetadata.MediaID, err = r.generateMediaID(ctx, db)
+		if err != nil {
+			r.Logger.WithError(err).Error("Failed to generate media ID for new upload")
+			resErr := jsonerror.InternalServerError()
+			return &resErr
+		}
+	}
+
+	r.Logger = r.Logger.WithField("media_id", r.MediaMetadata.MediaID)
 	r.Logger.WithFields(log.Fields{
 		"Base64Hash":    r.MediaMetadata.Base64Hash,
 		"UploadName":    r.MediaMetadata.UploadName,
 		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
 		"ContentType":   r.MediaMetadata.ContentType,
 	}).Info("File uploaded")
-
-	// check if we already have a record of the media in our database and if so, we can remove the temporary directory
-	mediaMetadata, err := db.GetMediaMetadata(
-		ctx, r.MediaMetadata.MediaID, r.MediaMetadata.Origin,
-	)
-	if err != nil {
-		r.Logger.WithError(err).Error("Error querying the database.")
-		resErr := jsonerror.InternalServerError()
-		return &resErr
-	}
-
-	if mediaMetadata != nil {
-		r.MediaMetadata = mediaMetadata
-		fileutils.RemoveDir(tmpDir, r.Logger)
-		return &util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: uploadResponse{
-				ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.Matrix.ServerName, r.MediaMetadata.MediaID),
-			},
-		}
-	}
 
 	return r.storeFileAndMetadata(
 		ctx, tmpDir, cfg.AbsBasePath, db, cfg.ThumbnailSizes,

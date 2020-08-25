@@ -67,6 +67,19 @@ func (d *Database) GetMediaMetadata(
 	return mediaMetadata, err
 }
 
+// GetMediaMetadataByHash returns metadata about media stored on this server.
+// The media could have been uploaded to this server or fetched from another server and cached here.
+// Returns nil metadata if there is no metadata associated with this media.
+func (d *Database) GetMediaMetadataByHash(
+	ctx context.Context, mediaHash types.Base64Hash, mediaOrigin gomatrixserverlib.ServerName,
+) (*types.MediaMetadata, error) {
+	mediaMetadata, err := d.statements.media.selectMediaByHash(ctx, mediaHash, mediaOrigin)
+	if err != nil && err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return mediaMetadata, err
+}
+
 // StoreThumbnail inserts the metadata about the thumbnail into the database.
 // Returns an error if the combination of MediaID and Origin are not unique in the table.
 func (d *Database) StoreThumbnail(
