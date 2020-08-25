@@ -216,7 +216,6 @@ func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (ro
 		if err != nil {
 			return
 		}
-		d.Cache.StoreRoomServerRoomNID(roomID, roomNID)
 	}
 	latestEvents, _, err := d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
 	if err != nil {

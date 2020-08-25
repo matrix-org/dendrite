@@ -47,7 +47,7 @@ func (c Caches) GetRoomServerStateKeyNID(stateKey string) (types.EventStateKeyNI
 }
 
 func (c Caches) StoreRoomServerStateKeyNID(stateKey string, nid types.EventStateKeyNID) {
-	c.RoomVersions.Set(stateKey, nid)
+	c.RoomServerStateKeyNIDs.Set(stateKey, nid)
 }
 
 func (c Caches) GetRoomServerEventTypeNID(eventType string) (types.EventTypeNID, bool) {
@@ -61,7 +61,7 @@ func (c Caches) GetRoomServerEventTypeNID(eventType string) (types.EventTypeNID,
 }
 
 func (c Caches) StoreRoomServerEventTypeNID(eventType string, nid types.EventTypeNID) {
-	c.RoomVersions.Set(eventType, nid)
+	c.RoomServerEventTypeNIDs.Set(eventType, nid)
 }
 
 func (c Caches) GetRoomServerRoomNID(roomID string) (types.RoomNID, bool) {
@@ -75,5 +75,5 @@ func (c Caches) GetRoomServerRoomNID(roomID string) (types.RoomNID, bool) {
 }
 
 func (c Caches) StoreRoomServerRoomNID(roomID string, nid types.RoomNID) {
-	c.RoomVersions.Set(roomID, nid)
+	c.RoomServerRoomNIDs.Set(roomID, nid)
 }
