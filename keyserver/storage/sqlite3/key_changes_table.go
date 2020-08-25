@@ -21,7 +21,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 )
 
@@ -52,15 +51,13 @@ const selectKeyChangesSQL = "" +
 
 type keyChangesStatements struct {
 	db                   *sql.DB
-	writer               sqlutil.Writer
 	upsertKeyChangeStmt  *sql.Stmt
 	selectKeyChangesStmt *sql.Stmt
 }
 
-func NewSqliteKeyChangesTable(db *sql.DB, writer sqlutil.Writer) (tables.KeyChanges, error) {
+func NewSqliteKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 	s := &keyChangesStatements{
-		db:     db,
-		writer: writer,
+		db: db,
 	}
 	_, err := db.Exec(keyChangesSchema)
 	if err != nil {
@@ -76,10 +73,8 @@ func NewSqliteKeyChangesTable(db *sql.DB, writer sqlutil.Writer) (tables.KeyChan
 }
 
 func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, partition int32, offset int64, userID string) error {
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		_, err := s.upsertKeyChangeStmt.ExecContext(ctx, partition, offset, userID)
-		return err
-	})
+	_, err := s.upsertKeyChangeStmt.ExecContext(ctx, partition, offset, userID)
+	return err
 }
 
 func (s *keyChangesStatements) SelectKeyChanges(
