@@ -60,11 +60,16 @@ const selectMediaSQL = `
 SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM mediaapi_media_repository WHERE media_id = $1 AND media_origin = $2
 `
 
+const selectMediaByHashSQL = `
+SELECT content_type, file_size_bytes, creation_ts, upload_name, media_id, user_id FROM mediaapi_media_repository WHERE base64hash = $1 AND media_origin = $2
+`
+
 type mediaStatements struct {
-	db              *sql.DB
-	writer          sqlutil.Writer
-	insertMediaStmt *sql.Stmt
-	selectMediaStmt *sql.Stmt
+	db                    *sql.DB
+	writer                sqlutil.Writer
+	insertMediaStmt       *sql.Stmt
+	selectMediaStmt       *sql.Stmt
+	selectMediaByHashStmt *sql.Stmt
 }
 
 func (s *mediaStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
@@ -79,6 +84,7 @@ func (s *mediaStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error)
 	return statementList{
 		{&s.insertMediaStmt, insertMediaSQL},
 		{&s.selectMediaStmt, selectMediaSQL},
+		{&s.selectMediaByHashStmt, selectMediaByHashSQL},
 	}.prepare(db)
 }
 
@@ -118,6 +124,26 @@ func (s *mediaStatements) selectMedia(
 		&mediaMetadata.CreationTimestamp,
 		&mediaMetadata.UploadName,
 		&mediaMetadata.Base64Hash,
+		&mediaMetadata.UserID,
+	)
+	return &mediaMetadata, err
+}
+
+func (s *mediaStatements) selectMediaByHash(
+	ctx context.Context, mediaHash types.Base64Hash, mediaOrigin gomatrixserverlib.ServerName,
+) (*types.MediaMetadata, error) {
+	mediaMetadata := types.MediaMetadata{
+		Base64Hash: mediaHash,
+		Origin:     mediaOrigin,
+	}
+	err := s.selectMediaStmt.QueryRowContext(
+		ctx, mediaMetadata.Base64Hash, mediaMetadata.Origin,
+	).Scan(
+		&mediaMetadata.ContentType,
+		&mediaMetadata.FileSizeBytes,
+		&mediaMetadata.CreationTimestamp,
+		&mediaMetadata.UploadName,
+		&mediaMetadata.MediaID,
 		&mediaMetadata.UserID,
 	)
 	return &mediaMetadata, err
