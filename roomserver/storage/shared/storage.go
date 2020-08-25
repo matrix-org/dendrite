@@ -24,7 +24,7 @@ import (
 // unsigned.redacted_because - we just don't clear out the content fields yet.
 //
 // If this hasn't been done by 09/2020 this should be flipped to true.
-const redactionsArePermanent = false
+const redactionsArePermanent = true
 
 type Database struct {
 	DB                  *sql.DB
