@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
@@ -27,6 +28,7 @@ const redactionsArePermanent = false
 
 type Database struct {
 	DB                  *sql.DB
+	Cache               caching.RoomServerCaches
 	Writer              sqlutil.Writer
 	EventsTable         tables.Events
 	EventJSONTable      tables.EventJSON
@@ -51,7 +53,25 @@ func (d *Database) SupportsConcurrentRoomInputs() bool {
 func (d *Database) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
-	return d.EventTypesTable.BulkSelectEventTypeNID(ctx, eventTypes)
+	result := make(map[string]types.EventTypeNID)
+	remaining := []string{}
+	for _, eventType := range eventTypes {
+		if nid, ok := d.Cache.GetRoomServerEventTypeNID(eventType); ok {
+			result[eventType] = nid
+		} else {
+			remaining = append(remaining, eventType)
+		}
+	}
+	if len(remaining) > 0 {
+		nids, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, remaining)
+		if err != nil {
+			return nil, err
+		}
+		for eventType, nid := range nids {
+			result[eventType] = nid
+		}
+	}
+	return result, nil
 }
 
 func (d *Database) EventStateKeys(
@@ -63,7 +83,25 @@ func (d *Database) EventStateKeys(
 func (d *Database) EventStateKeyNIDs(
 	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
-	return d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, eventStateKeys)
+	result := make(map[string]types.EventStateKeyNID)
+	remaining := []string{}
+	for _, eventStateKey := range eventStateKeys {
+		if nid, ok := d.Cache.GetRoomServerStateKeyNID(eventStateKey); ok {
+			result[eventStateKey] = nid
+		} else {
+			remaining = append(remaining, eventStateKey)
+		}
+	}
+	if len(remaining) > 0 {
+		nids, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, remaining)
+		if err != nil {
+			return nil, err
+		}
+		for eventStateKey, nid := range nids {
+			result[eventStateKey] = nid
+		}
+	}
+	return result, nil
 }
 
 func (d *Database) StateEntriesForEventIDs(
@@ -157,6 +195,9 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 }
 
 func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, error) {
+	if nid, ok := d.Cache.GetRoomServerRoomNID(roomID); ok {
+		return nid, nil
+	}
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
 	if err == sql.ErrNoRows {
 		return 0, nil
@@ -165,9 +206,13 @@ func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, e
 }
 
 func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
-	roomNID, err = d.RoomNID(ctx, roomID)
-	if err != nil {
-		return
+	if nid, ok := d.Cache.GetRoomServerRoomNID(roomID); ok {
+		roomNID = nid
+	} else {
+		roomNID, err = d.RoomNID(ctx, roomID)
+		if err != nil {
+			return
+		}
 	}
 	latestEvents, _, err := d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
 	if err != nil {

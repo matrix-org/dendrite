@@ -4,8 +4,11 @@ package caching
 // different implementations as long as they satisfy the Cache
 // interface.
 type Caches struct {
-	RoomVersions Cache // implements RoomVersionCache
-	ServerKeys   Cache // implements ServerKeyCache
+	RoomVersions            Cache // RoomVersionCache
+	ServerKeys              Cache // ServerKeyCache
+	RoomServerStateKeyNIDs  Cache // RoomServerNIDsCache
+	RoomServerEventTypeNIDs Cache // RoomServerNIDsCache
+	RoomServerRoomNIDs      Cache // RoomServerNIDsCache
 }
 
 // Cache is the interface that an implementation must satisfy.
