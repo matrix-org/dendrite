@@ -388,15 +388,20 @@ func checkMemberInRoom(ctx context.Context, stateAPI currentstateAPI.CurrentStat
 		e := jsonerror.InternalServerError()
 		return &e
 	}
-	ev, ok := membershipRes.StateEvents[tuple]
-	if !ok {
+	ev := membershipRes.StateEvents[tuple]
+	if ev == nil {
 		return &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("user does not belong to room"),
 		}
 	}
 	membership, err := ev.Membership()
-	if err != nil || membership != "join" {
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Member event isn't valid")
+		e := jsonerror.InternalServerError()
+		return &e
+	}
+	if membership != gomatrixserverlib.Join {
 		return &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("user does not belong to room"),

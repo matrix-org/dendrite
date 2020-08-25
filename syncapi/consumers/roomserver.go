@@ -169,9 +169,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 }
 
 func (s *OutputRoomEventConsumer) notifyKeyChanges(ev *gomatrixserverlib.HeaderedEvent) {
-	if ev.Type() != gomatrixserverlib.MRoomMember || ev.StateKey() == nil {
-		return
-	}
 	membership, err := ev.Membership()
 	if err != nil {
 		return
