@@ -63,7 +63,6 @@ const deleteAllDeviceKeysSQL = "" +
 
 type deviceKeysStatements struct {
 	db                         *sql.DB
-	writer                     sqlutil.Writer
 	upsertDeviceKeysStmt       *sql.Stmt
 	selectDeviceKeysStmt       *sql.Stmt
 	selectBatchDeviceKeysStmt  *sql.Stmt
@@ -71,10 +70,9 @@ type deviceKeysStatements struct {
 	deleteAllDeviceKeysStmt    *sql.Stmt
 }
 
-func NewSqliteDeviceKeysTable(db *sql.DB, writer sqlutil.Writer) (tables.DeviceKeys, error) {
+func NewSqliteDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 	s := &deviceKeysStatements{
-		db:     db,
-		writer: writer,
+		db: db,
 	}
 	_, err := db.Exec(deviceKeysSchema)
 	if err != nil {
@@ -188,16 +186,14 @@ func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID
 }
 
 func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx, keys []api.DeviceMessage) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		for _, key := range keys {
-			now := time.Now().Unix()
-			_, err := txn.Stmt(s.upsertDeviceKeysStmt).ExecContext(
-				ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID, key.DisplayName,
-			)
-			if err != nil {
-				return err
-			}
+	for _, key := range keys {
+		now := time.Now().Unix()
+		_, err := txn.Stmt(s.upsertDeviceKeysStmt).ExecContext(
+			ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID, key.DisplayName,
+		)
+		if err != nil {
+			return err
 		}
-		return nil
-	})
+	}
+	return nil
 }

@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -51,16 +50,14 @@ const selectStaleDeviceListsSQL = "" +
 
 type staleDeviceListsStatements struct {
 	db                                    *sql.DB
-	writer                                sqlutil.Writer
 	upsertStaleDeviceListStmt             *sql.Stmt
 	selectStaleDeviceListsWithDomainsStmt *sql.Stmt
 	selectStaleDeviceListsStmt            *sql.Stmt
 }
 
-func NewSqliteStaleDeviceListsTable(db *sql.DB, writer sqlutil.Writer) (tables.StaleDeviceLists, error) {
+func NewSqliteStaleDeviceListsTable(db *sql.DB) (tables.StaleDeviceLists, error) {
 	s := &staleDeviceListsStatements{
-		db:     db,
-		writer: writer,
+		db: db,
 	}
 	_, err := db.Exec(staleDeviceListsSchema)
 	if err != nil {
@@ -83,11 +80,8 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-	return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.upsertStaleDeviceListStmt)
-		_, err = stmt.ExecContext(ctx, userID, string(domain), isStale, time.Now().Unix())
-		return err
-	})
+	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, time.Now().Unix())
+	return err
 }
 
 func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {

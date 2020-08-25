@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 )
@@ -60,7 +59,6 @@ const selectKeyByAlgorithmSQL = "" +
 
 type oneTimeKeysStatements struct {
 	db                       *sql.DB
-	writer                   sqlutil.Writer
 	upsertKeysStmt           *sql.Stmt
 	selectKeysStmt           *sql.Stmt
 	selectKeysCountStmt      *sql.Stmt
@@ -68,10 +66,9 @@ type oneTimeKeysStatements struct {
 	deleteOneTimeKeyStmt     *sql.Stmt
 }
 
-func NewSqliteOneTimeKeysTable(db *sql.DB, writer sqlutil.Writer) (tables.OneTimeKeys, error) {
+func NewSqliteOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
 	s := &oneTimeKeysStatements{
-		db:     db,
-		writer: writer,
+		db: db,
 	}
 	_, err := db.Exec(oneTimeKeysSchema)
 	if err != nil {
@@ -145,39 +142,39 @@ func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, de
 	return counts, nil
 }
 
-func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error) {
+func (s *oneTimeKeysStatements) InsertOneTimeKeys(
+	ctx context.Context, txn *sql.Tx, keys api.OneTimeKeys,
+) (*api.OneTimeKeysCount, error) {
 	now := time.Now().Unix()
 	counts := &api.OneTimeKeysCount{
 		DeviceID: keys.DeviceID,
 		UserID:   keys.UserID,
 		KeyCount: make(map[string]int),
 	}
-	return counts, s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		for keyIDWithAlgo, keyJSON := range keys.KeyJSON {
-			algo, keyID := keys.Split(keyIDWithAlgo)
-			_, err := txn.Stmt(s.upsertKeysStmt).ExecContext(
-				ctx, keys.UserID, keys.DeviceID, keyID, algo, now, string(keyJSON),
-			)
-			if err != nil {
-				return err
-			}
-		}
-		rows, err := txn.Stmt(s.selectKeysCountStmt).QueryContext(ctx, keys.UserID, keys.DeviceID)
+	for keyIDWithAlgo, keyJSON := range keys.KeyJSON {
+		algo, keyID := keys.Split(keyIDWithAlgo)
+		_, err := txn.Stmt(s.upsertKeysStmt).ExecContext(
+			ctx, keys.UserID, keys.DeviceID, keyID, algo, now, string(keyJSON),
+		)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		defer internal.CloseAndLogIfError(ctx, rows, "selectKeysCountStmt: rows.close() failed")
-		for rows.Next() {
-			var algorithm string
-			var count int
-			if err = rows.Scan(&algorithm, &count); err != nil {
-				return err
-			}
-			counts.KeyCount[algorithm] = count
+	}
+	rows, err := txn.Stmt(s.selectKeysCountStmt).QueryContext(ctx, keys.UserID, keys.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectKeysCountStmt: rows.close() failed")
+	for rows.Next() {
+		var algorithm string
+		var count int
+		if err = rows.Scan(&algorithm, &count); err != nil {
+			return nil, err
 		}
+		counts.KeyCount[algorithm] = count
+	}
 
-		return rows.Err()
-	})
+	return counts, rows.Err()
 }
 
 func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
@@ -185,17 +182,17 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 ) (map[string]json.RawMessage, error) {
 	var keyID string
 	var keyJSON string
-	err := s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		err := txn.StmtContext(ctx, s.selectKeyByAlgorithmStmt).QueryRowContext(ctx, userID, deviceID, algorithm).Scan(&keyID, &keyJSON)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return nil
-			}
-			return err
+	err := txn.StmtContext(ctx, s.selectKeyByAlgorithmStmt).QueryRowContext(ctx, userID, deviceID, algorithm).Scan(&keyID, &keyJSON)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
 		}
-		_, err = txn.StmtContext(ctx, s.deleteOneTimeKeyStmt).ExecContext(ctx, userID, deviceID, algorithm, keyID)
-		return err
-	})
+		return nil, err
+	}
+	_, err = txn.StmtContext(ctx, s.deleteOneTimeKeyStmt).ExecContext(ctx, userID, deviceID, algorithm, keyID)
+	if err != nil {
+		return nil, err
+	}
 	if keyJSON == "" {
 		return nil, nil
 	}
