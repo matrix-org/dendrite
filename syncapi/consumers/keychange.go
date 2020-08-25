@@ -95,9 +95,8 @@ func (s *OutputKeyChangeEventConsumer) updateOffset(msg *sarama.ConsumerMessage)
 }
 
 func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	defer func() {
-		s.updateOffset(msg)
-	}()
+	defer s.updateOffset(msg)
+
 	var output api.DeviceMessage
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream

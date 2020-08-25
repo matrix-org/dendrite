@@ -101,6 +101,9 @@ func worker(db storage.Database, ws types.ApplicationServiceWorkerState) {
 		// Backoff if the application service does not respond
 		err = send(client, ws.AppService, txnID, transactionJSON)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"appservice": ws.AppService.ID,
+			}).WithError(err).Error("unable to send event")
 			// Backoff
 			backoff(&ws, err)
 			continue
@@ -207,7 +210,7 @@ func send(
 	appservice config.ApplicationService,
 	txnID int,
 	transaction []byte,
-) error {
+) (err error) {
 	// PUT a transaction to our AS
 	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
 	address := fmt.Sprintf("%s/transactions/%d?access_token=%s", appservice.URL, txnID, url.QueryEscape(appservice.HSToken))
@@ -220,14 +223,7 @@ func send(
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err := resp.Body.Close()
-		if err != nil {
-			log.WithFields(log.Fields{
-				"appservice": appservice.ID,
-			}).WithError(err).Error("unable to close response body from application service")
-		}
-	}()
+	defer checkNamedErr(resp.Body.Close, &err)
 
 	// Check the AS received the events correctly
 	if resp.StatusCode != http.StatusOK {
@@ -236,4 +232,11 @@ func send(
 	}
 
 	return nil
+}
+
+// checkNamedErr calls fn and overwrite err if it was nil and fn returned non-nil
+func checkNamedErr(fn func() error, err *error) {
+	if e := fn(); e != nil && *err == nil {
+		*err = e
+	}
 }

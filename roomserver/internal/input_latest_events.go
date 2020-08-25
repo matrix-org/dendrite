@@ -60,12 +60,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 		return fmt.Errorf("r.DB.GetLatestEventsForUpdate: %w", err)
 	}
 	succeeded := false
-	defer func() {
-		txerr := sqlutil.EndTransaction(updater, &succeeded)
-		if err == nil && txerr != nil {
-			err = txerr
-		}
-	}()
+	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 
 	u := latestEventsUpdater{
 		ctx:           ctx,

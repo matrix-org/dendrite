@@ -18,8 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"strings"
-
-	"github.com/matrix-org/util"
 )
 
 // A PartitionOffset is the offset into a partition of the input log.
@@ -99,26 +97,28 @@ func (s *PartitionOffsetStatements) SetPartitionOffset(
 // selectPartitionOffsets returns all the partition offsets for the given topic.
 func (s *PartitionOffsetStatements) selectPartitionOffsets(
 	ctx context.Context, topic string,
-) ([]PartitionOffset, error) {
+) (results []PartitionOffset, err error) {
 	rows, err := s.selectPartitionOffsetsStmt.QueryContext(ctx, topic)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err2 := rows.Close()
-		if err2 != nil {
-			util.GetLogger(ctx).WithError(err2).Error("selectPartitionOffsets: rows.close() failed")
-		}
-	}()
-	var results []PartitionOffset
+	defer checkNamedErr(rows.Close, &err)
 	for rows.Next() {
 		var offset PartitionOffset
-		if err := rows.Scan(&offset.Partition, &offset.Offset); err != nil {
+		if err = rows.Scan(&offset.Partition, &offset.Offset); err != nil {
 			return nil, err
 		}
 		results = append(results, offset)
 	}
-	return results, rows.Err()
+	err = rows.Err()
+	return results, err
+}
+
+// checkNamedErr calls fn and overwrite err if it was nil and fn returned non-nil
+func checkNamedErr(fn func() error, err *error) {
+	if e := fn(); e != nil && *err == nil {
+		*err = e
+	}
 }
 
 // UpsertPartitionOffset updates or inserts the partition offset for the given topic.

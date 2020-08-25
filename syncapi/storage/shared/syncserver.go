@@ -455,13 +455,8 @@ func (d *Database) addPDUDeltaToResponse(
 	if err != nil {
 		return nil, err
 	}
-	var succeeded bool
-	defer func() {
-		txerr := sqlutil.EndTransaction(txn, &succeeded)
-		if err == nil && txerr != nil {
-			err = txerr
-		}
-	}()
+	succeeded := false
+	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 
 	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
@@ -641,13 +636,8 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	if err != nil {
 		return
 	}
-	var succeeded bool
-	defer func() {
-		txerr := sqlutil.EndTransaction(txn, &succeeded)
-		if err == nil && txerr != nil {
-			err = txerr
-		}
-	}()
+	succeeded := false
+	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 
 	// Get the current sync position which we will base the sync response on.
 	toPos, err = d.syncPositionTx(ctx, txn)
