@@ -204,7 +204,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		// a member of the room.
 		alreadyJoined := false
 		for _, se := range buildRes.StateEvents {
-			if !se.StateKeyEquals(*event.StateKey()) {
+			if !se.StateKeyEquals(userID) {
 				continue
 			}
 			if membership, merr := se.Membership(); merr == nil {
