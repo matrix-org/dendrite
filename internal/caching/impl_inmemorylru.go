@@ -54,12 +54,22 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
+	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
+		RoomServerRoomIDsCacheName,
+		RoomServerRoomIDsCacheMutable,
+		RoomServerRoomIDsCacheMaxEntries,
+		enablePrometheus,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &Caches{
 		RoomVersions:            roomVersions,
 		ServerKeys:              serverKeys,
 		RoomServerStateKeyNIDs:  roomServerStateKeyNIDs,
 		RoomServerEventTypeNIDs: roomServerEventTypeNIDs,
 		RoomServerRoomNIDs:      roomServerRoomNIDs,
+		RoomServerRoomIDs:       roomServerRoomIDs,
 	}, nil
 }
 

@@ -16,6 +16,10 @@ const (
 	RoomServerRoomNIDsCacheName       = "roomserver_room_nids"
 	RoomServerRoomNIDsCacheMaxEntries = 1024
 	RoomServerRoomNIDsCacheMutable    = false
+
+	RoomServerRoomIDsCacheName       = "roomserver_room_ids"
+	RoomServerRoomIDsCacheMaxEntries = 1024
+	RoomServerRoomIDsCacheMutable    = false
 )
 
 type RoomServerCaches interface {
@@ -34,6 +38,9 @@ type RoomServerNIDsCache interface {
 
 	GetRoomServerRoomNID(roomID string) (types.RoomNID, bool)
 	StoreRoomServerRoomNID(roomID string, nid types.RoomNID)
+
+	GetRoomServerRoomID(roomNID types.RoomNID) (string, bool)
+	StoreRoomServerRoomID(roomNID types.RoomNID, roomID string)
 }
 
 func (c Caches) GetRoomServerStateKeyNID(stateKey string) (types.EventStateKeyNID, bool) {
@@ -74,6 +81,21 @@ func (c Caches) GetRoomServerRoomNID(roomID string) (types.RoomNID, bool) {
 	return 0, false
 }
 
-func (c Caches) StoreRoomServerRoomNID(roomID string, nid types.RoomNID) {
-	c.RoomServerRoomNIDs.Set(roomID, nid)
+func (c Caches) StoreRoomServerRoomNID(roomID string, roomNID types.RoomNID) {
+	c.RoomServerRoomNIDs.Set(roomID, roomNID)
+	c.RoomServerRoomIDs.Set(string(roomNID), roomID)
+}
+
+func (c Caches) GetRoomServerRoomID(roomNID types.RoomNID) (string, bool) {
+	val, found := c.RoomServerRoomIDs.Get(string(roomNID))
+	if found && val != nil {
+		if roomID, ok := val.(string); ok {
+			return roomID, true
+		}
+	}
+	return "", false
+}
+
+func (c Caches) StoreRoomServerRoomID(roomNID types.RoomNID, roomID string) {
+	c.StoreRoomServerRoomNID(roomID, roomNID)
 }

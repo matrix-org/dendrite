@@ -258,6 +258,9 @@ func (d *Database) StateEntries(
 func (d *Database) GetRoomVersionForRoom(
 	ctx context.Context, roomID string,
 ) (gomatrixserverlib.RoomVersion, error) {
+	if roomVersion, ok := d.Cache.GetRoomVersion(roomID); ok {
+		return roomVersion, nil
+	}
 	return d.RoomsTable.SelectRoomVersionForRoomID(
 		ctx, nil, roomID,
 	)
@@ -266,6 +269,11 @@ func (d *Database) GetRoomVersionForRoom(
 func (d *Database) GetRoomVersionForRoomNID(
 	ctx context.Context, roomNID types.RoomNID,
 ) (gomatrixserverlib.RoomVersion, error) {
+	if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
+		if roomVersion, ok := d.Cache.GetRoomVersion(roomID); ok {
+			return roomVersion, nil
+		}
+	}
 	return d.RoomsTable.SelectRoomVersionForRoomNID(
 		ctx, roomNID,
 	)
@@ -532,6 +540,9 @@ func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
+	if roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID); ok {
+		return roomNID, nil
+	}
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
@@ -542,14 +553,20 @@ func (d *Database) assignRoomNID(
 			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 		}
 	}
+	if err == nil {
+		d.Cache.StoreRoomServerRoomNID(roomID, roomNID)
+	}
 	return roomNID, err
 }
 
 func (d *Database) assignEventTypeNID(
 	ctx context.Context, txn *sql.Tx, eventType string,
-) (eventTypeNID types.EventTypeNID, err error) {
+) (types.EventTypeNID, error) {
+	if eventTypeNID, ok := d.Cache.GetRoomServerEventTypeNID(eventType); ok {
+		return eventTypeNID, nil
+	}
 	// Check if we already have a numeric ID in the database.
-	eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
+	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
 		eventTypeNID, err = d.EventTypesTable.InsertEventTypeNID(ctx, txn, eventType)
@@ -558,12 +575,18 @@ func (d *Database) assignEventTypeNID(
 			eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
 		}
 	}
-	return
+	if err == nil {
+		d.Cache.StoreRoomServerEventTypeNID(eventType, eventTypeNID)
+	}
+	return eventTypeNID, err
 }
 
 func (d *Database) assignStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
+	if eventStateKeyNID, ok := d.Cache.GetRoomServerStateKeyNID(eventStateKey); ok {
+		return eventStateKeyNID, nil
+	}
 	// Check if we already have a numeric ID in the database.
 	eventStateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 	if err == sql.ErrNoRows {
@@ -573,6 +596,9 @@ func (d *Database) assignStateKeyNID(
 			// We raced with another insert so run the select again.
 			eventStateKeyNID, err = d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 		}
+	}
+	if err == nil {
+		d.Cache.StoreRoomServerStateKeyNID(eventStateKey, eventStateKeyNID)
 	}
 	return eventStateKeyNID, err
 }
