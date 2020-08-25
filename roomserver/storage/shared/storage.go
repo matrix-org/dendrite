@@ -22,9 +22,7 @@ import (
 // will be necessary for compliance with the law. Note that downstream components (syncapi) WILL delete information
 // in their database on receipt of a redaction. Also note that we still modify the event JSON to set the field
 // unsigned.redacted_because - we just don't clear out the content fields yet.
-//
-// If this hasn't been done by 09/2020 this should be flipped to true.
-const redactionsArePermanent = false
+const redactionsArePermanent = true
 
 type Database struct {
 	DB                  *sql.DB
