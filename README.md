@@ -1,8 +1,7 @@
 # Dendrite [![Build Status](https://badge.buildkite.com/4be40938ab19f2bbc4a6c6724517353ee3ec1422e279faf374.svg?branch=master)](https://buildkite.com/matrix-dot-org/dendrite) [![Dendrite Dev on Matrix](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org) [![Dendrite on Matrix](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org)
 
 Dendrite is a second-generation Matrix homeserver written in Go. It is not recommended to use Dendrite as
-a production homeserver at this time as there is no stable release. An overview of the design can be found
-in [DESIGN.md](docs/DESIGN.md).
+a production homeserver at this time as there is no stable release.
 
 # Quick start
 
@@ -60,8 +59,33 @@ This means Dendrite supports amongst others:
 
 # Contributing
 
-Everyone is welcome to help out and contribute! See
-[CONTRIBUTING.md](docs/CONTRIBUTING.md) to get started!
+We would be grateful for any help on issues marked as
+[Are We Synapse Yet](https://github.com/matrix-org/dendrite/labels/are-we-synapse-yet). These issues
+all have related Sytests which need to pass in order for the issue to be closed. Once you've written your
+code, you can quickly run Sytest to ensure that the test names are now passing.
+
+For example, if the test `Local device key changes get to remote servers` was marked as failing, find the
+test file (e.g via `grep` or via the
+[CI log output](https://buildkite.com/matrix-dot-org/dendrite/builds/2826#39cff5de-e032-4ad0-ad26-f819e6919c42)
+it's `tests/50federation/40devicelists.pl` ) then to run Sytest:
+```
+docker run --rm --name sytest
+-v "/Users/kegan/github/sytest:/sytest"
+-v "/Users/kegan/github/dendrite:/src"
+-v "/Users/kegan/logs:/logs"
+-v "/Users/kegan/go/:/gopath"
+-e "POSTGRES=1" -e "DENDRITE_TRACE_HTTP=1"
+matrixdotorg/sytest-dendrite:latest tests/50federation/40devicelists.pl
+```
+See [sytest.md](docs/sytest.md) for the full description of these flags.
+
+Sometimes Sytest is testing the wrong thing or is flakey, so it will need to be patched.
+Ask on `#dendrite-dev:matrix.org` if you think this is the case for you and we'll be happy to help.
+
+If you're new to the project, see [CONTRIBUTING.md](docs/CONTRIBUTING.md) to get up to speed then
+look for [Good First Issues](https://github.com/matrix-org/dendrite/labels/good%20first%20issue). If you're
+familiar with the project, look for [Help Wanted](https://github.com/matrix-org/dendrite/labels/help-wanted)
+issues.
 
 # Discussion
 

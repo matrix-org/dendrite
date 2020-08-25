@@ -12,18 +12,18 @@ See [INSTALL.md](INSTALL.md) for instructions on setting up a running dev
 instance of dendrite, and [CODE_STYLE.md](CODE_STYLE.md) for the code style
 guide.
 
-As of May 2019, we're not using `gb` anymore, which is the tool we had been
-using for managing our dependencies. We're now using Go modules. To build
-Dendrite, run the `build.sh` script at the root of this repository (which runs
-`go install` under the hood), and to run unit tests, run `go test ./...` (which
-should pick up any unit test and run it). There are also [build/scripts](/build/scripts) for
-[linting](/build/scripts/find-lint.sh) and doing a [build/test/lint
-run](/build/scripts/build-test-lint.sh).
+We use [golangci-lint](https://github.com/golangci/golangci-lint) to lint
+Dendrite which can be executed via:
 
-As of February 2020, we are deprecating support for Go 1.11 and Go 1.12 and are
-now targeting Go 1.13 or later. Please ensure that you are using at least Go
-1.13 when developing for Dendrite - our CI will lint and run tests against this
-version.
+```
+$ golangci-lint run
+```
+
+We also have unit tests which we run via:
+
+```
+$ go test ./...
+```
 
 ## Continuous Integration
 
@@ -73,7 +73,7 @@ These should be well-contained, small pieces of work that can be picked up to
 help you get familiar with the code base.
 
 Once you're comfortable with hacking on Dendrite there are issues lablled as
-[help wanted](https://github.com/matrix-org/dendrite/labels/help%20wanted),
+[help wanted](https://github.com/matrix-org/dendrite/labels/help-wanted),
 these are often slightly larger or more complicated pieces of work but are
 hopefully nonetheless fairly well-contained.
 
