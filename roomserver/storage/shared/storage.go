@@ -182,14 +182,15 @@ func (d *Database) StateForRoomID(
 		// the room doesn't exist or it doesn't have state
 		return nil, nil
 	}
-	stateBlockNIDs, err := d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, []types.StateSnapshotNID{stateSnapshotNID})
+	stateBlockLists, err := d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, []types.StateSnapshotNID{stateSnapshotNID})
 	if err != nil {
 		return nil, fmt.Errorf("d.StateSnapshotTable.BulkSelectStateBlockNIDs: %w", err)
 	}
-	if len(stateBlockNIDs) != 1 {
-		return nil, fmt.Errorf("expected one StateBlockNIDList, got %d", len(stateBlockNIDs))
+	stateBlockNIDs := []types.StateBlockNID{}
+	for _, stateBlockList := range stateBlockLists {
+		stateBlockNIDs = append(stateBlockNIDs, stateBlockList.StateBlockNIDs...)
 	}
-	stateEventLists, err := d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs[0].StateBlockNIDs)
+	stateEventLists, err := d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs)
 	if err != nil {
 		return nil, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", err)
 	}
