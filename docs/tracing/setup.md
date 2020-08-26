@@ -1,6 +1,6 @@
 ## OpenTracing Setup
 
-![Trace when sending an event into a room](docs/tracing/jaeger.png)
+![Trace when sending an event into a room](/docs/tracing/jaeger.png)
 
 Dendrite uses [Jaeger](https://www.jaegertracing.io/) for tracing between microservices.
 Tracing shows the nesting of logical spans which provides visibility on how the microservices interact.
