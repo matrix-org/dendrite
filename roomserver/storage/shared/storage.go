@@ -174,6 +174,32 @@ func (d *Database) SnapshotNIDFromEventID(
 	return stateNID, err
 }
 
+func (d *Database) StateForRoomID(
+	ctx context.Context, roomID string,
+) ([]types.StateEntry, error) {
+	stateSnapshotNID, err := d.RoomsTable.SelectStateSnapshotNID(ctx, roomID)
+	if err != nil || stateSnapshotNID == 0 {
+		// the room doesn't exist or it doesn't have state
+		return nil, nil
+	}
+	stateBlockNIDs, err := d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, []types.StateSnapshotNID{stateSnapshotNID})
+	if err != nil {
+		return nil, fmt.Errorf("d.StateSnapshotTable.BulkSelectStateBlockNIDs: %w", err)
+	}
+	if len(stateBlockNIDs) != 1 {
+		return nil, fmt.Errorf("expected one StateBlockNIDList, got %d", len(stateBlockNIDs))
+	}
+	stateEventLists, err := d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs[0].StateBlockNIDs)
+	if err != nil {
+		return nil, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", err)
+	}
+	stateEventNIDs := []types.StateEntry{}
+	for _, stateEventList := range stateEventLists {
+		stateEventNIDs = append(stateEventNIDs, stateEventList.StateEntries...)
+	}
+	return stateEventNIDs, nil
+}
+
 func (d *Database) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) (map[types.EventNID]string, error) {

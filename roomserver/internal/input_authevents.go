@@ -16,12 +16,69 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
+
+// checkForSoftFail returns true if the event should be soft-failed
+// and false otherwise. The return error value should be checked before
+// the soft-fail bool.
+func checkForSoftFail(
+	ctx context.Context,
+	db storage.Database,
+	event gomatrixserverlib.HeaderedEvent,
+) (bool, error) {
+	// Look up the current state of the room.
+	authStateEntries, err := db.StateForRoomID(ctx, event.RoomID())
+	if err != nil {
+		return false, fmt.Errorf("db.SnapshotNIDFromRoomID: %w", err)
+	}
+
+	// As a special case, it's possible that the room will have no
+	// state because we haven't received a m.room.create event yet.
+	// If we're now processing the first create event then never
+	// soft-fail it.
+	if len(authStateEntries) == 0 && event.Type() == gomatrixserverlib.MRoomCreate {
+		return false, nil
+	}
+
+	// Work out which of the state events we actually need.
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})
+
+	logger := logrus.WithField("room_id", event.RoomID())
+	logger.Infof("EVENT %s TYPE %s", event.EventID(), event.Type())
+
+	logger.Infof("STATE NEEDED:")
+	for _, tuple := range stateNeeded.Tuples() {
+		logger.Infof("* %q %q", tuple.EventType, tuple.StateKey)
+	}
+
+	// Load the actual auth events from the database.
+	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
+	if err != nil {
+		return false, fmt.Errorf("loadAuthEvents: %w", err)
+	}
+
+	logger.Info("STATE RETRIEVED:")
+	for _, e := range authEvents.events {
+		logger.Infof("* %q %q -> %s", e.Type(), *e.StateKey(), string(e.Content()))
+	}
+
+	// Check if the event is allowed.
+	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
+		// return true, nil
+		logger.Info("SOFT-FAIL")
+		return false, fmt.Errorf("gomatrixserverlib.Allowed: %w", err)
+	}
+
+	logger.Info("ALLOW")
+	return false, nil
+}
 
 // checkAuthEvents checks that the event passes authentication checks
 // Returns the numeric IDs for the auth events.

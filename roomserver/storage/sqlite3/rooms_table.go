@@ -64,6 +64,9 @@ const selectRoomVersionForRoomIDSQL = "" +
 const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
 
+const selectStateSnapshotNIDSQL = "" +
+	"SELECT state_snapshot_nid FROM roomserver_rooms WHERE room_id = $1"
+
 type roomStatements struct {
 	db                                 *sql.DB
 	insertRoomNIDStmt                  *sql.Stmt
@@ -73,6 +76,7 @@ type roomStatements struct {
 	updateLatestEventNIDsStmt          *sql.Stmt
 	selectRoomVersionForRoomIDStmt     *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
+	selectStateSnapshotNIDStmt         *sql.Stmt
 }
 
 func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
@@ -91,6 +95,7 @@ func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
+		{&s.selectStateSnapshotNIDStmt, selectStateSnapshotNIDSQL},
 	}.Prepare(db)
 }
 
@@ -194,4 +199,15 @@ func (s *roomStatements) SelectRoomVersionForRoomNID(
 		return roomVersion, errors.New("room not found")
 	}
 	return roomVersion, err
+}
+
+func (s *roomStatements) SelectStateSnapshotNID(
+	ctx context.Context, roomID string,
+) (types.StateSnapshotNID, error) {
+	var stateSnapshotNID types.StateSnapshotNID
+	err := s.selectStateSnapshotNIDStmt.QueryRowContext(ctx, roomID).Scan(&stateSnapshotNID)
+	if err == sql.ErrNoRows {
+		return 0, errors.New("room not found")
+	}
+	return stateSnapshotNID, err
 }

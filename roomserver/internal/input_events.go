@@ -42,13 +42,25 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 	// Parse and validate the event JSON
 	headered := input.Event
 	event := headered.Unwrap()
+	softfail := false
 
-	// Check that the event passes authentication checks and work out
-	// the numeric IDs for the auth events.
+	// Check that the event passes authentication checks based on the
+	// event-specified auth events and work out the numeric IDs for those.
 	authEventNIDs, err := checkAuthEvents(ctx, r.DB, headered, input.AuthEventIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("processRoomEvent.checkAuthEvents failed for event")
 		return
+	}
+
+	// Check that the event passes authentication checks based on the
+	// current room state.
+	softfail, err = checkForSoftFail(ctx, r.DB, headered)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"event_id": event.EventID(),
+			"type":     event.Type(),
+			"room":     event.RoomID(),
+		}).WithError(err).Info("Error authing soft-failed event")
 	}
 
 	// If we don't have a transaction ID then get one.
@@ -68,6 +80,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 	if err != nil {
 		return "", fmt.Errorf("r.DB.StoreEvent: %w", err)
 	}
+
 	// if storing this event results in it being redacted then do so.
 	if redactedEventID == event.EventID() {
 		r, rerr := eventutil.RedactEvent(redactionEvent, &event)
@@ -105,6 +118,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 		event,               // event
 		input.SendAsServer,  // send as server
 		input.TransactionID, // transaction ID
+		softfail,            // event soft-failed?
 	); err != nil {
 		return "", fmt.Errorf("r.updateLatestEvents: %w", err)
 	}
