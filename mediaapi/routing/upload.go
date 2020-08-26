@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/thumbnailer"
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -55,8 +56,8 @@ type uploadResponse struct {
 // This implementation supports a configurable maximum file size limit in bytes. If a user tries to upload more than this, they will receive an error that their upload is too large.
 // Uploaded files are processed piece-wise to avoid DoS attacks which would starve the server of memory.
 // TODO: We should time out requests if they have not received any data within a configured timeout period.
-func Upload(req *http.Request, cfg *config.MediaAPI, db storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) util.JSONResponse {
-	r, resErr := parseAndValidateRequest(req, cfg)
+func Upload(req *http.Request, cfg *config.MediaAPI, dev *userapi.Device, db storage.Database, activeThumbnailGeneration *types.ActiveThumbnailGeneration) util.JSONResponse {
+	r, resErr := parseAndValidateRequest(req, cfg, dev)
 	if resErr != nil {
 		return *resErr
 	}
@@ -76,13 +77,14 @@ func Upload(req *http.Request, cfg *config.MediaAPI, db storage.Database, active
 // parseAndValidateRequest parses the incoming upload request to validate and extract
 // all the metadata about the media being uploaded.
 // Returns either an uploadRequest or an error formatted as a util.JSONResponse
-func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI) (*uploadRequest, *util.JSONResponse) {
+func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI, dev *userapi.Device) (*uploadRequest, *util.JSONResponse) {
 	r := &uploadRequest{
 		MediaMetadata: &types.MediaMetadata{
 			Origin:        cfg.Matrix.ServerName,
 			FileSizeBytes: types.FileSizeBytes(req.ContentLength),
 			ContentType:   types.ContentType(req.Header.Get("Content-Type")),
 			UploadName:    types.Filename(url.PathEscape(req.FormValue("filename"))),
+			UserID:        types.MatrixUserID(dev.UserID),
 		},
 		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName),
 	}
@@ -138,12 +140,18 @@ func (r *uploadRequest) doUpload(
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	// Data is truncated to maxFileSizeBytes. Content-Length was reported as 0 < Content-Length <= maxFileSizeBytes so this is OK.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(reqReader, *cfg.MaxFileSizeBytes, cfg.AbsBasePath)
+	//
+	// TODO: This has a bad API shape where you either need to call:
+	//   fileutils.RemoveDir(tmpDir, r.Logger)
+	// or call:
+	//   r.storeFileAndMetadata(ctx, tmpDir, ...)
+	// before you return from doUpload else we will leak a temp file. We could make this nicer with a `WithTransaction` style of
+	// nested function to guarantee either storage or cleanup.
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, *cfg.MaxFileSizeBytes, cfg.AbsBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": *cfg.MaxFileSizeBytes,
 		}).Warn("Error while transferring file")
-		fileutils.RemoveDir(tmpDir, r.Logger)
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("Failed to upload"),
@@ -157,11 +165,14 @@ func (r *uploadRequest) doUpload(
 		ctx, hash, r.MediaMetadata.Origin,
 	)
 	if err != nil {
+		fileutils.RemoveDir(tmpDir, r.Logger)
 		r.Logger.WithError(err).Error("Error querying the database by hash.")
 		resErr := jsonerror.InternalServerError()
 		return &resErr
 	}
 	if existingMetadata != nil {
+		// The file already exists, delete the uploaded temporary file.
+		defer fileutils.RemoveDir(tmpDir, r.Logger)
 		// The file already exists. Make a new media ID up for it.
 		mediaID, merr := r.generateMediaID(ctx, db)
 		if merr != nil {
@@ -181,15 +192,13 @@ func (r *uploadRequest) doUpload(
 			Base64Hash:        hash,
 			UserID:            r.MediaMetadata.UserID,
 		}
-
-		// Clean up the uploaded temporary file.
-		fileutils.RemoveDir(tmpDir, r.Logger)
 	} else {
 		// The file doesn't exist. Update the request metadata.
 		r.MediaMetadata.FileSizeBytes = bytesWritten
 		r.MediaMetadata.Base64Hash = hash
 		r.MediaMetadata.MediaID, err = r.generateMediaID(ctx, db)
 		if err != nil {
+			fileutils.RemoveDir(tmpDir, r.Logger)
 			r.Logger.WithError(err).Error("Failed to generate media ID for new upload")
 			resErr := jsonerror.InternalServerError()
 			return &resErr
