@@ -302,6 +302,8 @@ user_api:
     conn_max_lifetime: -1
 
 # Configuration for Opentracing.
+# See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on
+# how this works and how to set it up.
 tracing:
   enabled: false
   jaeger:
