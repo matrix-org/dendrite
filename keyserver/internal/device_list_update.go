@@ -323,7 +323,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 	logger := util.GetLogger(ctx).WithField("server_name", serverName)
-	waitTime := time.Minute
+	waitTime := 2 * time.Second
 	// fetch stale device lists
 	userIDs, err := u.db.StaleDeviceLists(ctx, []gomatrixserverlib.ServerName{serverName})
 	if err != nil {
