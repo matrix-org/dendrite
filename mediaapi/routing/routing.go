@@ -53,8 +53,8 @@ func Setup(
 
 	uploadHandler := httputil.MakeAuthAPI(
 		"upload", userAPI,
-		func(req *http.Request, _ *userapi.Device) util.JSONResponse {
-			return Upload(req, cfg, db, activeThumbnailGeneration)
+		func(req *http.Request, dev *userapi.Device) util.JSONResponse {
+			return Upload(req, cfg, dev, db, activeThumbnailGeneration)
 		},
 	)
 
