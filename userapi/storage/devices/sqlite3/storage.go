@@ -181,7 +181,7 @@ func (d *Database) RemoveDevices(
 func (d *Database) RemoveAllDevices(
 	ctx context.Context, localpart string,
 ) (devices []api.Device, err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		devices, err = d.devices.selectDevicesByLocalpart(ctx, txn, localpart)
 		if err != nil {
 			return err

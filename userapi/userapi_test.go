@@ -31,7 +31,9 @@ func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database) 
 	}
 	cfg := &config.UserAPI{
 		DeviceDatabase: config.DatabaseOptions{
-			ConnectionString: "file::memory:",
+			ConnectionString:   "file::memory:",
+			MaxOpenConnections: 1,
+			MaxIdleConnections: 1,
 		},
 		Matrix: &config.Global{
 			ServerName: serverName,
