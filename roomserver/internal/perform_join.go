@@ -161,8 +161,9 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	// where we might think we know about a room in the following
 	// section but don't know the latest state as all of our users
 	// have left.
+	serverInRoom, _ := r.isServerCurrentlyInRoom(ctx, r.ServerName, req.RoomIDOrAlias)
 	isInvitePending, inviteSender, _, err := r.isInvitePending(ctx, req.RoomIDOrAlias, req.UserID)
-	if err == nil && isInvitePending {
+	if err == nil && isInvitePending && !serverInRoom {
 		// Check if there's an invite pending.
 		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
 		if ierr != nil {
