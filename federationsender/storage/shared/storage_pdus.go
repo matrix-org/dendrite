@@ -34,7 +34,7 @@ func (d *Database) AssociatePDUWithDestination(
 	serverName gomatrixserverlib.ServerName,
 	receipt *Receipt,
 ) error {
-	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for _, nid := range receipt.nids {
 			if err := d.FederationSenderQueuePDUs.InsertQueuePDU(
 				ctx,           // context
@@ -111,7 +111,7 @@ func (d *Database) CleanPDUs(
 		return errors.New("expected receipt")
 	}
 
-	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if err := d.FederationSenderQueuePDUs.DeleteQueuePDUs(ctx, txn, serverName, receipt.nids); err != nil {
 			return err
 		}
