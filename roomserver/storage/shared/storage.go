@@ -177,22 +177,27 @@ func (d *Database) SnapshotNIDFromEventID(
 func (d *Database) StateForRoomID(
 	ctx context.Context, roomID string,
 ) ([]types.StateEntry, error) {
-	stateSnapshotNID, err := d.RoomsTable.SelectStateSnapshotNID(ctx, roomID)
-	if err != nil || stateSnapshotNID == 0 {
-		// the room doesn't exist or it doesn't have state
+	roomNID, err := d.RoomNIDExcludingStubs(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	if roomNID == 0 {
 		return nil, nil
 	}
-	stateBlockLists, err := d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, []types.StateSnapshotNID{stateSnapshotNID})
-	if err != nil {
-		return nil, fmt.Errorf("d.StateSnapshotTable.BulkSelectStateBlockNIDs: %w", err)
+	_, stateSnapshotNID, _, err := d.LatestEventIDs(ctx, roomNID)
+	if err != nil || stateSnapshotNID == 0 {
+		return nil, err
 	}
-	stateBlockNIDs := []types.StateBlockNID{}
-	for _, stateBlockList := range stateBlockLists {
-		stateBlockNIDs = append(stateBlockNIDs, stateBlockList.StateBlockNIDs...)
-	}
-	stateEventLists, err := d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs)
+
+	stateBlockNIDLists, err := d.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateSnapshotNID})
 	if err != nil {
-		return nil, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", err)
+		return nil, err
+	}
+	// We've asked for exactly one snapshot from the db so we should have exactly one entry in the result.
+	stateBlockNIDList := stateBlockNIDLists[0]
+	stateEventLists, err := d.StateEntries(ctx, stateBlockNIDList.StateBlockNIDs)
+	if err != nil {
+		return nil, err
 	}
 	stateEventNIDs := []types.StateEntry{}
 	for _, stateEventList := range stateEventLists {

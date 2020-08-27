@@ -85,7 +85,6 @@ type roomStatements struct {
 	updateLatestEventNIDsStmt          *sql.Stmt
 	selectRoomVersionForRoomIDStmt     *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
-	selectStateSnapshotNIDStmt         *sql.Stmt
 }
 
 func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
@@ -102,7 +101,6 @@ func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
-		{&s.selectStateSnapshotNIDStmt, selectStateSnapshotNIDSQL},
 	}.Prepare(db)
 }
 
@@ -200,15 +198,4 @@ func (s *roomStatements) SelectRoomVersionForRoomNID(
 		return roomVersion, errors.New("room not found")
 	}
 	return roomVersion, err
-}
-
-func (s *roomStatements) SelectStateSnapshotNID(
-	ctx context.Context, roomID string,
-) (types.StateSnapshotNID, error) {
-	var stateSnapshotNID types.StateSnapshotNID
-	err := s.selectStateSnapshotNIDStmt.QueryRowContext(ctx, roomID).Scan(&stateSnapshotNID)
-	if err == sql.ErrNoRows {
-		return 0, errors.New("room not found")
-	}
-	return stateSnapshotNID, err
 }
