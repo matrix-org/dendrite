@@ -33,7 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -41,7 +40,6 @@ import (
 // all components of Dendrite, for use in monolith mode.
 type Monolith struct {
 	Config        *config.Dendrite
-	DeviceDB      devices.Database
 	AccountDB     accounts.Database
 	KeyRing       *gomatrixserverlib.KeyRing
 	Client        *gomatrixserverlib.Client

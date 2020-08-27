@@ -69,7 +69,6 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
@@ -110,7 +109,7 @@ func main() {
 	rsImpl.SetFederationSenderAPI(fsAPI)
 
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI, base.KafkaProducer)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, cfg.Derived.ApplicationServices, keyAPI)
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(
@@ -130,7 +129,6 @@ func main() {
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
-		DeviceDB:      deviceDB,
 		Client:        gomatrixserverlib.NewClient(cfg.FederationSender.DisableTLSValidation),
 		FedClient:     federation,
 		KeyRing:       keyRing,
