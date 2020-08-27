@@ -32,7 +32,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
 
 	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
@@ -235,17 +234,6 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 		logrus.WithError(err).Panic("KeyServerHTTPClient failed", b.httpClient)
 	}
 	return f
-}
-
-// CreateDeviceDB creates a new instance of the device database. Should only be
-// called once per component.
-func (b *BaseDendrite) CreateDeviceDB() devices.Database {
-	db, err := devices.NewDatabase(&b.Cfg.UserAPI.DeviceDatabase, b.Cfg.Global.ServerName)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to devices db")
-	}
-
-	return db
 }
 
 // CreateAccountsDB creates a new instance of the accounts database. Should only

@@ -25,9 +25,8 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
 
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, cfg.Derived.ApplicationServices, base.KeyServerHTTPClient())
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, base.KeyServerHTTPClient())
 
 	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
 
