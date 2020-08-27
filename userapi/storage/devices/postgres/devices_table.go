@@ -251,11 +251,10 @@ func (s *devicesStatements) selectDevicesByID(ctx context.Context, deviceIDs []s
 }
 
 func (s *devicesStatements) selectDevicesByLocalpart(
-	ctx context.Context, localpart string,
+	ctx context.Context, txn *sql.Tx, localpart string,
 ) ([]api.Device, error) {
 	devices := []api.Device{}
-
-	rows, err := s.selectDevicesByLocalpartStmt.QueryContext(ctx, localpart)
+	rows, err := sqlutil.TxStmt(txn, s.selectDevicesByLocalpartStmt).QueryContext(ctx, localpart)
 
 	if err != nil {
 		return devices, err

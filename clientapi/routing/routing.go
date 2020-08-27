@@ -35,7 +35,6 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -52,7 +51,6 @@ func Setup(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	accountDB accounts.Database,
-	deviceDB devices.Database,
 	userAPI userapi.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
@@ -322,13 +320,13 @@ func Setup(
 
 	r0mux.Handle("/logout",
 		httputil.MakeAuthAPI("logout", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return Logout(req, deviceDB, device)
+			return Logout(req, userAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/logout/all",
 		httputil.MakeAuthAPI("logout", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return LogoutAll(req, deviceDB, device)
+			return LogoutAll(req, userAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -632,7 +630,7 @@ func Setup(
 
 	r0mux.Handle("/devices",
 		httputil.MakeAuthAPI("get_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return GetDevicesByLocalpart(req, deviceDB, device)
+			return GetDevicesByLocalpart(req, userAPI, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -642,7 +640,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetDeviceByID(req, deviceDB, device, vars["deviceID"])
+			return GetDeviceByID(req, userAPI, device, vars["deviceID"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

@@ -61,7 +61,7 @@ type PerformDeviceUpdateResponse struct {
 
 type PerformDeviceDeletionRequest struct {
 	UserID string
-	// The devices to delete
+	// The devices to delete. An empty slice means delete all devices.
 	DeviceIDs []string
 }
 
@@ -192,8 +192,7 @@ type Device struct {
 	// The unique ID of the session identified by the access token.
 	// Can be used as a secure substitution in places where data needs to be
 	// associated with access tokens.
-	SessionID int64
-	// TODO: display name, last used timestamp, keys, etc
+	SessionID   int64
 	DisplayName string
 }
 

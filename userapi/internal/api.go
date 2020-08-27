@@ -123,12 +123,21 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 	if domain != a.ServerName {
 		return fmt.Errorf("cannot PerformDeviceDeletion of remote users: got %s want %s", domain, a.ServerName)
 	}
-	err = a.DeviceDB.RemoveDevices(ctx, local, req.DeviceIDs)
+	deletedDeviceIDs := req.DeviceIDs
+	if len(req.DeviceIDs) == 0 {
+		var devices []api.Device
+		devices, err = a.DeviceDB.RemoveAllDevices(ctx, local)
+		for _, d := range devices {
+			deletedDeviceIDs = append(deletedDeviceIDs, d.ID)
+		}
+	} else {
+		err = a.DeviceDB.RemoveDevices(ctx, local, req.DeviceIDs)
+	}
 	if err != nil {
 		return err
 	}
 	// create empty device keys and upload them to delete what was once there and trigger device list changes
-	return a.deviceListUpdate(req.UserID, req.DeviceIDs)
+	return a.deviceListUpdate(req.UserID, deletedDeviceIDs)
 }
 
 func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) error {
