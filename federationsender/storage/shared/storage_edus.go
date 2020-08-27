@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -33,7 +32,7 @@ func (d *Database) AssociateEDUWithDestination(
 	serverName gomatrixserverlib.ServerName,
 	receipt *Receipt,
 ) error {
-	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for _, nid := range receipt.nids {
 			if err := d.FederationSenderQueueEDUs.InsertQueueEDU(
 				ctx,        // context
