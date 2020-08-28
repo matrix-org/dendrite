@@ -208,13 +208,9 @@ func buildInviteStrippedState(
 			StateKey:  "",
 		})
 	}
-	_, currentStateSnapshotNID, _, err := db.LatestEventIDs(ctx, info.RoomNID)
-	if err != nil {
-		return nil, err
-	}
 	roomState := state.NewStateResolution(db)
 	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
-		ctx, currentStateSnapshotNID, stateWanted,
+		ctx, info.StateSnapshotNID, stateWanted,
 	)
 	if err != nil {
 		return nil, err

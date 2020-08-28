@@ -559,6 +559,9 @@ func (r *RoomserverInternalAPI) isServerCurrentlyInRoom(ctx context.Context, ser
 	if err != nil {
 		return false, err
 	}
+	if info == nil {
+		return false, fmt.Errorf("unknown room %s", roomID)
+	}
 
 	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {
