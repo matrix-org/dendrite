@@ -124,8 +124,13 @@ func WriteTempFile(
 		}
 	}()
 
-	// The amount of data read is limited to maxFileSizeBytes. At this point, if there is more data it will be truncated.
-	limitedReader := io.LimitReader(reqReader, int64(maxFileSizeBytes))
+	// If the max_file_size_bytes configuration option is set to a positive
+	// number then limit the upload to that size. Otherwise, just read the
+	// whole file.
+	limitedReader := reqReader
+	if maxFileSizeBytes > 0 {
+		limitedReader = io.LimitReader(reqReader, int64(maxFileSizeBytes))
+	}
 	// Hash the file data. The hash will be returned. The hash is useful as a
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
