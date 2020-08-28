@@ -111,6 +111,15 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 		}
 	}
 
+	if softfail {
+		logrus.WithFields(logrus.Fields{
+			"event_id": event.EventID(),
+			"type":     event.Type(),
+			"room":     event.RoomID(),
+		}).Info("Stored soft-failed event")
+		return event.EventID(), nil
+	}
+
 	if err = r.updateLatestEvents(
 		ctx,                 // context
 		roomNID,             // room NID to update
@@ -118,7 +127,6 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 		event,               // event
 		input.SendAsServer,  // send as server
 		input.TransactionID, // transaction ID
-		softfail,            // event soft-failed?
 	); err != nil {
 		return "", fmt.Errorf("r.updateLatestEvents: %w", err)
 	}

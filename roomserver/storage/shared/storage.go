@@ -174,38 +174,6 @@ func (d *Database) SnapshotNIDFromEventID(
 	return stateNID, err
 }
 
-func (d *Database) StateForRoomID(
-	ctx context.Context, roomID string,
-) ([]types.StateEntry, error) {
-	roomNID, err := d.RoomNIDExcludingStubs(ctx, roomID)
-	if err != nil {
-		return nil, err
-	}
-	if roomNID == 0 {
-		return nil, nil
-	}
-	_, stateSnapshotNID, _, err := d.LatestEventIDs(ctx, roomNID)
-	if err != nil || stateSnapshotNID == 0 {
-		return nil, err
-	}
-
-	stateBlockNIDLists, err := d.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateSnapshotNID})
-	if err != nil {
-		return nil, err
-	}
-	// We've asked for exactly one snapshot from the db so we should have exactly one entry in the result.
-	stateBlockNIDList := stateBlockNIDLists[0]
-	stateEventLists, err := d.StateEntries(ctx, stateBlockNIDList.StateBlockNIDs)
-	if err != nil {
-		return nil, err
-	}
-	stateEventNIDs := []types.StateEntry{}
-	for _, stateEventList := range stateEventLists {
-		stateEventNIDs = append(stateEventNIDs, stateEventList.StateEntries...)
-	}
-	return stateEventNIDs, nil
-}
-
 func (d *Database) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) (map[types.EventNID]string, error) {

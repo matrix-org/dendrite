@@ -16,13 +16,14 @@ package internal
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 // checkForSoftFail returns true if the event should be soft-failed
@@ -33,10 +34,27 @@ func checkForSoftFail(
 	db storage.Database,
 	event gomatrixserverlib.HeaderedEvent,
 ) (bool, error) {
-	// Look up the current state of the room.
-	authStateEntries, err := db.StateForRoomID(ctx, event.RoomID())
+	// Work out if the room exists.
+	roomNID, err := db.RoomNID(ctx, event.RoomID())
+	if roomNID == 0 || err == sql.ErrNoRows {
+		return false, nil
+	}
 	if err != nil {
-		return false, fmt.Errorf("db.SnapshotNIDFromRoomID: %w", err)
+		return false, fmt.Errorf("db.RoomNID: %w", err)
+	}
+
+	// If the room exist, gets the current state snapshot.
+	_, stateSnapshotNID, _, err := db.LatestEventIDs(ctx, roomNID)
+	if err != nil {
+		return true, fmt.Errorf("r.DB.LatestEventIDs: %w", err)
+	}
+
+	// Then get the state entries for the current state snapshot.
+	// We'll use this to check if the event is allowed right now.
+	roomState := state.NewStateResolution(db)
+	authStateEntries, err := roomState.LoadStateAtSnapshot(ctx, stateSnapshotNID)
+	if err != nil {
+		return true, fmt.Errorf("roomState.LoadStateAtSnapshot: %w", err)
 	}
 
 	// As a special case, it's possible that the room will have no
@@ -50,33 +68,17 @@ func checkForSoftFail(
 	// Work out which of the state events we actually need.
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})
 
-	logger := logrus.WithField("room_id", event.RoomID())
-	logger.Infof("EVENT %s TYPE %s", event.EventID(), event.Type())
-
-	logger.Infof("STATE NEEDED:")
-	for _, tuple := range stateNeeded.Tuples() {
-		logger.Infof("* %q %q", tuple.EventType, tuple.StateKey)
-	}
-
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
 	if err != nil {
-		return false, fmt.Errorf("loadAuthEvents: %w", err)
-	}
-
-	logger.Info("STATE RETRIEVED:")
-	for _, e := range authEvents.events {
-		logger.Infof("* %q %q -> %s", e.Type(), *e.StateKey(), string(e.Content()))
+		return true, fmt.Errorf("loadAuthEvents: %w", err)
 	}
 
 	// Check if the event is allowed.
 	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
 		// return true, nil
-		logger.Info("SOFT-FAIL")
-		return false, fmt.Errorf("gomatrixserverlib.Allowed: %w", err)
+		return true, fmt.Errorf("gomatrixserverlib.Allowed: %w", err)
 	}
-
-	logger.Info("ALLOW")
 	return false, nil
 }
 
