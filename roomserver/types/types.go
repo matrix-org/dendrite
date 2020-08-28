@@ -144,3 +144,11 @@ type StateEntryList struct {
 type MissingEventError string
 
 func (e MissingEventError) Error() string { return string(e) }
+
+// RoomInfo contains metadata about a room
+type RoomInfo struct {
+	RoomNID          RoomNID
+	RoomVersion      gomatrixserverlib.RoomVersion
+	StateSnapshotNID StateSnapshotNID
+	IsStub           bool
+}

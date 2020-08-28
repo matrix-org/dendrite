@@ -74,6 +74,9 @@ const selectRoomVersionForRoomIDSQL = "" +
 const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
 
+const selectRoomInfoSQL = "" +
+	"SELECT room_version, room_nid, state_snapshot_nid, latest_event_nids FROM roomserver_rooms WHERE room_id = $1"
+
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
@@ -82,6 +85,7 @@ type roomStatements struct {
 	updateLatestEventNIDsStmt          *sql.Stmt
 	selectRoomVersionForRoomIDStmt     *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
+	selectRoomInfoStmt                 *sql.Stmt
 }
 
 func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
@@ -98,6 +102,7 @@ func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
+		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
 	}.Prepare(db)
 }
 
@@ -109,6 +114,19 @@ func (s *roomStatements) InsertRoomNID(
 	stmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
 	err := stmt.QueryRowContext(ctx, roomID, roomVersion).Scan(&roomNID)
 	return types.RoomNID(roomNID), err
+}
+
+func (s *roomStatements) SelectRoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
+	var info types.RoomInfo
+	var latestNIDs pq.Int64Array
+	err := s.selectRoomInfoStmt.QueryRowContext(ctx, roomID).Scan(
+		&info.RoomVersion, &info.RoomNID, &info.StateSnapshotNID, &latestNIDs,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	info.IsStub = len(latestNIDs) == 0
+	return &info, err
 }
 
 func (s *roomStatements) SelectRoomNID(
