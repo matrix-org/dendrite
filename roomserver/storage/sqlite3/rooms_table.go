@@ -64,9 +64,6 @@ const selectRoomVersionForRoomIDSQL = "" +
 const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
 
-const selectStateSnapshotNIDSQL = "" +
-	"SELECT state_snapshot_nid FROM roomserver_rooms WHERE room_id = $1"
-
 type roomStatements struct {
 	db                                 *sql.DB
 	insertRoomNIDStmt                  *sql.Stmt
