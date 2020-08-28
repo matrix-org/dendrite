@@ -198,7 +198,9 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI,
 		&respState,
-		event.Headered(respMakeJoin.RoomVersion), nil,
+		event.Headered(respMakeJoin.RoomVersion),
+		nil,
+		roomserverAPI.KindNew,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}
