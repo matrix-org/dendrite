@@ -18,6 +18,7 @@ package sync
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -204,31 +205,34 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	// See if we have any new tasks to do for the send-to-device messaging.
 	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, since)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("rp.db.SendToDeviceUpdatesForSync: %w", err)
 	}
 
 	// TODO: handle ignored users
 	if req.since == nil {
 		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
+		if err != nil {
+			return res, fmt.Errorf("rp.db.CompleteSync: %w", err)
+		}
 	} else {
 		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, *req.since, latestPos, req.limit, req.wantFullState)
-	}
-	if err != nil {
-		return res, err
+		if err != nil {
+			return res, fmt.Errorf("rp.db.IncrementalSync: %w", err)
+		}
 	}
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
 	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
 	if err != nil {
-		return res, err
+		return res, fmt.Errorf("rp.appendAccountData: %w", err)
 	}
 	res, err = rp.appendDeviceLists(res, req.device.UserID, since, latestPos)
 	if err != nil {
-		return res, err
+		return res, fmt.Errorf("rp.appendDeviceLists: %w", err)
 	}
 	err = internal.DeviceOTKCounts(req.ctx, rp.keyAPI, req.device.UserID, req.device.ID, res)
 	if err != nil {
-		return res, err
+		return res, fmt.Errorf("internal.DeviceOTKCounts: %w", err)
 	}
 
 	// Before we return the sync response, make sure that we take action on
@@ -238,7 +242,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		// Handle the updates and deletions in the database.
 		err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, since)
 		if err != nil {
-			return res, err
+			return res, fmt.Errorf("rp.db.CleanSendToDeviceUpdates: %w", err)
 		}
 	}
 	if len(events) > 0 {
@@ -263,7 +267,7 @@ func (rp *RequestPool) appendDeviceLists(
 ) (*types.Response, error) {
 	_, err := internal.DeviceListCatchup(context.Background(), rp.keyAPI, rp.stateAPI, userID, data, since, to)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("internal.DeviceListCatchup: %w", err)
 	}
 
 	return data, nil
@@ -329,7 +333,7 @@ func (rp *RequestPool) appendAccountData(
 		req.ctx, userID, r, accountDataFilter,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("rp.db.GetAccountDataInRange: %w", err)
 	}
 
 	if len(dataTypes) == 0 {
