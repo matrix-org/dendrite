@@ -451,7 +451,7 @@ func (d *Database) addPDUDeltaToResponse(
 	wantFullState bool,
 	res *types.Response,
 ) (joinedRoomIDs []string, err error) {
-	txn, err := d.DB.BeginTx(ctx, &txReadOnlySnapshot)
+	txn, err := d.DB.BeginTx(context.TODO(), &txReadOnlySnapshot) // TODO: check mattn/go-sqlite3#764
 	if err != nil {
 		return nil, err
 	}
@@ -635,7 +635,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	// a consistent view of the database throughout. This includes extracting the sync position.
 	// This does have the unfortunate side-effect that all the matrixy logic resides in this function,
 	// but it's better to not hide the fact that this is being done in a transaction.
-	txn, err := d.DB.BeginTx(ctx, &txReadOnlySnapshot)
+	txn, err := d.DB.BeginTx(context.TODO(), &txReadOnlySnapshot) // TODO: check mattn/go-sqlite3#764
 	if err != nil {
 		return
 	}
