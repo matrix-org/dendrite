@@ -41,6 +41,17 @@ func JoinRoomByIDOrAlias(
 	}
 	joinRes := roomserverAPI.PerformJoinResponse{}
 
+	// Check to see if any ?server_name= query parameters were
+	// given in the request.
+	if serverNames, ok := req.URL.Query()["server_name"]; ok {
+		for _, serverName := range serverNames {
+			joinReq.ServerNames = append(
+				joinReq.ServerNames,
+				gomatrixserverlib.ServerName(serverName),
+			)
+		}
+	}
+
 	// If content was provided in the request then incude that
 	// in the request. It'll get used as a part of the membership
 	// event content.

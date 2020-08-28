@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -34,7 +33,7 @@ func (d *Database) AssociatePDUWithDestination(
 	serverName gomatrixserverlib.ServerName,
 	receipt *Receipt,
 ) error {
-	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for _, nid := range receipt.nids {
 			if err := d.FederationSenderQueuePDUs.InsertQueuePDU(
 				ctx,           // context
@@ -62,7 +61,12 @@ func (d *Database) GetNextTransactionPDUs(
 	receipt *Receipt,
 	err error,
 ) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	// Strictly speaking this doesn't need to be using the writer
+	// since we are only performing selects, but since we don't have
+	// a guarantee of transactional isolation, it's actually useful
+	// to know in SQLite mode that nothing else is trying to modify
+	// the database.
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		transactionID, err = d.FederationSenderQueuePDUs.SelectQueuePDUNextTransactionID(ctx, txn, serverName)
 		if err != nil {
 			return fmt.Errorf("SelectQueuePDUNextTransactionID: %w", err)
@@ -111,7 +115,7 @@ func (d *Database) CleanPDUs(
 		return errors.New("expected receipt")
 	}
 
-	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if err := d.FederationSenderQueuePDUs.DeleteQueuePDUs(ctx, txn, serverName, receipt.nids); err != nil {
 			return err
 		}
