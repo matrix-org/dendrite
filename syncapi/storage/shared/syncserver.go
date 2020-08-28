@@ -577,20 +577,23 @@ func (d *Database) IncrementalSync(
 		joinedRoomIDs, err = d.addPDUDeltaToResponse(
 			ctx, device, r, numRecentEventsPerRoom, wantFullState, res,
 		)
+		if err != nil {
+			return nil, fmt.Errorf("d.addPDUDeltaToResponse: %w", err)
+		}
 	} else {
 		joinedRoomIDs, err = d.CurrentRoomState.SelectRoomIDsWithMembership(
 			ctx, nil, device.UserID, gomatrixserverlib.Join,
 		)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, fmt.Errorf("d.CurrentRoomState.SelectRoomIDsWithMembership: %w", err)
+		}
 	}
 
 	err = d.addEDUDeltaToResponse(
 		fromPos, toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("d.addEDUDeltaToResponse: %w", err)
 	}
 
 	return res, nil
@@ -719,7 +722,7 @@ func (d *Database) CompleteSync(
 		ctx, res, device.UserID, numRecentEventsPerRoom,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("d.getResponseWithPDUsForCompleteSync: %w", err)
 	}
 
 	// Use a zero value SyncPosition for fromPos so all EDU states are added.
@@ -727,7 +730,7 @@ func (d *Database) CompleteSync(
 		types.NewStreamToken(0, 0, nil), toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("d.addEDUDeltaToResponse: %w", err)
 	}
 
 	return res, nil
@@ -753,7 +756,7 @@ func (d *Database) addInvitesToResponse(
 		ctx, txn, userID, r,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("d.Invites.SelectInviteEventsInRange: %w", err)
 	}
 	for roomID, inviteEvent := range invites {
 		ir := types.NewInviteResponse(inviteEvent)
