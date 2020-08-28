@@ -198,18 +198,6 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 	return d.Events(ctx, nids)
 }
 
-func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, error) {
-	if nid, ok := d.Cache.GetRoomServerRoomNID(roomID); ok {
-		return nid, nil
-	}
-	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	d.Cache.StoreRoomServerRoomNID(roomID, roomNID)
-	return roomNID, err
-}
-
 func (d *Database) LatestEventIDs(
 	ctx context.Context, roomNID types.RoomNID,
 ) (references []gomatrixserverlib.EventReference, currentStateSnapshotNID types.StateSnapshotNID, depth int64, err error) {

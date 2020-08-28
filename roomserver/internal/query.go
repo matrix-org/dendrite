@@ -210,12 +210,12 @@ func (r *RoomserverInternalAPI) QueryMembershipForUser(
 	request *api.QueryMembershipForUserRequest,
 	response *api.QueryMembershipForUserResponse,
 ) error {
-	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
 
-	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, roomNID, request.UserID)
+	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, info.RoomNID, request.UserID)
 	if err != nil {
 		return err
 	}
@@ -247,12 +247,12 @@ func (r *RoomserverInternalAPI) QueryMembershipsForRoom(
 	request *api.QueryMembershipsForRoomRequest,
 	response *api.QueryMembershipsForRoomResponse,
 ) error {
-	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
 
-	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, roomNID, request.Sender)
+	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (r *RoomserverInternalAPI) QueryMembershipsForRoom(
 	var stateEntries []types.StateEntry
 	if stillInRoom {
 		var eventNIDs []types.EventNID
-		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, request.JoinedOnly, false)
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
 		if err != nil {
 			return err
 		}
@@ -555,12 +555,12 @@ func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *
 }
 
 func (r *RoomserverInternalAPI) isServerCurrentlyInRoom(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
-	roomNID, err := r.DB.RoomNID(ctx, roomID)
+	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
 		return false, err
 	}
 
-	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, false)
+	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {
 		return false, err
 	}
