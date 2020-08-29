@@ -457,3 +457,6 @@ Inbound /v1/send_leave rejects leaves from other servers
 Guest users can accept invites to private rooms over federation
 AS user (not ghost) can join room without registering
 If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
+Can search public room list
+Can get remote public room list
+Asking for a remote rooms list, but supplying the local server's name, returns the local rooms list

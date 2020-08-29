@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -41,6 +42,7 @@ type PublicRoomReq struct {
 	Since  string `json:"since,omitempty"`
 	Limit  int16  `json:"limit,omitempty"`
 	Filter filter `json:"filter,omitempty"`
+	Server string `json:"server,omitempty"`
 }
 
 type filter struct {
@@ -51,11 +53,28 @@ type filter struct {
 func GetPostPublicRooms(
 	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
+	federation *gomatrixserverlib.FederationClient,
+	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var request PublicRoomReq
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
 		return *fillErr
 	}
+
+	serverName := gomatrixserverlib.ServerName(request.Server)
+
+	if serverName != "" && serverName != cfg.Matrix.ServerName {
+		res, err := federation.GetPublicRooms(req.Context(), serverName, int(request.Limit), request.Since, false, "")
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("failed to get public rooms")
+			return jsonerror.InternalServerError()
+		}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: res,
+		}
+	}
+
 	response, err := publicRooms(req.Context(), request, rsAPI, stateAPI, extRoomsProvider)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to work out public rooms")
@@ -98,6 +117,8 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 
 	response.TotalRoomCountEstimate = len(rooms)
 
+	rooms = filterRooms(rooms, request.Filter.SearchTerms)
+
 	chunk, prev, next := sliceInto(rooms, offset, limit)
 	if prev >= 0 {
 		response.PrevBatch = "T" + strconv.Itoa(prev)
@@ -109,6 +130,25 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 		response.Chunk = chunk
 	}
 	return &response, err
+}
+
+func filterRooms(rooms []gomatrixserverlib.PublicRoom, searchTerm string) []gomatrixserverlib.PublicRoom {
+	if searchTerm == "" {
+		return rooms
+	}
+
+	normalizedTerm := strings.ToLower(searchTerm)
+
+	result := make([]gomatrixserverlib.PublicRoom, 0)
+	for _, room := range rooms {
+		if strings.Contains(strings.ToLower(room.Name), normalizedTerm) ||
+			strings.Contains(strings.ToLower(room.Topic), normalizedTerm) ||
+			strings.Contains(strings.ToLower(room.CanonicalAlias), normalizedTerm) {
+			result = append(result, room)
+		}
+	}
+
+	return result
 }
 
 // fillPublicRoomsReq fills the Limit, Since and Filter attributes of a GET or POST request
@@ -134,11 +174,13 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 		}
 		request.Limit = int16(limit)
 		request.Since = httpReq.FormValue("since")
+		request.Server = httpReq.FormValue("server")
 	} else {
 		resErr := httputil.UnmarshalJSONRequest(httpReq, request)
 		if resErr != nil {
 			return resErr
 		}
+		request.Server = httpReq.FormValue("server")
 	}
 
 	// strip the 'T' which is only required because when sytest does pagination tests it stops
