@@ -108,6 +108,20 @@ type PerformInviteResponse struct {
 	Error *PerformError
 }
 
+type PerformPeekRequest struct {
+	RoomIDOrAlias string                         `json:"room_id_or_alias"`
+	UserID        string                         `json:"user_id"`
+	DeviceID      string                         `json:"device_id"`
+	ServerNames   []gomatrixserverlib.ServerName `json:"server_names"`
+}
+
+type PerformPeekResponse struct {
+	// The room ID, populated on success.
+	RoomID string `json:"room_id"`
+	// If non-nil, the join request failed. Contains more information why it failed.
+	Error *PerformError
+}
+
 // PerformBackfillRequest is a request to PerformBackfill.
 type PerformBackfillRequest struct {
 	// The room to backfill

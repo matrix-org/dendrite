@@ -120,6 +120,10 @@ func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]stri
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
 }
 
+func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]PeekingDevice, error) {
+	return d.Peeks.SelectPeekingDevices(ctx)
+}
+
 func (d *Database) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
@@ -182,6 +186,19 @@ func (d *Database) RetireInviteEvent(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
 		sp, err = d.Invites.DeleteInviteEvent(ctx, inviteEventID)
+		return nil
+	})
+	return
+}
+
+// AddPeek tracks the fact that a user has started peeking.
+// If the peek was successfully stored this returns the stream ID it was stored at.
+// Returns an error if there was a problem communicating with the database.
+func (d *Database) AddPeek(
+	ctx context.Context, roomID, userID, deviceID string,
+) (sp types.StreamPosition, err error) {
+	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+		sp, err = d.Peeks.InsertPeek(ctx, nil, inviteEvent)
 		return nil
 	})
 	return

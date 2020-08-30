@@ -30,6 +30,8 @@ type Database interface {
 	internal.PartitionStorer
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
+	// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
+	AllPeekingDevicesInRooms(ctx context.Context) (map[string][]PeekingDevice, error)
 	// Events lookups a list of event by their event ID.
 	// Returns a list of events matching the requested IDs found in the database.
 	// If an event is not found in the database then it will be omitted from the list.

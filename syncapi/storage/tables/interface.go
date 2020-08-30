@@ -39,6 +39,13 @@ type Invites interface {
 	SelectMaxInviteID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }
 
+type Peeks interface {
+	InsertPeek(ctx context.Context, txn *sql.Tx, roomID, userID, deviceID string) (streamPos types.StreamPosition, err error)
+	DeletePeek(ctx context.Context, txn *sql.Tx, roomID, userID, deviceID string) (streamPos types.StreamPosition, err error)
+	SelectPeeks(ctxt context.Context, txn *sql.Tx, userID, deviceID string) (peeks []string, err error)
+	SelectPeekingDevices((ctxt context.Context) (peekingDevices map[string][]PeekingDevice, err error)
+}
+
 type Events interface {
 	SelectStateInRange(ctx context.Context, txn *sql.Tx, r types.Range, stateFilter *gomatrixserverlib.StateFilter) (map[string]map[string]bool, map[string]types.StreamEvent, error)
 	SelectMaxEventID(ctx context.Context, txn *sql.Tx) (id int64, err error)
