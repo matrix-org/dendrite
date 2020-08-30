@@ -34,7 +34,7 @@ type Notifier struct {
 	// A map of RoomID => Set<UserID> : Must only be accessed by the OnNewEvent goroutine
 	roomIDToJoinedUsers map[string]userIDSet
 	// A map of RoomID => Set<UserID> : Must only be accessed by the OnNewEvent goroutine
-	roomIDToPeekingDevices map[string]PeekingDeviceSet
+	roomIDToPeekingDevices map[string]peekingDeviceSet
 	// Protects currPos and userStreams.
 	streamLock *sync.Mutex
 	// The latest sync position
@@ -52,7 +52,7 @@ func NewNotifier(pos types.StreamingToken) *Notifier {
 	return &Notifier{
 		currPos:                pos,
 		roomIDToJoinedUsers:    make(map[string]userIDSet),
-		roomIDToPeekingDevices: make(map[string]PeekingDeviceSet),
+		roomIDToPeekingDevices: make(map[string]peekingDeviceSet),
 		userDeviceStreams:      make(map[string]map[string]*UserDeviceStream),
 		streamLock:             &sync.Mutex{},
 	}
@@ -225,7 +225,7 @@ func (n *Notifier) setPeekingDevices(roomIDToPeekingDevices map[string][]Peeking
 	// This is just the bulk form of addPeekingDevice
 	for roomID, peekingDevices := range roomIDToPeekingDevices {
 		if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
-			n.roomIDToPeekingDevices[roomID] = make(PeekingDeviceSet)
+			n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 		}
 		for _, peekingDevice := range peekingDevices {
 			n.roomIDToPeekingDevices[roomID].add(peekingDevice)
@@ -335,7 +335,7 @@ func (n *Notifier) joinedUsers(roomID string) (userIDs []string) {
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) addPeekingDevice(roomID, userID, deviceID string) {
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
-		n.roomIDToPeekingDevices[roomID] = make(PeekingDeviceSet)
+		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
 	n.roomIDToPeekingDevices[roomID].add(PeekingDevice{deviceID, userID})
 }
@@ -343,7 +343,7 @@ func (n *Notifier) addPeekingDevice(roomID, userID, deviceID string) {
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) removePeekingDevice(roomID, userID, deviceID string) {
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
-		n.roomIDToPeekingDevices[roomID] = make(PeekingDeviceSet)
+		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
 	// XXX: is this going to work as a key?
 	n.roomIDToPeekingDevices[roomID].remove(PeekingDevice{deviceID, userID})
@@ -401,6 +401,25 @@ func (s userIDSet) remove(str string) {
 func (s userIDSet) values() (vals []string) {
 	for str := range s {
 		vals = append(vals, str)
+	}
+	return
+}
+
+// A set of PeekingDevices, similar to userIDSet
+
+type peekingDeviceSet map[PeekingDevice]bool
+
+func (s peekingDeviceSet) add(d PeekingDevice) {
+	s[d] = true
+}
+
+func (s peekingDeviceSet) remove(d PeekingDevice) {
+	delete(s, d)
+}
+
+func (s peekingDeviceSet) values() (vals []PeekingDevice) {
+	for d := range s {
+		vals = append(vals, d)
 	}
 	return
 }

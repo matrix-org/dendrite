@@ -508,26 +508,8 @@ type SendToDeviceEvent struct {
 	SentByToken *StreamingToken
 }
 
-// For tracking peeking devices
-
 type PeekingDevice struct {
 	ID     string
 	UserID string
 }
 
-type PeekingDeviceSet map[PeekingDevice]bool
-
-func (s PeekingDeviceSet) add(d PeekingDevice) {
-	s[d] = true
-}
-
-func (s PeekingDeviceSet) remove(d PeekingDevice) {
-	delete(s, d)
-}
-
-func (s PeekingDeviceSet) values() (vals []PeekingDevice) {
-	for d := range s {
-		vals = append(vals, d)
-	}
-	return
-}
