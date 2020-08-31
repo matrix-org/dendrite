@@ -33,6 +33,17 @@ func PeekRoomByIDOrAlias(
 	accountDB accounts.Database,
 	roomIDOrAlias string,
 ) util.JSONResponse {
+	// Check to see if any ?server_name= query parameters were
+	// given in the request.
+	if serverNames, ok := req.URL.Query()["server_name"]; ok {
+		for _, serverName := range serverNames {
+			peekReq.ServerNames = append(
+				peekReq.ServerNames,
+				gomatrixserverlib.ServerName(serverName),
+			)
+		}
+	}
+
 	// if this is a remote roomIDOrAlias, we have to ask the roomserver (or federation sender?) to
 	// to call /peek and /state on the remote server.
 	// TODO: in future we could skip this if we know we're already participating in the room,
@@ -46,7 +57,7 @@ func PeekRoomByIDOrAlias(
 	}
 	peekRes := roomserverAPI.PerformPeekResponse{}
 
-	// Ask the roomserver to perform the join.
+	// Ask the roomserver to perform the peek.
 	rsAPI.PerformPeek(req.Context(), &peekReq, &peekRes)
 	if peekRes.Error != nil {
 		return peekRes.Error.JSONResponse()
@@ -66,6 +77,6 @@ func PeekRoomByIDOrAlias(
 		// TODO: Put the response struct somewhere internal.
 		JSON: struct {
 			RoomID string `json:"room_id"`
-		}{joinRes.RoomID},
+		}{peekRes.RoomID},
 	}
 }
