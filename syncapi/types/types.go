@@ -511,8 +511,8 @@ type SendToDeviceEvent struct {
 }
 
 type PeekingDevice struct {
-	ID     string
-	UserID string
+	UserID 		string
+	DeviceID    string
 }
 
 type Peek struct {

@@ -48,6 +48,9 @@ const insertPeekSQL = "" +
 const deletePeekSQL = "" +
 	"DELETE FROM syncapi_peeks WHERE room_id = $1 AND user_id = $2 and device_id = $3"
 
+const deletePeeksSQL = "" +
+	"DELETE FROM syncapi_peeks WHERE room_id = $1 AND user_id = $2"
+
 const selectPeeksSQL = "" +
 	"SELECT room_id, new FROM syncapi_peeks WHERE user_id = $1 and device_id = $2"
 
@@ -62,6 +65,7 @@ type peekStatements struct {
 	streamIDStatements            *streamIDStatements
 	insertPeekStmt        		  *sql.Stmt
 	deletePeekStmt         		  *sql.Stmt
+	deletePeeksStmt				  *sql.Stmt
 	selectPeeksStmt				  *sql.Stmt
 	selectPeekingDevicesStmt	  *sql.Stmt
 	markPeeksAsOldStmt            *sql.Stmt
@@ -80,6 +84,9 @@ func NewSqlitePeeksTable(db *sql.DB, streamID *streamIDStatements) (tables.Peeks
 		return nil, err
 	}
 	if s.deletePeekStmt, err = db.Prepare(deletePeekSQL); err != nil {
+		return nil, err
+	}
+	if s.deletePeeksStmt, err = db.Prepare(deletePeeksSQL); err != nil {
 		return nil, err
 	}
 	if s.selectPeeksStmt, err = db.Prepare(selectPeeksSQL); err != nil {
@@ -114,6 +121,17 @@ func (s *peekStatements) DeletePeek(
 		return
 	}
 	_, err = sqlutil.TxStmt(txn, s.deletePeekStmt).ExecContext(ctx, roomID, userID, deviceID)
+	return
+}
+
+func (s *peekStatements) DeletePeeks(
+	ctx context.Context, txn *sql.Tx, roomID, userID string,
+) (streamPos types.StreamPosition, err error) {
+	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	if err != nil {
+		return
+	}
+	_, err = sqlutil.TxStmt(txn, s.deletePeeksStmt).ExecContext(ctx, roomID, userID)
 	return
 }
 

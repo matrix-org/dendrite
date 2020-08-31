@@ -1032,7 +1032,9 @@ func (d *Database) getStateDeltas(
 	}
 
 	// add peek blocks
+	peeking := make(map[string]bool)
 	for _, peek := range peeks {
+		peeking[peek.RoomID] = true
 		if peek.New {
 			// send full room state down instead of a delta
 			var s []types.StreamEvent
@@ -1067,6 +1069,14 @@ func (d *Database) getStateDeltas(
 			//       the timeline.
 			if membership := getMembershipFromEvent(&ev.Event, userID); membership != "" {
 				if membership == gomatrixserverlib.Join {
+					if peeking[roomID] {
+						// we automatically cancel our peeks when we join a room
+						_, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
+						if err != nil {
+							return nil, nil, err
+						}
+					}
+
 					// send full room state down instead of a delta
 					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)

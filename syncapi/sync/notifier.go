@@ -248,7 +248,7 @@ func (n *Notifier) wakeupUsers(userIDs []string, peekingDevices []types.PeekingD
 	if peekingDevices != nil {
 		for _, peekingDevice := range peekingDevices {
 			// TODO: don't bother waking up for devices whose users we already woke up
-			if stream := n.fetchUserDeviceStream(peekingDevice.UserID, peekingDevice.ID, false); stream != nil {
+			if stream := n.fetchUserDeviceStream(peekingDevice.UserID, peekingDevice.DeviceID, false); stream != nil {
 				stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 			}
 		}
@@ -337,7 +337,7 @@ func (n *Notifier) addPeekingDevice(roomID, userID, deviceID string) {
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
-	n.roomIDToPeekingDevices[roomID].add(types.PeekingDevice{deviceID, userID})
+	n.roomIDToPeekingDevices[roomID].add(types.PeekingDevice{userID, deviceID})
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
@@ -346,7 +346,7 @@ func (n *Notifier) removePeekingDevice(roomID, userID, deviceID string) {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
 	// XXX: is this going to work as a key?
-	n.roomIDToPeekingDevices[roomID].remove(types.PeekingDevice{deviceID, userID})
+	n.roomIDToPeekingDevices[roomID].remove(types.PeekingDevice{userID, deviceID})
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
