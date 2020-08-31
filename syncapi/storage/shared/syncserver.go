@@ -695,7 +695,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 
 	// Add peeked rooms.
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, deviceID)
+	peeks, err := d.Peeks.SelectPeeks(ctx, userID, deviceID)
 	if err != nil {
 		return
 	}
@@ -1026,7 +1026,7 @@ func (d *Database) getStateDeltas(
 
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so joins overwrite peeks
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.ID)
+	peeks, err := d.Peeks.SelectPeeks(ctx, userID, device.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1128,7 +1128,7 @@ func (d *Database) getStateDeltasForFullStateSync(
 		return nil, nil, err
 	}
 
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.ID)
+	peeks, err := d.Peeks.SelectPeeks(ctx, userID, device.ID)
 	if err != nil {
 		return nil, nil, err
 	}
