@@ -33,16 +33,16 @@ CREATE TABLE IF NOT EXISTS syncapi_peeks (
 	device_id TEXT NOT NULL,
 	new BOOL NOT NULL DEFAULT true,
     -- When the peek was created in UNIX epoch ms.
-    creation_ts INTEGER NOT NULL,
+    creation_ts INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS syncapi_peeks_room_id_idx ON syncapi_peeks(room_id);
-CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(user_Id, device_id);
+CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(user_id, device_id);
 `
 
 const insertPeekSQL = "" +
 	"INSERT INTO syncapi_peeks" +
-	" (id, room_id, user_id, device_id, creation_ts" +
+	" (id, room_id, user_id, device_id, creation_ts)" +
 	" VALUES ($1, $2, $3, $4, $5)"
 
 const deletePeekSQL = "" +
@@ -68,7 +68,7 @@ type peekStatements struct {
 }
 
 func NewSqlitePeeksTable(db *sql.DB, streamID *streamIDStatements) (tables.Peeks, error) {
-	_, err := db.Exec(filterSchema)
+	_, err := db.Exec(peeksSchema)
 	if err != nil {
 		return nil, err
 	}
