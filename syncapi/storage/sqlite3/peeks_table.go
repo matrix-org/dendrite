@@ -42,8 +42,8 @@ CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(
 
 const insertPeekSQL = "" +
 	"INSERT INTO syncapi_peeks" +
-	" (id, room_id, user_id, device_id, creation_ts)" +
-	" VALUES ($1, $2, $3, $4, $5)"
+	" (room_id, user_id, device_id, creation_ts)" +
+	" VALUES ($1, $2, $3, $4)"
 
 const deletePeekSQL = "" +
 	"DELETE FROM syncapi_peeks WHERE room_id = $1 AND user_id = $2 and device_id = $3"
