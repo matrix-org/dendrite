@@ -341,8 +341,12 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		if err != nil {
 			logger.WithError(err).WithField("user_id", userID).Error("failed to query device keys for user")
 			fcerr, ok := err.(*fedsenderapi.FederationClientError)
-			if ok && fcerr.RetryAfter > 0 {
-				waitTime = fcerr.RetryAfter
+			if ok {
+				if fcerr.RetryAfter > 0 {
+					waitTime = fcerr.RetryAfter
+				} else if fcerr.Blacklisted {
+					waitTime = time.Hour * 8
+				}
 			}
 			hasFailures = true
 			continue

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -33,7 +32,7 @@ func (d *Database) AssociateEDUWithDestination(
 	serverName gomatrixserverlib.ServerName,
 	receipt *Receipt,
 ) error {
-	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for _, nid := range receipt.nids {
 			if err := d.FederationSenderQueueEDUs.InsertQueueEDU(
 				ctx,        // context
@@ -60,7 +59,7 @@ func (d *Database) GetNextTransactionEDUs(
 	receipt *Receipt,
 	err error,
 ) {
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		nids, err := d.FederationSenderQueueEDUs.SelectQueueEDUs(ctx, txn, serverName, limit)
 		if err != nil {
 			return fmt.Errorf("SelectQueueEDUs: %w", err)
@@ -99,7 +98,7 @@ func (d *Database) CleanEDUs(
 		return errors.New("expected receipt")
 	}
 
-	return sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if err := d.FederationSenderQueueEDUs.DeleteQueueEDUs(ctx, txn, serverName, receipt.nids); err != nil {
 			return err
 		}

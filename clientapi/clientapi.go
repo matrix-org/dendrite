@@ -30,7 +30,6 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -39,7 +38,6 @@ func AddPublicRoutes(
 	router *mux.Router,
 	cfg *config.ClientAPI,
 	producer sarama.SyncProducer,
-	deviceDB devices.Database,
 	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
@@ -59,7 +57,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		router, cfg, eduInputAPI, rsAPI, asAPI,
-		accountsDB, deviceDB, userAPI, federation,
+		accountsDB, userAPI, federation,
 		syncProducer, transactionsCache, fsAPI, stateAPI, keyAPI, extRoomsProvider,
 	)
 }

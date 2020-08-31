@@ -111,13 +111,12 @@ func (m *DendriteMonolith) Start() {
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
 	federation := ygg.CreateFederationClient(base)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, cfg.Derived.ApplicationServices, keyAPI)
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
 	rsAPI := roomserver.NewInternalAPI(
@@ -153,7 +152,6 @@ func (m *DendriteMonolith) Start() {
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
-		DeviceDB:      deviceDB,
 		Client:        ygg.CreateClient(base),
 		FedClient:     federation,
 		KeyRing:       keyRing,

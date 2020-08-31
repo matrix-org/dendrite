@@ -15,7 +15,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -23,27 +22,31 @@ const (
 	serverName = gomatrixserverlib.ServerName("example.com")
 )
 
-func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database, devices.Database) {
+func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database) {
 	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
 		ConnectionString: "file::memory:",
 	}, serverName)
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}
-	deviceDB, err := devices.NewDatabase(&config.DatabaseOptions{
-		ConnectionString: "file::memory:",
-	}, serverName)
-	if err != nil {
-		t.Fatalf("failed to create device DB: %s", err)
+	cfg := &config.UserAPI{
+		DeviceDatabase: config.DatabaseOptions{
+			ConnectionString:   "file::memory:",
+			MaxOpenConnections: 1,
+			MaxIdleConnections: 1,
+		},
+		Matrix: &config.Global{
+			ServerName: serverName,
+		},
 	}
 
-	return userapi.NewInternalAPI(accountDB, deviceDB, serverName, nil, nil), accountDB, deviceDB
+	return userapi.NewInternalAPI(accountDB, cfg, nil, nil), accountDB
 }
 
 func TestQueryProfile(t *testing.T) {
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
-	userAPI, accountDB, _ := MustMakeInternalAPI(t)
+	userAPI, accountDB := MustMakeInternalAPI(t)
 	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "")
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)

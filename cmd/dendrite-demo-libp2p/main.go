@@ -140,10 +140,9 @@ func main() {
 	defer base.Base.Close() // nolint: errcheck
 
 	accountDB := base.Base.CreateAccountsDB()
-	deviceDB := base.Base.CreateDeviceDB()
 	federation := createFederationClient(base)
 	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation, base.Base.KafkaProducer)
-	userAPI := userapi.NewInternalAPI(accountDB, deviceDB, cfg.Global.ServerName, nil, keyAPI)
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
 	serverKeyAPI := serverkeyapi.NewInternalAPI(
@@ -175,7 +174,6 @@ func main() {
 	monolith := setup.Monolith{
 		Config:        base.Base.Cfg,
 		AccountDB:     accountDB,
-		DeviceDB:      deviceDB,
 		Client:        createClient(base),
 		FedClient:     federation,
 		KeyRing:       keyRing,

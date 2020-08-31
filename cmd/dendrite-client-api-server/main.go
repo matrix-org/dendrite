@@ -27,7 +27,6 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
-	deviceDB := base.CreateDeviceDB()
 	federation := base.CreateFederationClient()
 
 	asQuery := base.AppserviceHTTPClient()
@@ -39,7 +38,7 @@ func main() {
 	keyAPI := base.KeyServerHTTPClient()
 
 	clientapi.AddPublicRoutes(
-		base.PublicClientAPIMux, &base.Cfg.ClientAPI, base.KafkaProducer, deviceDB, accountDB, federation,
+		base.PublicClientAPIMux, &base.Cfg.ClientAPI, base.KafkaProducer, accountDB, federation,
 		rsAPI, eduInputAPI, asQuery, stateAPI, transactions.New(), fsAPI, userAPI, keyAPI, nil,
 	)
 

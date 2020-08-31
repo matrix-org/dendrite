@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"database/sql"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -23,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -50,57 +49,56 @@ type devicesDeleteJSON struct {
 
 // GetDeviceByID handles /devices/{deviceID}
 func GetDeviceByID(
-	req *http.Request, deviceDB devices.Database, device *api.Device,
+	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	var queryRes userapi.QueryDevicesResponse
+	err := userAPI.QueryDevices(req.Context(), &userapi.QueryDevicesRequest{
+		UserID: device.UserID,
+	}, &queryRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
 		return jsonerror.InternalServerError()
 	}
-
-	ctx := req.Context()
-	dev, err := deviceDB.GetDeviceByID(ctx, localpart, deviceID)
-	if err == sql.ErrNoRows {
+	var targetDevice *userapi.Device
+	for _, device := range queryRes.Devices {
+		if device.ID == deviceID {
+			targetDevice = &device
+			break
+		}
+	}
+	if targetDevice == nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Unknown device"),
 		}
-	} else if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDeviceByID failed")
-		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: deviceJSON{
-			DeviceID:    dev.ID,
-			DisplayName: dev.DisplayName,
+			DeviceID:    targetDevice.ID,
+			DisplayName: targetDevice.DisplayName,
 		},
 	}
 }
 
 // GetDevicesByLocalpart handles /devices
 func GetDevicesByLocalpart(
-	req *http.Request, deviceDB devices.Database, device *api.Device,
+	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	var queryRes userapi.QueryDevicesResponse
+	err := userAPI.QueryDevices(req.Context(), &userapi.QueryDevicesRequest{
+		UserID: device.UserID,
+	}, &queryRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
-	}
-
-	ctx := req.Context()
-	deviceList, err := deviceDB.GetDevicesByLocalpart(ctx, localpart)
-
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.GetDevicesByLocalpart failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
 		return jsonerror.InternalServerError()
 	}
 
 	res := devicesJSON{}
 
-	for _, dev := range deviceList {
+	for _, dev := range queryRes.Devices {
 		res.Devices = append(res.Devices, deviceJSON{
 			DeviceID:    dev.ID,
 			DisplayName: dev.DisplayName,

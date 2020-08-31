@@ -19,23 +19,21 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
-	"github.com/matrix-org/gomatrixserverlib"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
 // Logout handles POST /logout
 func Logout(
-	req *http.Request, deviceDB devices.Database, device *api.Device,
+	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	var performRes userapi.PerformDeviceDeletionResponse
+	err := userAPI.PerformDeviceDeletion(req.Context(), &userapi.PerformDeviceDeletionRequest{
+		UserID:    device.UserID,
+		DeviceIDs: []string{device.ID},
+	}, &performRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
-	}
-
-	if err := deviceDB.RemoveDevice(req.Context(), device.ID, localpart); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveDevice failed")
+		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -47,16 +45,15 @@ func Logout(
 
 // LogoutAll handles POST /logout/all
 func LogoutAll(
-	req *http.Request, deviceDB devices.Database, device *api.Device,
+	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	var performRes userapi.PerformDeviceDeletionResponse
+	err := userAPI.PerformDeviceDeletion(req.Context(), &userapi.PerformDeviceDeletionRequest{
+		UserID:    device.UserID,
+		DeviceIDs: nil,
+	}, &performRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
-	}
-
-	if err := deviceDB.RemoveAllDevices(req.Context(), localpart); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("deviceDB.RemoveAllDevices failed")
+		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 		return jsonerror.InternalServerError()
 	}
 

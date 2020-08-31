@@ -33,7 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -41,7 +40,6 @@ import (
 // all components of Dendrite, for use in monolith mode.
 type Monolith struct {
 	Config        *config.Dendrite
-	DeviceDB      devices.Database
 	AccountDB     accounts.Database
 	KeyRing       *gomatrixserverlib.KeyRing
 	Client        *gomatrixserverlib.Client
@@ -65,7 +63,7 @@ type Monolith struct {
 // AddAllPublicRoutes attaches all public paths to the given router
 func (m *Monolith) AddAllPublicRoutes(csMux, ssMux, keyMux, mediaMux *mux.Router) {
 	clientapi.AddPublicRoutes(
-		csMux, &m.Config.ClientAPI, m.KafkaProducer, m.DeviceDB, m.AccountDB,
+		csMux, &m.Config.ClientAPI, m.KafkaProducer, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, m.StateAPI, transactions.New(),
 		m.FederationSenderAPI, m.UserAPI, m.KeyAPI, m.ExtPublicRoomsProvider,

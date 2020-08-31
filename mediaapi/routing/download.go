@@ -728,12 +728,11 @@ func (r *downloadRequest) fetchRemoteFile(
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	// Data is truncated to maxFileSizeBytes. Content-Length was reported as 0 < Content-Length <= maxFileSizeBytes so this is OK.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(resp.Body, maxFileSizeBytes, absBasePath)
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, resp.Body, maxFileSizeBytes, absBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": maxFileSizeBytes,
 		}).Warn("Error while downloading file from remote server")
-		fileutils.RemoveDir(tmpDir, r.Logger)
 		return "", false, errors.New("file could not be downloaded from remote server")
 	}
 

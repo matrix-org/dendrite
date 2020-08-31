@@ -72,7 +72,7 @@ func (d *Database) GetDeviceByID(
 func (d *Database) GetDevicesByLocalpart(
 	ctx context.Context, localpart string,
 ) ([]api.Device, error) {
-	return d.devices.selectDevicesByLocalpart(ctx, localpart)
+	return d.devices.selectDevicesByLocalpart(ctx, nil, localpart)
 }
 
 func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
@@ -180,11 +180,16 @@ func (d *Database) RemoveDevices(
 // If something went wrong during the deletion, it will return the SQL error.
 func (d *Database) RemoveAllDevices(
 	ctx context.Context, localpart string,
-) error {
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+) (devices []api.Device, err error) {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		devices, err = d.devices.selectDevicesByLocalpart(ctx, txn, localpart)
+		if err != nil {
+			return err
+		}
 		if err := d.devices.deleteDevicesByLocalpart(ctx, txn, localpart); err != sql.ErrNoRows {
 			return err
 		}
 		return nil
 	})
+	return
 }
