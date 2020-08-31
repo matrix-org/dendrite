@@ -17,8 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -33,17 +31,6 @@ func PeekRoomByIDOrAlias(
 	accountDB accounts.Database,
 	roomIDOrAlias string,
 ) util.JSONResponse {
-	// Check to see if any ?server_name= query parameters were
-	// given in the request.
-	if serverNames, ok := req.URL.Query()["server_name"]; ok {
-		for _, serverName := range serverNames {
-			peekReq.ServerNames = append(
-				peekReq.ServerNames,
-				gomatrixserverlib.ServerName(serverName),
-			)
-		}
-	}
-
 	// if this is a remote roomIDOrAlias, we have to ask the roomserver (or federation sender?) to
 	// to call /peek and /state on the remote server.
 	// TODO: in future we could skip this if we know we're already participating in the room,
@@ -56,6 +43,17 @@ func PeekRoomByIDOrAlias(
 		DeviceID:	   device.ID,
 	}
 	peekRes := roomserverAPI.PerformPeekResponse{}
+
+	// Check to see if any ?server_name= query parameters were
+	// given in the request.
+	if serverNames, ok := req.URL.Query()["server_name"]; ok {
+		for _, serverName := range serverNames {
+			peekReq.ServerNames = append(
+				peekReq.ServerNames,
+				gomatrixserverlib.ServerName(serverName),
+			)
+		}
+	}
 
 	// Ask the roomserver to perform the peek.
 	rsAPI.PerformPeek(req.Context(), &peekReq, &peekRes)

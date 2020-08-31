@@ -16,13 +16,10 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -80,7 +77,7 @@ func (r *RoomserverInternalAPI) performPeek(
 
 func (r *RoomserverInternalAPI) performPeekRoomByAlias(
 	ctx context.Context,
-	req *api.PerformJoinRequest,
+	req *api.PerformPeekRequest,
 ) (string, error) {
 	// Get the domain part of the room alias.
 	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
@@ -149,7 +146,7 @@ func (r *RoomserverInternalAPI) performPeekRoomByID(
 
 	// TODO: handle federated peeks
 
-	err := r.WriteOutputEvents(roomID, []api.OutputEvent{
+	err = r.WriteOutputEvents(roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewPeek,
 			NewPeek: &api.OutputNewPeek{
@@ -167,5 +164,5 @@ func (r *RoomserverInternalAPI) performPeekRoomByID(
 	// it will have been overwritten with a room ID by performPeekRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return
+	return roomID, nil;
 }

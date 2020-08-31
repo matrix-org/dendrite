@@ -221,7 +221,7 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 // setPeekingDevices marks the given devices as peeking in the given rooms, such that new events from
 // these rooms will wake the given devices' /sync requests. This should be called prior to ANY calls to
 // OnNewEvent (eg on startup) to prevent racing.
-func (n *Notifier) setPeekingDevices(roomIDToPeekingDevices map[string][]PeekingDevices) {
+func (n *Notifier) setPeekingDevices(roomIDToPeekingDevices map[string][]types.PeekingDevice) {
 	// This is just the bulk form of addPeekingDevice
 	for roomID, peekingDevices := range roomIDToPeekingDevices {
 		if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
@@ -235,7 +235,7 @@ func (n *Notifier) setPeekingDevices(roomIDToPeekingDevices map[string][]Peeking
 
 // wakeupUsers will wake up the sync strems for all of the devices for all of the
 // specified user IDs, and also the specified peekingDevices
-func (n *Notifier) wakeupUsers(userIDs []string, peekingDevices []PeekingDevice, newPos types.StreamingToken) {
+func (n *Notifier) wakeupUsers(userIDs []string, peekingDevices []types.PeekingDevice, newPos types.StreamingToken) {
 	for _, userID := range userIDs {
 		for _, stream := range n.fetchUserStreams(userID) {
 			if stream == nil {
@@ -248,7 +248,7 @@ func (n *Notifier) wakeupUsers(userIDs []string, peekingDevices []PeekingDevice,
 	if peekingDevices != nil {
 		for _, peekingDevice := range peekingDevices {
 			// TODO: don't bother waking up for devices whose users we already woke up
-			if stream := n.fetchUserDeviceStream(peekingDevice.UserID, peekingDevice.DeviceID, false); stream != nil {
+			if stream := n.fetchUserDeviceStream(peekingDevice.UserID, peekingDevice.ID, false); stream != nil {
 				stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 			}
 		}
@@ -337,7 +337,7 @@ func (n *Notifier) addPeekingDevice(roomID, userID, deviceID string) {
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
-	n.roomIDToPeekingDevices[roomID].add(PeekingDevice{deviceID, userID})
+	n.roomIDToPeekingDevices[roomID].add(types.PeekingDevice{deviceID, userID})
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
@@ -346,11 +346,11 @@ func (n *Notifier) removePeekingDevice(roomID, userID, deviceID string) {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
 	// XXX: is this going to work as a key?
-	n.roomIDToPeekingDevices[roomID].remove(PeekingDevice{deviceID, userID})
+	n.roomIDToPeekingDevices[roomID].remove(types.PeekingDevice{deviceID, userID})
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
-func (n *Notifier) PeekingDevices(roomID string) (peekingDevices []PeekingDevices) {
+func (n *Notifier) PeekingDevices(roomID string) (peekingDevices []types.PeekingDevice) {
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
 		return
 	}
@@ -407,17 +407,17 @@ func (s userIDSet) values() (vals []string) {
 
 // A set of PeekingDevices, similar to userIDSet
 
-type peekingDeviceSet map[PeekingDevice]bool
+type peekingDeviceSet map[types.PeekingDevice]bool
 
-func (s peekingDeviceSet) add(d PeekingDevice) {
+func (s peekingDeviceSet) add(d types.PeekingDevice) {
 	s[d] = true
 }
 
-func (s peekingDeviceSet) remove(d PeekingDevice) {
+func (s peekingDeviceSet) remove(d types.PeekingDevice) {
 	delete(s, d)
 }
 
-func (s peekingDeviceSet) values() (vals []PeekingDevice) {
+func (s peekingDeviceSet) values() (vals []types.PeekingDevice) {
 	for d := range s {
 		vals = append(vals, d)
 	}

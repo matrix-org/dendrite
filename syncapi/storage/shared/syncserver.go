@@ -39,6 +39,7 @@ type Database struct {
 	DB                  *sql.DB
 	Writer              sqlutil.Writer
 	Invites             tables.Invites
+	Peeks               tables.Peeks
 	AccountData         tables.AccountData
 	OutputEvents        tables.Events
 	Topology            tables.Topology
@@ -120,7 +121,7 @@ func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]stri
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
 }
 
-func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]PeekingDevice, error) {
+func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
 	return d.Peeks.SelectPeekingDevices(ctx)
 }
 
@@ -198,7 +199,7 @@ func (d *Database) AddPeek(
 	ctx context.Context, roomID, userID, deviceID string,
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		sp, err = d.Peeks.InsertPeek(ctx, nil, inviteEvent)
+		sp, err = d.Peeks.InsertPeek(ctx, nil, roomID, userID, deviceID)
 		return nil
 	})
 	return
@@ -992,7 +993,7 @@ func (d *Database) getStateDeltas(
 
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so joins overwrite peeks
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.DeviceID)
+	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1006,7 +1007,7 @@ func (d *Database) getStateDeltas(
 			if err != nil {
 				return nil, nil, err
 			}
-			state[roomID] = s
+			state[peek.RoomID] = s
 		}
 
 		deltas = append(deltas, stateDelta{
@@ -1017,7 +1018,7 @@ func (d *Database) getStateDeltas(
 	}
 
 	if len(peeks) > 0 {
-		err := d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.DeviceID)
+		err := d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1084,7 +1085,7 @@ func (d *Database) getStateDeltasForFullStateSync(
 		return nil, nil, err
 	}
 
-	peeks, err = d.Peeks.SelectPeeks(ctx, txn, userID, device,ID)
+	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1119,7 +1120,7 @@ func (d *Database) getStateDeltasForFullStateSync(
 	}
 
 	if len(peeks) > 0 {
-		err := d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.DeviceID)
+		err := d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
 		if err != nil {
 			return nil, nil, err
 		}

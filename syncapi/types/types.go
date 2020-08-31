@@ -517,5 +517,5 @@ type PeekingDevice struct {
 
 type Peek struct {
 	RoomID string
-	New    boolean
+	New    bool
 }
