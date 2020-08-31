@@ -6,7 +6,7 @@ Implementationwise, this means:
  * Users call `/peek` and `/unpeek` on the clientapi from a given device.
  * The clientapi delegates these via HTTP to the roomserver, which coordinates peeking in general for a given room
  * The roomserver writes an NewPeek event into the kafka log headed to the syncserver
- * The syncserver tracks the existence of the local peek in its DB, and then starts waking up the peeking devices for the room in question, putting it in the `peeking` section of the /sync response.
+ * The syncserver tracks the existence of the local peek in its DB, and then starts waking up the peeking devices for the room in question, putting it in the `peek` section of the /sync response.
 
 Questions (given this is [my](https://github.com/ara4n) first time hacking on Dendrite):
  * The whole clientapi -> roomserver -> syncapi flow to initiate a peek seems very indirect.  Is there a reason not to just let syncapi itself host the implementation of `/peek`?

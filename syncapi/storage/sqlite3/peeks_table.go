@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS syncapi_peeks (
 	room_id TEXT NOT NULL,
 	user_id TEXT NOT NULL,
 	device_id TEXT NOT NULL,
+	new BOOL NOT NULL DEFAULT true,
     -- When the peek was created in UNIX epoch ms.
     creation_ts INTEGER NOT NULL,
 );
@@ -49,10 +50,13 @@ const deletePeekSQL = "" +
 	"DELETE FROM syncapi_peeks WHERE room_id = $1 AND user_id = $2 and device_id = $3"
 
 const selectPeeksSQL == "" +
-	"SELECT room_id FROM syncapi_peeks WHERE user_id = $1 and device_id = $2"
+	"SELECT room_id, new FROM syncapi_peeks WHERE user_id = $1 and device_id = $2"
 
 const selectPeekingDevicesSQL == "" +
 	"SELECT room_id, user_id, device_id FROM syncapi_peeks"
+
+const markPeeksAsOldSQL == "" +
+	"UPDATE syncapi_peeks SET new=false WHERE user_id = $1 and device_id = $2"
 
 type peekStatements struct {
 	db                            *sql.DB
@@ -80,6 +84,9 @@ func NewSqlitePeeksTable(db *sql.DB) (tables.Peeks, error) {
 		return nil, err
 	}
 	if s.selectPeekingDevicesStmt, err = db.Prepare(selectPeekingDevicesSQL); err != nil {
+		return nil, err
+	}
+	if s.markPeeksAsOldStmt, err = db.Prepare(markPeeksAsOldSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -110,7 +117,7 @@ func (s *peekStatements) DeletePeek(
 
 func (s *peekStatements) SelectPeeks(
 	ctx context.Context, txn *sql.Tx, userID, deviceID string,
-) (roomIDs []string, err error) {
+) (peeks []Peek, err error) {
 	rows, err := sqlutil.TxStmt(txn, s.selectPeeksStmt).QueryContext(ctx, userID, deviceID)
 	if err != nil {
 		return
@@ -118,14 +125,21 @@ func (s *peekStatements) SelectPeeks(
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectPeeks: rows.close() failed")
 
 	for rows.Next() {
-		var roomID string
-		if err = rows.Scan(&roomId); err != nil {
+		peek = Peek{}
+		if err = rows.Scan(&peek.roomId, &peek.new); err != nil {
 			return
 		}
-		roomIDs = append(roomIDs, roomID)
+		peeks = append(peeks, peek)
 	}
 
-	return roomIDs, rows.Err()
+	return peeks, rows.Err()
+}
+
+func (s *peekStatements) MarkPeeksAsOld (
+	ctx context.Context, txn *sql.Tx, userID, deviceID string,
+) (err error) {
+	_, err := sqlutil.TxStmt(txn, s.markPeeksAsOldStmt).ExecContext(ctx, userID, deviceID)
+	return
 }
 
 func (s *peekStatements) SelectPeekingDevices(
