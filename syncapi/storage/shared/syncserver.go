@@ -644,7 +644,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 // nolint:nakedret
 func (d *Database) getResponseWithPDUsForCompleteSync(
 	ctx context.Context, res *types.Response,
-	userID string,
+	userID string, deviceID string,
 	numRecentEventsPerRoom int,
 ) (
 	toPos types.StreamingToken,
@@ -684,46 +684,30 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
-		var stateEvents []gomatrixserverlib.HeaderedEvent
-		stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, &stateFilter)
-		if err != nil {
-			return
-		}
-		// TODO: When filters are added, we may need to call this multiple times to get enough events.
-		//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-		var recentStreamEvents []types.StreamEvent
-		var limited bool
-		recentStreamEvents, limited, err = d.OutputEvents.SelectRecentEvents(
-			ctx, txn, roomID, r, numRecentEventsPerRoom, true, true,
+		var jr *types.JoinResponse
+		jr, err = d.getJoinResponseForCompleteSync(
+			ctx, txn, roomID, r, &stateFilter, numRecentEventsPerRoom,
 		)
 		if err != nil {
 			return
 		}
-
-		// Retrieve the backward topology position, i.e. the position of the
-		// oldest event in the room's topology.
-		var prevBatchStr string
-		if len(recentStreamEvents) > 0 {
-			var backwardTopologyPos, backwardStreamPos types.StreamPosition
-			backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
-			if err != nil {
-				return
-			}
-			prevBatch := types.NewTopologyToken(backwardTopologyPos, backwardStreamPos)
-			prevBatch.Decrement()
-			prevBatchStr = prevBatch.String()
-		}
-
-		// We don't include a device here as we don't need to send down
-		// transaction IDs for complete syncs
-		recentEvents := d.StreamEventsToEvents(nil, recentStreamEvents)
-		stateEvents = removeDuplicates(stateEvents, recentEvents)
-		jr := types.NewJoinResponse()
-		jr.Timeline.PrevBatch = prevBatchStr
-		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = limited
-		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[roomID] = *jr
+	}
+
+	// Add peeked rooms.
+	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, deviceID)
+	if err != nil {
+		return
+	}
+	for _, peek := range peeks {
+		var jr *types.JoinResponse
+		jr, err = d.getJoinResponseForCompleteSync(
+			ctx, txn, peek.RoomID, r, &stateFilter, numRecentEventsPerRoom,
+		)
+		if err != nil {
+			return
+		}
+		res.Rooms.Peek[peek.RoomID] = *jr
 	}
 
 	if err = d.addInvitesToResponse(ctx, txn, userID, r, res); err != nil {
@@ -734,12 +718,61 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	return //res, toPos, joinedRoomIDs, err
 }
 
+func (d* Database) getJoinResponseForCompleteSync(
+	ctx context.Context, txn *sql.Tx,
+	roomID string, 
+	r types.Range,
+	stateFilter *gomatrixserverlib.StateFilter,
+	numRecentEventsPerRoom int,
+) (jr *types.JoinResponse, err error) {
+	var stateEvents []gomatrixserverlib.HeaderedEvent
+	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
+	if err != nil {
+		return
+	}
+	// TODO: When filters are added, we may need to call this multiple times to get enough events.
+	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
+	var recentStreamEvents []types.StreamEvent
+	var limited bool
+	recentStreamEvents, limited, err = d.OutputEvents.SelectRecentEvents(
+		ctx, txn, roomID, r, numRecentEventsPerRoom, true, true,
+	)
+	if err != nil {
+		return
+	}
+
+	// Retrieve the backward topology position, i.e. the position of the
+	// oldest event in the room's topology.
+	var prevBatchStr string
+	if len(recentStreamEvents) > 0 {
+		var backwardTopologyPos, backwardStreamPos types.StreamPosition
+		backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
+		if err != nil {
+			return
+		}
+		prevBatch := types.NewTopologyToken(backwardTopologyPos, backwardStreamPos)
+		prevBatch.Decrement()
+		prevBatchStr = prevBatch.String()
+	}
+
+	// We don't include a device here as we don't need to send down
+	// transaction IDs for complete syncs
+	recentEvents := d.StreamEventsToEvents(nil, recentStreamEvents)
+	stateEvents = removeDuplicates(stateEvents, recentEvents)
+	jr = types.NewJoinResponse()
+	jr.Timeline.PrevBatch = prevBatchStr
+	jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+	jr.Timeline.Limited = limited
+	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
+	return jr, nil
+}
+
 func (d *Database) CompleteSync(
 	ctx context.Context, res *types.Response,
 	device userapi.Device, numRecentEventsPerRoom int,
 ) (*types.Response, error) {
 	toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
-		ctx, res, device.UserID, numRecentEventsPerRoom,
+		ctx, res, device.UserID, device.ID, numRecentEventsPerRoom,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("d.getResponseWithPDUsForCompleteSync: %w", err)
