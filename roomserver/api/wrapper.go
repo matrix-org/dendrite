@@ -48,37 +48,29 @@ func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, state *gomatrixserverlib.RespState,
 	event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool, stateKind Kind,
 ) error {
-	outliers, err := state.Events()
+	events, err := state.Events()
 	if err != nil {
 		return err
 	}
 
 	var ires []InputRoomEvent
-	var stateEventIDs []string
 
-	for _, outlier := range outliers {
-		if haveEventIDs[outlier.EventID()] {
+	for _, ev := range events {
+		if haveEventIDs[ev.EventID()] {
 			continue
 		}
 		in := InputRoomEvent{
 			Kind:         stateKind,
-			Event:        outlier.Headered(event.RoomVersion),
-			AuthEventIDs: outlier.AuthEventIDs(),
-		}
-		if stateKind == KindNew {
-			in.HasState = true
-			in.StateEventIDs = stateEventIDs
+			Event:        ev.Headered(event.RoomVersion),
+			AuthEventIDs: ev.AuthEventIDs(),
 		}
 		ires = append(ires, in)
-		stateEventIDs = append(stateEventIDs, outlier.EventID())
 	}
 
 	ires = append(ires, InputRoomEvent{
-		Kind:          KindNew,
-		Event:         event,
-		AuthEventIDs:  event.AuthEventIDs(),
-		HasState:      true,
-		StateEventIDs: stateEventIDs,
+		Kind:         KindNew,
+		Event:        event,
+		AuthEventIDs: event.AuthEventIDs(),
 	})
 
 	_, err = SendInputRoomEvents(ctx, rsAPI, ires)
