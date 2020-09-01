@@ -1005,7 +1005,7 @@ func (d *Database) getStateDeltas(
 	}
 
 	// find out which rooms this user is peeking, if any.
-	// We do this before joins so joins overwrite peeks
+	// We do this before joins so any peeks get overwritten
 	peeks, err := d.Peeks.SelectPeeks(ctx, userID, device.ID)
 	if err != nil {
 		return nil, nil, err
@@ -1013,6 +1013,7 @@ func (d *Database) getStateDeltas(
 
 	// add peek blocks
 	peeking := make(map[string]bool)
+	newPeeks := false
 	for _, peek := range peeks {
 		peeking[peek.RoomID] = true
 		if peek.New {
@@ -1023,6 +1024,7 @@ func (d *Database) getStateDeltas(
 				return nil, nil, err
 			}
 			state[peek.RoomID] = s
+			newPeeks = true
 		}
 
 		deltas = append(deltas, stateDelta{
@@ -1032,8 +1034,10 @@ func (d *Database) getStateDeltas(
 		})
 	}
 
-	if len(peeks) > 0 {
-		err := d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
+	if newPeeks {
+		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+			return d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
+		})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1051,7 +1055,11 @@ func (d *Database) getStateDeltas(
 				if membership == gomatrixserverlib.Join {
 					if peeking[roomID] {
 						// we automatically cancel our peeks when we join a room
-						_, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
+						err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+							// XXX: is it correct that we're discarding the streamid here?
+							_, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
+							return err
+						})
 						if err != nil {
 							return nil, nil, err
 						}
@@ -1130,7 +1138,11 @@ func (d *Database) getStateDeltasForFullStateSync(
 	}
 
 	// Add full states for all peeking rooms
+	newPeeks := false
 	for _, peek := range peeks {
+		if peek.New {
+			newPeeks = true
+		}
 		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
 		if stateErr != nil {
 			return nil, nil, stateErr
@@ -1142,8 +1154,10 @@ func (d *Database) getStateDeltasForFullStateSync(
 		})
 	}
 
-	if len(peeks) > 0 {
-		err := d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
+	if newPeeks {
+		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+			 return d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
+		})
 		if err != nil {
 			return nil, nil, err
 		}
