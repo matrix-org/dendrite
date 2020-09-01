@@ -26,6 +26,8 @@ import (
 type Database interface {
 	// Do we support processing input events for more than one room at a time?
 	SupportsConcurrentRoomInputs() bool
+	// RoomInfo returns room information for the given room ID, or nil if there is no room.
+	RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
 	// Store the room state at an event in the database
 	AddState(
 		ctx context.Context,
@@ -94,14 +96,6 @@ type Database interface {
 	// This is used to determine if the room event is processed/processing already.
 	// Returns an empty string if no such event exists.
 	GetTransactionEventID(ctx context.Context, transactionID string, sessionID int64, userID string) (string, error)
-	// Look up the numeric ID for the room.
-	// Returns 0 if the room doesn't exists.
-	// Returns an error if there was a problem talking to the database.
-	RoomNID(ctx context.Context, roomID string) (types.RoomNID, error)
-	// RoomNIDExcludingStubs is a special variation of RoomNID that will return 0 as if the room
-	// does not exist if the room has no latest events. This can happen when we've received an
-	// invite over federation for a room that we don't know anything else about yet.
-	RoomNIDExcludingStubs(ctx context.Context, roomID string) (types.RoomNID, error)
 	// Look up event references for the latest events in the room and the current state snapshot.
 	// Returns the latest events, the current state and the maximum depth of the latest events plus 1.
 	// Returns an error if there was a problem talking to the database.

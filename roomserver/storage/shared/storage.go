@@ -120,6 +120,10 @@ func (d *Database) StateEntriesForTuples(
 	)
 }
 
+func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
+	return d.RoomsTable.SelectRoomInfo(ctx, roomID)
+}
+
 func (d *Database) AddState(
 	ctx context.Context,
 	roomNID types.RoomNID,
@@ -192,34 +196,6 @@ func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]type
 	}
 
 	return d.Events(ctx, nids)
-}
-
-func (d *Database) RoomNID(ctx context.Context, roomID string) (types.RoomNID, error) {
-	if nid, ok := d.Cache.GetRoomServerRoomNID(roomID); ok {
-		return nid, nil
-	}
-	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	d.Cache.StoreRoomServerRoomNID(roomID, roomNID)
-	return roomNID, err
-}
-
-func (d *Database) RoomNIDExcludingStubs(ctx context.Context, roomID string) (roomNID types.RoomNID, err error) {
-	roomNID, err = d.RoomNID(ctx, roomID)
-	if err != nil {
-		return
-	}
-	latestEvents, _, err := d.RoomsTable.SelectLatestEventNIDs(ctx, nil, roomNID)
-	if err != nil {
-		return
-	}
-	if len(latestEvents) == 0 {
-		roomNID = 0
-		return
-	}
-	return
 }
 
 func (d *Database) LatestEventIDs(

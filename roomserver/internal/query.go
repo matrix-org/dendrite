@@ -46,11 +46,11 @@ func (r *RoomserverInternalAPI) QueryLatestEventsAndState(
 
 	roomState := state.NewStateResolution(r.DB)
 
-	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
-	if roomNID == 0 {
+	if info.IsStub {
 		return nil
 	}
 	response.RoomExists = true
@@ -58,7 +58,7 @@ func (r *RoomserverInternalAPI) QueryLatestEventsAndState(
 
 	var currentStateSnapshotNID types.StateSnapshotNID
 	response.LatestEvents, currentStateSnapshotNID, response.Depth, err =
-		r.DB.LatestEventIDs(ctx, roomNID)
+		r.DB.LatestEventIDs(ctx, info.RoomNID)
 	if err != nil {
 		return err
 	}
@@ -105,11 +105,11 @@ func (r *RoomserverInternalAPI) QueryStateAfterEvents(
 
 	roomState := state.NewStateResolution(r.DB)
 
-	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
-	if roomNID == 0 {
+	if info.IsStub {
 		return nil
 	}
 	response.RoomExists = true
@@ -128,7 +128,7 @@ func (r *RoomserverInternalAPI) QueryStateAfterEvents(
 
 	// Look up the currrent state for the requested tuples.
 	stateEntries, err := roomState.LoadStateAfterEventsForStringTuples(
-		ctx, roomNID, prevStates, request.StateToFetch,
+		ctx, info.RoomNID, prevStates, request.StateToFetch,
 	)
 	if err != nil {
 		return err
@@ -210,12 +210,12 @@ func (r *RoomserverInternalAPI) QueryMembershipForUser(
 	request *api.QueryMembershipForUserRequest,
 	response *api.QueryMembershipForUserResponse,
 ) error {
-	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
 
-	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, roomNID, request.UserID)
+	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, info.RoomNID, request.UserID)
 	if err != nil {
 		return err
 	}
@@ -247,12 +247,12 @@ func (r *RoomserverInternalAPI) QueryMembershipsForRoom(
 	request *api.QueryMembershipsForRoomRequest,
 	response *api.QueryMembershipsForRoomResponse,
 ) error {
-	roomNID, err := r.DB.RoomNID(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
 
-	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, roomNID, request.Sender)
+	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (r *RoomserverInternalAPI) QueryMembershipsForRoom(
 	var stateEntries []types.StateEntry
 	if stillInRoom {
 		var eventNIDs []types.EventNID
-		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, request.JoinedOnly, false)
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
 		if err != nil {
 			return err
 		}
@@ -555,12 +555,15 @@ func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *
 }
 
 func (r *RoomserverInternalAPI) isServerCurrentlyInRoom(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
-	roomNID, err := r.DB.RoomNID(ctx, roomID)
+	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
 		return false, err
 	}
+	if info == nil {
+		return false, fmt.Errorf("unknown room %s", roomID)
+	}
 
-	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, false)
+	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {
 		return false, err
 	}
@@ -737,20 +740,15 @@ func (r *RoomserverInternalAPI) QueryStateAndAuthChain(
 	request *api.QueryStateAndAuthChainRequest,
 	response *api.QueryStateAndAuthChainResponse,
 ) error {
-	roomNID, err := r.DB.RoomNIDExcludingStubs(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
-	if roomNID == 0 {
+	if info.IsStub {
 		return nil
 	}
 	response.RoomExists = true
-
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
-	if err != nil {
-		return err
-	}
-	response.RoomVersion = roomVersion
+	response.RoomVersion = info.RoomVersion
 
 	stateEvents, err := r.loadStateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
@@ -773,18 +771,18 @@ func (r *RoomserverInternalAPI) QueryStateAndAuthChain(
 
 	if request.ResolveState {
 		if stateEvents, err = state.ResolveConflictsAdhoc(
-			roomVersion, stateEvents, authEvents,
+			info.RoomVersion, stateEvents, authEvents,
 		); err != nil {
 			return err
 		}
 	}
 
 	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, event.Headered(roomVersion))
+		response.StateEvents = append(response.StateEvents, event.Headered(info.RoomVersion))
 	}
 
 	for _, event := range authEvents {
-		response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(roomVersion))
+		response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
 	}
 
 	return err

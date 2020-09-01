@@ -293,11 +293,11 @@ func joinEventsFromHistoryVisibility(
 		return nil, nil
 	}
 	// get joined members
-	roomNID, err := db.RoomNID(ctx, roomID)
+	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
-	joinEventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, roomNID, true, false)
+	joinEventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {
 		return nil, err
 	}
