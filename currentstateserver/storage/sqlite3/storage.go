@@ -27,7 +27,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "currentstate"); err != nil {
 		return nil, err
 	}
-	currRoomState, err := NewSqliteCurrentRoomStateTable(d.db, d.writer)
+	currRoomState, err := NewSqliteCurrentRoomStateTable(d.db)
 	if err != nil {
 		return nil, err
 	}
