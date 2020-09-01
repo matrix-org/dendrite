@@ -48,6 +48,7 @@ func NewOutputSendToDeviceEventConsumer(
 ) *OutputSendToDeviceEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		ComponentName:  "syncapi/eduserver/sendtodevice",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,

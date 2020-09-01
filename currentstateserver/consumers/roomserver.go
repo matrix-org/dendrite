@@ -36,6 +36,7 @@ type OutputRoomEventConsumer struct {
 
 func NewOutputRoomEventConsumer(topicName string, kafkaConsumer sarama.Consumer, store storage.Database, acls *acls.ServerACLs) *OutputRoomEventConsumer {
 	consumer := &internal.ContinualConsumer{
+		ComponentName:  "currentstateserver/roomserver",
 		Topic:          topicName,
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
