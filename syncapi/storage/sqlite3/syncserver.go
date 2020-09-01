@@ -258,3 +258,16 @@ func (d *SyncServerDatasource) PutFilter(ctx context.Context, localpart string, 
 func (d *SyncServerDatasource) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error {
 	return d.Database.RedactEvent(d.dbctx, redactedEventID, redactedBecause)
 }
+
+func (d *SyncServerDatasource) PartitionOffsets(
+	ctx context.Context, topic string,
+) ([]sqlutil.PartitionOffset, error) {
+	return d.PartitionOffsetStatements.PartitionOffsets(d.dbctx, topic)
+}
+
+// SetPartitionOffset implements PartitionStorer
+func (d *SyncServerDatasource) SetPartitionOffset(
+	ctx context.Context, topic string, partition int32, offset int64,
+) error {
+	return d.PartitionOffsetStatements.SetPartitionOffset(d.dbctx, topic, partition, offset)
+}

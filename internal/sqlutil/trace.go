@@ -53,7 +53,7 @@ func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.St
 			safe = w.Safe()
 		}
 	}
-	if safe != "" {
+	if safe != "" && !strings.HasPrefix(query, "SELECT ") {
 		logrus.Infof("unsafe: %s -- %s", safe, query)
 	}
 
@@ -75,7 +75,7 @@ func (in *traceInterceptor) StmtExecContext(ctx context.Context, stmt driver.Stm
 			safe = w.Safe()
 		}
 	}
-	if safe != "" {
+	if safe != "" && !strings.HasPrefix(query, "SELECT ") {
 		logrus.Infof("unsafe: %s -- %s", safe, query)
 	}
 
