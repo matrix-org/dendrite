@@ -856,6 +856,12 @@ func (d *Database) addRoomDeltaToResponse(
 		return err
 	}
 
+	// XXX: should we ever get this far if we have no recent events or state in this room?
+	// in practice we do for peeks, but possibly not joins?
+	if len(recentEvents) == 0 && len(delta.stateEvents) == 0 {
+		return nil
+	}
+
 	switch delta.membership {
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
