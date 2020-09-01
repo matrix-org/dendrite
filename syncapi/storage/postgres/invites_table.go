@@ -110,9 +110,10 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 }
 
 func (s *inviteEventsStatements) DeleteInviteEvent(
-	ctx context.Context, inviteEventID string,
+	ctx context.Context, txn *sql.Tx, inviteEventID string,
 ) (sp types.StreamPosition, err error) {
-	err = s.deleteInviteEventStmt.QueryRowContext(ctx, inviteEventID).Scan(&sp)
+	stmt := sqlutil.TxStmt(txn, s.deleteInviteEventStmt)
+	err = stmt.QueryRowContext(ctx, inviteEventID).Scan(&sp)
 	return
 }
 

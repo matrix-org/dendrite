@@ -139,8 +139,8 @@ func (d *Database) GetStateEventsForRoom(
 func (d *Database) AddInviteEvent(
 	ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		sp, err = d.Invites.InsertInviteEvent(ctx, nil, inviteEvent)
+	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
 		return nil
 	})
 	return
@@ -151,8 +151,8 @@ func (d *Database) AddInviteEvent(
 func (d *Database) RetireInviteEvent(
 	ctx context.Context, inviteEventID string,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		sp, err = d.Invites.DeleteInviteEvent(ctx, inviteEventID)
+	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		sp, err = d.Invites.DeleteInviteEvent(ctx, txn, inviteEventID)
 		return nil
 	})
 	return
@@ -422,7 +422,7 @@ func (d *Database) addPDUDeltaToResponse(
 	wantFullState bool,
 	res *types.Response,
 ) (joinedRoomIDs []string, err error) {
-	txn, err := d.DB.BeginTx(context.TODO(), &txReadOnlySnapshot) // TODO: check mattn/go-sqlite3#764
+	txn, err := d.DB.BeginTx(ctx, &txReadOnlySnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +606,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	// a consistent view of the database throughout. This includes extracting the sync position.
 	// This does have the unfortunate side-effect that all the matrixy logic resides in this function,
 	// but it's better to not hide the fact that this is being done in a transaction.
-	txn, err := d.DB.BeginTx(context.TODO(), &txReadOnlySnapshot) // TODO: check mattn/go-sqlite3#764
+	txn, err := d.DB.BeginTx(ctx, &txReadOnlySnapshot)
 	if err != nil {
 		return
 	}
@@ -1063,15 +1063,6 @@ func (d *Database) SendToDeviceUpdatesWaiting(
 	return count > 0, nil
 }
 
-func (d *Database) AddSendToDeviceEvent(
-	ctx context.Context, txn *sql.Tx,
-	userID, deviceID, content string,
-) error {
-	return d.SendToDevice.InsertSendToDeviceMessage(
-		ctx, txn, userID, deviceID, content,
-	)
-}
-
 func (d *Database) StoreNewSendForDeviceMessage(
 	ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
 ) (types.StreamPosition, error) {
@@ -1082,7 +1073,7 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
 	// that we don't lock the table for writes in more than one place.
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.AddSendToDeviceEvent(
+		return d.SendToDevice.InsertSendToDeviceMessage(
 			ctx, txn, userID, deviceID, string(j),
 		)
 	})
