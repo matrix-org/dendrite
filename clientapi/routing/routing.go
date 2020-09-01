@@ -102,7 +102,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/peek/{roomIDOrAlias}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
