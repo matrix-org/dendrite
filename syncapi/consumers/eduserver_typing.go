@@ -44,6 +44,7 @@ func NewOutputTypingEventConsumer(
 ) *OutputTypingEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		ComponentName:  "syncapi/eduserver/typing",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,

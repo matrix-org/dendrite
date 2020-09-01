@@ -56,6 +56,7 @@ func NewOutputKeyChangeEventConsumer(
 ) *OutputKeyChangeEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		ComponentName:  "syncapi/keychange",
 		Topic:          topic,
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
