@@ -83,7 +83,6 @@ const selectKnownUsersSQL = "" +
 
 type currentRoomStateStatements struct {
 	db                               *sql.DB
-	writer                           sqlutil.Writer
 	upsertRoomStateStmt              *sql.Stmt
 	deleteRoomStateByEventIDStmt     *sql.Stmt
 	selectRoomIDsWithMembershipStmt  *sql.Stmt
@@ -95,8 +94,7 @@ type currentRoomStateStatements struct {
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{
-		db:     db,
-		writer: sqlutil.NewExclusiveWriter(),
+		db: db,
 	}
 	_, err := db.Exec(currentRoomStateSchema)
 	if err != nil {
@@ -177,11 +175,9 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) error {
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
-		_, err := stmt.ExecContext(ctx, eventID)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
+	_, err := stmt.ExecContext(ctx, eventID)
+	return err
 }
 
 func (s *currentRoomStateStatements) UpsertRoomState(
@@ -194,20 +190,18 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	}
 
 	// upsert state event
-	return s.writer.Do(s.db, txn, func(txn *sql.Tx) error {
-		stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
-		_, err = stmt.ExecContext(
-			ctx,
-			event.RoomID(),
-			event.EventID(),
-			event.Type(),
-			event.Sender(),
-			*event.StateKey(),
-			headeredJSON,
-			contentVal,
-		)
-		return err
-	})
+	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
+	_, err = stmt.ExecContext(
+		ctx,
+		event.RoomID(),
+		event.EventID(),
+		event.Type(),
+		event.Sender(),
+		*event.StateKey(),
+		headeredJSON,
+		contentVal,
+	)
+	return err
 }
 
 func (s *currentRoomStateStatements) SelectEventsWithEventIDs(

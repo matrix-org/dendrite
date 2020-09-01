@@ -93,7 +93,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
-		Writer:              sqlutil.NewExclusiveWriter(),
+		Writer:              d.writer,
 		Invites:             invites,
 		AccountData:         accountData,
 		OutputEvents:        events,
