@@ -38,7 +38,7 @@ func (r *RoomserverInternalAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
+	roomVersion, err := r.roomVersion(request.RoomID)
 	if err != nil {
 		response.RoomExists = false
 		return nil
@@ -97,7 +97,7 @@ func (r *RoomserverInternalAPI) QueryStateAfterEvents(
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
 ) error {
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
+	roomVersion, err := r.roomVersion(request.RoomID)
 	if err != nil {
 		response.RoomExists = false
 		return nil
@@ -168,7 +168,7 @@ func (r *RoomserverInternalAPI) QueryEventsByID(
 	}
 
 	for _, event := range events {
-		roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
+		roomVersion, verr := r.roomVersion(event.RoomID())
 		if verr != nil {
 			return verr
 		}
@@ -432,7 +432,7 @@ func (r *RoomserverInternalAPI) QueryMissingEvents(
 	response.Events = make([]gomatrixserverlib.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
 	for _, event := range loadedEvents {
 		if !eventsToFilter[event.EventID()] {
-			roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
+			roomVersion, verr := r.roomVersion(event.RoomID())
 			if verr != nil {
 				return verr
 			}
@@ -481,7 +481,7 @@ func (r *RoomserverInternalAPI) PerformBackfill(
 	}
 
 	for _, event := range loadedEvents {
-		roomVersion, verr := r.DB.GetRoomVersionForRoom(ctx, event.RoomID())
+		roomVersion, verr := r.roomVersion(event.RoomID())
 		if verr != nil {
 			return verr
 		}
@@ -493,7 +493,7 @@ func (r *RoomserverInternalAPI) PerformBackfill(
 }
 
 func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *api.PerformBackfillRequest, res *api.PerformBackfillResponse) error {
-	roomVer, err := r.DB.GetRoomVersionForRoom(ctx, req.RoomID)
+	roomVer, err := r.roomVersion(req.RoomID)
 	if err != nil {
 		return fmt.Errorf("backfillViaFederation: unknown room version for room %s : %w", req.RoomID, err)
 	}
@@ -937,13 +937,21 @@ func (r *RoomserverInternalAPI) QueryRoomVersionForRoom(
 		return nil
 	}
 
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, request.RoomID)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
 	}
-	response.RoomVersion = roomVersion
+	response.RoomVersion = info.RoomVersion
 	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	return nil
+}
+
+func (r *RoomserverInternalAPI) roomVersion(roomID string) (gomatrixserverlib.RoomVersion, error) {
+	var res api.QueryRoomVersionForRoomResponse
+	err := r.QueryRoomVersionForRoom(context.Background(), &api.QueryRoomVersionForRoomRequest{
+		RoomID: roomID,
+	}, &res)
+	return res.RoomVersion, err
 }
 
 func (r *RoomserverInternalAPI) QueryPublishedRooms(

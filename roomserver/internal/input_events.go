@@ -98,9 +98,17 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 		}
 	}
 
+	roomInfo, err := r.DB.RoomInfo(ctx, event.RoomID())
+	if err != nil {
+		return "", fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	if roomInfo == nil {
+		return "", fmt.Errorf("r.DB.RoomInfo missing for room %s", event.RoomID())
+	}
+
 	if err = r.updateLatestEvents(
 		ctx,                 // context
-		roomNID,             // room NID to update
+		roomInfo,            // room info for the room being updated
 		stateAtEvent,        // state at event (below)
 		event,               // event
 		input.SendAsServer,  // send as server

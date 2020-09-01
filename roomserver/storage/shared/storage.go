@@ -229,17 +229,6 @@ func (d *Database) StateEntries(
 	return d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs)
 }
 
-func (d *Database) GetRoomVersionForRoom(
-	ctx context.Context, roomID string,
-) (gomatrixserverlib.RoomVersion, error) {
-	if roomVersion, ok := d.Cache.GetRoomVersion(roomID); ok {
-		return roomVersion, nil
-	}
-	return d.RoomsTable.SelectRoomVersionForRoomID(
-		ctx, nil, roomID,
-	)
-}
-
 func (d *Database) GetRoomVersionForRoomNID(
 	ctx context.Context, roomNID types.RoomNID,
 ) (gomatrixserverlib.RoomVersion, error) {
