@@ -587,7 +587,10 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 
 	newEvent := ev.Headered(redactedBecause.RoomVersion)
-	return d.OutputEvents.UpdateEventJSON(ctx, &newEvent)
+	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+		return d.OutputEvents.UpdateEventJSON(ctx, &newEvent)
+	})
+	return err
 }
 
 // getResponseWithPDUsForCompleteSync creates a response and adds all PDUs needed
