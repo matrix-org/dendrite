@@ -189,7 +189,17 @@ FindSuccessor:
 		return nil
 	}
 
-	stateEntries, err := stateBeforeEvent(ctx, b.db, NIDs[eventID])
+	info, err := b.db.RoomInfo(ctx, roomID)
+	if err != nil {
+		logrus.WithError(err).WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room")
+		return nil
+	}
+	if info == nil || info.IsStub {
+		logrus.WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room, room is missing")
+		return nil
+	}
+
+	stateEntries, err := stateBeforeEvent(ctx, b.db, *info, NIDs[eventID])
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
 		return nil

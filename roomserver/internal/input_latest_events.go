@@ -55,7 +55,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 	sendAsServer string,
 	transactionID *api.TransactionID,
 ) (err error) {
-	updater, err := r.DB.GetLatestEventsForUpdate(ctx, roomInfo.RoomNID)
+	updater, err := r.DB.GetLatestEventsForUpdate(ctx, *roomInfo)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetLatestEventsForUpdate: %w", err)
 	}
@@ -209,7 +209,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
-	roomState := state.NewStateResolution(u.api.DB)
+	roomState := state.NewStateResolution(u.api.DB, *u.roomInfo)
 
 	// Get a list of the current latest events.
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
@@ -221,7 +221,7 @@ func (u *latestEventsUpdater) latestState() error {
 	// of the state after the events. The snapshot state will be resolved
 	// using the correct state resolution algorithm for the room.
 	u.newStateNID, err = roomState.CalculateAndStoreStateAfterEvents(
-		u.ctx, u.roomInfo.RoomNID, latestStateAtEvents,
+		u.ctx, latestStateAtEvents,
 	)
 	if err != nil {
 		return fmt.Errorf("roomState.CalculateAndStoreStateAfterEvents: %w", err)
