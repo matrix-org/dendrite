@@ -26,3 +26,7 @@ func (w *DummyWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) err
 		return f(txn)
 	}
 }
+
+func (w *DummyWriter) Safe() string {
+	return "DummyWriter"
+}
