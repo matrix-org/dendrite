@@ -64,6 +64,9 @@ const selectRoomVersionForRoomIDSQL = "" +
 const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
 
+const selectRoomInfoSQL = "" +
+	"SELECT room_version, room_nid, state_snapshot_nid, latest_event_nids FROM roomserver_rooms WHERE room_id = $1"
+
 type roomStatements struct {
 	db                                 *sql.DB
 	insertRoomNIDStmt                  *sql.Stmt
@@ -73,6 +76,7 @@ type roomStatements struct {
 	updateLatestEventNIDsStmt          *sql.Stmt
 	selectRoomVersionForRoomIDStmt     *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
+	selectRoomInfoStmt                 *sql.Stmt
 }
 
 func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
@@ -91,7 +95,28 @@ func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
+		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
 	}.Prepare(db)
+}
+
+func (s *roomStatements) SelectRoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
+	var info types.RoomInfo
+	var latestNIDsJSON string
+	err := s.selectRoomInfoStmt.QueryRowContext(ctx, roomID).Scan(
+		&info.RoomVersion, &info.RoomNID, &info.StateSnapshotNID, &latestNIDsJSON,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var latestNIDs []int64
+	if err = json.Unmarshal([]byte(latestNIDsJSON), &latestNIDs); err != nil {
+		return nil, err
+	}
+	info.IsStub = len(latestNIDs) == 0
+	return &info, err
 }
 
 func (s *roomStatements) InsertRoomNID(

@@ -172,9 +172,12 @@ func (r *RoomserverInternalAPI) isInvitePending(
 	roomID, userID string,
 ) (bool, string, string, error) {
 	// Look up the room NID for the supplied room ID.
-	roomNID, err := r.DB.RoomNID(ctx, roomID)
+	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.RoomNID: %w", err)
+		return false, "", "", fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	if info == nil {
+		return false, "", "", fmt.Errorf("cannot get RoomInfo: unknown room ID %s", roomID)
 	}
 
 	// Look up the state key NID for the supplied user ID.
@@ -190,7 +193,7 @@ func (r *RoomserverInternalAPI) isInvitePending(
 	// Let's see if we have an event active for the user in the room. If
 	// we do then it will contain a server name that we can direct the
 	// send_leave to.
-	senderUserNIDs, eventIDs, err := r.DB.GetInvitesForUser(ctx, roomNID, targetUserNID)
+	senderUserNIDs, eventIDs, err := r.DB.GetInvitesForUser(ctx, info.RoomNID, targetUserNID)
 	if err != nil {
 		return false, "", "", fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
 	}

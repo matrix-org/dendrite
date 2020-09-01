@@ -26,12 +26,17 @@ func (r *RoomserverInternalAPI) PerformInvite(
 
 	roomID := event.RoomID()
 	targetUserID := *event.StateKey()
+	info, err := r.DB.RoomInfo(ctx, roomID)
+	if err != nil {
+		return fmt.Errorf("Failed to load RoomInfo: %w", err)
+	}
 
 	log.WithFields(log.Fields{
-		"event_id":       event.EventID(),
-		"room_id":        roomID,
-		"room_version":   req.RoomVersion,
-		"target_user_id": targetUserID,
+		"event_id":         event.EventID(),
+		"room_id":          roomID,
+		"room_version":     req.RoomVersion,
+		"target_user_id":   targetUserID,
+		"room_info_exists": info != nil,
 	}).Info("processing invite event")
 
 	_, domain, _ := gomatrixserverlib.SplitID('@', targetUserID)
@@ -39,25 +44,25 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	isOriginLocal := event.Origin() == r.Cfg.Matrix.ServerName
 
 	inviteState := req.InviteRoomState
-	if len(inviteState) == 0 {
-		if is, err := buildInviteStrippedState(ctx, r.DB, req); err == nil {
+	if len(inviteState) == 0 && info != nil {
+		var is []gomatrixserverlib.InviteV2StrippedState
+		if is, err = buildInviteStrippedState(ctx, r.DB, info, req); err == nil {
 			inviteState = is
 		}
 	}
 	if len(inviteState) == 0 {
-		if err := event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
+		if err = event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
 			return fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	} else {
-		if err := event.SetUnsignedField("invite_room_state", inviteState); err != nil {
+		if err = event.SetUnsignedField("invite_room_state", inviteState); err != nil {
 			return fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	}
 
 	var isAlreadyJoined bool
-	roomNID, err := r.DB.RoomNID(ctx, roomID)
-	if err == nil {
-		_, isAlreadyJoined, err = r.DB.GetMembership(ctx, roomNID, *event.StateKey())
+	if info != nil {
+		_, isAlreadyJoined, err = r.DB.GetMembership(ctx, info.RoomNID, *event.StateKey())
 		if err != nil {
 			return fmt.Errorf("r.DB.GetMembership: %w", err)
 		}
@@ -187,12 +192,9 @@ func (r *RoomserverInternalAPI) PerformInvite(
 func buildInviteStrippedState(
 	ctx context.Context,
 	db storage.Database,
+	info *types.RoomInfo,
 	input *api.PerformInviteRequest,
 ) ([]gomatrixserverlib.InviteV2StrippedState, error) {
-	roomNID, err := db.RoomNID(ctx, input.Event.RoomID())
-	if err != nil || roomNID == 0 {
-		return nil, fmt.Errorf("room %q unknown", input.Event.RoomID())
-	}
 	stateWanted := []gomatrixserverlib.StateKeyTuple{}
 	// "If they are set on the room, at least the state for m.room.avatar, m.room.canonical_alias, m.room.join_rules, and m.room.name SHOULD be included."
 	// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
@@ -206,13 +208,9 @@ func buildInviteStrippedState(
 			StateKey:  "",
 		})
 	}
-	_, currentStateSnapshotNID, _, err := db.LatestEventIDs(ctx, roomNID)
-	if err != nil {
-		return nil, err
-	}
 	roomState := state.NewStateResolution(db)
 	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
-		ctx, currentStateSnapshotNID, stateWanted,
+		ctx, info.StateSnapshotNID, stateWanted,
 	)
 	if err != nil {
 		return nil, err
