@@ -1,6 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
+	github.com/PuerkitoBio/goquery v1.5.1 // indirect
 	github.com/Shopify/sarama v1.27.0
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/gologme/log v1.2.0
@@ -22,6 +23,7 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20200817100842-9d02141812f2
+	github.com/matrix-org/naffka v0.0.0-20200901083833-bcdd62999a91 // indirect
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.2
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
