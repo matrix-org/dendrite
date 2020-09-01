@@ -133,35 +133,6 @@ func (d *Database) GetStateEventsForRoom(
 	return
 }
 
-func (d *Database) SyncStreamPosition(ctx context.Context) (types.StreamPosition, error) {
-	var maxID int64
-	var err error
-	err = sqlutil.WithTransaction(d.DB, func(txn *sql.Tx) error {
-		maxID, err = d.OutputEvents.SelectMaxEventID(ctx, txn)
-		if err != nil {
-			return err
-		}
-		var maxAccountDataID int64
-		maxAccountDataID, err = d.AccountData.SelectMaxAccountDataID(ctx, txn)
-		if err != nil {
-			return err
-		}
-		if maxAccountDataID > maxID {
-			maxID = maxAccountDataID
-		}
-		var maxInviteID int64
-		maxInviteID, err = d.Invites.SelectMaxInviteID(ctx, txn)
-		if err != nil {
-			return err
-		}
-		if maxInviteID > maxID {
-			maxID = maxInviteID
-		}
-		return nil
-	})
-	return types.StreamPosition(maxID), err
-}
-
 // AddInviteEvent stores a new invite event for a user.
 // If the invite was successfully stored this returns the stream ID it was stored at.
 // Returns an error if there was a problem communicating with the database.

@@ -104,8 +104,6 @@ type Database interface {
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.
 	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent
-	// SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
-	SyncStreamPosition(ctx context.Context) (types.StreamPosition, error)
 	// AddSendToDevice increases the EDU position in the cache and returns the stream position.
 	AddSendToDevice() types.StreamPosition
 	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns three lists:
