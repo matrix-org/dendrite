@@ -349,11 +349,11 @@ func (v StateResolution) LoadStateAfterEventsForStringTuples(
 	if err != nil {
 		return nil, err
 	}
-	return v.loadStateAfterEventsForNumericTuples(ctx, v.roomInfo.RoomNID, prevStates, numericTuples)
+	return v.loadStateAfterEventsForNumericTuples(ctx, prevStates, numericTuples)
 }
 
 func (v StateResolution) loadStateAfterEventsForNumericTuples(
-	ctx context.Context, roomNID types.RoomNID,
+	ctx context.Context,
 	prevStates []types.StateAtEvent,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {

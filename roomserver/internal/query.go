@@ -397,6 +397,7 @@ func (r *RoomserverInternalAPI) checkServerAllowedToSeeEvent(
 }
 
 // QueryMissingEvents implements api.RoomserverInternalAPI
+// nolint:gocyclo
 func (r *RoomserverInternalAPI) QueryMissingEvents(
 	ctx context.Context,
 	request *api.QueryMissingEventsRequest,
