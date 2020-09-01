@@ -525,7 +525,13 @@ func (d *Database) GetFilter(
 func (d *Database) PutFilter(
 	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
 ) (string, error) {
-	return d.Filter.InsertFilter(ctx, filter, localpart)
+	var filterID string
+	var err error
+	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+		filterID, err = d.Filter.InsertFilter(ctx, filter, localpart)
+		return err
+	})
+	return filterID, err
 }
 
 func (d *Database) IncrementalSync(
@@ -587,7 +593,10 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 
 	newEvent := ev.Headered(redactedBecause.RoomVersion)
-	return d.OutputEvents.UpdateEventJSON(ctx, &newEvent)
+	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+		return d.OutputEvents.UpdateEventJSON(ctx, &newEvent)
+	})
+	return err
 }
 
 // getResponseWithPDUsForCompleteSync creates a response and adds all PDUs needed
