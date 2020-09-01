@@ -264,6 +264,18 @@ func (d *SyncServerDatasource) RedactEvent(ctx context.Context, redactedEventID 
 	return d.Database.RedactEvent(d.dbctx, redactedEventID, redactedBecause)
 }
 
+// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
+func (d *SyncServerDatasource) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
+	return d.Database.AllPeekingDevicesInRooms(d.dbctx)
+}
+
+// AddPeek adds a new peek to our DB for a given room by a given user's device.
+// Returns an error if there was a problem communicating with the database.
+func (d *SyncServerDatasource) AddPeek(ctx context.Context, roomID, userID, deviceID string) (types.StreamPosition, error) {
+	return d.Database.AddPeek(d.dbctx, roomID, userID, deviceID)
+}
+
+
 func (d *SyncServerDatasource) PartitionOffsets(
 	ctx context.Context, topic string,
 ) ([]sqlutil.PartitionOffset, error) {
