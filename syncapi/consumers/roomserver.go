@@ -49,6 +49,7 @@ func NewOutputRoomEventConsumer(
 ) *OutputRoomEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		ComponentName:  "syncapi/roomserver",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,

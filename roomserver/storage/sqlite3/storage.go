@@ -122,7 +122,7 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Cache:               cache,
-		Writer:              sqlutil.NewExclusiveWriter(),
+		Writer:              d.writer,
 		EventsTable:         d.events,
 		EventTypesTable:     d.eventTypes,
 		EventStateKeysTable: d.eventStateKeys,

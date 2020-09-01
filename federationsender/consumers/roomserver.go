@@ -48,6 +48,7 @@ func NewOutputRoomEventConsumer(
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
 	consumer := internal.ContinualConsumer{
+		ComponentName:  "federationsender/roomserver",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,

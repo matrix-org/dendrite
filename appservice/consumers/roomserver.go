@@ -48,6 +48,7 @@ func NewOutputRoomEventConsumer(
 	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
 	consumer := internal.ContinualConsumer{
+		ComponentName:  "appservice/roomserver",
 		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: appserviceDB,
