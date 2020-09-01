@@ -176,6 +176,9 @@ func (r *RoomserverInternalAPI) isInvitePending(
 	if err != nil {
 		return false, "", "", fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
+	if info == nil {
+		return false, "", "", fmt.Errorf("cannot get RoomInfo: unknown room ID %s", roomID)
+	}
 
 	// Look up the state key NID for the supplied user ID.
 	targetUserNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{userID})
