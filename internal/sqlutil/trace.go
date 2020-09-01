@@ -31,16 +31,33 @@ import (
 )
 
 var tracingEnabled = os.Getenv("DENDRITE_TRACE_SQL") == "1"
+var dbToWriter map[string]Writer
+var CtxDBInstance = "db_instance"
+var instCount = 0
 
 type traceInterceptor struct {
 	sqlmw.NullInterceptor
+	conn driver.Conn
 }
 
 func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.StmtQueryContext, query string, args []driver.NamedValue) (driver.Rows, error) {
 	startedAt := time.Now()
 	rows, err := stmt.QueryContext(ctx, args)
+	key := ctx.Value(CtxDBInstance)
+	var safe string
+	if key != nil {
+		w := dbToWriter[key.(string)]
+		if w == nil {
+			safe = fmt.Sprintf("no writer for key %s", key)
+		} else {
+			safe = w.Safe()
+		}
+	}
+	if safe != "" {
+		logrus.Infof("unsafe: %s -- %s", safe, query)
+	}
 
-	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).Debug("executed sql query ", query, " args: ", args)
+	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).WithField("safe", safe).Debug("executed sql query ", query, " args: ", args)
 
 	return rows, err
 }
@@ -48,8 +65,21 @@ func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.St
 func (in *traceInterceptor) StmtExecContext(ctx context.Context, stmt driver.StmtExecContext, query string, args []driver.NamedValue) (driver.Result, error) {
 	startedAt := time.Now()
 	result, err := stmt.ExecContext(ctx, args)
+	key := ctx.Value(CtxDBInstance)
+	var safe string
+	if key != nil {
+		w := dbToWriter[key.(string)]
+		if w == nil {
+			safe = fmt.Sprintf("no writer for key %s", key)
+		} else {
+			safe = w.Safe()
+		}
+	}
+	if safe != "" {
+		logrus.Infof("unsafe: %s -- %s", safe, query)
+	}
 
-	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).Debug("executed sql query ", query, " args: ", args)
+	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).WithField("safe", safe).Debug("executed sql query ", query, " args: ", args)
 
 	return result, err
 }
@@ -73,6 +103,18 @@ func (in *traceInterceptor) RowsNext(c context.Context, rows driver.Rows, dest [
 	}
 	logrus.Debug(b.String())
 	return err
+}
+
+func OpenWithWriter(dbProperties *config.DatabaseOptions, w Writer) (*sql.DB, context.Context, error) {
+	db, err := Open(dbProperties)
+	if err != nil {
+		return nil, nil, err
+	}
+	instCount++
+	ctxVal := fmt.Sprintf("%d", instCount)
+	dbToWriter[ctxVal] = w
+	ctx := context.WithValue(context.TODO(), CtxDBInstance, ctxVal)
+	return db, ctx, nil
 }
 
 // Open opens a database specified by its database driver name and a driver-specific data source name,
@@ -118,4 +160,5 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 
 func init() {
 	registerDrivers()
+	dbToWriter = make(map[string]Writer)
 }
