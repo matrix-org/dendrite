@@ -748,5 +748,5 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 
 // GetKnownRooms returns a list of all rooms we know about.
 func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	return nil, nil
 }
