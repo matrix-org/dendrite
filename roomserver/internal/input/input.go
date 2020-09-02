@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package input contains the code processes new room events
-package internal
+package input
 
 import (
 	"context"
@@ -22,11 +22,22 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
 
+type Inputer struct {
+	DB                   storage.Database
+	Producer             sarama.SyncProducer
+	ServerName           gomatrixserverlib.ServerName
+	OutputRoomEventTopic string
+
+	mutexes sync.Map // room ID -> *sync.Mutex, protects calls to processRoomEvent
+}
+
 // WriteOutputEvents implements OutputRoomEventWriter
-func (r *RoomserverInternalAPI) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
+func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
 	messages := make([]*sarama.ProducerMessage, len(updates))
 	for i := range updates {
 		value, err := json.Marshal(updates[i])
@@ -58,7 +69,7 @@ func (r *RoomserverInternalAPI) WriteOutputEvents(roomID string, updates []api.O
 }
 
 // InputRoomEvents implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) InputRoomEvents(
+func (r *Inputer) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,

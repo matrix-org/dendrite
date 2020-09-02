@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package input
 
 import (
 	"context"
@@ -36,7 +36,7 @@ import (
 // state deltas when sending to kafka streams
 // TODO: Break up function - we should probably do transaction ID checks before calling this.
 // nolint:gocyclo
-func (r *RoomserverInternalAPI) processRoomEvent(
+func (r *Inputer) processRoomEvent(
 	ctx context.Context,
 	input api.InputRoomEvent,
 ) (eventID string, err error) {
@@ -141,7 +141,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 	return event.EventID(), nil
 }
 
-func (r *RoomserverInternalAPI) calculateAndSetState(
+func (r *Inputer) calculateAndSetState(
 	ctx context.Context,
 	input api.InputRoomEvent,
 	roomInfo types.RoomInfo,
