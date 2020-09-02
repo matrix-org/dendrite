@@ -10,12 +10,19 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/perform"
+	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
 type RoomserverInternalAPI struct {
+	*query.Queryer
+	*perform.Inviter
+	*perform.Joiner
+	*perform.Leaver
+	*perform.Publisher
+	*perform.Backfiller
 	DB                   storage.Database
 	Cfg                  *config.RoomServer
 	Producer             sarama.SyncProducer
@@ -24,13 +31,9 @@ type RoomserverInternalAPI struct {
 	KeyRing              gomatrixserverlib.JSONVerifier
 	FedClient            *gomatrixserverlib.FederationClient
 	OutputRoomEventTopic string // Kafka topic for new output room events
-	Inviter              *perform.Inviter
-	Joiner               *perform.Joiner
-	Leaver               *perform.Leaver
-	Publisher            *perform.Publisher
-	Backfiller           *perform.Backfiller
-	mutexes              sync.Map // room ID -> *sync.Mutex, protects calls to processRoomEvent
-	fsAPI                fsAPI.FederationSenderInternalAPI
+
+	mutexes sync.Map // room ID -> *sync.Mutex, protects calls to processRoomEvent
+	fsAPI   fsAPI.FederationSenderInternalAPI
 }
 
 func NewRoomserverAPI(
@@ -47,6 +50,10 @@ func NewRoomserverAPI(
 		KeyRing:              keyRing,
 		FedClient:            fedClient,
 		OutputRoomEventTopic: outputRoomEventTopic,
+		Queryer: &query.Queryer{
+			DB:    roomserverDB,
+			Cache: caches,
+		},
 		// perform-er structs get initialised when we have a federation sender to use
 	}
 	return a
@@ -103,14 +110,6 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	return r.WriteOutputEvents(req.Event.RoomID(), outputEvents)
 }
 
-func (r *RoomserverInternalAPI) PerformJoin(
-	ctx context.Context,
-	req *api.PerformJoinRequest,
-	res *api.PerformJoinResponse,
-) {
-	r.Joiner.PerformJoin(ctx, req, res)
-}
-
 func (r *RoomserverInternalAPI) PerformLeave(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
@@ -124,21 +123,4 @@ func (r *RoomserverInternalAPI) PerformLeave(
 		return nil
 	}
 	return r.WriteOutputEvents(req.RoomID, outputEvents)
-}
-
-func (r *RoomserverInternalAPI) PerformPublish(
-	ctx context.Context,
-	req *api.PerformPublishRequest,
-	res *api.PerformPublishResponse,
-) {
-	r.Publisher.PerformPublish(ctx, req, res)
-}
-
-// Query a given amount (or less) of events prior to a given set of events.
-func (r *RoomserverInternalAPI) PerformBackfill(
-	ctx context.Context,
-	request *api.PerformBackfillRequest,
-	response *api.PerformBackfillResponse,
-) error {
-	return r.Backfiller.PerformBackfill(ctx, request, response)
 }

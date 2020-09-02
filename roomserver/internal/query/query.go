@@ -1,6 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
-// Copyright 2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package query
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -30,8 +30,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type Queryer struct {
+	DB    storage.Database
+	Cache caching.RoomServerCaches
+}
+
 // QueryLatestEventsAndState implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryLatestEventsAndState(
+func (r *Queryer) QueryLatestEventsAndState(
 	ctx context.Context,
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
@@ -85,7 +90,7 @@ func (r *RoomserverInternalAPI) QueryLatestEventsAndState(
 }
 
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryStateAfterEvents(
+func (r *Queryer) QueryStateAfterEvents(
 	ctx context.Context,
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
@@ -134,7 +139,7 @@ func (r *RoomserverInternalAPI) QueryStateAfterEvents(
 }
 
 // QueryEventsByID implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryEventsByID(
+func (r *Queryer) QueryEventsByID(
 	ctx context.Context,
 	request *api.QueryEventsByIDRequest,
 	response *api.QueryEventsByIDResponse,
@@ -167,7 +172,7 @@ func (r *RoomserverInternalAPI) QueryEventsByID(
 }
 
 // QueryMembershipForUser implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryMembershipForUser(
+func (r *Queryer) QueryMembershipForUser(
 	ctx context.Context,
 	request *api.QueryMembershipForUserRequest,
 	response *api.QueryMembershipForUserResponse,
@@ -204,7 +209,7 @@ func (r *RoomserverInternalAPI) QueryMembershipForUser(
 }
 
 // QueryMembershipsForRoom implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryMembershipsForRoom(
+func (r *Queryer) QueryMembershipsForRoom(
 	ctx context.Context,
 	request *api.QueryMembershipsForRoomRequest,
 	response *api.QueryMembershipsForRoomResponse,
@@ -260,7 +265,7 @@ func (r *RoomserverInternalAPI) QueryMembershipsForRoom(
 }
 
 // QueryServerAllowedToSeeEvent implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryServerAllowedToSeeEvent(
+func (r *Queryer) QueryServerAllowedToSeeEvent(
 	ctx context.Context,
 	request *api.QueryServerAllowedToSeeEventRequest,
 	response *api.QueryServerAllowedToSeeEventResponse,
@@ -293,7 +298,7 @@ func (r *RoomserverInternalAPI) QueryServerAllowedToSeeEvent(
 
 // QueryMissingEvents implements api.RoomserverInternalAPI
 // nolint:gocyclo
-func (r *RoomserverInternalAPI) QueryMissingEvents(
+func (r *Queryer) QueryMissingEvents(
 	ctx context.Context,
 	request *api.QueryMissingEventsRequest,
 	response *api.QueryMissingEventsResponse,
@@ -352,7 +357,7 @@ func (r *RoomserverInternalAPI) QueryMissingEvents(
 }
 
 // QueryStateAndAuthChain implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryStateAndAuthChain(
+func (r *Queryer) QueryStateAndAuthChain(
 	ctx context.Context,
 	request *api.QueryStateAndAuthChainRequest,
 	response *api.QueryStateAndAuthChainResponse,
@@ -405,7 +410,7 @@ func (r *RoomserverInternalAPI) QueryStateAndAuthChain(
 	return err
 }
 
-func (r *RoomserverInternalAPI) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomInfo, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomInfo, eventIDs []string) ([]gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
@@ -482,7 +487,7 @@ func getAuthChain(
 }
 
 // QueryRoomVersionCapabilities implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryRoomVersionCapabilities(
+func (r *Queryer) QueryRoomVersionCapabilities(
 	ctx context.Context,
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
@@ -500,7 +505,7 @@ func (r *RoomserverInternalAPI) QueryRoomVersionCapabilities(
 }
 
 // QueryRoomVersionCapabilities implements api.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) QueryRoomVersionForRoom(
+func (r *Queryer) QueryRoomVersionForRoom(
 	ctx context.Context,
 	request *api.QueryRoomVersionForRoomRequest,
 	response *api.QueryRoomVersionForRoomResponse,
@@ -522,7 +527,7 @@ func (r *RoomserverInternalAPI) QueryRoomVersionForRoom(
 	return nil
 }
 
-func (r *RoomserverInternalAPI) roomVersion(roomID string) (gomatrixserverlib.RoomVersion, error) {
+func (r *Queryer) roomVersion(roomID string) (gomatrixserverlib.RoomVersion, error) {
 	var res api.QueryRoomVersionForRoomResponse
 	err := r.QueryRoomVersionForRoom(context.Background(), &api.QueryRoomVersionForRoomRequest{
 		RoomID: roomID,
@@ -530,7 +535,7 @@ func (r *RoomserverInternalAPI) roomVersion(roomID string) (gomatrixserverlib.Ro
 	return res.RoomVersion, err
 }
 
-func (r *RoomserverInternalAPI) QueryPublishedRooms(
+func (r *Queryer) QueryPublishedRooms(
 	ctx context.Context,
 	req *api.QueryPublishedRoomsRequest,
 	res *api.QueryPublishedRoomsResponse,
