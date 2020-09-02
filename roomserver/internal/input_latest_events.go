@@ -49,13 +49,13 @@ import (
 // Can only be called once at a time
 func (r *RoomserverInternalAPI) updateLatestEvents(
 	ctx context.Context,
-	roomNID types.RoomNID,
+	roomInfo *types.RoomInfo,
 	stateAtEvent types.StateAtEvent,
 	event gomatrixserverlib.Event,
 	sendAsServer string,
 	transactionID *api.TransactionID,
 ) (err error) {
-	updater, err := r.DB.GetLatestEventsForUpdate(ctx, roomNID)
+	updater, err := r.DB.GetLatestEventsForUpdate(ctx, *roomInfo)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetLatestEventsForUpdate: %w", err)
 	}
@@ -66,7 +66,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 		ctx:           ctx,
 		api:           r,
 		updater:       updater,
-		roomNID:       roomNID,
+		roomInfo:      roomInfo,
 		stateAtEvent:  stateAtEvent,
 		event:         event,
 		sendAsServer:  sendAsServer,
@@ -89,7 +89,7 @@ type latestEventsUpdater struct {
 	ctx           context.Context
 	api           *RoomserverInternalAPI
 	updater       *shared.LatestEventsUpdater
-	roomNID       types.RoomNID
+	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event
 	transactionID *api.TransactionID
@@ -196,7 +196,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 
-	if err = u.updater.SetLatestEvents(u.roomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
+	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
 		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
@@ -209,7 +209,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
-	roomState := state.NewStateResolution(u.api.DB)
+	roomState := state.NewStateResolution(u.api.DB, *u.roomInfo)
 
 	// Get a list of the current latest events.
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
@@ -221,7 +221,7 @@ func (u *latestEventsUpdater) latestState() error {
 	// of the state after the events. The snapshot state will be resolved
 	// using the correct state resolution algorithm for the room.
 	u.newStateNID, err = roomState.CalculateAndStoreStateAfterEvents(
-		u.ctx, u.roomNID, latestStateAtEvents,
+		u.ctx, latestStateAtEvents,
 	)
 	if err != nil {
 		return fmt.Errorf("roomState.CalculateAndStoreStateAfterEvents: %w", err)
@@ -303,13 +303,8 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
-	roomVersion, err := u.api.DB.GetRoomVersionForRoom(u.ctx, u.event.RoomID())
-	if err != nil {
-		return nil, err
-	}
-
 	ore := api.OutputNewRoomEvent{
-		Event:           u.event.Headered(roomVersion),
+		Event:           u.event.Headered(u.roomInfo.RoomVersion),
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,
@@ -337,7 +332,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	// include extra state events if they were added as nearly every downstream component will care about it
 	// and we'd rather not have them all hit QueryEventsByID at the same time!
 	if len(ore.AddsStateEventIDs) > 0 {
-		ore.AddStateEvents, err = u.extraEventsForIDs(roomVersion, ore.AddsStateEventIDs)
+		ore.AddStateEvents, err = u.extraEventsForIDs(u.roomInfo.RoomVersion, ore.AddsStateEventIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load add_state_events from db: %w", err)
 		}

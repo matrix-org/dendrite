@@ -162,6 +162,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // It returns a list of servers which can be queried for backfill requests. These servers
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
+// nolint:gocyclo
 func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []gomatrixserverlib.ServerName {
 	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
 	// its successor, so look it up.
@@ -189,7 +190,17 @@ FindSuccessor:
 		return nil
 	}
 
-	stateEntries, err := stateBeforeEvent(ctx, b.db, NIDs[eventID])
+	info, err := b.db.RoomInfo(ctx, roomID)
+	if err != nil {
+		logrus.WithError(err).WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room")
+		return nil
+	}
+	if info == nil || info.IsStub {
+		logrus.WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room, room is missing")
+		return nil
+	}
+
+	stateEntries, err := stateBeforeEvent(ctx, b.db, *info, NIDs[eventID])
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
 		return nil

@@ -229,30 +229,6 @@ func (d *Database) StateEntries(
 	return d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs)
 }
 
-func (d *Database) GetRoomVersionForRoom(
-	ctx context.Context, roomID string,
-) (gomatrixserverlib.RoomVersion, error) {
-	if roomVersion, ok := d.Cache.GetRoomVersion(roomID); ok {
-		return roomVersion, nil
-	}
-	return d.RoomsTable.SelectRoomVersionForRoomID(
-		ctx, nil, roomID,
-	)
-}
-
-func (d *Database) GetRoomVersionForRoomNID(
-	ctx context.Context, roomNID types.RoomNID,
-) (gomatrixserverlib.RoomVersion, error) {
-	if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
-		if roomVersion, ok := d.Cache.GetRoomVersion(roomID); ok {
-			return roomVersion, nil
-		}
-	}
-	return d.RoomsTable.SelectRoomVersionForRoomNID(
-		ctx, roomNID,
-	)
-}
-
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.RoomAliasesTable.InsertRoomAlias(ctx, txn, alias, roomID, creatorUserID)
@@ -387,7 +363,7 @@ func (d *Database) MembershipUpdater(
 }
 
 func (d *Database) GetLatestEventsForUpdate(
-	ctx context.Context, roomNID types.RoomNID,
+	ctx context.Context, roomInfo types.RoomInfo,
 ) (*LatestEventsUpdater, error) {
 	txn, err := d.DB.Begin()
 	if err != nil {
@@ -395,7 +371,7 @@ func (d *Database) GetLatestEventsForUpdate(
 	}
 	var updater *LatestEventsUpdater
 	_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-		updater, err = NewLatestEventsUpdater(ctx, d, txn, roomNID)
+		updater, err = NewLatestEventsUpdater(ctx, d, txn, roomInfo)
 		return nil
 	})
 	return updater, err

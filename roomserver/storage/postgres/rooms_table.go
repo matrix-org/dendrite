@@ -68,9 +68,6 @@ const selectLatestEventNIDsForUpdateSQL = "" +
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE roomserver_rooms SET latest_event_nids = $2, last_event_sent_nid = $3, state_snapshot_nid = $4 WHERE room_nid = $1"
 
-const selectRoomVersionForRoomIDSQL = "" +
-	"SELECT room_version FROM roomserver_rooms WHERE room_id = $1"
-
 const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
 
@@ -83,7 +80,6 @@ type roomStatements struct {
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
-	selectRoomVersionForRoomIDStmt     *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 	selectRoomInfoStmt                 *sql.Stmt
 }
@@ -100,7 +96,6 @@ func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
-		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
 		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
 	}.Prepare(db)
@@ -190,18 +185,6 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 		int64(stateSnapshotNID),
 	)
 	return err
-}
-
-func (s *roomStatements) SelectRoomVersionForRoomID(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) (gomatrixserverlib.RoomVersion, error) {
-	var roomVersion gomatrixserverlib.RoomVersion
-	stmt := sqlutil.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
-	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
-	if err == sql.ErrNoRows {
-		return roomVersion, errors.New("room not found")
-	}
-	return roomVersion, err
 }
 
 func (s *roomStatements) SelectRoomVersionForRoomNID(

@@ -150,7 +150,7 @@ func (d *Database) SupportsConcurrentRoomInputs() bool {
 }
 
 func (d *Database) GetLatestEventsForUpdate(
-	ctx context.Context, roomNID types.RoomNID,
+	ctx context.Context, roomInfo types.RoomInfo,
 ) (*shared.LatestEventsUpdater, error) {
 	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
 	// multiple write transactions on sqlite. The code will perform additional
@@ -158,7 +158,7 @@ func (d *Database) GetLatestEventsForUpdate(
 	// 'database is locked' errors. As sqlite doesn't support multi-process on the
 	// same DB anyway, and we only execute updates sequentially, the only worries
 	// are for rolling back when things go wrong. (atomicity)
-	return shared.NewLatestEventsUpdater(ctx, &d.Database, nil, roomNID)
+	return shared.NewLatestEventsUpdater(ctx, &d.Database, nil, roomInfo)
 }
 
 func (d *Database) MembershipUpdater(
