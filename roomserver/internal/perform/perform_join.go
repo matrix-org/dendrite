@@ -1,3 +1,17 @@
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package perform
 
 import (
@@ -12,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -23,8 +38,7 @@ type Joiner struct {
 	FSAPI      fsAPI.FederationSenderInternalAPI
 	DB         storage.Database
 
-	// TODO FIXME: Remove this
-	RSAPI api.RoomserverInternalAPI
+	Inputer *input.Inputer
 }
 
 // PerformJoin handles joining matrix rooms, including over federation by talking to the federationsender.
@@ -201,15 +215,7 @@ func (r *Joiner) performJoinRoomByID(
 	// locally on the homeserver.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	buildRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.BuildEvent(
-		ctx,          // the request context
-		&eb,          // the template join event
-		r.Cfg.Matrix, // the server configuration
-		time.Now(),   // the event timestamp to use
-		r.RSAPI,      // the roomserver API to use
-		&buildRes,    // the query response
-	)
+	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, &eb)
 
 	switch err {
 	case nil:
@@ -241,7 +247,7 @@ func (r *Joiner) performJoinRoomByID(
 				},
 			}
 			inputRes := api.InputRoomEventsResponse{}
-			if err = r.RSAPI.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
 				var notAllowed *gomatrixserverlib.NotAllowed
 				if errors.As(err, &notAllowed) {
 					return "", &api.PerformError{
@@ -305,4 +311,32 @@ func (r *Joiner) performFederatedJoinRoomByID(
 		}
 	}
 	return nil
+}
+
+func buildEvent(
+	ctx context.Context, db storage.Database, cfg *config.Global, builder *gomatrixserverlib.EventBuilder,
+) (*gomatrixserverlib.HeaderedEvent, *api.QueryLatestEventsAndStateResponse, error) {
+	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
+	}
+
+	if len(eventsNeeded.Tuples()) == 0 {
+		return nil, nil, errors.New("expecting state tuples for event builder, got none")
+	}
+
+	var queryRes api.QueryLatestEventsAndStateResponse
+	err = helpers.QueryLatestEventsAndState(ctx, db, &api.QueryLatestEventsAndStateRequest{
+		RoomID:       builder.RoomID,
+		StateToFetch: eventsNeeded.Tuples(),
+	}, &queryRes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
+	}
+
+	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ev, &queryRes, nil
 }

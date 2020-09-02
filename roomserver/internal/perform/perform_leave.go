@@ -1,16 +1,29 @@
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package perform
 
 import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -20,8 +33,7 @@ type Leaver struct {
 	DB    storage.Database
 	FSAPI fsAPI.FederationSenderInternalAPI
 
-	// TODO FIXME: Remove this
-	RSAPI api.RoomserverInternalAPI
+	Inputer *input.Inputer
 }
 
 // WriteOutputEvents implements OutputRoomEventWriter
@@ -67,7 +79,7 @@ func (r *Leaver) performLeaveRoomByID(
 		},
 	}
 	latestRes := api.QueryLatestEventsAndStateResponse{}
-	if err = r.RSAPI.QueryLatestEventsAndState(ctx, &latestReq, &latestRes); err != nil {
+	if err = helpers.QueryLatestEventsAndState(ctx, r.DB, &latestReq, &latestRes); err != nil {
 		return nil, err
 	}
 	if !latestRes.RoomExists {
@@ -108,15 +120,7 @@ func (r *Leaver) performLeaveRoomByID(
 	// a leave event.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	buildRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.BuildEvent(
-		ctx,          // the request context
-		&eb,          // the template leave event
-		r.Cfg.Matrix, // the server configuration
-		time.Now(),   // the event timestamp to use
-		r.RSAPI,      // the roomserver API to use
-		&buildRes,    // the query response
-	)
+	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, &eb)
 	if err != nil {
 		return nil, fmt.Errorf("eventutil.BuildEvent: %w", err)
 	}
@@ -135,7 +139,7 @@ func (r *Leaver) performLeaveRoomByID(
 		},
 	}
 	inputRes := api.InputRoomEventsResponse{}
-	if err = r.RSAPI.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+	if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
 		return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
 	}
 
