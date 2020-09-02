@@ -319,7 +319,7 @@ func (h *httpFederationSenderInternalAPI) LookupStateIDs(
 		EventID: eventID,
 	}
 	var response lookupStateIDs
-	apiURL := h.federationSenderURL + FederationSenderLookupStatePath
+	apiURL := h.federationSenderURL + FederationSenderLookupStateIDsPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return gomatrixserverlib.RespStateIDs{}, err
@@ -348,7 +348,7 @@ func (h *httpFederationSenderInternalAPI) GetEvent(
 		EventID: eventID,
 	}
 	var response getEvent
-	apiURL := h.federationSenderURL + FederationSenderLookupStatePath
+	apiURL := h.federationSenderURL + FederationSenderGetEventPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return gomatrixserverlib.Transaction{}, err
