@@ -55,6 +55,7 @@ func NewNotifier(pos types.StreamingToken) *Notifier {
 		roomIDToPeekingDevices: make(map[string]peekingDeviceSet),
 		userDeviceStreams:      make(map[string]map[string]*UserDeviceStream),
 		streamLock:             &sync.Mutex{},
+		lastCleanUpTime:        time.Now(),
 	}
 }
 
