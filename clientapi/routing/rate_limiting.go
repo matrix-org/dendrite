@@ -9,36 +9,63 @@ import (
 	"github.com/matrix-org/util"
 )
 
-var clientRateLimits sync.Map // device ID -> chan bool buffered
-var clientRateLimitMaxRequests = 10
-var clientRateLimitTimeIntervalMS = time.Millisecond * 500
+type rateLimits struct {
+	limits       map[string]chan struct{}
+	limitsMutex  sync.RWMutex
+	maxRequests  int
+	timeInterval time.Duration
+}
 
-func rateLimit(req *http.Request) *util.JSONResponse {
+func newRateLimits() *rateLimits {
+	l := &rateLimits{
+		limits:       make(map[string]chan struct{}),
+		maxRequests:  10,
+		timeInterval: time.Millisecond * 500,
+	}
+	go l.clean()
+	return l
+}
+
+func (l *rateLimits) clean() {
+	for {
+		time.Sleep(time.Second * 10)
+		l.limitsMutex.Lock()
+		for k, c := range l.limits {
+			if len(c) == 0 {
+				close(c)
+				delete(l.limits, k)
+			}
+		}
+		l.limitsMutex.Unlock()
+	}
+}
+
+func (l *rateLimits) rateLimit(req *http.Request) *util.JSONResponse {
 	// Check if the user has got free resource slots for this request.
 	// If they don't then we'll return an error.
-	rateLimit, _ := clientRateLimits.LoadOrStore(req.RemoteAddr, make(chan struct{}, clientRateLimitMaxRequests))
-	rateChan := rateLimit.(chan struct{})
+	l.limitsMutex.RLock()
+	defer l.limitsMutex.RUnlock()
+
+	rateLimit, ok := l.limits[req.RemoteAddr]
+	if !ok {
+		l.limits[req.RemoteAddr] = make(chan struct{}, l.maxRequests)
+		rateLimit = l.limits[req.RemoteAddr]
+	}
 	select {
-	case rateChan <- struct{}{}:
+	case rateLimit <- struct{}{}:
 	default:
 		// We hit the rate limit. Tell the client to back off.
 		return &util.JSONResponse{
 			Code: http.StatusTooManyRequests,
-			JSON: jsonerror.LimitExceeded("You are sending too many requests too quickly!", clientRateLimitTimeIntervalMS.Milliseconds()),
+			JSON: jsonerror.LimitExceeded("You are sending too many requests too quickly!", l.timeInterval.Milliseconds()),
 		}
 	}
 
 	// After the time interval, drain a resource from the rate limiting
 	// channel. This will free up space in the channel for new requests.
 	go func() {
-		<-time.After(clientRateLimitTimeIntervalMS)
-		<-rateChan
-
-		// TODO: racy?
-		if len(rateChan) == 0 {
-			close(rateChan)
-			clientRateLimits.Delete(req.RemoteAddr)
-		}
+		<-time.After(l.timeInterval)
+		<-rateLimit
 	}()
 	return nil
 }

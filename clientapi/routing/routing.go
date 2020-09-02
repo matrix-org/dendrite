@@ -60,6 +60,7 @@ func Setup(
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
+	rateLimits := newRateLimits()
 	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
 
 	publicAPIMux.Handle("/versions",
@@ -92,7 +93,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/join/{roomIDOrAlias}",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -111,7 +112,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/join",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -125,7 +126,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/leave",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -148,7 +149,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/invite",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -265,21 +266,21 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		if r := rateLimit(req); r != nil {
+		if r := rateLimits.rateLimit(req); r != nil {
 			return *r
 		}
 		return Register(req, userAPI, accountDB, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	v1mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		if r := rateLimit(req); r != nil {
+		if r := rateLimits.rateLimit(req); r != nil {
 			return *r
 		}
 		return LegacyRegister(req, userAPI, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
-		if r := rateLimit(req); r != nil {
+		if r := rateLimits.rateLimit(req); r != nil {
 			return *r
 		}
 		return RegisterAvailable(req, cfg, accountDB)
@@ -353,7 +354,7 @@ func Setup(
 
 	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
 		httputil.MakeAuthAPI("rooms_typing", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -409,7 +410,7 @@ func Setup(
 
 	r0mux.Handle("/account/whoami",
 		httputil.MakeAuthAPI("whoami", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			return Whoami(req, device)
@@ -420,7 +421,7 @@ func Setup(
 
 	r0mux.Handle("/login",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			return Login(req, accountDB, userAPI, cfg)
@@ -477,7 +478,7 @@ func Setup(
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		httputil.MakeAuthAPI("profile_avatar_url", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -502,7 +503,7 @@ func Setup(
 
 	r0mux.Handle("/profile/{userID}/displayname",
 		httputil.MakeAuthAPI("profile_displayname", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -542,7 +543,7 @@ func Setup(
 	// Riot logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",
 		httputil.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			// TODO: Set presence (probably the responsibility of a presence server not clientapi)
@@ -555,7 +556,7 @@ func Setup(
 
 	r0mux.Handle("/voip/turnServer",
 		httputil.MakeAuthAPI("turn_server", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			return RequestTurnServer(req, device, cfg)
@@ -624,7 +625,7 @@ func Setup(
 
 	r0mux.Handle("/user_directory/search",
 		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			postContent := struct {
@@ -668,7 +669,7 @@ func Setup(
 
 	r0mux.Handle("/rooms/{roomID}/read_markers",
 		httputil.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			// TODO: return the read_markers.
@@ -769,7 +770,7 @@ func Setup(
 
 	r0mux.Handle("/capabilities",
 		httputil.MakeAuthAPI("capabilities", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimit(req); r != nil {
+			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
 			return GetCapabilities(req, rsAPI)
