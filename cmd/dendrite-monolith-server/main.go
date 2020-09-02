@@ -81,7 +81,7 @@ func main() {
 	keyRing := serverKeyAPI.KeyRing()
 
 	rsImpl := roomserver.NewInternalAPI(
-		base, keyRing, federation,
+		base, keyRing,
 	)
 	// call functions directly on the impl unless running in HTTP mode
 	rsAPI := rsImpl

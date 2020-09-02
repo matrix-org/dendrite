@@ -104,7 +104,7 @@ func main() {
 	keyAPI.SetUserAPI(userAPI)
 
 	rsComponent := roomserver.NewInternalAPI(
-		base, keyRing, federation,
+		base, keyRing,
 	)
 	rsAPI := rsComponent
 

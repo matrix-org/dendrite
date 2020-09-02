@@ -512,7 +512,7 @@ func (r *RoomserverInternalAPI) backfillViaFederation(ctx context.Context, req *
 	if err != nil {
 		return fmt.Errorf("backfillViaFederation: unknown room version for room %s : %w", req.RoomID, err)
 	}
-	requester := newBackfillRequester(r.DB, r.FedClient, r.ServerName, req.BackwardsExtremities)
+	requester := newBackfillRequester(r.DB, r.fsAPI, r.ServerName, req.BackwardsExtremities)
 	// Request 100 items regardless of what the query asks for.
 	// We don't want to go much higher than this.
 	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
@@ -622,7 +622,7 @@ func (r *RoomserverInternalAPI) fetchAndStoreMissingEvents(ctx context.Context, 
 				continue // already found
 			}
 			logger := util.GetLogger(ctx).WithField("server", srv).WithField("event_id", id)
-			res, err := r.FedClient.GetEvent(ctx, srv, id)
+			res, err := r.fsAPI.GetEvent(ctx, srv, id)
 			if err != nil {
 				logger.WithError(err).Warn("failed to get event from server")
 				continue
