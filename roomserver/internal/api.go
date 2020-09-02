@@ -2,13 +2,13 @@ package internal
 
 import (
 	"context"
-	"sync"
 
 	"github.com/Shopify/sarama"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/perform"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -17,6 +17,7 @@ import (
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
 type RoomserverInternalAPI struct {
+	*input.Inputer
 	*query.Queryer
 	*perform.Inviter
 	*perform.Joiner
@@ -32,8 +33,7 @@ type RoomserverInternalAPI struct {
 	FedClient            *gomatrixserverlib.FederationClient
 	OutputRoomEventTopic string // Kafka topic for new output room events
 
-	mutexes sync.Map // room ID -> *sync.Mutex, protects calls to processRoomEvent
-	fsAPI   fsAPI.FederationSenderInternalAPI
+	fsAPI fsAPI.FederationSenderInternalAPI
 }
 
 func NewRoomserverAPI(
@@ -42,17 +42,21 @@ func NewRoomserverAPI(
 	keyRing gomatrixserverlib.JSONVerifier,
 ) *RoomserverInternalAPI {
 	a := &RoomserverInternalAPI{
-		DB:                   roomserverDB,
-		Cfg:                  cfg,
-		Producer:             producer,
-		Cache:                caches,
-		ServerName:           cfg.Matrix.ServerName,
-		KeyRing:              keyRing,
-		FedClient:            fedClient,
-		OutputRoomEventTopic: outputRoomEventTopic,
+		DB:         roomserverDB,
+		Cfg:        cfg,
+		Cache:      caches,
+		ServerName: cfg.Matrix.ServerName,
+		KeyRing:    keyRing,
+		FedClient:  fedClient,
 		Queryer: &query.Queryer{
 			DB:    roomserverDB,
 			Cache: caches,
+		},
+		Inputer: &input.Inputer{
+			DB:                   roomserverDB,
+			OutputRoomEventTopic: outputRoomEventTopic,
+			Producer:             producer,
+			ServerName:           cfg.Matrix.ServerName,
 		},
 		// perform-er structs get initialised when we have a federation sender to use
 	}
@@ -66,23 +70,23 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 	r.fsAPI = fsAPI
 
 	r.Inviter = &perform.Inviter{
-		DB:    r.DB,
-		Cfg:   r.Cfg,
-		FSAPI: r.fsAPI,
-		RSAPI: r,
+		DB:      r.DB,
+		Cfg:     r.Cfg,
+		FSAPI:   r.fsAPI,
+		Inputer: r.Inputer,
 	}
 	r.Joiner = &perform.Joiner{
 		ServerName: r.Cfg.Matrix.ServerName,
 		Cfg:        r.Cfg,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
-		RSAPI:      r,
+		Inputer:    r.Inputer,
 	}
 	r.Leaver = &perform.Leaver{
-		Cfg:   r.Cfg,
-		DB:    r.DB,
-		FSAPI: r.fsAPI,
-		RSAPI: r,
+		Cfg:     r.Cfg,
+		DB:      r.DB,
+		FSAPI:   r.fsAPI,
+		Inputer: r.Inputer,
 	}
 	r.Publisher = &perform.Publisher{
 		DB: r.DB,

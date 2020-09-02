@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package input
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 // user affected by a change in the current state of the room.
 // Returns a list of output events to write to the kafka log to inform the
 // consumers about the invites added or retired by the change in current state.
-func (r *RoomserverInternalAPI) updateMemberships(
+func (r *Inputer) updateMemberships(
 	ctx context.Context,
 	updater *shared.LatestEventsUpdater,
 	removed, added []types.StateEntry,
@@ -78,7 +78,7 @@ func (r *RoomserverInternalAPI) updateMemberships(
 	return updates, nil
 }
 
-func (r *RoomserverInternalAPI) updateMembership(
+func (r *Inputer) updateMembership(
 	updater *shared.LatestEventsUpdater,
 	targetUserNID types.EventStateKeyNID,
 	remove, add *gomatrixserverlib.Event,
@@ -133,11 +133,11 @@ func (r *RoomserverInternalAPI) updateMembership(
 	}
 }
 
-func (r *RoomserverInternalAPI) isLocalTarget(event *gomatrixserverlib.Event) bool {
+func (r *Inputer) isLocalTarget(event *gomatrixserverlib.Event) bool {
 	isTargetLocalUser := false
 	if statekey := event.StateKey(); statekey != nil {
 		_, domain, _ := gomatrixserverlib.SplitID('@', *statekey)
-		isTargetLocalUser = domain == r.Cfg.Matrix.ServerName
+		isTargetLocalUser = domain == r.ServerName
 	}
 	return isTargetLocalUser
 }

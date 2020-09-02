@@ -324,3 +324,56 @@ BFSLoop:
 
 	return resultNIDs, err
 }
+
+func QueryLatestEventsAndState(
+	ctx context.Context, db storage.Database,
+	request *api.QueryLatestEventsAndStateRequest,
+	response *api.QueryLatestEventsAndStateResponse,
+) error {
+	roomInfo, err := db.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	if roomInfo == nil || roomInfo.IsStub {
+		response.RoomExists = false
+		return nil
+	}
+
+	roomState := state.NewStateResolution(db, *roomInfo)
+	response.RoomExists = true
+	response.RoomVersion = roomInfo.RoomVersion
+
+	var currentStateSnapshotNID types.StateSnapshotNID
+	response.LatestEvents, currentStateSnapshotNID, response.Depth, err =
+		db.LatestEventIDs(ctx, roomInfo.RoomNID)
+	if err != nil {
+		return err
+	}
+
+	var stateEntries []types.StateEntry
+	if len(request.StateToFetch) == 0 {
+		// Look up all room state.
+		stateEntries, err = roomState.LoadStateAtSnapshot(
+			ctx, currentStateSnapshotNID,
+		)
+	} else {
+		// Look up the current state for the requested tuples.
+		stateEntries, err = roomState.LoadStateAtSnapshotForStringTuples(
+			ctx, currentStateSnapshotNID, request.StateToFetch,
+		)
+	}
+	if err != nil {
+		return err
+	}
+
+	stateEvents, err := LoadStateEvents(ctx, db, stateEntries)
+	if err != nil {
+		return err
+	}
+
+	for _, event := range stateEvents {
+		response.StateEvents = append(response.StateEvents, event.Headered(roomInfo.RoomVersion))
+	}
+
+	return nil
+}

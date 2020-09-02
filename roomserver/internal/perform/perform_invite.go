@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -30,12 +31,10 @@ import (
 )
 
 type Inviter struct {
-	DB    storage.Database
-	Cfg   *config.RoomServer
-	FSAPI federationSenderAPI.FederationSenderInternalAPI
-
-	// TODO FIXME: Remove this
-	RSAPI api.RoomserverInternalAPI
+	DB      storage.Database
+	Cfg     *config.RoomServer
+	FSAPI   federationSenderAPI.FederationSenderInternalAPI
+	Inputer *input.Inputer
 }
 
 // nolint:gocyclo
@@ -184,7 +183,7 @@ func (r *Inviter) PerformInvite(
 			},
 		}
 		inputRes := &api.InputRoomEventsResponse{}
-		if err = r.RSAPI.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
+		if err = r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
 			return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
 		}
 	} else {

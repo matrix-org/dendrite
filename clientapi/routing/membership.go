@@ -270,7 +270,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return eventutil.BuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
+	return eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

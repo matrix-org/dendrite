@@ -95,7 +95,7 @@ func MakeJoin(
 	queryRes := api.QueryLatestEventsAndStateResponse{
 		RoomVersion: verRes.RoomVersion,
 	}
-	event, err := eventutil.BuildEvent(httpReq.Context(), &builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package input
 
 import (
 	"bytes"
@@ -47,7 +47,7 @@ import (
 //      7 <----- latest
 //
 // Can only be called once at a time
-func (r *RoomserverInternalAPI) updateLatestEvents(
+func (r *Inputer) updateLatestEvents(
 	ctx context.Context,
 	roomInfo *types.RoomInfo,
 	stateAtEvent types.StateAtEvent,
@@ -87,7 +87,7 @@ func (r *RoomserverInternalAPI) updateLatestEvents(
 // when there are so many variables to pass around.
 type latestEventsUpdater struct {
 	ctx           context.Context
-	api           *RoomserverInternalAPI
+	api           *Inputer
 	updater       *shared.LatestEventsUpdater
 	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent

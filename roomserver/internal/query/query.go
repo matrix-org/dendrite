@@ -41,52 +41,7 @@ func (r *Queryer) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
-	roomInfo, err := r.DB.RoomInfo(ctx, request.RoomID)
-	if err != nil {
-		return err
-	}
-	if roomInfo == nil || roomInfo.IsStub {
-		response.RoomExists = false
-		return nil
-	}
-
-	roomState := state.NewStateResolution(r.DB, *roomInfo)
-	response.RoomExists = true
-	response.RoomVersion = roomInfo.RoomVersion
-
-	var currentStateSnapshotNID types.StateSnapshotNID
-	response.LatestEvents, currentStateSnapshotNID, response.Depth, err =
-		r.DB.LatestEventIDs(ctx, roomInfo.RoomNID)
-	if err != nil {
-		return err
-	}
-
-	var stateEntries []types.StateEntry
-	if len(request.StateToFetch) == 0 {
-		// Look up all room state.
-		stateEntries, err = roomState.LoadStateAtSnapshot(
-			ctx, currentStateSnapshotNID,
-		)
-	} else {
-		// Look up the current state for the requested tuples.
-		stateEntries, err = roomState.LoadStateAtSnapshotForStringTuples(
-			ctx, currentStateSnapshotNID, request.StateToFetch,
-		)
-	}
-	if err != nil {
-		return err
-	}
-
-	stateEvents, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
-	if err != nil {
-		return err
-	}
-
-	for _, event := range stateEvents {
-		response.StateEvents = append(response.StateEvents, event.Headered(roomInfo.RoomVersion))
-	}
-
-	return nil
+	return helpers.QueryLatestEventsAndState(ctx, r.DB, request, response)
 }
 
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
