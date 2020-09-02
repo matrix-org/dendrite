@@ -17,6 +17,7 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/util"
 )
 
@@ -31,5 +32,13 @@ type server struct {
 
 // Version returns the server version
 func Version() util.JSONResponse {
-	return util.JSONResponse{Code: http.StatusOK, JSON: &version{server{"dev", "Dendrite"}}}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: &version{
+			server{
+				Name:    "Dendrite",
+				Version: internal.VersionString(),
+			},
+		},
+	}
 }
