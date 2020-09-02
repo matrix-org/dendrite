@@ -14,9 +14,12 @@ import (
 // implements as proxy calls, with built-in backoff/retries/etc. Errors returned from functions in
 // this interface are of type FederationClientError
 type FederationClient interface {
+	gomatrixserverlib.BackfillClient
+	gomatrixserverlib.FederatedStateClient
 	GetUserDevices(ctx context.Context, s gomatrixserverlib.ServerName, userID string) (res gomatrixserverlib.RespUserDevices, err error)
 	ClaimKeys(ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (res gomatrixserverlib.RespClaimKeys, err error)
 	QueryKeys(ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string) (res gomatrixserverlib.RespQueryKeys, err error)
+	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
 }
 
 // FederationClientError is returned from FederationClient methods in the event of a problem.

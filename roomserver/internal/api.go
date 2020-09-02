@@ -30,15 +30,13 @@ type RoomserverInternalAPI struct {
 	Cache                caching.RoomServerCaches
 	ServerName           gomatrixserverlib.ServerName
 	KeyRing              gomatrixserverlib.JSONVerifier
-	FedClient            *gomatrixserverlib.FederationClient
+	fsAPI                fsAPI.FederationSenderInternalAPI
 	OutputRoomEventTopic string // Kafka topic for new output room events
-
-	fsAPI fsAPI.FederationSenderInternalAPI
 }
 
 func NewRoomserverAPI(
 	cfg *config.RoomServer, roomserverDB storage.Database, producer sarama.SyncProducer,
-	outputRoomEventTopic string, caches caching.RoomServerCaches, fedClient *gomatrixserverlib.FederationClient,
+	outputRoomEventTopic string, caches caching.RoomServerCaches,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) *RoomserverInternalAPI {
 	a := &RoomserverInternalAPI{
@@ -47,7 +45,6 @@ func NewRoomserverAPI(
 		Cache:      caches,
 		ServerName: cfg.Matrix.ServerName,
 		KeyRing:    keyRing,
-		FedClient:  fedClient,
 		Queryer: &query.Queryer{
 			DB:    roomserverDB,
 			Cache: caches,
@@ -94,7 +91,7 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 	r.Backfiller = &perform.Backfiller{
 		ServerName: r.ServerName,
 		DB:         r.DB,
-		FedClient:  r.FedClient,
+		FSAPI:      r.fsAPI,
 		KeyRing:    r.KeyRing,
 	}
 }

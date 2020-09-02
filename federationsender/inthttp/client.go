@@ -26,6 +26,10 @@ const (
 	FederationSenderGetUserDevicesPath = "/federationsender/client/getUserDevices"
 	FederationSenderClaimKeysPath      = "/federationsender/client/claimKeys"
 	FederationSenderQueryKeysPath      = "/federationsender/client/queryKeys"
+	FederationSenderBackfillPath       = "/federationsender/client/backfill"
+	FederationSenderLookupStatePath    = "/federationsender/client/lookupState"
+	FederationSenderLookupStateIDsPath = "/federationsender/client/lookupStateIDs"
+	FederationSenderGetEventPath       = "/federationsender/client/getEvent"
 )
 
 // NewFederationSenderClient creates a FederationSenderInternalAPI implemented by talking to a HTTP POST API.
@@ -225,6 +229,132 @@ func (h *httpFederationSenderInternalAPI) QueryKeys(
 	}
 	if response.Err != nil {
 		return result, response.Err
+	}
+	return *response.Res, nil
+}
+
+type backfill struct {
+	S        gomatrixserverlib.ServerName
+	RoomID   string
+	Limit    int
+	EventIDs []string
+	Res      *gomatrixserverlib.Transaction
+	Err      *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) Backfill(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID string, limit int, eventIDs []string,
+) (gomatrixserverlib.Transaction, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Backfill")
+	defer span.Finish()
+
+	request := backfill{
+		S:        s,
+		RoomID:   roomID,
+		Limit:    limit,
+		EventIDs: eventIDs,
+	}
+	var response backfill
+	apiURL := h.federationSenderURL + FederationSenderBackfillPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return gomatrixserverlib.Transaction{}, err
+	}
+	if response.Err != nil {
+		return gomatrixserverlib.Transaction{}, response.Err
+	}
+	return *response.Res, nil
+}
+
+type lookupState struct {
+	S           gomatrixserverlib.ServerName
+	RoomID      string
+	EventID     string
+	RoomVersion gomatrixserverlib.RoomVersion
+	Res         *gomatrixserverlib.RespState
+	Err         *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) LookupState(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion,
+) (gomatrixserverlib.RespState, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LookupState")
+	defer span.Finish()
+
+	request := lookupState{
+		S:           s,
+		RoomID:      roomID,
+		EventID:     eventID,
+		RoomVersion: roomVersion,
+	}
+	var response lookupState
+	apiURL := h.federationSenderURL + FederationSenderLookupStatePath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return gomatrixserverlib.RespState{}, err
+	}
+	if response.Err != nil {
+		return gomatrixserverlib.RespState{}, response.Err
+	}
+	return *response.Res, nil
+}
+
+type lookupStateIDs struct {
+	S       gomatrixserverlib.ServerName
+	RoomID  string
+	EventID string
+	Res     *gomatrixserverlib.RespStateIDs
+	Err     *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) LookupStateIDs(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string,
+) (gomatrixserverlib.RespStateIDs, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LookupStateIDs")
+	defer span.Finish()
+
+	request := lookupStateIDs{
+		S:       s,
+		RoomID:  roomID,
+		EventID: eventID,
+	}
+	var response lookupStateIDs
+	apiURL := h.federationSenderURL + FederationSenderLookupStateIDsPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return gomatrixserverlib.RespStateIDs{}, err
+	}
+	if response.Err != nil {
+		return gomatrixserverlib.RespStateIDs{}, response.Err
+	}
+	return *response.Res, nil
+}
+
+type getEvent struct {
+	S       gomatrixserverlib.ServerName
+	EventID string
+	Res     *gomatrixserverlib.Transaction
+	Err     *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) GetEvent(
+	ctx context.Context, s gomatrixserverlib.ServerName, eventID string,
+) (gomatrixserverlib.Transaction, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetEvent")
+	defer span.Finish()
+
+	request := getEvent{
+		S:       s,
+		EventID: eventID,
+	}
+	var response getEvent
+	apiURL := h.federationSenderURL + FederationSenderGetEventPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return gomatrixserverlib.Transaction{}, err
+	}
+	if response.Err != nil {
+		return gomatrixserverlib.Transaction{}, response.Err
 	}
 	return *response.Res, nil
 }

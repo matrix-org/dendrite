@@ -38,7 +38,6 @@ func AddInternalRoutes(router *mux.Router, intAPI api.RoomserverInternalAPI) {
 func NewInternalAPI(
 	base *setup.BaseDendrite,
 	keyRing gomatrixserverlib.JSONVerifier,
-	fedClient *gomatrixserverlib.FederationClient,
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
@@ -49,6 +48,6 @@ func NewInternalAPI(
 
 	return internal.NewRoomserverAPI(
 		cfg, roomserverDB, base.KafkaProducer, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
-		base.Caches, fedClient, keyRing,
+		base.Caches, keyRing,
 	)
 }
