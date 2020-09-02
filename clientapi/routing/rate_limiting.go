@@ -19,8 +19,8 @@ type rateLimits struct {
 func newRateLimits() *rateLimits {
 	l := &rateLimits{
 		limits:       make(map[string]chan struct{}),
-		maxRequests:  10,
-		timeInterval: time.Millisecond * 500,
+		maxRequests:  5,
+		timeInterval: time.Second,
 	}
 	go l.clean()
 	return l
