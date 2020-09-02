@@ -1,12 +1,17 @@
-package internal
+package perform
 
 import (
 	"context"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 )
 
-func (r *RoomserverInternalAPI) PerformPublish(
+type Publisher struct {
+	DB storage.Database
+}
+
+func (r *Publisher) PerformPublish(
 	ctx context.Context,
 	req *api.PerformPublishRequest,
 	res *api.PerformPublishResponse,
