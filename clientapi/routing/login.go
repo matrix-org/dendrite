@@ -41,15 +41,13 @@ type flows struct {
 }
 
 type flow struct {
-	Type   string   `json:"type"`
-	Stages []string `json:"stages"`
+	Type string `json:"type"`
 }
 
 func passwordLogin() flows {
 	f := flows{}
 	s := flow{
-		Type:   "m.login.password",
-		Stages: []string{"m.login.password"},
+		Type: "m.login.password",
 	}
 	f.Flows = append(f.Flows, s)
 	return f
