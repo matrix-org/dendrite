@@ -112,7 +112,7 @@ func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []js
 		Cfg:           cfg,
 	}
 
-	rsAPI := NewInternalAPI(base, &test.NopJSONVerifier{}, nil)
+	rsAPI := NewInternalAPI(base, &test.NopJSONVerifier{})
 	hevents := mustLoadEvents(t, ver, events)
 	_, err = api.SendEvents(ctx, rsAPI, hevents, testOrigin, nil)
 	if err != nil {

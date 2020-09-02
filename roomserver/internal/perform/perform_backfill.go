@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
@@ -18,7 +19,7 @@ import (
 type Backfiller struct {
 	ServerName gomatrixserverlib.ServerName
 	DB         storage.Database
-	FedClient  *gomatrixserverlib.FederationClient
+	FSAPI      federationSenderAPI.FederationSenderInternalAPI
 	KeyRing    gomatrixserverlib.JSONVerifier
 }
 
@@ -81,7 +82,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if info == nil || info.IsStub {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
-	requester := newBackfillRequester(r.DB, r.FedClient, r.ServerName, req.BackwardsExtremities)
+	requester := newBackfillRequester(r.DB, r.FSAPI, r.ServerName, req.BackwardsExtremities)
 	// Request 100 items regardless of what the query asks for.
 	// We don't want to go much higher than this.
 	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
@@ -166,7 +167,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 				continue // already found
 			}
 			logger := util.GetLogger(ctx).WithField("server", srv).WithField("event_id", id)
-			res, err := r.FedClient.GetEvent(ctx, srv, id)
+			res, err := r.FSAPI.GetEvent(ctx, srv, id)
 			if err != nil {
 				logger.WithError(err).Warn("failed to get event from server")
 				continue
@@ -201,7 +202,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 // backfillRequester implements gomatrixserverlib.BackfillRequester
 type backfillRequester struct {
 	db         storage.Database
-	fedClient  *gomatrixserverlib.FederationClient
+	fsAPI      federationSenderAPI.FederationSenderInternalAPI
 	thisServer gomatrixserverlib.ServerName
 	bwExtrems  map[string][]string
 
@@ -211,10 +212,10 @@ type backfillRequester struct {
 	eventIDMap              map[string]gomatrixserverlib.Event
 }
 
-func newBackfillRequester(db storage.Database, fedClient *gomatrixserverlib.FederationClient, thisServer gomatrixserverlib.ServerName, bwExtrems map[string][]string) *backfillRequester {
+func newBackfillRequester(db storage.Database, fsAPI federationSenderAPI.FederationSenderInternalAPI, thisServer gomatrixserverlib.ServerName, bwExtrems map[string][]string) *backfillRequester {
 	return &backfillRequester{
 		db:                      db,
-		fedClient:               fedClient,
+		fsAPI:                   fsAPI,
 		thisServer:              thisServer,
 		eventIDToBeforeStateIDs: make(map[string][]string),
 		eventIDMap:              make(map[string]gomatrixserverlib.Event),
@@ -258,7 +259,7 @@ FederationHit:
 	logrus.WithField("event_id", targetEvent.EventID()).Info("Requesting /state_ids at event")
 	for _, srv := range b.servers { // hit any valid server
 		c := gomatrixserverlib.FederatedStateProvider{
-			FedClient:          b.fedClient,
+			FedClient:          b.fsAPI,
 			RememberAuthEvents: false,
 			Server:             srv,
 		}
@@ -331,7 +332,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 	}
 
 	c := gomatrixserverlib.FederatedStateProvider{
-		FedClient:          b.fedClient,
+		FedClient:          b.fsAPI,
 		RememberAuthEvents: false,
 		Server:             b.servers[0],
 	}
@@ -430,10 +431,10 @@ FindSuccessor:
 // Backfill performs a backfill request to the given server.
 // https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid
 func (b *backfillRequester) Backfill(ctx context.Context, server gomatrixserverlib.ServerName, roomID string,
-	fromEventIDs []string, limit int) (*gomatrixserverlib.Transaction, error) {
+	limit int, fromEventIDs []string) (gomatrixserverlib.Transaction, error) {
 
-	tx, err := b.fedClient.Backfill(ctx, server, roomID, limit, fromEventIDs)
-	return &tx, err
+	tx, err := b.fsAPI.Backfill(ctx, server, roomID, limit, fromEventIDs)
+	return tx, err
 }
 
 func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.Event, error) {
