@@ -27,7 +27,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -46,10 +45,6 @@ type BasicAuth struct {
 	Password string `yaml:"password"`
 }
 
-var clientRateLimits sync.Map // device ID -> chan bool buffered
-var clientRateLimitMaxRequests = 10
-var clientRateLimitTimeIntervalMS = time.Millisecond * 500
-
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
 	metricsName string, userAPI userapi.UserInternalAPI,
@@ -60,27 +55,6 @@ func MakeAuthAPI(
 		if err != nil {
 			return *err
 		}
-
-		// Check if the user has got free resource slots for this request.
-		// If they don't then we'll return an error.
-		rateLimit, _ := clientRateLimits.LoadOrStore(device.ID, make(chan struct{}, clientRateLimitMaxRequests))
-		rateChan := rateLimit.(chan struct{})
-		select {
-		case rateChan <- struct{}{}:
-		default:
-			// We hit the rate limit. Tell the client to back off.
-			return util.JSONResponse{
-				Code: http.StatusTooManyRequests,
-				JSON: jsonerror.LimitExceeded("You are sending too many requests too quickly!", clientRateLimitTimeIntervalMS.Milliseconds()),
-			}
-		}
-
-		// After the time interval, drain a resource from the rate limiting
-		// channel. This will free up space in the channel for new requests.
-		go func() {
-			<-time.After(clientRateLimitTimeIntervalMS)
-			<-rateChan
-		}()
 
 		// add the user ID to the logger
 		logger := util.GetLogger((req.Context()))
