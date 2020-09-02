@@ -43,6 +43,12 @@ const (
 	RoomserverQueryRoomVersionCapabilitiesPath = "/roomserver/queryRoomVersionCapabilities"
 	RoomserverQueryRoomVersionForRoomPath      = "/roomserver/queryRoomVersionForRoom"
 	RoomserverQueryPublishedRoomsPath          = "/roomserver/queryPublishedRooms"
+	RoomserverQueryCurrentStatePath            = "/roomserver/queryCurrentState"
+	RoomserverQueryRoomsForUserPath            = "/roomserver/queryRoomsForUser"
+	RoomserverQueryBulkStateContentPath        = "/roomserver/queryBulkStateContent"
+	RoomserverQuerySharedUsersPath             = "/roomserver/querySharedUsers"
+	RoomserverQueryKnownUsersPath              = "/roomserver/queryKnownUsers"
+	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -370,4 +376,70 @@ func (h *httpRoomserverInternalAPI) QueryRoomVersionForRoom(
 		h.cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	}
 	return err
+}
+
+func (h *httpRoomserverInternalAPI) QueryCurrentState(
+	ctx context.Context,
+	request *api.QueryCurrentStateRequest,
+	response *api.QueryCurrentStateResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryCurrentState")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryCurrentStatePath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpRoomserverInternalAPI) QueryRoomsForUser(
+	ctx context.Context,
+	request *api.QueryRoomsForUserRequest,
+	response *api.QueryRoomsForUserResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomsForUser")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryRoomsForUserPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpRoomserverInternalAPI) QueryBulkStateContent(
+	ctx context.Context,
+	request *api.QueryBulkStateContentRequest,
+	response *api.QueryBulkStateContentResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBulkStateContent")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryBulkStateContentPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpRoomserverInternalAPI) QuerySharedUsers(
+	ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QuerySharedUsers")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQuerySharedUsersPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) QueryKnownUsers(
+	ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKnownUsers")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryKnownUsersPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
+	ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerBannedFromRoom")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryServerBannedFromRoomPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/currentstateserver/acls"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -46,8 +47,9 @@ func NewRoomserverAPI(
 		ServerName: cfg.Matrix.ServerName,
 		KeyRing:    keyRing,
 		Queryer: &query.Queryer{
-			DB:    roomserverDB,
-			Cache: caches,
+			DB:         roomserverDB,
+			Cache:      caches,
+			ServerACLs: acls.NewServerACLs(roomserverDB),
 		},
 		Inputer: &input.Inputer{
 			DB:                   roomserverDB,

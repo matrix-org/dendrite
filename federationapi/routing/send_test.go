@@ -296,6 +296,30 @@ func (t *testRoomserverAPI) RemoveRoomAlias(
 	return fmt.Errorf("not implemented")
 }
 
+func (t *testRoomserverAPI) QueryCurrentState(ctx context.Context, req *api.QueryCurrentStateRequest, res *api.QueryCurrentStateResponse) error {
+	return nil
+}
+
+func (t *testRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (t *testRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (t *testRoomserverAPI) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (t *testRoomserverAPI) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (t *testRoomserverAPI) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse) error {
+	return nil
+}
+
 type testStateAPI struct {
 }
 

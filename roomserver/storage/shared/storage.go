@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	csstables "github.com/matrix-org/dendrite/currentstateserver/storage/tables"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -710,4 +711,42 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 		return nil
 	}
 	return &evs[0]
+}
+
+// GetStateEvent returns the state event of a given type for a given room with a given state key
+// If no event could be found, returns nil
+// If there was an issue during the retrieval, returns an error
+func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
+// GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
+func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
+// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
+// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
+func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]csstables.StrippedEvent, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
+// Redact a state event
+func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause gomatrixserverlib.HeaderedEvent) error {
+	return nil
+}
+
+// JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
+func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
+// GetKnownUsers searches all users that userID knows about.
+func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
+// GetKnownRooms returns a list of all rooms we know about.
+func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
+	return nil, fmt.Errorf("not implemented yet")
 }

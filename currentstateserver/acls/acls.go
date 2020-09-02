@@ -23,17 +23,25 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/matrix-org/dendrite/currentstateserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
+
+type ServerACLDatabase interface {
+	// GetKnownRooms returns a list of all rooms we know about.
+	GetKnownRooms(ctx context.Context) ([]string, error)
+	// GetStateEvent returns the state event of a given type for a given room with a given state key
+	// If no event could be found, returns nil
+	// If there was an issue during the retrieval, returns an error
+	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
+}
 
 type ServerACLs struct {
 	acls      map[string]*serverACL // room ID -> ACL
 	aclsMutex sync.RWMutex          // protects the above
 }
 
-func NewServerACLs(db storage.Database) *ServerACLs {
+func NewServerACLs(db ServerACLDatabase) *ServerACLs {
 	ctx := context.TODO()
 	acls := &ServerACLs{
 		acls: make(map[string]*serverACL),
