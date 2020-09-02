@@ -28,6 +28,10 @@ func newRateLimits() *rateLimits {
 
 func (l *rateLimits) clean() {
 	for {
+		// On a ten minute interval, we'll take an exclusive write
+		// lock of the entire map and see if any of the channels are
+		// empty. If they are then we will close and delete them,
+		// freeing up memory.
 		time.Sleep(time.Second * 10)
 		l.limitsMutex.Lock()
 		for k, c := range l.limits {
@@ -41,16 +45,26 @@ func (l *rateLimits) clean() {
 }
 
 func (l *rateLimits) rateLimit(req *http.Request) *util.JSONResponse {
-	// Check if the user has got free resource slots for this request.
-	// If they don't then we'll return an error.
 	l.limitsMutex.RLock()
 	defer l.limitsMutex.RUnlock()
 
-	rateLimit, ok := l.limits[req.RemoteAddr]
-	if !ok {
-		l.limits[req.RemoteAddr] = make(chan struct{}, l.maxRequests)
-		rateLimit = l.limits[req.RemoteAddr]
+	// First of all, work out if X-Forwarded-For was sent to us. If not
+	// then we'll just use the IP address of the caller.
+	caller := req.RemoteAddr
+	if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		caller = forwardedFor
 	}
+
+	// Look up the caller's channel, if they have one. If they don't then
+	// let's create one.
+	rateLimit, ok := l.limits[caller]
+	if !ok {
+		l.limits[caller] = make(chan struct{}, l.maxRequests)
+		rateLimit = l.limits[caller]
+	}
+
+	// Check if the user has got free resource slots for this request.
+	// If they don't then we'll return an error.
 	select {
 	case rateLimit <- struct{}{}:
 	default:
