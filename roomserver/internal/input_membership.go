@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -59,13 +60,13 @@ func (r *RoomserverInternalAPI) updateMemberships(
 		var re *gomatrixserverlib.Event
 		targetUserNID := change.EventStateKeyNID
 		if change.removedEventNID != 0 {
-			ev, _ := eventMap(events).lookup(change.removedEventNID)
+			ev, _ := helpers.EventMap(events).Lookup(change.removedEventNID)
 			if ev != nil {
 				re = &ev.Event
 			}
 		}
 		if change.addedEventNID != 0 {
-			ev, _ := eventMap(events).lookup(change.addedEventNID)
+			ev, _ := helpers.EventMap(events).Lookup(change.addedEventNID)
 			if ev != nil {
 				ae = &ev.Event
 			}
@@ -120,7 +121,7 @@ func (r *RoomserverInternalAPI) updateMembership(
 
 	switch newMembership {
 	case gomatrixserverlib.Invite:
-		return updateToInviteMembership(mu, add, updates, updater.RoomVersion())
+		return helpers.UpdateToInviteMembership(mu, add, updates, updater.RoomVersion())
 	case gomatrixserverlib.Join:
 		return updateToJoinMembership(mu, add, updates)
 	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
@@ -139,36 +140,6 @@ func (r *RoomserverInternalAPI) isLocalTarget(event *gomatrixserverlib.Event) bo
 		isTargetLocalUser = domain == r.Cfg.Matrix.ServerName
 	}
 	return isTargetLocalUser
-}
-
-func updateToInviteMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
-	roomVersion gomatrixserverlib.RoomVersion,
-) ([]api.OutputEvent, error) {
-	// We may have already sent the invite to the user, either because we are
-	// reprocessing this event, or because the we received this invite from a
-	// remote server via the federation invite API. In those cases we don't need
-	// to send the event.
-	needsSending, err := mu.SetToInvite(*add)
-	if err != nil {
-		return nil, err
-	}
-	if needsSending {
-		// We notify the consumers using a special event even though we will
-		// notify them about the change in current state as part of the normal
-		// room event stream. This ensures that the consumers only have to
-		// consider a single stream of events when determining whether a user
-		// is invited, rather than having to combine multiple streams themselves.
-		onie := api.OutputNewInviteEvent{
-			Event:       add.Headered(roomVersion),
-			RoomVersion: roomVersion,
-		}
-		updates = append(updates, api.OutputEvent{
-			Type:           api.OutputTypeNewInviteEvent,
-			NewInviteEvent: &onie,
-		})
-	}
-	return updates, nil
 }
 
 func updateToJoinMembership(

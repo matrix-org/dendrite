@@ -23,16 +23,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	log "github.com/sirupsen/logrus"
-
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 )
-
-// SetFederationSenderInputAPI passes in a federation sender input API reference
-// so that we can avoid the chicken-and-egg problem of both the roomserver input API
-// and the federation sender input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
-	r.fsAPI = fsAPI
-}
 
 // WriteOutputEvents implements OutputRoomEventWriter
 func (r *RoomserverInternalAPI) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {

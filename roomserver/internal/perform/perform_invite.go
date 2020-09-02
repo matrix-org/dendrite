@@ -1,11 +1,13 @@
-package internal
+package perform
 
 import (
 	"context"
 	"fmt"
 
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -13,22 +15,31 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type Inviter struct {
+	DB    storage.Database
+	Cfg   *config.RoomServer
+	FSAPI federationSenderAPI.FederationSenderInternalAPI
+
+	// TODO FIXME: Remove this
+	RSAPI api.RoomserverInternalAPI
+}
+
 // nolint:gocyclo
-func (r *RoomserverInternalAPI) PerformInvite(
+func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 	res *api.PerformInviteResponse,
-) error {
+) ([]api.OutputEvent, error) {
 	event := req.Event
 	if event.StateKey() == nil {
-		return fmt.Errorf("invite must be a state event")
+		return nil, fmt.Errorf("invite must be a state event")
 	}
 
 	roomID := event.RoomID()
 	targetUserID := *event.StateKey()
 	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		return fmt.Errorf("Failed to load RoomInfo: %w", err)
+		return nil, fmt.Errorf("Failed to load RoomInfo: %w", err)
 	}
 
 	log.WithFields(log.Fields{
@@ -52,11 +63,11 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	}
 	if len(inviteState) == 0 {
 		if err = event.SetUnsignedField("invite_room_state", struct{}{}); err != nil {
-			return fmt.Errorf("event.SetUnsignedField: %w", err)
+			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	} else {
 		if err = event.SetUnsignedField("invite_room_state", inviteState); err != nil {
-			return fmt.Errorf("event.SetUnsignedField: %w", err)
+			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
 	}
 
@@ -64,7 +75,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	if info != nil {
 		_, isAlreadyJoined, err = r.DB.GetMembership(ctx, info.RoomNID, *event.StateKey())
 		if err != nil {
-			return fmt.Errorf("r.DB.GetMembership: %w", err)
+			return nil, fmt.Errorf("r.DB.GetMembership: %w", err)
 		}
 	}
 	if isAlreadyJoined {
@@ -99,7 +110,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 			Code: api.PerformErrorNotAllowed,
 			Msg:  "User is already joined to room",
 		}
-		return nil
+		return nil, nil
 	}
 
 	if isOriginLocal {
@@ -107,7 +118,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		// try and see if the user is allowed to make this invite. We can't do
 		// this for invites coming in over federation - we have to take those on
 		// trust.
-		_, err = checkAuthEvents(ctx, r.DB, event, event.AuthEventIDs())
+		_, err = helpers.CheckAuthEvents(ctx, r.DB, event, event.AuthEventIDs())
 		if err != nil {
 			log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
 				"processInviteEvent.checkAuthEvents failed for event",
@@ -117,9 +128,9 @@ func (r *RoomserverInternalAPI) PerformInvite(
 					Msg:  err.Error(),
 					Code: api.PerformErrorNotAllowed,
 				}
-				return nil
+				return nil, nil
 			}
-			return fmt.Errorf("checkAuthEvents: %w", err)
+			return nil, fmt.Errorf("checkAuthEvents: %w", err)
 		}
 
 		// If the invite originated from us and the target isn't local then we
@@ -133,13 +144,13 @@ func (r *RoomserverInternalAPI) PerformInvite(
 				InviteRoomState: inviteState,
 			}
 			fsRes := &federationSenderAPI.PerformInviteResponse{}
-			if err = r.fsAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
+			if err = r.FSAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
 				res.Error = &api.PerformError{
 					Msg:  err.Error(),
 					Code: api.PerformErrorNoOperation,
 				}
-				log.WithError(err).WithField("event_id", event.EventID()).Error("r.fsAPI.PerformInvite failed")
-				return nil
+				log.WithError(err).WithField("event_id", event.EventID()).Error("r.FSAPI.PerformInvite failed")
+				return nil, nil
 			}
 			event = fsRes.Event
 		}
@@ -159,8 +170,8 @@ func (r *RoomserverInternalAPI) PerformInvite(
 			},
 		}
 		inputRes := &api.InputRoomEventsResponse{}
-		if err = r.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
-			return fmt.Errorf("r.InputRoomEvents: %w", err)
+		if err = r.RSAPI.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
+			return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
 		}
 	} else {
 		// The invite originated over federation. Process the membership
@@ -168,25 +179,23 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		// invite.
 		updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
 		if err != nil {
-			return fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 		}
 
 		unwrapped := event.Unwrap()
-		outputUpdates, err := updateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
+		outputUpdates, err := helpers.UpdateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
 		if err != nil {
-			return fmt.Errorf("updateToInviteMembership: %w", err)
+			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 		}
 
 		if err = updater.Commit(); err != nil {
-			return fmt.Errorf("updater.Commit: %w", err)
+			return nil, fmt.Errorf("updater.Commit: %w", err)
 		}
 
-		if err = r.WriteOutputEvents(roomID, outputUpdates); err != nil {
-			return fmt.Errorf("r.WriteOutputEvents: %w", err)
-		}
+		return outputUpdates, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func buildInviteStrippedState(

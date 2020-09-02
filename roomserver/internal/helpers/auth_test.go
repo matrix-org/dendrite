@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package helpers
 
 import (
 	"testing"
@@ -95,7 +95,7 @@ func TestStateEntryMap(t *testing.T) {
 }
 
 func TestEventMap(t *testing.T) {
-	events := eventMap([]types.Event{
+	events := EventMap([]types.Event{
 		{EventNID: 1},
 		{EventNID: 2},
 		{EventNID: 3},
@@ -123,7 +123,7 @@ func TestEventMap(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		gotEvent, gotOK := events.lookup(testCase.inputEventNID)
+		gotEvent, gotOK := events.Lookup(testCase.inputEventNID)
 		if testCase.wantOK != gotOK {
 			t.Fatalf("eventMap lookup(%v): want ok to be %v, got %v", testCase.inputEventNID, testCase.wantOK, gotOK)
 		}
