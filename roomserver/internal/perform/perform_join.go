@@ -1,4 +1,4 @@
-package internal
+package perform
 
 import (
 	"context"
@@ -8,14 +8,27 @@ import (
 	"time"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
+type Joiner struct {
+	ServerName gomatrixserverlib.ServerName
+	Cfg        *config.RoomServer
+	FSAPI      fsAPI.FederationSenderInternalAPI
+	DB         storage.Database
+
+	// TODO FIXME: Remove this
+	RSAPI api.RoomserverInternalAPI
+}
+
 // PerformJoin handles joining matrix rooms, including over federation by talking to the federationsender.
-func (r *RoomserverInternalAPI) PerformJoin(
+func (r *Joiner) PerformJoin(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 	res *api.PerformJoinResponse,
@@ -34,7 +47,7 @@ func (r *RoomserverInternalAPI) PerformJoin(
 	res.RoomID = roomID
 }
 
-func (r *RoomserverInternalAPI) performJoin(
+func (r *Joiner) performJoin(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) (string, error) {
@@ -63,7 +76,7 @@ func (r *RoomserverInternalAPI) performJoin(
 	}
 }
 
-func (r *RoomserverInternalAPI) performJoinRoomByAlias(
+func (r *Joiner) performJoinRoomByAlias(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) (string, error) {
@@ -85,7 +98,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByAlias(
 			ServerName: domain,            // the server to ask
 		}
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
-		err = r.fsAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
+		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
 			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
 			return "", fmt.Errorf("Looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
@@ -112,7 +125,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByAlias(
 
 // TODO: Break this function up a bit
 // nolint:gocyclo
-func (r *RoomserverInternalAPI) performJoinRoomByID(
+func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) (string, error) {
@@ -161,8 +174,8 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	// where we might think we know about a room in the following
 	// section but don't know the latest state as all of our users
 	// have left.
-	serverInRoom, _ := r.isServerCurrentlyInRoom(ctx, r.ServerName, req.RoomIDOrAlias)
-	isInvitePending, inviteSender, _, err := r.isInvitePending(ctx, req.RoomIDOrAlias, req.UserID)
+	serverInRoom, _ := helpers.IsServerCurrentlyInRoom(ctx, r.DB, r.ServerName, req.RoomIDOrAlias)
+	isInvitePending, inviteSender, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
 	if err == nil && isInvitePending && !serverInRoom {
 		// Check if there's an invite pending.
 		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
@@ -194,7 +207,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 		&eb,          // the template join event
 		r.Cfg.Matrix, // the server configuration
 		time.Now(),   // the event timestamp to use
-		r,            // the roomserver API to use
+		r.RSAPI,      // the roomserver API to use
 		&buildRes,    // the query response
 	)
 
@@ -228,7 +241,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 				},
 			}
 			inputRes := api.InputRoomEventsResponse{}
-			if err = r.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+			if err = r.RSAPI.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
 				var notAllowed *gomatrixserverlib.NotAllowed
 				if errors.As(err, &notAllowed) {
 					return "", &api.PerformError{
@@ -271,7 +284,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	return req.RoomIDOrAlias, nil
 }
 
-func (r *RoomserverInternalAPI) performFederatedJoinRoomByID(
+func (r *Joiner) performFederatedJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) error {
@@ -283,7 +296,7 @@ func (r *RoomserverInternalAPI) performFederatedJoinRoomByID(
 		Content:     req.Content,       // the membership event content
 	}
 	fedRes := fsAPI.PerformJoinResponse{}
-	r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
+	r.FSAPI.PerformJoin(ctx, &fedReq, &fedRes)
 	if fedRes.LastError != nil {
 		return &api.PerformError{
 			Code:       api.PerformErrRemote,

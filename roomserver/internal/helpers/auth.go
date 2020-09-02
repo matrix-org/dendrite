@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package helpers
 
 import (
 	"context"
@@ -23,9 +23,9 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// checkAuthEvents checks that the event passes authentication checks
+// CheckAuthEvents checks that the event passes authentication checks
 // Returns the numeric IDs for the auth events.
-func checkAuthEvents(
+func CheckAuthEvents(
 	ctx context.Context,
 	db storage.Database,
 	event gomatrixserverlib.HeaderedEvent,
@@ -63,7 +63,7 @@ func checkAuthEvents(
 type authEvents struct {
 	stateKeyNIDMap map[string]types.EventStateKeyNID
 	state          stateEntryMap
-	events         eventMap
+	events         EventMap
 }
 
 // Create implements gomatrixserverlib.AuthEventProvider
@@ -99,7 +99,7 @@ func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) *
 	if !ok {
 		return nil
 	}
-	event, ok := ae.events.lookup(eventNID)
+	event, ok := ae.events.Lookup(eventNID)
 	if !ok {
 		return nil
 	}
@@ -118,7 +118,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *
 	if !ok {
 		return nil
 	}
-	event, ok := ae.events.lookup(eventNID)
+	event, ok := ae.events.Lookup(eventNID)
 	if !ok {
 		return nil
 	}
@@ -224,10 +224,10 @@ func (m stateEntryMap) lookup(stateKey types.StateKeyTuple) (eventNID types.Even
 
 // Map from numeric event ID to event.
 // Implemented using binary search on a sorted array.
-type eventMap []types.Event
+type EventMap []types.Event
 
 // lookup an entry in the event map.
-func (m eventMap) lookup(eventNID types.EventNID) (event *types.Event, ok bool) {
+func (m EventMap) Lookup(eventNID types.EventNID) (event *types.Event, ok bool) {
 	// Since the list is sorted we can implement this using binary search.
 	// This is faster than using a hash map.
 	// We don't have to worry about pathological cases because the keys are fixed
