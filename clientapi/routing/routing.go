@@ -60,7 +60,7 @@ func Setup(
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
-	rateLimits := newRateLimits()
+	rateLimits := newRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
 
 	publicAPIMux.Handle("/versions",

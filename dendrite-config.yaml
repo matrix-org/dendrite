@@ -133,6 +133,14 @@ client_api:
     turn_username: ""
     turn_password: ""
 
+  # Settings for rate-limited endpoints. Rate limiting will kick in after the
+  # threshold number of "slots" have been taken by requests from a specific 
+  # host. Each "slot" will be released after the cooloff time in milliseconds.
+  rate_limiting:
+    enabled: true
+    threshold: 5
+    cooloff_ms: 500
+
 # Configuration for the Current State Server.
 current_state_server:
   internal_api:
