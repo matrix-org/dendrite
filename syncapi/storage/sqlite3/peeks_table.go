@@ -136,9 +136,9 @@ func (s *peekStatements) DeletePeeks(
 }
 
 func (s *peekStatements) SelectPeeks(
-	ctx context.Context, userID, deviceID string,
+	ctx context.Context, txn *sql.Tx, userID, deviceID string,
 ) (peeks []types.Peek, err error) {
-	rows, err := s.selectPeeksStmt.QueryContext(ctx, userID, deviceID)
+	rows, err := sqlutil.TxStmt(txn, s.selectPeeksStmt).QueryContext(ctx, userID, deviceID)
 	if err != nil {
 		return
 	}
