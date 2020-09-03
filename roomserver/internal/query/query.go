@@ -16,9 +16,12 @@ package query
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -31,8 +34,9 @@ import (
 )
 
 type Queryer struct {
-	DB    storage.Database
-	Cache caching.RoomServerCaches
+	DB         storage.Database
+	Cache      caching.RoomServerCaches
+	ServerACLs *acls.ServerACLs
 }
 
 // QueryLatestEventsAndState implements api.RoomserverInternalAPI
@@ -500,5 +504,99 @@ func (r *Queryer) QueryPublishedRooms(
 		return err
 	}
 	res.RoomIDs = rooms
+	return nil
+}
+
+func (r *Queryer) QueryCurrentState(ctx context.Context, req *api.QueryCurrentStateRequest, res *api.QueryCurrentStateResponse) error {
+	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
+	for _, tuple := range req.StateTuples {
+		ev, err := r.DB.GetStateEvent(ctx, req.RoomID, tuple.EventType, tuple.StateKey)
+		if err != nil {
+			return err
+		}
+		if ev != nil {
+			res.StateEvents[tuple] = ev
+		}
+	}
+	return nil
+}
+
+func (r *Queryer) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, req.WantMembership)
+	if err != nil {
+		return err
+	}
+	res.RoomIDs = roomIDs
+	return nil
+}
+
+func (r *Queryer) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
+	users, err := r.DB.GetKnownUsers(ctx, req.UserID, req.SearchString, req.Limit)
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		res.Users = append(res.Users, authtypes.FullyQualifiedProfile{
+			UserID: user,
+		})
+	}
+	return nil
+}
+
+func (r *Queryer) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
+	events, err := r.DB.GetBulkStateContent(ctx, req.RoomIDs, req.StateTuples, req.AllowWildcards)
+	if err != nil {
+		return err
+	}
+	res.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
+	for _, ev := range events {
+		if res.Rooms[ev.RoomID] == nil {
+			res.Rooms[ev.RoomID] = make(map[gomatrixserverlib.StateKeyTuple]string)
+		}
+		room := res.Rooms[ev.RoomID]
+		room[gomatrixserverlib.StateKeyTuple{
+			EventType: ev.EventType,
+			StateKey:  ev.StateKey,
+		}] = ev.ContentValue
+		res.Rooms[ev.RoomID] = room
+	}
+	return nil
+}
+
+func (r *Queryer) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, "join")
+	if err != nil {
+		return err
+	}
+	roomIDs = append(roomIDs, req.IncludeRoomIDs...)
+	excludeMap := make(map[string]bool)
+	for _, roomID := range req.ExcludeRoomIDs {
+		excludeMap[roomID] = true
+	}
+	// filter out excluded rooms
+	j := 0
+	for i := range roomIDs {
+		// move elements to include to the beginning of the slice
+		// then trim elements on the right
+		if !excludeMap[roomIDs[i]] {
+			roomIDs[j] = roomIDs[i]
+			j++
+		}
+	}
+	roomIDs = roomIDs[:j]
+
+	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs)
+	if err != nil {
+		return err
+	}
+	res.UserIDsToCount = users
+	return nil
+}
+
+func (r *Queryer) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse) error {
+	if r.ServerACLs == nil {
+		return errors.New("no server ACL tracking")
+	}
+	res.Banned = r.ServerACLs.IsServerBannedFromRoom(req.ServerName, req.RoomID)
 	return nil
 }

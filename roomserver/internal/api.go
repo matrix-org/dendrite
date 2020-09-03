@@ -7,6 +7,7 @@ import (
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/perform"
@@ -46,8 +47,9 @@ func NewRoomserverAPI(
 		ServerName: cfg.Matrix.ServerName,
 		KeyRing:    keyRing,
 		Queryer: &query.Queryer{
-			DB:    roomserverDB,
-			Cache: caches,
+			DB:         roomserverDB,
+			Cache:      caches,
+			ServerACLs: acls.NewServerACLs(roomserverDB),
 		},
 		Inputer: &input.Inputer{
 			DB:                   roomserverDB,

@@ -312,4 +312,82 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(RoomserverQueryCurrentStatePath,
+		httputil.MakeInternalAPI("queryCurrentState", func(req *http.Request) util.JSONResponse {
+			request := api.QueryCurrentStateRequest{}
+			response := api.QueryCurrentStateResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QueryCurrentState(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(RoomserverQueryRoomsForUserPath,
+		httputil.MakeInternalAPI("queryRoomsForUser", func(req *http.Request) util.JSONResponse {
+			request := api.QueryRoomsForUserRequest{}
+			response := api.QueryRoomsForUserResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QueryRoomsForUser(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(RoomserverQueryBulkStateContentPath,
+		httputil.MakeInternalAPI("queryBulkStateContent", func(req *http.Request) util.JSONResponse {
+			request := api.QueryBulkStateContentRequest{}
+			response := api.QueryBulkStateContentResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QueryBulkStateContent(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(RoomserverQuerySharedUsersPath,
+		httputil.MakeInternalAPI("querySharedUsers", func(req *http.Request) util.JSONResponse {
+			request := api.QuerySharedUsersRequest{}
+			response := api.QuerySharedUsersResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QuerySharedUsers(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(RoomserverQuerySharedUsersPath,
+		httputil.MakeInternalAPI("queryKnownUsers", func(req *http.Request) util.JSONResponse {
+			request := api.QueryKnownUsersRequest{}
+			response := api.QueryKnownUsersResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QueryKnownUsers(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(RoomserverQueryServerBannedFromRoomPath,
+		httputil.MakeInternalAPI("queryServerBannedFromRoom", func(req *http.Request) util.JSONResponse {
+			request := api.QueryServerBannedFromRoomRequest{}
+			response := api.QueryServerBannedFromRoomResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QueryServerBannedFromRoom(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

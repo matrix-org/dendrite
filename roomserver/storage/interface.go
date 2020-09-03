@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/currentstateserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -138,4 +139,22 @@ type Database interface {
 	PublishRoom(ctx context.Context, roomID string, publish bool) error
 	// Returns a list of room IDs for rooms which are published.
 	GetPublishedRooms(ctx context.Context) ([]string, error)
+
+	// TODO: factor out - from currentstateserver
+
+	// GetStateEvent returns the state event of a given type for a given room with a given state key
+	// If no event could be found, returns nil
+	// If there was an issue during the retrieval, returns an error
+	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
+	// GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
+	GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error)
+	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
+	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
+	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
+	// JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
+	JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
+	// GetKnownUsers searches all users that userID knows about.
+	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
+	// GetKnownRooms returns a list of all rooms we know about.
+	GetKnownRooms(ctx context.Context) ([]string, error)
 }

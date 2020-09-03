@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
@@ -74,6 +75,12 @@ const selectRoomVersionForRoomNIDSQL = "" +
 const selectRoomInfoSQL = "" +
 	"SELECT room_version, room_nid, state_snapshot_nid, latest_event_nids FROM roomserver_rooms WHERE room_id = $1"
 
+const selectRoomIDsSQL = "" +
+	"SELECT room_id FROM roomserver_rooms"
+
+const bulkSelectRoomIDsSQL = "" +
+	"SELECT room_id FROM roomserver_rooms WHERE room_nid IN ($1)"
+
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
@@ -82,6 +89,8 @@ type roomStatements struct {
 	updateLatestEventNIDsStmt          *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
 	selectRoomInfoStmt                 *sql.Stmt
+	selectRoomIDsStmt                  *sql.Stmt
+	bulkSelectRoomIDsStmt              *sql.Stmt
 }
 
 func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
@@ -98,9 +107,27 @@ func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
 		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
+		{&s.selectRoomIDsStmt, selectRoomIDsSQL},
+		{&s.bulkSelectRoomIDsStmt, bulkSelectRoomIDsSQL},
 	}.Prepare(db)
 }
 
+func (s *roomStatements) SelectRoomIDs(ctx context.Context) ([]string, error) {
+	rows, err := s.selectRoomIDsStmt.QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomIDsStmt: rows.close() failed")
+	var roomIDs []string
+	for rows.Next() {
+		var roomID string
+		if err = rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return roomIDs, nil
+}
 func (s *roomStatements) InsertRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
@@ -196,4 +223,25 @@ func (s *roomStatements) SelectRoomVersionForRoomNID(
 		return roomVersion, errors.New("room not found")
 	}
 	return roomVersion, err
+}
+
+func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error) {
+	var array pq.Int64Array
+	for _, nid := range roomNIDs {
+		array = append(array, int64(nid))
+	}
+	rows, err := s.bulkSelectRoomIDsStmt.QueryContext(ctx, array)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectRoomIDsStmt: rows.close() failed")
+	var roomIDs []string
+	for rows.Next() {
+		var roomID string
+		if err = rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return roomIDs, nil
 }
