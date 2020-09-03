@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package input
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -35,9 +36,9 @@ import (
 // state deltas when sending to kafka streams
 // TODO: Break up function - we should probably do transaction ID checks before calling this.
 // nolint:gocyclo
-func (r *RoomserverInternalAPI) processRoomEvent(
+func (r *Inputer) processRoomEvent(
 	ctx context.Context,
-	input api.InputRoomEvent,
+	input *api.InputRoomEvent,
 ) (eventID string, err error) {
 	// Parse and validate the event JSON
 	headered := input.Event
@@ -45,7 +46,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 
 	// Check that the event passes authentication checks and work out
 	// the numeric IDs for the auth events.
-	authEventNIDs, err := checkAuthEvents(ctx, r.DB, headered, input.AuthEventIDs)
+	authEventNIDs, err := helpers.CheckAuthEvents(ctx, r.DB, headered, input.AuthEventIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("processRoomEvent.checkAuthEvents failed for event")
 		return
@@ -64,7 +65,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 	}
 
 	// Store the event.
-	roomNID, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
+	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
 	if err != nil {
 		return "", fmt.Errorf("r.DB.StoreEvent: %w", err)
 	}
@@ -89,10 +90,18 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 		return event.EventID(), nil
 	}
 
+	roomInfo, err := r.DB.RoomInfo(ctx, event.RoomID())
+	if err != nil {
+		return "", fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	if roomInfo == nil {
+		return "", fmt.Errorf("r.DB.RoomInfo missing for room %s", event.RoomID())
+	}
+
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		err = r.calculateAndSetState(ctx, input, roomNID, &stateAtEvent, event)
+		err = r.calculateAndSetState(ctx, input, *roomInfo, &stateAtEvent, event)
 		if err != nil {
 			return "", fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
@@ -100,7 +109,7 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 
 	if err = r.updateLatestEvents(
 		ctx,                 // context
-		roomNID,             // room NID to update
+		roomInfo,            // room info for the room being updated
 		stateAtEvent,        // state at event (below)
 		event,               // event
 		input.SendAsServer,  // send as server
@@ -132,22 +141,22 @@ func (r *RoomserverInternalAPI) processRoomEvent(
 	return event.EventID(), nil
 }
 
-func (r *RoomserverInternalAPI) calculateAndSetState(
+func (r *Inputer) calculateAndSetState(
 	ctx context.Context,
-	input api.InputRoomEvent,
-	roomNID types.RoomNID,
+	input *api.InputRoomEvent,
+	roomInfo types.RoomInfo,
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
 ) error {
 	var err error
-	roomState := state.NewStateResolution(r.DB)
+	roomState := state.NewStateResolution(r.DB, roomInfo)
 
 	if input.HasState {
 		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
 		var joinEventNIDs []types.EventNID
 		// Request join memberships only for local users only.
-		if joinEventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomNID, true, true); err == nil {
+		if joinEventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true); err == nil {
 			// If we have no local users that are joined to the room then any state about
 			// the room that we have is quite possibly out of date. Therefore in that case
 			// we should overwrite it rather than merge it.
@@ -161,14 +170,14 @@ func (r *RoomserverInternalAPI) calculateAndSetState(
 			return err
 		}
 
-		if stateAtEvent.BeforeStateSnapshotNID, err = r.DB.AddState(ctx, roomNID, nil, entries); err != nil {
+		if stateAtEvent.BeforeStateSnapshotNID, err = r.DB.AddState(ctx, roomInfo.RoomNID, nil, entries); err != nil {
 			return err
 		}
 	} else {
 		stateAtEvent.Overwrite = false
 
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, roomNID); err != nil {
+		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event); err != nil {
 			return err
 		}
 	}

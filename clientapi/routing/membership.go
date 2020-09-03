@@ -75,13 +75,12 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 		return jsonerror.InternalServerError()
 	}
 
-	_, err = roomserverAPI.SendEvents(
+	if err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
 		cfg.Matrix.ServerName,
 		nil,
-	)
-	if err != nil {
+	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -270,7 +269,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return eventutil.BuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
+	return eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

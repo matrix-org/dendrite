@@ -1,4 +1,4 @@
-// Copyright 2017 New Vector Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,33 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package routing
+package perform
 
 import (
-	"net/http"
+	"context"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/util"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 )
 
-type version struct {
-	Server server `json:"server"`
+type Publisher struct {
+	DB storage.Database
 }
 
-type server struct {
-	Version string `json:"version"`
-	Name    string `json:"name"`
-}
-
-// Version returns the server version
-func Version() util.JSONResponse {
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: &version{
-			server{
-				Name:    "Dendrite",
-				Version: internal.VersionString(),
-			},
-		},
+func (r *Publisher) PerformPublish(
+	ctx context.Context,
+	req *api.PerformPublishRequest,
+	res *api.PerformPublishResponse,
+) {
+	err := r.DB.PublishRoom(ctx, req.RoomID, req.Visibility == "public")
+	if err != nil {
+		res.Error = &api.PerformError{
+			Msg: err.Error(),
+		}
 	}
 }

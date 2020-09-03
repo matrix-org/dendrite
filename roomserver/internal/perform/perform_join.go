@@ -1,4 +1,18 @@
-package internal
+// Copyright 2020 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package perform
 
 import (
 	"context"
@@ -8,14 +22,27 @@ import (
 	"time"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
+	"github.com/matrix-org/dendrite/roomserver/internal/input"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
+type Joiner struct {
+	ServerName gomatrixserverlib.ServerName
+	Cfg        *config.RoomServer
+	FSAPI      fsAPI.FederationSenderInternalAPI
+	DB         storage.Database
+
+	Inputer *input.Inputer
+}
+
 // PerformJoin handles joining matrix rooms, including over federation by talking to the federationsender.
-func (r *RoomserverInternalAPI) PerformJoin(
+func (r *Joiner) PerformJoin(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 	res *api.PerformJoinResponse,
@@ -34,7 +61,7 @@ func (r *RoomserverInternalAPI) PerformJoin(
 	res.RoomID = roomID
 }
 
-func (r *RoomserverInternalAPI) performJoin(
+func (r *Joiner) performJoin(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) (string, error) {
@@ -63,7 +90,7 @@ func (r *RoomserverInternalAPI) performJoin(
 	}
 }
 
-func (r *RoomserverInternalAPI) performJoinRoomByAlias(
+func (r *Joiner) performJoinRoomByAlias(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) (string, error) {
@@ -85,7 +112,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByAlias(
 			ServerName: domain,            // the server to ask
 		}
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
-		err = r.fsAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
+		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
 			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
 			return "", fmt.Errorf("Looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
@@ -112,7 +139,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByAlias(
 
 // TODO: Break this function up a bit
 // nolint:gocyclo
-func (r *RoomserverInternalAPI) performJoinRoomByID(
+func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) (string, error) {
@@ -161,8 +188,8 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	// where we might think we know about a room in the following
 	// section but don't know the latest state as all of our users
 	// have left.
-	serverInRoom, _ := r.isServerCurrentlyInRoom(ctx, r.ServerName, req.RoomIDOrAlias)
-	isInvitePending, inviteSender, _, err := r.isInvitePending(ctx, req.RoomIDOrAlias, req.UserID)
+	serverInRoom, _ := helpers.IsServerCurrentlyInRoom(ctx, r.DB, r.ServerName, req.RoomIDOrAlias)
+	isInvitePending, inviteSender, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
 	if err == nil && isInvitePending && !serverInRoom {
 		// Check if there's an invite pending.
 		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
@@ -188,15 +215,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	// locally on the homeserver.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	buildRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.BuildEvent(
-		ctx,          // the request context
-		&eb,          // the template join event
-		r.Cfg.Matrix, // the server configuration
-		time.Now(),   // the event timestamp to use
-		r,            // the roomserver API to use
-		&buildRes,    // the query response
-	)
+	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, &eb)
 
 	switch err {
 	case nil:
@@ -228,7 +247,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 				},
 			}
 			inputRes := api.InputRoomEventsResponse{}
-			if err = r.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
 				var notAllowed *gomatrixserverlib.NotAllowed
 				if errors.As(err, &notAllowed) {
 					return "", &api.PerformError{
@@ -271,7 +290,7 @@ func (r *RoomserverInternalAPI) performJoinRoomByID(
 	return req.RoomIDOrAlias, nil
 }
 
-func (r *RoomserverInternalAPI) performFederatedJoinRoomByID(
+func (r *Joiner) performFederatedJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) error {
@@ -283,7 +302,7 @@ func (r *RoomserverInternalAPI) performFederatedJoinRoomByID(
 		Content:     req.Content,       // the membership event content
 	}
 	fedRes := fsAPI.PerformJoinResponse{}
-	r.fsAPI.PerformJoin(ctx, &fedReq, &fedRes)
+	r.FSAPI.PerformJoin(ctx, &fedReq, &fedRes)
 	if fedRes.LastError != nil {
 		return &api.PerformError{
 			Code:       api.PerformErrRemote,
@@ -292,4 +311,32 @@ func (r *RoomserverInternalAPI) performFederatedJoinRoomByID(
 		}
 	}
 	return nil
+}
+
+func buildEvent(
+	ctx context.Context, db storage.Database, cfg *config.Global, builder *gomatrixserverlib.EventBuilder,
+) (*gomatrixserverlib.HeaderedEvent, *api.QueryLatestEventsAndStateResponse, error) {
+	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
+	}
+
+	if len(eventsNeeded.Tuples()) == 0 {
+		return nil, nil, errors.New("expecting state tuples for event builder, got none")
+	}
+
+	var queryRes api.QueryLatestEventsAndStateResponse
+	err = helpers.QueryLatestEventsAndState(ctx, db, &api.QueryLatestEventsAndStateRequest{
+		RoomID:       builder.RoomID,
+		StateToFetch: eventsNeeded.Tuples(),
+	}, &queryRes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
+	}
+
+	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ev, &queryRes, nil
 }

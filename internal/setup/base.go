@@ -100,6 +100,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	internal.SetupHookLogging(cfg.Logging, componentName)
 	internal.SetupPprof()
 
+	logrus.Infof("Dendrite version %s", internal.VersionString())
+
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")

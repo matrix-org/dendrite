@@ -95,7 +95,7 @@ func MakeJoin(
 	queryRes := api.QueryLatestEventsAndStateResponse{
 		RoomVersion: verRes.RoomVersion,
 	}
-	event, err := eventutil.BuildEvent(httpReq.Context(), &builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -266,15 +266,14 @@ func SendJoin(
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if !alreadyJoined {
-		_, err = api.SendEvents(
+		if err = api.SendEvents(
 			httpReq.Context(), rsAPI,
 			[]gomatrixserverlib.HeaderedEvent{
 				event.Headered(stateAndAuthChainResponse.RoomVersion),
 			},
 			cfg.Matrix.ServerName,
 			nil,
-		)
-		if err != nil {
+		); err != nil {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("SendEvents failed")
 			return jsonerror.InternalServerError()
 		}

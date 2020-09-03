@@ -120,7 +120,7 @@ func (m *DendriteMonolith) Start() {
 	keyAPI.SetUserAPI(userAPI)
 
 	rsAPI := roomserver.NewInternalAPI(
-		base, keyRing, federation,
+		base, keyRing,
 	)
 
 	eduInputAPI := eduserver.NewInternalAPI(

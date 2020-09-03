@@ -205,7 +205,7 @@ func main() {
 	}
 
 	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
-	rsAPI := roomserver.NewInternalAPI(base, keyRing, federation)
+	rsAPI := roomserver.NewInternalAPI(base, keyRing)
 	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
