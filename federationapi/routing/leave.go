@@ -247,15 +247,14 @@ func SendLeave(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	_, err = api.SendEvents(
+	if err = api.SendEvents(
 		httpReq.Context(), rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			event.Headered(verRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,
 		nil,
-	)
-	if err != nil {
+	); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
 		return jsonerror.InternalServerError()
 	}

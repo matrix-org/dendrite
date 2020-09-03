@@ -90,27 +90,26 @@ func SendEvent(
 
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
-	eventID, err := api.SendEvents(
+	if err := api.SendEvents(
 		req.Context(), rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			e.Headered(verRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,
 		txnAndSessionID,
-	)
-	if err != nil {
+	); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
-		"event_id":     eventID,
+		"event_id":     e.EventID(),
 		"room_id":      roomID,
 		"room_version": verRes.RoomVersion,
 	}).Info("Sent event to roomserver")
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: sendEventResponse{eventID},
+		JSON: sendEventResponse{e.EventID()},
 	}
 	// Add response to transactionsCache
 	if txnID != nil {

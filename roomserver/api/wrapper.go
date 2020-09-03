@@ -26,7 +26,7 @@ import (
 func SendEvents(
 	ctx context.Context, rsAPI RoomserverInternalAPI, events []gomatrixserverlib.HeaderedEvent,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
-) (string, error) {
+) error {
 	ires := make([]InputRoomEvent, len(events))
 	for i, event := range events {
 		ires[i] = InputRoomEvent{
@@ -77,19 +77,16 @@ func SendEventWithState(
 		StateEventIDs: stateEventIDs,
 	})
 
-	_, err = SendInputRoomEvents(ctx, rsAPI, ires)
-	return err
+	return SendInputRoomEvents(ctx, rsAPI, ires)
 }
 
 // SendInputRoomEvents to the roomserver.
 func SendInputRoomEvents(
 	ctx context.Context, rsAPI RoomserverInternalAPI, ires []InputRoomEvent,
-) (eventID string, err error) {
+) error {
 	request := InputRoomEventsRequest{InputRoomEvents: ires}
 	var response InputRoomEventsResponse
-	err = rsAPI.InputRoomEvents(ctx, &request, &response)
-	eventID = response.EventID
-	return
+	return rsAPI.InputRoomEvents(ctx, &request, &response)
 }
 
 // SendInvite event to the roomserver.

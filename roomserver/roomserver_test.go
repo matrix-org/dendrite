@@ -114,8 +114,7 @@ func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []js
 
 	rsAPI := NewInternalAPI(base, &test.NopJSONVerifier{})
 	hevents := mustLoadEvents(t, ver, events)
-	_, err = api.SendEvents(ctx, rsAPI, hevents, testOrigin, nil)
-	if err != nil {
+	if err = api.SendEvents(ctx, rsAPI, hevents, testOrigin, nil); err != nil {
 		t.Errorf("failed to SendEvents: %s", err)
 	}
 	return rsAPI, dp, hevents

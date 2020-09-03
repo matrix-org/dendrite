@@ -382,7 +382,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event, isInboundTxn bool) erro
 	}
 
 	// pass the event to the roomserver
-	_, err := api.SendEvents(
+	return api.SendEvents(
 		t.context, t.rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			e.Headered(stateResp.RoomVersion),
@@ -390,7 +390,6 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event, isInboundTxn bool) erro
 		api.DoNotSendToOtherServers,
 		nil,
 	)
-	return err
 }
 
 func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserverlib.Event) error {
