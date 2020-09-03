@@ -10,7 +10,7 @@ cd `dirname $0`/../..
 docker build -t complement-dendrite -f build/scripts/Complement.Dockerfile .
 
 # Download Complement
-wget https://github.com/matrix-org/complement/archive/master.tar.gz
+wget -N https://github.com/matrix-org/complement/archive/master.tar.gz
 tar -xzf master.tar.gz
 
 # Run the tests!
