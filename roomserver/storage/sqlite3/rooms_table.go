@@ -72,6 +72,9 @@ const selectRoomIDsSQL = "" +
 const bulkSelectRoomIDsSQL = "" +
 	"SELECT room_id FROM roomserver_rooms WHERE room_nid IN ($1)"
 
+const bulkSelectRoomNIDsSQL = "" +
+	"SELECT room_nid FROM roomserver_rooms WHERE room_id IN ($1)"
+
 type roomStatements struct {
 	db                                 *sql.DB
 	insertRoomNIDStmt                  *sql.Stmt
@@ -251,4 +254,26 @@ func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, roomNIDs []types
 		roomIDs = append(roomIDs, roomID)
 	}
 	return roomIDs, nil
+}
+
+func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, roomIDs []string) ([]types.RoomNID, error) {
+	iRoomIDs := make([]interface{}, len(roomIDs))
+	for i, v := range roomIDs {
+		iRoomIDs[i] = v
+	}
+	sqlQuery := strings.Replace(bulkSelectRoomNIDsSQL, "($1)", sqlutil.QueryVariadic(len(roomIDs)), 1)
+	rows, err := s.db.QueryContext(ctx, sqlQuery, iRoomIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectRoomNIDsStmt: rows.close() failed")
+	var roomNIDs []types.RoomNID
+	for rows.Next() {
+		var roomNID types.RoomNID
+		if err = rows.Scan(&roomNID); err != nil {
+			return nil, err
+		}
+		roomNIDs = append(roomNIDs, roomNID)
+	}
+	return roomNIDs, nil
 }
