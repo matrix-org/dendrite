@@ -137,8 +137,8 @@ func (r *Inputer) InputRoomEvents(
 		}
 
 		// Send the task to the worker.
-		go func(task *inputTask) { worker.input <- task }(tasks[i])
 		go worker.start()
+		worker.input <- tasks[i]
 	}
 
 	// Wait for all of the workers to return results about our tasks.
