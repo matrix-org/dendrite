@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/config"
@@ -8,6 +9,9 @@ import (
 )
 
 func main() {
+	defaultsForCI := flag.Bool("ci", false, "sane defaults for CI testing")
+	flag.Parse()
+
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
 	cfg.Global.TrustedIDServers = []string{
@@ -54,6 +58,11 @@ func main() {
 			Height:       480,
 			ResizeMethod: "scale",
 		},
+	}
+
+	if *defaultsForCI {
+		cfg.ClientAPI.RateLimiting.Enabled = false
+		cfg.FederationSender.DisableTLSValidation = true
 	}
 
 	j, err := yaml.Marshal(cfg)
