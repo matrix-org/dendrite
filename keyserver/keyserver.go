@@ -48,10 +48,11 @@ func NewInternalAPI(
 		DB:       db,
 	}
 	updater := internal.NewDeviceListUpdater(db, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
-	err = updater.Start()
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to start device list updater")
-	}
+	go func() {
+		if err := updater.Start(); err != nil {
+			logrus.WithError(err).Panicf("failed to start device list updater")
+		}
+	}()
 	return &internal.KeyInternalAPI{
 		DB:         db,
 		ThisServer: cfg.Matrix.ServerName,
