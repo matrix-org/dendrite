@@ -20,15 +20,28 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/dendrite/internal/config"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/input"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
+type Peeker struct {
+	ServerName gomatrixserverlib.ServerName
+	Cfg        *config.RoomServer
+	FSAPI      fsAPI.FederationSenderInternalAPI
+	DB         storage.Database
+
+	Inputer *input.Inputer
+}
+
+
 // PerformPeek handles peeking into matrix rooms, including over federation by talking to the federationsender.
-func (r *RoomserverInternalAPI) PerformPeek(
+func (r *Peeker) PerformPeek(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
 	res *api.PerformPeekResponse,
@@ -47,7 +60,7 @@ func (r *RoomserverInternalAPI) PerformPeek(
 	res.RoomID = roomID
 }
 
-func (r *RoomserverInternalAPI) performPeek(
+func (r *Peeker) performPeek(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
 ) (string, error) {
@@ -77,7 +90,7 @@ func (r *RoomserverInternalAPI) performPeek(
 	}
 }
 
-func (r *RoomserverInternalAPI) performPeekRoomByAlias(
+func (r *Peeker) performPeekRoomByAlias(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
 ) (string, error) {
@@ -99,7 +112,7 @@ func (r *RoomserverInternalAPI) performPeekRoomByAlias(
 			ServerName: domain,            // the server to ask
 		}
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
-		err = r.fsAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
+		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
 			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
 			return "", fmt.Errorf("Looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
@@ -124,7 +137,7 @@ func (r *RoomserverInternalAPI) performPeekRoomByAlias(
 	return r.performPeekRoomByID(ctx, req)
 }
 
-func (r *RoomserverInternalAPI) performPeekRoomByID(
+func (r *Peeker) performPeekRoomByID(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
 ) (roomID string, err error) {
@@ -172,7 +185,7 @@ func (r *RoomserverInternalAPI) performPeekRoomByID(
 
 	// TODO: handle federated peeks
 
-	err = r.WriteOutputEvents(roomID, []api.OutputEvent{
+	err = r.Inputer.WriteOutputEvents(roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewPeek,
 			NewPeek: &api.OutputNewPeek{
