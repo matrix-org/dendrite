@@ -89,7 +89,7 @@ func CreateInvitesFrom3PIDInvites(
 	}
 
 	// Send all the events
-	if _, err := api.SendEvents(req.Context(), rsAPI, evs, cfg.Matrix.ServerName, nil); err != nil {
+	if err := api.SendEvents(req.Context(), rsAPI, evs, cfg.Matrix.ServerName, nil); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -172,7 +172,7 @@ func ExchangeThirdPartyInvite(
 	}
 
 	// Send the event to the roomserver
-	if _, err = api.SendEvents(
+	if err = api.SendEvents(
 		httpReq.Context(), rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			signedEvent.Event.Headered(verRes.RoomVersion),

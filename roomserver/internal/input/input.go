@@ -40,6 +40,7 @@ type Inputer struct {
 }
 
 type inputTask struct {
+	ctx     context.Context
 	event   api.InputRoomEvent
 	wg      *sync.WaitGroup
 	eventID string // written back by worker
@@ -65,7 +66,7 @@ func (w *inputWorker) start() {
 		select {
 		case task := <-w.input:
 			logrus.Warn("WORKER DOING TASK")
-			task.eventID, task.err = w.r.processRoomEvent(context.TODO(), task.event)
+			task.eventID, task.err = w.r.processRoomEvent(task.ctx, task.event)
 			logrus.Warn("WORKER FINISHING TASK")
 			task.wg.Done()
 			logrus.Warn("WORKER FINISHED TASK")
@@ -113,6 +114,11 @@ func (r *Inputer) InputRoomEvents(
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) (err error) {
+	if len(request.InputRoomEvents) == 0 {
+		logrus.Warn("Nothing to do")
+		return nil
+	}
+
 	wg := &sync.WaitGroup{}
 	wg.Add(len(request.InputRoomEvents))
 	tasks := make([]*inputTask, len(request.InputRoomEvents))
@@ -137,6 +143,7 @@ func (r *Inputer) InputRoomEvents(
 		// the wait group, so that the worker can notify us when this specific
 		// task has been finished.
 		tasks[i] = &inputTask{
+			ctx:   ctx,
 			event: e,
 			wg:    wg,
 		}
@@ -152,7 +159,7 @@ func (r *Inputer) InputRoomEvents(
 
 	for _, task := range tasks {
 		if task.err != nil {
-			logrus.Warnf("Error: %w", task.err)
+			logrus.Warnf("Error: %s", task.err.Error())
 		} else {
 			logrus.Warnf("Event ID: %s", task.eventID)
 		}

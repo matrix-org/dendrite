@@ -83,5 +83,4 @@ type InputRoomEventsRequest struct {
 
 // InputRoomEventsResponse is a response to InputRoomEvents
 type InputRoomEventsResponse struct {
-	EventID string `json:"event_id"`
 }
