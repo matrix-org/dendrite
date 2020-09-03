@@ -81,6 +81,9 @@ const selectRoomIDsSQL = "" +
 const bulkSelectRoomIDsSQL = "" +
 	"SELECT room_id FROM roomserver_rooms WHERE room_nid IN ($1)"
 
+const bulkSelectRoomNIDsSQL = "" +
+	"SELECT room_nid FROM roomserver_rooms WHERE room_id IN ($1)"
+
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt
 	selectRoomNIDStmt                  *sql.Stmt
@@ -91,6 +94,7 @@ type roomStatements struct {
 	selectRoomInfoStmt                 *sql.Stmt
 	selectRoomIDsStmt                  *sql.Stmt
 	bulkSelectRoomIDsStmt              *sql.Stmt
+	bulkSelectRoomNIDsStmt             *sql.Stmt
 }
 
 func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
@@ -109,6 +113,7 @@ func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
 		{&s.selectRoomIDsStmt, selectRoomIDsSQL},
 		{&s.bulkSelectRoomIDsStmt, bulkSelectRoomIDsSQL},
+		{&s.bulkSelectRoomNIDsStmt, bulkSelectRoomNIDsSQL},
 	}.Prepare(db)
 }
 
@@ -244,4 +249,25 @@ func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, roomNIDs []types
 		roomIDs = append(roomIDs, roomID)
 	}
 	return roomIDs, nil
+}
+
+func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, roomIDs []string) ([]types.RoomNID, error) {
+	var array pq.StringArray
+	for _, roomID := range roomIDs {
+		array = append(array, roomID)
+	}
+	rows, err := s.bulkSelectRoomNIDsStmt.QueryContext(ctx, array)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectRoomNIDsStmt: rows.close() failed")
+	var roomNIDs []types.RoomNID
+	for rows.Next() {
+		var roomNID types.RoomNID
+		if err = rows.Scan(&roomNID); err != nil {
+			return nil, err
+		}
+		roomNIDs = append(roomNIDs, roomNID)
+	}
+	return roomNIDs, nil
 }

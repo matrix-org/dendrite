@@ -67,6 +67,7 @@ type Rooms interface {
 	SelectRoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
 	SelectRoomIDs(ctx context.Context) ([]string, error)
 	BulkSelectRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error)
+	BulkSelectRoomNIDs(ctx context.Context, roomIDs []string) ([]types.RoomNID, error)
 }
 
 type Transactions interface {
@@ -123,6 +124,10 @@ type Membership interface {
 	SelectMembershipsFromRoomAndMembership(ctx context.Context, roomNID types.RoomNID, membership MembershipState, localOnly bool) (eventNIDs []types.EventNID, err error)
 	UpdateMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership MembershipState, eventNID types.EventNID) error
 	SelectRoomsWithMembership(ctx context.Context, userID types.EventStateKeyNID, membershipState MembershipState) ([]types.RoomNID, error)
+	// SelectJoinedUsersSetForRooms returns the set of all users in the rooms who are joined to any of these rooms, along with the
+	// counts of how many rooms they are joined.
+	SelectJoinedUsersSetForRooms(ctx context.Context, roomNIDs []types.RoomNID) (map[types.EventStateKeyNID]int, error)
+	SelectKnownUsers(ctx context.Context, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error)
 }
 
 type Published interface {

@@ -18,6 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -37,6 +39,10 @@ const membershipSchema = `
 		UNIQUE (room_nid, target_nid)
 	);
 `
+
+var selectJoinedUsersSetForRoomsSQL = "" +
+	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership WHERE room_nid = ANY($1) AND" +
+	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " GROUP BY target_nid"
 
 // Insert a row in to membership table so that it can be locked by the
 // SELECT FOR UPDATE
@@ -78,6 +84,16 @@ const updateMembershipSQL = "" +
 const selectRoomsWithMembershipSQL = "" +
 	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2"
 
+// selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
+// joined to. Since this information is used to populate the user directory, we will
+// only return users that the user would ordinarily be able to see anyway.
+var selectKnownUsersSQL = "" +
+	"SELECT DISTINCT event_state_key FROM roomserver_membership INNER JOIN roomserver_event_state_keys ON " +
+	"roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
+	" WHERE room_nid IN (" +
+	"  SELECT DISTINCT room_nid FROM roomserver_membership WHERE target_nid=$1 AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	") AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " AND event_state_key LIKE $2 LIMIT $3"
+
 type membershipStatements struct {
 	db                                              *sql.DB
 	insertMembershipStmt                            *sql.Stmt
@@ -89,6 +105,7 @@ type membershipStatements struct {
 	selectLocalMembershipsFromRoomStmt              *sql.Stmt
 	selectRoomsWithMembershipStmt                   *sql.Stmt
 	updateMembershipStmt                            *sql.Stmt
+	selectKnownUsersStmt                            *sql.Stmt
 }
 
 func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
@@ -110,6 +127,7 @@ func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectLocalMembershipsFromRoomStmt, selectLocalMembershipsFromRoomSQL},
 		{&s.updateMembershipStmt, updateMembershipSQL},
 		{&s.selectRoomsWithMembershipStmt, selectRoomsWithMembershipSQL},
+		{&s.selectKnownUsersStmt, selectKnownUsersSQL},
 	}.Prepare(db)
 }
 
@@ -226,4 +244,44 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 		roomNIDs = append(roomNIDs, roomNID)
 	}
 	return roomNIDs, nil
+}
+
+func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context, roomNIDs []types.RoomNID) (map[types.EventStateKeyNID]int, error) {
+	iRoomNIDs := make([]interface{}, len(roomNIDs))
+	for i, v := range roomNIDs {
+		iRoomNIDs[i] = v
+	}
+	query := strings.Replace(selectJoinedUsersSetForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomNIDs)), 1)
+	rows, err := s.db.QueryContext(ctx, query, iRoomNIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsersSetForRooms: rows.close() failed")
+	result := make(map[types.EventStateKeyNID]int)
+	for rows.Next() {
+		var userID types.EventStateKeyNID
+		var count int
+		if err := rows.Scan(&userID, &count); err != nil {
+			return nil, err
+		}
+		result[userID] = count
+	}
+	return result, rows.Err()
+}
+
+func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error) {
+	rows, err := s.selectKnownUsersStmt.QueryContext(ctx, userID, fmt.Sprintf("%%%s%%", searchString), limit)
+	if err != nil {
+		return nil, err
+	}
+	result := []string{}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownUsers: rows.close() failed")
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		result = append(result, userID)
+	}
+	return result, rows.Err()
 }

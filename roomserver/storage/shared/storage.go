@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	csstables "github.com/matrix-org/dendrite/currentstateserver/storage/tables"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -13,6 +14,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
 
@@ -717,25 +719,42 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
 func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error) {
-	/*
-		roomInfo, err := d.RoomInfo(ctx, roomID)
-		if err != nil {
-			return nil, err
+	roomInfo, err := d.RoomInfo(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+	if err != nil {
+		return nil, err
+	}
+	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, stateKey)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	if err != nil {
+		return nil, err
+	}
+	// return the event requested
+	for _, e := range entries {
+		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
+			data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, []types.EventNID{e.EventNID})
+			if err != nil {
+				return nil, err
+			}
+			if len(data) == 0 {
+				return nil, fmt.Errorf("GetStateEvent: no json for event nid %d", e.EventNID)
+			}
+			ev, err := gomatrixserverlib.NewEventFromTrustedJSON(data[0].EventJSON, false, roomInfo.RoomVersion)
+			if err != nil {
+				return nil, err
+			}
+			h := ev.Headered(roomInfo.RoomVersion)
+			return &h, nil
 		}
-		eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
-		if err != nil {
-			return nil, err
-		}
-		stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, stateKey)
-		if err != nil {
-			return nil, err
-		}
-		blockNIDs, err := d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, []types.StateSnapshotNID{roomInfo.StateSnapshotNID})
-		if err != nil {
-			return nil, err
-		}
-	*/
-	return nil, nil
+	}
+
+	return nil, fmt.Errorf("GetStateEvent: no event type '%s' with key '%s' exists in room %s", evType, stateKey, roomID)
 }
 
 // GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
@@ -779,15 +798,106 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 
 // JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
 func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	roomNIDs, err := d.RoomsTable.BulkSelectRoomNIDs(ctx, roomIDs)
+	if err != nil {
+		return nil, err
+	}
+	userNIDToCount, err := d.MembershipTable.SelectJoinedUsersSetForRooms(ctx, roomNIDs)
+	if err != nil {
+		return nil, err
+	}
+	stateKeyNIDs := make([]types.EventStateKeyNID, len(userNIDToCount))
+	i := 0
+	for nid := range userNIDToCount {
+		stateKeyNIDs[i] = nid
+		i++
+	}
+	nidToUserID, err := d.EventStateKeysTable.BulkSelectEventStateKey(ctx, stateKeyNIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(nidToUserID) != len(userNIDToCount) {
+		return nil, fmt.Errorf("found %d users but only have state key nids for %d of them", len(userNIDToCount), len(nidToUserID))
+	}
+	result := make(map[string]int, len(userNIDToCount))
+	for nid, count := range userNIDToCount {
+		result[nidToUserID[nid]] = count
+	}
+	return result, nil
 }
 
 // GetKnownUsers searches all users that userID knows about.
 func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
+	if err != nil {
+		return nil, err
+	}
+	return d.MembershipTable.SelectKnownUsers(ctx, stateKeyNID, searchString, limit)
 }
 
 // GetKnownRooms returns a list of all rooms we know about.
 func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
 	return d.RoomsTable.SelectRoomIDs(ctx)
 }
+
+// FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops
+// it should live in this package!
+
+func (d *Database) loadStateAtSnapshot(
+	ctx context.Context, stateNID types.StateSnapshotNID,
+) ([]types.StateEntry, error) {
+	stateBlockNIDLists, err := d.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateNID})
+	if err != nil {
+		return nil, err
+	}
+	// We've asked for exactly one snapshot from the db so we should have exactly one entry in the result.
+	stateBlockNIDList := stateBlockNIDLists[0]
+
+	stateEntryLists, err := d.StateEntries(ctx, stateBlockNIDList.StateBlockNIDs)
+	if err != nil {
+		return nil, err
+	}
+	stateEntriesMap := stateEntryListMap(stateEntryLists)
+
+	// Combine all the state entries for this snapshot.
+	// The order of state block NIDs in the list tells us the order to combine them in.
+	var fullState []types.StateEntry
+	for _, stateBlockNID := range stateBlockNIDList.StateBlockNIDs {
+		entries, ok := stateEntriesMap.lookup(stateBlockNID)
+		if !ok {
+			// This should only get hit if the database is corrupt.
+			// It should be impossible for an event to reference a NID that doesn't exist
+			panic(fmt.Errorf("Corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+		}
+		fullState = append(fullState, entries...)
+	}
+
+	// Stable sort so that the most recent entry for each state key stays
+	// remains later in the list than the older entries for the same state key.
+	sort.Stable(stateEntryByStateKeySorter(fullState))
+	// Unique returns the last entry and hence the most recent entry for each state key.
+	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
+	return fullState, nil
+}
+
+type stateEntryListMap []types.StateEntryList
+
+func (m stateEntryListMap) lookup(stateBlockNID types.StateBlockNID) (stateEntries []types.StateEntry, ok bool) {
+	list := []types.StateEntryList(m)
+	i := sort.Search(len(list), func(i int) bool {
+		return list[i].StateBlockNID >= stateBlockNID
+	})
+	if i < len(list) && list[i].StateBlockNID == stateBlockNID {
+		ok = true
+		stateEntries = list[i].StateEntries
+	}
+	return
+}
+
+type stateEntryByStateKeySorter []types.StateEntry
+
+func (s stateEntryByStateKeySorter) Len() int { return len(s) }
+func (s stateEntryByStateKeySorter) Less(i, j int) bool {
+	return s[i].StateKeyTuple.LessThan(s[j].StateKeyTuple)
+}
+func (s stateEntryByStateKeySorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
