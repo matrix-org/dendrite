@@ -114,10 +114,6 @@ func (s *mockCurrentStateAPI) QuerySharedUsers(ctx context.Context, req *api.Que
 	return nil
 }
 
-func (t *mockCurrentStateAPI) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse) error {
-	return nil
-}
-
 type wantCatchup struct {
 	hasNew  bool
 	changed []string

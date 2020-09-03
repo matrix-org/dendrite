@@ -16,18 +16,15 @@ package internal
 
 import (
 	"context"
-	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/currentstateserver/acls"
 	"github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/currentstateserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type CurrentStateInternalAPI struct {
-	DB         storage.Database
-	ServerACLs *acls.ServerACLs
+	DB storage.Database
 }
 
 func (a *CurrentStateInternalAPI) QueryCurrentState(ctx context.Context, req *api.QueryCurrentStateRequest, res *api.QueryCurrentStateResponse) error {
@@ -113,13 +110,5 @@ func (a *CurrentStateInternalAPI) QuerySharedUsers(ctx context.Context, req *api
 		return err
 	}
 	res.UserIDsToCount = users
-	return nil
-}
-
-func (a *CurrentStateInternalAPI) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse) error {
-	if a.ServerACLs == nil {
-		return errors.New("no server ACL tracking")
-	}
-	res.Banned = a.ServerACLs.IsServerBannedFromRoom(req.ServerName, req.RoomID)
 	return nil
 }
