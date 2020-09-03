@@ -65,6 +65,8 @@ type Rooms interface {
 	UpdateLatestEventNIDs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventNIDs []types.EventNID, lastEventSentNID types.EventNID, stateSnapshotNID types.StateSnapshotNID) error
 	SelectRoomVersionForRoomNID(ctx context.Context, roomNID types.RoomNID) (gomatrixserverlib.RoomVersion, error)
 	SelectRoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
+	SelectRoomIDs(ctx context.Context) ([]string, error)
+	BulkSelectRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error)
 }
 
 type Transactions interface {
@@ -120,6 +122,7 @@ type Membership interface {
 	SelectMembershipsFromRoom(ctx context.Context, roomNID types.RoomNID, localOnly bool) (eventNIDs []types.EventNID, err error)
 	SelectMembershipsFromRoomAndMembership(ctx context.Context, roomNID types.RoomNID, membership MembershipState, localOnly bool) (eventNIDs []types.EventNID, err error)
 	UpdateMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership MembershipState, eventNID types.EventNID) error
+	SelectRoomsWithMembership(ctx context.Context, userID types.EventStateKeyNID, membershipState MembershipState) ([]types.RoomNID, error)
 }
 
 type Published interface {

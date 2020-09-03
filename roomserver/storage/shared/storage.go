@@ -713,27 +713,68 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 	return &evs[0]
 }
 
-// GetStateEvent returns the state event of a given type for a given room with a given state key
+// GetStateEvent returns the current state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
 func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	/*
+		roomInfo, err := d.RoomInfo(ctx, roomID)
+		if err != nil {
+			return nil, err
+		}
+		eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+		if err != nil {
+			return nil, err
+		}
+		stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, stateKey)
+		if err != nil {
+			return nil, err
+		}
+		blockNIDs, err := d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, []types.StateSnapshotNID{roomInfo.StateSnapshotNID})
+		if err != nil {
+			return nil, err
+		}
+	*/
+	return nil, nil
 }
 
 // GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
 func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	var membershipState tables.MembershipState
+	switch membership {
+	case "join":
+		membershipState = tables.MembershipStateJoin
+	case "invite":
+		membershipState = tables.MembershipStateInvite
+	case "leave":
+		membershipState = tables.MembershipStateLeaveOrBan
+	case "ban":
+		membershipState = tables.MembershipStateLeaveOrBan
+	default:
+		return nil, fmt.Errorf("GetRoomsByMembership: invalid membership %s", membership)
+	}
+	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
+	if err != nil {
+		return nil, fmt.Errorf("GetRoomsByMembership: cannot map user ID to state key NID: %w", err)
+	}
+	roomNIDs, err := d.MembershipTable.SelectRoomsWithMembership(ctx, stateKeyNID, membershipState)
+	if err != nil {
+		return nil, err
+	}
+	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, roomNIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(roomIDs) != len(roomNIDs) {
+		return nil, fmt.Errorf("GetRoomsByMembership: missing room IDs, got %d want %d", len(roomIDs), len(roomNIDs))
+	}
+	return roomIDs, nil
 }
 
 // GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 // If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
 func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]csstables.StrippedEvent, error) {
 	return nil, fmt.Errorf("not implemented yet")
-}
-
-// Redact a state event
-func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, redactedBecause gomatrixserverlib.HeaderedEvent) error {
-	return nil
 }
 
 // JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
@@ -748,5 +789,5 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 
 // GetKnownRooms returns a list of all rooms we know about.
 func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
-	return nil, nil
+	return d.RoomsTable.SelectRoomIDs(ctx)
 }

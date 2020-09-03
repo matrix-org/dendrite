@@ -75,6 +75,9 @@ const updateMembershipSQL = "" +
 	"UPDATE roomserver_membership SET sender_nid = $1, membership_nid = $2, event_nid = $3" +
 	" WHERE room_nid = $4 AND target_nid = $5"
 
+const selectRoomsWithMembershipSQL = "" +
+	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2"
+
 type membershipStatements struct {
 	db                                              *sql.DB
 	insertMembershipStmt                            *sql.Stmt
@@ -84,6 +87,7 @@ type membershipStatements struct {
 	selectLocalMembershipsFromRoomAndMembershipStmt *sql.Stmt
 	selectMembershipsFromRoomStmt                   *sql.Stmt
 	selectLocalMembershipsFromRoomStmt              *sql.Stmt
+	selectRoomsWithMembershipStmt                   *sql.Stmt
 	updateMembershipStmt                            *sql.Stmt
 }
 
@@ -105,6 +109,7 @@ func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectMembershipsFromRoomStmt, selectMembershipsFromRoomSQL},
 		{&s.selectLocalMembershipsFromRoomStmt, selectLocalMembershipsFromRoomSQL},
 		{&s.updateMembershipStmt, updateMembershipSQL},
+		{&s.selectRoomsWithMembershipStmt, selectRoomsWithMembershipSQL},
 	}.Prepare(db)
 }
 
@@ -202,4 +207,23 @@ func (s *membershipStatements) UpdateMembership(
 		ctx, senderUserNID, membership, eventNID, roomNID, targetUserNID,
 	)
 	return err
+}
+
+func (s *membershipStatements) SelectRoomsWithMembership(
+	ctx context.Context, userID types.EventStateKeyNID, membershipState tables.MembershipState,
+) ([]types.RoomNID, error) {
+	rows, err := s.selectRoomsWithMembershipStmt.QueryContext(ctx, membershipState, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithMembership: rows.close() failed")
+	var roomNIDs []types.RoomNID
+	for rows.Next() {
+		var roomNID types.RoomNID
+		if err := rows.Scan(&roomNID); err != nil {
+			return nil, err
+		}
+		roomNIDs = append(roomNIDs, roomNID)
+	}
+	return roomNIDs, nil
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/currentstateserver/acls"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/perform"
