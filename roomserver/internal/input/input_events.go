@@ -38,7 +38,7 @@ import (
 // nolint:gocyclo
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
-	input api.InputRoomEvent,
+	input *api.InputRoomEvent,
 ) (eventID string, err error) {
 	// Parse and validate the event JSON
 	headered := input.Event
@@ -143,7 +143,7 @@ func (r *Inputer) processRoomEvent(
 
 func (r *Inputer) calculateAndSetState(
 	ctx context.Context,
-	input api.InputRoomEvent,
+	input *api.InputRoomEvent,
 	roomInfo types.RoomInfo,
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
