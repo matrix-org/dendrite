@@ -16,12 +16,14 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -142,6 +144,30 @@ func (r *RoomserverInternalAPI) performPeekRoomByID(
 	// it to the list of servers to try.
 	if domain != r.Cfg.Matrix.ServerName {
 		req.ServerNames = append(req.ServerNames, domain)
+	}
+
+	// If this room isn't world_readable, we reject.
+	// XXX: would be nicer to call this with NIDs
+	// XXX: we should probably factor out history_visibility checks into a common utility method somewhere
+	// which handles the default value etc.
+	var worldReadable = false
+	ev, err := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", "")
+	if ev != nil {
+		content := map[string]string{}
+		if err = json.Unmarshal(ev.Content(), &content); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
+			return
+		}
+		if visibility, ok := content["history_visibility"]; ok {
+			worldReadable = visibility == "world_readable"
+		}
+	}
+
+	if !worldReadable {
+		return "", &api.PerformError{
+			Code: api.PerformErrorNotAllowed,
+			Msg: "Room is not world-readable",
+		}
 	}
 
 	// TODO: handle federated peeks
