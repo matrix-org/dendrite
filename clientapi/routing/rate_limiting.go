@@ -23,7 +23,7 @@ func newRateLimits(cfg *config.RateLimiting) *rateLimits {
 		limits:           make(map[string]chan struct{}),
 		enabled:          cfg.Enabled,
 		requestThreshold: cfg.Threshold,
-		cooloffDuration:  time.Duration(cfg.Cooloff) * time.Millisecond,
+		cooloffDuration:  time.Duration(cfg.CooloffMS) * time.Millisecond,
 	}
 	if l.enabled {
 		go l.clean()
@@ -33,11 +33,11 @@ func newRateLimits(cfg *config.RateLimiting) *rateLimits {
 
 func (l *rateLimits) clean() {
 	for {
-		// On a ten minute interval, we'll take an exclusive write
+		// On a 30 second interval, we'll take an exclusive write
 		// lock of the entire map and see if any of the channels are
 		// empty. If they are then we will close and delete them,
 		// freeing up memory.
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 30)
 		l.limitsMutex.Lock()
 		for k, c := range l.limits {
 			if len(c) == 0 {

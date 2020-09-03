@@ -106,18 +106,18 @@ type RateLimiting struct {
 
 	// The cooloff period in milliseconds after a request before the "slot"
 	// is freed again
-	Cooloff int64 `yaml:"cooloff_ms"`
+	CooloffMS int64 `yaml:"cooloff_ms"`
 }
 
 func (r *RateLimiting) Verify(configErrs *ConfigErrors) {
 	if r.Enabled {
 		checkPositive(configErrs, "client_api.rate_limiting.threshold", r.Threshold)
-		checkPositive(configErrs, "client_api.rate_limiting.cooloff_ms", r.Cooloff)
+		checkPositive(configErrs, "client_api.rate_limiting.cooloff_ms", r.CooloffMS)
 	}
 }
 
 func (r *RateLimiting) Defaults() {
 	r.Enabled = true
 	r.Threshold = 5
-	r.Cooloff = 500
+	r.CooloffMS = 500
 }
