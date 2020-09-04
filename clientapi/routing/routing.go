@@ -417,6 +417,15 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	r0mux.Handle("/account/password",
+		httputil.MakeAuthAPI("password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			return Password(req, userAPI, accountDB, device, cfg)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
