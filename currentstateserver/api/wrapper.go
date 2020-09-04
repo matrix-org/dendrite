@@ -21,38 +21,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// GetEvent returns the current state event in the room or nil.
-func GetEvent(ctx context.Context, stateAPI CurrentStateInternalAPI, roomID string, tuple gomatrixserverlib.StateKeyTuple) *gomatrixserverlib.HeaderedEvent {
-	var res QueryCurrentStateResponse
-	err := stateAPI.QueryCurrentState(ctx, &QueryCurrentStateRequest{
-		RoomID:      roomID,
-		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
-	}, &res)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to QueryCurrentState")
-		return nil
-	}
-	ev, ok := res.StateEvents[tuple]
-	if ok {
-		return ev
-	}
-	return nil
-}
-
-// IsServerBannedFromRoom returns whether the server is banned from a room by server ACLs.
-func IsServerBannedFromRoom(ctx context.Context, stateAPI CurrentStateInternalAPI, roomID string, serverName gomatrixserverlib.ServerName) bool {
-	req := &QueryServerBannedFromRoomRequest{
-		ServerName: serverName,
-		RoomID:     roomID,
-	}
-	res := &QueryServerBannedFromRoomResponse{}
-	if err := stateAPI.QueryServerBannedFromRoom(ctx, req, res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to QueryServerBannedFromRoom")
-		return true
-	}
-	return res.Banned
-}
-
 // PopulatePublicRooms extracts PublicRoom information for all the provided room IDs. The IDs are not checked to see if they are visible in the
 // published room directory.
 // due to lots of switches

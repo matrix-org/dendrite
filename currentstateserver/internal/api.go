@@ -16,32 +16,14 @@ package internal
 
 import (
 	"context"
-	"errors"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/currentstateserver/acls"
 	"github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/currentstateserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type CurrentStateInternalAPI struct {
-	DB         storage.Database
-	ServerACLs *acls.ServerACLs
-}
-
-func (a *CurrentStateInternalAPI) QueryCurrentState(ctx context.Context, req *api.QueryCurrentStateRequest, res *api.QueryCurrentStateResponse) error {
-	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
-	for _, tuple := range req.StateTuples {
-		ev, err := a.DB.GetStateEvent(ctx, req.RoomID, tuple.EventType, tuple.StateKey)
-		if err != nil {
-			return err
-		}
-		if ev != nil {
-			res.StateEvents[tuple] = ev
-		}
-	}
-	return nil
+	DB storage.Database
 }
 
 func (a *CurrentStateInternalAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
@@ -50,19 +32,6 @@ func (a *CurrentStateInternalAPI) QueryRoomsForUser(ctx context.Context, req *ap
 		return err
 	}
 	res.RoomIDs = roomIDs
-	return nil
-}
-
-func (a *CurrentStateInternalAPI) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
-	users, err := a.DB.GetKnownUsers(ctx, req.UserID, req.SearchString, req.Limit)
-	if err != nil {
-		return err
-	}
-	for _, user := range users {
-		res.Users = append(res.Users, authtypes.FullyQualifiedProfile{
-			UserID: user,
-		})
-	}
 	return nil
 }
 
@@ -113,13 +82,5 @@ func (a *CurrentStateInternalAPI) QuerySharedUsers(ctx context.Context, req *api
 		return err
 	}
 	res.UserIDsToCount = users
-	return nil
-}
-
-func (a *CurrentStateInternalAPI) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse) error {
-	if a.ServerACLs == nil {
-		return errors.New("no server ACL tracking")
-	}
-	res.Banned = a.ServerACLs.IsServerBannedFromRoom(req.ServerName, req.RoomID)
 	return nil
 }

@@ -273,7 +273,7 @@ func SetVisibility(
 	req *http.Request, stateAPI currentstateAPI.CurrentStateInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI, dev *userapi.Device,
 	roomID string,
 ) util.JSONResponse {
-	resErr := checkMemberInRoom(req.Context(), stateAPI, dev.UserID, roomID)
+	resErr := checkMemberInRoom(req.Context(), rsAPI, dev.UserID, roomID)
 	if resErr != nil {
 		return *resErr
 	}

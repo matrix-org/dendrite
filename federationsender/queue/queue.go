@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	stateapi "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -36,7 +35,6 @@ import (
 type OutgoingQueues struct {
 	db          storage.Database
 	rsAPI       api.RoomserverInternalAPI
-	stateAPI    stateapi.CurrentStateInternalAPI
 	origin      gomatrixserverlib.ServerName
 	client      *gomatrixserverlib.FederationClient
 	statistics  *statistics.Statistics
@@ -51,14 +49,12 @@ func NewOutgoingQueues(
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
-	stateAPI stateapi.CurrentStateInternalAPI,
 	statistics *statistics.Statistics,
 	signing *SigningInfo,
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
 		db:         db,
 		rsAPI:      rsAPI,
-		stateAPI:   stateAPI,
 		origin:     origin,
 		client:     client,
 		statistics: statistics,
@@ -144,9 +140,9 @@ func (oqs *OutgoingQueues) SendEvent(
 
 	// Check if any of the destinations are prohibited by server ACLs.
 	for destination := range destmap {
-		if stateapi.IsServerBannedFromRoom(
+		if api.IsServerBannedFromRoom(
 			context.TODO(),
-			oqs.stateAPI,
+			oqs.rsAPI,
 			ev.RoomID(),
 			destination,
 		) {
@@ -208,9 +204,9 @@ func (oqs *OutgoingQueues) SendEDU(
 	// ACLs.
 	if result := gjson.GetBytes(e.Content, "room_id"); result.Exists() {
 		for destination := range destmap {
-			if stateapi.IsServerBannedFromRoom(
+			if api.IsServerBannedFromRoom(
 				context.TODO(),
-				oqs.stateAPI,
+				oqs.rsAPI,
 				result.Str,
 				destination,
 			) {

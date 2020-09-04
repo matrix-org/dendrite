@@ -21,6 +21,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -117,7 +118,8 @@ func (s *eventTypeStatements) InsertEventTypeNID(
 	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := txn.Stmt(s.insertEventTypeNIDStmt).QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	stmt := sqlutil.TxStmt(txn, s.insertEventTypeNIDStmt)
+	err := stmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
@@ -125,7 +127,8 @@ func (s *eventTypeStatements) SelectEventTypeNID(
 	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	var eventTypeNID int64
-	err := txn.Stmt(s.selectEventTypeNIDStmt).QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	stmt := sqlutil.TxStmt(txn, s.selectEventTypeNIDStmt)
+	err := stmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
