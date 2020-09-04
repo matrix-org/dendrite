@@ -140,8 +140,8 @@ func SetAvatarURL(
 		return jsonerror.InternalServerError()
 	}
 
-	var res currentstateAPI.QueryRoomsForUserResponse
-	err = stateAPI.QueryRoomsForUser(req.Context(), &currentstateAPI.QueryRoomsForUserRequest{
+	var res api.QueryRoomsForUserResponse
+	err = rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{
 		UserID:         device.UserID,
 		WantMembership: "join",
 	}, &res)
@@ -258,8 +258,8 @@ func SetDisplayName(
 		return jsonerror.InternalServerError()
 	}
 
-	var res currentstateAPI.QueryRoomsForUserResponse
-	err = stateAPI.QueryRoomsForUser(req.Context(), &currentstateAPI.QueryRoomsForUserRequest{
+	var res api.QueryRoomsForUserResponse
+	err = rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{
 		UserID:         device.UserID,
 		WantMembership: "join",
 	}, &res)

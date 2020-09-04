@@ -98,7 +98,7 @@ func main() {
 	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, stateAPI, keyRing,
+		base, federation, rsAPI, keyRing,
 	)
 	if base.UseHTTPAPIs {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)

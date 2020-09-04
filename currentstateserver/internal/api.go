@@ -26,15 +26,6 @@ type CurrentStateInternalAPI struct {
 	DB storage.Database
 }
 
-func (a *CurrentStateInternalAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
-	roomIDs, err := a.DB.GetRoomsByMembership(ctx, req.UserID, req.WantMembership)
-	if err != nil {
-		return err
-	}
-	res.RoomIDs = roomIDs
-	return nil
-}
-
 func (a *CurrentStateInternalAPI) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
 	events, err := a.DB.GetBulkStateContent(ctx, req.RoomIDs, req.StateTuples, req.AllowWildcards)
 	if err != nil {
