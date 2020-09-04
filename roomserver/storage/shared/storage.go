@@ -774,6 +774,9 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership 
 	}
 	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("GetRoomsByMembership: cannot map user ID to state key NID: %w", err)
 	}
 	roomNIDs, err := d.MembershipTable.SelectRoomsWithMembership(ctx, stateKeyNID, membershipState)
