@@ -210,7 +210,7 @@ func main() {
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
 	)
-	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, stateAPI, &keyRing)
+	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, &keyRing)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
 

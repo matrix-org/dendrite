@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -94,10 +93,10 @@ func GetMemberships(
 func GetJoinedRooms(
 	req *http.Request,
 	device *userapi.Device,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
+	rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
-	var res currentstateAPI.QueryRoomsForUserResponse
-	err := stateAPI.QueryRoomsForUser(req.Context(), &currentstateAPI.QueryRoomsForUserRequest{
+	var res api.QueryRoomsForUserResponse
+	err := rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{
 		UserID:         device.UserID,
 		WantMembership: "join",
 	}, &res)

@@ -130,7 +130,7 @@ func (m *DendriteMonolith) Start() {
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, stateAPI, keyRing,
+		base, federation, rsAPI, keyRing,
 	)
 
 	ygg.SetSessionFunc(func(address string) {
