@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"sync"
 
@@ -135,9 +134,7 @@ func (d *Database) SetPassword(
 	if err != nil {
 		return err
 	}
-	fmt.Println("PASSWORD:", localpart, plaintextPassword, hash)
 	err = d.accounts.updatePassword(ctx, localpart, hash)
-	fmt.Println("ERROR:", err)
 	return err
 }
 
