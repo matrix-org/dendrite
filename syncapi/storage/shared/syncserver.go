@@ -1129,8 +1129,10 @@ func (d *Database) getStateDeltasForFullStateSync(
 	}
 
 	// Add full states for all peeking rooms
+	peeking := make(map[string]bool)
 	newPeeks := false
 	for _, peek := range peeks {
+		peeking[peek.RoomID] = true
 		if peek.New {
 			newPeeks = true
 		}
@@ -1191,6 +1193,16 @@ func (d *Database) getStateDeltasForFullStateSync(
 		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
 		if stateErr != nil {
 			return nil, nil, stateErr
+		}
+		if peeking[joinedRoomID] {
+			// we automatically cancel our peeks when we join a room
+			if err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+				// XXX: is it correct that we're discarding the streamid here?
+				_, err = d.Peeks.DeletePeeks(ctx, txn, joinedRoomID, userID)
+				return err
+			}); err != nil {
+				return nil, nil, err
+			}
 		}
 		deltas[joinedRoomID] = stateDelta{
 			membership:  gomatrixserverlib.Join,
