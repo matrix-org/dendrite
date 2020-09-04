@@ -26,11 +26,9 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
-	QueryCurrentStatePath     = "/currentstateserver/queryCurrentState"
 	QueryRoomsForUserPath     = "/currentstateserver/queryRoomsForUser"
 	QueryBulkStateContentPath = "/currentstateserver/queryBulkStateContent"
 	QuerySharedUsersPath      = "/currentstateserver/querySharedUsers"
-	QueryKnownUsersPath       = "/currentstateserver/queryKnownUsers"
 )
 
 // NewCurrentStateAPIClient creates a CurrentStateInternalAPI implemented by talking to a HTTP POST API.
@@ -51,18 +49,6 @@ func NewCurrentStateAPIClient(
 type httpCurrentStateInternalAPI struct {
 	apiURL     string
 	httpClient *http.Client
-}
-
-func (h *httpCurrentStateInternalAPI) QueryCurrentState(
-	ctx context.Context,
-	request *api.QueryCurrentStateRequest,
-	response *api.QueryCurrentStateResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryCurrentState")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryCurrentStatePath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpCurrentStateInternalAPI) QueryRoomsForUser(
@@ -96,15 +82,5 @@ func (h *httpCurrentStateInternalAPI) QuerySharedUsers(
 	defer span.Finish()
 
 	apiURL := h.apiURL + QuerySharedUsersPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
-}
-
-func (h *httpCurrentStateInternalAPI) QueryKnownUsers(
-	ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKnownUsers")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryKnownUsersPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

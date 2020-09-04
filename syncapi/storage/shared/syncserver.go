@@ -743,8 +743,10 @@ func (d *Database) addInvitesToResponse(
 		res.Rooms.Invite[roomID] = *ir
 	}
 	for roomID := range retiredInvites {
-		lr := types.NewLeaveResponse()
-		res.Rooms.Leave[roomID] = *lr
+		if _, ok := res.Rooms.Join[roomID]; !ok {
+			lr := types.NewLeaveResponse()
+			res.Rooms.Leave[roomID] = *lr
+		}
 	}
 	return nil
 }
@@ -996,26 +998,8 @@ func (d *Database) getStateDeltasForFullStateSync(
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
-	joinedRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// Use a reasonable initial capacity
-	deltas := make([]stateDelta, 0, len(joinedRoomIDs))
-
-	// Add full states for all joined rooms
-	for _, joinedRoomID := range joinedRoomIDs {
-		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
-		if stateErr != nil {
-			return nil, nil, stateErr
-		}
-		deltas = append(deltas, stateDelta{
-			membership:  gomatrixserverlib.Join,
-			stateEvents: d.StreamEventsToEvents(device, s),
-			roomID:      joinedRoomID,
-		})
-	}
+	deltas := make(map[string]stateDelta)
 
 	// Get all the state events ever between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter)
@@ -1031,12 +1015,12 @@ func (d *Database) getStateDeltasForFullStateSync(
 		for _, ev := range stateStreamEvents {
 			if membership := getMembershipFromEvent(&ev.Event, userID); membership != "" {
 				if membership != gomatrixserverlib.Join { // We've already added full state for all joined rooms above.
-					deltas = append(deltas, stateDelta{
+					deltas[roomID] = stateDelta{
 						membership:    membership,
 						membershipPos: ev.StreamPosition,
 						stateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
 						roomID:        roomID,
-					})
+					}
 				}
 
 				break
@@ -1044,7 +1028,33 @@ func (d *Database) getStateDeltasForFullStateSync(
 		}
 	}
 
-	return deltas, joinedRoomIDs, nil
+	joinedRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Add full states for all joined rooms
+	for _, joinedRoomID := range joinedRoomIDs {
+		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
+		if stateErr != nil {
+			return nil, nil, stateErr
+		}
+		deltas[joinedRoomID] = stateDelta{
+			membership:  gomatrixserverlib.Join,
+			stateEvents: d.StreamEventsToEvents(device, s),
+			roomID:      joinedRoomID,
+		}
+	}
+
+	// Create a response array.
+	result := make([]stateDelta, len(deltas))
+	i := 0
+	for _, delta := range deltas {
+		result[i] = delta
+		i++
+	}
+
+	return result, joinedRoomIDs, nil
 }
 
 func (d *Database) currentStateStreamEventsForRoom(
