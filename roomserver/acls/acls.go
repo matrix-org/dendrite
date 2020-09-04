@@ -24,7 +24,6 @@ import (
 	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -88,7 +87,6 @@ func compileACLRegex(orig string) (*regexp.Regexp, error) {
 }
 
 func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
-	util.GetLogger(context.TODO()).Infof("banana OnServerACLUpdate :D %s", string(state.Content()))
 	acls := &serverACL{}
 	if err := json.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
 		logrus.WithError(err).Errorf("Failed to unmarshal state content for server ACLs")
@@ -123,7 +121,6 @@ func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 }
 
 func (s *ServerACLs) IsServerBannedFromRoom(serverName gomatrixserverlib.ServerName, roomID string) bool {
-	util.GetLogger(context.TODO()).Infof("banana IsServerBannedFromRoom %s %s", serverName, roomID)
 	s.aclsMutex.RLock()
 	// First of all check if we have an ACL for this room. If we don't then
 	// no servers are banned from the room.
