@@ -63,7 +63,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(RoomserverPerformJoinPath,
+	internalAPIMux.Handle(RoomserverPerformPeekPath,
 		httputil.MakeInternalAPI("performPeek", func(req *http.Request) util.JSONResponse {
 			var request api.PerformPeekRequest
 			var response api.PerformPeekResponse
