@@ -21,20 +21,8 @@ import (
 )
 
 type CurrentStateInternalAPI interface {
-	// QueryRoomsForUser retrieves a list of room IDs matching the given query.
-	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
 	// QueryBulkStateContent does a bulk query for state event content in the given rooms.
 	QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error
-}
-
-type QueryRoomsForUserRequest struct {
-	UserID string
-	// The desired membership of the user. If this is the empty string then no rooms are returned.
-	WantMembership string
-}
-
-type QueryRoomsForUserResponse struct {
-	RoomIDs []string
 }
 
 type QueryBulkStateContentRequest struct {

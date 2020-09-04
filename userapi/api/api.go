@@ -26,6 +26,7 @@ import (
 type UserInternalAPI interface {
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
+	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
 	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
@@ -63,6 +64,10 @@ type PerformDeviceDeletionRequest struct {
 	UserID string
 	// The devices to delete. An empty slice means delete all devices.
 	DeviceIDs []string
+	// The requesting device ID to exclude from deletion. This is needed
+	// so that a password change doesn't cause that client to be logged
+	// out. Only specify when DeviceIDs is empty.
+	ExceptDeviceID string
 }
 
 type PerformDeviceDeletionResponse struct {
@@ -163,6 +168,18 @@ type PerformAccountCreationRequest struct {
 type PerformAccountCreationResponse struct {
 	AccountCreated bool
 	Account        *Account
+}
+
+// PerformAccountCreationRequest is the request for PerformAccountCreation
+type PerformPasswordUpdateRequest struct {
+	Localpart string // Required: The localpart for this account.
+	Password  string // Required: The new password to set.
+}
+
+// PerformAccountCreationResponse is the response for PerformAccountCreation
+type PerformPasswordUpdateResponse struct {
+	PasswordUpdated bool
+	Account         *Account
 }
 
 // PerformDeviceCreationRequest is the request for PerformDeviceCreation

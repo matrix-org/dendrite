@@ -112,11 +112,6 @@ type mockStateAPI struct {
 	rsAPI *mockRoomserverAPI
 }
 
-// QueryRoomsForUser retrieves a list of room IDs matching the given query.
-func (s *mockStateAPI) QueryRoomsForUser(ctx context.Context, req *stateapi.QueryRoomsForUserRequest, res *stateapi.QueryRoomsForUserResponse) error {
-	return nil
-}
-
 // QueryBulkStateContent does a bulk query for state event content in the given rooms.
 func (s *mockStateAPI) QueryBulkStateContent(ctx context.Context, req *stateapi.QueryBulkStateContentRequest, res *stateapi.QueryBulkStateContentResponse) error {
 	var res2 api.QueryBulkStateContentResponse

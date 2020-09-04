@@ -460,3 +460,8 @@ If user leaves room, remote user changes device and rejoins we see update in /sy
 Can search public room list
 Can get remote public room list
 Asking for a remote rooms list, but supplying the local server's name, returns the local rooms list
+After changing password, can't log in with old password
+After changing password, can log in with new password
+After changing password, existing session still works
+After changing password, different sessions can optionally be kept
+After changing password, a different session no longer works by default

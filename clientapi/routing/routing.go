@@ -118,7 +118,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/joined_rooms",
 		httputil.MakeAuthAPI("joined_rooms", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return GetJoinedRooms(req, device, stateAPI)
+			return GetJoinedRooms(req, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/join",
@@ -427,6 +427,15 @@ func Setup(
 			return Whoami(req, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/account/password",
+		httputil.MakeAuthAPI("password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			return Password(req, userAPI, accountDB, device, cfg)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	// Stub endpoints required by Riot
 

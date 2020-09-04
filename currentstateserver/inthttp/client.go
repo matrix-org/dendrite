@@ -50,18 +50,6 @@ type httpCurrentStateInternalAPI struct {
 	httpClient *http.Client
 }
 
-func (h *httpCurrentStateInternalAPI) QueryRoomsForUser(
-	ctx context.Context,
-	request *api.QueryRoomsForUserRequest,
-	response *api.QueryRoomsForUserResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomsForUser")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryRoomsForUserPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
 func (h *httpCurrentStateInternalAPI) QueryBulkStateContent(
 	ctx context.Context,
 	request *api.QueryBulkStateContentRequest,

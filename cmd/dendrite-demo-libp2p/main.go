@@ -162,7 +162,7 @@ func main() {
 	)
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	fsAPI := federationsender.NewInternalAPI(
-		&base.Base, federation, rsAPI, stateAPI, keyRing,
+		&base.Base, federation, rsAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI, stateAPI)
