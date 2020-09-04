@@ -364,7 +364,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(RoomserverQuerySharedUsersPath,
+	internalAPIMux.Handle(RoomserverQueryKnownUsersPath,
 		httputil.MakeInternalAPI("queryKnownUsers", func(req *http.Request) util.JSONResponse {
 			request := api.QueryKnownUsersRequest{}
 			response := api.QueryKnownUsersResponse{}

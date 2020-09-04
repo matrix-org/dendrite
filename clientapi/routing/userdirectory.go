@@ -88,7 +88,7 @@ func SearchUserDirectory(
 		}
 		stateRes := &api.QueryKnownUsersResponse{}
 		if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil {
-			errRes := util.ErrorResponse(fmt.Errorf("stateAPI.QueryKnownUsers: %w", err))
+			errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 			return &errRes
 		}
 
