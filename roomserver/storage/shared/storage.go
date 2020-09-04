@@ -724,6 +724,10 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, err
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+	if err == sql.ErrNoRows {
+		// No rooms have an event of this type, otherwise we'd have an event type NID
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -754,7 +758,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		}
 	}
 
-	return nil, fmt.Errorf("GetStateEvent: no event type '%s' with key '%s' exists in room %s", evType, stateKey, roomID)
+	return nil, nil
 }
 
 // GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
