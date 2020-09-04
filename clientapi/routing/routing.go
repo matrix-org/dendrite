@@ -639,7 +639,7 @@ func Setup(
 				req.Context(),
 				device,
 				userAPI,
-				stateAPI,
+				rsAPI,
 				cfg.Matrix.ServerName,
 				postContent.SearchString,
 				postContent.Limit,
