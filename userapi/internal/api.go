@@ -135,11 +135,9 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 	deletedDeviceIDs := req.DeviceIDs
 	if len(req.DeviceIDs) == 0 {
 		var devices []api.Device
-		devices, err = a.DeviceDB.RemoveAllDevices(ctx, local)
+		devices, err = a.DeviceDB.RemoveAllDevices(ctx, local, req.ExceptDeviceID)
 		for _, d := range devices {
-			if d.ID != req.ExceptDeviceID {
-				deletedDeviceIDs = append(deletedDeviceIDs, d.ID)
-			}
+			deletedDeviceIDs = append(deletedDeviceIDs, d.ID)
 		}
 	} else {
 		err = a.DeviceDB.RemoveDevices(ctx, local, req.DeviceIDs)

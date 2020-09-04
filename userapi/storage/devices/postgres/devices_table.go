@@ -70,7 +70,7 @@ const selectDeviceByIDSQL = "" +
 	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name FROM device_devices WHERE localpart = $1"
+	"SELECT device_id, display_name FROM device_devices WHERE localpart = $1 AND device_id != $2"
 
 const updateDeviceNameSQL = "" +
 	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
@@ -79,7 +79,7 @@ const deleteDeviceSQL = "" +
 	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
 
 const deleteDevicesByLocalpartSQL = "" +
-	"DELETE FROM device_devices WHERE localpart = $1"
+	"DELETE FROM device_devices WHERE localpart = $1 AND device_id != $2"
 
 const deleteDevicesSQL = "" +
 	"DELETE FROM device_devices WHERE localpart = $1 AND device_id = ANY($2)"
@@ -179,10 +179,10 @@ func (s *devicesStatements) deleteDevices(
 // deleteDevicesByLocalpart removes all devices for the
 // given user localpart.
 func (s *devicesStatements) deleteDevicesByLocalpart(
-	ctx context.Context, txn *sql.Tx, localpart string,
+	ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
-	_, err := stmt.ExecContext(ctx, localpart)
+	_, err := stmt.ExecContext(ctx, localpart, exceptDeviceID)
 	return err
 }
 
@@ -251,10 +251,10 @@ func (s *devicesStatements) selectDevicesByID(ctx context.Context, deviceIDs []s
 }
 
 func (s *devicesStatements) selectDevicesByLocalpart(
-	ctx context.Context, txn *sql.Tx, localpart string,
+	ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string,
 ) ([]api.Device, error) {
 	devices := []api.Device{}
-	rows, err := sqlutil.TxStmt(txn, s.selectDevicesByLocalpartStmt).QueryContext(ctx, localpart)
+	rows, err := sqlutil.TxStmt(txn, s.selectDevicesByLocalpartStmt).QueryContext(ctx, localpart, exceptDeviceID)
 
 	if err != nil {
 		return devices, err
