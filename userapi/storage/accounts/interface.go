@@ -28,6 +28,7 @@ type Database interface {
 	internal.PartitionStorer
 	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
+	SetPassword(ctx context.Context, localpart string, plaintextPassword string) error
 	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
 	SetDisplayName(ctx context.Context, localpart string, displayName string) error
 	// CreateAccount makes a new account with the given login name and password, and creates an empty profile
