@@ -58,7 +58,7 @@ type FederationSenderInternalAPI interface {
 		response *PerformJoinResponse,
 	)
 	// Handle an instruction to peek a room on a remote server.
-	PerformJoin(
+	PerformPeek(
 		ctx context.Context,
 		request *PerformPeekRequest,
 		response *PerformPeekResponse,
