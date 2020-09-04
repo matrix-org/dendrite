@@ -126,6 +126,18 @@ func (d *Database) SetDisplayName(
 	})
 }
 
+// SetPassword sets the account password to the given hash.
+func (d *Database) SetPassword(
+	ctx context.Context, localpart, plaintextPassword string,
+) error {
+	hash, err := hashPassword(plaintextPassword)
+	if err != nil {
+		return err
+	}
+	err = d.accounts.updatePassword(ctx, localpart, hash)
+	return err
+}
+
 // CreateGuestAccount makes a new guest account and creates an empty profile
 // for this account.
 func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, err error) {
