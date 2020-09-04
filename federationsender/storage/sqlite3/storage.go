@@ -65,6 +65,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	remotePeeks, err := NewSQLiteRemotePeeksTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                          d.db,
 		Writer:                      d.writer,
@@ -74,6 +78,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 		FederationSenderQueueJSON:   queueJSON,
 		FederationSenderRooms:       rooms,
 		FederationSenderBlacklist:   blacklist,
+		FederationSenderRemotePeeks: remotePeeks,
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
 		return nil, err

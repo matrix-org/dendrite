@@ -57,6 +57,12 @@ type FederationSenderInternalAPI interface {
 		request *PerformJoinRequest,
 		response *PerformJoinResponse,
 	)
+	// Handle an instruction to peek a room on a remote server.
+	PerformJoin(
+		ctx context.Context,
+		request *PerformPeekRequest,
+		response *PerformPeekResponse,
+	)
 	// Handle an instruction to make_leave & send_leave with a remote server.
 	PerformLeave(
 		ctx context.Context,
@@ -102,6 +108,16 @@ type PerformJoinRequest struct {
 }
 
 type PerformJoinResponse struct {
+	LastError *gomatrix.HTTPError
+}
+
+type PerformPeekRequest struct {
+	RoomID string `json:"room_id"`
+	// The sorted list of servers to try. Servers will be tried sequentially, after de-duplication.
+	ServerNames types.ServerNames      `json:"server_names"`
+}
+
+type PerformPeekResponse struct {
 	LastError *gomatrix.HTTPError
 }
 

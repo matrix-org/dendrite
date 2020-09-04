@@ -163,3 +163,23 @@ func (d *Database) RemoveServerFromBlacklist(serverName gomatrixserverlib.Server
 func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
 	return d.FederationSenderBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
 }
+
+func (d *Database) AddRemotePeek(serverName gomatrixserverlib.ServerName, roomID string, renewalInterval int) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.RemotePeeks.InsertRemotePeek(context.TODO(), txn, serverName, roomID, renewalInterval)
+	})
+}
+
+func (d *Database) RenewRemotePeek(serverName gomatrixserverlib.ServerName, roomID string, renewalInterval int) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.RemotePeeks.RenewRemotePeek(context.TODO(), txn, serverName, roomID, renewalInterval)
+	})
+}
+
+func (d *Database) GetRemotePeek(serverName gomatrixserverlib.ServerName, roomID string) (types.RemotePeek, error) {
+	return d.RemotePeeks.SelectRemotePeek(context.TODO(), serverName, roomID)
+}
+
+func (d *Database) GetRemotePeeks(roomID string) ([]types.RemotePeek, error) {
+	return d.RemotePeeks.SelectRemotePeeks(context.TODO(), roomID)
+}

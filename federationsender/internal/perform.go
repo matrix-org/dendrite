@@ -186,7 +186,7 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// Check that the send_join response was valid.
 	joinCtx := perform.JoinContext(r.federation, r.keyRing)
 	if err = joinCtx.CheckSendJoinResponse(
-		ctx, event, serverName, respMakeJoin, respSendJoin,
+		ctx, event, serverName, respSendJoin,
 	); err != nil {
 		return fmt.Errorf("joinCtx.CheckSendJoinResponse: %w", err)
 	}
@@ -199,6 +199,156 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		ctx, r.rsAPI,
 		&respState,
 		event.Headered(respMakeJoin.RoomVersion), nil,
+	); err != nil {
+		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
+	}
+
+	return nil
+}
+
+// PerformPeekRequest implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) PerformPeek(
+	ctx context.Context,
+	request *api.PerformPeekRequest,
+	response *api.PerformPeekResponse,
+) (err error) {
+	// Look up the supported room versions.
+	var supportedVersions []gomatrixserverlib.RoomVersion
+	for version := range version.SupportedRoomVersions() {
+		supportedVersions = append(supportedVersions, version)
+	}
+
+	// Deduplicate the server names we were provided but keep the ordering
+	// as this encodes useful information about which servers are most likely
+	// to respond.
+	seenSet := make(map[gomatrixserverlib.ServerName]bool)
+	var uniqueList []gomatrixserverlib.ServerName
+	for _, srv := range request.ServerNames {
+		if seenSet[srv] {
+			continue
+		}
+		seenSet[srv] = true
+		uniqueList = append(uniqueList, srv)
+	}
+	request.ServerNames = uniqueList
+
+	// Try each server that we were provided until we land on one that
+	// successfully completes the peek
+	var lastErr error
+	for _, serverName := range request.ServerNames {
+		if err := r.performPeekUsingServer(
+			ctx,
+			request.RoomID,
+			serverName,
+			supportedVersions,
+		); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"server_name": serverName,
+				"room_id":     request.RoomID,
+			}).Warnf("Failed to peek room through server")
+			lastErr = err
+			continue
+		}
+
+		// We're all good.
+		return
+	}
+
+	// If we reach here then we didn't complete a peek for some reason.
+	var httpErr gomatrix.HTTPError
+	if ok := errors.As(lastErr, &httpErr); ok {
+		httpErr.Message = string(httpErr.Contents)
+		// Clear the wrapped error, else serialising to JSON (in polylith mode) will fail
+		httpErr.WrappedError = nil
+		response.LastError = &httpErr
+	} else {
+		response.LastError = &gomatrix.HTTPError{
+			Code:         0,
+			WrappedError: nil,
+			Message:      lastErr.Error(),
+		}
+	}
+
+	logrus.Errorf(
+		"failed to peek room %q through %d server(s): last error %s",
+		request.RoomID, len(request.ServerNames), lastErr,
+	)
+}
+
+func (r *FederationSenderInternalAPI) performPeekUsingServer(
+	ctx context.Context,
+	roomID string,
+	serverName gomatrixserverlib.ServerName,
+	supportedVersions []gomatrixserverlib.RoomVersion,
+) error {
+	// check whether we're peeking already to try to avoid needlessly
+	// re-peeking on the server. we don't need a transaction for this,
+	// given this is a nice-to-have.
+	remotePeek, err := r.db.GetRemotePeek(ctx, serverName, roomID)
+	if err != nil {
+		return err
+	}
+	renewing := false
+	if remotePeek != nil {
+		nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
+		if (nowMilli > remotePeek.RenewedTimestamp + remotePeek.RenewalInterval) {
+			logrus.Infof("stale remote peek to %s for %s already exists; renewing", serverName, roomID)
+			renewing = true
+		}
+		else {
+			logrus.Infof("live remote peek to %s for %s already exists", serverName, roomID)
+			return nil
+		}
+	}
+
+	// create a unique ID for this peek.
+	// for now we just use the room ID again. In future, if we ever
+	// support concurrent peeks to the same room with different filters
+	// then we would need to disambiguate further.
+	peekID := roomID
+
+	// Try to perform a /peek using the information supplied in the
+	// request.
+	respPeek, err := r.federation.Peek(
+		ctx,
+		serverName,
+		roomID,
+		peekID,
+		supportedVersions,
+	)
+	if err != nil {
+		r.statistics.ForServer(serverName).Failure()
+		return fmt.Errorf("r.federation.MakePeek: %w", err)
+	}
+	r.statistics.ForServer(serverName).Success()
+
+	// Work out if we support the room version that has been supplied in
+	// the make_peek response.
+	if respPeek.RoomVersion == "" {
+		respPeek.RoomVersion = gomatrixserverlib.RoomVersionV1
+	}
+	if _, err = respPeek.RoomVersion.EventFormat(); err != nil {
+		return fmt.Errorf("respPeek.RoomVersion.EventFormat: %w", err)
+	}
+
+	// If we've got this far, the remote server is peeking.
+	if renewing {
+		if err = r.db.RenewRemotePeek(ctx, serverName, roomID, respPeek.RenewalInterval); err != nil {
+			return err
+		}
+	}
+	else {
+		if err = r.db.AddRemotePeek(ctx, serverName, roomID, respPeek.RenewalInterval); err != nil {
+			return err
+		}
+	}
+
+	respState := respPeek.ToRespState()
+	// Send the newly returned state to the roomserver to update our local view.
+	if err = roomserverAPI.SendEventWithState(
+		ctx, r.rsAPI,
+		&respState,
+		event.Headered(respPeek.RoomVersion), nil,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}

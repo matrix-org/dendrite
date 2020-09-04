@@ -49,3 +49,12 @@ func (e EventIDMismatchError) Error() string {
 		e.DatabaseID, e.RoomServerID,
 	)
 }
+
+type RemotePeek {
+	PeekID string
+	RoomID string
+	ServerName gomatrixserverlib.ServerName
+	CreatedTimestamp UnixMs
+	RenewedTimestamp UnixMs
+	RenewalInterval UnixMs
+}
