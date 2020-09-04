@@ -1049,9 +1049,7 @@ func (d *Database) getStateDeltasForFullStateSync(
 	// Create a response array.
 	result := make([]stateDelta, len(deltas))
 	i := 0
-	fmt.Println("DELTAS:")
 	for _, delta := range deltas {
-		fmt.Println("*", delta.roomID, delta.membership)
 		result[i] = delta
 		i++
 	}
