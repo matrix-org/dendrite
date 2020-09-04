@@ -43,6 +43,4 @@ type Writer interface {
 	// Queue up one or more database write operations within the
 	// provided function to be executed when it is safe to do so.
 	Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error
-
-	Safe() string
 }

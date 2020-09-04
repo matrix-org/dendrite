@@ -61,14 +61,14 @@ const markPeeksAsOldSQL = "" +
 	"UPDATE syncapi_peeks SET new=false WHERE user_id = $1 and device_id = $2"
 
 type peekStatements struct {
-	db                            *sql.DB
-	streamIDStatements            *streamIDStatements
-	insertPeekStmt        		  *sql.Stmt
-	deletePeekStmt         		  *sql.Stmt
-	deletePeeksStmt				  *sql.Stmt
-	selectPeeksStmt				  *sql.Stmt
-	selectPeekingDevicesStmt	  *sql.Stmt
-	markPeeksAsOldStmt            *sql.Stmt
+	db                       *sql.DB
+	streamIDStatements       *streamIDStatements
+	insertPeekStmt           *sql.Stmt
+	deletePeekStmt           *sql.Stmt
+	deletePeeksStmt          *sql.Stmt
+	selectPeeksStmt          *sql.Stmt
+	selectPeekingDevicesStmt *sql.Stmt
+	markPeeksAsOldStmt       *sql.Stmt
 }
 
 func NewSqlitePeeksTable(db *sql.DB, streamID *streamIDStatements) (tables.Peeks, error) {
@@ -77,7 +77,7 @@ func NewSqlitePeeksTable(db *sql.DB, streamID *streamIDStatements) (tables.Peeks
 		return nil, err
 	}
 	s := &peekStatements{
-		db: db,
+		db:                 db,
 		streamIDStatements: streamID,
 	}
 	if s.insertPeekStmt, err = db.Prepare(insertPeekSQL); err != nil {
@@ -155,7 +155,7 @@ func (s *peekStatements) SelectPeeks(
 	return peeks, rows.Err()
 }
 
-func (s *peekStatements) MarkPeeksAsOld (
+func (s *peekStatements) MarkPeeksAsOld(
 	ctx context.Context, txn *sql.Tx, userID, deviceID string,
 ) (err error) {
 	_, err = sqlutil.TxStmt(txn, s.markPeeksAsOldStmt).ExecContext(ctx, userID, deviceID)
