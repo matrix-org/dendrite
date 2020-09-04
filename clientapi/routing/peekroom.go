@@ -40,7 +40,7 @@ func PeekRoomByIDOrAlias(
 	peekReq := roomserverAPI.PerformPeekRequest{
 		RoomIDOrAlias: roomIDOrAlias,
 		UserID:        device.UserID,
-		DeviceID:	   device.ID,
+		DeviceID:      device.ID,
 	}
 	peekRes := roomserverAPI.PerformPeekResponse{}
 
@@ -63,7 +63,6 @@ func PeekRoomByIDOrAlias(
 
 	// if this user is already joined to the room, we let them peek anyway
 	// (given they might be about to part the room, and it makes things less fiddly)
-
 
 	// Peeking stops if none of the devices who started peeking have been
 	// /syncing for a while, or if everyone who was peeking calls /leave

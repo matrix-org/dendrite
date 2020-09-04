@@ -178,7 +178,7 @@ func (s *peekStatements) SelectPeekingDevices(
 			return nil, err
 		}
 		devices := result[roomID]
-		devices = append(devices, types.PeekingDevice{userID, deviceID})
+		devices = append(devices, types.PeekingDevice{UserID: userID, DeviceID: deviceID})
 		result[roomID] = devices
 	}
 	return result, nil

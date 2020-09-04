@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/internal/config"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -38,7 +38,6 @@ type Peeker struct {
 
 	Inputer *input.Inputer
 }
-
 
 // PerformPeek handles peeking into matrix rooms, including over federation by talking to the federationsender.
 func (r *Peeker) PerformPeek(
@@ -164,7 +163,7 @@ func (r *Peeker) performPeekRoomByID(
 	// XXX: we should probably factor out history_visibility checks into a common utility method somewhere
 	// which handles the default value etc.
 	var worldReadable = false
-	ev, err := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", "")
+	ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", "")
 	if ev != nil {
 		content := map[string]string{}
 		if err = json.Unmarshal(ev.Content(), &content); err != nil {
@@ -179,7 +178,7 @@ func (r *Peeker) performPeekRoomByID(
 	if !worldReadable {
 		return "", &api.PerformError{
 			Code: api.PerformErrorNotAllowed,
-			Msg: "Room is not world-readable",
+			Msg:  "Room is not world-readable",
 		}
 	}
 
@@ -189,8 +188,8 @@ func (r *Peeker) performPeekRoomByID(
 		{
 			Type: api.OutputTypeNewPeek,
 			NewPeek: &api.OutputNewPeek{
-				RoomID: roomID,
-				UserID: req.UserID,
+				RoomID:   roomID,
+				UserID:   req.UserID,
 				DeviceID: req.DeviceID,
 			},
 		},
@@ -203,5 +202,5 @@ func (r *Peeker) performPeekRoomByID(
 	// it will have been overwritten with a room ID by performPeekRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return roomID, nil;
+	return roomID, nil
 }

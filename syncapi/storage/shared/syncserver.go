@@ -987,6 +987,7 @@ func (d *Database) fetchMissingStateEvents(
 // exclusive of oldPos, inclusive of newPos, for the rooms in which
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
+// nolint:gocyclo
 func (d *Database) getStateDeltas(
 	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,

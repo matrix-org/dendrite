@@ -246,12 +246,10 @@ func (n *Notifier) wakeupUsers(userIDs []string, peekingDevices []types.PeekingD
 		}
 	}
 
-	if peekingDevices != nil {
-		for _, peekingDevice := range peekingDevices {
-			// TODO: don't bother waking up for devices whose users we already woke up
-			if stream := n.fetchUserDeviceStream(peekingDevice.UserID, peekingDevice.DeviceID, false); stream != nil {
-				stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
-			}
+	for _, peekingDevice := range peekingDevices {
+		// TODO: don't bother waking up for devices whose users we already woke up
+		if stream := n.fetchUserDeviceStream(peekingDevice.UserID, peekingDevice.DeviceID, false); stream != nil {
+			stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 		}
 	}
 }
@@ -332,13 +330,12 @@ func (n *Notifier) joinedUsers(roomID string) (userIDs []string) {
 	return n.roomIDToJoinedUsers[roomID].values()
 }
 
-
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) addPeekingDevice(roomID, userID, deviceID string) {
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
-	n.roomIDToPeekingDevices[roomID].add(types.PeekingDevice{userID, deviceID})
+	n.roomIDToPeekingDevices[roomID].add(types.PeekingDevice{UserID: userID, DeviceID: deviceID})
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
@@ -347,7 +344,7 @@ func (n *Notifier) removePeekingDevice(roomID, userID, deviceID string) {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
 	// XXX: is this going to work as a key?
-	n.roomIDToPeekingDevices[roomID].remove(types.PeekingDevice{userID, deviceID})
+	n.roomIDToPeekingDevices[roomID].remove(types.PeekingDevice{UserID: userID, DeviceID: deviceID})
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
@@ -357,8 +354,6 @@ func (n *Notifier) PeekingDevices(roomID string) (peekingDevices []types.Peeking
 	}
 	return n.roomIDToPeekingDevices[roomID].values()
 }
-
-
 
 // removeEmptyUserStreams iterates through the user stream map and removes any
 // that have been empty for a certain amount of time. This is a crude way of
