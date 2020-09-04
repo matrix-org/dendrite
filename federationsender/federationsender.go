@@ -59,7 +59,7 @@ func NewInternalAPI(
 
 	queues := queue.NewOutgoingQueues(
 		federationSenderDB, cfg.Matrix.ServerName, federation,
-		rsAPI, stateAPI, stats,
+		rsAPI, stats,
 		&queue.SigningInfo{
 			KeyID:      cfg.Matrix.KeyID,
 			PrivateKey: cfg.Matrix.PrivateKey,

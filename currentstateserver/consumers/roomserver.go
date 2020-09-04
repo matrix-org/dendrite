@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/currentstateserver/acls"
 	"github.com/matrix-org/dendrite/currentstateserver/storage"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -31,10 +30,9 @@ import (
 type OutputRoomEventConsumer struct {
 	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
-	acls       *acls.ServerACLs
 }
 
-func NewOutputRoomEventConsumer(topicName string, kafkaConsumer sarama.Consumer, store storage.Database, acls *acls.ServerACLs) *OutputRoomEventConsumer {
+func NewOutputRoomEventConsumer(topicName string, kafkaConsumer sarama.Consumer, store storage.Database) *OutputRoomEventConsumer {
 	consumer := &internal.ContinualConsumer{
 		ComponentName:  "currentstateserver/roomserver",
 		Topic:          topicName,
@@ -44,7 +42,6 @@ func NewOutputRoomEventConsumer(topicName string, kafkaConsumer sarama.Consumer,
 	s := &OutputRoomEventConsumer{
 		rsConsumer: consumer,
 		db:         store,
-		acls:       acls,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -79,10 +76,6 @@ func (c *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-
-	if ev.Type() == "m.room.server_acl" && ev.StateKeyEquals("") {
-		defer c.acls.OnServerACLUpdate(&ev.Event)
-	}
 
 	addsStateEvents := msg.AddsState()
 
