@@ -41,7 +41,7 @@ const membershipSchema = `
 `
 
 var selectJoinedUsersSetForRoomsSQL = "" +
-	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership WHERE room_nid = ANY($1) AND" +
+	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership WHERE room_nid IN ($1) AND" +
 	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " GROUP BY target_nid"
 
 // Insert a row in to membership table so that it can be locked by the

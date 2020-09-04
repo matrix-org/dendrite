@@ -778,11 +778,11 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership 
 	}
 	roomNIDs, err := d.MembershipTable.SelectRoomsWithMembership(ctx, stateKeyNID, membershipState)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetRoomsByMembership: failed to SelectRoomsWithMembership: %w", err)
 	}
 	roomIDs, err := d.RoomsTable.BulkSelectRoomIDs(ctx, roomNIDs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetRoomsByMembership: failed to lookup room nids: %w", err)
 	}
 	if len(roomIDs) != len(roomNIDs) {
 		return nil, fmt.Errorf("GetRoomsByMembership: missing room IDs, got %d want %d", len(roomIDs), len(roomNIDs))

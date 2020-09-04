@@ -28,7 +28,6 @@ import (
 const (
 	QueryRoomsForUserPath     = "/currentstateserver/queryRoomsForUser"
 	QueryBulkStateContentPath = "/currentstateserver/queryBulkStateContent"
-	QuerySharedUsersPath      = "/currentstateserver/querySharedUsers"
 )
 
 // NewCurrentStateAPIClient creates a CurrentStateInternalAPI implemented by talking to a HTTP POST API.
@@ -73,14 +72,4 @@ func (h *httpCurrentStateInternalAPI) QueryBulkStateContent(
 
 	apiURL := h.apiURL + QueryBulkStateContentPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-func (h *httpCurrentStateInternalAPI) QuerySharedUsers(
-	ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QuerySharedUsers")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QuerySharedUsersPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
