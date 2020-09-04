@@ -36,6 +36,7 @@ func Password(
 ) util.JSONResponse {
 	// Check that the existing password is right.
 	var r newPasswordRequest
+	r.LogoutDevices = true
 
 	// Unmarshal the request.
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
