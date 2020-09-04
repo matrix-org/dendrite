@@ -15,7 +15,6 @@
 package currentstateserver
 
 import (
-	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
@@ -137,81 +136,6 @@ func MustMakeInternalAPI(t *testing.T) (api.CurrentStateInternalAPI, storage.Dat
 		os.Remove(naffkaDBName)
 		os.Remove(stateDBName)
 	}
-}
-
-func TestQueryCurrentState(t *testing.T) {
-	currStateAPI, db, producer, cancel := MustMakeInternalAPI(t)
-	defer cancel()
-	plTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: "m.room.power_levels",
-		StateKey:  "",
-	}
-	plEvent := testEvents[4]
-	offset := MustWriteOutputEvent(t, producer, &roomserverAPI.OutputNewRoomEvent{
-		Event:             plEvent,
-		AddsStateEventIDs: []string{plEvent.EventID()},
-	})
-	waitForOffsetProcessed(t, db, offset)
-
-	testCases := []struct {
-		req     api.QueryCurrentStateRequest
-		wantRes api.QueryCurrentStateResponse
-		wantErr error
-	}{
-		{
-			req: api.QueryCurrentStateRequest{
-				RoomID: plEvent.RoomID(),
-				StateTuples: []gomatrixserverlib.StateKeyTuple{
-					plTuple,
-				},
-			},
-			wantRes: api.QueryCurrentStateResponse{
-				StateEvents: map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent{
-					plTuple: &plEvent,
-				},
-			},
-		},
-	}
-
-	runCases := func(testAPI api.CurrentStateInternalAPI) {
-		for _, tc := range testCases {
-			var gotRes api.QueryCurrentStateResponse
-			gotErr := testAPI.QueryCurrentState(context.TODO(), &tc.req, &gotRes)
-			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {
-				t.Errorf("QueryCurrentState error, got %s want %s", gotErr, tc.wantErr)
-				continue
-			}
-			for tuple, wantEvent := range tc.wantRes.StateEvents {
-				gotEvent, ok := gotRes.StateEvents[tuple]
-				if !ok {
-					t.Errorf("QueryCurrentState want tuple %+v but it is missing from the response", tuple)
-					continue
-				}
-				gotCanon, err := gomatrixserverlib.CanonicalJSON(gotEvent.JSON())
-				if err != nil {
-					t.Errorf("CanonicalJSON failed: %w", err)
-					continue
-				}
-				if !bytes.Equal(gotCanon, wantEvent.JSON()) {
-					t.Errorf("QueryCurrentState tuple %+v got event JSON %s want %s", tuple, string(gotCanon), string(wantEvent.JSON()))
-				}
-			}
-		}
-	}
-	t.Run("HTTP API", func(t *testing.T) {
-		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-		AddInternalRoutes(router, currStateAPI)
-		apiURL, cancel := test.ListenAndServe(t, router, false)
-		defer cancel()
-		httpAPI, err := inthttp.NewCurrentStateAPIClient(apiURL, &http.Client{})
-		if err != nil {
-			t.Fatalf("failed to create HTTP client")
-		}
-		runCases(httpAPI)
-	})
-	t.Run("Monolith", func(t *testing.T) {
-		runCases(currStateAPI)
-	})
 }
 
 func mustMakeMembershipEvent(t *testing.T, roomID, userID, membership string) *roomserverAPI.OutputNewRoomEvent {

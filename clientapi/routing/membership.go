@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -95,7 +94,6 @@ func SendKick(
 	req *http.Request, accountDB accounts.Database, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
 ) util.JSONResponse {
 	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
 	if reqErr != nil {
@@ -108,7 +106,7 @@ func SendKick(
 		}
 	}
 
-	errRes := checkMemberInRoom(req.Context(), stateAPI, device.UserID, roomID)
+	errRes := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
 	if errRes != nil {
 		return *errRes
 	}
@@ -372,13 +370,13 @@ func checkAndProcessThreepid(
 	return
 }
 
-func checkMemberInRoom(ctx context.Context, stateAPI currentstateAPI.CurrentStateInternalAPI, userID, roomID string) *util.JSONResponse {
+func checkMemberInRoom(ctx context.Context, rsAPI api.RoomserverInternalAPI, userID, roomID string) *util.JSONResponse {
 	tuple := gomatrixserverlib.StateKeyTuple{
 		EventType: gomatrixserverlib.MRoomMember,
 		StateKey:  userID,
 	}
-	var membershipRes currentstateAPI.QueryCurrentStateResponse
-	err := stateAPI.QueryCurrentState(ctx, &currentstateAPI.QueryCurrentStateRequest{
+	var membershipRes api.QueryCurrentStateResponse
+	err := rsAPI.QueryCurrentState(ctx, &api.QueryCurrentStateRequest{
 		RoomID:      roomID,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
 	}, &membershipRes)

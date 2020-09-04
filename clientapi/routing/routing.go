@@ -165,7 +165,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendKick(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI, stateAPI)
+			return SendKick(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/unban",
@@ -361,7 +361,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduAPI, stateAPI)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduAPI, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/redact/{eventID}",
@@ -370,7 +370,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, stateAPI)
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/redact/{eventID}/{txnId}",
@@ -379,7 +379,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, stateAPI)
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
