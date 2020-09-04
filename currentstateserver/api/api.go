@@ -25,18 +25,6 @@ type CurrentStateInternalAPI interface {
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
 	// QueryBulkStateContent does a bulk query for state event content in the given rooms.
 	QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error
-	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
-	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
-}
-
-type QuerySharedUsersRequest struct {
-	UserID         string
-	ExcludeRoomIDs []string
-	IncludeRoomIDs []string
-}
-
-type QuerySharedUsersResponse struct {
-	UserIDsToCount map[string]int
 }
 
 type QueryRoomsForUserRequest struct {

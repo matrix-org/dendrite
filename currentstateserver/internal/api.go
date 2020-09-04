@@ -54,33 +54,3 @@ func (a *CurrentStateInternalAPI) QueryBulkStateContent(ctx context.Context, req
 	}
 	return nil
 }
-
-func (a *CurrentStateInternalAPI) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
-	roomIDs, err := a.DB.GetRoomsByMembership(ctx, req.UserID, "join")
-	if err != nil {
-		return err
-	}
-	roomIDs = append(roomIDs, req.IncludeRoomIDs...)
-	excludeMap := make(map[string]bool)
-	for _, roomID := range req.ExcludeRoomIDs {
-		excludeMap[roomID] = true
-	}
-	// filter out excluded rooms
-	j := 0
-	for i := range roomIDs {
-		// move elements to include to the beginning of the slice
-		// then trim elements on the right
-		if !excludeMap[roomIDs[i]] {
-			roomIDs[j] = roomIDs[i]
-			j++
-		}
-	}
-	roomIDs = roomIDs[:j]
-
-	users, err := a.DB.JoinedUsersSetInRooms(ctx, roomIDs)
-	if err != nil {
-		return err
-	}
-	res.UserIDsToCount = users
-	return nil
-}
