@@ -25,19 +25,6 @@ import (
 )
 
 func AddRoutes(internalAPIMux *mux.Router, intAPI api.CurrentStateInternalAPI) {
-	internalAPIMux.Handle(QueryCurrentStatePath,
-		httputil.MakeInternalAPI("queryCurrentState", func(req *http.Request) util.JSONResponse {
-			request := api.QueryCurrentStateRequest{}
-			response := api.QueryCurrentStateResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := intAPI.QueryCurrentState(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 	internalAPIMux.Handle(QueryRoomsForUserPath,
 		httputil.MakeInternalAPI("queryRoomsForUser", func(req *http.Request) util.JSONResponse {
 			request := api.QueryRoomsForUserRequest{}
