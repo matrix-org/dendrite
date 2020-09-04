@@ -98,6 +98,15 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	res.Account = acc
 	return nil
 }
+
+func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
+	if err := a.AccountDB.SetPassword(ctx, req.Localpart, req.Password); err != nil {
+		return err
+	}
+	res.PasswordUpdated = true
+	return nil
+}
+
 func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.PerformDeviceCreationRequest, res *api.PerformDeviceCreationResponse) error {
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"localpart":    req.Localpart,
@@ -128,7 +137,9 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 		var devices []api.Device
 		devices, err = a.DeviceDB.RemoveAllDevices(ctx, local)
 		for _, d := range devices {
-			deletedDeviceIDs = append(deletedDeviceIDs, d.ID)
+			if d.ID != req.ExceptDeviceID {
+				deletedDeviceIDs = append(deletedDeviceIDs, d.ID)
+			}
 		}
 	} else {
 		err = a.DeviceDB.RemoveDevices(ctx, local, req.DeviceIDs)

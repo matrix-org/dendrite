@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -124,6 +125,20 @@ func (d *Database) SetDisplayName(
 	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		return d.profiles.setDisplayName(ctx, txn, localpart, displayName)
 	})
+}
+
+// SetPassword sets the account password to the given hash.
+func (d *Database) SetPassword(
+	ctx context.Context, localpart, plaintextPassword string,
+) error {
+	hash, err := hashPassword(plaintextPassword)
+	if err != nil {
+		return err
+	}
+	fmt.Println("PASSWORD:", localpart, plaintextPassword, hash)
+	err = d.accounts.updatePassword(ctx, localpart, hash)
+	fmt.Println("ERROR:", err)
+	return err
 }
 
 // CreateGuestAccount makes a new guest account and creates an empty profile
