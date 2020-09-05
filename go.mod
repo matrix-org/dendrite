@@ -1,6 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Shopify/sarama v1.27.0
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/gologme/log v1.2.0
@@ -32,6 +33,7 @@ require (
 	github.com/pressly/goose v2.7.0-rc5+incompatible
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.6.0
+	github.com/stretchr/testify v1.6.1
 	github.com/tidwall/gjson v1.6.1
 	github.com/tidwall/sjson v1.1.1
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
