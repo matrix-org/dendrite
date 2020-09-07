@@ -267,7 +267,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 func (rp *RequestPool) appendDeviceLists(
 	data *types.Response, userID string, since, to types.StreamingToken,
 ) (*types.Response, error) {
-	_, err := internal.DeviceListCatchup(context.Background(), rp.keyAPI, rp.rsAPI, rp.stateAPI, userID, data, since, to)
+	_, err := internal.DeviceListCatchup(context.Background(), rp.keyAPI, rp.rsAPI, userID, data, since, to)
 	if err != nil {
 		return nil, fmt.Errorf("internal.DeviceListCatchup: %w", err)
 	}

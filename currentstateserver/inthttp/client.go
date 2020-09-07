@@ -15,13 +15,10 @@
 package inthttp
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/currentstateserver/api"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/opentracing/opentracing-go"
 )
 
 // HTTP paths for the internal HTTP APIs
@@ -48,16 +45,4 @@ func NewCurrentStateAPIClient(
 type httpCurrentStateInternalAPI struct {
 	apiURL     string
 	httpClient *http.Client
-}
-
-func (h *httpCurrentStateInternalAPI) QueryBulkStateContent(
-	ctx context.Context,
-	request *api.QueryBulkStateContentRequest,
-	response *api.QueryBulkStateContentResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBulkStateContent")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryBulkStateContentPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

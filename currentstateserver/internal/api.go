@@ -15,33 +15,9 @@
 package internal
 
 import (
-	"context"
-
-	"github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/currentstateserver/storage"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type CurrentStateInternalAPI struct {
 	DB storage.Database
-}
-
-func (a *CurrentStateInternalAPI) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
-	events, err := a.DB.GetBulkStateContent(ctx, req.RoomIDs, req.StateTuples, req.AllowWildcards)
-	if err != nil {
-		return err
-	}
-	res.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
-	for _, ev := range events {
-		if res.Rooms[ev.RoomID] == nil {
-			res.Rooms[ev.RoomID] = make(map[gomatrixserverlib.StateKeyTuple]string)
-		}
-		room := res.Rooms[ev.RoomID]
-		room[gomatrixserverlib.StateKeyTuple{
-			EventType: ev.EventType,
-			StateKey:  ev.StateKey,
-		}] = ev.ContentValue
-		res.Rooms[ev.RoomID] = room
-	}
-	return nil
 }

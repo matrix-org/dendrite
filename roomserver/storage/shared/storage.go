@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 
-	csstables "github.com/matrix-org/dendrite/currentstateserver/storage/tables"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -799,8 +798,90 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership 
 
 // GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 // If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
-func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]csstables.StrippedEvent, error) {
-	return nil, fmt.Errorf("not implemented yet")
+// nolint:gocyclo
+func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error) {
+	eventTypes := make([]string, 0, len(tuples))
+	for _, tuple := range tuples {
+		eventTypes = append(eventTypes, tuple.EventType)
+	}
+	// we don't bother failing the request if we get asked for event types we don't know about, as all that would result in is no matches which
+	// isn't a failure.
+	eventTypeNIDMap, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, eventTypes)
+	if err != nil {
+		return nil, fmt.Errorf("GetBulkStateContent: failed to map event type nids: %w", err)
+	}
+	typeNIDSet := make(map[types.EventTypeNID]bool)
+	for _, nid := range eventTypeNIDMap {
+		typeNIDSet[nid] = true
+	}
+
+	allowWildcard := make(map[types.EventTypeNID]bool)
+	eventStateKeys := make([]string, 0, len(tuples))
+	for _, tuple := range tuples {
+		if allowWildcards && tuple.StateKey == "*" {
+			allowWildcard[eventTypeNIDMap[tuple.EventType]] = true
+			continue
+		}
+		eventStateKeys = append(eventStateKeys, tuple.StateKey)
+
+	}
+
+	eventStateKeyNIDMap, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, eventStateKeys)
+	if err != nil {
+		return nil, fmt.Errorf("GetBulkStateContent: failed to map state key nids: %w", err)
+	}
+	stateKeyNIDSet := make(map[types.EventStateKeyNID]bool)
+	for _, nid := range eventStateKeyNIDMap {
+		stateKeyNIDSet[nid] = true
+	}
+
+	var eventNIDs []types.EventNID
+	eventNIDToVer := make(map[types.EventNID]gomatrixserverlib.RoomVersion)
+	// TODO: This feels like this is going to be really slow...
+	for _, roomID := range roomIDs {
+		roomInfo, err2 := d.RoomInfo(ctx, roomID)
+		if err2 != nil {
+			return nil, fmt.Errorf("GetBulkStateContent: failed to load room info for room %s : %w", roomID, err2)
+		}
+		// for unknown rooms or rooms which we don't have the current state, skip them.
+		if roomInfo == nil || roomInfo.IsStub {
+			continue
+		}
+		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+		if err2 != nil {
+			return nil, fmt.Errorf("GetBulkStateContent: failed to load state for room %s : %w", roomID, err2)
+		}
+		for _, entry := range entries {
+			if typeNIDSet[entry.EventTypeNID] {
+				if allowWildcard[entry.EventTypeNID] || stateKeyNIDSet[entry.EventStateKeyNID] {
+					eventNIDs = append(eventNIDs, entry.EventNID)
+					eventNIDToVer[entry.EventNID] = roomInfo.RoomVersion
+				}
+			}
+		}
+	}
+
+	events, err := d.EventJSONTable.BulkSelectEventJSON(ctx, eventNIDs)
+	if err != nil {
+		return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event nids: %w", err)
+	}
+	result := make([]tables.StrippedEvent, len(events))
+	for i := range events {
+		roomVer := eventNIDToVer[events[i].EventNID]
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(events[i].EventJSON, false, roomVer)
+		if err != nil {
+			return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event NID %v : %w", events[i].EventNID, err)
+		}
+		hev := ev.Headered(roomVer)
+		result[i] = tables.StrippedEvent{
+			EventType:    ev.Type(),
+			RoomID:       ev.RoomID(),
+			StateKey:     *ev.StateKey(),
+			ContentValue: tables.ExtractContentValue(&hev),
+		}
+	}
+
+	return result, nil
 }
 
 // JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
