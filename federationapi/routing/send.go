@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
@@ -369,7 +370,6 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event, isInboundTxn bool) erro
 	}
 
 	if !stateResp.PrevEventsExist {
-		t.context = context.Background()
 		return t.processEventWithMissingState(e, stateResp.RoomVersion, isInboundTxn)
 	}
 
@@ -401,6 +401,12 @@ func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserver
 }
 
 func (t *txnReq) processEventWithMissingState(e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion, isInboundTxn bool) error {
+	// Do this with a fresh context, so that we keep working even if the
+	// original request times out. With any luck, by the time the remote
+	// side retries, we'll have fetched the missing state.
+	var cancel context.CancelFunc
+	t.context, cancel = context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
