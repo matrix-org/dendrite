@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/internal"
@@ -42,15 +41,14 @@ type RequestPool struct {
 	notifier *Notifier
 	keyAPI   keyapi.KeyInternalAPI
 	rsAPI    roomserverAPI.RoomserverInternalAPI
-	stateAPI currentstateAPI.CurrentStateInternalAPI
 }
 
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
 	db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *RequestPool {
-	return &RequestPool{db, userAPI, n, keyAPI, rsAPI, stateAPI}
+	return &RequestPool{db, userAPI, n, keyAPI, rsAPI}
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be

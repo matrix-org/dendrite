@@ -21,7 +21,6 @@ import (
 	"net/url"
 	"time"
 
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -38,7 +37,6 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
-	currentstateinthttp "github.com/matrix-org/dendrite/currentstateserver/inthttp"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	eduinthttp "github.com/matrix-org/dendrite/eduserver/inthttp"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -186,15 +184,6 @@ func (b *BaseDendrite) UserAPIClient() userapi.UserInternalAPI {
 		logrus.WithError(err).Panic("UserAPIClient failed", b.httpClient)
 	}
 	return userAPI
-}
-
-// CurrentStateAPIClient returns CurrentStateInternalAPI for hitting the currentstateserver over HTTP.
-func (b *BaseDendrite) CurrentStateAPIClient() currentstateAPI.CurrentStateInternalAPI {
-	stateAPI, err := currentstateinthttp.NewCurrentStateAPIClient(b.Cfg.CurrentStateAPIURL(), b.httpClient)
-	if err != nil {
-		logrus.WithError(err).Panic("UserAPIClient failed", b.httpClient)
-	}
-	return stateAPI
 }
 
 // EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
