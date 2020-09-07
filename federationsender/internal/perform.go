@@ -192,13 +192,25 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("joinCtx.CheckSendJoinResponse: %w", err)
 	}
 
+	// Work out which events were not returned from checking the
+	// send_join response. We'll include these in a map so that we
+	// don't generate input events for them.
+	var invalidEventIDs map[string]bool
+	if invalid := respState.InvalidEventIDs(); len(invalid) > 0 {
+		invalidEventIDs = make(map[string]bool)
+		for _, eventID := range invalid {
+			invalidEventIDs[eventID] = true
+		}
+	}
+
 	// If we successfully performed a send_join above then the other
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI,
 		respState,
-		event.Headered(respMakeJoin.RoomVersion), nil,
+		event.Headered(respMakeJoin.RoomVersion),
+		invalidEventIDs,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}
