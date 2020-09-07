@@ -843,6 +843,10 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 		if err2 != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load room info for room %s : %w", roomID, err2)
 		}
+		// for unknown rooms or rooms which we don't have the current state, skip them.
+		if roomInfo == nil || roomInfo.IsStub {
+			continue
+		}
 		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
 		if err2 != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load state for room %s : %w", roomID, err2)
