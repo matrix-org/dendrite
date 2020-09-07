@@ -369,6 +369,7 @@ func (t *txnReq) processEvent(e gomatrixserverlib.Event, isInboundTxn bool) erro
 	}
 
 	if !stateResp.PrevEventsExist {
+		t.context = context.Background()
 		return t.processEventWithMissingState(e, stateResp.RoomVersion, isInboundTxn)
 	}
 
