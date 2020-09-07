@@ -390,7 +390,7 @@ func Setup(
 
 	v1fedmux.Handle("/publicRooms",
 		httputil.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
-			return GetPostPublicRooms(req, rsAPI, stateAPI)
+			return GetPostPublicRooms(req, rsAPI)
 		}),
 	).Methods(http.MethodGet)
 

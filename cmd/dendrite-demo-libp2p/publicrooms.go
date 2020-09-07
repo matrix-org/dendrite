@@ -106,7 +106,7 @@ func (p *publicRoomsProvider) AdvertiseRooms() error {
 		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return err
 	}
-	ourRooms, err := currentstateAPI.PopulatePublicRooms(ctx, queryRes.RoomIDs, p.stateAPI)
+	ourRooms, err := roomserverAPI.PopulatePublicRooms(ctx, queryRes.RoomIDs, p.rsAPI)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("PopulatePublicRooms failed")
 		return err

@@ -15,27 +15,10 @@
 package inthttp
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/currentstateserver/api"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/util"
 )
 
 func AddRoutes(internalAPIMux *mux.Router, intAPI api.CurrentStateInternalAPI) {
-	internalAPIMux.Handle(QueryBulkStateContentPath,
-		httputil.MakeInternalAPI("queryBulkStateContent", func(req *http.Request) util.JSONResponse {
-			request := api.QueryBulkStateContentRequest{}
-			response := api.QueryBulkStateContentResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := intAPI.QueryBulkStateContent(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
+
 }

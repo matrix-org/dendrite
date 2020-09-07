@@ -336,7 +336,7 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
 		httputil.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
-			return GetPostPublicRooms(req, rsAPI, stateAPI, extRoomsProvider, federation, cfg)
+			return GetPostPublicRooms(req, rsAPI, extRoomsProvider, federation, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 

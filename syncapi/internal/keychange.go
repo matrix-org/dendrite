@@ -19,7 +19,6 @@ import (
 	"strings"
 
 	"github.com/Shopify/sarama"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -50,7 +49,6 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, 
 // nolint:gocyclo
 func DeviceListCatchup(
 	ctx context.Context, keyAPI keyapi.KeyInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	userID string, res *types.Response, from, to types.StreamingToken,
 ) (hasNew bool, err error) {
 
@@ -58,7 +56,7 @@ func DeviceListCatchup(
 	newlyJoinedRooms := joinedRooms(res, userID)
 	newlyLeftRooms := leftRooms(res)
 	if len(newlyJoinedRooms) > 0 || len(newlyLeftRooms) > 0 {
-		changed, left, err := TrackChangedUsers(ctx, rsAPI, stateAPI, userID, newlyJoinedRooms, newlyLeftRooms)
+		changed, left, err := TrackChangedUsers(ctx, rsAPI, userID, newlyJoinedRooms, newlyLeftRooms)
 		if err != nil {
 			return false, err
 		}
@@ -144,7 +142,7 @@ func DeviceListCatchup(
 // TrackChangedUsers calculates the values of device_lists.changed|left in the /sync response.
 // nolint:gocyclo
 func TrackChangedUsers(
-	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI, userID string, newlyJoinedRooms, newlyLeftRooms []string,
+	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, userID string, newlyJoinedRooms, newlyLeftRooms []string,
 ) (changed, left []string, err error) {
 	// process leaves first, then joins afterwards so if we join/leave/join/leave we err on the side of including users.
 
@@ -161,8 +159,8 @@ func TrackChangedUsers(
 	if err != nil {
 		return nil, nil, err
 	}
-	var stateRes currentstateAPI.QueryBulkStateContentResponse
-	err = stateAPI.QueryBulkStateContent(ctx, &currentstateAPI.QueryBulkStateContentRequest{
+	var stateRes roomserverAPI.QueryBulkStateContentResponse
+	err = rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
 		RoomIDs: newlyLeftRooms,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			{
@@ -202,7 +200,7 @@ func TrackChangedUsers(
 	if err != nil {
 		return nil, left, err
 	}
-	err = stateAPI.QueryBulkStateContent(ctx, &currentstateAPI.QueryBulkStateContentRequest{
+	err = rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
 		RoomIDs: newlyJoinedRooms,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			{
