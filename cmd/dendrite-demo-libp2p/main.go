@@ -29,7 +29,6 @@ import (
 	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
-	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -129,7 +128,6 @@ func main() {
 	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
 	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-currentstate.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
@@ -153,7 +151,6 @@ func main() {
 		base, serverKeyAPI,
 	)
 
-	stateAPI := currentstateserver.NewInternalAPI(&base.Base.Cfg.CurrentStateServer, base.Base.KafkaConsumer)
 	rsAPI := roomserver.NewInternalAPI(
 		&base.Base, keyRing,
 	)
@@ -165,7 +162,7 @@ func main() {
 		&base.Base, federation, rsAPI, keyRing,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
-	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI, stateAPI)
+	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI)
 	err = provider.Start()
 	if err != nil {
 		panic("failed to create new public rooms provider: " + err.Error())
@@ -185,7 +182,6 @@ func main() {
 		FederationSenderAPI:    fsAPI,
 		RoomserverAPI:          rsAPI,
 		ServerKeyAPI:           serverKeyAPI,
-		StateAPI:               stateAPI,
 		UserAPI:                userAPI,
 		KeyAPI:                 keyAPI,
 		ExtPublicRoomsProvider: provider,

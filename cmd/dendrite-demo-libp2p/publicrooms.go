@@ -22,7 +22,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -46,15 +45,13 @@ type publicRoomsProvider struct {
 	maintenanceTimer *time.Timer               //
 	roomsAdvertised  atomic.Value              // stores int
 	rsAPI            roomserverAPI.RoomserverInternalAPI
-	stateAPI         currentstateAPI.CurrentStateInternalAPI
 }
 
-func newPublicRoomsProvider(ps *pubsub.PubSub, rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI) *publicRoomsProvider {
+func newPublicRoomsProvider(ps *pubsub.PubSub, rsAPI roomserverAPI.RoomserverInternalAPI) *publicRoomsProvider {
 	return &publicRoomsProvider{
 		foundRooms: make(map[string]discoveredRoom),
 		pubsub:     ps,
 		rsAPI:      rsAPI,
-		stateAPI:   stateAPI,
 	}
 }
 
