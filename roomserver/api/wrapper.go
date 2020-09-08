@@ -53,15 +53,20 @@ func SendEventWithState(
 	}
 
 	var ires []InputRoomEvent
+	var stateIDs []string
+
 	for _, outlier := range outliers {
 		if haveEventIDs[outlier.EventID()] {
 			continue
 		}
 		ires = append(ires, InputRoomEvent{
-			Kind:         KindOutlier,
-			Event:        outlier.Headered(event.RoomVersion),
-			AuthEventIDs: outlier.AuthEventIDs(),
+			Kind:          KindNew,
+			Event:         outlier.Headered(event.RoomVersion),
+			AuthEventIDs:  outlier.AuthEventIDs(),
+			HasState:      true,
+			StateEventIDs: stateIDs,
 		})
+		stateIDs = append(stateIDs, outlier.EventID())
 	}
 
 	stateEventIDs := make([]string, len(state.StateEvents))
