@@ -44,7 +44,7 @@ func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.St
 	startedAt := time.Now()
 	rows, err := stmt.QueryContext(ctx, args)
 
-	trackGoID(ctx, query)
+	trackGoID(query)
 
 	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).Debug("executed sql query ", query, " args: ", args)
 
@@ -55,7 +55,7 @@ func (in *traceInterceptor) StmtExecContext(ctx context.Context, stmt driver.Stm
 	startedAt := time.Now()
 	result, err := stmt.ExecContext(ctx, args)
 
-	trackGoID(ctx, query)
+	trackGoID(query)
 
 	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).Debug("executed sql query ", query, " args: ", args)
 
@@ -83,7 +83,7 @@ func (in *traceInterceptor) RowsNext(c context.Context, rows driver.Rows, dest [
 	return err
 }
 
-func trackGoID(ctx context.Context, query string) {
+func trackGoID(query string) {
 	thisGoID := goid()
 	if _, ok := goidToWriter.Load(thisGoID); ok {
 		return // we're on a writer goroutine
