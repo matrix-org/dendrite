@@ -54,7 +54,7 @@ const deletePeeksSQL = "" +
 // we care about all the peeks which were created in this range, deleted in this range,
 // or were created before this range but haven't been deleted yet.
 const selectPeeksInRangeSQL = "" +
-	"SELECT room_id, deleted, (id > $3 AND id <= $4) AS new FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted) OR new)"
+	"SELECT room_id, deleted, (id > $3 AND id <= $4) AS changed FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted) OR (id > $3 AND id <= $4))"
 
 const selectPeekingDevicesSQL = "" +
 	"SELECT room_id, user_id, device_id FROM syncapi_peeks WHERE deleted=false"
@@ -148,9 +148,11 @@ func (s *peekStatements) SelectPeeksInRange(
 
 	for rows.Next() {
 		peek := types.Peek{}
-		if err = rows.Scan(&peek.RoomID, &peek.Deleted, &peek.New); err != nil {
+		var changed bool
+		if err = rows.Scan(&peek.RoomID, &peek.Deleted, &changed); err != nil {
 			return
 		}
+		peek.New = changed && !peek.Deleted
 		peeks = append(peeks, peek)
 	}
 
