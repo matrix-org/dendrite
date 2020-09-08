@@ -47,7 +47,7 @@ func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, state *gomatrixserverlib.RespState,
 	event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool,
 ) error {
-	outliers, err := state.Events()
+	stateEvents, err := state.Events()
 	if err != nil {
 		return err
 	}
@@ -55,18 +55,34 @@ func SendEventWithState(
 	var ires []InputRoomEvent
 	var stateIDs []string
 
-	for _, outlier := range outliers {
-		if haveEventIDs[outlier.EventID()] {
+	for _, stateEvent := range stateEvents {
+		if stateEvent.StateKey() == nil {
+			continue
+		}
+		if haveEventIDs[stateEvent.EventID()] {
+			continue
+		}
+		if stateEvent.Type() == event.Type() && *stateEvent.StateKey() == *event.StateKey() {
+			// If this event is an old state event that will be replaced by the
+			// given event, then store it as an outlier instead. We don't want
+			// to include it in the current room state as we will end up violating
+			// unique constraints in the state block, but we need the event to
+			// be stored as it may be referred to as an auth_event or prev_event.
+			ires = append(ires, InputRoomEvent{
+				Kind:         KindOutlier,
+				Event:        stateEvent.Headered(event.RoomVersion),
+				AuthEventIDs: stateEvent.AuthEventIDs(),
+			})
 			continue
 		}
 		ires = append(ires, InputRoomEvent{
 			Kind:          KindNew,
-			Event:         outlier.Headered(event.RoomVersion),
-			AuthEventIDs:  outlier.AuthEventIDs(),
+			Event:         stateEvent.Headered(event.RoomVersion),
+			AuthEventIDs:  stateEvent.AuthEventIDs(),
 			HasState:      true,
 			StateEventIDs: stateIDs,
 		})
-		stateIDs = append(stateIDs, outlier.EventID())
+		stateIDs = append(stateIDs, stateEvent.EventID())
 	}
 
 	ires = append(ires, InputRoomEvent{
