@@ -167,19 +167,24 @@ func (r *Inputer) calculateAndSetState(
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
 		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
-			return err
+			return fmt.Errorf("r.DB.StateEntriesForEventIDs: %w", err)
 		}
 
 		if stateAtEvent.BeforeStateSnapshotNID, err = r.DB.AddState(ctx, roomInfo.RoomNID, nil, entries); err != nil {
-			return err
+			return fmt.Errorf("r.DB.AddState: %w", err)
 		}
 	} else {
 		stateAtEvent.Overwrite = false
 
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
 		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event); err != nil {
-			return err
+			return fmt.Errorf("roomState.CalculateAndStoreStateBeforeEvent: %w", err)
 		}
 	}
-	return r.DB.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
+
+	err = r.DB.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
+	if err != nil {
+		return fmt.Errorf("r.DB.SetState: %w", err)
+	}
+	return nil
 }
