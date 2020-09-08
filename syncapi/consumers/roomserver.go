@@ -31,6 +31,7 @@ import (
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
+	cfg        *config.SyncAPI
 	rsAPI      api.RoomserverInternalAPI
 	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
@@ -55,6 +56,7 @@ func NewOutputRoomEventConsumer(
 		PartitionStore: store,
 	}
 	s := &OutputRoomEventConsumer{
+		cfg:		cfg,
 		rsConsumer: &consumer,
 		db:         store,
 		notifier:   n,
@@ -168,6 +170,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	s.notifyKeyChanges(&ev)
 
+	if err = s.notifyJoinedPeeks(ctx, &ev); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -184,6 +190,32 @@ func (s *OutputRoomEventConsumer) notifyKeyChanges(ev *gomatrixserverlib.Headere
 	case gomatrixserverlib.Leave:
 		s.keyChanges.OnLeaveEvent(ev)
 	}
+}
+
+func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) (error) {
+	membership, err := ev.Membership()
+	if err != nil {
+		return nil
+	}
+	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
+	if membership == gomatrixserverlib.Join {
+		// check it's a local join
+		_, domain, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
+		if err != nil {
+			return err
+		}
+		if domain != s.cfg.Matrix.ServerName {
+			return nil
+		}
+
+		// cancel any peeks for it
+		_, err = s.db.DeletePeeks(ctx, ev.RoomID(), *ev.StateKey())
+		// XXX: should we do anything with this new streampos?
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
