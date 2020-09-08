@@ -23,7 +23,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -171,7 +170,6 @@ func main() {
 	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"
 	cfg.ServerKeyAPI.Database.ConnectionString = "file:/idb/dendritejs_serverkey.db"
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
-	cfg.CurrentStateServer.Database.ConnectionString = "file:/idb/dendritejs_currentstate.db"
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.Global.Kafka.Database.ConnectionString = "file:/idb/dendritejs_naffka.db"
@@ -204,7 +202,6 @@ func main() {
 		KeyDatabase: fetcher,
 	}
 
-	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 	rsAPI := roomserver.NewInternalAPI(base, keyRing)
 	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
@@ -227,7 +224,6 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fedSenderAPI,
 		RoomserverAPI:       rsAPI,
-		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
 		//ServerKeyAPI:        serverKeyAPI,

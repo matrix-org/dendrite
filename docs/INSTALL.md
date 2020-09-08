@@ -109,7 +109,7 @@ Assuming that Postgres 9.5 (or later) is installed:
 * Create the component databases:
 
   ```bash
-  for i in account device mediaapi syncapi roomserver serverkey federationsender currentstate appservice e2ekey naffka; do
+  for i in account device mediaapi syncapi roomserver serverkey federationsender appservice e2ekey naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
@@ -237,16 +237,6 @@ This is what implements the room DAG. Clients do not talk to this.
 
 ```bash
 ./bin/dendrite-room-server --config=dendrite.yaml
-```
-
-#### Current state server
-
-This tracks the current state of rooms which various components need to know. For example,
-`/publicRooms` implemented by client API asks this server for the room names, joined member
-counts, etc.
-
-```bash
-./bin/dendrite-current-state-server --config=dendrite.yaml
 ```
 
 #### Federation sender

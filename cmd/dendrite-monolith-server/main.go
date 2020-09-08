@@ -19,7 +19,6 @@ import (
 	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/currentstateserver"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -54,7 +53,6 @@ func main() {
 		// itself.
 		cfg.AppServiceAPI.InternalAPI.Connect = httpAddr
 		cfg.ClientAPI.InternalAPI.Connect = httpAddr
-		cfg.CurrentStateServer.InternalAPI.Connect = httpAddr
 		cfg.EDUServer.InternalAPI.Connect = httpAddr
 		cfg.FederationAPI.InternalAPI.Connect = httpAddr
 		cfg.FederationSender.InternalAPI.Connect = httpAddr
@@ -94,8 +92,6 @@ func main() {
 			Impl: rsAPI,
 		}
 	}
-
-	stateAPI := currentstateserver.NewInternalAPI(&base.Cfg.CurrentStateServer, base.KafkaConsumer)
 
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, keyRing,
@@ -140,7 +136,6 @@ func main() {
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
 		ServerKeyAPI:        serverKeyAPI,
-		StateAPI:            stateAPI,
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
 	}

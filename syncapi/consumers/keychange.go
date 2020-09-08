@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	"github.com/Shopify/sarama"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -38,7 +37,6 @@ type OutputKeyChangeEventConsumer struct {
 	db                  storage.Database
 	serverName          gomatrixserverlib.ServerName // our server name
 	rsAPI               roomserverAPI.RoomserverInternalAPI
-	stateAPI            currentstateAPI.CurrentStateInternalAPI
 	keyAPI              api.KeyInternalAPI
 	partitionToOffset   map[int32]int64
 	partitionToOffsetMu sync.Mutex
@@ -54,7 +52,6 @@ func NewOutputKeyChangeEventConsumer(
 	n *syncapi.Notifier,
 	keyAPI api.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	store storage.Database,
 ) *OutputKeyChangeEventConsumer {
 
@@ -71,7 +68,6 @@ func NewOutputKeyChangeEventConsumer(
 		serverName:          serverName,
 		keyAPI:              keyAPI,
 		rsAPI:               rsAPI,
-		stateAPI:            stateAPI,
 		partitionToOffset:   make(map[int32]int64),
 		partitionToOffsetMu: sync.Mutex{},
 		notifier:            n,
@@ -133,7 +129,7 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 func (s *OutputKeyChangeEventConsumer) OnJoinEvent(ev *gomatrixserverlib.HeaderedEvent) {
 	// work out who we are now sharing rooms with which we previously were not and notify them about the joining
 	// users keys:
-	changed, _, err := syncinternal.TrackChangedUsers(context.Background(), s.rsAPI, s.stateAPI, *ev.StateKey(), []string{ev.RoomID()}, nil)
+	changed, _, err := syncinternal.TrackChangedUsers(context.Background(), s.rsAPI, *ev.StateKey(), []string{ev.RoomID()}, nil)
 	if err != nil {
 		log.WithError(err).Error("OnJoinEvent: failed to work out changed users")
 		return
@@ -146,7 +142,7 @@ func (s *OutputKeyChangeEventConsumer) OnJoinEvent(ev *gomatrixserverlib.Headere
 
 func (s *OutputKeyChangeEventConsumer) OnLeaveEvent(ev *gomatrixserverlib.HeaderedEvent) {
 	// work out who we are no longer sharing any rooms with and notify them about the leaving user
-	_, left, err := syncinternal.TrackChangedUsers(context.Background(), s.rsAPI, s.stateAPI, *ev.StateKey(), nil, []string{ev.RoomID()})
+	_, left, err := syncinternal.TrackChangedUsers(context.Background(), s.rsAPI, *ev.StateKey(), nil, []string{ev.RoomID()})
 	if err != nil {
 		log.WithError(err).Error("OnLeaveEvent: failed to work out left users")
 		return

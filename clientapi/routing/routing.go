@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -56,7 +55,6 @@ func Setup(
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
@@ -342,12 +340,12 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetVisibility(req, stateAPI, rsAPI, device, vars["roomID"])
+			return SetVisibility(req, rsAPI, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
 		httputil.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
-			return GetPostPublicRooms(req, rsAPI, stateAPI, extRoomsProvider, federation, cfg)
+			return GetPostPublicRooms(req, rsAPI, extRoomsProvider, federation, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
@@ -505,7 +503,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetAvatarURL(req, accountDB, stateAPI, device, vars["userID"], cfg, rsAPI)
+			return SetAvatarURL(req, accountDB, device, vars["userID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -530,7 +528,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetDisplayName(req, accountDB, stateAPI, device, vars["userID"], cfg, rsAPI)
+			return SetDisplayName(req, accountDB, device, vars["userID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows

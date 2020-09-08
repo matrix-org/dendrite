@@ -372,7 +372,6 @@ func (c *txnFedClient) LookupMissingEvents(ctx context.Context, s gomatrixserver
 
 func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
 	t := &txnReq{
-		context:    context.Background(),
 		rsAPI:      rsAPI,
 		eduAPI:     &testEDUProducer{},
 		keys:       &test.NopJSONVerifier{},
@@ -388,7 +387,7 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 }
 
 func mustProcessTransaction(t *testing.T, txn *txnReq, pdusWithErrors []string) {
-	res, err := txn.processTransaction()
+	res, err := txn.processTransaction(context.Background())
 	if err != nil {
 		t.Errorf("txn.processTransaction returned an error: %v", err)
 		return

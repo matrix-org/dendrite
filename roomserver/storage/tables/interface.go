@@ -6,6 +6,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 )
 
 type EventJSONPair struct {
@@ -154,4 +155,46 @@ type Redactions interface {
 	// Mark this redaction event as having been validated. This means we have both sides of the redaction and have
 	// successfully redacted the event JSON.
 	MarkRedactionValidated(ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool) error
+}
+
+// StrippedEvent represents a stripped event for returning extracted content values.
+type StrippedEvent struct {
+	RoomID       string
+	EventType    string
+	StateKey     string
+	ContentValue string
+}
+
+// ExtractContentValue from the given state event. For example, given an m.room.name event with:
+//    content: { name: "Foo" }
+// this returns "Foo".
+func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
+	content := ev.Content()
+	key := ""
+	switch ev.Type() {
+	case gomatrixserverlib.MRoomCreate:
+		key = "creator"
+	case gomatrixserverlib.MRoomCanonicalAlias:
+		key = "alias"
+	case gomatrixserverlib.MRoomHistoryVisibility:
+		key = "history_visibility"
+	case gomatrixserverlib.MRoomJoinRules:
+		key = "join_rule"
+	case gomatrixserverlib.MRoomMember:
+		key = "membership"
+	case gomatrixserverlib.MRoomName:
+		key = "name"
+	case "m.room.avatar":
+		key = "url"
+	case "m.room.topic":
+		key = "topic"
+	case "m.room.guest_access":
+		key = "guest_access"
+	}
+	result := gjson.GetBytes(content, key)
+	if !result.Exists() {
+		return ""
+	}
+	// this returns the empty string if this is not a string type
+	return result.Str
 }

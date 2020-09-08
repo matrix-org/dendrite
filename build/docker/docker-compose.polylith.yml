@@ -43,17 +43,6 @@ services:
     networks:
       - internal
 
-  current_state_server:
-    hostname: current_state_server
-    image: matrixdotorg/dendrite:currentstateserver
-    command: [
-      "--config=dendrite.yaml"
-    ]
-    volumes:
-      - ./config:/etc/dendrite
-    networks:
-      - internal
-
   sync_api:
     hostname: sync_api
     image: matrixdotorg/dendrite:syncapi
