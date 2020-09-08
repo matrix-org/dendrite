@@ -429,7 +429,8 @@ func (d *Database) addPDUDeltaToResponse(
 	succeeded := false
 	defer func() {
 		_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			return sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
+			sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
+			return nil
 		})
 	}()
 
@@ -626,7 +627,8 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	succeeded := false
 	defer func() {
 		_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			return sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
+			sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
+			return nil
 		})
 	}()
 
