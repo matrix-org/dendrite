@@ -420,10 +420,6 @@ func (d *Database) EventPositionInTopology(
 func (d *Database) syncPositionTx(
 	ctx context.Context, txn *sql.Tx,
 ) (sp types.StreamingToken, err error) {
-
-	// XXX: it seems very inefficient to be doing all these aggregate selects
-	// every time we call /sync...
-
 	maxEventID, err := d.OutputEvents.SelectMaxEventID(ctx, txn)
 	if err != nil {
 		return sp, err
