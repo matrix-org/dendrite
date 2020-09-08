@@ -70,7 +70,10 @@ func failBlacklistableError(err error, stats *statistics.ServerStatistics) (unti
 	if !ok {
 		return stats.Failure()
 	}
-	if mxerr.Code >= 500 && mxerr.Code < 600 {
+	if mxerr.Code == 401 { // invalid signature in X-Matrix header
+		return stats.Failure()
+	}
+	if mxerr.Code >= 500 && mxerr.Code < 600 { // internal server errors
 		return stats.Failure()
 	}
 	return
