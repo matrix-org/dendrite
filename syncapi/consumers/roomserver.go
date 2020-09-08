@@ -170,7 +170,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, &ev, pduPos); err != nil {
-		logrus.WithError(err).Panicf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
