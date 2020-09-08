@@ -516,6 +516,7 @@ type PeekingDevice struct {
 }
 
 type Peek struct {
-	RoomID string
-	New    bool
+	RoomID  string
+	New     bool
+	Deleted bool
 }

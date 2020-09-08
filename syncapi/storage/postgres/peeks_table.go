@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS syncapi_peeks (
 	room_id TEXT NOT NULL,
 	user_id TEXT NOT NULL,
 	device_id TEXT NOT NULL,
-	new BOOL NOT NULL DEFAULT true,
 	deleted BOOL NOT NULL DEFAULT false,
     -- When the peek was created in UNIX epoch ms.
     creation_ts BIGINT NOT NULL
@@ -52,14 +51,13 @@ const deletePeekSQL = "" +
 const deletePeeksSQL = "" +
 	"UPDATE syncapi_peeks SET deleted=true, id=nextval('syncapi_stream_id') WHERE room_id = $1 AND user_id = $2 RETURNING id"
 
-const selectPeeksSQL = "" +
-	"SELECT room_id, new FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND deleted=false"
+// we care about all the peeks which were created in this range, deleted in this range,
+// or were created before this range but haven't been deleted yet.
+const selectPeeksInRangeSQL = "" +
+	"SELECT room_id, deleted, (id > $3 AND id <= $4) AS new FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted) OR new)"
 
 const selectPeekingDevicesSQL = "" +
 	"SELECT room_id, user_id, device_id FROM syncapi_peeks WHERE deleted=false"
-
-const markPeeksAsOldSQL = "" +
-	"UPDATE syncapi_peeks SET id=nextval('syncapi_stream_id'), new=false WHERE user_id = $1 AND device_id = $2 AND deleted=false RETURNING id"
 
 const selectMaxPeekIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_peeks"
@@ -69,9 +67,8 @@ type peekStatements struct {
 	insertPeekStmt           *sql.Stmt
 	deletePeekStmt           *sql.Stmt
 	deletePeeksStmt          *sql.Stmt
-	selectPeeksStmt          *sql.Stmt
+	selectPeeksInRangeStmt   *sql.Stmt
 	selectPeekingDevicesStmt *sql.Stmt
-	markPeeksAsOldStmt       *sql.Stmt
 	selectMaxPeekIDStmt      *sql.Stmt
 }
 
@@ -92,13 +89,10 @@ func NewPostgresPeeksTable(db *sql.DB) (tables.Peeks, error) {
 	if s.deletePeeksStmt, err = db.Prepare(deletePeeksSQL); err != nil {
 		return nil, err
 	}
-	if s.selectPeeksStmt, err = db.Prepare(selectPeeksSQL); err != nil {
+	if s.selectPeeksInRangeStmt, err = db.Prepare(selectPeeksInRangeSQL); err != nil {
 		return nil, err
 	}
 	if s.selectPeekingDevicesStmt, err = db.Prepare(selectPeekingDevicesSQL); err != nil {
-		return nil, err
-	}
-	if s.markPeeksAsOldStmt, err = db.Prepare(markPeeksAsOldSQL); err != nil {
 		return nil, err
 	}
 	if s.selectMaxPeekIDStmt, err = db.Prepare(selectMaxPeekIDSQL); err != nil {
@@ -132,32 +126,24 @@ func (s *peekStatements) DeletePeeks(
 	return
 }
 
-func (s *peekStatements) SelectPeeks(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string,
+func (s *peekStatements) SelectPeeksInRange(
+	ctx context.Context, txn *sql.Tx, userID, deviceID string, r types.Range,
 ) (peeks []types.Peek, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectPeeksStmt).QueryContext(ctx, userID, deviceID)
+	rows, err := sqlutil.TxStmt(txn, s.selectPeeksInRangeStmt).QueryContext(ctx, userID, deviceID, r.Low(), r.High())
 	if err != nil {
 		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectPeeks: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectPeeksInRange: rows.close() failed")
 
 	for rows.Next() {
 		peek := types.Peek{}
-		if err = rows.Scan(&peek.RoomID, &peek.New); err != nil {
+		if err = rows.Scan(&peek.RoomID, &peek.Deleted, &peek.New); err != nil {
 			return
 		}
 		peeks = append(peeks, peek)
 	}
 
 	return peeks, rows.Err()
-}
-
-func (s *peekStatements) MarkPeeksAsOld(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string,
-) (streamPos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.markPeeksAsOldStmt)
-	err = stmt.QueryRowContext(ctx, userID, deviceID).Scan(&streamPos)
-	return
 }
 
 func (s *peekStatements) SelectPeekingDevices(

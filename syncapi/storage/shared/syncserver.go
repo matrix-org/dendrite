@@ -694,19 +694,21 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 
 	// Add peeked rooms.
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, deviceID)
+	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, deviceID, r)
 	if err != nil {
 		return
 	}
 	for _, peek := range peeks {
-		var jr *types.JoinResponse
-		jr, err = d.getJoinResponseForCompleteSync(
-			ctx, txn, peek.RoomID, r, &stateFilter, numRecentEventsPerRoom,
-		)
-		if err != nil {
-			return
+		if !peek.Deleted {
+			var jr *types.JoinResponse
+			jr, err = d.getJoinResponseForCompleteSync(
+				ctx, txn, peek.RoomID, r, &stateFilter, numRecentEventsPerRoom,
+			)
+			if err != nil {
+				return
+			}
+			res.Rooms.Peek[peek.RoomID] = *jr
 		}
-		res.Rooms.Peek[peek.RoomID] = *jr
 	}
 
 	if err = d.addInvitesToResponse(ctx, txn, userID, r, res); err != nil {
@@ -1034,13 +1036,12 @@ func (d *Database) getStateDeltas(
 
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so any peeks get overwritten
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.ID)
+	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// add peek blocks
-	newPeeks := false
 	for _, peek := range peeks {
 		if peek.New {
 			// send full room state down instead of a delta
@@ -1050,23 +1051,13 @@ func (d *Database) getStateDeltas(
 				return nil, nil, err
 			}
 			state[peek.RoomID] = s
-			newPeeks = true
 		}
-
-		deltas = append(deltas, stateDelta{
-			membership:  gomatrixserverlib.Peek,
-			stateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
-			roomID:      peek.RoomID,
-		})
-	}
-
-	if newPeeks {
-		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			_, err := d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
-			return err
-		})
-		if err != nil {
-			return nil, nil, err
+		if !peek.Deleted {
+			deltas = append(deltas, stateDelta{
+				membership:  gomatrixserverlib.Peek,
+				stateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
+				roomID:      peek.RoomID,
+			})
 		}
 	}
 
@@ -1130,35 +1121,23 @@ func (d *Database) getStateDeltasForFullStateSync(
 	// Use a reasonable initial capacity
 	deltas := make(map[string]stateDelta)
 
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.ID)
+	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Add full states for all peeking rooms
-	newPeeks := false
 	for _, peek := range peeks {
-		if peek.New {
-			newPeeks = true
-		}
-		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
-		if stateErr != nil {
-			return nil, nil, stateErr
-		}
-		deltas[peek.RoomID] = stateDelta{
-			membership:  gomatrixserverlib.Peek,
-			stateEvents: d.StreamEventsToEvents(device, s),
-			roomID:      peek.RoomID,
-		}
-	}
-
-	if newPeeks {
-		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			_, err := d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
-			return err
-		})
-		if err != nil {
-			return nil, nil, err
+		if !peek.Deleted {
+			s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
+			if stateErr != nil {
+				return nil, nil, stateErr
+			}
+			deltas[peek.RoomID] = stateDelta{
+				membership:  gomatrixserverlib.Peek,
+				stateEvents: d.StreamEventsToEvents(device, s),
+				roomID:      peek.RoomID,
+			}
 		}
 	}
 
