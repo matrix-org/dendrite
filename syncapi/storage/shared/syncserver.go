@@ -36,17 +36,31 @@ import (
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
 // For now this contains the shared functions
 type Database struct {
-	DB                  *sql.DB
-	Writer              sqlutil.Writer
-	Invites             tables.Invites
-	AccountData         tables.AccountData
-	OutputEvents        tables.Events
-	Topology            tables.Topology
-	CurrentRoomState    tables.CurrentRoomState
-	BackwardExtremities tables.BackwardsExtremities
-	SendToDevice        tables.SendToDevice
-	Filter              tables.Filter
-	EDUCache            *cache.EDUCache
+	DB                     *sql.DB
+	TransactionalIsolation bool
+	Writer                 sqlutil.Writer
+	Invites                tables.Invites
+	AccountData            tables.AccountData
+	OutputEvents           tables.Events
+	Topology               tables.Topology
+	CurrentRoomState       tables.CurrentRoomState
+	BackwardExtremities    tables.BackwardsExtremities
+	SendToDevice           tables.SendToDevice
+	Filter                 tables.Filter
+	EDUCache               *cache.EDUCache
+}
+
+func (d *Database) getIsolatedTransactionIfAvailable(ctx context.Context, succeeded *bool) (txn *sql.Tx, done func(), err error) {
+	if d.TransactionalIsolation {
+		txn, err = d.DB.BeginTx(ctx, &txReadOnlySnapshot)
+		if err != nil {
+			return nil, nil, err
+		}
+		done = func() {
+			sqlutil.EndTransactionWithCheck(txn, succeeded, &err)
+		}
+	}
+	return
 }
 
 // Events lookups a list of event by their event ID.
@@ -422,17 +436,14 @@ func (d *Database) addPDUDeltaToResponse(
 	wantFullState bool,
 	res *types.Response,
 ) (joinedRoomIDs []string, err error) {
-	txn, err := d.DB.BeginTx(ctx, &txReadOnlySnapshot)
-	if err != nil {
-		return nil, err
-	}
 	succeeded := false
-	defer func() {
-		_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
-			return nil
-		})
-	}()
+	txn, done, err := d.getIsolatedTransactionIfAvailable(ctx, &succeeded)
+	if err != nil {
+		return nil, fmt.Errorf("getIsolatedTransactionIfAvailable: %w", err)
+	}
+	if txn != nil {
+		defer done()
+	}
 
 	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
 
@@ -620,17 +631,14 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	// a consistent view of the database throughout. This includes extracting the sync position.
 	// This does have the unfortunate side-effect that all the matrixy logic resides in this function,
 	// but it's better to not hide the fact that this is being done in a transaction.
-	txn, err := d.DB.BeginTx(ctx, &txReadOnlySnapshot)
+	succeeded := false
+	txn, done, err := d.getIsolatedTransactionIfAvailable(ctx, &succeeded)
 	if err != nil {
 		return
 	}
-	succeeded := false
-	defer func() {
-		_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
-			return nil
-		})
-	}()
+	if txn != nil {
+		defer done()
+	}
 
 	// Get the current sync position which we will base the sync response on.
 	toPos, err = d.syncPositionTx(ctx, txn)

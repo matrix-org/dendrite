@@ -92,17 +92,18 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		return err
 	}
 	d.Database = shared.Database{
-		DB:                  d.db,
-		Writer:              d.writer,
-		Invites:             invites,
-		AccountData:         accountData,
-		OutputEvents:        events,
-		BackwardExtremities: bwExtrem,
-		CurrentRoomState:    roomState,
-		Topology:            topology,
-		Filter:              filter,
-		SendToDevice:        sendToDevice,
-		EDUCache:            cache.New(),
+		DB:                     d.db,
+		TransactionalIsolation: false,
+		Writer:                 d.writer,
+		Invites:                invites,
+		AccountData:            accountData,
+		OutputEvents:           events,
+		BackwardExtremities:    bwExtrem,
+		CurrentRoomState:       roomState,
+		Topology:               topology,
+		Filter:                 filter,
+		SendToDevice:           sendToDevice,
+		EDUCache:               cache.New(),
 	}
 	return nil
 }

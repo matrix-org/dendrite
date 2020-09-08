@@ -79,17 +79,18 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		return nil, err
 	}
 	d.Database = shared.Database{
-		DB:                  d.db,
-		Writer:              d.writer,
-		Invites:             invites,
-		AccountData:         accountData,
-		OutputEvents:        events,
-		Topology:            topology,
-		CurrentRoomState:    currState,
-		BackwardExtremities: backwardExtremities,
-		Filter:              filter,
-		SendToDevice:        sendToDevice,
-		EDUCache:            cache.New(),
+		DB:                     d.db,
+		TransactionalIsolation: true,
+		Writer:                 d.writer,
+		Invites:                invites,
+		AccountData:            accountData,
+		OutputEvents:           events,
+		Topology:               topology,
+		CurrentRoomState:       currState,
+		BackwardExtremities:    backwardExtremities,
+		Filter:                 filter,
+		SendToDevice:           sendToDevice,
+		EDUCache:               cache.New(),
 	}
 	return &d, nil
 }
