@@ -69,17 +69,12 @@ func SendEventWithState(
 		stateIDs = append(stateIDs, outlier.EventID())
 	}
 
-	stateEventIDs := make([]string, len(state.StateEvents))
-	for i := range state.StateEvents {
-		stateEventIDs[i] = state.StateEvents[i].EventID()
-	}
-
 	ires = append(ires, InputRoomEvent{
 		Kind:          KindNew,
 		Event:         event,
 		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
-		StateEventIDs: stateEventIDs,
+		StateEventIDs: stateIDs,
 	})
 
 	return SendInputRoomEvents(ctx, rsAPI, ires)
