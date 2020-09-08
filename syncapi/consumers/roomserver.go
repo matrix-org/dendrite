@@ -166,13 +166,14 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write event failure")
 		return nil
 	}
+
+	if pduPos, err = s.notifyJoinedPeeks(ctx, &ev, pduPos); err != nil {
+		return err
+	}
+
 	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
 
 	s.notifyKeyChanges(&ev)
-
-	if err = s.notifyJoinedPeeks(ctx, &ev); err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -192,30 +193,30 @@ func (s *OutputRoomEventConsumer) notifyKeyChanges(ev *gomatrixserverlib.Headere
 	}
 }
 
-func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) (error) {
+func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {
 	membership, err := ev.Membership()
 	if err != nil {
-		return nil
+		return sp, err
 	}
 	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
 	if membership == gomatrixserverlib.Join {
 		// check it's a local join
 		_, domain, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
 		if err != nil {
-			return err
+			return sp, err
 		}
 		if domain != s.cfg.Matrix.ServerName {
-			return nil
+			return sp, nil
 		}
 
 		// cancel any peeks for it
-		_, err = s.db.DeletePeeks(ctx, ev.RoomID(), *ev.StateKey())
+		sp, err = s.db.DeletePeeks(ctx, ev.RoomID(), *ev.StateKey())
 		// XXX: should we do anything with this new streampos?
 		if err != nil {
-			return err
+			return sp, err
 		}
 	}
-	return nil
+	return sp, nil
 }
 
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
