@@ -477,7 +477,12 @@ func (t *txnReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrix
 
 	// fetch the event we're missing and add it to the pile
 	h, err := t.lookupEvent(ctx, roomVersion, eventID, false)
-	if err != nil {
+	switch err.(type) {
+	case verifySigError:
+		return respState, nil
+	case nil:
+		// do nothing
+	default:
 		return nil, err
 	}
 	t.haveEvents[h.EventID()] = h
@@ -586,7 +591,15 @@ retryAllowedState:
 		switch missing := err.(type) {
 		case gomatrixserverlib.MissingAuthEventError:
 			h, err2 := t.lookupEvent(ctx, roomVersion, missing.AuthEventID, true)
-			if err2 != nil {
+			switch err2.(type) {
+			case verifySigError:
+				return &gomatrixserverlib.RespState{
+					AuthEvents:  authEventList,
+					StateEvents: resolvedStateEvents,
+				}, nil
+			case nil:
+				// do nothing
+			default:
 				return nil, fmt.Errorf("missing auth event %s and failed to look it up: %w", missing.AuthEventID, err2)
 			}
 			util.GetLogger(ctx).Infof("fetched event %s", missing.AuthEventID)
@@ -762,7 +775,12 @@ func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, even
 	for missingEventID := range missing {
 		var h *gomatrixserverlib.HeaderedEvent
 		h, err = t.lookupEvent(ctx, roomVersion, missingEventID, false)
-		if err != nil {
+		switch err.(type) {
+		case verifySigError:
+			continue
+		case nil:
+			// do nothing
+		default:
 			return nil, err
 		}
 		t.haveEvents[h.EventID()] = h
