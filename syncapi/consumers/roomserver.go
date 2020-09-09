@@ -143,7 +143,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
-	if msg.Historical {
+	if msg.Type == api.OutputRoomState {
 		return nil
 	}
 

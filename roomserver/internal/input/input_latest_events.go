@@ -307,9 +307,14 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
+	var outputType api.OutputRoomEventType
+	if u.isHistorical {
+		outputType = api.OutputRoomState
+	}
+
 	ore := api.OutputNewRoomEvent{
 		Event:           u.event.Headered(u.roomInfo.RoomVersion),
-		Historical:      u.isHistorical,
+		Type:            outputType,
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,

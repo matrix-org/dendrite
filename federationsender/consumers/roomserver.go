@@ -110,9 +110,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
 func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
-	if ore.Historical {
-		return nil
-	}
 
 	addsJoinedHosts, err := joinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(ore.AddsState()))
 	if err != nil {
@@ -143,7 +140,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 		return nil
 	}
 
-	if ore.SendAsServer == api.DoNotSendToOtherServers {
+	if ore.SendAsServer == api.DoNotSendToOtherServers || ore.Type == api.OutputRoomState {
 		// Ignore event that we don't need to send anywhere.
 		return nil
 	}
