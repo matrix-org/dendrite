@@ -33,6 +33,10 @@ const (
 	// KindBackfill event extend the contiguous graph going backwards.
 	// They always have state.
 	KindBackfill = 3
+	// KindRewrite events are used to rewrite the head of the graph.
+	// They are used in state, forward extremity and membership updates
+	// but are not sent as output events.
+	KindRewrite = 4
 )
 
 // DoNotSendToOtherServers tells us not to send the event to other matrix

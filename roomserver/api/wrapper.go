@@ -76,7 +76,7 @@ func SendEventWithState(
 			continue
 		}
 		ires = append(ires, InputRoomEvent{
-			Kind:          KindNew,
+			Kind:          KindRewrite,
 			Event:         stateEvent.Headered(event.RoomVersion),
 			AuthEventIDs:  stateEvent.AuthEventIDs(),
 			HasState:      true,
