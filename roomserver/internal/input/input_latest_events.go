@@ -72,7 +72,7 @@ func (r *Inputer) updateLatestEvents(
 		event:         event,
 		sendAsServer:  sendAsServer,
 		transactionID: transactionID,
-		sendOutput:    sendOutput,
+		isHistorical:  sendOutput,
 	}
 
 	if err = u.doUpdateLatestEvents(); err != nil {
@@ -95,7 +95,7 @@ type latestEventsUpdater struct {
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event
 	transactionID *api.TransactionID
-	sendOutput    bool
+	isHistorical  bool
 	// Which server to send this event as.
 	sendAsServer string
 	// The eventID of the event that was processed before this one.
@@ -181,35 +181,31 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return fmt.Errorf("u.api.updateMemberships: %w", err)
 	}
 
-	if u.sendOutput {
-		var update *api.OutputEvent
-		update, err = u.makeOutputNewRoomEvent()
-		if err != nil {
-			return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
-		}
-		updates = append(updates, *update)
+	var update *api.OutputEvent
+	update, err = u.makeOutputNewRoomEvent()
+	if err != nil {
+		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
+	}
+	updates = append(updates, *update)
 
-		// Send the event to the output logs.
-		// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
-		// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
-		//  the write to the output log succeeds)
-		// TODO: This assumes that writing the event to the output log is synchronous. It should be possible to
-		// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
-		// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
-		// necessary bookkeeping we'll keep the event sending synchronous for now.
-		if err = u.api.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
-			return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
-		}
+	// Send the event to the output logs.
+	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
+	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
+	//  the write to the output log succeeds)
+	// TODO: This assumes that writing the event to the output log is synchronous. It should be possible to
+	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
+	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
+	// necessary bookkeeping we'll keep the event sending synchronous for now.
+	if err = u.api.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
+		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 
 	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
 		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
-	if u.sendOutput {
-		if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
-			return fmt.Errorf("u.updater.MarkEventAsSent: %w", err)
-		}
+	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
+		return fmt.Errorf("u.updater.MarkEventAsSent: %w", err)
 	}
 
 	return nil
@@ -313,6 +309,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 
 	ore := api.OutputNewRoomEvent{
 		Event:           u.event.Headered(u.roomInfo.RoomVersion),
+		Historical:      u.isHistorical,
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,

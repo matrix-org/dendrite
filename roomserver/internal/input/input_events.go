@@ -114,7 +114,7 @@ func (r *Inputer) processRoomEvent(
 		event,                         // event
 		input.SendAsServer,            // send as server
 		input.TransactionID,           // transaction ID
-		input.Kind != api.KindRewrite, // should we send output events?
+		input.Kind == api.KindRewrite, // historical
 	); err != nil {
 		return "", fmt.Errorf("r.updateLatestEvents: %w", err)
 	}

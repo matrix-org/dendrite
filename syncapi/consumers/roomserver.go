@@ -143,6 +143,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
+	if msg.Historical {
+		return nil
+	}
+
 	pduPos, err := s.db.WriteEvent(
 		ctx,
 		&ev,

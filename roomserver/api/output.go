@@ -75,6 +75,9 @@ type OutputEvent struct {
 type OutputNewRoomEvent struct {
 	// The Event.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	// Is the event historical? If so, then downstream components should not treat the
+	// event as if it just arrived.
+	Historical bool `json:"historical"`
 	// The latest events in the room after this event.
 	// This can be used to set the prev events for new events in the room.
 	// This also can be used to get the full current state after this event.
