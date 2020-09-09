@@ -67,27 +67,36 @@ func SendEventWithState(
 		if haveEventIDs[authOrStateEvent.EventID()] {
 			continue
 		}
-		if _, ok := isCurrentState[authOrStateEvent.EventID()]; !ok {
-			// If this is an auth event rather than a current state event
-			// then store it as an outlier. We won't include it in the
-			// current state set for the input event.
+
+		// Work out whether we should store the event as an outlier
+		// or if we should send it as a rewrite event.
+		storeAsOutlier := false
+		if authOrStateEvent.Type() == event.Type() && *authOrStateEvent.StateKey() == *event.StateKey() {
+			// The event is the same as the event that we are looking
+			// to send as a new event.
+			storeAsOutlier = true
+		} else if _, ok := isCurrentState[authOrStateEvent.EventID()]; !ok {
+			// The event doesn't belong to the current state but is
+			// actually an auth event.
+			storeAsOutlier = true
+		}
+
+		if storeAsOutlier {
 			ires = append(ires, InputRoomEvent{
 				Kind:         KindOutlier,
 				Event:        authOrStateEvent.Headered(event.RoomVersion),
 				AuthEventIDs: authOrStateEvent.AuthEventIDs(),
 			})
-			continue
+		} else {
+			ires = append(ires, InputRoomEvent{
+				Kind:          KindRewrite,
+				Event:         authOrStateEvent.Headered(event.RoomVersion),
+				AuthEventIDs:  authOrStateEvent.AuthEventIDs(),
+				HasState:      true,
+				StateEventIDs: stateIDs,
+			})
+			stateIDs = append(stateIDs, authOrStateEvent.EventID())
 		}
-		// The event is a current state event. Send it as a rewrite
-		// event so that we generate a state output event for it.
-		ires = append(ires, InputRoomEvent{
-			Kind:          KindRewrite,
-			Event:         authOrStateEvent.Headered(event.RoomVersion),
-			AuthEventIDs:  authOrStateEvent.AuthEventIDs(),
-			HasState:      true,
-			StateEventIDs: stateIDs,
-		})
-		stateIDs = append(stateIDs, authOrStateEvent.EventID())
 	}
 
 	// Send the final event as a new event, which will generate
