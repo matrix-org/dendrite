@@ -129,11 +129,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-	if msg.Type == api.OutputRoomState {
-		s.notifyKeyChanges(&ev)
-		return nil
-	}
-
 	addsStateEvents := msg.AddsState()
 
 	ev, err := s.updateStateEvent(ev)
@@ -155,7 +150,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
-		false,
+		msg.Type == api.OutputRoomState,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
