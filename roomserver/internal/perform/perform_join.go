@@ -335,8 +335,18 @@ func buildEvent(
 		return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
 	}
 
-	if !auth.IsAnyUserOnServerWithMembership(cfg.ServerName, gomatrixserverlib.UnwrapEventHeaders(queryRes.StateEvents), "join") {
-		return nil, nil, eventutil.ErrRoomNoExists
+	// If we know about any membership events in this room, check and see
+	// if we still believe any of our users to be in the room. If not, then
+	// returning that the room doesn't exist will kick the room join over
+	// to a federated join. If we don't know about any of the membership
+	// events then it's probably a new local room so do nothing.
+	for _, ev := range queryRes.StateEvents {
+		if ev.Type() == gomatrixserverlib.MRoomMember {
+			if !auth.IsAnyUserOnServerWithMembership(cfg.ServerName, gomatrixserverlib.UnwrapEventHeaders(queryRes.StateEvents), "join") {
+				return nil, nil, eventutil.ErrRoomNoExists
+			}
+			break
+		}
 	}
 
 	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)
