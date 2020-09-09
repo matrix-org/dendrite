@@ -187,6 +187,7 @@ func (d *Database) DeletePeeks(
 		return err
 	})
 	if err == sql.ErrNoRows {
+		sp = 0
 		err = nil
 	}
 	return

@@ -129,13 +129,23 @@ func (s *peekStatements) DeletePeek(
 
 func (s *peekStatements) DeletePeeks(
 	ctx context.Context, txn *sql.Tx, roomID, userID string,
-) (streamPos types.StreamPosition, err error) {
-	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+) (types.StreamPosition, error) {
+	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
 	if err != nil {
-		return
+		return 0, err
 	}
-	_, err = sqlutil.TxStmt(txn, s.deletePeeksStmt).ExecContext(ctx, streamPos, roomID, userID)
-	return
+	result, err := sqlutil.TxStmt(txn, s.deletePeeksStmt).ExecContext(ctx, streamPos, roomID, userID)
+	if err != nil {
+		return 0, err
+	}
+	numAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if numAffected == 0 {
+		return 0, sql.ErrNoRows
+	}
+	return streamPos, nil
 }
 
 func (s *peekStatements) SelectPeeksInRange(
