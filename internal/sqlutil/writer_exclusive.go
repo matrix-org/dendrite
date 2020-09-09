@@ -60,6 +60,12 @@ func (w *ExclusiveWriter) run() {
 	if !w.running.CAS(false, true) {
 		return
 	}
+	if tracingEnabled {
+		gid := goid()
+		goidToWriter.Store(gid, w)
+		defer goidToWriter.Delete(gid)
+	}
+
 	defer w.running.Store(false)
 	for task := range w.todo {
 		if task.db != nil && task.txn != nil {
