@@ -86,7 +86,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		DB:                  d.db,
 		Writer:              d.writer,
 		Invites:             invites,
-		Peeks:				 peeks,
+		Peeks:               peeks,
 		AccountData:         accountData,
 		OutputEvents:        events,
 		Topology:            topology,
