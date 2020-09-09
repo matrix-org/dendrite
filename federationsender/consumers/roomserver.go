@@ -139,7 +139,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 		return nil
 	}
 
-	if ore.SendAsServer == api.DoNotSendToOtherServers || ore.Type == api.OutputRoomState {
+	if ore.SendAsServer == api.DoNotSendToOtherServers {
 		// Ignore event that we don't need to send anywhere.
 		return nil
 	}

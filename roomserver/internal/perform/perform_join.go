@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -332,6 +333,10 @@ func buildEvent(
 	}, &queryRes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
+	}
+
+	if !auth.IsAnyUserOnServerWithMembership(cfg.ServerName, gomatrixserverlib.UnwrapEventHeaders(queryRes.StateEvents), "join") {
+		return nil, nil, eventutil.ErrRoomNoExists
 	}
 
 	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)

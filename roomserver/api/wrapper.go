@@ -47,7 +47,12 @@ func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, state *gomatrixserverlib.RespState,
 	event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool,
 ) error {
-	stateEvents, err := state.Events()
+	isCurrentState := map[string]struct{}{}
+	for _, se := range state.StateEvents {
+		isCurrentState[se.EventID()] = struct{}{}
+	}
+
+	authAndStateEvents, err := state.Events()
 	if err != nil {
 		return err
 	}
@@ -55,36 +60,38 @@ func SendEventWithState(
 	var ires []InputRoomEvent
 	var stateIDs []string
 
-	for _, stateEvent := range stateEvents {
-		if stateEvent.StateKey() == nil {
+	for _, authOrStateEvent := range authAndStateEvents {
+		if authOrStateEvent.StateKey() == nil {
 			continue
 		}
-		if haveEventIDs[stateEvent.EventID()] {
+		if haveEventIDs[authOrStateEvent.EventID()] {
 			continue
 		}
-		if stateEvent.Type() == event.Type() && *stateEvent.StateKey() == *event.StateKey() {
-			// If this event is an old state event that will be replaced by the
-			// given event, then store it as an outlier instead. We don't want
-			// to include it in the current room state as we will end up violating
-			// unique constraints in the state block, but we need the event to
-			// be stored as it may be referred to as an auth_event or prev_event.
+		if _, ok := isCurrentState[authOrStateEvent.EventID()]; !ok {
+			// If this is an auth event rather than a current state event
+			// then store it as an outlier. We won't include it in the
+			// current state set for the input event.
 			ires = append(ires, InputRoomEvent{
 				Kind:         KindOutlier,
-				Event:        stateEvent.Headered(event.RoomVersion),
-				AuthEventIDs: stateEvent.AuthEventIDs(),
+				Event:        authOrStateEvent.Headered(event.RoomVersion),
+				AuthEventIDs: authOrStateEvent.AuthEventIDs(),
 			})
 			continue
 		}
+		// The event is a current state event. Send it as a rewrite
+		// event so that we generate a state output event for it.
 		ires = append(ires, InputRoomEvent{
 			Kind:          KindRewrite,
-			Event:         stateEvent.Headered(event.RoomVersion),
-			AuthEventIDs:  stateEvent.AuthEventIDs(),
+			Event:         authOrStateEvent.Headered(event.RoomVersion),
+			AuthEventIDs:  authOrStateEvent.AuthEventIDs(),
 			HasState:      true,
 			StateEventIDs: stateIDs,
 		})
-		stateIDs = append(stateIDs, stateEvent.EventID())
+		stateIDs = append(stateIDs, authOrStateEvent.EventID())
 	}
 
+	// Send the final event as a new event, which will generate
+	// a timeline output event for it.
 	ires = append(ires, InputRoomEvent{
 		Kind:          KindNew,
 		Event:         event,

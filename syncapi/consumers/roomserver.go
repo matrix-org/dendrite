@@ -143,11 +143,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
-	if msg.Type == api.OutputRoomState {
-		s.notifyKeyChanges(&ev)
-		return nil
-	}
-
 	pduPos, err := s.db.WriteEvent(
 		ctx,
 		&ev,
@@ -155,7 +150,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
-		false,
+		msg.Type == api.OutputRoomState,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
