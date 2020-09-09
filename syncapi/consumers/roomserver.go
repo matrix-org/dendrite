@@ -150,7 +150,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
-		msg.SendAsServer == "", // TODO: this helps us to spot backfilled/historical events but there must be a better way
+		false,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
