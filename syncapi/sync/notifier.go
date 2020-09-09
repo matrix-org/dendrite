@@ -339,6 +339,7 @@ func (n *Notifier) addPeekingDevice(roomID, userID, deviceID string) {
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
+// nolint:unused
 func (n *Notifier) removePeekingDevice(roomID, userID, deviceID string) {
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
@@ -409,6 +410,7 @@ func (s peekingDeviceSet) add(d types.PeekingDevice) {
 	s[d] = true
 }
 
+// nolint:unused
 func (s peekingDeviceSet) remove(d types.PeekingDevice) {
 	delete(s, d)
 }
