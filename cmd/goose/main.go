@@ -22,7 +22,10 @@ var (
 )
 
 func main() {
-	flags.Parse(os.Args[1:])
+	err := flags.Parse(os.Args[1:])
+	if err != nil {
+		panic(err.Error())
+	}
 	args := flags.Args()
 
 	if len(args) < 3 {
