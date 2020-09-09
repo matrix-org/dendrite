@@ -146,7 +146,7 @@ func (d *Database) AddInviteEvent(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
-		return nil
+		return err
 	})
 	return
 }
@@ -158,7 +158,7 @@ func (d *Database) RetireInviteEvent(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Invites.DeleteInviteEvent(ctx, txn, inviteEventID)
-		return nil
+		return err
 	})
 	return
 }
@@ -171,7 +171,7 @@ func (d *Database) AddPeek(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
 		sp, err = d.Peeks.InsertPeek(ctx, nil, roomID, userID, deviceID)
-		return nil
+		return err
 	})
 	return
 }
@@ -184,7 +184,7 @@ func (d *Database) DeletePeeks(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
 		sp, err = d.Peeks.DeletePeeks(ctx, nil, roomID, userID)
-		return nil
+		return err
 	})
 	if err == sql.ErrNoRows {
 		err = nil

@@ -41,7 +41,7 @@ func (d *Database) ExistingOneTimeKeys(ctx context.Context, userID, deviceID str
 func (d *Database) StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (counts *api.OneTimeKeysCount, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		counts, err = d.OneTimeKeysTable.InsertOneTimeKeys(ctx, txn, keys)
-		return nil
+		return err
 	})
 	return
 }
