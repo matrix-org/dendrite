@@ -108,7 +108,6 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	)
 }
 
-// nolint:gocyclo
 func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	ctx context.Context,
 	roomID, userID string,
