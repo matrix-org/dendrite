@@ -216,10 +216,12 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 		}
 
 		// cancel any peeks for it
-		sp, err = s.db.DeletePeeks(ctx, ev.RoomID(), *ev.StateKey())
-		// XXX: should we do anything with this new streampos?
-		if err != nil {
-			return sp, fmt.Errorf("s.db.DeletePeeks: %w", err)
+		peekSP, peekErr := s.db.DeletePeeks(ctx, ev.RoomID(), *ev.StateKey())
+		if peekErr != nil {
+			return sp, fmt.Errorf("s.db.DeletePeeks: %w", peekErr)
+		}
+		if peekSP > 0 {
+			sp = peekSP
 		}
 	}
 	return sp, nil

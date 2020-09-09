@@ -78,7 +78,7 @@ func NewPostgresPeeksTable(db *sql.DB) (tables.Peeks, error) {
 		return nil, err
 	}
 	s := &peekStatements{
-		db:                 db,
+		db: db,
 	}
 	if s.insertPeekStmt, err = db.Prepare(insertPeekSQL); err != nil {
 		return nil, err
