@@ -108,6 +108,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	)
 }
 
+// nolint:gocyclo
 func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	ctx context.Context,
 	roomID, userID string,
@@ -190,6 +191,19 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	)
 	if err != nil {
 		return fmt.Errorf("joinCtx.CheckSendJoinResponse: %w", err)
+	}
+
+	// It's possible that the remote server has included our new
+	// membership event in the room state in the send_join response,
+	// but if that's the case, then we'll get a duplicate state block
+	// error if we try to send that along with our own copy of the
+	// event. The simple way around this is just to prune the event
+	// from the state if we find it.
+	for i, ev := range respState.StateEvents {
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(userID) {
+			respState.StateEvents = append(respState.StateEvents[i:], respState.StateEvents[:i+1]...)
+			break
+		}
 	}
 
 	// If we successfully performed a send_join above then the other
