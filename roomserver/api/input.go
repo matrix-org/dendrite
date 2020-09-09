@@ -33,9 +33,9 @@ const (
 	// KindBackfill event extend the contiguous graph going backwards.
 	// They always have state.
 	KindBackfill = 3
-	// KindRewrite events are used to rewrite the head of the graph.
-	// They are used in state, forward extremity and membership updates
-	// but are not sent as output events.
+	// KindRewrite events are used when rewriting the head of the room
+	// graph with entirely new state. The output events generated will
+	// be state events rather than timeline events.
 	KindRewrite = 4
 )
 

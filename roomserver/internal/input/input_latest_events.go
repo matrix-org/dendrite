@@ -54,7 +54,7 @@ func (r *Inputer) updateLatestEvents(
 	event gomatrixserverlib.Event,
 	sendAsServer string,
 	transactionID *api.TransactionID,
-	sendOutput bool,
+	isHistorical bool,
 ) (err error) {
 	updater, err := r.DB.GetLatestEventsForUpdate(ctx, *roomInfo)
 	if err != nil {
@@ -72,7 +72,7 @@ func (r *Inputer) updateLatestEvents(
 		event:         event,
 		sendAsServer:  sendAsServer,
 		transactionID: transactionID,
-		isHistorical:  sendOutput,
+		isHistorical:  isHistorical,
 	}
 
 	if err = u.doUpdateLatestEvents(); err != nil {
