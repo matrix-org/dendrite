@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
@@ -169,8 +169,8 @@ func (d *Database) RetireInviteEvent(
 func (d *Database) AddPeek(
 	ctx context.Context, roomID, userID, deviceID string,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		sp, err = d.Peeks.InsertPeek(ctx, nil, roomID, userID, deviceID)
+	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		sp, err = d.Peeks.InsertPeek(ctx, txn, roomID, userID, deviceID)
 		return nil
 	})
 	return
@@ -182,8 +182,8 @@ func (d *Database) AddPeek(
 func (d *Database) DeletePeeks(
 	ctx context.Context, roomID, userID string,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		sp, err = d.Peeks.DeletePeeks(ctx, nil, roomID, userID)
+	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		sp, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
 		return nil
 	})
 	if err == sql.ErrNoRows {
@@ -230,7 +230,7 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 					"transaction_id", in[i].TransactionID.TransactionID,
 				)
 				if err != nil {
-					logrus.WithFields(logrus.Fields{
+					log.WithFields(log.Fields{
 						"event_id": out[i].EventID(),
 					}).WithError(err).Warnf("Failed to add transaction ID to event")
 				}
@@ -624,7 +624,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		return err
 	}
 	if len(redactedEvents) == 0 {
-		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
+		log.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
 		return nil
 	}
 	eventToRedact := redactedEvents[0].Unwrap()
