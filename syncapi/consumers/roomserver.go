@@ -144,6 +144,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	if msg.Type == api.OutputRoomState {
+		s.notifyKeyChanges(&ev)
 		return nil
 	}
 
