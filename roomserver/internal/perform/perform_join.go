@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -333,20 +332,6 @@ func buildEvent(
 	}, &queryRes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
-	}
-
-	// If we know about any membership events in this room, check and see
-	// if we still believe any of our users to be in the room. If not, then
-	// returning that the room doesn't exist will kick the room join over
-	// to a federated join. If we don't know about any of the membership
-	// events then it's probably a new local room so do nothing.
-	for _, ev := range queryRes.StateEvents {
-		if ev.Type() == gomatrixserverlib.MRoomMember {
-			if !auth.IsAnyUserOnServerWithMembership(cfg.ServerName, gomatrixserverlib.UnwrapEventHeaders(queryRes.StateEvents), "join") {
-				return nil, nil, eventutil.ErrRoomNoExists
-			}
-			break
-		}
 	}
 
 	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)
