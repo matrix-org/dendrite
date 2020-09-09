@@ -146,7 +146,7 @@ func (d *Database) AddInviteEvent(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
-		return nil
+		return err
 	})
 	return
 }
@@ -158,7 +158,7 @@ func (d *Database) RetireInviteEvent(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Invites.DeleteInviteEvent(ctx, txn, inviteEventID)
-		return nil
+		return err
 	})
 	return
 }
