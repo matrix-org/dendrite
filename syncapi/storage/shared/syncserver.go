@@ -169,9 +169,9 @@ func (d *Database) RetireInviteEvent(
 func (d *Database) AddPeek(
 	ctx context.Context, roomID, userID, deviceID string,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Peeks.InsertPeek(ctx, txn, roomID, userID, deviceID)
-		return nil
+		return err
 	})
 	return
 }
@@ -182,9 +182,9 @@ func (d *Database) AddPeek(
 func (d *Database) DeletePeeks(
 	ctx context.Context, roomID, userID string,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
-		return nil
+		return err
 	})
 	if err == sql.ErrNoRows {
 		err = nil
