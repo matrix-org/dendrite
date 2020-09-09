@@ -16,6 +16,8 @@
 package types
 
 import (
+	"sort"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -70,6 +72,24 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 		return a.StateKeyTuple.LessThan(b.StateKeyTuple)
 	}
 	return a.EventNID < b.EventNID
+}
+
+// Deduplicate ensures that the latest NIDs are always presented in the case of duplicates.
+func DeduplicateStateEntries(a []StateEntry) []StateEntry {
+	result := a
+	if len(a) < 2 {
+		return a
+	}
+	sort.SliceStable(a, func(i, j int) bool {
+		return a[i].LessThan(a[j])
+	})
+	for i := 0; i < len(result)-1; i++ {
+		if result[i].StateKeyTuple == result[i+1].StateKeyTuple {
+			result = append(result[:i], result[i+1:]...)
+			i--
+		}
+	}
+	return result
 }
 
 // StateAtEvent is the state before and after a matrix event.

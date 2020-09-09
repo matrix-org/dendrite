@@ -170,6 +170,7 @@ func (r *Inputer) calculateAndSetState(
 		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
 			return fmt.Errorf("r.DB.StateEntriesForEventIDs: %w", err)
 		}
+		entries = types.DeduplicateStateEntries(entries)
 
 		if stateAtEvent.BeforeStateSnapshotNID, err = r.DB.AddState(ctx, roomInfo.RoomNID, nil, entries); err != nil {
 			return fmt.Errorf("r.DB.AddState: %w", err)
