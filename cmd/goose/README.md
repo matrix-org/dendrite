@@ -46,6 +46,8 @@ $ ./goose -dir serverkeyapi/storage/sqlite3/deltas sqlite3 ./foo.db create new_c
 2020/09/09 14:37:43 Created new file: serverkeyapi/storage/sqlite3/deltas/20200909143743_new_col.sql
 ```
 
+In this case, the version number is `20200909143743`. The important thing is that it is always increasing.
+
 Then add up/downgrade SQL commands to the created file which looks like:
 ```sql
 -- +goose Up
@@ -86,13 +88,11 @@ func init() {
 
 func upComplexUpdate(tx *sql.Tx) error {
 	// This code is executed when the migration is applied.
-	fmt.Println("complex update")
 	return nil
 }
 
 func downComplexUpdate(tx *sql.Tx) error {
 	// This code is executed when the migration is rolled back.
-	fmt.Println("complex downgrade")
 	return nil
 }
 
@@ -100,3 +100,8 @@ func downComplexUpdate(tx *sql.Tx) error {
 
 You __must__ import the package in `/cmd/goose/main.go` so `func init()` gets called.
 
+
+#### Database limitations
+
+- SQLite3 does NOT support `ALTER TABLE table_name DROP COLUMN` - you would have to rename the column or drop the table
+  entirely and recreate it.
