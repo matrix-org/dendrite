@@ -53,8 +53,9 @@ const deletePeeksSQL = "" +
 
 // we care about all the peeks which were created in this range, deleted in this range,
 // or were created before this range but haven't been deleted yet.
+// BEWARE: sqlite chokes on out of order substitution strings.
 const selectPeeksInRangeSQL = "" +
-	"SELECT room_id, deleted, (id > $3 AND id <= $4) AS changed FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted) OR (id > $3 AND id <= $4))"
+	"SELECT id, room_id, deleted FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted=true) OR (id > $3 AND id <= $4))"
 
 const selectPeekingDevicesSQL = "" +
 	"SELECT room_id, user_id, device_id FROM syncapi_peeks WHERE deleted=false"
@@ -148,11 +149,11 @@ func (s *peekStatements) SelectPeeksInRange(
 
 	for rows.Next() {
 		peek := types.Peek{}
-		var changed bool
-		if err = rows.Scan(&peek.RoomID, &peek.Deleted, &changed); err != nil {
+		var id types.StreamPosition
+		if err = rows.Scan(&id, &peek.RoomID, &peek.Deleted); err != nil {
 			return
 		}
-		peek.New = changed && !peek.Deleted
+		peek.New = (id > r.Low() && id <= r.High()) && !peek.Deleted
 		peeks = append(peeks, peek)
 	}
 
