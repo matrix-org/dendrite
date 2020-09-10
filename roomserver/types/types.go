@@ -74,22 +74,23 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 	return a.EventNID < b.EventNID
 }
 
-// Deduplicate ensures that the latest NIDs are always presented in the case of duplicates.
+// Deduplicate takes a set of state entries and ensures that there are no
+// duplicate (event type, state key) tuples. If there are then we dedupe
+// them, making sure that the latest/highest NIDs are always chosen.
 func DeduplicateStateEntries(a []StateEntry) []StateEntry {
-	result := a
 	if len(a) < 2 {
 		return a
 	}
 	sort.SliceStable(a, func(i, j int) bool {
 		return a[i].LessThan(a[j])
 	})
-	for i := 0; i < len(result)-1; i++ {
-		if result[i].StateKeyTuple == result[i+1].StateKeyTuple {
-			result = append(result[:i], result[i+1:]...)
+	for i := 0; i < len(a)-1; i++ {
+		if a[i].StateKeyTuple == a[i+1].StateKeyTuple {
+			a = append(a[:i], a[i+1:]...)
 			i--
 		}
 	}
-	return result
+	return a
 }
 
 // StateAtEvent is the state before and after a matrix event.
