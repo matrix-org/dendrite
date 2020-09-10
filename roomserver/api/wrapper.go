@@ -40,9 +40,9 @@ func SendEvents(
 	return SendInputRoomEvents(ctx, rsAPI, ires)
 }
 
-// SendEventWithState writes an event with KindNew to the roomserver
-// with the state at the event as KindOutlier before it. Will not send any event that is
-// marked as `true` in haveEventIDs
+// SendEventWithState writes an event with KindNew to the roomserver along
+// with a number of rewrite and outlier events for state and auth events
+// respectively.
 func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, state *gomatrixserverlib.RespState,
 	event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool,
@@ -60,6 +60,14 @@ func SendEventWithState(
 	var ires []InputRoomEvent
 	var stateIDs []string
 
+	// This function generates three things:
+	// A - A set of "rewrite" events, which will form the newly rewritten
+	//     state before the event, which includes every rewrite event that
+	//     came before it in its state
+	// B - A set of "outlier" events, which are auth events but not part
+	//     of the rewritten state
+	// C - A "new" event, which include all of the rewrite events in its
+	//     state
 	for _, authOrStateEvent := range authAndStateEvents {
 		if authOrStateEvent.StateKey() == nil {
 			continue
@@ -68,16 +76,21 @@ func SendEventWithState(
 			continue
 		}
 
-		// Work out whether we should store the event as an outlier
-		// or if we should send it as a rewrite event.
+		// We will handle an event as if it's an outlier if one of the
+		// following conditions is true:
 		storeAsOutlier := false
 		if authOrStateEvent.Type() == event.Type() && *authOrStateEvent.StateKey() == *event.StateKey() {
-			// The event is the same as the event that we are looking
-			// to send as a new event.
+			// The event is a state event but the input event is going to
+			// replace it, therefore it can't be added to the state or we'll
+			// get duplicate state keys in the state block. We'll send it
+			// as an outlier because we don't know if something will be
+			// referring to it as an auth event, but need it to be stored
+			// just in case.
 			storeAsOutlier = true
 		} else if _, ok := isCurrentState[authOrStateEvent.EventID()]; !ok {
-			// The event doesn't belong to the current state but is
-			// actually an auth event.
+			// The event is an auth event and isn't a part of the state set.
+			// We'll send it as an outlier because we need it to be stored
+			// in case something is referring to it as an auth event.
 			storeAsOutlier = true
 		}
 
@@ -87,20 +100,33 @@ func SendEventWithState(
 				Event:        authOrStateEvent.Headered(event.RoomVersion),
 				AuthEventIDs: authOrStateEvent.AuthEventIDs(),
 			})
-		} else {
-			ires = append(ires, InputRoomEvent{
-				Kind:          KindRewrite,
-				Event:         authOrStateEvent.Headered(event.RoomVersion),
-				AuthEventIDs:  authOrStateEvent.AuthEventIDs(),
-				HasState:      true,
-				StateEventIDs: stateIDs,
-			})
-			stateIDs = append(stateIDs, authOrStateEvent.EventID())
+			continue
 		}
+
+		// If the event isn't an outlier then we'll instead send it as a
+		// rewrite event, so that it'll form part of the rewritten state.
+		// These events will go through the membership and latest event
+		// updaters and we will generate output events, but they will be
+		// flagged as non-current (i.e. didn't just happen) events.
+		// Each of these rewrite events includes all of the rewrite events
+		// that came before in their StateEventIDs.
+		ires = append(ires, InputRoomEvent{
+			Kind:          KindRewrite,
+			Event:         authOrStateEvent.Headered(event.RoomVersion),
+			AuthEventIDs:  authOrStateEvent.AuthEventIDs(),
+			HasState:      true,
+			StateEventIDs: stateIDs,
+		})
+
+		// Add the event ID into the StateEventIDs of all subsequent
+		// rewrite events, and the new event.
+		stateIDs = append(stateIDs, authOrStateEvent.EventID())
 	}
 
 	// Send the final event as a new event, which will generate
-	// a timeline output event for it.
+	// a timeline output event for it. All of the rewrite events
+	// that came before will be sent as StateEventIDs, forming a
+	// new clean state before the event.
 	ires = append(ires, InputRoomEvent{
 		Kind:          KindNew,
 		Event:         event,
