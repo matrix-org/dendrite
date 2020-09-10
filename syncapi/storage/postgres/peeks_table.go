@@ -27,13 +27,14 @@ import (
 
 const peeksSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_peeks (
-	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
+	id BIGINT DEFAULT nextval('syncapi_stream_id'),
 	room_id TEXT NOT NULL,
 	user_id TEXT NOT NULL,
 	device_id TEXT NOT NULL,
 	deleted BOOL NOT NULL DEFAULT false,
     -- When the peek was created in UNIX epoch ms.
-    creation_ts BIGINT NOT NULL
+    creation_ts BIGINT NOT NULL,
+    UNIQUE(room_id, user_id, device_id)
 );
 
 CREATE INDEX IF NOT EXISTS syncapi_peeks_room_id_idx ON syncapi_peeks(room_id);
