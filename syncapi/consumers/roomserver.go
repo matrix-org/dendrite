@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
@@ -143,6 +144,20 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
+	if msg.Type == api.OutputRoomState {
+		err = s.db.RewriteState(
+			ctx,
+			&ev,
+			addsStateEvents,
+			msg.AddsStateEventIDs,
+			msg.TransactionID,
+		)
+		if err != nil {
+			return fmt.Errorf("s.db.RewriteState: %w", err)
+		}
+		return nil
+	}
+
 	pduPos, err := s.db.WriteEvent(
 		ctx,
 		&ev,
@@ -150,7 +165,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
-		msg.Type == api.OutputRoomState,
+		false,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database

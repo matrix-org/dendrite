@@ -75,6 +75,7 @@ type CurrentRoomState interface {
 	SelectEventsWithEventIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StreamEvent, error)
 	UpsertRoomState(ctx context.Context, txn *sql.Tx, event gomatrixserverlib.HeaderedEvent, membership *string, addedAt types.StreamPosition) error
 	DeleteRoomStateByEventID(ctx context.Context, txn *sql.Tx, eventID string) error
+	DeleteRoomStateByRoomID(ctx context.Context, txn *sql.Tx, roomID string) error
 	// SelectCurrentState returns all the current state events for the given room.
 	SelectCurrentState(ctx context.Context, txn *sql.Tx, roomID string, stateFilter *gomatrixserverlib.StateFilter) ([]gomatrixserverlib.HeaderedEvent, error)
 	// SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.

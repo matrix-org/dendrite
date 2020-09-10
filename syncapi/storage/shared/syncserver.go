@@ -241,6 +241,27 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 	return nil
 }
 
+func (d *Database) RewriteState(
+	ctx context.Context,
+	ev *gomatrixserverlib.HeaderedEvent,
+	addStateEvents []gomatrixserverlib.HeaderedEvent,
+	addStateEventIDs []string,
+	transactionID *api.TransactionID,
+) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		// If the event is a create event then we'll delete all of the existing
+		// state in the room. The only reason that a create event would be replayed
+		// to us in this way is if we're about to receive the entire room state.
+		if ev.Type() == gomatrixserverlib.MRoomCreate {
+			if err := d.CurrentRoomState.DeleteRoomStateByRoomID(ctx, txn, ev.RoomID()); err != nil {
+				return fmt.Errorf("d.CurrentRoomState.DeleteRoomStateByRoomID: %w", err)
+			}
+		}
+
+		return d.updateRoomState(ctx, txn, []string{}, addStateEvents, types.StreamPosition(0))
+	})
+}
+
 func (d *Database) WriteEvent(
 	ctx context.Context,
 	ev *gomatrixserverlib.HeaderedEvent,

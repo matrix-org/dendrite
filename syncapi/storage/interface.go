@@ -41,6 +41,9 @@ type Database interface {
 	// Returns an error if there was a problem inserting this event.
 	WriteEvent(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, addStateEvents []gomatrixserverlib.HeaderedEvent,
 		addStateEventIDs []string, removeStateEventIDs []string, transactionID *api.TransactionID, excludeFromSync bool) (types.StreamPosition, error)
+	// RewriteState rewrites a current room state event. If the state event is a create event then all existing
+	// state in the room will be deleted before rewriting the event.
+	RewriteState(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, addStateEvents []gomatrixserverlib.HeaderedEvent, addStateEventIDs []string, transactionID *api.TransactionID) error
 	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
