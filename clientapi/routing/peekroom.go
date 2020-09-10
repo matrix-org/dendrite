@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 New Vector Ltd
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -26,64 +24,56 @@ import (
 	"github.com/matrix-org/util"
 )
 
-func JoinRoomByIDOrAlias(
+func PeekRoomByIDOrAlias(
 	req *http.Request,
 	device *api.Device,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	accountDB accounts.Database,
 	roomIDOrAlias string,
 ) util.JSONResponse {
-	// Prepare to ask the roomserver to perform the room join.
-	joinReq := roomserverAPI.PerformJoinRequest{
+	// if this is a remote roomIDOrAlias, we have to ask the roomserver (or federation sender?) to
+	// to call /peek and /state on the remote server.
+	// TODO: in future we could skip this if we know we're already participating in the room,
+	// but this is fiddly in case we stop participating in the room.
+
+	// then we create a local peek.
+	peekReq := roomserverAPI.PerformPeekRequest{
 		RoomIDOrAlias: roomIDOrAlias,
 		UserID:        device.UserID,
-		Content:       map[string]interface{}{},
+		DeviceID:      device.ID,
 	}
-	joinRes := roomserverAPI.PerformJoinResponse{}
+	peekRes := roomserverAPI.PerformPeekResponse{}
 
 	// Check to see if any ?server_name= query parameters were
 	// given in the request.
 	if serverNames, ok := req.URL.Query()["server_name"]; ok {
 		for _, serverName := range serverNames {
-			joinReq.ServerNames = append(
-				joinReq.ServerNames,
+			peekReq.ServerNames = append(
+				peekReq.ServerNames,
 				gomatrixserverlib.ServerName(serverName),
 			)
 		}
 	}
 
-	// If content was provided in the request then include that
-	// in the request. It'll get used as a part of the membership
-	// event content.
-	_ = httputil.UnmarshalJSONRequest(req, &joinReq.Content)
-
-	// Work out our localpart for the client profile request.
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-	} else {
-		// Request our profile content to populate the request content with.
-		var profile *authtypes.Profile
-		profile, err = accountDB.GetProfileByLocalpart(req.Context(), localpart)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
-		} else {
-			joinReq.Content["displayname"] = profile.DisplayName
-			joinReq.Content["avatar_url"] = profile.AvatarURL
-		}
+	// Ask the roomserver to perform the peek.
+	rsAPI.PerformPeek(req.Context(), &peekReq, &peekRes)
+	if peekRes.Error != nil {
+		return peekRes.Error.JSONResponse()
 	}
 
-	// Ask the roomserver to perform the join.
-	rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
-	if joinRes.Error != nil {
-		return joinRes.Error.JSONResponse()
-	}
+	// if this user is already joined to the room, we let them peek anyway
+	// (given they might be about to part the room, and it makes things less fiddly)
+
+	// Peeking stops if none of the devices who started peeking have been
+	// /syncing for a while, or if everyone who was peeking calls /leave
+	// (or /unpeek with a server_name param? or DELETE /peek?)
+	// on the peeked room.
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		// TODO: Put the response struct somewhere internal.
 		JSON: struct {
 			RoomID string `json:"room_id"`
-		}{joinRes.RoomID},
+		}{peekRes.RoomID},
 	}
 }

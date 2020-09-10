@@ -74,7 +74,7 @@ func (in *traceInterceptor) RowsNext(c context.Context, rows driver.Rows, dest [
 
 	b := strings.Builder{}
 	for i, val := range dest {
-		b.WriteString(fmt.Sprintf("%v", val))
+		b.WriteString(fmt.Sprintf("%q", val))
 		if i+1 <= len(dest)-1 {
 			b.WriteString(" | ")
 		}

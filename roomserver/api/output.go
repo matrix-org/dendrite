@@ -46,6 +46,9 @@ const (
 	// - Redact the event and set the corresponding `unsigned` fields to indicate it as redacted.
 	// - Replace the event in the database.
 	OutputTypeRedactedEvent OutputType = "redacted_event"
+
+	// OutputTypeNewPeek indicates that the kafka event is an OutputNewPeek
+	OutputTypeNewPeek OutputType = "new_peek"
 )
 
 // An OutputEvent is an entry in the roomserver output kafka log.
@@ -59,8 +62,10 @@ type OutputEvent struct {
 	NewInviteEvent *OutputNewInviteEvent `json:"new_invite_event,omitempty"`
 	// The content of event with type OutputTypeRetireInviteEvent
 	RetireInviteEvent *OutputRetireInviteEvent `json:"retire_invite_event,omitempty"`
-	// The content of event with type  OutputTypeRedactedEvent
+	// The content of event with type OutputTypeRedactedEvent
 	RedactedEvent *OutputRedactedEvent `json:"redacted_event,omitempty"`
+	// The content of event with type OutputTypeNewPeek
+	NewPeek *OutputNewPeek `json:"new_peek,omitempty"`
 }
 
 // An OutputNewRoomEvent is written when the roomserver receives a new event.
@@ -194,4 +199,12 @@ type OutputRedactedEvent struct {
 	RedactedEventID string
 	// The value of `unsigned.redacted_because` - the redaction event itself
 	RedactedBecause gomatrixserverlib.HeaderedEvent
+}
+
+// An OutputNewPeek is written whenever a user starts peeking into a room
+// using a given device.
+type OutputNewPeek struct {
+	RoomID   string
+	UserID   string
+	DeviceID string
 }

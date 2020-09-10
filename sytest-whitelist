@@ -465,3 +465,9 @@ After changing password, can log in with new password
 After changing password, existing session still works
 After changing password, different sessions can optionally be kept
 After changing password, a different session no longer works by default
+Local users can peek into world_readable rooms by room ID
+We can't peek into rooms with shared history_visibility
+We can't peek into rooms with invited history_visibility
+We can't peek into rooms with joined history_visibility
+Local users can peek by room alias
+Peeked rooms only turn up in the sync for the device who peeked them

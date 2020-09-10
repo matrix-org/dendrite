@@ -81,6 +81,18 @@ matrixdotorg/sytest-dendrite:latest tests/50federation/40devicelists.pl
 ```
 See [sytest.md](docs/sytest.md) for the full description of these flags.
 
+You can try running sytest outside of docker for faster runs, but the dependencies can be temperamental
+and we recommend using docker where possible.
+```
+cd sytest
+export PERL5LIB=$HOME/lib/perl5
+export PERL_MB_OPT=--install_base=$HOME
+export PERL_MM_OPT=INSTALL_BASE=$HOME
+./install-deps.pl
+
+./run-tests.pl -I Dendrite::Monolith -d $PATH_TO_DENDRITE_BINARIES
+```
+
 Sometimes Sytest is testing the wrong thing or is flakey, so it will need to be patched.
 Ask on `#dendrite-dev:matrix.org` if you think this is the case for you and we'll be happy to help.
 

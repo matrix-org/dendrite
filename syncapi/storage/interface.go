@@ -30,6 +30,8 @@ type Database interface {
 	internal.PartitionStorer
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
+	// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
+	AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error)
 	// Events lookups a list of event by their event ID.
 	// Returns a list of events matching the requested IDs found in the database.
 	// If an event is not found in the database then it will be omitted from the list.
@@ -81,6 +83,12 @@ type Database interface {
 	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
 	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
+	// AddPeek adds a new peek to our DB for a given room by a given user's device.
+	// Returns an error if there was a problem communicating with the database.
+	AddPeek(ctx context.Context, RoomID, UserID, DeviceID string) (types.StreamPosition, error)
+	// DeletePeek deletes all peeks for a given room by a given user
+	// Returns an error if there was a problem communicating with the database.
+	DeletePeeks(ctx context.Context, RoomID, UserID string) (types.StreamPosition, error)
 	// SetTypingTimeoutCallback sets a callback function that is called right after
 	// a user is removed from the typing user list due to timeout.
 	SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn)

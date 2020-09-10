@@ -38,6 +38,15 @@ func (t *RoomserverInternalAPITrace) PerformInvite(
 	return t.Impl.PerformInvite(ctx, req, res)
 }
 
+func (t *RoomserverInternalAPITrace) PerformPeek(
+	ctx context.Context,
+	req *PerformPeekRequest,
+	res *PerformPeekResponse,
+) {
+	t.Impl.PerformPeek(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformPeek req=%+v res=%+v", js(req), js(res))
+}
+
 func (t *RoomserverInternalAPITrace) PerformJoin(
 	ctx context.Context,
 	req *PerformJoinRequest,

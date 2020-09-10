@@ -359,7 +359,7 @@ func (d *Database) MembershipUpdater(
 	var updater *MembershipUpdater
 	_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
 		updater, err = NewMembershipUpdater(ctx, d, txn, roomID, targetUserID, targetLocal, roomVersion)
-		return nil
+		return err
 	})
 	return updater, err
 }
@@ -374,7 +374,7 @@ func (d *Database) GetLatestEventsForUpdate(
 	var updater *LatestEventsUpdater
 	_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
 		updater, err = NewLatestEventsUpdater(ctx, d, txn, roomInfo)
-		return nil
+		return err
 	})
 	return updater, err
 }

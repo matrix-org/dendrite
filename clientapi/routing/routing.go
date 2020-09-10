@@ -103,6 +103,17 @@ func Setup(
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/peek/{roomIDOrAlias}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return PeekRoomByIDOrAlias(
+				req, device, rsAPI, accountDB, vars["roomIDOrAlias"],
+			)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/joined_rooms",
 		httputil.MakeAuthAPI("joined_rooms", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetJoinedRooms(req, device, rsAPI)

@@ -112,6 +112,13 @@ func (t *testRoomserverAPI) PerformJoin(
 ) {
 }
 
+func (t *testRoomserverAPI) PerformPeek(
+	ctx context.Context,
+	req *api.PerformPeekRequest,
+	res *api.PerformPeekResponse,
+) {
+}
+
 func (t *testRoomserverAPI) PerformPublish(
 	ctx context.Context,
 	req *api.PerformPublishRequest,
