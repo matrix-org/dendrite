@@ -42,9 +42,9 @@ CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(
 `
 
 const insertPeekSQL = "" +
-	"INSERT INTO syncapi_peeks" +
-	" (id, room_id, user_id, device_id, creation_ts)" +
-	" VALUES ($1, $2, $3, $4, $5)"
+	"INSERT OR REPLACE INTO syncapi_peeks" +
+	" (id, room_id, user_id, device_id, creation_ts, deleted)" +
+	" VALUES ($1, $2, $3, $4, $5, false)"
 
 const deletePeekSQL = "" +
 	"UPDATE syncapi_peeks SET deleted=true, id=$1 WHERE room_id = $2 AND user_id = $3 AND device_id = $4"

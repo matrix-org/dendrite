@@ -44,7 +44,9 @@ CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(
 const insertPeekSQL = "" +
 	"INSERT INTO syncapi_peeks" +
 	" (room_id, user_id, device_id, creation_ts)" +
-	" VALUES ($1, $2, $3, $4) RETURNING id"
+	" VALUES ($1, $2, $3, $4)" +
+	" ON CONFLICT (room_id, user_id, device_id) DO UPDATE SET deleted=false, creation_ts=$4" +
+	" RETURNING id"
 
 const deletePeekSQL = "" +
 	"UPDATE syncapi_peeks SET deleted=true, id=nextval('syncapi_stream_id') WHERE room_id = $1 AND user_id = $2 AND device_id = $3 RETURNING id"
