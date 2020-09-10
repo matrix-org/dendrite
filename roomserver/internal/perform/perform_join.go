@@ -183,33 +183,30 @@ func (r *Joiner) performJoinRoomByID(
 		return "", fmt.Errorf("eb.SetContent: %w", err)
 	}
 
-	// Work out if this should be a federated join. This will be true
-	// if our server isn't joined to this room already, or in response
-	// to an existing invite from a federated server. If it is then we
-	// avoid the situation where we might think we know about a room
-	// in the following section but don't know the latest state as all
-	// of our users have left.
+	// Force a federated join if we aren't in the room and we've been
+	// given some server names to try joining by.
 	serverInRoom, _ := helpers.IsServerCurrentlyInRoom(ctx, r.DB, r.ServerName, req.RoomIDOrAlias)
-	isInvitePending, inviteSender, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
-	if !serverInRoom || (err == nil && isInvitePending) {
-		if err == nil && inviteSender != "" {
-			// Check if there's an invite pending.
-			_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
-			if ierr != nil {
-				return "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
-			}
+	forceFederatedJoin := len(req.ServerNames) > 0 && !serverInRoom
 
-			// Check that the domain isn't ours. If it's local then we don't
-			// need to do anything as our own copy of the room state will be
-			// up-to-date.
-			if inviterDomain != r.Cfg.Matrix.ServerName {
-				// Add the server of the person who invited us to the server list,
-				// as they should be a fairly good bet.
-				req.ServerNames = append(req.ServerNames, inviterDomain)
-			}
+	// Force a federated join if we're dealing with a pending invite
+	// and we aren't in the room.
+	isInvitePending, inviteSender, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
+	if err == nil && isInvitePending {
+		forceFederatedJoin = true
+		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
+		if ierr != nil {
+			return "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 		}
 
-		// Perform a federated room join.
+		// If we were invited by someone from another server then we can
+		// assume they are in the room so we can join via them.
+		if inviterDomain != r.Cfg.Matrix.ServerName {
+			req.ServerNames = append(req.ServerNames, inviterDomain)
+		}
+	}
+
+	// If we should do a forced federated join then do that.
+	if forceFederatedJoin {
 		return req.RoomIDOrAlias, r.performFederatedJoinRoomByID(ctx, req)
 	}
 
