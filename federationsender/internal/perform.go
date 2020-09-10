@@ -98,7 +98,10 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		response.LastError = &gomatrix.HTTPError{
 			Code:         0,
 			WrappedError: nil,
-			Message:      lastErr.Error(),
+			Message:      "Unknown HTTP error",
+		}
+		if lastErr != nil {
+			response.LastError.Message = lastErr.Error()
 		}
 	}
 

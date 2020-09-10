@@ -192,7 +192,7 @@ func (r *Joiner) performJoinRoomByID(
 	serverInRoom, _ := helpers.IsServerCurrentlyInRoom(ctx, r.DB, r.ServerName, req.RoomIDOrAlias)
 	isInvitePending, inviteSender, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
 	if !serverInRoom || (err == nil && isInvitePending) {
-		if inviteSender != "" {
+		if err == nil && inviteSender != "" {
 			// Check if there's an invite pending.
 			_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
 			if ierr != nil {
