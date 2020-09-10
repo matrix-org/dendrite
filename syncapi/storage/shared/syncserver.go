@@ -258,6 +258,7 @@ func (d *Database) RewriteState(
 			}
 		}
 
+		// TODO: is there something better here that we can do instead of giving stream position 0?
 		return d.updateRoomState(ctx, txn, []string{}, addStateEvents, types.StreamPosition(0))
 	})
 }
