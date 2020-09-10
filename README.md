@@ -101,6 +101,18 @@ look for [Good First Issues](https://github.com/matrix-org/dendrite/labels/good%
 familiar with the project, look for [Help Wanted](https://github.com/matrix-org/dendrite/labels/help-wanted)
 issues.
 
+# Hardware requirements
+
+Dendrite in Monolith + SQLite works in a range of environments including iOS and in-browser via WASM.
+
+For small homeserver installations joined on ~10s rooms on matrix.org with ~100s of users in those rooms, including some
+encrypted rooms:
+ - Memory: uses around 100MB of RAM, with peaks at around 200MB.
+ - Disk space: After a few months of usage, the database grew to around 2GB (in Monolith mode).
+ - CPU: Brief spikes when processing events, typically idles at 1% CPU.
+
+This means Dendrite should comfortably work on things like Raspberry Pis.
+
 # Discussion
 
 For questions about Dendrite we have a dedicated room on Matrix
