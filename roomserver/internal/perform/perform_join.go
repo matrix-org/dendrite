@@ -192,7 +192,6 @@ func (r *Joiner) performJoinRoomByID(
 	// and we aren't in the room.
 	isInvitePending, inviteSender, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
 	if err == nil && isInvitePending {
-		forceFederatedJoin = true
 		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
 		if ierr != nil {
 			return "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
@@ -202,6 +201,7 @@ func (r *Joiner) performJoinRoomByID(
 		// assume they are in the room so we can join via them.
 		if inviterDomain != r.Cfg.Matrix.ServerName {
 			req.ServerNames = append(req.ServerNames, inviterDomain)
+			forceFederatedJoin = true
 		}
 	}
 
