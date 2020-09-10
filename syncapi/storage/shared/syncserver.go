@@ -250,12 +250,25 @@ func (d *Database) RewriteState(
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		// If the event is a create event then we'll delete all of the existing
-		// state in the room. The only reason that a create event would be replayed
+		// data for the room. The only reason that a create event would be replayed
 		// to us in this way is if we're about to receive the entire room state.
 		if ev.Type() == gomatrixserverlib.MRoomCreate {
-			if err := d.CurrentRoomState.DeleteRoomStateByRoomID(ctx, txn, ev.RoomID()); err != nil {
-				return fmt.Errorf("d.CurrentRoomState.DeleteRoomStateByRoomID: %w", err)
+			if err := d.CurrentRoomState.DeleteRoomStateForRoom(ctx, txn, ev.RoomID()); err != nil {
+				return fmt.Errorf("d.CurrentRoomState.DeleteRoomStateForRoom: %w", err)
 			}
+			if err := d.OutputEvents.DeleteEventsForRoom(ctx, txn, ev.RoomID()); err != nil {
+				return fmt.Errorf("d.Events.DeleteEventsForRoom: %w", err)
+			}
+			if err := d.Topology.DeleteTopologyForRoom(ctx, txn, ev.RoomID()); err != nil {
+				return fmt.Errorf("d.Topology.DeleteTopologyForRoom: %w", err)
+			}
+			if err := d.BackwardExtremities.DeleteBackwardExtremitiesForRoom(ctx, txn, ev.RoomID()); err != nil {
+				return fmt.Errorf("d.BackwardExtremities.DeleteBackwardExtremitiesForRoom: %w", err)
+			}
+		}
+
+		if err := d.handleBackwardExtremities(ctx, txn, ev); err != nil {
+			return fmt.Errorf("d.handleBackwardExtremities: %w", err)
 		}
 
 		// TODO: is there something better here that we can do instead of giving stream position 0?

@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 )
 
@@ -46,11 +47,15 @@ const selectBackwardExtremitiesForRoomSQL = "" +
 const deleteBackwardExtremitySQL = "" +
 	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND prev_event_id = $2"
 
+const deleteBackwardExtremitiesForRoomSQL = "" +
+	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1"
+
 type backwardExtremitiesStatements struct {
 	db                                   *sql.DB
 	insertBackwardExtremityStmt          *sql.Stmt
 	selectBackwardExtremitiesForRoomStmt *sql.Stmt
 	deleteBackwardExtremityStmt          *sql.Stmt
+	deleteBackwardExtremitiesForRoomStmt *sql.Stmt
 }
 
 func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities, error) {
@@ -68,6 +73,9 @@ func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities
 		return nil, err
 	}
 	if s.deleteBackwardExtremityStmt, err = db.Prepare(deleteBackwardExtremitySQL); err != nil {
+		return nil, err
+	}
+	if s.deleteBackwardExtremitiesForRoomStmt, err = db.Prepare(deleteBackwardExtremitiesForRoomSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -106,5 +114,12 @@ func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 	ctx context.Context, txn *sql.Tx, roomID, knownEventID string,
 ) (err error) {
 	_, err = txn.Stmt(s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
+	return err
+}
+
+func (s *backwardExtremitiesStatements) DeleteBackwardExtremitiesForRoom(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (err error) {
+	_, err = sqlutil.TxStmt(txn, s.deleteBackwardExtremitiesForRoomStmt).ExecContext(ctx, roomID)
 	return err
 }
