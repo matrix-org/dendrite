@@ -221,7 +221,7 @@ func Setup(
 			queryVars := httpReq.URL.Query()
 			remoteVersions := []gomatrixserverlib.RoomVersion{}
 			if vers, ok := queryVars["ver"]; ok {
-				// The remote side supplied a ?=ver so use that to build up the list
+				// The remote side supplied a ?ver= so use that to build up the list
 				// of supported room versions
 				for _, v := range vers {
 					remoteVersions = append(remoteVersions, gomatrixserverlib.RoomVersion(v))

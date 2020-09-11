@@ -458,7 +458,8 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 
 	// pass the event along with the state to the roomserver using a background context so we don't
 	// needlessly expire
-	return api.SendEventWithState(context.Background(), t.rsAPI, resolvedState, e.Headered(roomVersion), t.haveEventIDs())
+	headeredEvent := e.Headered(roomVersion)
+	return api.SendEventWithState(context.Background(), t.rsAPI, resolvedState, &headeredEvent, t.haveEventIDs())
 }
 
 // lookupStateAfterEvent returns the room state after `eventID`, which is the state before eventID with the state of `eventID` (if it's a state event)
