@@ -41,6 +41,7 @@ func NewRoomserverAPI(
 	outputRoomEventTopic string, caches caching.RoomServerCaches,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) *RoomserverInternalAPI {
+	serverACLs := acls.NewServerACLs(roomserverDB)
 	a := &RoomserverInternalAPI{
 		DB:         roomserverDB,
 		Cfg:        cfg,
@@ -50,13 +51,14 @@ func NewRoomserverAPI(
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
-			ServerACLs: acls.NewServerACLs(roomserverDB),
+			ServerACLs: serverACLs,
 		},
 		Inputer: &input.Inputer{
 			DB:                   roomserverDB,
 			OutputRoomEventTopic: outputRoomEventTopic,
 			Producer:             producer,
 			ServerName:           cfg.Matrix.ServerName,
+			ACLs:                 serverACLs,
 		},
 		// perform-er structs get initialised when we have a federation sender to use
 	}

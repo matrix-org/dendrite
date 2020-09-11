@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -40,15 +40,15 @@ type RequestPool struct {
 	userAPI  userapi.UserInternalAPI
 	notifier *Notifier
 	keyAPI   keyapi.KeyInternalAPI
-	stateAPI currentstateAPI.CurrentStateInternalAPI
+	rsAPI    roomserverAPI.RoomserverInternalAPI
 }
 
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
 	db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *RequestPool {
-	return &RequestPool{db, userAPI, n, keyAPI, stateAPI}
+	return &RequestPool{db, userAPI, n, keyAPI, rsAPI}
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -265,7 +265,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 func (rp *RequestPool) appendDeviceLists(
 	data *types.Response, userID string, since, to types.StreamingToken,
 ) (*types.Response, error) {
-	_, err := internal.DeviceListCatchup(context.Background(), rp.keyAPI, rp.stateAPI, userID, data, since, to)
+	_, err := internal.DeviceListCatchup(context.Background(), rp.keyAPI, rp.rsAPI, userID, data, since, to)
 	if err != nil {
 		return nil, fmt.Errorf("internal.DeviceListCatchup: %w", err)
 	}

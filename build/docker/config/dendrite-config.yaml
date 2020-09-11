@@ -133,17 +133,6 @@ client_api:
     turn_username: ""
     turn_password: ""
 
-# Configuration for the Current State Server.
-current_state_server:
-  internal_api:
-    listen: http://0.0.0.0:7782
-    connect: http://current_state_server:7782
-  database:
-    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_currentstate?sslmode=disable
-    max_open_conns: 100
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
 # Configuration for the EDU server.
 edu_server:
   internal_api:

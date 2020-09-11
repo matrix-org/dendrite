@@ -43,7 +43,7 @@ func (r joinContext) CheckSendJoinResponse(
 	event gomatrixserverlib.Event,
 	server gomatrixserverlib.ServerName,
 	respSendJoin gomatrixserverlib.RespSendJoin,
-) error {
+) (*gomatrixserverlib.RespState, error) {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
 	retries := map[string][]gomatrixserverlib.Event{}
@@ -110,8 +110,9 @@ func (r joinContext) CheckSendJoinResponse(
 
 	// TODO: Can we expand Check here to return a list of missing auth
 	// events rather than failing one at a time?
-	if err := respSendJoin.Check(ctx, r.keyRing, event, missingAuth); err != nil {
-		return fmt.Errorf("respSendJoin: %w", err)
+	rs, err := respSendJoin.Check(ctx, r.keyRing, event, missingAuth)
+	if err != nil {
+		return nil, fmt.Errorf("respSendJoin: %w", err)
 	}
-	return nil
+	return rs, nil
 }

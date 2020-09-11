@@ -79,10 +79,10 @@ const selectRoomIDsSQL = "" +
 	"SELECT room_id FROM roomserver_rooms"
 
 const bulkSelectRoomIDsSQL = "" +
-	"SELECT room_id FROM roomserver_rooms WHERE room_nid IN ($1)"
+	"SELECT room_id FROM roomserver_rooms WHERE room_nid = ANY($1)"
 
 const bulkSelectRoomNIDsSQL = "" +
-	"SELECT room_nid FROM roomserver_rooms WHERE room_id IN ($1)"
+	"SELECT room_nid FROM roomserver_rooms WHERE room_id = ANY($1)"
 
 type roomStatements struct {
 	insertRoomNIDStmt                  *sql.Stmt

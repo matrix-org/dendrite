@@ -99,7 +99,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		DB:                  d.db,
 		Writer:              d.writer,
 		Invites:             invites,
-		Peeks:				 peeks,
+		Peeks:               peeks,
 		AccountData:         accountData,
 		OutputEvents:        events,
 		BackwardExtremities: bwExtrem,

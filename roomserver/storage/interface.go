@@ -17,9 +17,9 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/currentstateserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )

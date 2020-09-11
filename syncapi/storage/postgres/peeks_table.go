@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sqlite3
+package postgres
 
 import (
 	"context"
@@ -27,13 +27,13 @@ import (
 
 const peeksSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_peeks (
-	id INTEGER,
+	id BIGINT DEFAULT nextval('syncapi_stream_id'),
 	room_id TEXT NOT NULL,
 	user_id TEXT NOT NULL,
 	device_id TEXT NOT NULL,
 	deleted BOOL NOT NULL DEFAULT false,
     -- When the peek was created in UNIX epoch ms.
-    creation_ts INTEGER NOT NULL,
+    creation_ts BIGINT NOT NULL,
     UNIQUE(room_id, user_id, device_id)
 );
 
@@ -42,21 +42,22 @@ CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(
 `
 
 const insertPeekSQL = "" +
-	"INSERT OR REPLACE INTO syncapi_peeks" +
-	" (id, room_id, user_id, device_id, creation_ts, deleted)" +
-	" VALUES ($1, $2, $3, $4, $5, false)"
+	"INSERT INTO syncapi_peeks" +
+	" (room_id, user_id, device_id, creation_ts)" +
+	" VALUES ($1, $2, $3, $4)" +
+	" ON CONFLICT (room_id, user_id, device_id) DO UPDATE SET deleted=false, creation_ts=$4" +
+	" RETURNING id"
 
 const deletePeekSQL = "" +
-	"UPDATE syncapi_peeks SET deleted=true, id=$1 WHERE room_id = $2 AND user_id = $3 AND device_id = $4"
+	"UPDATE syncapi_peeks SET deleted=true, id=nextval('syncapi_stream_id') WHERE room_id = $1 AND user_id = $2 AND device_id = $3 RETURNING id"
 
 const deletePeeksSQL = "" +
-	"UPDATE syncapi_peeks SET deleted=true, id=$1 WHERE room_id = $2 AND user_id = $3"
+	"UPDATE syncapi_peeks SET deleted=true, id=nextval('syncapi_stream_id') WHERE room_id = $1 AND user_id = $2 RETURNING id"
 
 // we care about all the peeks which were created in this range, deleted in this range,
 // or were created before this range but haven't been deleted yet.
-// BEWARE: sqlite chokes on out of order substitution strings.
 const selectPeeksInRangeSQL = "" +
-	"SELECT id, room_id, deleted FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted=true) OR (id > $3 AND id <= $4))"
+	"SELECT room_id, deleted, (id > $3 AND id <= $4) AS changed FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted) OR (id > $3 AND id <= $4))"
 
 const selectPeekingDevicesSQL = "" +
 	"SELECT room_id, user_id, device_id FROM syncapi_peeks WHERE deleted=false"
@@ -66,7 +67,6 @@ const selectMaxPeekIDSQL = "" +
 
 type peekStatements struct {
 	db                       *sql.DB
-	streamIDStatements       *streamIDStatements
 	insertPeekStmt           *sql.Stmt
 	deletePeekStmt           *sql.Stmt
 	deletePeeksStmt          *sql.Stmt
@@ -75,14 +75,13 @@ type peekStatements struct {
 	selectMaxPeekIDStmt      *sql.Stmt
 }
 
-func NewSqlitePeeksTable(db *sql.DB, streamID *streamIDStatements) (tables.Peeks, error) {
+func NewPostgresPeeksTable(db *sql.DB) (tables.Peeks, error) {
 	_, err := db.Exec(peeksSchema)
 	if err != nil {
 		return nil, err
 	}
 	s := &peekStatements{
-		db:                 db,
-		streamIDStatements: streamID,
+		db: db,
 	}
 	if s.insertPeekStmt, err = db.Prepare(insertPeekSQL); err != nil {
 		return nil, err
@@ -108,45 +107,26 @@ func NewSqlitePeeksTable(db *sql.DB, streamID *streamIDStatements) (tables.Peeks
 func (s *peekStatements) InsertPeek(
 	ctx context.Context, txn *sql.Tx, roomID, userID, deviceID string,
 ) (streamPos types.StreamPosition, err error) {
-	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
-	if err != nil {
-		return
-	}
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	_, err = sqlutil.TxStmt(txn, s.insertPeekStmt).ExecContext(ctx, streamPos, roomID, userID, deviceID, nowMilli)
+	stmt := sqlutil.TxStmt(txn, s.insertPeekStmt)
+	err = stmt.QueryRowContext(ctx, roomID, userID, deviceID, nowMilli).Scan(&streamPos)
 	return
 }
 
 func (s *peekStatements) DeletePeek(
 	ctx context.Context, txn *sql.Tx, roomID, userID, deviceID string,
 ) (streamPos types.StreamPosition, err error) {
-	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
-	if err != nil {
-		return
-	}
-	_, err = sqlutil.TxStmt(txn, s.deletePeekStmt).ExecContext(ctx, streamPos, roomID, userID, deviceID)
+	stmt := sqlutil.TxStmt(txn, s.deletePeekStmt)
+	err = stmt.QueryRowContext(ctx, roomID, userID, deviceID).Scan(&streamPos)
 	return
 }
 
 func (s *peekStatements) DeletePeeks(
 	ctx context.Context, txn *sql.Tx, roomID, userID string,
-) (types.StreamPosition, error) {
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
-	if err != nil {
-		return 0, err
-	}
-	result, err := sqlutil.TxStmt(txn, s.deletePeeksStmt).ExecContext(ctx, streamPos, roomID, userID)
-	if err != nil {
-		return 0, err
-	}
-	numAffected, err := result.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	if numAffected == 0 {
-		return 0, sql.ErrNoRows
-	}
-	return streamPos, nil
+) (streamPos types.StreamPosition, err error) {
+	stmt := sqlutil.TxStmt(txn, s.deletePeeksStmt)
+	err = stmt.QueryRowContext(ctx, roomID, userID).Scan(&streamPos)
+	return
 }
 
 func (s *peekStatements) SelectPeeksInRange(
@@ -160,11 +140,11 @@ func (s *peekStatements) SelectPeeksInRange(
 
 	for rows.Next() {
 		peek := types.Peek{}
-		var id types.StreamPosition
-		if err = rows.Scan(&id, &peek.RoomID, &peek.Deleted); err != nil {
+		var changed bool
+		if err = rows.Scan(&peek.RoomID, &peek.Deleted, &changed); err != nil {
 			return
 		}
-		peek.New = (id > r.Low() && id <= r.High()) && !peek.Deleted
+		peek.New = changed && !peek.Deleted
 		peeks = append(peeks, peek)
 	}
 

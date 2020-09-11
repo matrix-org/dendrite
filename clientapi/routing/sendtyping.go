@@ -17,8 +17,8 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/eduserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/util"
@@ -35,7 +35,7 @@ func SendTyping(
 	req *http.Request, device *userapi.Device, roomID string,
 	userID string, accountDB accounts.Database,
 	eduAPI api.EDUServerInputAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if device.UserID != userID {
 		return util.JSONResponse{
@@ -45,7 +45,7 @@ func SendTyping(
 	}
 
 	// Verify that the user is a member of this room
-	resErr := checkMemberInRoom(req.Context(), stateAPI, userID, roomID)
+	resErr := checkMemberInRoom(req.Context(), rsAPI, userID, roomID)
 	if resErr != nil {
 		return *resErr
 	}

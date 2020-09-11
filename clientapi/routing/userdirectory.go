@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -34,7 +34,7 @@ func SearchUserDirectory(
 	ctx context.Context,
 	device *userapi.Device,
 	userAPI userapi.UserInternalAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
+	rsAPI api.RoomserverInternalAPI,
 	serverName gomatrixserverlib.ServerName,
 	searchString string,
 	limit int,
@@ -81,14 +81,14 @@ func SearchUserDirectory(
 	// start searching for known users from joined rooms.
 
 	if len(results) <= limit {
-		stateReq := &currentstateAPI.QueryKnownUsersRequest{
+		stateReq := &api.QueryKnownUsersRequest{
 			UserID:       device.UserID,
 			SearchString: searchString,
 			Limit:        limit - len(results),
 		}
-		stateRes := &currentstateAPI.QueryKnownUsersResponse{}
-		if err := stateAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil {
-			errRes := util.ErrorResponse(fmt.Errorf("stateAPI.QueryKnownUsers: %w", err))
+		stateRes := &api.QueryKnownUsersResponse{}
+		if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil {
+			errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 			return &errRes
 		}
 

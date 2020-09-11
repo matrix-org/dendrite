@@ -21,7 +21,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20200902135805-f7a5b5e89750
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20200907151926-38f437f2b2a6
 	github.com/matrix-org/naffka v0.0.0-20200901083833-bcdd62999a91
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.2
@@ -29,6 +29,7 @@ require (
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
+	github.com/pressly/goose v2.7.0-rc5+incompatible
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/tidwall/gjson v1.6.1

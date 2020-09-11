@@ -204,7 +204,7 @@ type OutputRedactedEvent struct {
 // An OutputNewPeek is written whenever a user starts peeking into a room
 // using a given device.
 type OutputNewPeek struct {
-	RoomID string
-	UserID string
+	RoomID   string
+	UserID   string
 	DeviceID string
 }

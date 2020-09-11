@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,6 +34,7 @@ type Inputer struct {
 	DB                   storage.Database
 	Producer             sarama.SyncProducer
 	ServerName           gomatrixserverlib.ServerName
+	ACLs                 *acls.ServerACLs
 	OutputRoomEventTopic string
 
 	workers sync.Map // room ID -> *inputWorker
@@ -88,6 +90,10 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 				"send_as_server": updates[i].NewRoomEvent.SendAsServer,
 				"sender":         updates[i].NewRoomEvent.Event.Sender(),
 			})
+			if updates[i].NewRoomEvent.Event.Type() == "m.room.server_acl" && updates[i].NewRoomEvent.Event.StateKeyEquals("") {
+				ev := updates[i].NewRoomEvent.Event.Unwrap()
+				defer r.ACLs.OnServerACLUpdate(&ev)
+			}
 		}
 		logger.Infof("Producing to topic '%s'", r.OutputRoomEventTopic)
 		messages[i] = &sarama.ProducerMessage{

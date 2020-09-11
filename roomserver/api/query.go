@@ -303,6 +303,39 @@ type QueryServerBannedFromRoomResponse struct {
 	Banned bool `json:"banned"`
 }
 
+// MarshalJSON stringifies the room ID and StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
+func (r *QueryBulkStateContentResponse) MarshalJSON() ([]byte, error) {
+	se := make(map[string]string)
+	for roomID, tupleToEvent := range r.Rooms {
+		for tuple, event := range tupleToEvent {
+			// use 0x1F (unit separator) as the delimiter between room ID/type/state key,
+			se[fmt.Sprintf("%s\x1F%s\x1F%s", roomID, tuple.EventType, tuple.StateKey)] = event
+		}
+	}
+	return json.Marshal(se)
+}
+
+func (r *QueryBulkStateContentResponse) UnmarshalJSON(data []byte) error {
+	wireFormat := make(map[string]string)
+	err := json.Unmarshal(data, &wireFormat)
+	if err != nil {
+		return err
+	}
+	r.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
+	for roomTuple, value := range wireFormat {
+		fields := strings.Split(roomTuple, "\x1F")
+		roomID := fields[0]
+		if r.Rooms[roomID] == nil {
+			r.Rooms[roomID] = make(map[gomatrixserverlib.StateKeyTuple]string)
+		}
+		r.Rooms[roomID][gomatrixserverlib.StateKeyTuple{
+			EventType: fields[1],
+			StateKey:  fields[2],
+		}] = value
+	}
+	return nil
+}
+
 // MarshalJSON stringifies the StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
 func (r *QueryCurrentStateResponse) MarshalJSON() ([]byte, error) {
 	se := make(map[string]*gomatrixserverlib.HeaderedEvent, len(r.StateEvents))

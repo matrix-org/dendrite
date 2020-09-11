@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
@@ -146,7 +146,7 @@ func (d *Database) AddInviteEvent(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
-		return nil
+		return err
 	})
 	return
 }
@@ -158,7 +158,7 @@ func (d *Database) RetireInviteEvent(
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sp, err = d.Invites.DeleteInviteEvent(ctx, txn, inviteEventID)
-		return nil
+		return err
 	})
 	return
 }
@@ -169,10 +169,27 @@ func (d *Database) RetireInviteEvent(
 func (d *Database) AddPeek(
 	ctx context.Context, roomID, userID, deviceID string,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		sp, err = d.Peeks.InsertPeek(ctx, nil, roomID, userID, deviceID)
-		return nil
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		sp, err = d.Peeks.InsertPeek(ctx, txn, roomID, userID, deviceID)
+		return err
 	})
+	return
+}
+
+// DeletePeeks tracks the fact that a user has stopped peeking from all devices
+// If the peeks was successfully deleted this returns the stream ID it was stored at.
+// Returns an error if there was a problem communicating with the database.
+func (d *Database) DeletePeeks(
+	ctx context.Context, roomID, userID string,
+) (sp types.StreamPosition, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		sp, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
+		return err
+	})
+	if err == sql.ErrNoRows {
+		sp = 0
+		err = nil
+	}
 	return
 }
 
@@ -214,7 +231,7 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 					"transaction_id", in[i].TransactionID.TransactionID,
 				)
 				if err != nil {
-					logrus.WithFields(logrus.Fields{
+					log.WithFields(log.Fields{
 						"event_id": out[i].EventID(),
 					}).WithError(err).Warnf("Failed to add transaction ID to event")
 				}
@@ -407,7 +424,6 @@ func (d *Database) EventPositionInTopology(
 func (d *Database) syncPositionTx(
 	ctx context.Context, txn *sql.Tx,
 ) (sp types.StreamingToken, err error) {
-
 	maxEventID, err := d.OutputEvents.SelectMaxEventID(ctx, txn)
 	if err != nil {
 		return sp, err
@@ -425,6 +441,13 @@ func (d *Database) syncPositionTx(
 	}
 	if maxInviteID > maxEventID {
 		maxEventID = maxInviteID
+	}
+	maxPeekID, err := d.Peeks.SelectMaxPeekID(ctx, txn)
+	if err != nil {
+		return sp, err
+	}
+	if maxPeekID > maxEventID {
+		maxEventID = maxPeekID
 	}
 	sp = types.NewStreamToken(types.StreamPosition(maxEventID), types.StreamPosition(d.EDUCache.GetLatestSyncPosition()), nil)
 	return
@@ -602,7 +625,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		return err
 	}
 	if len(redactedEvents) == 0 {
-		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
+		log.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
 		return nil
 	}
 	eventToRedact := redactedEvents[0].Unwrap()
@@ -675,19 +698,21 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 
 	// Add peeked rooms.
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, deviceID)
+	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, deviceID, r)
 	if err != nil {
 		return
 	}
 	for _, peek := range peeks {
-		var jr *types.JoinResponse
-		jr, err = d.getJoinResponseForCompleteSync(
-			ctx, txn, peek.RoomID, r, &stateFilter, numRecentEventsPerRoom,
-		)
-		if err != nil {
-			return
+		if !peek.Deleted {
+			var jr *types.JoinResponse
+			jr, err = d.getJoinResponseForCompleteSync(
+				ctx, txn, peek.RoomID, r, &stateFilter, numRecentEventsPerRoom,
+			)
+			if err != nil {
+				return
+			}
+			res.Rooms.Peek[peek.RoomID] = *jr
 		}
-		res.Rooms.Peek[peek.RoomID] = *jr
 	}
 
 	if err = d.addInvitesToResponse(ctx, txn, userID, r, res); err != nil {
@@ -698,9 +723,9 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	return //res, toPos, joinedRoomIDs, err
 }
 
-func (d* Database) getJoinResponseForCompleteSync(
+func (d *Database) getJoinResponseForCompleteSync(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, 
+	roomID string,
 	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 	numRecentEventsPerRoom int,
@@ -798,8 +823,10 @@ func (d *Database) addInvitesToResponse(
 		res.Rooms.Invite[roomID] = *ir
 	}
 	for roomID := range retiredInvites {
-		lr := types.NewLeaveResponse()
-		res.Rooms.Leave[roomID] = *lr
+		if _, ok := res.Rooms.Join[roomID]; !ok {
+			lr := types.NewLeaveResponse()
+			res.Rooms.Leave[roomID] = *lr
+		}
 	}
 	return nil
 }
@@ -985,6 +1012,7 @@ func (d *Database) fetchMissingStateEvents(
 // exclusive of oldPos, inclusive of newPos, for the rooms in which
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
+// nolint:gocyclo
 func (d *Database) getStateDeltas(
 	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
@@ -1012,16 +1040,13 @@ func (d *Database) getStateDeltas(
 
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so any peeks get overwritten
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.ID)
+	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// add peek blocks
-	peeking := make(map[string]bool)
-	newPeeks := false
 	for _, peek := range peeks {
-		peeking[peek.RoomID] = true
 		if peek.New {
 			// send full room state down instead of a delta
 			var s []types.StreamEvent
@@ -1030,22 +1055,13 @@ func (d *Database) getStateDeltas(
 				return nil, nil, err
 			}
 			state[peek.RoomID] = s
-			newPeeks = true
 		}
-
-		deltas = append(deltas, stateDelta{
-			membership:  gomatrixserverlib.Peek,
-			stateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
-			roomID:      peek.RoomID,
-		})
-	}
-
-	if newPeeks {
-		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			return d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
-		})
-		if err != nil {
-			return nil, nil, err
+		if !peek.Deleted {
+			deltas = append(deltas, stateDelta{
+				membership:  gomatrixserverlib.Peek,
+				stateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
+				roomID:      peek.RoomID,
+			})
 		}
 	}
 
@@ -1112,35 +1128,33 @@ func (d *Database) getStateDeltas(
 // requests with full_state=true.
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
+// nolint:gocyclo
 func (d *Database) getStateDeltasForFullStateSync(
 	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]stateDelta, []string, error) {
-	joinedRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	peeks, err := d.Peeks.SelectPeeks(ctx, txn, userID, device.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// Use a reasonable initial capacity
-	deltas := make([]stateDelta, 0, len(joinedRoomIDs) + len(peeks))
+	deltas := make(map[string]stateDelta)
 
-	// Add full states for all joined rooms
-	for _, joinedRoomID := range joinedRoomIDs {
-		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
-		if stateErr != nil {
-			return nil, nil, stateErr
+	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Add full states for all peeking rooms
+	for _, peek := range peeks {
+		if !peek.Deleted {
+			s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
+			if stateErr != nil {
+				return nil, nil, stateErr
+			}
+			deltas[peek.RoomID] = stateDelta{
+				membership:  gomatrixserverlib.Peek,
+				stateEvents: d.StreamEventsToEvents(device, s),
+				roomID:      peek.RoomID,
+			}
 		}
-		deltas = append(deltas, stateDelta{
-			membership:  gomatrixserverlib.Join,
-			stateEvents: d.StreamEventsToEvents(device, s),
-			roomID:      joinedRoomID,
-		})
 	}
 
 	// Add full states for all peeking rooms
@@ -1183,12 +1197,12 @@ func (d *Database) getStateDeltasForFullStateSync(
 		for _, ev := range stateStreamEvents {
 			if membership := getMembershipFromEvent(&ev.Event, userID); membership != "" {
 				if membership != gomatrixserverlib.Join { // We've already added full state for all joined rooms above.
-					deltas = append(deltas, stateDelta{
+					deltas[roomID] = stateDelta{
 						membership:    membership,
 						membershipPos: ev.StreamPosition,
 						stateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
 						roomID:        roomID,
-					})
+					}
 				}
 
 				break
@@ -1196,7 +1210,33 @@ func (d *Database) getStateDeltasForFullStateSync(
 		}
 	}
 
-	return deltas, joinedRoomIDs, nil
+	joinedRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Add full states for all joined rooms
+	for _, joinedRoomID := range joinedRoomIDs {
+		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
+		if stateErr != nil {
+			return nil, nil, stateErr
+		}
+		deltas[joinedRoomID] = stateDelta{
+			membership:  gomatrixserverlib.Join,
+			stateEvents: d.StreamEventsToEvents(device, s),
+			roomID:      joinedRoomID,
+		}
+	}
+
+	// Create a response array.
+	result := make([]stateDelta, len(deltas))
+	i := 0
+	for _, delta := range deltas {
+		result[i] = delta
+		i++
+	}
+
+	return result, joinedRoomIDs, nil
 }
 
 func (d *Database) currentStateStreamEventsForRoom(
