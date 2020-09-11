@@ -151,11 +151,27 @@ func (r *Peeker) performPeekRoomByID(
 		}
 	}
 
-	// If the server name in the room ID isn't ours then it's a
-	// possible candidate for finding the room via federation. Add
-	// it to the list of servers to try.
+	// handle federated peeks
 	if domain != r.Cfg.Matrix.ServerName {
+		// If the server name in the room ID isn't ours then it's a
+		// possible candidate for finding the room via federation. Add
+		// it to the list of servers to try.
 		req.ServerNames = append(req.ServerNames, domain)
+
+		// Try peeking by all of the supplied server names.
+		fedReq := fsAPI.PerformPeekRequest{
+			RoomID:      req.RoomIDOrAlias, // the room ID to try and peek
+			ServerNames: req.ServerNames,   // the servers to try peeking via
+		}
+		fedRes := fsAPI.PerformPeekResponse{}
+		r.FSAPI.PerformPeek(ctx, &fedReq, &fedRes)
+		if fedRes.LastError != nil {
+			return "", &api.PerformError{
+				Code:       api.PerformErrRemote,
+				Msg:        fedRes.LastError.Message,
+				RemoteCode: fedRes.LastError.Code,
+			}
+		}
 	}
 
 	// If this room isn't world_readable, we reject.
