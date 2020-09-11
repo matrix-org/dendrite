@@ -212,7 +212,7 @@ func (r *FederationSenderInternalAPI) PerformPeek(
 	ctx context.Context,
 	request *api.PerformPeekRequest,
 	response *api.PerformPeekResponse,
-) (err error) {
+) error {
 	// Look up the supported room versions.
 	var supportedVersions []gomatrixserverlib.RoomVersion
 	for version := range version.SupportedRoomVersions() {
@@ -252,7 +252,7 @@ func (r *FederationSenderInternalAPI) PerformPeek(
 		}
 
 		// We're all good.
-		return
+		return nil
 	}
 
 	// If we reach here then we didn't complete a peek for some reason.
@@ -274,6 +274,8 @@ func (r *FederationSenderInternalAPI) PerformPeek(
 		"failed to peek room %q through %d server(s): last error %s",
 		request.RoomID, len(request.ServerNames), lastErr,
 	)
+
+	return lastErr
 }
 
 func (r *FederationSenderInternalAPI) performPeekUsingServer(
@@ -282,10 +284,16 @@ func (r *FederationSenderInternalAPI) performPeekUsingServer(
 	serverName gomatrixserverlib.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
 ) error {
+	// create a unique ID for this peek.
+	// for now we just use the room ID again. In future, if we ever
+	// support concurrent peeks to the same room with different filters
+	// then we would need to disambiguate further.
+	peekID := roomID
+
 	// check whether we're peeking already to try to avoid needlessly
 	// re-peeking on the server. we don't need a transaction for this,
 	// given this is a nice-to-have.
-	remotePeek, err := r.db.GetRemotePeek(ctx, serverName, roomID)
+	remotePeek, err := r.db.GetRemotePeek(ctx, roomID, serverName, peekID)
 	if err != nil {
 		return err
 	}
@@ -301,12 +309,6 @@ func (r *FederationSenderInternalAPI) performPeekUsingServer(
 			return nil
 		}
 	}
-
-	// create a unique ID for this peek.
-	// for now we just use the room ID again. In future, if we ever
-	// support concurrent peeks to the same room with different filters
-	// then we would need to disambiguate further.
-	peekID := roomID
 
 	// Try to perform a /peek using the information supplied in the
 	// request.

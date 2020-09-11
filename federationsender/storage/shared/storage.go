@@ -35,6 +35,7 @@ type Database struct {
 	FederationSenderJoinedHosts tables.FederationSenderJoinedHosts
 	FederationSenderRooms       tables.FederationSenderRooms
 	FederationSenderBlacklist   tables.FederationSenderBlacklist
+	FederationSenderRemotePeeks tables.FederationSenderRemotePeeks
 }
 
 // An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
@@ -164,22 +165,22 @@ func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) 
 	return d.FederationSenderBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
 }
 
-func (d *Database) AddRemotePeek(serverName gomatrixserverlib.ServerName, roomID string, renewalInterval int) error {
+func (d *Database) AddRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.RemotePeeks.InsertRemotePeek(context.TODO(), txn, serverName, roomID, renewalInterval)
+		return d.FederationSenderRemotePeeks.InsertRemotePeek(context.TODO(), txn, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
-func (d *Database) RenewRemotePeek(serverName gomatrixserverlib.ServerName, roomID string, renewalInterval int) error {
+func (d *Database) RenewRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.RemotePeeks.RenewRemotePeek(context.TODO(), txn, serverName, roomID, renewalInterval)
+		return d.FederationSenderRemotePeeks.RenewRemotePeek(context.TODO(), txn, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
-func (d *Database) GetRemotePeek(serverName gomatrixserverlib.ServerName, roomID string) (types.RemotePeek, error) {
-	return d.RemotePeeks.SelectRemotePeek(context.TODO(), serverName, roomID)
+func (d *Database) GetRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string) (types.RemotePeek, error) {
+	return d.FederationSenderRemotePeeks.SelectRemotePeek(context.TODO(), serverName, roomID, peekID)
 }
 
 func (d *Database) GetRemotePeeks(roomID string) ([]types.RemotePeek, error) {
-	return d.RemotePeeks.SelectRemotePeeks(context.TODO(), roomID)
+	return d.FederationSenderRemotePeeks.SelectRemotePeeks(context.TODO(), roomID)
 }

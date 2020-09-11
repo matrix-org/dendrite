@@ -26,24 +26,25 @@ const remotePeeksSchema = `
 CREATE TABLE IF NOT EXISTS federationsender_remote_peeks (
 	room_id TEXT NOT NULL,
 	server_name TEXT NOT NULL,
+	peek_id TEXT NOT NULL,
     creation_ts INTEGER NOT NULL,
     renewed_ts INTEGER NOT NULL,
     renewal_interval INTEGER NOT NULL,
-	UNIQUE (room_id, server_name)
+	UNIQUE (room_id, server_name, peek_id)
 );
 `
 
 const insertRemotePeekSQL = "" +
-	"INSERT INTO federationsender_remote_peeks (room_id, server_name, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5)"
+	"INSERT INTO federationsender_remote_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
 
 const selectRemotePeekSQL = "" +
-	"SELECT room_id, server_name, creation_ts, renewed_ts, renewal_interval FROM federationsender_remote_peeks WHERE room_id = $1 and server_name = $2"
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_remote_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
 const selectRemotePeeksSQL = "" +
-	"SELECT room_id, server_name, creation_ts, renewed_ts, renewal_interval FROM federationsender_remote_peeks WHERE room_id = $1"
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_remote_peeks WHERE room_id = $1"
 
 const renewRemotePeekSQL = "" +
-	"UPDATE federationsender_remote_peeks SET renewed_ts=$3, renewal_interval=$4 WHERE room_id = $1 and server_name = $2"
+	"UPDATE federationsender_remote_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
 
 const deleteRemotePeekSQL = "" +
 	"DELETE FROM federationsender_remote_peeks WHERE room_id = $1 and server_name = $2"
@@ -92,25 +93,25 @@ func NewSQLiteRemotePeeksTable(db *sql.DB) (s *remotePeeksStatements, err error)
 }
 
 func (s *remotePeeksStatements) InsertRemotePeek(
-	ctx context.Context, txn *sql.Tx, roomID string, serverName gomatrixserverlib.ServerName, renewalInterval int,
+	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 	stmt := sqlutil.TxStmt(txn, s.insertRemotePeekStmt)
-	_, err := stmt.ExecContext(ctx, roomID, serverName, nowMilli, nowMilli, renewalInterval)
+	_, err := stmt.ExecContext(ctx, roomID, serverName, peekID, nowMilli, nowMilli, renewalInterval)
 	return
 }
 
 func (s *remotePeeksStatements) RenewRemotePeek(
-	ctx context.Context, txn *sql.Tx, roomID string, serverName gomatrixserverlib.ServerName, renewalInterval int,
+	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	_, err := sqlutil.TxStmt(txn, s.renewRemotePeekStmt).ExecContext(ctx, roomID, serverName, nowMilli, renewalInterval)
+	_, err := sqlutil.TxStmt(txn, s.renewRemotePeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
 	return
 }
 
 
 func (s *remotePeeksStatements) SelectRemotePeek(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID string,
+	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
 ) (remotePeek types.RemotePeek, err error) {
 	rows, err := sqlutil.TxStmt(txn, s.selectRemotePeeksStmt).QueryContext(ctx, roomID)
 	if err != nil {
@@ -121,6 +122,7 @@ func (s *remotePeeksStatements) SelectRemotePeek(
 	if err = rows.Scan(
 		&remotePeek.RoomID,
 		&remotePeek.ServerName,
+		&remotePeek.PeekID,
 		&remotePeek.CreationTimestamp,
 		&remotePeek.RenewTimestamp,
 		&remotePeek.RenewalInterval,
@@ -144,6 +146,7 @@ func (s *remotePeeksStatements) SelectRemotePeeks(
 		if err = rows.Scan(
 			&remotePeek.RoomID,
 			&remotePeek.ServerName,
+			&remotePeek.PeekID,
 			&remotePeek.CreationTimestamp,
 			&remotePeek.RenewTimestamp,
 			&remotePeek.RenewalInterval,
@@ -157,9 +160,9 @@ func (s *remotePeeksStatements) SelectRemotePeeks(
 }
 
 func (s *remotePeeksStatements) DeleteRemotePeek(
-	ctx context.Context, txn *sql.Tx, roomID string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
 ) (err error) {
-	_, err := sqlutil.TxStmt(txn, s.deleteRemotePeekStmt).ExecContext(ctx, roomID, serverName)
+	_, err := sqlutil.TxStmt(txn, s.deleteRemotePeekStmt).ExecContext(ctx, roomID, serverName, peekID)
 	return
 }
 

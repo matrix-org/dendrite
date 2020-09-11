@@ -69,9 +69,10 @@ type FederationSenderBlacklist interface {
 }
 
 type FederationSenderRemotePeeks interface {
-	InsertRemotePeek(ctx context.Context, txn *sql.Tx, roomID string, serverName gomatrixserverlib.ServerName, renewalInterval int) (err error)
-	RenewRemotePeek(ctx context.Context, txn *sql.Tx, roomID string, serverName gomatrixserverlib.ServerName, renewalInterval int) (err error)
+	InsertRemotePeek(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) (err error)
+	RenewRemotePeek(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) (err error)
+	SelectRemotePeek(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string) (remotePeek types.RemotePeek, err error)
 	SelectRemotePeeks(ctx context.Context, txn *sql.Tx, roomID string) (remotePeeks []types.RemotePeek, err error)
-	DeleteRemotePeek(ctx context.Context, txn *sql.Tx, roomID string, serverName gomatrixserverlib.ServerName) (err error)
+	DeleteRemotePeek(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string) (err error)
 	DeleteRemotePeeks(ctx context.Context, txn *sql.Tx, roomID string) (err error)
 }

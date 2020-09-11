@@ -62,7 +62,7 @@ type FederationSenderInternalAPI interface {
 		ctx context.Context,
 		request *PerformPeekRequest,
 		response *PerformPeekResponse,
-	)
+	) error
 	// Handle an instruction to make_leave & send_leave with a remote server.
 	PerformLeave(
 		ctx context.Context,
