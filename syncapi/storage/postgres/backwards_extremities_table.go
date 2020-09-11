@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 )
 
@@ -73,7 +74,7 @@ func NewPostgresBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremiti
 func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 	ctx context.Context, txn *sql.Tx, roomID, eventID string, prevEventID string,
 ) (err error) {
-	_, err = txn.Stmt(s.insertBackwardExtremityStmt).ExecContext(ctx, roomID, eventID, prevEventID)
+	_, err = sqlutil.TxStmt(txn, s.insertBackwardExtremityStmt).ExecContext(ctx, roomID, eventID, prevEventID)
 	return
 }
 
@@ -102,6 +103,6 @@ func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
 func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 	ctx context.Context, txn *sql.Tx, roomID, knownEventID string,
 ) (err error) {
-	_, err = txn.Stmt(s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
+	_, err = sqlutil.TxStmt(txn, s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
 	return
 }

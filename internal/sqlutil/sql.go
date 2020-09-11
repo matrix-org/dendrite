@@ -15,6 +15,7 @@
 package sqlutil
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -80,6 +81,14 @@ func WithTransaction(db *sql.DB, fn func(txn *sql.Tx) error) (err error) {
 func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 	if transaction != nil {
 		statement = transaction.Stmt(statement)
+	}
+	return statement
+}
+
+// TxStmtContext behaves similarly to TxStmt, with support for also passing context.
+func TxStmtContext(context context.Context, transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
+	if transaction != nil {
+		statement = transaction.StmtContext(context, statement)
 	}
 	return statement
 }
