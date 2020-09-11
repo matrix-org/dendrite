@@ -145,15 +145,8 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	if msg.RewritesState {
-		err = s.db.RewriteState(
-			ctx,
-			&ev,
-			addsStateEvents,
-			msg.AddsStateEventIDs,
-			msg.TransactionID,
-		)
-		if err != nil {
-			return fmt.Errorf("s.db.RewriteState: %w", err)
+		if err = s.db.PurgeRoom(ctx, ev.RoomID()); err != nil {
+			return fmt.Errorf("s.db.PurgeRoom: %w", err)
 		}
 	}
 
