@@ -417,7 +417,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 			[]gomatrixserverlib.HeaderedEvent{},
 			[]string{},
 			[]string{},
-			nil, true,
+			nil, false,
 		)
 		if err != nil {
 			return nil, err

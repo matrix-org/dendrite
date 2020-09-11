@@ -144,7 +144,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
-	if msg.Type == api.OutputRoomState {
+	if msg.RewritesState {
 		err = s.db.RewriteState(
 			ctx,
 			&ev,
@@ -155,7 +155,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		if err != nil {
 			return fmt.Errorf("s.db.RewriteState: %w", err)
 		}
-		return nil
 	}
 
 	pduPos, err := s.db.WriteEvent(

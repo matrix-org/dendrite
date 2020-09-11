@@ -86,7 +86,7 @@ func (r *Inputer) processRoomEvent(
 			"event_id": event.EventID(),
 			"type":     event.Type(),
 			"room":     event.RoomID(),
-		}).Info("Stored outlier")
+		}).Debug("Stored outlier")
 		return event.EventID(), nil
 	}
 
@@ -107,14 +107,23 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	if input.Kind == api.KindRewrite {
+		logrus.WithFields(logrus.Fields{
+			"event_id": event.EventID(),
+			"type":     event.Type(),
+			"room":     event.RoomID(),
+		}).Debug("Stored rewrite")
+		return event.EventID(), nil
+	}
+
 	if err = r.updateLatestEvents(
-		ctx,                           // context
-		roomInfo,                      // room info for the room being updated
-		stateAtEvent,                  // state at event (below)
-		event,                         // event
-		input.SendAsServer,            // send as server
-		input.TransactionID,           // transaction ID
-		input.Kind == api.KindRewrite, // historical
+		ctx,                 // context
+		roomInfo,            // room info for the room being updated
+		stateAtEvent,        // state at event (below)
+		event,               // event
+		input.SendAsServer,  // send as server
+		input.TransactionID, // transaction ID
+		input.HasState,      // rewrites state?
 	); err != nil {
 		return "", fmt.Errorf("r.updateLatestEvents: %w", err)
 	}

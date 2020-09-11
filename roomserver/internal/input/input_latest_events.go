@@ -54,7 +54,7 @@ func (r *Inputer) updateLatestEvents(
 	event gomatrixserverlib.Event,
 	sendAsServer string,
 	transactionID *api.TransactionID,
-	isHistorical bool,
+	rewritesState bool,
 ) (err error) {
 	updater, err := r.DB.GetLatestEventsForUpdate(ctx, *roomInfo)
 	if err != nil {
@@ -72,7 +72,7 @@ func (r *Inputer) updateLatestEvents(
 		event:         event,
 		sendAsServer:  sendAsServer,
 		transactionID: transactionID,
-		isHistorical:  isHistorical,
+		rewritesState: rewritesState,
 	}
 
 	if err = u.doUpdateLatestEvents(); err != nil {
@@ -95,7 +95,7 @@ type latestEventsUpdater struct {
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event
 	transactionID *api.TransactionID
-	isHistorical  bool
+	rewritesState bool
 	// Which server to send this event as.
 	sendAsServer string
 	// The eventID of the event that was processed before this one.
@@ -307,14 +307,9 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		latestEventIDs[i] = u.latest[i].EventID
 	}
 
-	var outputType api.OutputRoomEventType
-	if u.isHistorical {
-		outputType = api.OutputRoomState
-	}
-
 	ore := api.OutputNewRoomEvent{
 		Event:           u.event.Headered(u.roomInfo.RoomVersion),
-		Type:            outputType,
+		RewritesState:   u.rewritesState,
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,

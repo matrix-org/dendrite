@@ -86,9 +86,9 @@ const (
 type OutputNewRoomEvent struct {
 	// The Event.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
-	// Is the event a timeline event or a state event? Defaults to timeline
-	// if not specified.
-	Type OutputRoomEventType `json:"type"`
+	// Does the event completely rewrite the room state? If so, then AddsStateEventIDs
+	// will contain the entire room state.
+	RewritesState bool `json:"rewrites_state"`
 	// The latest events in the room after this event.
 	// This can be used to set the prev events for new events in the room.
 	// This also can be used to get the full current state after this event.

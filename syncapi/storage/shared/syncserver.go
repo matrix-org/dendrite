@@ -267,12 +267,14 @@ func (d *Database) RewriteState(
 			}
 		}
 
-		if err := d.handleBackwardExtremities(ctx, txn, ev); err != nil {
-			return fmt.Errorf("d.handleBackwardExtremities: %w", err)
-		}
-
+		/*
+			if err := d.handleBackwardExtremities(ctx, txn, ev); err != nil {
+				return fmt.Errorf("d.handleBackwardExtremities: %w", err)
+			}
+		*/
 		// TODO: is there something better here that we can do instead of giving stream position 0?
-		return d.updateRoomState(ctx, txn, []string{}, addStateEvents, types.StreamPosition(0))
+		//return d.updateRoomState(ctx, txn, []string{}, addStateEvents, types.StreamPosition(0))
+		return nil
 	})
 }
 
