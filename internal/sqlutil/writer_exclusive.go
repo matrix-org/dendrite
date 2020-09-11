@@ -3,10 +3,6 @@ package sqlutil
 import (
 	"database/sql"
 	"errors"
-	"fmt"
-	"runtime"
-	"strconv"
-	"strings"
 
 	"go.uber.org/atomic"
 )
@@ -16,9 +12,8 @@ import (
 // contend on database locks in, e.g. SQLite. Only one task will run
 // at a time on a given ExclusiveWriter.
 type ExclusiveWriter struct {
-	running  atomic.Bool
-	todo     chan transactionWriterTask
-	writerID int
+	running atomic.Bool
+	todo    chan transactionWriterTask
 }
 
 func NewExclusiveWriter() Writer {
@@ -33,15 +28,6 @@ type transactionWriterTask struct {
 	txn  *sql.Tx
 	f    func(txn *sql.Tx) error
 	wait chan error
-}
-
-func (w *ExclusiveWriter) Safe() string {
-	a := goid()
-	b := w.writerID
-	if a == b {
-		return ""
-	}
-	return fmt.Sprintf("%v != %v", a, b)
 }
 
 // Do queues a task to be run by a TransactionWriter. The function
@@ -74,7 +60,6 @@ func (w *ExclusiveWriter) run() {
 	if !w.running.CAS(false, true) {
 		return
 	}
-	w.writerID = goid()
 	defer w.running.Store(false)
 	for task := range w.todo {
 		if task.db != nil && task.txn != nil {
@@ -88,15 +73,4 @@ func (w *ExclusiveWriter) run() {
 		}
 		close(task.wait)
 	}
-}
-
-func goid() int {
-	var buf [64]byte
-	n := runtime.Stack(buf[:], false)
-	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
-	id, err := strconv.Atoi(idField)
-	if err != nil {
-		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
-	}
-	return id
 }
