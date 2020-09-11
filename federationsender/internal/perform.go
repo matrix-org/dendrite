@@ -186,7 +186,7 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// Check that the send_join response was valid.
 	joinCtx := perform.JoinContext(r.federation, r.keyRing)
 	respState, err := joinCtx.CheckSendJoinResponse(
-		ctx, event, serverName, respMakeJoin, respSendJoin,
+		ctx, event, serverName, respSendJoin,
 	)
 	if err != nil {
 		return fmt.Errorf("joinCtx.CheckSendJoinResponse: %w", err)
@@ -195,10 +195,11 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// If we successfully performed a send_join above then the other
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
+	headeredEvent := event.Headered(respMakeJoin.RoomVersion)
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI,
 		respState,
-		event.Headered(respMakeJoin.RoomVersion),
+		&headeredEvent,
 		nil,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
@@ -293,18 +294,17 @@ func (r *FederationSenderInternalAPI) performPeekUsingServer(
 	// check whether we're peeking already to try to avoid needlessly
 	// re-peeking on the server. we don't need a transaction for this,
 	// given this is a nice-to-have.
-	remotePeek, err := r.db.GetRemotePeek(ctx, roomID, serverName, peekID)
+	remotePeek, err := r.db.GetRemotePeek(ctx, serverName, roomID, peekID)
 	if err != nil {
 		return err
 	}
 	renewing := false
 	if remotePeek != nil {
 		nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-		if (nowMilli > remotePeek.RenewedTimestamp + remotePeek.RenewalInterval) {
+		if nowMilli > remotePeek.RenewedTimestamp+remotePeek.RenewalInterval {
 			logrus.Infof("stale remote peek to %s for %s already exists; renewing", serverName, roomID)
 			renewing = true
-		}
-		else {
+		} else {
 			logrus.Infof("live remote peek to %s for %s already exists", serverName, roomID)
 			return nil
 		}
@@ -336,12 +336,11 @@ func (r *FederationSenderInternalAPI) performPeekUsingServer(
 
 	// If we've got this far, the remote server is peeking.
 	if renewing {
-		if err = r.db.RenewRemotePeek(ctx, serverName, roomID, respPeek.RenewalInterval); err != nil {
+		if err = r.db.RenewRemotePeek(ctx, serverName, roomID, peekID, respPeek.RenewalInterval); err != nil {
 			return err
 		}
-	}
-	else {
-		if err = r.db.AddRemotePeek(ctx, serverName, roomID, respPeek.RenewalInterval); err != nil {
+	} else {
+		if err = r.db.AddRemotePeek(ctx, serverName, roomID, peekID, respPeek.RenewalInterval); err != nil {
 			return err
 		}
 	}
@@ -351,7 +350,7 @@ func (r *FederationSenderInternalAPI) performPeekUsingServer(
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI,
 		&respState,
-		event.Headered(respPeek.RoomVersion), nil,
+		nil, nil,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}

@@ -165,22 +165,22 @@ func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) 
 	return d.FederationSenderBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
 }
 
-func (d *Database) AddRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error {
+func (d *Database) AddRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationSenderRemotePeeks.InsertRemotePeek(context.TODO(), txn, serverName, roomID, peekID, renewalInterval)
+		return d.FederationSenderRemotePeeks.InsertRemotePeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
-func (d *Database) RenewRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error {
+func (d *Database) RenewRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationSenderRemotePeeks.RenewRemotePeek(context.TODO(), txn, serverName, roomID, peekID, renewalInterval)
+		return d.FederationSenderRemotePeeks.RenewRemotePeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
-func (d *Database) GetRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string) (types.RemotePeek, error) {
-	return d.FederationSenderRemotePeeks.SelectRemotePeek(context.TODO(), serverName, roomID, peekID)
+func (d *Database) GetRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.RemotePeek, error) {
+	return d.FederationSenderRemotePeeks.SelectRemotePeek(ctx, nil, serverName, roomID, peekID)
 }
 
-func (d *Database) GetRemotePeeks(roomID string) ([]types.RemotePeek, error) {
-	return d.FederationSenderRemotePeeks.SelectRemotePeeks(context.TODO(), roomID)
+func (d *Database) GetRemotePeeks(ctx context.Context, roomID string) ([]types.RemotePeek, error) {
+	return d.FederationSenderRemotePeeks.SelectRemotePeeks(ctx, nil, roomID)
 }

@@ -17,7 +17,10 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"time"
 
+	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -97,7 +100,7 @@ func (s *remotePeeksStatements) InsertRemotePeek(
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 	stmt := sqlutil.TxStmt(txn, s.insertRemotePeekStmt)
-	_, err := stmt.ExecContext(ctx, roomID, serverName, peekID, nowMilli, nowMilli, renewalInterval)
+	_, err = stmt.ExecContext(ctx, roomID, serverName, peekID, nowMilli, nowMilli, renewalInterval)
 	return
 }
 
@@ -105,31 +108,34 @@ func (s *remotePeeksStatements) RenewRemotePeek(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	_, err := sqlutil.TxStmt(txn, s.renewRemotePeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
+	_, err = sqlutil.TxStmt(txn, s.renewRemotePeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
 	return
 }
 
-
 func (s *remotePeeksStatements) SelectRemotePeek(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
-) (remotePeek types.RemotePeek, err error) {
+) (*types.RemotePeek, error) {
 	rows, err := sqlutil.TxStmt(txn, s.selectRemotePeeksStmt).QueryContext(ctx, roomID)
 	if err != nil {
-		return
+		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRemotePeek: rows.close() failed")
 	remotePeek := types.RemotePeek{}
-	if err = rows.Scan(
+	err = rows.Scan(
 		&remotePeek.RoomID,
 		&remotePeek.ServerName,
 		&remotePeek.PeekID,
 		&remotePeek.CreationTimestamp,
-		&remotePeek.RenewTimestamp,
+		&remotePeek.RenewedTimestamp,
 		&remotePeek.RenewalInterval,
-	); err != nil {
-		return
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
-	return remotePeek, rows.Err()
+	if err != nil {
+		return nil, err
+	}
+	return &remotePeek, rows.Err()
 }
 
 func (s *remotePeeksStatements) SelectRemotePeeks(
@@ -148,7 +154,7 @@ func (s *remotePeeksStatements) SelectRemotePeeks(
 			&remotePeek.ServerName,
 			&remotePeek.PeekID,
 			&remotePeek.CreationTimestamp,
-			&remotePeek.RenewTimestamp,
+			&remotePeek.RenewedTimestamp,
 			&remotePeek.RenewalInterval,
 		); err != nil {
 			return
@@ -162,13 +168,13 @@ func (s *remotePeeksStatements) SelectRemotePeeks(
 func (s *remotePeeksStatements) DeleteRemotePeek(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
 ) (err error) {
-	_, err := sqlutil.TxStmt(txn, s.deleteRemotePeekStmt).ExecContext(ctx, roomID, serverName, peekID)
+	_, err = sqlutil.TxStmt(txn, s.deleteRemotePeekStmt).ExecContext(ctx, roomID, serverName, peekID)
 	return
 }
 
 func (s *remotePeeksStatements) DeleteRemotePeeks(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (err error) {
-	_, err := sqlutil.TxStmt(txn, s.deleteRemotePeeksStmt).ExecContext(ctx, roomID)
+	_, err = sqlutil.TxStmt(txn, s.deleteRemotePeeksStmt).ExecContext(ctx, roomID)
 	return
 }

@@ -50,14 +50,11 @@ func (e EventIDMismatchError) Error() string {
 	)
 }
 
-// UnixMs is the milliseconds since the Unix epoch
-type UnixMs int64
-
 type RemotePeek struct {
-	PeekID string
-	RoomID string
-	ServerName gomatrixserverlib.ServerName
-	CreatedTimestamp UnixMs
-	RenewedTimestamp UnixMs
-	RenewalInterval UnixMs
+	PeekID            string
+	RoomID            string
+	ServerName        gomatrixserverlib.ServerName
+	CreationTimestamp int64
+	RenewedTimestamp  int64
+	RenewalInterval   int64
 }

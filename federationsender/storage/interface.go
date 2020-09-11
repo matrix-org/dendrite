@@ -50,12 +50,13 @@ type Database interface {
 	GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 
+	// XXX: why don't these have contexts passed in?
 	AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error
 	RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error
 	IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error)
 
-	AddRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error
-	RenewRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error
-	GetRemotePeek(serverName gomatrixserverlib.ServerName, roomID, peekID string) (types.RemotePeek, error)
-	GetRemotePeeks(roomID string) ([]types.RemotePeek, error)
+	AddRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error
+	RenewRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error
+	GetRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.RemotePeek, error)
+	GetRemotePeeks(ctx context.Context, roomID string) ([]types.RemotePeek, error)
 }

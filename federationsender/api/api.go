@@ -114,7 +114,7 @@ type PerformJoinResponse struct {
 type PerformPeekRequest struct {
 	RoomID string `json:"room_id"`
 	// The sorted list of servers to try. Servers will be tried sequentially, after de-duplication.
-	ServerNames types.ServerNames      `json:"server_names"`
+	ServerNames types.ServerNames `json:"server_names"`
 }
 
 type PerformPeekResponse struct {
