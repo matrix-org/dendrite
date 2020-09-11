@@ -115,13 +115,9 @@ func (s *remotePeeksStatements) RenewRemotePeek(
 func (s *remotePeeksStatements) SelectRemotePeek(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string,
 ) (*types.RemotePeek, error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectRemotePeeksStmt).QueryContext(ctx, roomID)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectRemotePeek: rows.close() failed")
+	row := sqlutil.TxStmt(txn, s.selectRemotePeeksStmt).QueryRowContext(ctx, roomID)
 	remotePeek := types.RemotePeek{}
-	err = rows.Scan(
+	err := row.Scan(
 		&remotePeek.RoomID,
 		&remotePeek.ServerName,
 		&remotePeek.PeekID,
@@ -135,7 +131,7 @@ func (s *remotePeeksStatements) SelectRemotePeek(
 	if err != nil {
 		return nil, err
 	}
-	return &remotePeek, rows.Err()
+	return &remotePeek, nil
 }
 
 func (s *remotePeeksStatements) SelectRemotePeeks(
