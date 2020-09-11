@@ -1075,18 +1075,6 @@ func (d *Database) getStateDeltas(
 			//       the timeline.
 			if membership := getMembershipFromEvent(&ev.Event, userID); membership != "" {
 				if membership == gomatrixserverlib.Join {
-					if peeking[roomID] {
-						// we automatically cancel our peeks when we join a room
-						err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-							// XXX: is it correct that we're discarding the streamid here?
-							_, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
-							return err
-						})
-						if err != nil {
-							return nil, nil, err
-						}
-					}
-
 					// send full room state down instead of a delta
 					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)
@@ -1154,32 +1142,6 @@ func (d *Database) getStateDeltasForFullStateSync(
 				stateEvents: d.StreamEventsToEvents(device, s),
 				roomID:      peek.RoomID,
 			}
-		}
-	}
-
-	// Add full states for all peeking rooms
-	newPeeks := false
-	for _, peek := range peeks {
-		if peek.New {
-			newPeeks = true
-		}
-		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
-		if stateErr != nil {
-			return nil, nil, stateErr
-		}
-		deltas = append(deltas, stateDelta{
-			membership:  gomatrixserverlib.Peek,
-			stateEvents: d.StreamEventsToEvents(device, s),
-			roomID:      peek.RoomID,
-		})
-	}
-
-	if newPeeks {
-		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-			 return d.Peeks.MarkPeeksAsOld(ctx, txn, userID, device.ID)
-		})
-		if err != nil {
-			return nil, nil, err
 		}
 	}
 
