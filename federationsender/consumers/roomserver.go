@@ -167,7 +167,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 	// TODO: track what hosts are peeking (federationsender_received_peeks)
 	// TODO: rename federationsender_remote_peeks as federationsender_sent_peeks
 
-	// TOOD: add peeking hosts to the joinedHosts list
+	// TODO: add peeking hosts to the joinedHosts list
 
 	// TODO: do housekeeping to evict unrenewed peeking hosts
 

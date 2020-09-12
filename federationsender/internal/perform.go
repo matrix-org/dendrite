@@ -294,18 +294,18 @@ func (r *FederationSenderInternalAPI) performPeekUsingServer(
 	// check whether we're peeking already to try to avoid needlessly
 	// re-peeking on the server. we don't need a transaction for this,
 	// given this is a nice-to-have.
-	remotePeek, err := r.db.GetRemotePeek(ctx, serverName, roomID, peekID)
+	outboundPeek, err := r.db.GetOutboundPeek(ctx, serverName, roomID, peekID)
 	if err != nil {
 		return err
 	}
 	renewing := false
-	if remotePeek != nil {
+	if outboundPeek != nil {
 		nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-		if nowMilli > remotePeek.RenewedTimestamp+remotePeek.RenewalInterval {
-			logrus.Infof("stale remote peek to %s for %s already exists; renewing", serverName, roomID)
+		if nowMilli > outboundPeek.RenewedTimestamp + outboundPeek.RenewalInterval {
+			logrus.Infof("stale outbound peek to %s for %s already exists; renewing", serverName, roomID)
 			renewing = true
 		} else {
-			logrus.Infof("live remote peek to %s for %s already exists", serverName, roomID)
+			logrus.Infof("live outbound peek to %s for %s already exists", serverName, roomID)
 			return nil
 		}
 	}
@@ -339,11 +339,11 @@ func (r *FederationSenderInternalAPI) performPeekUsingServer(
 
 	// If we've got this far, the remote server is peeking.
 	if renewing {
-		if err = r.db.RenewRemotePeek(ctx, serverName, roomID, peekID, respPeek.RenewalInterval); err != nil {
+		if err = r.db.RenewOutboundPeek(ctx, serverName, roomID, peekID, respPeek.RenewalInterval); err != nil {
 			return err
 		}
 	} else {
-		if err = r.db.AddRemotePeek(ctx, serverName, roomID, peekID, respPeek.RenewalInterval); err != nil {
+		if err = r.db.AddOutboundPeek(ctx, serverName, roomID, peekID, respPeek.RenewalInterval); err != nil {
 			return err
 		}
 	}

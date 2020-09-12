@@ -55,8 +55,8 @@ type Database interface {
 	RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error
 	IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error)
 
-	AddRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error
-	RenewRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error
-	GetRemotePeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.RemotePeek, error)
-	GetRemotePeeks(ctx context.Context, roomID string) ([]types.RemotePeek, error)
+	AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error
+	RenewOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int) error
+	GetOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.OutboundPeek, error)
+	GetOutboundPeeks(ctx context.Context, roomID string) ([]types.OutboundPeek, error)
 }

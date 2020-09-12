@@ -50,7 +50,7 @@ func (e EventIDMismatchError) Error() string {
 	)
 }
 
-type RemotePeek struct {
+type OutboundPeek struct {
 	PeekID            string
 	RoomID            string
 	ServerName        gomatrixserverlib.ServerName
