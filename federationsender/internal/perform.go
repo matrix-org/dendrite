@@ -334,6 +334,9 @@ func (r *FederationSenderInternalAPI) performPeekUsingServer(
 		return fmt.Errorf("respPeek.RoomVersion.EventFormat: %w", err)
 	}
 
+	// TODO: authenticate the state returned (check its auth events etc)
+	// the equivalent of CheckSendJoinResponse()
+
 	// If we've got this far, the remote server is peeking.
 	if renewing {
 		if err = r.db.RenewRemotePeek(ctx, serverName, roomID, peekID, respPeek.RenewalInterval); err != nil {
