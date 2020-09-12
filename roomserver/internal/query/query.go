@@ -334,10 +334,41 @@ func (r *Queryer) QueryStateAndAuthChain(
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
-	stateEvents, err := r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
-	if err != nil {
-		return err
+	var stateEvents []gomatrixserverlib.Event
+	if len(request.PrevEventIDs) > 0 {
+		stateEvents, err = r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
+		if err != nil {
+			return err
+		}
+	} else {
+		// no PrevEventIDs or AuthEventIDs were provided, so return current state instead.
+
+		// XXX: is this right?
+		roomState := state.NewStateResolution(r.DB, *info)
+		// no need to resolve state again later
+		request.ResolveState = false
+
+		var currentStateSnapshotNID types.StateSnapshotNID
+		_, currentStateSnapshotNID, _, err =
+			r.DB.LatestEventIDs(ctx, info.RoomNID)
+		if err != nil {
+			return err
+		}
+
+		var stateEntries []types.StateEntry
+		stateEntries, err = roomState.LoadStateAtSnapshot(
+			ctx, currentStateSnapshotNID,
+		)
+		if err != nil {
+			return err
+		}
+
+		stateEvents, err = helpers.LoadStateEvents(ctx, r.DB, stateEntries)
+		if err != nil {
+			return err
+		}
 	}
+
 	response.PrevEventsExist = true
 
 	// add the auth event IDs for the current state events too
