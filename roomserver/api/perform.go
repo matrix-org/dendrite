@@ -160,7 +160,7 @@ type PerformPublishResponse struct {
 	Error *PerformError
 }
 
-type PerformHandleRemotePeekRequest struct {
+type PerformInboundPeekRequest struct {
 	UserID        string                         `json:"user_id"`
 	RoomID        string                         `json:"room_id"`
 	PeekID        string                         `json:"peek_id"`
@@ -168,7 +168,7 @@ type PerformHandleRemotePeekRequest struct {
 	RenewalInterval int64     					 `json:"renewal_interval"`
 }
 
-type PerformHandleRemotePeekResponse struct {
+type PerformInboundPeekResponse struct {
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist this will be false and StateEvents will be empty.
 	RoomExists bool `json:"room_exists"`

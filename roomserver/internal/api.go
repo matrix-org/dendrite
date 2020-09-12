@@ -23,7 +23,7 @@ type RoomserverInternalAPI struct {
 	*perform.Inviter
 	*perform.Joiner
 	*perform.Peeker
-	*perform.HandleRemotePeeker
+	*perform.InboundPeeker
 	*perform.Leaver
 	*perform.Publisher
 	*perform.Backfiller
@@ -92,7 +92,7 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		FSAPI:      r.fsAPI,
 		Inputer:    r.Inputer,
 	}
-	r.HandleRemotePeeker = &perform.HandleRemotePeeker{
+	r.InboundPeeker = &perform.InboundPeeker{
 		DB:         r.DB,
 		Inputer:    r.Inputer,
 	}

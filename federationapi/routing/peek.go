@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// Peek implements the SS /peek API
+// Peek implements the SS /peek API, handling inbound peeks
 func Peek(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -67,10 +67,10 @@ func Peek(
 	// tell the peeking server to renew every hour
 	renewalInterval := int64(60 * 60 * 1000 * 1000)
 
-	var response api.PerformHandleRemotePeekResponse
-	err := rsAPI.PerformHandleRemotePeek(
+	var response api.PerformInboundPeekResponse
+	err := rsAPI.PerformInboundPeek(
 		httpReq.Context(),
-		&api.PerformHandleRemotePeekRequest{
+		&api.PerformInboundPeekRequest{
 			RoomID:       roomID,
 			PeekID:		  peekID,
 			ServerName:	  request.Origin(),

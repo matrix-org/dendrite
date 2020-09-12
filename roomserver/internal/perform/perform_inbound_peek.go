@@ -28,23 +28,23 @@ import (
 	"github.com/matrix-org/util"
 )
 
-type HandleRemotePeeker struct {
+type InboundPeeker struct {
 	DB         storage.Database
 	Inputer *input.Inputer
 }
 
-// PerformHandleRemotePeek handles peeking into matrix rooms, including over
+// PerformInboundPeek handles peeking into matrix rooms, including over
 // federation by talking to the federationsender. called when a remote server
 // initiates a /peek over federation.
 //
 // It should atomically figure out the current state of the room (for the
-// response to /peek) while adding the remotepeek to the kafka stream so the
+// response to /peek) while adding the new inbound peek to the kafka stream so the
 // fed sender can start sending peeked events without a race between the state
 // snapshot and the stream of peeked events.
-func (r *HandleRemotePeeker) PerformHandleRemotePeek(
+func (r *InboundPeeker) PerformInboundPeek(
     ctx context.Context,
-    request *api.PerformHandleRemotePeekRequest,
-    response *api.PerformHandleRemotePeekResponse,
+    request *api.PerformInboundPeekRequest,
+    response *api.PerformInboundPeekResponse,
 ) error {
     info, err := r.DB.RoomInfo(ctx, request.RoomID)
     if err != nil {
@@ -105,8 +105,8 @@ func (r *HandleRemotePeeker) PerformHandleRemotePeek(
 
 	err = r.Inputer.WriteOutputEvents(request.RoomID, []api.OutputEvent{
 		{
-			Type: api.OutputTypeNewRemotePeek,
-			NewRemotePeek: &api.OutputNewRemotePeek{
+			Type: api.OutputTypeNewInboundPeek,
+			NewInboundPeek: &api.OutputNewInboundPeek{
 				RoomID:   request.RoomID,
 				PeekID:   request.PeekID,
 				ServerName: request.ServerName,

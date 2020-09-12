@@ -31,7 +31,7 @@ const (
 	RoomserverPerformLeavePath                 = "/roomserver/performLeave"
 	RoomserverPerformBackfillPath              = "/roomserver/performBackfill"
 	RoomserverPerformPublishPath               = "/roomserver/performPublish"
-	RoomserverPerformHandleRemotePeekPath      = "/roomserver/performHandleRemotePeek"
+	RoomserverPerformInboundPeekPath           = "/roomserver/performInboundPeek"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -204,15 +204,15 @@ func (h *httpRoomserverInternalAPI) PerformPeek(
 	}
 }
 
-func (h *httpRoomserverInternalAPI) PerformHandleRemotePeek(
+func (h *httpRoomserverInternalAPI) PerformInboundPeek(
 	ctx context.Context,
-	request *api.PerformHandleRemotePeekRequest,
-	response *api.PerformHandleRemotePeekResponse,
+	request *api.PerformInboundPeekRequest,
+	response *api.PerformInboundPeekResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformHandleRemotePeek")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInboundPeek")
 	defer span.Finish()
 
-	apiURL := h.roomserverURL + RoomserverPerformHandleRemotePeekPath
+	apiURL := h.roomserverURL + RoomserverPerformInboundPeekPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

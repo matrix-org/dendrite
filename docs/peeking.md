@@ -13,8 +13,8 @@ Peeking over federation is implemented as per [MSC2444](https://github.com/matri
 For requests to peek our rooms ("inbound peeks"):
  * Remote servers call `/peek` on federationapi
    * The federationapi queries the federationsender to check if this is renewing an inbound peek or not.
-   * If not, it hits the PerformHandleRemotePeek on the roomserver to ask it for the current state of the room.
-   * The roomserver atomically (in theory) adds a NewRemotePeek to its kafka stream to tell the federationserver to start peeking.
+   * If not, it hits the PerformInboundPeek on the roomserver to ask it for the current state of the room.
+   * The roomserver atomically (in theory) adds a NewInboundPeek to its kafka stream to tell the federationserver to start peeking.
    * The federationsender receives the event, tracks the inbound peek in the federationsender_inbound_peeks table, and starts sending events to the peeking server.
    * The federationsender evicts stale inbound peeks which haven't been renewed.
 

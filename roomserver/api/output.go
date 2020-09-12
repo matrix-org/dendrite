@@ -50,8 +50,8 @@ const (
 	// OutputTypeNewPeek indicates that the kafka event is an OutputNewPeek
 	OutputTypeNewPeek OutputType = "new_peek"
 
-	// OutputTypeNewRemotePeek indicates that the kafka event is an OutputNewRemotePeek
-	OutputTypeNewRemotePeek OutputType = "new_remote_peek"
+	// OutputTypeNewInboundPeek indicates that the kafka event is an OutputNewInboundPeek
+	OutputTypeNewInboundPeek OutputType = "new_remote_peek"
 )
 
 // An OutputEvent is an entry in the roomserver output kafka log.
@@ -69,8 +69,8 @@ type OutputEvent struct {
 	RedactedEvent *OutputRedactedEvent `json:"redacted_event,omitempty"`
 	// The content of event with type OutputTypeNewPeek
 	NewPeek *OutputNewPeek `json:"new_peek,omitempty"`
-	// The content of event with type OutputTypeNewRemotePeek
-	NewRemotePeek *OutputNewRemotePeek `json:"new_remote_peek,omitempty"`
+	// The content of event with type OutputTypeNewInboundPeek
+	NewInboundPeek *OutputNewInboundPeek `json:"new_remote_peek,omitempty"`
 }
 
 // An OutputNewRoomEvent is written when the roomserver receives a new event.
@@ -214,8 +214,8 @@ type OutputNewPeek struct {
 	DeviceID string
 }
 
-// An OutputNewRemotePeek is written whenever a server starts peeking into a room
-type OutputNewRemotePeek struct {
+// An OutputNewInboundPeek is written whenever a server starts peeking into a room
+type OutputNewInboundPeek struct {
 	RoomID   string
 	PeekID   string
 	ServerName gomatrixserverlib.ServerName

@@ -97,10 +97,10 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			}).Panicf("roomserver output log: write room event failure")
 			return nil
 		}
-	case api.OutputTypeNewRemotePeek:
-		if err := s.processRemotePeek(*output.NewRemotePeek); err != nil {
+	case api.OutputTypeNewInboundPeek:
+		if err := s.processInboundPeek(*output.NewInboundPeek); err != nil {
 			log.WithFields(log.Fields{
-				"event":      output.NewRemotePeek,
+				"event":      output.NewInboundPeek,
 				log.ErrorKey: err,
 			}).Panicf("roomserver output log: remote peek event failure")
 			return nil
@@ -115,9 +115,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	return nil
 }
 
-// processRemotePeek adds a new inbound peek (replacing the existing one if any)
+// processInboundPeek starts tracking a new federated inbound peek (replacing the existing one if any)
 // causing the federationsender to start sending messages to the peeking server
-func (s *OutputRoomEventConsumer) processRemotePeek(orp api.OutputNewRemotePeek) error {
+func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPeek) error {
   	return s.db.AddInboundPeek(context.TODO(), orp.ServerName, orp.RoomID, orp.PeekID, orp.RenewalInterval)
 }
 
