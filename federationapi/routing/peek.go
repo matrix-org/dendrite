@@ -64,6 +64,9 @@ func Peek(
 
 	// TODO: Check history visibility
 
+	// tell the peeking server to renew every hour
+	renewalInterval := int64(60 * 60 * 1000 * 1000)
+
 	var response api.PerformHandleRemotePeekResponse
 	err := rsAPI.PerformHandleRemotePeek(
 		httpReq.Context(),
@@ -71,6 +74,7 @@ func Peek(
 			RoomID:       roomID,
 			PeekID:		  peekID,
 			ServerName:	  request.Origin(),
+			RenewalInterval: renewalInterval,
 		},
 		&response,
 	)
@@ -89,7 +93,7 @@ func Peek(
 			StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
 			AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
 			RoomVersion: response.RoomVersion,
-			RenewalInterval: 60 * 60 * 1000 * 1000, // one hour
+			RenewalInterval: renewalInterval,
 		},
 	}
 }

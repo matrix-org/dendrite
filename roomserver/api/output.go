@@ -219,4 +219,6 @@ type OutputNewRemotePeek struct {
 	RoomID   string
 	PeekID   string
 	ServerName gomatrixserverlib.ServerName
+	// how often we told the peeking server to renew the peek
+	RenewalInterval int64
 }

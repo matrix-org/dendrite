@@ -110,6 +110,7 @@ func (r *HandleRemotePeeker) PerformHandleRemotePeek(
 				RoomID:   request.RoomID,
 				PeekID:   request.PeekID,
 				ServerName: request.ServerName,
+                RenewalInterval: request.RenewalInterval,
 			},
 		},
 	})

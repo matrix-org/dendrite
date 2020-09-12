@@ -165,6 +165,7 @@ type PerformHandleRemotePeekRequest struct {
 	RoomID        string                         `json:"room_id"`
 	PeekID        string                         `json:"peek_id"`
 	ServerName    gomatrixserverlib.ServerName   `json:"server_name"`
+	RenewalInterval int64     					 `json:"renewal_interval"`
 }
 
 type PerformHandleRemotePeekResponse struct {
