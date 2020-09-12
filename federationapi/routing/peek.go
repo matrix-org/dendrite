@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -25,7 +24,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// Peek implements the /peek API
+// Peek implements the SS /peek API
 func Peek(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -34,6 +33,8 @@ func Peek(
 	roomID, peekID string,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
+	// TODO: check if we're just refreshing an existing peek. Somehow.
+
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
 	if err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), &verReq, &verRes); err != nil {
@@ -43,7 +44,7 @@ func Peek(
 		}
 	}
 
-	// Check that the room that the remote side is trying to join is actually
+	// Check that the room that the peeking server is trying to peek is actually
 	// one of the room versions that they listed in their supported ?ver= in
 	// the peek URL.
 	remoteSupportsVersion := false
@@ -53,7 +54,7 @@ func Peek(
 			break
 		}
 	}
-	// If it isn't, stop trying to join the room.
+	// If it isn't, stop trying to peek the room.
 	if !remoteSupportsVersion {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -63,50 +64,33 @@ func Peek(
 
 	// TODO: Check history visibility
 
-	state, err := getCurrentState(httpReq.Context(), request, rsAPI, roomID)
-	if err != nil {
-		return *err
-	}
-
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: map[string]interface{}{
-			"state":        state,
-			"room_version": verRes.RoomVersion,
-		},
-	}
-}
-
-
-func getCurrentState(
-	ctx context.Context,
-	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
-	roomID string,
-) (*gomatrixserverlib.RespPeek, *util.JSONResponse) {
-	var response api.QueryStateAndAuthChainResponse
-	err := rsAPI.QueryStateAndAuthChain(
-		ctx,
-		&api.QueryStateAndAuthChainRequest{
+	var response api.PerformHandleRemotePeekResponse
+	err := rsAPI.PerformHandleRemotePeek(
+		httpReq.Context(),
+		&api.PerformHandleRemotePeekRequest{
 			RoomID:       roomID,
-			PrevEventIDs: []string{},
-			AuthEventIDs: []string{},
+			PeekID:		  peekID,
+			ServerName:	  request.Origin(),
 		},
 		&response,
 	)
 	if err != nil {
 		resErr := util.ErrorResponse(err)
-		return nil, &resErr
+		return resErr
 	}
 
 	if !response.RoomExists {
-		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
+		return util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	return &gomatrixserverlib.RespPeek{
-		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
-		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
-		RoomVersion: response.RoomVersion,
-		RenewalInterval: 60 * 60 * 1000 * 1000, // one hour
-	}, nil
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: gomatrixserverlib.RespPeek{
+			StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
+			AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
+			RoomVersion: response.RoomVersion,
+			RenewalInterval: 60 * 60 * 1000 * 1000, // one hour
+		},
+	}
 }
+

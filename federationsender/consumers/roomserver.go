@@ -97,6 +97,14 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			}).Panicf("roomserver output log: write room event failure")
 			return nil
 		}
+	case api.OutputTypeNewRemotePeek:
+		if err := s.processRemotePeek(*output.NewRemotePeek); err != nil {
+			log.WithFields(log.Fields{
+				"event":      output.NewRemotePeek,
+				log.ErrorKey: err,
+			}).Panicf("roomserver output log: remote peek event failure")
+			return nil
+		}
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -104,6 +112,12 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
+	return nil
+}
+
+// processMessage updates the list of currently joined hosts in the room
+// and then sends the event to the hosts that were joined before the event.
+func (s *OutputRoomEventConsumer) processRemotePeek(orp api.OutputNewRemotePeek) error {
 	return nil
 }
 
@@ -149,6 +163,15 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 	if err != nil {
 		return err
 	}
+
+	// TODO: track what hosts are peeking (federationsender_received_peeks)
+	// TODO: rename federationsender_remote_peeks as federationsender_sent_peeks
+
+	// TOOD: add peeking hosts to the joinedHosts list
+
+	// TODO: do housekeeping to evict unrenewed peeking hosts
+
+	// TODO: implement query to let the fedapi check whether a given peek is live or not
 
 	// Send the event.
 	return s.queues.SendEvent(

@@ -335,38 +335,9 @@ func (r *Queryer) QueryStateAndAuthChain(
 	response.RoomVersion = info.RoomVersion
 
 	var stateEvents []gomatrixserverlib.Event
-	if len(request.PrevEventIDs) > 0 {
-		stateEvents, err = r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
-		if err != nil {
-			return err
-		}
-	} else {
-		// no PrevEventIDs or AuthEventIDs were provided, so return current state instead.
-
-		// XXX: is this right?
-		roomState := state.NewStateResolution(r.DB, *info)
-		// no need to resolve state again later
-		request.ResolveState = false
-
-		var currentStateSnapshotNID types.StateSnapshotNID
-		_, currentStateSnapshotNID, _, err =
-			r.DB.LatestEventIDs(ctx, info.RoomNID)
-		if err != nil {
-			return err
-		}
-
-		var stateEntries []types.StateEntry
-		stateEntries, err = roomState.LoadStateAtSnapshot(
-			ctx, currentStateSnapshotNID,
-		)
-		if err != nil {
-			return err
-		}
-
-		stateEvents, err = helpers.LoadStateEvents(ctx, r.DB, stateEntries)
-		if err != nil {
-			return err
-		}
+	stateEvents, err = r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
+	if err != nil {
+		return err
 	}
 
 	response.PrevEventsExist = true
@@ -379,7 +350,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 	authEventIDs = util.UniqueStrings(authEventIDs) // de-dupe
 
-	authEvents, err := getAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
+	authEvents, err := GetAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
 	if err != nil {
 		return err
 	}
@@ -428,11 +399,11 @@ func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomIn
 
 type eventsFromIDs func(context.Context, []string) ([]types.Event, error)
 
-// getAuthChain fetches the auth chain for the given auth events. An auth chain
+// GetAuthChain fetches the auth chain for the given auth events. An auth chain
 // is the list of all events that are referenced in the auth_events section, and
 // all their auth_events, recursively. The returned set of events contain the
 // given events. Will *not* error if we don't have all auth events.
-func getAuthChain(
+func GetAuthChain(
 	ctx context.Context, fn eventsFromIDs, authEventIDs []string,
 ) ([]gomatrixserverlib.Event, error) {
 	// List of event IDs to fetch. On each pass, these events will be requested

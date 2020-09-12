@@ -23,6 +23,7 @@ type RoomserverInternalAPI struct {
 	*perform.Inviter
 	*perform.Joiner
 	*perform.Peeker
+	*perform.HandleRemotePeeker
 	*perform.Leaver
 	*perform.Publisher
 	*perform.Backfiller
@@ -91,6 +92,10 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		FSAPI:      r.fsAPI,
 		Inputer:    r.Inputer,
 	}
+	r.HandleRemotePeeker = &perform.HandleRemotePeeker{
+		DB:         r.DB,
+		Inputer:    r.Inputer,
+	}
 	r.Leaver = &perform.Leaver{
 		Cfg:     r.Cfg,
 		DB:      r.DB,
@@ -137,3 +142,4 @@ func (r *RoomserverInternalAPI) PerformLeave(
 	}
 	return r.WriteOutputEvents(req.RoomID, outputEvents)
 }
+

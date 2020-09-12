@@ -75,6 +75,16 @@ func (t *RoomserverInternalAPITrace) PerformPublish(
 	util.GetLogger(ctx).Infof("PerformPublish req=%+v res=%+v", js(req), js(res))
 }
 
+func (t *RoomserverInternalAPITrace) PerformHandleRemotePeek(
+	ctx context.Context,
+	req *PerformHandleRemotePeekRequest,
+	res *PerformHandleRemotePeekResponse,
+) error {
+	err := t.Impl.PerformHandleRemotePeek(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformHandleRemotePeek req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func (t *RoomserverInternalAPITrace) QueryPublishedRooms(
 	ctx context.Context,
 	req *QueryPublishedRoomsRequest,

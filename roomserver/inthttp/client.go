@@ -25,12 +25,13 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath   = "/roomserver/performInvite"
-	RoomserverPerformPeekPath     = "/roomserver/performPeek"
-	RoomserverPerformJoinPath     = "/roomserver/performJoin"
-	RoomserverPerformLeavePath    = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath  = "/roomserver/performPublish"
+	RoomserverPerformInvitePath                = "/roomserver/performInvite"
+	RoomserverPerformPeekPath                  = "/roomserver/performPeek"
+	RoomserverPerformJoinPath                  = "/roomserver/performJoin"
+	RoomserverPerformLeavePath                 = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath              = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath               = "/roomserver/performPublish"
+	RoomserverPerformHandleRemotePeekPath      = "/roomserver/performHandleRemotePeek"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -203,6 +204,19 @@ func (h *httpRoomserverInternalAPI) PerformPeek(
 	}
 }
 
+func (h *httpRoomserverInternalAPI) PerformHandleRemotePeek(
+	ctx context.Context,
+	request *api.PerformHandleRemotePeekRequest,
+	response *api.PerformHandleRemotePeekResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformHandleRemotePeek")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformHandleRemotePeekPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// XXX: why do some of these Perform's return errors, and others don't?
 func (h *httpRoomserverInternalAPI) PerformLeave(
 	ctx context.Context,
 	request *api.PerformLeaveRequest,
