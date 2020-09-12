@@ -51,7 +51,7 @@ const (
 	OutputTypeNewPeek OutputType = "new_peek"
 
 	// OutputTypeNewInboundPeek indicates that the kafka event is an OutputNewInboundPeek
-	OutputTypeNewInboundPeek OutputType = "new_remote_peek"
+	OutputTypeNewInboundPeek OutputType = "new_inbound_peek"
 )
 
 // An OutputEvent is an entry in the roomserver output kafka log.
@@ -70,7 +70,7 @@ type OutputEvent struct {
 	// The content of event with type OutputTypeNewPeek
 	NewPeek *OutputNewPeek `json:"new_peek,omitempty"`
 	// The content of event with type OutputTypeNewInboundPeek
-	NewInboundPeek *OutputNewInboundPeek `json:"new_remote_peek,omitempty"`
+	NewInboundPeek *OutputNewInboundPeek `json:"new_inbound_peek,omitempty"`
 }
 
 // An OutputNewRoomEvent is written when the roomserver receives a new event.

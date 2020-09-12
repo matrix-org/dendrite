@@ -208,11 +208,11 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	return nil
 }
 
-// PerformPeekRequest implements api.FederationSenderInternalAPI
-func (r *FederationSenderInternalAPI) PerformPeek(
+// PerformOutboundPeekRequest implements api.FederationSenderInternalAPI
+func (r *FederationSenderInternalAPI) PerformOutboundPeek(
 	ctx context.Context,
-	request *api.PerformPeekRequest,
-	response *api.PerformPeekResponse,
+	request *api.PerformOutboundPeekRequest,
+	response *api.PerformOutboundPeekResponse,
 ) error {
 	// Look up the supported room versions.
 	var supportedVersions []gomatrixserverlib.RoomVersion
@@ -238,7 +238,7 @@ func (r *FederationSenderInternalAPI) PerformPeek(
 	// successfully completes the peek
 	var lastErr error
 	for _, serverName := range request.ServerNames {
-		if err := r.performPeekUsingServer(
+		if err := r.performOutboundPeekUsingServer(
 			ctx,
 			request.RoomID,
 			serverName,
@@ -279,7 +279,7 @@ func (r *FederationSenderInternalAPI) PerformPeek(
 	return lastErr
 }
 
-func (r *FederationSenderInternalAPI) performPeekUsingServer(
+func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 	ctx context.Context,
 	roomID string,
 	serverName gomatrixserverlib.ServerName,

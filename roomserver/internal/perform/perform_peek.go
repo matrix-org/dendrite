@@ -159,12 +159,12 @@ func (r *Peeker) performPeekRoomByID(
 		req.ServerNames = append(req.ServerNames, domain)
 
 		// Try peeking by all of the supplied server names.
-		fedReq := fsAPI.PerformPeekRequest{
+		fedReq := fsAPI.PerformOutboundPeekRequest{
 			RoomID:      req.RoomIDOrAlias, // the room ID to try and peek
 			ServerNames: req.ServerNames,   // the servers to try peeking via
 		}
-		fedRes := fsAPI.PerformPeekResponse{}
-		r.FSAPI.PerformPeek(ctx, &fedReq, &fedRes)
+		fedRes := fsAPI.PerformOutboundPeekResponse{}
+		r.FSAPI.PerformOutboundPeek(ctx, &fedReq, &fedRes)
 		if fedRes.LastError != nil {
 			return "", &api.PerformError{
 				Code:       api.PerformErrRemote,
