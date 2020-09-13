@@ -201,6 +201,7 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		respState,
 		&headeredEvent,
 		nil,
+		respMakeJoin.RoomVersion,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}
@@ -310,7 +311,7 @@ func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 		}
 	}
 
-	// Try to perform a /peek using the information supplied in the
+	// Try to perform an outbound /peek using the information supplied in the
 	// request.
 	respPeek, err := r.federation.Peek(
 		ctx,
@@ -321,12 +322,12 @@ func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 	)
 	if err != nil {
 		r.statistics.ForServer(serverName).Failure()
-		return fmt.Errorf("r.federation.MakePeek: %w", err)
+		return fmt.Errorf("r.federation.Peek: %w", err)
 	}
 	r.statistics.ForServer(serverName).Success()
 
 	// Work out if we support the room version that has been supplied in
-	// the make_peek response.
+	// the peek response.
 	if respPeek.RoomVersion == "" {
 		respPeek.RoomVersion = gomatrixserverlib.RoomVersionV1
 	}
@@ -349,11 +350,13 @@ func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 	}
 
 	respState := respPeek.ToRespState()
+	// logrus.Warnf("converted respPeek %#v to respState %#v", respPeek, respState)
 	// Send the newly returned state to the roomserver to update our local view.
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI,
 		&respState,
 		nil, nil,
+		respPeek.RoomVersion,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}
