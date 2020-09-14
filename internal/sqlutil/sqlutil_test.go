@@ -3,15 +3,15 @@ package sqlutil
 import (
 	"context"
 	"database/sql"
+	"reflect"
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.T) {
 	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
+	assertNoError(t, err, "Failed to make DB")
 	limit := uint(4)
 
 	r := mock.NewRows([]string{"id"}).
@@ -33,18 +33,20 @@ func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.
 		for rows.Next() {
 			var id int
 			err = rows.Scan(&id)
-			assert.NoError(t, err, "rows.Scan returned an error")
+			assertNoError(t, err, "rows.Scan returned an error")
 			result = append(result, id)
 		}
 		return nil
 	}, iKeyIDs, limit)
-	assert.NoError(t, err, "Call returned an error")
-	assert.Len(t, result, len(v), "Result should be 3 long")
+	assertNoError(t, err, "Call returned an error")
+	if len(result) != len(v) {
+		t.Fatalf("Result should be 3 long")
+	}
 }
 
 func TestShouldReturnCorrectAmountOfResulstIfEqualVariablesAsLimit(t *testing.T) {
 	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
+	assertNoError(t, err, "Failed to make DB")
 	limit := uint(4)
 
 	r := mock.NewRows([]string{"id"}).
@@ -67,18 +69,20 @@ func TestShouldReturnCorrectAmountOfResulstIfEqualVariablesAsLimit(t *testing.T)
 		for rows.Next() {
 			var id int
 			err = rows.Scan(&id)
-			assert.NoError(t, err, "rows.Scan returned an error")
+			assertNoError(t, err, "rows.Scan returned an error")
 			result = append(result, id)
 		}
 		return nil
 	}, iKeyIDs, limit)
-	assert.NoError(t, err, "Call returned an error")
-	assert.Len(t, result, len(v), "Result should be 3 long")
+	assertNoError(t, err, "Call returned an error")
+	if len(result) != len(v) {
+		t.Fatalf("Result should be 4 long")
+	}
 }
 
 func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T) {
 	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
+	assertNoError(t, err, "Failed to make DB")
 	limit := uint(4)
 
 	r1 := mock.NewRows([]string{"id"}).
@@ -105,21 +109,26 @@ func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T
 		for rows.Next() {
 			var id int
 			err = rows.Scan(&id)
-			assert.NoError(t, err, "rows.Scan returned an error")
+			assertNoError(t, err, "rows.Scan returned an error")
 			result = append(result, id)
 		}
 		return nil
 	}, iKeyIDs, limit)
-	assert.NoError(t, err, "Call returned an error")
-	assert.Equal(t, v, result, "Result is not as expected")
-	assert.Len(t, result, len(v), "Result should be 3 long")
+	assertNoError(t, err, "Call returned an error")
+	if len(result) != len(v) {
+		t.Fatalf("Result should be 5 long")
+	}
+	if !reflect.DeepEqual(v, result) {
+		t.Fatalf("Result is not as expected: got %v want %v", v, result)
+	}
 }
 
 func TestShouldREturnErrorIfRowsScanReturnsError(t *testing.T) {
 	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
+	assertNoError(t, err, "Failed to make DB")
 	limit := uint(4)
 
+	// adding a string ID should result in rows.Scan returning an error
 	r := mock.NewRows([]string{"id"}).
 		AddRow("hej").
 		AddRow(2).
@@ -146,5 +155,15 @@ func TestShouldREturnErrorIfRowsScanReturnsError(t *testing.T) {
 		}
 		return nil
 	}, iKeyIDs, limit)
-	assert.Error(t, err, "Call did not return an error")
+	if err == nil {
+		t.Fatalf("Call did not return an error")
+	}
+}
+
+func assertNoError(t *testing.T, err error, msg string) {
+	t.Helper()
+	if err == nil {
+		return
+	}
+	t.Fatalf(msg)
 }
