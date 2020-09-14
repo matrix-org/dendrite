@@ -15,7 +15,10 @@
 package routing
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -53,6 +56,15 @@ func passwordLogin() flows {
 	return f
 }
 
+func ssoLogin() flows {
+	f := flows{}
+	s := flow{
+		Type: "m.login.sso",
+	}
+	f.Flows = append(f.Flows, s)
+	return f
+}
+
 // Login implements GET and POST /login
 func Login(
 	req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
@@ -60,31 +72,102 @@ func Login(
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
 		// TODO: support other forms of login other than password, depending on config options
+		flows := passwordLogin()
+		if cfg.CAS.Enabled {
+			flows.Flows = append(flows.Flows, ssoLogin().Flows...)
+		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: passwordLogin(),
+			JSON: flows,
 		}
 	} else if req.Method == http.MethodPost {
-		typePassword := auth.LoginTypePassword{
-			GetAccountByPassword: accountDB.GetAccountByPassword,
-			Config:               cfg,
+		// TODO: is the the right way to read the body and re-add it?
+		body, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			// TODO: is this appropriate?
+			return util.JSONResponse{
+				Code: http.StatusMethodNotAllowed,
+				JSON: jsonerror.NotFound("Bad method"),
+			}
 		}
-		r := typePassword.Request()
-		resErr := httputil.UnmarshalJSONRequest(req, r)
-		if resErr != nil {
-			return *resErr
+		// add the body back to the request because ioutil.ReadAll consumes the body
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
+		// marshall the body into an unstructured json map
+		var jsonBody map[string]interface{}
+		if err := json.Unmarshal([]byte(body), &jsonBody); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusMethodNotAllowed,
+				JSON: jsonerror.NotFound("Bad method"),
+			}
 		}
-		login, authErr := typePassword.Login(req.Context(), r)
-		if authErr != nil {
-			return *authErr
+
+		loginType := jsonBody["type"].(string)
+		if loginType == "m.login.password" {
+			return doPasswordLogin(req, accountDB, userAPI, cfg)
+		} else if loginType == "m.login.token" {
+			return doTokenLogin(req, accountDB, userAPI, cfg)
 		}
-		// make a device/access token
-		return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login)
 	}
+
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
+}
+
+// Handles a m.login.password login type request
+func doPasswordLogin(
+	req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
+	cfg *config.ClientAPI,
+) util.JSONResponse {
+	typePassword := auth.LoginTypePassword{
+		GetAccountByPassword: accountDB.GetAccountByPassword,
+		Config:               cfg,
+	}
+	r := typePassword.Request()
+	resErr := httputil.UnmarshalJSONRequest(req, r)
+	if resErr != nil {
+		return *resErr
+	}
+	login, authErr := typePassword.Login(req.Context(), r)
+	if authErr != nil {
+		return *authErr
+	}
+
+	// make a device/access token
+	return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login)
+}
+
+// Handles a m.login.token login type request
+func doTokenLogin(req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
+	cfg *config.ClientAPI,
+) util.JSONResponse {
+	// create a struct with the appropriate DB(postgres/sqlite) function and the configs
+	typeToken := auth.LoginTypeToken{
+		GetAccountByLocalpart: accountDB.GetAccountByLocalpart,
+		Config:                cfg,
+	}
+	r := typeToken.Request()
+	resErr := httputil.UnmarshalJSONRequest(req, r)
+	if resErr != nil {
+		return *resErr
+	}
+	login, authErr := typeToken.Login(req.Context(), r)
+	if authErr != nil {
+		return *authErr
+	}
+
+	// make a device/access token
+	authResult := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login)
+
+	// the login is successful, delete the login token before returning the access token to the client
+	if authResult.Code == http.StatusOK {
+		if err := auth.DeleteLoginToken(r.(*auth.LoginTokenRequest).Token); err != nil {
+			// TODO: what to do here?
+		}
+	}
+	return authResult
 }
 
 func completeAuth(

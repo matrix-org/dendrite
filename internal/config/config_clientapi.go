@@ -32,6 +32,9 @@ type ClientAPI struct {
 	// was successful
 	RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
 
+	// CAS server settings
+	CAS CAS `yaml:"cas"`
+
 	// TURN options
 	TURN TURN `yaml:"turn"`
 
@@ -51,6 +54,7 @@ func (c *ClientAPI) Defaults() {
 	c.RecaptchaSiteVerifyAPI = ""
 	c.RegistrationDisabled = false
 	c.RateLimiting.Defaults()
+	c.CAS.Enabled = false
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -64,8 +68,22 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", string(c.RecaptchaPrivateKey))
 		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", string(c.RecaptchaSiteVerifyAPI))
 	}
+	c.CAS.Verify(configErrs)
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
+}
+
+type CAS struct {
+	Enabled          bool   `yaml:"cas_enabled"`
+	Server           string `yaml:"cas_server"`
+	ValidateEndpoint string `yaml:"cas_validate_endpoint"`
+}
+
+func (cas *CAS) Verify(ConfigErrors *ConfigErrors) {
+	if cas.Enabled {
+		checkURL(ConfigErrors, "client_api.cas.cas_server", cas.Server)
+		checkNotEmpty(ConfigErrors, "client_api.cas.cas_validate_endpoint", cas.ValidateEndpoint)
+	}
 }
 
 type TURN struct {
