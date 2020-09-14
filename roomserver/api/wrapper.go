@@ -40,10 +40,50 @@ func SendEvents(
 	return SendInputRoomEvents(ctx, rsAPI, ires)
 }
 
-// SendEventWithState writes an event with KindNew to the roomserver along
+// SendEventWithState writes an event with KindNew to the roomserver
+// with the state at the event as KindOutlier before it. Will not send any event that is
+// marked as `true` in haveEventIDs
+func SendEventWithState(
+	ctx context.Context, rsAPI RoomserverInternalAPI, state *gomatrixserverlib.RespState,
+	event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool,
+) error {
+	outliers, err := state.Events()
+	if err != nil {
+		return err
+	}
+
+	var ires []InputRoomEvent
+	for _, outlier := range outliers {
+		if haveEventIDs[outlier.EventID()] {
+			continue
+		}
+		ires = append(ires, InputRoomEvent{
+			Kind:         KindOutlier,
+			Event:        outlier.Headered(event.RoomVersion),
+			AuthEventIDs: outlier.AuthEventIDs(),
+		})
+	}
+
+	stateEventIDs := make([]string, len(state.StateEvents))
+	for i := range state.StateEvents {
+		stateEventIDs[i] = state.StateEvents[i].EventID()
+	}
+
+	ires = append(ires, InputRoomEvent{
+		Kind:          KindNew,
+		Event:         event,
+		AuthEventIDs:  event.AuthEventIDs(),
+		HasState:      true,
+		StateEventIDs: stateEventIDs,
+	})
+
+	return SendInputRoomEvents(ctx, rsAPI, ires)
+}
+
+// SendEventWithRewrite writes an event with KindNew to the roomserver along
 // with a number of rewrite and outlier events for state and auth events
 // respectively.
-func SendEventWithState(
+func SendEventWithRewrite(
 	ctx context.Context, rsAPI RoomserverInternalAPI, state *gomatrixserverlib.RespState,
 	event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool,
 ) error {
@@ -73,6 +113,9 @@ func SendEventWithState(
 			continue
 		}
 		if haveEventIDs[authOrStateEvent.EventID()] {
+			continue
+		}
+		if event.StateKey() == nil {
 			continue
 		}
 
