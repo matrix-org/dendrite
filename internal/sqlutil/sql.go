@@ -129,22 +129,23 @@ type QueryProvider interface {
 const SQLite3MaxVariables = 999
 
 // RunLimitedVariablesQuery split up a query with more variables than the used database can handle in multiple queries.
-func RunLimitedVariablesQuery(ctx context.Context, query string, qp QueryProvider, rowHandler func(*sql.Rows) error, variables []interface{}, limit uint) error {
+func RunLimitedVariablesQuery(ctx context.Context, query string, qp QueryProvider, variables []interface{}, limit uint, rowHandler func(*sql.Rows) error) error {
 	var start int
 	for start < len(variables) {
 		n := minOfInts(len(variables)-start, int(limit))
-		query := strings.Replace(query, "($1)", QueryVariadic(n), 1)
-		rows, err := qp.QueryContext(ctx, query, variables[start:start+n]...)
+		nextQuery := strings.Replace(query, "($1)", QueryVariadic(n), 1)
+		rows, err := qp.QueryContext(ctx, nextQuery, variables[start:start+n]...)
 		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("QueryContext returned an error")
 			return err
 		}
 		err = rowHandler(rows)
-		if err := rows.Close(); err != nil {
-			util.GetLogger(ctx).WithError(err).Error(err.Error())
+		if closeErr := rows.Close(); closeErr != nil {
+			util.GetLogger(ctx).WithError(closeErr).Error("RunLimitedVariablesQuery: failed to close rows")
 			return err
 		}
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error(err.Error())
+			util.GetLogger(ctx).WithError(err).Error("RunLimitedVariablesQuery: rowHandler returned error")
 			return err
 		}
 		start = start + n

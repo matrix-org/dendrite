@@ -19,7 +19,8 @@ func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.
 		AddRow(2).
 		AddRow(3)
 
-	mock.ExpectQuery("SELECT id WHERE id IN \\((\\$[0-9]{1,4},?\\s?){3}\\)").WillReturnRows(r)
+	mock.ExpectQuery(`SELECT id WHERE id IN \(\$1, \$2, \$3\)`).WillReturnRows(r)
+	// nolint:goconst
 	q := "SELECT id WHERE id IN ($1)"
 	v := []int{1, 2, 3}
 	iKeyIDs := make([]interface{}, len(v))
@@ -29,7 +30,7 @@ func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.
 
 	ctx := context.Background()
 	var result = make([]int, 0)
-	err = RunLimitedVariablesQuery(ctx, q, db, func(rows *sql.Rows) error {
+	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
 			var id int
 			err = rows.Scan(&id)
@@ -37,7 +38,7 @@ func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.
 			result = append(result, id)
 		}
 		return nil
-	}, iKeyIDs, limit)
+	})
 	assertNoError(t, err, "Call returned an error")
 	if len(result) != len(v) {
 		t.Fatalf("Result should be 3 long")
@@ -55,7 +56,8 @@ func TestShouldReturnCorrectAmountOfResulstIfEqualVariablesAsLimit(t *testing.T)
 		AddRow(3).
 		AddRow(4)
 
-	mock.ExpectQuery("SELECT id WHERE id IN \\((\\$[0-9]{1,4},?\\s?){4}\\)").WillReturnRows(r)
+	mock.ExpectQuery(`SELECT id WHERE id IN \(\$1, \$2, \$3, \$4\)`).WillReturnRows(r)
+	// nolint:goconst
 	q := "SELECT id WHERE id IN ($1)"
 	v := []int{1, 2, 3, 4}
 	iKeyIDs := make([]interface{}, len(v))
@@ -65,7 +67,7 @@ func TestShouldReturnCorrectAmountOfResulstIfEqualVariablesAsLimit(t *testing.T)
 
 	ctx := context.Background()
 	var result = make([]int, 0)
-	err = RunLimitedVariablesQuery(ctx, q, db, func(rows *sql.Rows) error {
+	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
 			var id int
 			err = rows.Scan(&id)
@@ -73,7 +75,7 @@ func TestShouldReturnCorrectAmountOfResulstIfEqualVariablesAsLimit(t *testing.T)
 			result = append(result, id)
 		}
 		return nil
-	}, iKeyIDs, limit)
+	})
 	assertNoError(t, err, "Call returned an error")
 	if len(result) != len(v) {
 		t.Fatalf("Result should be 4 long")
@@ -94,8 +96,9 @@ func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T
 	r2 := mock.NewRows([]string{"id"}).
 		AddRow(5)
 
-	mock.ExpectQuery("SELECT id WHERE id IN \\((\\$[0-9]{1,4},?\\s?){4}\\)").WillReturnRows(r1)
-	mock.ExpectQuery("SELECT id WHERE id IN \\((\\$[0-9]{1,4},?\\s?){1}\\)").WillReturnRows(r2)
+	mock.ExpectQuery(`SELECT id WHERE id IN \(\$1, \$2, \$3, \$4\)`).WillReturnRows(r1)
+	mock.ExpectQuery(`SELECT id WHERE id IN \(\$1\)`).WillReturnRows(r2)
+	// nolint:goconst
 	q := "SELECT id WHERE id IN ($1)"
 	v := []int{1, 2, 3, 4, 5}
 	iKeyIDs := make([]interface{}, len(v))
@@ -105,7 +108,7 @@ func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T
 
 	ctx := context.Background()
 	var result = make([]int, 0)
-	err = RunLimitedVariablesQuery(ctx, q, db, func(rows *sql.Rows) error {
+	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
 			var id int
 			err = rows.Scan(&id)
@@ -113,7 +116,7 @@ func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T
 			result = append(result, id)
 		}
 		return nil
-	}, iKeyIDs, limit)
+	})
 	assertNoError(t, err, "Call returned an error")
 	if len(result) != len(v) {
 		t.Fatalf("Result should be 5 long")
@@ -123,7 +126,7 @@ func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T
 	}
 }
 
-func TestShouldREturnErrorIfRowsScanReturnsError(t *testing.T) {
+func TestShouldReturnErrorIfRowsScanReturnsError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	assertNoError(t, err, "Failed to make DB")
 	limit := uint(4)
@@ -134,7 +137,8 @@ func TestShouldREturnErrorIfRowsScanReturnsError(t *testing.T) {
 		AddRow(2).
 		AddRow(3)
 
-	mock.ExpectQuery("SELECT id WHERE id IN \\((\\$[0-9]{1,4},?\\s?){3}\\)").WillReturnRows(r)
+	mock.ExpectQuery(`SELECT id WHERE id IN \(\$1, \$2, \$3\)`).WillReturnRows(r)
+	// nolint:goconst
 	q := "SELECT id WHERE id IN ($1)"
 	v := []int{-1, -2, 3}
 	iKeyIDs := make([]interface{}, len(v))
@@ -144,7 +148,7 @@ func TestShouldREturnErrorIfRowsScanReturnsError(t *testing.T) {
 
 	ctx := context.Background()
 	var result = make([]uint, 0)
-	err = RunLimitedVariablesQuery(ctx, q, db, func(rows *sql.Rows) error {
+	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
 			var id uint
 			err = rows.Scan(&id)
@@ -154,7 +158,7 @@ func TestShouldREturnErrorIfRowsScanReturnsError(t *testing.T) {
 			result = append(result, id)
 		}
 		return nil
-	}, iKeyIDs, limit)
+	})
 	if err == nil {
 		t.Fatalf("Call did not return an error")
 	}

@@ -97,7 +97,8 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 		iKeyIDs[i] = v
 	}
 
-	err := sqlutil.RunLimitedVariablesQuery(ctx, bulkSelectServerKeysSQL, s.db,
+	err := sqlutil.RunLimitedVariablesQuery(
+		ctx, bulkSelectServerKeysSQL, s.db, iKeyIDs, sqlutil.SQLite3MaxVariables,
 		func(rows *sql.Rows) error {
 			for rows.Next() {
 				var serverName string
@@ -125,7 +126,7 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 			}
 			return nil
 		},
-		iKeyIDs, sqlutil.SQLite3MaxVariables)
+	)
 
 	if err != nil {
 		return nil, err
