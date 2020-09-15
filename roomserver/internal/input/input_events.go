@@ -46,10 +46,11 @@ func (r *Inputer) processRoomEvent(
 
 	// Check that the event passes authentication checks and work out
 	// the numeric IDs for the auth events.
+	isRejected := false
 	authEventNIDs, err := helpers.CheckAuthEvents(ctx, r.DB, headered, input.AuthEventIDs)
 	if err != nil {
-		logrus.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("processRoomEvent.checkAuthEvents failed for event")
-		return
+		logrus.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("processRoomEvent.checkAuthEvents failed for event, rejecting event")
+		isRejected = true
 	}
 
 	// If we don't have a transaction ID then get one.
@@ -65,9 +66,13 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Store the event.
-	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
+	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs, isRejected)
 	if err != nil {
 		return "", fmt.Errorf("r.DB.StoreEvent: %w", err)
+	}
+	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
+	if isRejected {
+		return event.EventID(), nil
 	}
 	// if storing this event results in it being redacted then do so.
 	if redactedEventID == event.EventID() {

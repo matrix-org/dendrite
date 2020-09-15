@@ -140,14 +140,6 @@ func mustCreateEvents(t *testing.T, roomVer gomatrixserverlib.RoomVersion, event
 	return
 }
 
-func eventsJSON(events []gomatrixserverlib.Event) []json.RawMessage {
-	result := make([]json.RawMessage, len(events))
-	for i := range events {
-		result[i] = events[i].JSON()
-	}
-	return result
-}
-
 func mustLoadRawEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) []gomatrixserverlib.HeaderedEvent {
 	t.Helper()
 	hs := make([]gomatrixserverlib.HeaderedEvent, len(events))
