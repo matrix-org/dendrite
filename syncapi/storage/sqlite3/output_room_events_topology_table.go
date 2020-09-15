@@ -65,6 +65,9 @@ const selectMaxPositionInTopologySQL = "" +
 	"SELECT MAX(topological_position), stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 ORDER BY stream_position DESC"
 
+const deleteTopologyForRoomSQL = "" +
+	"DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
+
 type outputRoomEventsTopologyStatements struct {
 	db                              *sql.DB
 	insertEventInTopologyStmt       *sql.Stmt
@@ -72,6 +75,7 @@ type outputRoomEventsTopologyStatements struct {
 	selectEventIDsInRangeDESCStmt   *sql.Stmt
 	selectPositionInTopologyStmt    *sql.Stmt
 	selectMaxPositionInTopologyStmt *sql.Stmt
+	deleteTopologyForRoomStmt       *sql.Stmt
 }
 
 func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
@@ -95,6 +99,9 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 		return nil, err
 	}
 	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
+		return nil, err
+	}
+	if s.deleteTopologyForRoomStmt, err = db.Prepare(deleteTopologyForRoomSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -163,4 +170,11 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	stmt := sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
 	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
+}
+
+func (s *outputRoomEventsTopologyStatements) DeleteTopologyForRoom(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (err error) {
+	_, err = sqlutil.TxStmt(txn, s.deleteTopologyForRoomStmt).ExecContext(ctx, roomID)
+	return err
 }

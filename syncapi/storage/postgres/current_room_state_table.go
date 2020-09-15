@@ -69,6 +69,9 @@ const upsertRoomStateSQL = "" +
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 
+const DeleteRoomStateForRoomSQL = "" +
+	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
+
 const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
@@ -98,6 +101,7 @@ const selectEventsWithEventIDsSQL = "" +
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt             *sql.Stmt
 	deleteRoomStateByEventIDStmt    *sql.Stmt
+	DeleteRoomStateForRoomStmt      *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
 	selectCurrentStateStmt          *sql.Stmt
 	selectJoinedUsersStmt           *sql.Stmt
@@ -115,6 +119,9 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 		return nil, err
 	}
 	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
+		return nil, err
+	}
+	if s.DeleteRoomStateForRoomStmt, err = db.Prepare(DeleteRoomStateForRoomSQL); err != nil {
 		return nil, err
 	}
 	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
@@ -211,6 +218,14 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
 	_, err := stmt.ExecContext(ctx, eventID)
+	return err
+}
+
+func (s *currentRoomStateStatements) DeleteRoomStateForRoom(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	stmt := sqlutil.TxStmt(txn, s.DeleteRoomStateForRoomStmt)
+	_, err := stmt.ExecContext(ctx, roomID)
 	return err
 }
 

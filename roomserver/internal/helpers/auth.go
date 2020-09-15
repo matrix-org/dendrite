@@ -36,7 +36,7 @@ func CheckAuthEvents(
 	if err != nil {
 		return nil, err
 	}
-	// TODO: check for duplicate state keys here.
+	authStateEntries = types.DeduplicateStateEntries(authStateEntries)
 
 	// Work out which of the state events we actually need.
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})

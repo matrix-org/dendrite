@@ -54,6 +54,7 @@ func (r *Inputer) updateLatestEvents(
 	event gomatrixserverlib.Event,
 	sendAsServer string,
 	transactionID *api.TransactionID,
+	rewritesState bool,
 ) (err error) {
 	updater, err := r.DB.GetLatestEventsForUpdate(ctx, *roomInfo)
 	if err != nil {
@@ -71,6 +72,7 @@ func (r *Inputer) updateLatestEvents(
 		event:         event,
 		sendAsServer:  sendAsServer,
 		transactionID: transactionID,
+		rewritesState: rewritesState,
 	}
 
 	if err = u.doUpdateLatestEvents(); err != nil {
@@ -93,6 +95,7 @@ type latestEventsUpdater struct {
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event
 	transactionID *api.TransactionID
+	rewritesState bool
 	// Which server to send this event as.
 	sendAsServer string
 	// The eventID of the event that was processed before this one.
@@ -178,7 +181,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return fmt.Errorf("u.api.updateMemberships: %w", err)
 	}
 
-	update, err := u.makeOutputNewRoomEvent()
+	var update *api.OutputEvent
+	update, err = u.makeOutputNewRoomEvent()
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
 	}
@@ -305,6 +309,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 
 	ore := api.OutputNewRoomEvent{
 		Event:           u.event.Headered(u.roomInfo.RoomVersion),
+		RewritesState:   u.rewritesState,
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,
@@ -337,6 +342,11 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 			return nil, fmt.Errorf("failed to load add_state_events from db: %w", err)
 		}
 	}
+	// State is rewritten if the input room event HasState and we actually produced a delta on state events.
+	// Without this check, /get_missing_events which produce events with associated (but not complete) state
+	// will incorrectly purge the room and set it to no state. TODO: This is likely flakey, as if /gme produced
+	// a state conflict res which just so happens to include 2+ events we might purge the room state downstream.
+	ore.RewritesState = len(ore.AddsStateEventIDs) > 1
 
 	return &api.OutputEvent{
 		Type:         api.OutputTypeNewRoomEvent,
