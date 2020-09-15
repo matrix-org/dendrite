@@ -162,5 +162,4 @@ func (r *Inputer) InputRoomEvents(
 			return
 		}
 	}
-	return
 }

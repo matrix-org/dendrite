@@ -26,7 +26,6 @@ func (t *RoomserverInternalAPITrace) InputRoomEvents(
 ) {
 	t.Impl.InputRoomEvents(ctx, req, res)
 	util.GetLogger(ctx).Infof("InputRoomEvents req=%+v res=%+v", js(req), js(res))
-	return
 }
 
 func (t *RoomserverInternalAPITrace) PerformInvite(
