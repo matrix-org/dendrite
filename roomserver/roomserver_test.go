@@ -172,7 +172,7 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	dp := &dummyProducer{
 		topic: cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
 	}
-	cache, err := caching.NewInMemoryLRUCache(true)
+	cache, err := caching.NewInMemoryLRUCache(false)
 	if err != nil {
 		t.Fatalf("failed to make caches: %s", err)
 	}
