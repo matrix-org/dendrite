@@ -16,7 +16,7 @@ type RoomserverInternalAPI interface {
 		ctx context.Context,
 		request *InputRoomEventsRequest,
 		response *InputRoomEventsResponse,
-	) error
+	)
 
 	PerformInvite(
 		ctx context.Context,

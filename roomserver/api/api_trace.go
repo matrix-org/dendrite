@@ -23,10 +23,10 @@ func (t *RoomserverInternalAPITrace) InputRoomEvents(
 	ctx context.Context,
 	req *InputRoomEventsRequest,
 	res *InputRoomEventsResponse,
-) error {
-	err := t.Impl.InputRoomEvents(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("InputRoomEvents req=%+v res=%+v", js(req), js(res))
-	return err
+) {
+	t.Impl.InputRoomEvents(ctx, req, res)
+	util.GetLogger(ctx).Infof("InputRoomEvents req=%+v res=%+v", js(req), js(res))
+	return
 }
 
 func (t *RoomserverInternalAPITrace) PerformInvite(
