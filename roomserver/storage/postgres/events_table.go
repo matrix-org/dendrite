@@ -89,7 +89,7 @@ const bulkSelectStateEventByIDSQL = "" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 const bulkSelectStateAtEventByIDSQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid FROM roomserver_events" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, is_rejected FROM roomserver_events" +
 	" WHERE event_id = ANY($1)"
 
 const updateEventStateSQL = "" +
@@ -258,6 +258,7 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 			&result.EventStateKeyNID,
 			&result.EventNID,
 			&result.BeforeStateSnapshotNID,
+			&result.IsRejected,
 		); err != nil {
 			return nil, err
 		}

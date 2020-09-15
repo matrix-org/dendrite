@@ -101,6 +101,9 @@ type StateAtEvent struct {
 	Overwrite bool
 	// The state before the event.
 	BeforeStateSnapshotNID StateSnapshotNID
+	// True if this StateEntry is rejected. State resolution should then treat this
+	// StateEntry as being a message event (not a state event).
+	IsRejected bool
 	// The state entry for the event itself, allows us to calculate the state after the event.
 	StateEntry
 }
