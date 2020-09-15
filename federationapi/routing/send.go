@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -378,7 +379,7 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 	}
 
 	// pass the event to the roomserver
-	return api.SendEvents(
+	err := api.SendEvents(
 		context.Background(),
 		t.rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
@@ -387,6 +388,12 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 		api.DoNotSendToOtherServers,
 		nil,
 	)
+	var notAllowed *gomatrixserverlib.NotAllowed
+	if errors.As(err, &notAllowed) {
+		// the event was rejected, silently ignore.
+		err = nil
+	}
+	return err
 }
 
 func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserverlib.Event) error {
