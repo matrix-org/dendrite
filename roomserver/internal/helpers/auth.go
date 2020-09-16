@@ -45,7 +45,8 @@ func CheckForSoftFail(
 		}
 	} else {
 		// Work out if the room exists.
-		roomInfo, err := db.RoomInfo(ctx, event.RoomID())
+		var roomInfo *types.RoomInfo
+		roomInfo, err = db.RoomInfo(ctx, event.RoomID())
 		if err != nil {
 			return false, fmt.Errorf("db.RoomNID: %w", err)
 		}
