@@ -32,28 +32,34 @@ func CheckForSoftFail(
 	ctx context.Context,
 	db storage.Database,
 	event gomatrixserverlib.HeaderedEvent,
+	stateEventIDs []string,
 ) (bool, error) {
-	// Work out if the room exists.
-	roomInfo, err := db.RoomInfo(ctx, event.RoomID())
-	if err != nil {
-		return false, fmt.Errorf("db.RoomNID: %w", err)
-	}
-	if roomInfo == nil || roomInfo.IsStub {
-		return false, nil
-	}
+	rewritesState := len(stateEventIDs) > 1
 
-	// If the room exist, gets the current state snapshot.
-	_, stateSnapshotNID, _, err := db.LatestEventIDs(ctx, roomInfo.RoomNID)
-	if err != nil {
-		return true, fmt.Errorf("r.DB.LatestEventIDs: %w", err)
-	}
+	var authStateEntries []types.StateEntry
+	var err error
+	if rewritesState {
+		authStateEntries, err = db.StateEntriesForEventIDs(ctx, stateEventIDs)
+		if err != nil {
+			return true, fmt.Errorf("StateEntriesForEventIDs failed: %w", err)
+		}
+	} else {
+		// Work out if the room exists.
+		roomInfo, err := db.RoomInfo(ctx, event.RoomID())
+		if err != nil {
+			return false, fmt.Errorf("db.RoomNID: %w", err)
+		}
+		if roomInfo == nil || roomInfo.IsStub {
+			return false, nil
+		}
 
-	// Then get the state entries for the current state snapshot.
-	// We'll use this to check if the event is allowed right now.
-	roomState := state.NewStateResolution(db, *roomInfo)
-	authStateEntries, err := roomState.LoadStateAtSnapshot(ctx, stateSnapshotNID)
-	if err != nil {
-		return true, fmt.Errorf("roomState.LoadStateAtSnapshot: %w", err)
+		// Then get the state entries for the current state snapshot.
+		// We'll use this to check if the event is allowed right now.
+		roomState := state.NewStateResolution(db, *roomInfo)
+		authStateEntries, err = roomState.LoadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+		if err != nil {
+			return true, fmt.Errorf("roomState.LoadStateAtSnapshot: %w", err)
+		}
 	}
 
 	// As a special case, it's possible that the room will have no

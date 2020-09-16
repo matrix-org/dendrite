@@ -53,6 +53,3 @@ Outbound federation requests missing prev_events and then asks for /state_ids an
 
 # We don't implement lazy membership loading yet.
 The only membership state included in a gapped incremental sync is for senders in the timeline
-
-# flakey since implementing rejected events
-Inbound federation correctly soft fails events
