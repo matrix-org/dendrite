@@ -21,7 +21,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
-	currentstateapi "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -42,7 +41,6 @@ func AddPublicRoutes(
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
 	keyAPI keyapi.KeyInternalAPI,
-	currentStateAPI currentstateapi.CurrentStateInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
@@ -62,11 +60,11 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, currentStateAPI)
+	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, rsAPI)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
-		consumer, notifier, keyAPI, currentStateAPI, syncDB,
+		consumer, notifier, keyAPI, rsAPI, syncDB,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start key change consumer")

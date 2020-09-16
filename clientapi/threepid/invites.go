@@ -354,12 +354,12 @@ func emit3PIDInviteEvent(
 	}
 
 	queryRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.BuildEvent(ctx, builder, cfg.Matrix, evTime, rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, builder, cfg.Matrix, evTime, rsAPI, &queryRes)
 	if err != nil {
 		return err
 	}
 
-	_, err = api.SendEvents(
+	return api.SendEvents(
 		ctx, rsAPI,
 		[]gomatrixserverlib.HeaderedEvent{
 			(*event).Headered(queryRes.RoomVersion),
@@ -367,5 +367,4 @@ func emit3PIDInviteEvent(
 		cfg.Matrix.ServerName,
 		nil,
 	)
-	return err
 }

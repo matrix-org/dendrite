@@ -23,10 +23,9 @@ func (t *RoomserverInternalAPITrace) InputRoomEvents(
 	ctx context.Context,
 	req *InputRoomEventsRequest,
 	res *InputRoomEventsResponse,
-) error {
-	err := t.Impl.InputRoomEvents(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("InputRoomEvents req=%+v res=%+v", js(req), js(res))
-	return err
+) {
+	t.Impl.InputRoomEvents(ctx, req, res)
+	util.GetLogger(ctx).Infof("InputRoomEvents req=%+v res=%+v", js(req), js(res))
 }
 
 func (t *RoomserverInternalAPITrace) PerformInvite(
@@ -36,6 +35,15 @@ func (t *RoomserverInternalAPITrace) PerformInvite(
 ) error {
 	util.GetLogger(ctx).Infof("PerformInvite req=%+v res=%+v", js(req), js(res))
 	return t.Impl.PerformInvite(ctx, req, res)
+}
+
+func (t *RoomserverInternalAPITrace) PerformPeek(
+	ctx context.Context,
+	req *PerformPeekRequest,
+	res *PerformPeekResponse,
+) {
+	t.Impl.PerformPeek(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformPeek req=%+v res=%+v", js(req), js(res))
 }
 
 func (t *RoomserverInternalAPITrace) PerformJoin(
@@ -233,6 +241,47 @@ func (t *RoomserverInternalAPITrace) RemoveRoomAlias(
 ) error {
 	err := t.Impl.RemoveRoomAlias(ctx, req, res)
 	util.GetLogger(ctx).WithError(err).Infof("RemoveRoomAlias req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *RoomserverInternalAPITrace) QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error {
+	err := t.Impl.QueryCurrentState(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryCurrentState req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+// QueryRoomsForUser retrieves a list of room IDs matching the given query.
+func (t *RoomserverInternalAPITrace) QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error {
+	err := t.Impl.QueryRoomsForUser(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryRoomsForUser req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+// QueryBulkStateContent does a bulk query for state event content in the given rooms.
+func (t *RoomserverInternalAPITrace) QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error {
+	err := t.Impl.QueryBulkStateContent(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryBulkStateContent req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
+func (t *RoomserverInternalAPITrace) QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error {
+	err := t.Impl.QuerySharedUsers(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QuerySharedUsers req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+// QueryKnownUsers returns a list of users that we know about from our joined rooms.
+func (t *RoomserverInternalAPITrace) QueryKnownUsers(ctx context.Context, req *QueryKnownUsersRequest, res *QueryKnownUsersResponse) error {
+	err := t.Impl.QueryKnownUsers(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryKnownUsers req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
+func (t *RoomserverInternalAPITrace) QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error {
+	err := t.Impl.QueryServerBannedFromRoom(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryServerBannedFromRoom req=%+v res=%+v", js(req), js(res))
 	return err
 }
 

@@ -117,13 +117,14 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 }
 
 func (s *inviteEventsStatements) DeleteInviteEvent(
-	ctx context.Context, inviteEventID string,
+	ctx context.Context, txn *sql.Tx, inviteEventID string,
 ) (types.StreamPosition, error) {
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, nil)
+	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
 	if err != nil {
 		return streamPos, err
 	}
-	_, err = s.deleteInviteEventStmt.ExecContext(ctx, streamPos, inviteEventID)
+	stmt := sqlutil.TxStmt(txn, s.deleteInviteEventStmt)
+	_, err = stmt.ExecContext(ctx, streamPos, inviteEventID)
 	return streamPos, err
 }
 

@@ -21,7 +21,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
@@ -58,11 +60,20 @@ const selectLatestEventNIDsForUpdateSQL = "" +
 const updateLatestEventNIDsSQL = "" +
 	"UPDATE roomserver_rooms SET latest_event_nids = $1, last_event_sent_nid = $2, state_snapshot_nid = $3 WHERE room_nid = $4"
 
-const selectRoomVersionForRoomIDSQL = "" +
-	"SELECT room_version FROM roomserver_rooms WHERE room_id = $1"
-
 const selectRoomVersionForRoomNIDSQL = "" +
 	"SELECT room_version FROM roomserver_rooms WHERE room_nid = $1"
+
+const selectRoomInfoSQL = "" +
+	"SELECT room_version, room_nid, state_snapshot_nid, latest_event_nids FROM roomserver_rooms WHERE room_id = $1"
+
+const selectRoomIDsSQL = "" +
+	"SELECT room_id FROM roomserver_rooms"
+
+const bulkSelectRoomIDsSQL = "" +
+	"SELECT room_id FROM roomserver_rooms WHERE room_nid IN ($1)"
+
+const bulkSelectRoomNIDsSQL = "" +
+	"SELECT room_nid FROM roomserver_rooms WHERE room_id IN ($1)"
 
 type roomStatements struct {
 	db                                 *sql.DB
@@ -71,8 +82,9 @@ type roomStatements struct {
 	selectLatestEventNIDsStmt          *sql.Stmt
 	selectLatestEventNIDsForUpdateStmt *sql.Stmt
 	updateLatestEventNIDsStmt          *sql.Stmt
-	selectRoomVersionForRoomIDStmt     *sql.Stmt
 	selectRoomVersionForRoomNIDStmt    *sql.Stmt
+	selectRoomInfoStmt                 *sql.Stmt
+	selectRoomIDsStmt                  *sql.Stmt
 }
 
 func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
@@ -89,9 +101,47 @@ func NewSqliteRoomsTable(db *sql.DB) (tables.Rooms, error) {
 		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
 		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
 		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
-		{&s.selectRoomVersionForRoomIDStmt, selectRoomVersionForRoomIDSQL},
 		{&s.selectRoomVersionForRoomNIDStmt, selectRoomVersionForRoomNIDSQL},
+		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
+		{&s.selectRoomIDsStmt, selectRoomIDsSQL},
 	}.Prepare(db)
+}
+
+func (s *roomStatements) SelectRoomIDs(ctx context.Context) ([]string, error) {
+	rows, err := s.selectRoomIDsStmt.QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomIDsStmt: rows.close() failed")
+	var roomIDs []string
+	for rows.Next() {
+		var roomID string
+		if err = rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return roomIDs, nil
+}
+
+func (s *roomStatements) SelectRoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
+	var info types.RoomInfo
+	var latestNIDsJSON string
+	err := s.selectRoomInfoStmt.QueryRowContext(ctx, roomID).Scan(
+		&info.RoomVersion, &info.RoomNID, &info.StateSnapshotNID, &latestNIDsJSON,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var latestNIDs []int64
+	if err = json.Unmarshal([]byte(latestNIDsJSON), &latestNIDs); err != nil {
+		return nil, err
+	}
+	info.IsStub = len(latestNIDs) == 0
+	return &info, err
 }
 
 func (s *roomStatements) InsertRoomNID(
@@ -173,18 +223,6 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 	return err
 }
 
-func (s *roomStatements) SelectRoomVersionForRoomID(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) (gomatrixserverlib.RoomVersion, error) {
-	var roomVersion gomatrixserverlib.RoomVersion
-	stmt := sqlutil.TxStmt(txn, s.selectRoomVersionForRoomIDStmt)
-	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomVersion)
-	if err == sql.ErrNoRows {
-		return roomVersion, errors.New("room not found")
-	}
-	return roomVersion, err
-}
-
 func (s *roomStatements) SelectRoomVersionForRoomNID(
 	ctx context.Context, roomNID types.RoomNID,
 ) (gomatrixserverlib.RoomVersion, error) {
@@ -194,4 +232,48 @@ func (s *roomStatements) SelectRoomVersionForRoomNID(
 		return roomVersion, errors.New("room not found")
 	}
 	return roomVersion, err
+}
+
+func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error) {
+	iRoomNIDs := make([]interface{}, len(roomNIDs))
+	for i, v := range roomNIDs {
+		iRoomNIDs[i] = v
+	}
+	sqlQuery := strings.Replace(bulkSelectRoomIDsSQL, "($1)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
+	rows, err := s.db.QueryContext(ctx, sqlQuery, iRoomNIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectRoomIDsStmt: rows.close() failed")
+	var roomIDs []string
+	for rows.Next() {
+		var roomID string
+		if err = rows.Scan(&roomID); err != nil {
+			return nil, err
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return roomIDs, nil
+}
+
+func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, roomIDs []string) ([]types.RoomNID, error) {
+	iRoomIDs := make([]interface{}, len(roomIDs))
+	for i, v := range roomIDs {
+		iRoomIDs[i] = v
+	}
+	sqlQuery := strings.Replace(bulkSelectRoomNIDsSQL, "($1)", sqlutil.QueryVariadic(len(roomIDs)), 1)
+	rows, err := s.db.QueryContext(ctx, sqlQuery, iRoomIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectRoomNIDsStmt: rows.close() failed")
+	var roomNIDs []types.RoomNID
+	for rows.Next() {
+		var roomNID types.RoomNID
+		if err = rows.Scan(&roomNID); err != nil {
+			return nil, err
+		}
+		roomNIDs = append(roomNIDs, roomNID)
+	}
+	return roomNIDs, nil
 }

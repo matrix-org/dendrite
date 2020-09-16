@@ -87,7 +87,6 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	// the table names are globally unique. But we might not want to
 	// rely on that in the future.
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(database)
-	cfg.CurrentStateServer.Database.ConnectionString = config.DataSource(database)
 	cfg.FederationSender.Database.ConnectionString = config.DataSource(database)
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(database)
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(database)
@@ -98,7 +97,6 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(database)
 
 	cfg.AppServiceAPI.InternalAPI.Listen = assignAddress()
-	cfg.CurrentStateServer.InternalAPI.Listen = assignAddress()
 	cfg.EDUServer.InternalAPI.Listen = assignAddress()
 	cfg.FederationAPI.InternalAPI.Listen = assignAddress()
 	cfg.FederationSender.InternalAPI.Listen = assignAddress()
@@ -110,7 +108,6 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.UserAPI.InternalAPI.Listen = assignAddress()
 
 	cfg.AppServiceAPI.InternalAPI.Connect = cfg.AppServiceAPI.InternalAPI.Listen
-	cfg.CurrentStateServer.InternalAPI.Connect = cfg.CurrentStateServer.InternalAPI.Listen
 	cfg.EDUServer.InternalAPI.Connect = cfg.EDUServer.InternalAPI.Listen
 	cfg.FederationAPI.InternalAPI.Connect = cfg.FederationAPI.InternalAPI.Listen
 	cfg.FederationSender.InternalAPI.Connect = cfg.FederationSender.InternalAPI.Listen

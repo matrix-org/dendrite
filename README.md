@@ -81,6 +81,18 @@ matrixdotorg/sytest-dendrite:latest tests/50federation/40devicelists.pl
 ```
 See [sytest.md](docs/sytest.md) for the full description of these flags.
 
+You can try running sytest outside of docker for faster runs, but the dependencies can be temperamental
+and we recommend using docker where possible.
+```
+cd sytest
+export PERL5LIB=$HOME/lib/perl5
+export PERL_MB_OPT=--install_base=$HOME
+export PERL_MM_OPT=INSTALL_BASE=$HOME
+./install-deps.pl
+
+./run-tests.pl -I Dendrite::Monolith -d $PATH_TO_DENDRITE_BINARIES
+```
+
 Sometimes Sytest is testing the wrong thing or is flakey, so it will need to be patched.
 Ask on `#dendrite-dev:matrix.org` if you think this is the case for you and we'll be happy to help.
 
@@ -88,6 +100,18 @@ If you're new to the project, see [CONTRIBUTING.md](docs/CONTRIBUTING.md) to get
 look for [Good First Issues](https://github.com/matrix-org/dendrite/labels/good%20first%20issue). If you're
 familiar with the project, look for [Help Wanted](https://github.com/matrix-org/dendrite/labels/help-wanted)
 issues.
+
+# Hardware requirements
+
+Dendrite in Monolith + SQLite works in a range of environments including iOS and in-browser via WASM.
+
+For small homeserver installations joined on ~10s rooms on matrix.org with ~100s of users in those rooms, including some
+encrypted rooms:
+ - Memory: uses around 100MB of RAM, with peaks at around 200MB.
+ - Disk space: After a few months of usage, the database grew to around 2GB (in Monolith mode).
+ - CPU: Brief spikes when processing events, typically idles at 1% CPU.
+
+This means Dendrite should comfortably work on things like Raspberry Pis.
 
 # Discussion
 

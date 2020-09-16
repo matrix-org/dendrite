@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -239,16 +240,19 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	}
 	builder.AuthEvents = refs
 
-	roomVersion, err := r.DB.GetRoomVersionForRoom(ctx, roomID)
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
 		return err
+	}
+	if roomInfo == nil {
+		return fmt.Errorf("room %s does not exist", roomID)
 	}
 
 	// Build the event
 	now := time.Now()
 	event, err := builder.Build(
 		now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID,
-		r.Cfg.Matrix.PrivateKey, roomVersion,
+		r.Cfg.Matrix.PrivateKey, roomInfo.RoomVersion,
 	)
 	if err != nil {
 		return err
@@ -257,7 +261,7 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	// Create the request
 	ire := api.InputRoomEvent{
 		Kind:         api.KindNew,
-		Event:        event.Headered(roomVersion),
+		Event:        event.Headered(roomInfo.RoomVersion),
 		AuthEventIDs: event.AuthEventIDs(),
 		SendAsServer: serverName,
 	}
@@ -267,5 +271,6 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	var inputRes api.InputRoomEventsResponse
 
 	// Send the request
-	return r.InputRoomEvents(ctx, &inputReq, &inputRes)
+	r.InputRoomEvents(ctx, &inputReq, &inputRes)
+	return inputRes.Err()
 }

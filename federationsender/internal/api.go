@@ -70,7 +70,10 @@ func failBlacklistableError(err error, stats *statistics.ServerStatistics) (unti
 	if !ok {
 		return stats.Failure()
 	}
-	if mxerr.Code >= 500 && mxerr.Code < 600 {
+	if mxerr.Code == 401 { // invalid signature in X-Matrix header
+		return stats.Failure()
+	}
+	if mxerr.Code >= 500 && mxerr.Code < 600 { // internal server errors
 		return stats.Failure()
 	}
 	return
@@ -135,4 +138,52 @@ func (a *FederationSenderInternalAPI) QueryKeys(
 		return gomatrixserverlib.RespQueryKeys{}, err
 	}
 	return ires.(gomatrixserverlib.RespQueryKeys), nil
+}
+
+func (a *FederationSenderInternalAPI) Backfill(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID string, limit int, eventIDs []string,
+) (res gomatrixserverlib.Transaction, err error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.Backfill(ctx, s, roomID, limit, eventIDs)
+	})
+	if err != nil {
+		return gomatrixserverlib.Transaction{}, err
+	}
+	return ires.(gomatrixserverlib.Transaction), nil
+}
+
+func (a *FederationSenderInternalAPI) LookupState(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion,
+) (res gomatrixserverlib.RespState, err error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.LookupState(ctx, s, roomID, eventID, roomVersion)
+	})
+	if err != nil {
+		return gomatrixserverlib.RespState{}, err
+	}
+	return ires.(gomatrixserverlib.RespState), nil
+}
+
+func (a *FederationSenderInternalAPI) LookupStateIDs(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string,
+) (res gomatrixserverlib.RespStateIDs, err error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.LookupStateIDs(ctx, s, roomID, eventID)
+	})
+	if err != nil {
+		return gomatrixserverlib.RespStateIDs{}, err
+	}
+	return ires.(gomatrixserverlib.RespStateIDs), nil
+}
+
+func (a *FederationSenderInternalAPI) GetEvent(
+	ctx context.Context, s gomatrixserverlib.ServerName, eventID string,
+) (res gomatrixserverlib.Transaction, err error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.GetEvent(ctx, s, eventID)
+	})
+	if err != nil {
+		return gomatrixserverlib.Transaction{}, err
+	}
+	return ires.(gomatrixserverlib.Transaction), nil
 }

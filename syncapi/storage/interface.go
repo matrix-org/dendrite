@@ -30,6 +30,8 @@ type Database interface {
 	internal.PartitionStorer
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
+	// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
+	AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error)
 	// Events lookups a list of event by their event ID.
 	// Returns a list of events matching the requested IDs found in the database.
 	// If an event is not found in the database then it will be omitted from the list.
@@ -41,6 +43,9 @@ type Database interface {
 	// Returns an error if there was a problem inserting this event.
 	WriteEvent(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, addStateEvents []gomatrixserverlib.HeaderedEvent,
 		addStateEventIDs []string, removeStateEventIDs []string, transactionID *api.TransactionID, excludeFromSync bool) (types.StreamPosition, error)
+	// PurgeRoom completely purges room state from the sync API. This is done when
+	// receiving an output event that completely resets the state.
+	PurgeRoom(ctx context.Context, roomID string) error
 	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
@@ -81,6 +86,12 @@ type Database interface {
 	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
 	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
+	// AddPeek adds a new peek to our DB for a given room by a given user's device.
+	// Returns an error if there was a problem communicating with the database.
+	AddPeek(ctx context.Context, RoomID, UserID, DeviceID string) (types.StreamPosition, error)
+	// DeletePeek deletes all peeks for a given room by a given user
+	// Returns an error if there was a problem communicating with the database.
+	DeletePeeks(ctx context.Context, RoomID, UserID string) (types.StreamPosition, error)
 	// SetTypingTimeoutCallback sets a callback function that is called right after
 	// a user is removed from the typing user list due to timeout.
 	SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn)
@@ -104,8 +115,6 @@ type Database interface {
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.
 	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent
-	// SyncStreamPosition returns the latest position in the sync stream. Returns 0 if there are no events yet.
-	SyncStreamPosition(ctx context.Context) (types.StreamPosition, error)
 	// AddSendToDevice increases the EDU position in the cache and returns the stream position.
 	AddSendToDevice() types.StreamPosition
 	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns three lists:

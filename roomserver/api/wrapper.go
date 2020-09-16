@@ -26,7 +26,7 @@ import (
 func SendEvents(
 	ctx context.Context, rsAPI RoomserverInternalAPI, events []gomatrixserverlib.HeaderedEvent,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
-) (string, error) {
+) error {
 	ires := make([]InputRoomEvent, len(events))
 	for i, event := range events {
 		ires[i] = InputRoomEvent{
@@ -77,19 +77,118 @@ func SendEventWithState(
 		StateEventIDs: stateEventIDs,
 	})
 
-	_, err = SendInputRoomEvents(ctx, rsAPI, ires)
-	return err
+	return SendInputRoomEvents(ctx, rsAPI, ires)
+}
+
+// SendEventWithRewrite writes an event with KindNew to the roomserver along
+// with a number of rewrite and outlier events for state and auth events
+// respectively.
+func SendEventWithRewrite(
+	ctx context.Context, rsAPI RoomserverInternalAPI, state *gomatrixserverlib.RespState,
+	event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool,
+) error {
+	isCurrentState := map[string]struct{}{}
+	for _, se := range state.StateEvents {
+		isCurrentState[se.EventID()] = struct{}{}
+	}
+
+	authAndStateEvents, err := state.Events()
+	if err != nil {
+		return err
+	}
+
+	var ires []InputRoomEvent
+	var stateIDs []string
+
+	// This function generates three things:
+	// A - A set of "rewrite" events, which will form the newly rewritten
+	//     state before the event, which includes every rewrite event that
+	//     came before it in its state
+	// B - A set of "outlier" events, which are auth events but not part
+	//     of the rewritten state
+	// C - A "new" event, which include all of the rewrite events in its
+	//     state
+	for _, authOrStateEvent := range authAndStateEvents {
+		if authOrStateEvent.StateKey() == nil {
+			continue
+		}
+		if haveEventIDs[authOrStateEvent.EventID()] {
+			continue
+		}
+		if event.StateKey() == nil {
+			continue
+		}
+
+		// We will handle an event as if it's an outlier if one of the
+		// following conditions is true:
+		storeAsOutlier := false
+		if authOrStateEvent.Type() == event.Type() && *authOrStateEvent.StateKey() == *event.StateKey() {
+			// The event is a state event but the input event is going to
+			// replace it, therefore it can't be added to the state or we'll
+			// get duplicate state keys in the state block. We'll send it
+			// as an outlier because we don't know if something will be
+			// referring to it as an auth event, but need it to be stored
+			// just in case.
+			storeAsOutlier = true
+		} else if _, ok := isCurrentState[authOrStateEvent.EventID()]; !ok {
+			// The event is an auth event and isn't a part of the state set.
+			// We'll send it as an outlier because we need it to be stored
+			// in case something is referring to it as an auth event.
+			storeAsOutlier = true
+		}
+
+		if storeAsOutlier {
+			ires = append(ires, InputRoomEvent{
+				Kind:         KindOutlier,
+				Event:        authOrStateEvent.Headered(event.RoomVersion),
+				AuthEventIDs: authOrStateEvent.AuthEventIDs(),
+			})
+			continue
+		}
+
+		// If the event isn't an outlier then we'll instead send it as a
+		// rewrite event, so that it'll form part of the rewritten state.
+		// These events will go through the membership and latest event
+		// updaters and we will generate output events, but they will be
+		// flagged as non-current (i.e. didn't just happen) events.
+		// Each of these rewrite events includes all of the rewrite events
+		// that came before in their StateEventIDs.
+		ires = append(ires, InputRoomEvent{
+			Kind:          KindRewrite,
+			Event:         authOrStateEvent.Headered(event.RoomVersion),
+			AuthEventIDs:  authOrStateEvent.AuthEventIDs(),
+			HasState:      true,
+			StateEventIDs: stateIDs,
+		})
+
+		// Add the event ID into the StateEventIDs of all subsequent
+		// rewrite events, and the new event.
+		stateIDs = append(stateIDs, authOrStateEvent.EventID())
+	}
+
+	// Send the final event as a new event, which will generate
+	// a timeline output event for it. All of the rewrite events
+	// that came before will be sent as StateEventIDs, forming a
+	// new clean state before the event.
+	ires = append(ires, InputRoomEvent{
+		Kind:          KindNew,
+		Event:         event,
+		AuthEventIDs:  event.AuthEventIDs(),
+		HasState:      true,
+		StateEventIDs: stateIDs,
+	})
+
+	return SendInputRoomEvents(ctx, rsAPI, ires)
 }
 
 // SendInputRoomEvents to the roomserver.
 func SendInputRoomEvents(
 	ctx context.Context, rsAPI RoomserverInternalAPI, ires []InputRoomEvent,
-) (eventID string, err error) {
+) error {
 	request := InputRoomEventsRequest{InputRoomEvents: ires}
 	var response InputRoomEventsResponse
-	err = rsAPI.InputRoomEvents(ctx, &request, &response)
-	eventID = response.EventID
-	return
+	rsAPI.InputRoomEvents(ctx, &request, &response)
+	return response.Err()
 }
 
 // SendInvite event to the roomserver.
@@ -135,4 +234,103 @@ func GetEvent(ctx context.Context, rsAPI RoomserverInternalAPI, eventID string) 
 		return nil
 	}
 	return &res.Events[0]
+}
+
+// GetStateEvent returns the current state event in the room or nil.
+func GetStateEvent(ctx context.Context, rsAPI RoomserverInternalAPI, roomID string, tuple gomatrixserverlib.StateKeyTuple) *gomatrixserverlib.HeaderedEvent {
+	var res QueryCurrentStateResponse
+	err := rsAPI.QueryCurrentState(ctx, &QueryCurrentStateRequest{
+		RoomID:      roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
+	}, &res)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to QueryCurrentState")
+		return nil
+	}
+	ev, ok := res.StateEvents[tuple]
+	if ok {
+		return ev
+	}
+	return nil
+}
+
+// IsServerBannedFromRoom returns whether the server is banned from a room by server ACLs.
+func IsServerBannedFromRoom(ctx context.Context, rsAPI RoomserverInternalAPI, roomID string, serverName gomatrixserverlib.ServerName) bool {
+	req := &QueryServerBannedFromRoomRequest{
+		ServerName: serverName,
+		RoomID:     roomID,
+	}
+	res := &QueryServerBannedFromRoomResponse{}
+	if err := rsAPI.QueryServerBannedFromRoom(ctx, req, res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to QueryServerBannedFromRoom")
+		return true
+	}
+	return res.Banned
+}
+
+// PopulatePublicRooms extracts PublicRoom information for all the provided room IDs. The IDs are not checked to see if they are visible in the
+// published room directory.
+// due to lots of switches
+// nolint:gocyclo
+func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI RoomserverInternalAPI) ([]gomatrixserverlib.PublicRoom, error) {
+	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
+	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
+	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
+	topicTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.topic", StateKey: ""}
+	guestTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.guest_access", StateKey: ""}
+	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""}
+	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}
+
+	var stateRes QueryBulkStateContentResponse
+	err := rsAPI.QueryBulkStateContent(ctx, &QueryBulkStateContentRequest{
+		RoomIDs:        roomIDs,
+		AllowWildcards: true,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{
+			nameTuple, canonicalTuple, topicTuple, guestTuple, visibilityTuple, joinRuleTuple, avatarTuple,
+			{EventType: gomatrixserverlib.MRoomMember, StateKey: "*"},
+		},
+	}, &stateRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("QueryBulkStateContent failed")
+		return nil, err
+	}
+	chunk := make([]gomatrixserverlib.PublicRoom, len(roomIDs))
+	i := 0
+	for roomID, data := range stateRes.Rooms {
+		pub := gomatrixserverlib.PublicRoom{
+			RoomID: roomID,
+		}
+		joinCount := 0
+		var joinRule, guestAccess string
+		for tuple, contentVal := range data {
+			if tuple.EventType == gomatrixserverlib.MRoomMember && contentVal == "join" {
+				joinCount++
+				continue
+			}
+			switch tuple {
+			case avatarTuple:
+				pub.AvatarURL = contentVal
+			case nameTuple:
+				pub.Name = contentVal
+			case topicTuple:
+				pub.Topic = contentVal
+			case canonicalTuple:
+				pub.CanonicalAlias = contentVal
+			case visibilityTuple:
+				pub.WorldReadable = contentVal == "world_readable"
+			// need both of these to determine whether guests can join
+			case joinRuleTuple:
+				joinRule = contentVal
+			case guestTuple:
+				guestAccess = contentVal
+			}
+		}
+		if joinRule == gomatrixserverlib.Public && guestAccess == "can_join" {
+			pub.GuestCanJoin = true
+		}
+		pub.JoinedMembersCount = joinCount
+		chunk[i] = pub
+		i++
+	}
+	return chunk, nil
 }

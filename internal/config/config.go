@@ -51,19 +51,18 @@ type Dendrite struct {
 	// been a breaking change to the config file format.
 	Version int `yaml:"version"`
 
-	Global             Global             `yaml:"global"`
-	AppServiceAPI      AppServiceAPI      `yaml:"app_service_api"`
-	ClientAPI          ClientAPI          `yaml:"client_api"`
-	CurrentStateServer CurrentStateServer `yaml:"current_state_server"`
-	EDUServer          EDUServer          `yaml:"edu_server"`
-	FederationAPI      FederationAPI      `yaml:"federation_api"`
-	FederationSender   FederationSender   `yaml:"federation_sender"`
-	KeyServer          KeyServer          `yaml:"key_server"`
-	MediaAPI           MediaAPI           `yaml:"media_api"`
-	RoomServer         RoomServer         `yaml:"room_server"`
-	ServerKeyAPI       ServerKeyAPI       `yaml:"server_key_api"`
-	SyncAPI            SyncAPI            `yaml:"sync_api"`
-	UserAPI            UserAPI            `yaml:"user_api"`
+	Global           Global           `yaml:"global"`
+	AppServiceAPI    AppServiceAPI    `yaml:"app_service_api"`
+	ClientAPI        ClientAPI        `yaml:"client_api"`
+	EDUServer        EDUServer        `yaml:"edu_server"`
+	FederationAPI    FederationAPI    `yaml:"federation_api"`
+	FederationSender FederationSender `yaml:"federation_sender"`
+	KeyServer        KeyServer        `yaml:"key_server"`
+	MediaAPI         MediaAPI         `yaml:"media_api"`
+	RoomServer       RoomServer       `yaml:"room_server"`
+	ServerKeyAPI     ServerKeyAPI     `yaml:"server_key_api"`
+	SyncAPI          SyncAPI          `yaml:"sync_api"`
+	UserAPI          UserAPI          `yaml:"user_api"`
 
 	// The config for tracing the dendrite servers.
 	Tracing struct {
@@ -289,7 +288,6 @@ func (c *Dendrite) Defaults() {
 
 	c.Global.Defaults()
 	c.ClientAPI.Defaults()
-	c.CurrentStateServer.Defaults()
 	c.EDUServer.Defaults()
 	c.FederationAPI.Defaults()
 	c.FederationSender.Defaults()
@@ -309,7 +307,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		Verify(configErrs *ConfigErrors, isMonolith bool)
 	}
 	for _, c := range []verifiable{
-		&c.Global, &c.ClientAPI, &c.CurrentStateServer,
+		&c.Global, &c.ClientAPI,
 		&c.EDUServer, &c.FederationAPI, &c.FederationSender,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
 		&c.ServerKeyAPI, &c.SyncAPI, &c.UserAPI,
@@ -321,7 +319,6 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 func (c *Dendrite) Wiring() {
 	c.ClientAPI.Matrix = &c.Global
-	c.CurrentStateServer.Matrix = &c.Global
 	c.EDUServer.Matrix = &c.Global
 	c.FederationAPI.Matrix = &c.Global
 	c.FederationSender.Matrix = &c.Global
@@ -510,15 +507,6 @@ func (config *Dendrite) UserAPIURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return string(config.UserAPI.InternalAPI.Connect)
-}
-
-// CurrentStateAPIURL returns an HTTP URL for where the currentstateserver is listening.
-func (config *Dendrite) CurrentStateAPIURL() string {
-	// Hard code the currentstateserver to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.CurrentStateServer.InternalAPI.Connect)
 }
 
 // EDUServerURL returns an HTTP URL for where the EDU server is listening.

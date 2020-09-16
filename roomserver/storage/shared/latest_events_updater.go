@@ -12,15 +12,15 @@ import (
 type LatestEventsUpdater struct {
 	transaction
 	d                       *Database
-	roomNID                 types.RoomNID
+	roomInfo                types.RoomInfo
 	latestEvents            []types.StateAtEventAndReference
 	lastEventIDSent         string
 	currentStateSnapshotNID types.StateSnapshotNID
 }
 
-func NewLatestEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomNID types.RoomNID) (*LatestEventsUpdater, error) {
+func NewLatestEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo types.RoomInfo) (*LatestEventsUpdater, error) {
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
-		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomNID)
+		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomInfo.RoomNID)
 	if err != nil {
 		txn.Rollback() // nolint: errcheck
 		return nil, err
@@ -39,14 +39,13 @@ func NewLatestEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomN
 		}
 	}
 	return &LatestEventsUpdater{
-		transaction{ctx, txn}, d, roomNID, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
+		transaction{ctx, txn}, d, roomInfo, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
 	}, nil
 }
 
 // RoomVersion implements types.RoomRecentEventsUpdater
 func (u *LatestEventsUpdater) RoomVersion() (version gomatrixserverlib.RoomVersion) {
-	version, _ = u.d.GetRoomVersionForRoomNID(u.ctx, u.roomNID)
-	return
+	return u.roomInfo.RoomVersion
 }
 
 // LatestEvents implements types.RoomRecentEventsUpdater
@@ -118,5 +117,5 @@ func (u *LatestEventsUpdater) MarkEventAsSent(eventNID types.EventNID) error {
 }
 
 func (u *LatestEventsUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (*MembershipUpdater, error) {
-	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomNID, targetUserNID, targetLocal)
+	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomInfo.RoomNID, targetUserNID, targetLocal)
 }

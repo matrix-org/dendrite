@@ -62,6 +62,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if err != nil {
 		return nil, err
 	}
+	peeks, err := NewPostgresPeeksTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	topology, err := NewPostgresTopologyTable(d.db)
 	if err != nil {
 		return nil, err
@@ -80,8 +84,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
-		Writer:              sqlutil.NewDummyWriter(),
+		Writer:              d.writer,
 		Invites:             invites,
+		Peeks:               peeks,
 		AccountData:         accountData,
 		OutputEvents:        events,
 		Topology:            topology,

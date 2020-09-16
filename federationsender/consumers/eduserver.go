@@ -50,11 +50,13 @@ func NewOutputEDUConsumer(
 ) *OutputEDUConsumer {
 	c := &OutputEDUConsumer{
 		typingConsumer: &internal.ContinualConsumer{
+			ComponentName:  "eduserver/typing",
 			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		sendToDeviceConsumer: &internal.ContinualConsumer{
+			ComponentName:  "eduserver/sendtodevice",
 			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,

@@ -10,10 +10,10 @@ cd `dirname $0`/../..
 docker build -t complement-dendrite -f build/scripts/Complement.Dockerfile .
 
 # Download Complement
-wget https://github.com/matrix-org/complement/archive/master.tar.gz
+wget -N https://github.com/matrix-org/complement/archive/master.tar.gz
 tar -xzf master.tar.gz
 
 # Run the tests!
 cd complement-master
-COMPLEMENT_BASE_IMAGE=complement-dendrite:latest go test -v ./tests
+COMPLEMENT_BASE_IMAGE=complement-dendrite:latest go test -v -count=1 ./tests
 

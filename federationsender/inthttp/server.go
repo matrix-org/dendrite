@@ -175,4 +175,92 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 			return util.JSONResponse{Code: http.StatusOK, JSON: request}
 		}),
 	)
+	internalAPIMux.Handle(
+		FederationSenderBackfillPath,
+		httputil.MakeInternalAPI("Backfill", func(req *http.Request) util.JSONResponse {
+			var request backfill
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.Backfill(req.Context(), request.S, request.RoomID, request.Limit, request.EventIDs)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
+		FederationSenderLookupStatePath,
+		httputil.MakeInternalAPI("LookupState", func(req *http.Request) util.JSONResponse {
+			var request lookupState
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.LookupState(req.Context(), request.S, request.RoomID, request.EventID, request.RoomVersion)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
+		FederationSenderLookupStateIDsPath,
+		httputil.MakeInternalAPI("LookupStateIDs", func(req *http.Request) util.JSONResponse {
+			var request lookupStateIDs
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.LookupStateIDs(req.Context(), request.S, request.RoomID, request.EventID)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
+		FederationSenderGetEventPath,
+		httputil.MakeInternalAPI("GetEvent", func(req *http.Request) util.JSONResponse {
+			var request getEvent
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.GetEvent(req.Context(), request.S, request.EventID)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
 }

@@ -44,6 +44,7 @@ func NewOutputClientDataConsumer(
 ) *OutputClientDataConsumer {
 
 	consumer := internal.ContinualConsumer{
+		ComponentName:  "syncapi/clientapi",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,

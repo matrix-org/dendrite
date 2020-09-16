@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -56,10 +55,10 @@ func Setup(
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
+	rateLimits := newRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
 
 	publicAPIMux.Handle("/versions",
@@ -92,6 +91,9 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/join/{roomIDOrAlias}",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -101,13 +103,27 @@ func Setup(
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/peek/{roomIDOrAlias}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return PeekRoomByIDOrAlias(
+				req, device, rsAPI, accountDB, vars["roomIDOrAlias"],
+			)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/joined_rooms",
 		httputil.MakeAuthAPI("joined_rooms", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return GetJoinedRooms(req, device, stateAPI)
+			return GetJoinedRooms(req, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/join",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -119,6 +135,9 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/leave",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -139,6 +158,9 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/invite",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -152,7 +174,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendKick(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI, stateAPI)
+			return SendKick(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/unban",
@@ -253,14 +275,23 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	r0mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
+		if r := rateLimits.rateLimit(req); r != nil {
+			return *r
+		}
 		return Register(req, userAPI, accountDB, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	v1mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
+		if r := rateLimits.rateLimit(req); r != nil {
+			return *r
+		}
 		return LegacyRegister(req, userAPI, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
+		if r := rateLimits.rateLimit(req); r != nil {
+			return *r
+		}
 		return RegisterAvailable(req, cfg, accountDB)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
@@ -309,12 +340,12 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetVisibility(req, stateAPI, rsAPI, device, vars["roomID"])
+			return SetVisibility(req, rsAPI, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/publicRooms",
 		httputil.MakeExternalAPI("public_rooms", func(req *http.Request) util.JSONResponse {
-			return GetPostPublicRooms(req, rsAPI, stateAPI, extRoomsProvider)
+			return GetPostPublicRooms(req, rsAPI, extRoomsProvider, federation, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
@@ -332,11 +363,14 @@ func Setup(
 
 	r0mux.Handle("/rooms/{roomID}/typing/{userID}",
 		httputil.MakeAuthAPI("rooms_typing", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduAPI, stateAPI)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], accountDB, eduAPI, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/redact/{eventID}",
@@ -345,7 +379,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, stateAPI)
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/redact/{eventID}/{txnId}",
@@ -354,7 +388,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, stateAPI)
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -385,14 +419,29 @@ func Setup(
 
 	r0mux.Handle("/account/whoami",
 		httputil.MakeAuthAPI("whoami", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			return Whoami(req, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/account/password",
+		httputil.MakeAuthAPI("password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			return Password(req, userAPI, accountDB, device, cfg)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			return Login(req, accountDB, userAPI, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
@@ -447,11 +496,14 @@ func Setup(
 
 	r0mux.Handle("/profile/{userID}/avatar_url",
 		httputil.MakeAuthAPI("profile_avatar_url", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetAvatarURL(req, accountDB, stateAPI, device, vars["userID"], cfg, rsAPI)
+			return SetAvatarURL(req, accountDB, device, vars["userID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -469,11 +521,14 @@ func Setup(
 
 	r0mux.Handle("/profile/{userID}/displayname",
 		httputil.MakeAuthAPI("profile_displayname", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SetDisplayName(req, accountDB, stateAPI, device, vars["userID"], cfg, rsAPI)
+			return SetDisplayName(req, accountDB, device, vars["userID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
@@ -506,6 +561,9 @@ func Setup(
 	// Riot logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",
 		httputil.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			// TODO: Set presence (probably the responsibility of a presence server not clientapi)
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -516,6 +574,9 @@ func Setup(
 
 	r0mux.Handle("/voip/turnServer",
 		httputil.MakeAuthAPI("turn_server", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			return RequestTurnServer(req, device, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -582,6 +643,9 @@ func Setup(
 
 	r0mux.Handle("/user_directory/search",
 		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			postContent := struct {
 				SearchString string `json:"search_term"`
 				Limit        int    `json:"limit"`
@@ -593,7 +657,7 @@ func Setup(
 				req.Context(),
 				device,
 				userAPI,
-				stateAPI,
+				rsAPI,
 				cfg.Matrix.ServerName,
 				postContent.SearchString,
 				postContent.Limit,
@@ -623,6 +687,9 @@ func Setup(
 
 	r0mux.Handle("/rooms/{roomID}/read_markers",
 		httputil.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			// TODO: return the read_markers.
 			return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
 		}),
@@ -721,6 +788,9 @@ func Setup(
 
 	r0mux.Handle("/capabilities",
 		httputil.MakeAuthAPI("capabilities", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			return GetCapabilities(req, rsAPI)
 		}),
 	).Methods(http.MethodGet)

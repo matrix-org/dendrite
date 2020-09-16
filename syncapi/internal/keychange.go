@@ -19,9 +19,9 @@ import (
 	"strings"
 
 	"github.com/Shopify/sarama"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -48,7 +48,7 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, 
 // be already filled in with join/leave information.
 // nolint:gocyclo
 func DeviceListCatchup(
-	ctx context.Context, keyAPI keyapi.KeyInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI,
+	ctx context.Context, keyAPI keyapi.KeyInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
 	userID string, res *types.Response, from, to types.StreamingToken,
 ) (hasNew bool, err error) {
 
@@ -56,7 +56,7 @@ func DeviceListCatchup(
 	newlyJoinedRooms := joinedRooms(res, userID)
 	newlyLeftRooms := leftRooms(res)
 	if len(newlyJoinedRooms) > 0 || len(newlyLeftRooms) > 0 {
-		changed, left, err := TrackChangedUsers(ctx, stateAPI, userID, newlyJoinedRooms, newlyLeftRooms)
+		changed, left, err := TrackChangedUsers(ctx, rsAPI, userID, newlyJoinedRooms, newlyLeftRooms)
 		if err != nil {
 			return false, err
 		}
@@ -97,7 +97,7 @@ func DeviceListCatchup(
 	}
 	// QueryKeyChanges gets ALL users who have changed keys, we want the ones who share rooms with the user.
 	var sharedUsersMap map[string]int
-	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, stateAPI, userID, queryRes.UserIDs)
+	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, rsAPI, userID, queryRes.UserIDs)
 	util.GetLogger(ctx).Debugf(
 		"QueryKeyChanges request p=%d,off=%d,to=%d response p=%d off=%d uids=%v",
 		partition, offset, toOffset, queryRes.Partition, queryRes.Offset, queryRes.UserIDs,
@@ -142,7 +142,7 @@ func DeviceListCatchup(
 // TrackChangedUsers calculates the values of device_lists.changed|left in the /sync response.
 // nolint:gocyclo
 func TrackChangedUsers(
-	ctx context.Context, stateAPI currentstateAPI.CurrentStateInternalAPI, userID string, newlyJoinedRooms, newlyLeftRooms []string,
+	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, userID string, newlyJoinedRooms, newlyLeftRooms []string,
 ) (changed, left []string, err error) {
 	// process leaves first, then joins afterwards so if we join/leave/join/leave we err on the side of including users.
 
@@ -151,16 +151,16 @@ func TrackChangedUsers(
 	// - Get users in newly left room. - QueryCurrentState
 	// - Loop set of users and decrement by 1 for each user in newly left room.
 	// - If count=0 then they share no more rooms so inform BOTH parties of this via 'left'=[...] in /sync.
-	var queryRes currentstateAPI.QuerySharedUsersResponse
-	err = stateAPI.QuerySharedUsers(ctx, &currentstateAPI.QuerySharedUsersRequest{
+	var queryRes roomserverAPI.QuerySharedUsersResponse
+	err = rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
 		UserID:         userID,
 		IncludeRoomIDs: newlyLeftRooms,
 	}, &queryRes)
 	if err != nil {
 		return nil, nil, err
 	}
-	var stateRes currentstateAPI.QueryBulkStateContentResponse
-	err = stateAPI.QueryBulkStateContent(ctx, &currentstateAPI.QueryBulkStateContentRequest{
+	var stateRes roomserverAPI.QueryBulkStateContentResponse
+	err = rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
 		RoomIDs: newlyLeftRooms,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			{
@@ -193,14 +193,14 @@ func TrackChangedUsers(
 	// - Loop set of users in newly joined room, do they appear in the set of users prior to joining?
 	// - If yes: then they already shared a room in common, do nothing.
 	// - If no: then they are a brand new user so inform BOTH parties of this via 'changed=[...]'
-	err = stateAPI.QuerySharedUsers(ctx, &currentstateAPI.QuerySharedUsersRequest{
+	err = rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
 		UserID:         userID,
 		ExcludeRoomIDs: newlyJoinedRooms,
 	}, &queryRes)
 	if err != nil {
 		return nil, left, err
 	}
-	err = stateAPI.QueryBulkStateContent(ctx, &currentstateAPI.QueryBulkStateContentRequest{
+	err = rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
 		RoomIDs: newlyJoinedRooms,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
 			{
@@ -228,11 +228,11 @@ func TrackChangedUsers(
 }
 
 func filterSharedUsers(
-	ctx context.Context, stateAPI currentstateAPI.CurrentStateInternalAPI, userID string, usersWithChangedKeys []string,
+	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, userID string, usersWithChangedKeys []string,
 ) (map[string]int, []string) {
 	var result []string
-	var sharedUsersRes currentstateAPI.QuerySharedUsersResponse
-	err := stateAPI.QuerySharedUsers(ctx, &currentstateAPI.QuerySharedUsersRequest{
+	var sharedUsersRes roomserverAPI.QuerySharedUsersResponse
+	err := rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
 		UserID: userID,
 	}, &sharedUsersRes)
 	if err != nil {

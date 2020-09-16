@@ -6,6 +6,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 )
 
 type EventJSONPair struct {
@@ -33,7 +34,10 @@ type EventStateKeys interface {
 }
 
 type Events interface {
-	InsertEvent(c context.Context, txn *sql.Tx, i types.RoomNID, j types.EventTypeNID, k types.EventStateKeyNID, eventID string, referenceSHA256 []byte, authEventNIDs []types.EventNID, depth int64) (types.EventNID, types.StateSnapshotNID, error)
+	InsertEvent(
+		ctx context.Context, txn *sql.Tx, i types.RoomNID, j types.EventTypeNID, k types.EventStateKeyNID, eventID string,
+		referenceSHA256 []byte, authEventNIDs []types.EventNID, depth int64, isRejected bool,
+	) (types.EventNID, types.StateSnapshotNID, error)
 	SelectEvent(ctx context.Context, txn *sql.Tx, eventID string) (types.EventNID, types.StateSnapshotNID, error)
 	// bulkSelectStateEventByID lookups a list of state events by event ID.
 	// If any of the requested events are missing from the database it returns a types.MissingEventError
@@ -63,8 +67,11 @@ type Rooms interface {
 	SelectLatestEventNIDs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) ([]types.EventNID, types.StateSnapshotNID, error)
 	SelectLatestEventsNIDsForUpdate(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) ([]types.EventNID, types.EventNID, types.StateSnapshotNID, error)
 	UpdateLatestEventNIDs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventNIDs []types.EventNID, lastEventSentNID types.EventNID, stateSnapshotNID types.StateSnapshotNID) error
-	SelectRoomVersionForRoomID(ctx context.Context, txn *sql.Tx, roomID string) (gomatrixserverlib.RoomVersion, error)
 	SelectRoomVersionForRoomNID(ctx context.Context, roomNID types.RoomNID) (gomatrixserverlib.RoomVersion, error)
+	SelectRoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
+	SelectRoomIDs(ctx context.Context) ([]string, error)
+	BulkSelectRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error)
+	BulkSelectRoomNIDs(ctx context.Context, roomIDs []string) ([]types.RoomNID, error)
 }
 
 type Transactions interface {
@@ -120,6 +127,11 @@ type Membership interface {
 	SelectMembershipsFromRoom(ctx context.Context, roomNID types.RoomNID, localOnly bool) (eventNIDs []types.EventNID, err error)
 	SelectMembershipsFromRoomAndMembership(ctx context.Context, roomNID types.RoomNID, membership MembershipState, localOnly bool) (eventNIDs []types.EventNID, err error)
 	UpdateMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership MembershipState, eventNID types.EventNID) error
+	SelectRoomsWithMembership(ctx context.Context, userID types.EventStateKeyNID, membershipState MembershipState) ([]types.RoomNID, error)
+	// SelectJoinedUsersSetForRooms returns the set of all users in the rooms who are joined to any of these rooms, along with the
+	// counts of how many rooms they are joined.
+	SelectJoinedUsersSetForRooms(ctx context.Context, roomNIDs []types.RoomNID) (map[types.EventStateKeyNID]int, error)
+	SelectKnownUsers(ctx context.Context, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error)
 }
 
 type Published interface {
@@ -146,4 +158,46 @@ type Redactions interface {
 	// Mark this redaction event as having been validated. This means we have both sides of the redaction and have
 	// successfully redacted the event JSON.
 	MarkRedactionValidated(ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool) error
+}
+
+// StrippedEvent represents a stripped event for returning extracted content values.
+type StrippedEvent struct {
+	RoomID       string
+	EventType    string
+	StateKey     string
+	ContentValue string
+}
+
+// ExtractContentValue from the given state event. For example, given an m.room.name event with:
+//    content: { name: "Foo" }
+// this returns "Foo".
+func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
+	content := ev.Content()
+	key := ""
+	switch ev.Type() {
+	case gomatrixserverlib.MRoomCreate:
+		key = "creator"
+	case gomatrixserverlib.MRoomCanonicalAlias:
+		key = "alias"
+	case gomatrixserverlib.MRoomHistoryVisibility:
+		key = "history_visibility"
+	case gomatrixserverlib.MRoomJoinRules:
+		key = "join_rule"
+	case gomatrixserverlib.MRoomMember:
+		key = "membership"
+	case gomatrixserverlib.MRoomName:
+		key = "name"
+	case "m.room.avatar":
+		key = "url"
+	case "m.room.topic":
+		key = "topic"
+	case "m.room.guest_access":
+		key = "guest_access"
+	}
+	result := gjson.GetBytes(content, key)
+	if !result.Exists() {
+		return ""
+	}
+	// this returns the empty string if this is not a string type
+	return result.Str
 }

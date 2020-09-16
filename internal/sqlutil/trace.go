@@ -22,7 +22,10 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/config"
@@ -31,6 +34,7 @@ import (
 )
 
 var tracingEnabled = os.Getenv("DENDRITE_TRACE_SQL") == "1"
+var goidToWriter sync.Map
 
 type traceInterceptor struct {
 	sqlmw.NullInterceptor
@@ -40,6 +44,8 @@ func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.St
 	startedAt := time.Now()
 	rows, err := stmt.QueryContext(ctx, args)
 
+	trackGoID(query)
+
 	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).Debug("executed sql query ", query, " args: ", args)
 
 	return rows, err
@@ -48,6 +54,8 @@ func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.St
 func (in *traceInterceptor) StmtExecContext(ctx context.Context, stmt driver.StmtExecContext, query string, args []driver.NamedValue) (driver.Result, error) {
 	startedAt := time.Now()
 	result, err := stmt.ExecContext(ctx, args)
+
+	trackGoID(query)
 
 	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).Debug("executed sql query ", query, " args: ", args)
 
@@ -66,13 +74,26 @@ func (in *traceInterceptor) RowsNext(c context.Context, rows driver.Rows, dest [
 
 	b := strings.Builder{}
 	for i, val := range dest {
-		b.WriteString(fmt.Sprintf("%v", val))
+		b.WriteString(fmt.Sprintf("%q", val))
 		if i+1 <= len(dest)-1 {
 			b.WriteString(" | ")
 		}
 	}
 	logrus.Debug(b.String())
 	return err
+}
+
+func trackGoID(query string) {
+	thisGoID := goid()
+	if _, ok := goidToWriter.Load(thisGoID); ok {
+		return // we're on a writer goroutine
+	}
+
+	q := strings.TrimSpace(query)
+	if strings.HasPrefix(q, "SELECT") {
+		return // SELECTs can go on other goroutines
+	}
+	logrus.Warnf("unsafe goid: SQL executed not on an ExclusiveWriter: %s", q)
 }
 
 // Open opens a database specified by its database driver name and a driver-specific data source name,
@@ -118,4 +139,15 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 
 func init() {
 	registerDrivers()
+}
+
+func goid() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, err := strconv.Atoi(idField)
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return id
 }

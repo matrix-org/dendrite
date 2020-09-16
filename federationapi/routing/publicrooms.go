@@ -7,7 +7,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	currentstateAPI "github.com/matrix-org/dendrite/currentstateserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -24,7 +23,7 @@ type filter struct {
 }
 
 // GetPostPublicRooms implements GET and POST /publicRooms
-func GetPostPublicRooms(req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI, stateAPI currentstateAPI.CurrentStateInternalAPI) util.JSONResponse {
+func GetPostPublicRooms(req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI) util.JSONResponse {
 	var request PublicRoomReq
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
 		return *fillErr
@@ -32,7 +31,7 @@ func GetPostPublicRooms(req *http.Request, rsAPI roomserverAPI.RoomserverInterna
 	if request.Limit == 0 {
 		request.Limit = 50
 	}
-	response, err := publicRooms(req.Context(), request, rsAPI, stateAPI)
+	response, err := publicRooms(req.Context(), request, rsAPI)
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
@@ -42,8 +41,9 @@ func GetPostPublicRooms(req *http.Request, rsAPI roomserverAPI.RoomserverInterna
 	}
 }
 
-func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI.RoomserverInternalAPI,
-	stateAPI currentstateAPI.CurrentStateInternalAPI) (*gomatrixserverlib.RespPublicRooms, error) {
+func publicRooms(
+	ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI.RoomserverInternalAPI,
+) (*gomatrixserverlib.RespPublicRooms, error) {
 
 	var response gomatrixserverlib.RespPublicRooms
 	var limit int16
@@ -80,7 +80,7 @@ func publicRooms(ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI
 		nextIndex = len(queryRes.RoomIDs)
 	}
 	roomIDs := queryRes.RoomIDs[offset:nextIndex]
-	response.Chunk, err = fillInRooms(ctx, roomIDs, stateAPI)
+	response.Chunk, err = fillInRooms(ctx, roomIDs, rsAPI)
 	return &response, err
 }
 
@@ -112,7 +112,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 
 // due to lots of switches
 // nolint:gocyclo
-func fillInRooms(ctx context.Context, roomIDs []string, stateAPI currentstateAPI.CurrentStateInternalAPI) ([]gomatrixserverlib.PublicRoom, error) {
+func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.RoomserverInternalAPI) ([]gomatrixserverlib.PublicRoom, error) {
 	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
 	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
 	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
@@ -121,8 +121,8 @@ func fillInRooms(ctx context.Context, roomIDs []string, stateAPI currentstateAPI
 	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""}
 	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}
 
-	var stateRes currentstateAPI.QueryBulkStateContentResponse
-	err := stateAPI.QueryBulkStateContent(ctx, &currentstateAPI.QueryBulkStateContentRequest{
+	var stateRes roomserverAPI.QueryBulkStateContentResponse
+	err := rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
 		RoomIDs:        roomIDs,
 		AllowWildcards: true,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{

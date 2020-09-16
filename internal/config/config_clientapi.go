@@ -34,6 +34,9 @@ type ClientAPI struct {
 
 	// TURN options
 	TURN TURN `yaml:"turn"`
+
+	// Rate-limiting options
+	RateLimiting RateLimiting `yaml:"rate_limiting"`
 }
 
 func (c *ClientAPI) Defaults() {
@@ -47,6 +50,7 @@ func (c *ClientAPI) Defaults() {
 	c.RecaptchaBypassSecret = ""
 	c.RecaptchaSiteVerifyAPI = ""
 	c.RegistrationDisabled = false
+	c.RateLimiting.Defaults()
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -61,6 +65,7 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", string(c.RecaptchaSiteVerifyAPI))
 	}
 	c.TURN.Verify(configErrs)
+	c.RateLimiting.Verify(configErrs)
 }
 
 type TURN struct {
@@ -89,4 +94,30 @@ func (c *TURN) Verify(configErrs *ConfigErrors) {
 			configErrs.Add(fmt.Sprintf("invalid duration for config key %q: %s", "client_api.turn.turn_user_lifetime", value))
 		}
 	}
+}
+
+type RateLimiting struct {
+	// Is rate limiting enabled or disabled?
+	Enabled bool `yaml:"enabled"`
+
+	// How many "slots" a user can occupy sending requests to a rate-limited
+	// endpoint before we apply rate-limiting
+	Threshold int64 `yaml:"threshold"`
+
+	// The cooloff period in milliseconds after a request before the "slot"
+	// is freed again
+	CooloffMS int64 `yaml:"cooloff_ms"`
+}
+
+func (r *RateLimiting) Verify(configErrs *ConfigErrors) {
+	if r.Enabled {
+		checkPositive(configErrs, "client_api.rate_limiting.threshold", r.Threshold)
+		checkPositive(configErrs, "client_api.rate_limiting.cooloff_ms", r.CooloffMS)
+	}
+}
+
+func (r *RateLimiting) Defaults() {
+	r.Enabled = true
+	r.Threshold = 5
+	r.CooloffMS = 500
 }

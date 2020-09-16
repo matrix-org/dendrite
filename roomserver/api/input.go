@@ -16,6 +16,8 @@
 package api
 
 import (
+	"fmt"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -33,6 +35,10 @@ const (
 	// KindBackfill event extend the contiguous graph going backwards.
 	// They always have state.
 	KindBackfill = 3
+	// KindRewrite events are used when rewriting the head of the room
+	// graph with entirely new state. The output events generated will
+	// be state events rather than timeline events.
+	KindRewrite = 4
 )
 
 // DoNotSendToOtherServers tells us not to send the event to other matrix
@@ -83,5 +89,18 @@ type InputRoomEventsRequest struct {
 
 // InputRoomEventsResponse is a response to InputRoomEvents
 type InputRoomEventsResponse struct {
-	EventID string `json:"event_id"`
+	ErrMsg     string // set if there was any error
+	NotAllowed bool   // true if an event in the input was not allowed.
+}
+
+func (r *InputRoomEventsResponse) Err() error {
+	if r.ErrMsg == "" {
+		return nil
+	}
+	if r.NotAllowed {
+		return &gomatrixserverlib.NotAllowed{
+			Message: r.ErrMsg,
+		}
+	}
+	return fmt.Errorf("InputRoomEventsResponse: %s", r.ErrMsg)
 }

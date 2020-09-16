@@ -138,7 +138,7 @@ func (d *Database) StoreJSON(
 	var err error
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		nid, err = d.FederationSenderQueueJSON.InsertQueueJSON(ctx, txn, js)
-		return nil
+		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)

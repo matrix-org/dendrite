@@ -52,7 +52,7 @@ func JoinRoomByIDOrAlias(
 		}
 	}
 
-	// If content was provided in the request then incude that
+	// If content was provided in the request then include that
 	// in the request. It'll get used as a part of the membership
 	// event content.
 	_ = httputil.UnmarshalJSONRequest(req, &joinReq.Content)

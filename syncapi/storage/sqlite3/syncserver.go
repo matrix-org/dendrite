@@ -75,6 +75,10 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err != nil {
 		return err
 	}
+	peeks, err := NewSqlitePeeksTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
 	topology, err := NewSqliteTopologyTable(d.db)
 	if err != nil {
 		return err
@@ -93,8 +97,9 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
-		Writer:              sqlutil.NewExclusiveWriter(),
+		Writer:              d.writer,
 		Invites:             invites,
+		Peeks:               peeks,
 		AccountData:         accountData,
 		OutputEvents:        events,
 		BackwardExtremities: bwExtrem,

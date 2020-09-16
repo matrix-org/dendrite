@@ -46,6 +46,9 @@ const (
 	// - Redact the event and set the corresponding `unsigned` fields to indicate it as redacted.
 	// - Replace the event in the database.
 	OutputTypeRedactedEvent OutputType = "redacted_event"
+
+	// OutputTypeNewPeek indicates that the kafka event is an OutputNewPeek
+	OutputTypeNewPeek OutputType = "new_peek"
 )
 
 // An OutputEvent is an entry in the roomserver output kafka log.
@@ -59,9 +62,22 @@ type OutputEvent struct {
 	NewInviteEvent *OutputNewInviteEvent `json:"new_invite_event,omitempty"`
 	// The content of event with type OutputTypeRetireInviteEvent
 	RetireInviteEvent *OutputRetireInviteEvent `json:"retire_invite_event,omitempty"`
-	// The content of event with type  OutputTypeRedactedEvent
+	// The content of event with type OutputTypeRedactedEvent
 	RedactedEvent *OutputRedactedEvent `json:"redacted_event,omitempty"`
+	// The content of event with type OutputTypeNewPeek
+	NewPeek *OutputNewPeek `json:"new_peek,omitempty"`
 }
+
+// Type of the OutputNewRoomEvent.
+type OutputRoomEventType int
+
+const (
+	// The event is a timeline event and likely just happened.
+	OutputRoomTimeline OutputRoomEventType = iota
+
+	// The event is a state event and quite possibly happened in the past.
+	OutputRoomState
+)
 
 // An OutputNewRoomEvent is written when the roomserver receives a new event.
 // It contains the full matrix room event and enough information for a
@@ -75,6 +91,9 @@ type OutputEvent struct {
 type OutputNewRoomEvent struct {
 	// The Event.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	// Does the event completely rewrite the room state? If so, then AddsStateEventIDs
+	// will contain the entire room state.
+	RewritesState bool `json:"rewrites_state"`
 	// The latest events in the room after this event.
 	// This can be used to set the prev events for new events in the room.
 	// This also can be used to get the full current state after this event.
@@ -194,4 +213,12 @@ type OutputRedactedEvent struct {
 	RedactedEventID string
 	// The value of `unsigned.redacted_because` - the redaction event itself
 	RedactedBecause gomatrixserverlib.HeaderedEvent
+}
+
+// An OutputNewPeek is written whenever a user starts peeking into a room
+// using a given device.
+type OutputNewPeek struct {
+	RoomID   string
+	UserID   string
+	DeviceID string
 }

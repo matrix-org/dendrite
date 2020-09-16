@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"github.com/Shopify/sarama"
-	stateapi "github.com/matrix-org/dendrite/currentstateserver/api"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -36,7 +36,7 @@ type KeyChangeConsumer struct {
 	db         storage.Database
 	queues     *queue.OutgoingQueues
 	serverName gomatrixserverlib.ServerName
-	stateAPI   stateapi.CurrentStateInternalAPI
+	rsAPI      roomserverAPI.RoomserverInternalAPI
 }
 
 // NewKeyChangeConsumer creates a new KeyChangeConsumer. Call Start() to begin consuming from key servers.
@@ -45,10 +45,11 @@ func NewKeyChangeConsumer(
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
-	stateAPI stateapi.CurrentStateInternalAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *KeyChangeConsumer {
 	c := &KeyChangeConsumer{
 		consumer: &internal.ContinualConsumer{
+			ComponentName:  "federationsender/keychange",
 			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
@@ -56,7 +57,7 @@ func NewKeyChangeConsumer(
 		queues:     queues,
 		db:         store,
 		serverName: cfg.Matrix.ServerName,
-		stateAPI:   stateAPI,
+		rsAPI:      rsAPI,
 	}
 	c.consumer.ProcessMessage = c.onMessage
 
@@ -91,8 +92,8 @@ func (t *KeyChangeConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	var queryRes stateapi.QueryRoomsForUserResponse
-	err = t.stateAPI.QueryRoomsForUser(context.Background(), &stateapi.QueryRoomsForUserRequest{
+	var queryRes roomserverAPI.QueryRoomsForUserResponse
+	err = t.rsAPI.QueryRoomsForUser(context.Background(), &roomserverAPI.QueryRoomsForUserRequest{
 		UserID:         m.UserID,
 		WantMembership: "join",
 	}, &queryRes)

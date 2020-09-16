@@ -65,13 +65,14 @@ CREATE TABLE IF NOT EXISTS roomserver_events (
     -- Needed for setting reference hashes when sending new events.
     reference_sha256 BYTEA NOT NULL,
     -- A list of numeric IDs for events that can authenticate this event.
-    auth_event_nids BIGINT[] NOT NULL
+	auth_event_nids BIGINT[] NOT NULL,
+	is_rejected BOOLEAN NOT NULL DEFAULT FALSE
 );
 `
 
 const insertEventSQL = "" +
-	"INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
+	"INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_event_id_unique" +
 	" DO NOTHING" +
 	" RETURNING event_nid, state_snapshot_nid"
@@ -88,7 +89,7 @@ const bulkSelectStateEventByIDSQL = "" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 const bulkSelectStateAtEventByIDSQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid FROM roomserver_events" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, is_rejected FROM roomserver_events" +
 	" WHERE event_id = ANY($1)"
 
 const updateEventStateSQL = "" +
@@ -174,12 +175,14 @@ func (s *eventStatements) InsertEvent(
 	referenceSHA256 []byte,
 	authEventNIDs []types.EventNID,
 	depth int64,
+	isRejected bool,
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	var eventNID int64
 	var stateNID int64
 	err := s.insertEventStmt.QueryRowContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
 		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth,
+		isRejected,
 	).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -255,6 +258,7 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 			&result.EventStateKeyNID,
 			&result.EventNID,
 			&result.BeforeStateSnapshotNID,
+			&result.IsRejected,
 		); err != nil {
 			return nil, err
 		}
