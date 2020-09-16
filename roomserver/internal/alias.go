@@ -271,5 +271,6 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	var inputRes api.InputRoomEventsResponse
 
 	// Send the request
-	return r.InputRoomEvents(ctx, &inputReq, &inputRes)
+	r.InputRoomEvents(ctx, &inputReq, &inputRes)
+	return inputRes.Err()
 }

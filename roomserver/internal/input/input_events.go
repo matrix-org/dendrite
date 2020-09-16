@@ -46,10 +46,11 @@ func (r *Inputer) processRoomEvent(
 
 	// Check that the event passes authentication checks and work out
 	// the numeric IDs for the auth events.
-	authEventNIDs, err := helpers.CheckAuthEvents(ctx, r.DB, headered, input.AuthEventIDs)
-	if err != nil {
-		logrus.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("processRoomEvent.checkAuthEvents failed for event")
-		return
+	isRejected := false
+	authEventNIDs, rejectionErr := helpers.CheckAuthEvents(ctx, r.DB, headered, input.AuthEventIDs)
+	if rejectionErr != nil {
+		logrus.WithError(rejectionErr).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("processRoomEvent.checkAuthEvents failed for event, rejecting event")
+		isRejected = true
 	}
 
 	// If we don't have a transaction ID then get one.
@@ -65,12 +66,13 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Store the event.
-	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs)
+	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs, isRejected)
 	if err != nil {
 		return "", fmt.Errorf("r.DB.StoreEvent: %w", err)
 	}
+
 	// if storing this event results in it being redacted then do so.
-	if redactedEventID == event.EventID() {
+	if !isRejected && redactedEventID == event.EventID() {
 		r, rerr := eventutil.RedactEvent(redactionEvent, &event)
 		if rerr != nil {
 			return "", fmt.Errorf("eventutil.RedactEvent: %w", rerr)
@@ -101,10 +103,20 @@ func (r *Inputer) processRoomEvent(
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		err = r.calculateAndSetState(ctx, input, *roomInfo, &stateAtEvent, event)
+		err = r.calculateAndSetState(ctx, input, *roomInfo, &stateAtEvent, event, isRejected)
 		if err != nil {
 			return "", fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
+	}
+
+	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
+	if isRejected {
+		logrus.WithFields(logrus.Fields{
+			"event_id": event.EventID(),
+			"type":     event.Type(),
+			"room":     event.RoomID(),
+		}).Debug("Stored rejected event")
+		return event.EventID(), rejectionErr
 	}
 
 	if input.Kind == api.KindRewrite {
@@ -157,11 +169,12 @@ func (r *Inputer) calculateAndSetState(
 	roomInfo types.RoomInfo,
 	stateAtEvent *types.StateAtEvent,
 	event gomatrixserverlib.Event,
+	isRejected bool,
 ) error {
 	var err error
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 
-	if input.HasState {
+	if input.HasState && !isRejected {
 		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
 		var joinEventNIDs []types.EventNID
@@ -188,7 +201,7 @@ func (r *Inputer) calculateAndSetState(
 		stateAtEvent.Overwrite = false
 
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event); err != nil {
+		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, isRejected); err != nil {
 			return fmt.Errorf("roomState.CalculateAndStoreStateBeforeEvent: %w", err)
 		}
 	}

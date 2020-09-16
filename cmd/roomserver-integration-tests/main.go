@@ -215,7 +215,8 @@ func writeToRoomServer(input []string, roomserverURL string) error {
 	if err != nil {
 		return err
 	}
-	return x.InputRoomEvents(context.Background(), &request, &response)
+	x.InputRoomEvents(context.Background(), &request, &response)
+	return response.Err()
 }
 
 // testRoomserver is used to run integration tests against a single roomserver.

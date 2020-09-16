@@ -247,7 +247,8 @@ func (r *Joiner) performJoinRoomByID(
 				},
 			}
 			inputRes := api.InputRoomEventsResponse{}
-			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+			r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
+			if err = inputRes.Err(); err != nil {
 				var notAllowed *gomatrixserverlib.NotAllowed
 				if errors.As(err, &notAllowed) {
 					return "", &api.PerformError{

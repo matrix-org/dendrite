@@ -187,7 +187,8 @@ func SendInputRoomEvents(
 ) error {
 	request := InputRoomEventsRequest{InputRoomEvents: ires}
 	var response InputRoomEventsResponse
-	return rsAPI.InputRoomEvents(ctx, &request, &response)
+	rsAPI.InputRoomEvents(ctx, &request, &response)
+	return response.Err()
 }
 
 // SendInvite event to the roomserver.

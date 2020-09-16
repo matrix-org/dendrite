@@ -159,7 +159,7 @@ func (v StateResolution) LoadCombinedStateAfterEvents(
 			}
 			fullState = append(fullState, entries...)
 		}
-		if prevState.IsStateEvent() {
+		if prevState.IsStateEvent() && !prevState.IsRejected {
 			// If the prev event was a state event then add an entry for the event itself
 			// so that we get the state after the event rather than the state before.
 			fullState = append(fullState, prevState.StateEntry)
@@ -523,6 +523,7 @@ func init() {
 func (v StateResolution) CalculateAndStoreStateBeforeEvent(
 	ctx context.Context,
 	event gomatrixserverlib.Event,
+	isRejected bool,
 ) (types.StateSnapshotNID, error) {
 	// Load the state at the prev events.
 	prevEventRefs := event.PrevEvents()
@@ -561,7 +562,7 @@ func (v StateResolution) CalculateAndStoreStateAfterEvents(
 
 	if len(prevStates) == 1 {
 		prevState := prevStates[0]
-		if prevState.EventStateKeyNID == 0 {
+		if prevState.EventStateKeyNID == 0 || prevState.IsRejected {
 			// 3) None of the previous events were state events and they all
 			// have the same state, so this event has exactly the same state
 			// as the previous events.

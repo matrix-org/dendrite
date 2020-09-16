@@ -16,6 +16,8 @@
 package api
 
 import (
+	"fmt"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -87,4 +89,18 @@ type InputRoomEventsRequest struct {
 
 // InputRoomEventsResponse is a response to InputRoomEvents
 type InputRoomEventsResponse struct {
+	ErrMsg     string // set if there was any error
+	NotAllowed bool   // true if an event in the input was not allowed.
+}
+
+func (r *InputRoomEventsResponse) Err() error {
+	if r.ErrMsg == "" {
+		return nil
+	}
+	if r.NotAllowed {
+		return &gomatrixserverlib.NotAllowed{
+			Message: r.ErrMsg,
+		}
+	}
+	return fmt.Errorf("InputRoomEventsResponse: %s", r.ErrMsg)
 }

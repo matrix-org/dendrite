@@ -110,7 +110,7 @@ func (r *Inputer) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) error {
+) {
 	// Create a wait group. Each task that we dispatch will call Done on
 	// this wait group so that we know when all of our events have been
 	// processed.
@@ -156,8 +156,10 @@ func (r *Inputer) InputRoomEvents(
 	// that back to the caller.
 	for _, task := range tasks {
 		if task.err != nil {
-			return task.err
+			response.ErrMsg = task.err.Error()
+			_, rejected := task.err.(*gomatrixserverlib.NotAllowed)
+			response.NotAllowed = rejected
+			return
 		}
 	}
-	return nil
 }
