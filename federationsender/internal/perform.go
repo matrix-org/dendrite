@@ -98,7 +98,10 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		response.LastError = &gomatrix.HTTPError{
 			Code:         0,
 			WrappedError: nil,
-			Message:      lastErr.Error(),
+			Message:      "Unknown HTTP error",
+		}
+		if lastErr != nil {
+			response.LastError.Message = lastErr.Error()
 		}
 	}
 
@@ -196,12 +199,11 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
 	headeredEvent := event.Headered(respMakeJoin.RoomVersion)
-	if err = roomserverAPI.SendEventWithState(
+	if err = roomserverAPI.SendEventWithRewrite(
 		ctx, r.rsAPI,
 		respState,
-		&headeredEvent,
+		headeredEvent,
 		nil,
-		respMakeJoin.RoomVersion,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}

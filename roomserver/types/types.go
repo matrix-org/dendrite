@@ -16,6 +16,8 @@
 package types
 
 import (
+	"sort"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -72,6 +74,25 @@ func (a StateEntry) LessThan(b StateEntry) bool {
 	return a.EventNID < b.EventNID
 }
 
+// Deduplicate takes a set of state entries and ensures that there are no
+// duplicate (event type, state key) tuples. If there are then we dedupe
+// them, making sure that the latest/highest NIDs are always chosen.
+func DeduplicateStateEntries(a []StateEntry) []StateEntry {
+	if len(a) < 2 {
+		return a
+	}
+	sort.SliceStable(a, func(i, j int) bool {
+		return a[i].LessThan(a[j])
+	})
+	for i := 0; i < len(a)-1; i++ {
+		if a[i].StateKeyTuple == a[i+1].StateKeyTuple {
+			a = append(a[:i], a[i+1:]...)
+			i--
+		}
+	}
+	return a
+}
+
 // StateAtEvent is the state before and after a matrix event.
 type StateAtEvent struct {
 	// Should this state overwrite the latest events and memberships of the room?
@@ -80,6 +101,9 @@ type StateAtEvent struct {
 	Overwrite bool
 	// The state before the event.
 	BeforeStateSnapshotNID StateSnapshotNID
+	// True if this StateEntry is rejected. State resolution should then treat this
+	// StateEntry as being a message event (not a state event).
+	IsRejected bool
 	// The state entry for the event itself, allows us to calculate the state after the event.
 	StateEntry
 }

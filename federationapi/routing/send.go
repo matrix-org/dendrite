@@ -372,12 +372,9 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 		return t.processEventWithMissingState(ctx, e, stateResp.RoomVersion, isInboundTxn)
 	}
 
-	// Check that the event is allowed by the state at the event.
-	if err := checkAllowedByState(e, gomatrixserverlib.UnwrapEventHeaders(stateResp.StateEvents)); err != nil {
-		return err
-	}
-
-	// pass the event to the roomserver
+	// pass the event to the roomserver which will do auth checks
+	// If the event fail auth checks, gmsl.NotAllowed error will be returned which we be silently
+	// discarded by the caller of this function
 	return api.SendEvents(
 		context.Background(),
 		t.rsAPI,
