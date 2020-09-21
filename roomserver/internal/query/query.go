@@ -473,11 +473,6 @@ func (r *Queryer) QueryRoomVersionForRoom(
 	request *api.QueryRoomVersionForRoomRequest,
 	response *api.QueryRoomVersionForRoomResponse,
 ) error {
-	if roomVersion, ok := r.Cache.GetRoomVersion(request.RoomID); ok {
-		response.RoomVersion = roomVersion
-		return nil
-	}
-
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
@@ -486,7 +481,6 @@ func (r *Queryer) QueryRoomVersionForRoom(
 		return fmt.Errorf("QueryRoomVersionForRoom: missing room info for room %s", request.RoomID)
 	}
 	response.RoomVersion = info.RoomVersion
-	r.Cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
 	return nil
 }
 

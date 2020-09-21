@@ -55,7 +55,7 @@ const (
 type httpRoomserverInternalAPI struct {
 	roomserverURL string
 	httpClient    *http.Client
-	cache         caching.RoomVersionCache
+	cache         caching.RoomInfoCache
 }
 
 // NewRoomserverClient creates a RoomserverInputAPI implemented by talking to a HTTP POST API.
@@ -63,7 +63,7 @@ type httpRoomserverInternalAPI struct {
 func NewRoomserverClient(
 	roomserverURL string,
 	httpClient *http.Client,
-	cache caching.RoomVersionCache,
+	cache caching.RoomInfoCache,
 ) (api.RoomserverInternalAPI, error) {
 	if httpClient == nil {
 		return nil, errors.New("NewRoomserverInternalAPIHTTP: httpClient is <nil>")
@@ -383,8 +383,8 @@ func (h *httpRoomserverInternalAPI) QueryRoomVersionForRoom(
 	request *api.QueryRoomVersionForRoomRequest,
 	response *api.QueryRoomVersionForRoomResponse,
 ) error {
-	if roomVersion, ok := h.cache.GetRoomVersion(request.RoomID); ok {
-		response.RoomVersion = roomVersion
+	if roomInfo, ok := h.cache.GetRoomInfo(request.RoomID); ok {
+		response.RoomVersion = roomInfo.RoomVersion
 		return nil
 	}
 
@@ -392,11 +392,7 @@ func (h *httpRoomserverInternalAPI) QueryRoomVersionForRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryRoomVersionForRoomPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err == nil {
-		h.cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
-	}
-	return err
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpRoomserverInternalAPI) QueryCurrentState(

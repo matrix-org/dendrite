@@ -9,10 +9,10 @@ import (
 )
 
 func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
-	roomVersions, err := NewInMemoryLRUCachePartition(
-		RoomVersionCacheName,
-		RoomVersionCacheMutable,
-		RoomVersionCacheMaxEntries,
+	roomInfos, err := NewInMemoryLRUCachePartition(
+		RoomInfoCacheName,
+		RoomInfoCacheMutable,
+		RoomInfoCacheMaxEntries,
 		enablePrometheus,
 	)
 	if err != nil {
@@ -45,31 +45,11 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
-	roomServerRoomNIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerRoomNIDsCacheName,
-		RoomServerRoomNIDsCacheMutable,
-		RoomServerRoomNIDsCacheMaxEntries,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerRoomIDsCacheName,
-		RoomServerRoomIDsCacheMutable,
-		RoomServerRoomIDsCacheMaxEntries,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
 	return &Caches{
-		RoomVersions:            roomVersions,
+		RoomServerRoomInfo:      roomInfos,
 		ServerKeys:              serverKeys,
 		RoomServerStateKeyNIDs:  roomServerStateKeyNIDs,
 		RoomServerEventTypeNIDs: roomServerEventTypeNIDs,
-		RoomServerRoomNIDs:      roomServerRoomNIDs,
-		RoomServerRoomIDs:       roomServerRoomIDs,
 	}, nil
 }
 

@@ -24,7 +24,7 @@ const (
 
 type RoomServerCaches interface {
 	RoomServerNIDsCache
-	RoomVersionCache
+	RoomInfoCache
 }
 
 // RoomServerNIDsCache contains the subset of functions needed for
@@ -35,12 +35,6 @@ type RoomServerNIDsCache interface {
 
 	GetRoomServerEventTypeNID(eventType string) (types.EventTypeNID, bool)
 	StoreRoomServerEventTypeNID(eventType string, nid types.EventTypeNID)
-
-	GetRoomServerRoomNID(roomID string) (types.RoomNID, bool)
-	StoreRoomServerRoomNID(roomID string, nid types.RoomNID)
-
-	GetRoomServerRoomID(roomNID types.RoomNID) (string, bool)
-	StoreRoomServerRoomID(roomNID types.RoomNID, roomID string)
 }
 
 func (c Caches) GetRoomServerStateKeyNID(stateKey string) (types.EventStateKeyNID, bool) {
@@ -69,33 +63,4 @@ func (c Caches) GetRoomServerEventTypeNID(eventType string) (types.EventTypeNID,
 
 func (c Caches) StoreRoomServerEventTypeNID(eventType string, nid types.EventTypeNID) {
 	c.RoomServerEventTypeNIDs.Set(eventType, nid)
-}
-
-func (c Caches) GetRoomServerRoomNID(roomID string) (types.RoomNID, bool) {
-	val, found := c.RoomServerRoomNIDs.Get(roomID)
-	if found && val != nil {
-		if roomNID, ok := val.(types.RoomNID); ok {
-			return roomNID, true
-		}
-	}
-	return 0, false
-}
-
-func (c Caches) StoreRoomServerRoomNID(roomID string, roomNID types.RoomNID) {
-	c.RoomServerRoomNIDs.Set(roomID, roomNID)
-	c.RoomServerRoomIDs.Set(string(roomNID), roomID)
-}
-
-func (c Caches) GetRoomServerRoomID(roomNID types.RoomNID) (string, bool) {
-	val, found := c.RoomServerRoomIDs.Get(string(roomNID))
-	if found && val != nil {
-		if roomID, ok := val.(string); ok {
-			return roomID, true
-		}
-	}
-	return "", false
-}
-
-func (c Caches) StoreRoomServerRoomID(roomNID types.RoomNID, roomID string) {
-	c.StoreRoomServerRoomNID(roomID, roomNID)
 }
