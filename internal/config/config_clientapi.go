@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"net/url"
+	"path"
 	"time"
 )
 
@@ -77,12 +79,21 @@ type CAS struct {
 	Enabled          bool   `yaml:"cas_enabled"`
 	Server           string `yaml:"cas_server"`
 	ValidateEndpoint string `yaml:"cas_validate_endpoint"`
+	URL              *url.URL
+	ValidateURL      *url.URL
 }
 
 func (cas *CAS) Verify(ConfigErrors *ConfigErrors) {
 	if cas.Enabled {
 		checkURL(ConfigErrors, "client_api.cas.cas_server", cas.Server)
 		checkNotEmpty(ConfigErrors, "client_api.cas.cas_validate_endpoint", cas.ValidateEndpoint)
+		var err error
+		cas.URL, err = url.Parse(cas.Server)
+		if err != nil {
+			ConfigErrors.Add(fmt.Sprintf("Couldn't parse %q (%q)to a URL", "client_api.cas.cas_server", cas.Server))
+		}
+		cas.ValidateURL.Path = path.Join(cas.URL.Path, cas.ValidateEndpoint)
+		checkURL(ConfigErrors, "client_api.cas.cas_validate_endpoint", cas.ValidateURL.String())
 	}
 }
 

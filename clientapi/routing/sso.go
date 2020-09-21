@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,17 +49,8 @@ func SSORedirect(
 	// If dendrite is not configured to use SSO by the admin return bad method
 	if !cfg.CAS.Enabled || cfg.CAS.Server == "" {
 		return util.JSONResponse{
-			Code: http.StatusMethodNotAllowed,
-			JSON: jsonerror.NotFound("Bad method"),
-		}
-	}
-
-	// Try to parse the SSO URL configured to a url.URL type
-	ssoURL, err := url.Parse(cfg.CAS.Server)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Failed to parse SSO URL configured: " + err.Error()),
+			Code: http.StatusNotImplemented,
+			JSON: jsonerror.NotFound("Method disabled"),
 		}
 	}
 
@@ -75,8 +66,8 @@ func SSORedirect(
 	redirectURL, err := url.Parse(redirectURLStr)
 	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Invalid redirectURL: " + err.Error()),
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue("Invalid redirectURL: " + err.Error()),
 		}
 	}
 
@@ -86,10 +77,10 @@ func SSORedirect(
 	}
 
 	// Adding the params to the sso url
+	ssoURL := cfg.CAS.URL
 	ssoQueries := make(url.Values)
 	// the service url that we send to CAS is homeserver.com/_matrix/client/r0/login/sso/redirect?redirectUrl=xyz
 	ssoQueries.Set("service", req.RequestURI)
-
 	ssoURL.RawQuery = ssoQueries.Encode()
 
 	return util.RedirectResponse(ssoURL.String())
@@ -106,23 +97,16 @@ func ssoTicket(
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	// form the ticket validation URL from the config
-	ssoURL, err := url.Parse(cfg.CAS.Server + cfg.CAS.ValidateEndpoint)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("Failed to parse SSO URL configured: " + err.Error()),
-		}
-	}
-
+	validateURL := cfg.CAS.ValidateURL
 	ticket := req.FormValue("ticket")
 
 	// append required params to the CAS validate endpoint
-	ssoQueries := make(url.Values)
-	ssoQueries.Set("ticket", ticket)
-	ssoURL.RawQuery = ssoQueries.Encode()
+	validateQueries := make(url.Values)
+	validateQueries.Set("ticket", ticket)
+	validateURL.RawQuery = validateQueries.Encode()
 
 	// validate the ticket
-	casUsername, err := validateTicket(ssoURL.String())
+	casUsername, err := validateTicket(validateURL.String())
 	if err != nil {
 		// TODO: should I be logging these? What else should I log?
 		util.GetLogger(req.Context()).WithError(err).Error("CAS SSO ticket validation failed")
@@ -182,10 +166,11 @@ func completeSSOAuth(
 	// if the user exists, then we pick that user, else we create a new user
 	account, err := accountDB.CreateAccount(req.Context(), username, "", "")
 	if err != nil {
-		// some error
 		if err != sqlutil.ErrUserExists {
+			// some error
+			util.GetLogger(req.Context()).WithError(err).Error("Could not create new user")
 			return util.JSONResponse{
-				Code: http.StatusUnauthorized,
+				Code: http.StatusInternalServerError,
 				JSON: jsonerror.Unknown("Could not create new user"),
 			}
 		} else {
@@ -193,7 +178,7 @@ func completeSSOAuth(
 			account, err = accountDB.GetAccountByLocalpart(req.Context(), username)
 			if err != nil {
 				return util.JSONResponse{
-					Code: http.StatusUnauthorized,
+					Code: http.StatusInternalServerError,
 					JSON: jsonerror.Unknown("Could not query user"),
 				}
 			}

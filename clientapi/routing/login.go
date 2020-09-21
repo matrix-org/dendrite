@@ -84,10 +84,9 @@ func Login(
 		// TODO: is the the right way to read the body and re-add it?
 		body, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			// TODO: is this appropriate?
 			return util.JSONResponse{
-				Code: http.StatusMethodNotAllowed,
-				JSON: jsonerror.NotFound("Bad method"),
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("Bad JSON"),
 			}
 		}
 		// add the body back to the request because ioutil.ReadAll consumes the body
@@ -97,12 +96,20 @@ func Login(
 		var jsonBody map[string]interface{}
 		if err := json.Unmarshal([]byte(body), &jsonBody); err != nil {
 			return util.JSONResponse{
-				Code: http.StatusMethodNotAllowed,
-				JSON: jsonerror.NotFound("Bad method"),
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("Bad JSON"),
 			}
 		}
 
-		loginType := jsonBody["type"].(string)
+		var loginType string
+		if val, ok := jsonBody["type"]; ok {
+			loginType = val.(string)
+		} else {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("No 'type' parameter"),
+			}
+		}
 		if loginType == "m.login.password" {
 			return doPasswordLogin(req, accountDB, userAPI, cfg)
 		} else if loginType == "m.login.token" {
@@ -164,7 +171,7 @@ func doTokenLogin(req *http.Request, accountDB accounts.Database, userAPI userap
 	// the login is successful, delete the login token before returning the access token to the client
 	if authResult.Code == http.StatusOK {
 		if err := auth.DeleteLoginToken(r.(*auth.LoginTokenRequest).Token); err != nil {
-			// TODO: what to do here?
+			util.GetLogger(req.Context()).WithError(err).Error("Could not delete login ticket from DB")
 		}
 	}
 	return authResult
