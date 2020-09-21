@@ -473,3 +473,5 @@ Local users can peek by room alias
 Peeked rooms only turn up in the sync for the device who peeked them
 Room state at a rejected message event is the same as its predecessor
 Room state at a rejected state event is the same as its predecessor
+Inbound federation correctly soft fails events
+Inbound federation accepts a second soft-failed event

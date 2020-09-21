@@ -18,6 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
@@ -25,10 +27,15 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
+// TODO: previous_reference_sha256 was NOT NULL before but it broke sytest because
+// sytest sends no SHA256 sums in the prev_events references in the soft-fail tests.
+// In Postgres an empty BYTEA field is not NULL so it's fine there. In SQLite it
+// seems to care that it's empty and therefore hits a NOT NULL constraint on insert.
+// We should really work out what the right thing to do here is.
 const previousEventSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_previous_events (
     previous_event_id TEXT NOT NULL,
-    previous_reference_sha256 BLOB NOT NULL,
+    previous_reference_sha256 BLOB,
     event_nids TEXT NOT NULL,
     UNIQUE (previous_event_id, previous_reference_sha256)
   );
@@ -45,6 +52,11 @@ const insertPreviousEventSQL = `
 	  VALUES ($1, $2, $3)
 `
 
+const selectPreviousEventNIDsSQL = `
+	SELECT event_nids FROM roomserver_previous_events
+	  WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
+`
+
 // Check if the event is referenced by another event in the table.
 // This should only be done while holding a "FOR UPDATE" lock on the row in the rooms table for this room.
 const selectPreviousEventExistsSQL = `
@@ -55,6 +67,7 @@ const selectPreviousEventExistsSQL = `
 type previousEventStatements struct {
 	db                            *sql.DB
 	insertPreviousEventStmt       *sql.Stmt
+	selectPreviousEventNIDsStmt   *sql.Stmt
 	selectPreviousEventExistsStmt *sql.Stmt
 }
 
@@ -69,6 +82,7 @@ func NewSqlitePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
 
 	return s, shared.StatementList{
 		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
+		{&s.selectPreviousEventNIDsStmt, selectPreviousEventNIDsSQL},
 		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},
 	}.Prepare(db)
 }
@@ -80,9 +94,28 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	previousEventReferenceSHA256 []byte,
 	eventNID types.EventNID,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
-	_, err := stmt.ExecContext(
-		ctx, previousEventID, previousEventReferenceSHA256, int64(eventNID),
+	var eventNIDs string
+	eventNIDAsString := fmt.Sprintf("%d", eventNID)
+	selectStmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
+	err := selectStmt.QueryRowContext(ctx, previousEventID, previousEventReferenceSHA256).Scan(&eventNIDs)
+	if err != sql.ErrNoRows {
+		return fmt.Errorf("selectStmt.QueryRowContext.Scan: %w", err)
+	}
+	var nids []string
+	if eventNIDs != "" {
+		nids = strings.Split(eventNIDs, ",")
+		for _, nid := range nids {
+			if nid == eventNIDAsString {
+				return nil
+			}
+		}
+		eventNIDs = strings.Join(append(nids, eventNIDAsString), ",")
+	} else {
+		eventNIDs = eventNIDAsString
+	}
+	insertStmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
+	_, err = insertStmt.ExecContext(
+		ctx, previousEventID, previousEventReferenceSHA256, eventNIDs,
 	)
 	return err
 }

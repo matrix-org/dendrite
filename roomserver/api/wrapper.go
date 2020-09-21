@@ -122,15 +122,7 @@ func SendEventWithRewrite(
 		// We will handle an event as if it's an outlier if one of the
 		// following conditions is true:
 		storeAsOutlier := false
-		if authOrStateEvent.Type() == event.Type() && *authOrStateEvent.StateKey() == *event.StateKey() {
-			// The event is a state event but the input event is going to
-			// replace it, therefore it can't be added to the state or we'll
-			// get duplicate state keys in the state block. We'll send it
-			// as an outlier because we don't know if something will be
-			// referring to it as an auth event, but need it to be stored
-			// just in case.
-			storeAsOutlier = true
-		} else if _, ok := isCurrentState[authOrStateEvent.EventID()]; !ok {
+		if _, ok := isCurrentState[authOrStateEvent.EventID()]; !ok {
 			// The event is an auth event and isn't a part of the state set.
 			// We'll send it as an outlier because we need it to be stored
 			// in case something is referring to it as an auth event.

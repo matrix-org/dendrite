@@ -53,6 +53,20 @@ func (r *Inputer) processRoomEvent(
 		isRejected = true
 	}
 
+	var softfail bool
+	if input.Kind == api.KindBackfill || input.Kind == api.KindNew {
+		// Check that the event passes authentication checks based on the
+		// current room state.
+		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"event_id": event.EventID(),
+				"type":     event.Type(),
+				"room":     event.RoomID(),
+			}).WithError(err).Info("Error authing soft-failed event")
+		}
+	}
+
 	// If we don't have a transaction ID then get one.
 	if input.TransactionID != nil {
 		tdID := input.TransactionID
@@ -88,6 +102,7 @@ func (r *Inputer) processRoomEvent(
 			"event_id": event.EventID(),
 			"type":     event.Type(),
 			"room":     event.RoomID(),
+			"sender":   event.Sender(),
 		}).Debug("Stored outlier")
 		return event.EventID(), nil
 	}
@@ -110,11 +125,13 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
-	if isRejected {
+	if isRejected || softfail {
 		logrus.WithFields(logrus.Fields{
-			"event_id": event.EventID(),
-			"type":     event.Type(),
-			"room":     event.RoomID(),
+			"event_id":  event.EventID(),
+			"type":      event.Type(),
+			"room":      event.RoomID(),
+			"soft_fail": softfail,
+			"sender":    event.Sender(),
 		}).Debug("Stored rejected event")
 		return event.EventID(), rejectionErr
 	}
