@@ -73,10 +73,6 @@ func failBlacklistableError(err error, stats *statistics.ServerStatistics) (unti
 	if mxerr.Code == 401 { // invalid signature in X-Matrix header
 		return stats.Failure()
 	}
-	if mxerr.Code == 404 {
-		// TODO: can any of the endpoints called in this file return genuine 404s?
-		return stats.Failure()
-	}
 	if mxerr.Code >= 500 && mxerr.Code < 600 { // internal server errors
 		return stats.Failure()
 	}
