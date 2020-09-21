@@ -27,10 +27,15 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
+// TODO: previous_reference_sha256 was NOT NULL before but it broke sytest because
+// sytest sends no SHA256 sums in the prev_events references in the soft-fail tests.
+// In Postgres an empty BYTEA field is not NULL so it's fine there. In SQLite it
+// seems to care that it's empty and therefore hits a NOT NULL constraint on insert.
+// We should really work out what the right thing to do here is.
 const previousEventSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_previous_events (
     previous_event_id TEXT NOT NULL,
-    previous_reference_sha256 BLOB NOT NULL,
+    previous_reference_sha256 BLOB,
     event_nids TEXT NOT NULL,
     UNIQUE (previous_event_id, previous_reference_sha256)
   );
@@ -90,17 +95,24 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	eventNID types.EventNID,
 ) error {
 	var eventNIDs string
+	eventNIDAsString := fmt.Sprintf("%d", eventNID)
 	selectStmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
 	err := selectStmt.QueryRowContext(ctx, previousEventID, previousEventReferenceSHA256).Scan(&eventNIDs)
 	if err != sql.ErrNoRows {
 		return fmt.Errorf("selectStmt.QueryRowContext.Scan: %w", err)
 	}
-	for _, nid := range strings.Split(eventNIDs, ",") {
-		if nid == fmt.Sprintf("%d", eventNID) {
-			return nil
+	var nids []string
+	if eventNIDs != "" {
+		nids = strings.Split(eventNIDs, ",")
+		for _, nid := range nids {
+			if nid == eventNIDAsString {
+				return nil
+			}
 		}
+		eventNIDs = strings.Join(append(nids, eventNIDAsString), ",")
+	} else {
+		eventNIDs = eventNIDAsString
 	}
-	eventNIDs = fmt.Sprintf("%s,%d", eventNIDs, eventNID)
 	insertStmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
 	_, err = insertStmt.ExecContext(
 		ctx, previousEventID, previousEventReferenceSHA256, eventNIDs,
