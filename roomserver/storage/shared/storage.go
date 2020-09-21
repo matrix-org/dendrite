@@ -320,9 +320,14 @@ func (d *Database) Events(
 		if err != nil {
 			return nil, err
 		}
-		roomVersion, err = d.RoomsTable.SelectRoomVersionForRoomNID(ctx, roomNID)
-		if err != nil {
-			return nil, err
+		if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
+			roomVersion, _ = d.Cache.GetRoomVersion(roomID)
+		}
+		if roomVersion == "" {
+			roomVersion, err = d.RoomsTable.SelectRoomVersionForRoomNID(ctx, roomNID)
+			if err != nil {
+				return nil, err
+			}
 		}
 		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSON(
 			eventJSON.EventJSON, false, roomVersion,
