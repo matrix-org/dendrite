@@ -43,6 +43,8 @@ const insertPreviousEventSQL = `
 	INSERT OR REPLACE INTO roomserver_previous_events
 	  (previous_event_id, previous_reference_sha256, event_nids)
 	  VALUES ($1, $2, $3)
+	  ON CONFLICT DO UPDATE
+	  SET event_nids = event_nids || ',' || $3
 `
 
 // Check if the event is referenced by another event in the table.
