@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/api"
@@ -23,6 +24,7 @@ type FederationSenderInternalAPI struct {
 	federation *gomatrixserverlib.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
 	queues     *queue.OutgoingQueues
+	joins      sync.Map // joins currently in progress
 }
 
 func NewFederationSenderInternalAPI(
