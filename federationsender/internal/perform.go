@@ -186,8 +186,15 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	}
 	r.statistics.ForServer(serverName).Success()
 
+	// Process the join response in a goroutine. The idea here is
+	// that we'll try and wait for as long as possible for the work
+	// to complete, but if the client does give up waiting, we'll
+	// still continue to process the join anyway so that we don't
+	// waste the effort.
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(context.Background())
 	go func() {
-		ctx = context.Background()
+		defer cancel()
 
 		// Check that the send_join response was valid.
 		joinCtx := perform.JoinContext(r.federation, r.keyRing)
@@ -219,6 +226,7 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		}
 	}()
 
+	<-ctx.Done()
 	return nil
 }
 
