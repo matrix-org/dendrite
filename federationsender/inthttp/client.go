@@ -30,6 +30,7 @@ const (
 	FederationSenderLookupStatePath      = "/federationsender/client/lookupState"
 	FederationSenderLookupStateIDsPath   = "/federationsender/client/lookupStateIDs"
 	FederationSenderGetEventPath         = "/federationsender/client/getEvent"
+	FederationSenderGetServerKeysPath    = "/federationsender/client/getServerKeys"
 	FederationSenderLookupServerKeysPath = "/federationsender/client/lookupServerKeys"
 )
 
@@ -358,6 +359,33 @@ func (h *httpFederationSenderInternalAPI) GetEvent(
 		return gomatrixserverlib.Transaction{}, response.Err
 	}
 	return *response.Res, nil
+}
+
+type getServerKeys struct {
+	S          gomatrixserverlib.ServerName
+	ServerKeys gomatrixserverlib.ServerKeys
+	Err        *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) GetServerKeys(
+	ctx context.Context, s gomatrixserverlib.ServerName,
+) (gomatrixserverlib.ServerKeys, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetServerKeys")
+	defer span.Finish()
+
+	request := getServerKeys{
+		S: s,
+	}
+	var response getServerKeys
+	apiURL := h.federationSenderURL + FederationSenderGetServerKeysPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return gomatrixserverlib.ServerKeys{}, err
+	}
+	if response.Err != nil {
+		return gomatrixserverlib.ServerKeys{}, response.Err
+	}
+	return response.ServerKeys, nil
 }
 
 type lookupServerKeys struct {

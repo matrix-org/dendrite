@@ -164,10 +164,16 @@ func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserver
 	return &keys, nil
 }
 
-func NotaryKeys(httpReq *http.Request, cfg *config.FederationAPI, fsAPI federationSenderAPI.FederationSenderInternalAPI) util.JSONResponse {
-	var req gomatrixserverlib.PublicKeyNotaryLookupRequest
-	if reqErr := httputil.UnmarshalJSONRequest(httpReq, &req); reqErr != nil {
-		return *reqErr
+func NotaryKeys(
+	httpReq *http.Request, cfg *config.FederationAPI,
+	fsAPI federationSenderAPI.FederationSenderInternalAPI,
+	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
+) util.JSONResponse {
+	if req == nil {
+		req = &gomatrixserverlib.PublicKeyNotaryLookupRequest{}
+		if reqErr := httputil.UnmarshalJSONRequest(httpReq, &req); reqErr != nil {
+			return *reqErr
+		}
 	}
 
 	var response struct {
@@ -175,64 +181,41 @@ func NotaryKeys(httpReq *http.Request, cfg *config.FederationAPI, fsAPI federati
 	}
 	response.ServerKeys = []json.RawMessage{}
 
-	for serverName, server := range req.ServerKeys {
+	for serverName := range req.ServerKeys {
+		var keys *gomatrixserverlib.ServerKeys
 		if serverName == cfg.Matrix.ServerName {
-			keys, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod))
-			if err != nil {
+			if k, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod)); err == nil {
+				keys = k
+			} else {
 				return util.ErrorResponse(err)
 			}
-
-			j, err := json.Marshal(keys)
-			if err != nil {
-				logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
-				return jsonerror.InternalServerError()
-			}
-
-			js, err := gomatrixserverlib.SignJSON(
-				string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, j,
-			)
-			if err != nil {
-				logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
-				return jsonerror.InternalServerError()
-			}
-
-			response.ServerKeys = append(response.ServerKeys, js)
 		} else {
-			requests := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{}
-			for keyID, criteria := range server {
-				requests[gomatrixserverlib.PublicKeyLookupRequest{
-					ServerName: serverName,
-					KeyID:      keyID,
-				}] = criteria.MinimumValidUntilTS
-			}
-			results, err := fsAPI.LookupServerKeys(httpReq.Context(), serverName, requests)
-			if err != nil {
-				logrus.WithError(err).Errorf("Failed to request %q keys as notary", serverName)
-				return jsonerror.InternalServerError()
-			}
-
-			for _, result := range results {
-				j, err := json.Marshal(result)
-				if err != nil {
-					logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
-					return jsonerror.InternalServerError()
-				}
-
-				js, err := gomatrixserverlib.SignJSON(
-					string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, j,
-				)
-				if err != nil {
-					logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
-					return jsonerror.InternalServerError()
-				}
-
-				response.ServerKeys = append(response.ServerKeys, js)
+			if k, err := fsAPI.GetServerKeys(httpReq.Context(), serverName); err == nil {
+				keys = &k
+			} else {
+				return util.ErrorResponse(err)
 			}
 		}
-	}
+		if keys == nil {
+			continue
+		}
 
-	j, _ := json.MarshalIndent(response, "", "  ")
-	logrus.Info("HERE WE ARE: %s", string(j))
+		j, err := json.Marshal(keys)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
+			return jsonerror.InternalServerError()
+		}
+
+		js, err := gomatrixserverlib.SignJSON(
+			string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, j,
+		)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
+			return jsonerror.InternalServerError()
+		}
+
+		response.ServerKeys = append(response.ServerKeys, js)
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,

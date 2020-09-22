@@ -264,6 +264,28 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		}),
 	)
 	internalAPIMux.Handle(
+		FederationSenderGetServerKeysPath,
+		httputil.MakeInternalAPI("GetServerKeys", func(req *http.Request) util.JSONResponse {
+			var request getServerKeys
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.GetServerKeys(req.Context(), request.S)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.ServerKeys = res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
 		FederationSenderLookupServerKeysPath,
 		httputil.MakeInternalAPI("LookupServerKeys", func(req *http.Request) util.JSONResponse {
 			var request lookupServerKeys
