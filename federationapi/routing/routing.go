@@ -61,6 +61,10 @@ func Setup(
 		return LocalKeys(cfg)
 	})
 
+	notaryKeys := httputil.MakeExternalAPI("notarykeys", func(req *http.Request) util.JSONResponse {
+		return NotaryKeys(req, cfg, fsAPI)
+	})
+
 	// Ignore the {keyID} argument as we only have a single server key so we always
 	// return that key.
 	// Even if we had more than one server key, we would probably still ignore the
@@ -68,6 +72,7 @@ func Setup(
 	v2keysmux.Handle("/server/{keyID}", localKeys).Methods(http.MethodGet)
 	v2keysmux.Handle("/server/", localKeys).Methods(http.MethodGet)
 	v2keysmux.Handle("/server", localKeys).Methods(http.MethodGet)
+	v2keysmux.Handle("/query", notaryKeys).Methods(http.MethodPost)
 
 	v1fedmux.Handle("/send/{txnID}", httputil.MakeFedAPI(
 		"federation_send", cfg.Matrix.ServerName, keys, wakeup,
