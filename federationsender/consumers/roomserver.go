@@ -118,7 +118,15 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // processInboundPeek starts tracking a new federated inbound peek (replacing the existing one if any)
 // causing the federationsender to start sending messages to the peeking server
 func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPeek) error {
-	// FIXME: do something with orp.LatestEventID to prevent races
+
+	// FIXME: there's a race here - we should start /sending new peeked events
+	// atomically after the orp.LatestEventID to ensure there are no gaps between
+	// the peek beginning and the send stream beginning.
+	//
+	// We probably need to track orp.LatestEventID on the inbound peek, but it's
+	// unclear how we then use that to prevent the race when we start the send
+	// stream.
+
 	return s.db.AddInboundPeek(context.TODO(), orp.ServerName, orp.RoomID, orp.PeekID, orp.RenewalInterval)
 }
 

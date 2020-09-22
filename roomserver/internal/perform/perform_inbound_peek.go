@@ -106,10 +106,6 @@ func (r *InboundPeeker) PerformInboundPeek(
 		response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
 	}
 
-	// FIXME: there's a race here - we really should be atomically telling the
-	// federationsender to start sending peek events alongside having captured
-	// the current state, but it's unclear if/how we can do that.
-
 	err = r.Inputer.WriteOutputEvents(request.RoomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewInboundPeek,
