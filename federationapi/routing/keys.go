@@ -19,11 +19,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -159,4 +162,63 @@ func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserver
 	}
 
 	return &keys, nil
+}
+
+func NotaryKeys(
+	httpReq *http.Request, cfg *config.FederationAPI,
+	fsAPI federationSenderAPI.FederationSenderInternalAPI,
+	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
+) util.JSONResponse {
+	if req == nil {
+		req = &gomatrixserverlib.PublicKeyNotaryLookupRequest{}
+		if reqErr := httputil.UnmarshalJSONRequest(httpReq, &req); reqErr != nil {
+			return *reqErr
+		}
+	}
+
+	var response struct {
+		ServerKeys []json.RawMessage `json:"server_keys"`
+	}
+	response.ServerKeys = []json.RawMessage{}
+
+	for serverName := range req.ServerKeys {
+		var keys *gomatrixserverlib.ServerKeys
+		if serverName == cfg.Matrix.ServerName {
+			if k, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod)); err == nil {
+				keys = k
+			} else {
+				return util.ErrorResponse(err)
+			}
+		} else {
+			if k, err := fsAPI.GetServerKeys(httpReq.Context(), serverName); err == nil {
+				keys = &k
+			} else {
+				return util.ErrorResponse(err)
+			}
+		}
+		if keys == nil {
+			continue
+		}
+
+		j, err := json.Marshal(keys)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
+			return jsonerror.InternalServerError()
+		}
+
+		js, err := gomatrixserverlib.SignJSON(
+			string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, j,
+		)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
+			return jsonerror.InternalServerError()
+		}
+
+		response.ServerKeys = append(response.ServerKeys, js)
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: response,
+	}
 }

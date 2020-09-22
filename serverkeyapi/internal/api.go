@@ -20,7 +20,7 @@ type ServerKeyAPI struct {
 	ServerKeyValidity time.Duration
 
 	OurKeyRing gomatrixserverlib.KeyRing
-	FedClient  *gomatrixserverlib.FederationClient
+	FedClient  gomatrixserverlib.KeyClient
 }
 
 func (s *ServerKeyAPI) KeyRing() *gomatrixserverlib.KeyRing {

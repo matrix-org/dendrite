@@ -61,6 +61,26 @@ func Setup(
 		return LocalKeys(cfg)
 	})
 
+	notaryKeys := httputil.MakeExternalAPI("notarykeys", func(req *http.Request) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		var pkReq *gomatrixserverlib.PublicKeyNotaryLookupRequest
+		serverName := gomatrixserverlib.ServerName(vars["serverName"])
+		keyID := gomatrixserverlib.KeyID(vars["keyID"])
+		if serverName != "" && keyID != "" {
+			pkReq = &gomatrixserverlib.PublicKeyNotaryLookupRequest{
+				ServerKeys: map[gomatrixserverlib.ServerName]map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyNotaryQueryCriteria{
+					serverName: {
+						keyID: gomatrixserverlib.PublicKeyNotaryQueryCriteria{},
+					},
+				},
+			}
+		}
+		return NotaryKeys(req, cfg, fsAPI, pkReq)
+	})
+
 	// Ignore the {keyID} argument as we only have a single server key so we always
 	// return that key.
 	// Even if we had more than one server key, we would probably still ignore the
@@ -68,6 +88,8 @@ func Setup(
 	v2keysmux.Handle("/server/{keyID}", localKeys).Methods(http.MethodGet)
 	v2keysmux.Handle("/server/", localKeys).Methods(http.MethodGet)
 	v2keysmux.Handle("/server", localKeys).Methods(http.MethodGet)
+	v2keysmux.Handle("/query", notaryKeys).Methods(http.MethodPost)
+	v2keysmux.Handle("/query/{serverName}/{keyID}", notaryKeys).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/send/{txnID}", httputil.MakeFedAPI(
 		"federation_send", cfg.Matrix.ServerName, keys, wakeup,

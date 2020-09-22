@@ -26,7 +26,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.ServerKeyInternalAPI, cach
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	cfg *config.ServerKeyAPI,
-	fedClient *gomatrixserverlib.FederationClient,
+	fedClient gomatrixserverlib.KeyClient,
 	caches *caching.Caches,
 ) api.ServerKeyInternalAPI {
 	innerDB, err := storage.NewDatabase(
@@ -53,7 +53,7 @@ func NewInternalAPI(
 		OurKeyRing: gomatrixserverlib.KeyRing{
 			KeyFetchers: []gomatrixserverlib.KeyFetcher{
 				&gomatrixserverlib.DirectKeyFetcher{
-					Client: fedClient.Client,
+					Client: fedClient,
 				},
 			},
 			KeyDatabase: serverKeyDB,
@@ -65,7 +65,7 @@ func NewInternalAPI(
 		perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
 			PerspectiveServerName: ps.ServerName,
 			PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},
-			Client:                fedClient.Client,
+			Client:                fedClient,
 		}
 
 		for _, key := range ps.Keys {
