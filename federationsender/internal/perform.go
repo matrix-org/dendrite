@@ -186,26 +186,38 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	}
 	r.statistics.ForServer(serverName).Success()
 
-	// Check that the send_join response was valid.
-	joinCtx := perform.JoinContext(r.federation, r.keyRing)
-	respState, err := joinCtx.CheckSendJoinResponse(
-		ctx, event, serverName, respMakeJoin, respSendJoin,
-	)
-	if err != nil {
-		return fmt.Errorf("joinCtx.CheckSendJoinResponse: %w", err)
-	}
+	go func() {
+		ctx = context.Background()
 
-	// If we successfully performed a send_join above then the other
-	// server now thinks we're a part of the room. Send the newly
-	// returned state to the roomserver to update our local view.
-	if err = roomserverAPI.SendEventWithRewrite(
-		ctx, r.rsAPI,
-		respState,
-		event.Headered(respMakeJoin.RoomVersion),
-		nil,
-	); err != nil {
-		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
-	}
+		// Check that the send_join response was valid.
+		joinCtx := perform.JoinContext(r.federation, r.keyRing)
+		respState, err := joinCtx.CheckSendJoinResponse(
+			ctx, event, serverName, respMakeJoin, respSendJoin,
+		)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"room_id": roomID,
+				"user_id": userID,
+			}).WithError(err).Error("Failed to process room join response")
+			return
+		}
+
+		// If we successfully performed a send_join above then the other
+		// server now thinks we're a part of the room. Send the newly
+		// returned state to the roomserver to update our local view.
+		if err = roomserverAPI.SendEventWithRewrite(
+			ctx, r.rsAPI,
+			respState,
+			event.Headered(respMakeJoin.RoomVersion),
+			nil,
+		); err != nil {
+			logrus.WithFields(logrus.Fields{
+				"room_id": roomID,
+				"user_id": userID,
+			}).WithError(err).Error("Failed to send room join response to roomserver")
+			return
+		}
+	}()
 
 	return nil
 }
