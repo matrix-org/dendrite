@@ -58,15 +58,22 @@ func (r *InboundPeeker) PerformInboundPeek(
 
     var stateEvents []gomatrixserverlib.Event
 
-    // XXX: is this right?
-    roomState := state.NewStateResolution(r.DB, *info)
-
     var currentStateSnapshotNID types.StateSnapshotNID
-    _, currentStateSnapshotNID, _, err =
+    latestEventRefs, currentStateSnapshotNID, _, err :=
             r.DB.LatestEventIDs(ctx, info.RoomNID)
     if err != nil {
             return err
     }
+    // XXX: is this actually the latest of the latest events?
+    latestEvents, err := r.DB.EventsFromIDs(ctx, []string{ latestEventRefs[0].EventID })
+    if err != nil {
+            return err
+    }
+    response.LatestEvent = latestEvents[0].Headered(info.RoomVersion)
+
+    // XXX: do we actually need to do a state resolution here?
+    roomState := state.NewStateResolution(r.DB, *info)
+
     var stateEntries []types.StateEntry
     stateEntries, err = roomState.LoadStateAtSnapshot(
             ctx, currentStateSnapshotNID,
@@ -109,6 +116,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 			NewInboundPeek: &api.OutputNewInboundPeek{
 				RoomID:   request.RoomID,
 				PeekID:   request.PeekID,
+				LatestEventID: latestEvents[0].EventID(),
 				ServerName: request.ServerName,
                 RenewalInterval: request.RenewalInterval,
 			},

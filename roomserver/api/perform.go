@@ -178,4 +178,6 @@ type PerformInboundPeekResponse struct {
 	// The lists will be in an arbitrary order.
 	StateEvents     []gomatrixserverlib.HeaderedEvent `json:"state_events"`
 	AuthChainEvents []gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	// The event at which this state was captured
+	LatestEvent gomatrixserverlib.HeaderedEvent `json:"latest_event"`
 }

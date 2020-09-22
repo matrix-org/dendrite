@@ -87,14 +87,17 @@ func Peek(
 		return util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
+	respPeek := gomatrixserverlib.RespPeek{
+		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
+		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
+		RoomVersion: response.RoomVersion,
+		LatestEvent: response.LatestEvent.Unwrap(),
+		RenewalInterval: renewalInterval,
+	}
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespPeek{
-			StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
-			AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
-			RoomVersion: response.RoomVersion,
-			RenewalInterval: renewalInterval,
-		},
+		JSON: respPeek,
 	}
 }
 

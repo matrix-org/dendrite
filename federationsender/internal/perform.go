@@ -357,7 +357,7 @@ func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI,
 		&respState,
-		nil, nil,
+		respPeek.LatestEvent.Headered(respPeek.RoomVersion), nil,
 		respPeek.RoomVersion,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
