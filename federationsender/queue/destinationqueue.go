@@ -239,7 +239,7 @@ func (oq *destinationQueue) backgroundSend() {
 			log.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
 			return
 		}
-		if until != nil {
+		if until != nil && until.After(time.Now()) {
 			// We haven't backed off yet, so wait for the suggested amount of
 			// time.
 			duration := time.Until(*until)
