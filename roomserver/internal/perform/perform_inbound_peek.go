@@ -18,18 +18,18 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
-    "github.com/matrix-org/dendrite/roomserver/internal/helpers"
-    "github.com/matrix-org/dendrite/roomserver/internal/query"
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
-    "github.com/matrix-org/dendrite/roomserver/state"
-    "github.com/matrix-org/dendrite/roomserver/storage"
-    "github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/roomserver/internal/query"
+	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 type InboundPeeker struct {
-	DB         storage.Database
+	DB      storage.Database
 	Inputer *input.Inputer
 }
 
@@ -42,86 +42,85 @@ type InboundPeeker struct {
 // fed sender can start sending peeked events without a race between the state
 // snapshot and the stream of peeked events.
 func (r *InboundPeeker) PerformInboundPeek(
-    ctx context.Context,
-    request *api.PerformInboundPeekRequest,
-    response *api.PerformInboundPeekResponse,
+	ctx context.Context,
+	request *api.PerformInboundPeekRequest,
+	response *api.PerformInboundPeekResponse,
 ) error {
-    info, err := r.DB.RoomInfo(ctx, request.RoomID)
-    if err != nil {
-        return err
-    }
-    if info == nil || info.IsStub {
-        return nil
-    }
-    response.RoomExists = true
-    response.RoomVersion = info.RoomVersion
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	if info == nil || info.IsStub {
+		return nil
+	}
+	response.RoomExists = true
+	response.RoomVersion = info.RoomVersion
 
-    var stateEvents []gomatrixserverlib.Event
+	var stateEvents []gomatrixserverlib.Event
 
-    var currentStateSnapshotNID types.StateSnapshotNID
-    latestEventRefs, currentStateSnapshotNID, _, err :=
-            r.DB.LatestEventIDs(ctx, info.RoomNID)
-    if err != nil {
-            return err
-    }
-    // XXX: is this actually the latest of the latest events?
-    latestEvents, err := r.DB.EventsFromIDs(ctx, []string{ latestEventRefs[0].EventID })
-    if err != nil {
-            return err
-    }
-    response.LatestEvent = latestEvents[0].Headered(info.RoomVersion)
+	var currentStateSnapshotNID types.StateSnapshotNID
+	latestEventRefs, currentStateSnapshotNID, _, err :=
+		r.DB.LatestEventIDs(ctx, info.RoomNID)
+	if err != nil {
+		return err
+	}
+	// XXX: is this actually the latest of the latest events?
+	latestEvents, err := r.DB.EventsFromIDs(ctx, []string{latestEventRefs[0].EventID})
+	if err != nil {
+		return err
+	}
+	response.LatestEvent = latestEvents[0].Headered(info.RoomVersion)
 
-    // XXX: do we actually need to do a state resolution here?
-    roomState := state.NewStateResolution(r.DB, *info)
+	// XXX: do we actually need to do a state resolution here?
+	roomState := state.NewStateResolution(r.DB, *info)
 
-    var stateEntries []types.StateEntry
-    stateEntries, err = roomState.LoadStateAtSnapshot(
-            ctx, currentStateSnapshotNID,
-    )
-    if err != nil {
-            return err
-    }
-    stateEvents, err = helpers.LoadStateEvents(ctx, r.DB, stateEntries)
-    if err != nil {
-            return err
-    }
+	var stateEntries []types.StateEntry
+	stateEntries, err = roomState.LoadStateAtSnapshot(
+		ctx, currentStateSnapshotNID,
+	)
+	if err != nil {
+		return err
+	}
+	stateEvents, err = helpers.LoadStateEvents(ctx, r.DB, stateEntries)
+	if err != nil {
+		return err
+	}
 
-    // get the auth event IDs for the current state events
-    var authEventIDs []string
-    for _, se := range stateEvents {
-        authEventIDs = append(authEventIDs, se.AuthEventIDs()...)
-    }
-    authEventIDs = util.UniqueStrings(authEventIDs) // de-dupe
+	// get the auth event IDs for the current state events
+	var authEventIDs []string
+	for _, se := range stateEvents {
+		authEventIDs = append(authEventIDs, se.AuthEventIDs()...)
+	}
+	authEventIDs = util.UniqueStrings(authEventIDs) // de-dupe
 
-    authEvents, err := query.GetAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
-    if err != nil {
-        return err
-    }
+	authEvents, err := query.GetAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
+	if err != nil {
+		return err
+	}
 
-    for _, event := range stateEvents {
-        response.StateEvents = append(response.StateEvents, event.Headered(info.RoomVersion))
-    }
+	for _, event := range stateEvents {
+		response.StateEvents = append(response.StateEvents, event.Headered(info.RoomVersion))
+	}
 
-    for _, event := range authEvents {
-        response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
-    }
+	for _, event := range authEvents {
+		response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
+	}
 
-    // FIXME: there's a race here - we really should be atomically telling the
-    // federationsender to start sending peek events alongside having captured
-    // the current state, but it's unclear if/how we can do that.
+	// FIXME: there's a race here - we really should be atomically telling the
+	// federationsender to start sending peek events alongside having captured
+	// the current state, but it's unclear if/how we can do that.
 
 	err = r.Inputer.WriteOutputEvents(request.RoomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewInboundPeek,
 			NewInboundPeek: &api.OutputNewInboundPeek{
-				RoomID:   request.RoomID,
-				PeekID:   request.PeekID,
-				LatestEventID: latestEvents[0].EventID(),
-				ServerName: request.ServerName,
-                RenewalInterval: request.RenewalInterval,
+				RoomID:          request.RoomID,
+				PeekID:          request.PeekID,
+				LatestEventID:   latestEvents[0].EventID(),
+				ServerName:      request.ServerName,
+				RenewalInterval: request.RenewalInterval,
 			},
 		},
 	})
-    return err
+	return err
 }
-

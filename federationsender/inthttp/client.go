@@ -20,7 +20,7 @@ const (
 	FederationSenderPerformJoinRequestPath            = "/federationsender/performJoinRequest"
 	FederationSenderPerformLeaveRequestPath           = "/federationsender/performLeaveRequest"
 	FederationSenderPerformInviteRequestPath          = "/federationsender/performInviteRequest"
-	FederationSenderPerformOutboundPeekRequestPath            = "/federationsender/performOutboundPeekRequest"
+	FederationSenderPerformOutboundPeekRequestPath    = "/federationsender/performOutboundPeekRequest"
 	FederationSenderPerformServersAlivePath           = "/federationsender/performServersAlive"
 	FederationSenderPerformBroadcastEDUPath           = "/federationsender/performBroadcastEDU"
 

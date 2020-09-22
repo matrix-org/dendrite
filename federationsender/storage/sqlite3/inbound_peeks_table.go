@@ -56,7 +56,7 @@ const deleteInboundPeeksSQL = "" +
 	"DELETE FROM federationsender_inbound_peeks WHERE room_id = $1"
 
 type inboundPeeksStatements struct {
-	db                    *sql.DB
+	db                     *sql.DB
 	insertInboundPeekStmt  *sql.Stmt
 	selectInboundPeekStmt  *sql.Stmt
 	selectInboundPeeksStmt *sql.Stmt

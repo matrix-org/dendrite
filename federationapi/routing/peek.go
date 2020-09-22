@@ -71,9 +71,9 @@ func Peek(
 	err := rsAPI.PerformInboundPeek(
 		httpReq.Context(),
 		&api.PerformInboundPeekRequest{
-			RoomID:       roomID,
-			PeekID:		  peekID,
-			ServerName:	  request.Origin(),
+			RoomID:          roomID,
+			PeekID:          peekID,
+			ServerName:      request.Origin(),
 			RenewalInterval: renewalInterval,
 		},
 		&response,
@@ -88,10 +88,10 @@ func Peek(
 	}
 
 	respPeek := gomatrixserverlib.RespPeek{
-		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
-		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
-		RoomVersion: response.RoomVersion,
-		LatestEvent: response.LatestEvent.Unwrap(),
+		StateEvents:     gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
+		AuthEvents:      gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
+		RoomVersion:     response.RoomVersion,
+		LatestEvent:     response.LatestEvent.Unwrap(),
 		RenewalInterval: renewalInterval,
 	}
 
@@ -100,4 +100,3 @@ func Peek(
 		JSON: respPeek,
 	}
 }
-

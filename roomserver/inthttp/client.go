@@ -25,13 +25,13 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath                = "/roomserver/performInvite"
-	RoomserverPerformPeekPath                  = "/roomserver/performPeek"
-	RoomserverPerformJoinPath                  = "/roomserver/performJoin"
-	RoomserverPerformLeavePath                 = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath              = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath               = "/roomserver/performPublish"
-	RoomserverPerformInboundPeekPath           = "/roomserver/performInboundPeek"
+	RoomserverPerformInvitePath      = "/roomserver/performInvite"
+	RoomserverPerformPeekPath        = "/roomserver/performPeek"
+	RoomserverPerformJoinPath        = "/roomserver/performJoin"
+	RoomserverPerformLeavePath       = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath    = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath     = "/roomserver/performPublish"
+	RoomserverPerformInboundPeekPath = "/roomserver/performInboundPeek"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"

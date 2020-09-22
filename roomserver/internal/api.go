@@ -93,8 +93,8 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		Inputer:    r.Inputer,
 	}
 	r.InboundPeeker = &perform.InboundPeeker{
-		DB:         r.DB,
-		Inputer:    r.Inputer,
+		DB:      r.DB,
+		Inputer: r.Inputer,
 	}
 	r.Leaver = &perform.Leaver{
 		Cfg:     r.Cfg,
@@ -142,4 +142,3 @@ func (r *RoomserverInternalAPI) PerformLeave(
 	}
 	return r.WriteOutputEvents(req.RoomID, outputEvents)
 }
-

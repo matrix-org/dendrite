@@ -230,13 +230,13 @@ type OutputNewPeek struct {
 
 // An OutputNewInboundPeek is written whenever a server starts peeking into a room
 type OutputNewInboundPeek struct {
-	RoomID   string
-	PeekID   string
+	RoomID string
+	PeekID string
 	// the event ID at which the peek begins (so we can avoid
 	// a race between tracking the state returned by /peek and emitting subsequent
 	// peeked events)
 	LatestEventID string
-	ServerName gomatrixserverlib.ServerName
+	ServerName    gomatrixserverlib.ServerName
 	// how often we told the peeking server to renew the peek
 	RenewalInterval int64
 }

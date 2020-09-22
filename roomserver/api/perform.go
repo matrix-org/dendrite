@@ -161,11 +161,11 @@ type PerformPublishResponse struct {
 }
 
 type PerformInboundPeekRequest struct {
-	UserID        string                         `json:"user_id"`
-	RoomID        string                         `json:"room_id"`
-	PeekID        string                         `json:"peek_id"`
-	ServerName    gomatrixserverlib.ServerName   `json:"server_name"`
-	RenewalInterval int64     					 `json:"renewal_interval"`
+	UserID          string                       `json:"user_id"`
+	RoomID          string                       `json:"room_id"`
+	PeekID          string                       `json:"peek_id"`
+	ServerName      gomatrixserverlib.ServerName `json:"server_name"`
+	RenewalInterval int64                        `json:"renewal_interval"`
 }
 
 type PerformInboundPeekResponse struct {

@@ -304,7 +304,7 @@ func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 	renewing := false
 	if outboundPeek != nil {
 		nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-		if nowMilli > outboundPeek.RenewedTimestamp + outboundPeek.RenewalInterval {
+		if nowMilli > outboundPeek.RenewedTimestamp+outboundPeek.RenewalInterval {
 			logrus.Infof("stale outbound peek to %s for %s already exists; renewing", serverName, roomID)
 			renewing = true
 		} else {

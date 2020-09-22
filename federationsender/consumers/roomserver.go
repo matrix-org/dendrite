@@ -119,7 +119,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // causing the federationsender to start sending messages to the peeking server
 func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPeek) error {
 	// FIXME: do something with orp.LatestEventID to prevent races
-  	return s.db.AddInboundPeek(context.TODO(), orp.ServerName, orp.RoomID, orp.PeekID, orp.RenewalInterval)
+	return s.db.AddInboundPeek(context.TODO(), orp.ServerName, orp.RoomID, orp.PeekID, orp.RenewalInterval)
 }
 
 // processMessage updates the list of currently joined hosts in the room

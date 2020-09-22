@@ -56,7 +56,7 @@ const deleteOutboundPeeksSQL = "" +
 	"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1"
 
 type outboundPeeksStatements struct {
-	db                    *sql.DB
+	db                      *sql.DB
 	insertOutboundPeekStmt  *sql.Stmt
 	selectOutboundPeekStmt  *sql.Stmt
 	selectOutboundPeeksStmt *sql.Stmt
