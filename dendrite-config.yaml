@@ -38,9 +38,6 @@ global:
   # The path to the signing private key file, used to sign requests and events.
   private_key: matrix_key.pem
 
-  # A unique identifier for this private key. Must start with the prefix "ed25519:".
-  key_id: ed25519:auto
-
   # How long a remote server can cache our server signing key before requesting it
   # again. Increasing this number will reduce the number of requests made by other
   # servers for our key but increases the period that a compromised key will be
