@@ -138,7 +138,14 @@ func SendLeave(
 
 	// Decode the event JSON from the request.
 	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(request.Content(), verRes.RoomVersion)
-	if err != nil {
+	switch err.(type) {
+	case gomatrixserverlib.BadJSONError:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	case nil:
+	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),

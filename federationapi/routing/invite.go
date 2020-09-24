@@ -39,7 +39,15 @@ func InviteV2(
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 	inviteReq := gomatrixserverlib.InviteV2Request{}
-	if err := json.Unmarshal(request.Content(), &inviteReq); err != nil {
+	err := json.Unmarshal(request.Content(), &inviteReq)
+	switch err.(type) {
+	case gomatrixserverlib.BadJSONError:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	case nil:
+	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
@@ -63,10 +71,17 @@ func InviteV1(
 	roomVer := gomatrixserverlib.RoomVersionV1
 	body := request.Content()
 	event, err := gomatrixserverlib.NewEventFromTrustedJSON(body, false, roomVer)
-	if err != nil {
+	switch err.(type) {
+	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite v1 request: " + err.Error()),
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	case nil:
+	default:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite v1 request. " + err.Error()),
 		}
 	}
 	var strippedState []gomatrixserverlib.InviteV2StrippedState
