@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -99,7 +100,7 @@ func (s *accountsStatements) insertAccount(
 	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string,
 ) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
-	stmt := txn.Stmt(s.insertAccountStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertAccountStmt)
 
 	var err error
 	if appserviceID == "" {
@@ -162,7 +163,7 @@ func (s *accountsStatements) selectNewNumericLocalpart(
 ) (id int64, err error) {
 	stmt := s.selectNewNumericLocalpartStmt
 	if txn != nil {
-		stmt = txn.Stmt(stmt)
+		stmt = sqlutil.TxStmt(txn, stmt)
 	}
 	err = stmt.QueryRowContext(ctx).Scan(&id)
 	return

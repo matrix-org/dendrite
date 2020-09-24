@@ -88,6 +88,14 @@ func TxStmt(transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
 	return statement
 }
 
+// TxStmtContext behaves similarly to TxStmt, with support for also passing context.
+func TxStmtContext(context context.Context, transaction *sql.Tx, statement *sql.Stmt) *sql.Stmt {
+	if transaction != nil {
+		statement = transaction.StmtContext(context, statement)
+	}
+	return statement
+}
+
 // Hack of the century
 func QueryVariadic(count int) string {
 	return QueryVariadicOffset(count, 0)
