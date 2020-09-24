@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/api"
@@ -23,6 +24,7 @@ type FederationSenderInternalAPI struct {
 	federation *gomatrixserverlib.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
 	queues     *queue.OutgoingQueues
+	joins      sync.Map // joins currently in progress
 }
 
 func NewFederationSenderInternalAPI(
@@ -186,4 +188,28 @@ func (a *FederationSenderInternalAPI) GetEvent(
 		return gomatrixserverlib.Transaction{}, err
 	}
 	return ires.(gomatrixserverlib.Transaction), nil
+}
+
+func (a *FederationSenderInternalAPI) GetServerKeys(
+	ctx context.Context, s gomatrixserverlib.ServerName,
+) (gomatrixserverlib.ServerKeys, error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.GetServerKeys(ctx, s)
+	})
+	if err != nil {
+		return gomatrixserverlib.ServerKeys{}, err
+	}
+	return ires.(gomatrixserverlib.ServerKeys), nil
+}
+
+func (a *FederationSenderInternalAPI) LookupServerKeys(
+	ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+) ([]gomatrixserverlib.ServerKeys, error) {
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.LookupServerKeys(ctx, s, keyRequests)
+	})
+	if err != nil {
+		return []gomatrixserverlib.ServerKeys{}, err
+	}
+	return ires.([]gomatrixserverlib.ServerKeys), nil
 }

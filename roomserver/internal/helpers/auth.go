@@ -16,12 +16,77 @@ package helpers
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
+
+// CheckForSoftFail returns true if the event should be soft-failed
+// and false otherwise. The return error value should be checked before
+// the soft-fail bool.
+func CheckForSoftFail(
+	ctx context.Context,
+	db storage.Database,
+	event gomatrixserverlib.HeaderedEvent,
+	stateEventIDs []string,
+) (bool, error) {
+	rewritesState := len(stateEventIDs) > 1
+
+	var authStateEntries []types.StateEntry
+	var err error
+	if rewritesState {
+		authStateEntries, err = db.StateEntriesForEventIDs(ctx, stateEventIDs)
+		if err != nil {
+			return true, fmt.Errorf("StateEntriesForEventIDs failed: %w", err)
+		}
+	} else {
+		// Work out if the room exists.
+		var roomInfo *types.RoomInfo
+		roomInfo, err = db.RoomInfo(ctx, event.RoomID())
+		if err != nil {
+			return false, fmt.Errorf("db.RoomNID: %w", err)
+		}
+		if roomInfo == nil || roomInfo.IsStub {
+			return false, nil
+		}
+
+		// Then get the state entries for the current state snapshot.
+		// We'll use this to check if the event is allowed right now.
+		roomState := state.NewStateResolution(db, *roomInfo)
+		authStateEntries, err = roomState.LoadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+		if err != nil {
+			return true, fmt.Errorf("roomState.LoadStateAtSnapshot: %w", err)
+		}
+	}
+
+	// As a special case, it's possible that the room will have no
+	// state because we haven't received a m.room.create event yet.
+	// If we're now processing the first create event then never
+	// soft-fail it.
+	if len(authStateEntries) == 0 && event.Type() == gomatrixserverlib.MRoomCreate {
+		return false, nil
+	}
+
+	// Work out which of the state events we actually need.
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})
+
+	// Load the actual auth events from the database.
+	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
+	if err != nil {
+		return true, fmt.Errorf("loadAuthEvents: %w", err)
+	}
+
+	// Check if the event is allowed.
+	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
+		// return true, nil
+		return true, fmt.Errorf("gomatrixserverlib.Allowed: %w", err)
+	}
+	return false, nil
+}
 
 // CheckAuthEvents checks that the event passes authentication checks
 // Returns the numeric IDs for the auth events.
@@ -36,7 +101,7 @@ func CheckAuthEvents(
 	if err != nil {
 		return nil, err
 	}
-	// TODO: check for duplicate state keys here.
+	authStateEntries = types.DeduplicateStateEntries(authStateEntries)
 
 	// Work out which of the state events we actually need.
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})

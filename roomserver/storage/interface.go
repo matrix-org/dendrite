@@ -70,6 +70,7 @@ type Database interface {
 	// Stores a matrix room event in the database. Returns the room NID, the state snapshot and the redacted event ID if any, or an error.
 	StoreEvent(
 		ctx context.Context, event gomatrixserverlib.Event, txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
+		isRejected bool,
 	) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
 	// Look up the state entries for a list of string event IDs
 	// Returns an error if the there is an error talking to the database

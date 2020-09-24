@@ -149,12 +149,15 @@ func (h *httpRoomserverInternalAPI) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) error {
+) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "InputRoomEvents")
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverInputRoomEventsPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.ErrMsg = err.Error()
+	}
 }
 
 func (h *httpRoomserverInternalAPI) PerformInvite(

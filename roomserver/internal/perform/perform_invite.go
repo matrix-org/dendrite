@@ -183,7 +183,8 @@ func (r *Inviter) PerformInvite(
 			},
 		}
 		inputRes := &api.InputRoomEventsResponse{}
-		if err = r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
+		r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
+		if err = inputRes.Err(); err != nil {
 			return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
 		}
 	} else {

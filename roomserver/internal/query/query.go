@@ -70,6 +70,7 @@ func (r *Queryer) QueryStateAfterEvents(
 	if err != nil {
 		switch err.(type) {
 		case types.MissingEventError:
+			util.GetLogger(ctx).Errorf("QueryStateAfterEvents: MissingEventError: %s", err)
 			return nil
 		default:
 			return err

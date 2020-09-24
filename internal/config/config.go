@@ -36,6 +36,9 @@ import (
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
 )
 
+// keyIDRegexp defines allowable characters in Key IDs.
+var keyIDRegexp = regexp.MustCompile("^ed25519:[a-zA-Z0-9_]+$")
+
 // Version is the current version of the config format.
 // This will change whenever we make breaking changes to the config format.
 const Version = 1
@@ -458,6 +461,9 @@ func readKeyPEM(path string, data []byte) (gomatrixserverlib.KeyID, ed25519.Priv
 			}
 			if !strings.HasPrefix(keyID, "ed25519:") {
 				return "", nil, fmt.Errorf("key ID %q doesn't start with \"ed25519:\" in %q", keyID, path)
+			}
+			if !keyIDRegexp.MatchString(keyID) {
+				return "", nil, fmt.Errorf("key ID %q in %q contains illegal characters (use a-z, A-Z, 0-9 and _ only)", keyID, path)
 			}
 			_, privKey, err := ed25519.GenerateKey(bytes.NewReader(keyBlock.Bytes))
 			if err != nil {

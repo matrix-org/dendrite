@@ -89,12 +89,11 @@ func (t *testRoomserverAPI) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) error {
+) {
 	t.inputRoomEvents = append(t.inputRoomEvents, request.InputRoomEvents...)
 	for _, ire := range request.InputRoomEvents {
 		fmt.Println("InputRoomEvents: ", ire.Event.EventID())
 	}
-	return nil
 }
 
 func (t *testRoomserverAPI) PerformInvite(
@@ -461,7 +460,8 @@ func TestBasicTransaction(t *testing.T) {
 	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
 }
 
-// The purpose of this test is to check that if the event received fails auth checks the transaction is failed.
+// The purpose of this test is to check that if the event received fails auth checks the event is still sent to the roomserver
+// as it does the auth check.
 func TestTransactionFailAuthChecks(t *testing.T) {
 	rsAPI := &testRoomserverAPI{
 		queryStateAfterEvents: func(req *api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse {
@@ -479,11 +479,9 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 		testData[len(testData)-1], // a message event
 	}
 	txn := mustCreateTransaction(rsAPI, &txnFedClient{}, pdus)
-	mustProcessTransaction(t, txn, []string{
-		// expect the event to have an error
-		testEvents[len(testEvents)-1].EventID(),
-	})
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, nil) // expect no messages to be sent to the roomserver
+	mustProcessTransaction(t, txn, []string{})
+	// expect message to be sent to the roomserver
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
 }
 
 // The purpose of this test is to make sure that when an event is received for which we do not know the prev_events,

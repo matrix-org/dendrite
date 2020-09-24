@@ -103,6 +103,9 @@ const selectStateInRangeSQL = "" +
 	" ORDER BY id ASC" +
 	" LIMIT $8" // limit
 
+const deleteEventsForRoomSQL = "" +
+	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
+
 type outputRoomEventsStatements struct {
 	db                            *sql.DB
 	streamIDStatements            *streamIDStatements
@@ -114,6 +117,7 @@ type outputRoomEventsStatements struct {
 	selectEarlyEventsStmt         *sql.Stmt
 	selectStateInRangeStmt        *sql.Stmt
 	updateEventJSONStmt           *sql.Stmt
+	deleteEventsForRoomStmt       *sql.Stmt
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
@@ -147,6 +151,9 @@ func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Even
 		return nil, err
 	}
 	if s.updateEventJSONStmt, err = db.Prepare(updateEventJSONSQL); err != nil {
+		return nil, err
+	}
+	if s.deleteEventsForRoomStmt, err = db.Prepare(deleteEventsForRoomSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -408,6 +415,13 @@ func (s *outputRoomEventsStatements) SelectEvents(
 		internal.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
 	}
 	return returnEvents, nil
+}
+
+func (s *outputRoomEventsStatements) DeleteEventsForRoom(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (err error) {
+	_, err = sqlutil.TxStmt(txn, s.deleteEventsForRoomStmt).ExecContext(ctx, roomID)
+	return err
 }
 
 func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {

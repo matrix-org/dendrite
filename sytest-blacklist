@@ -40,11 +40,6 @@ Ignore invite in incremental sync
 New room members see their own join event
 Existing members see new members' join events
 
-# Blacklisted because the federation work for these hasn't been finished yet. 
-Can recv device messages over federation
-Device messages over federation wake up /sync
-Wildcard device messages over federation wake up /sync
-
 # See https://github.com/matrix-org/sytest/pull/901
 Remote invited user can see room metadata
 
@@ -55,9 +50,6 @@ Inbound federation accepts a second soft-failed event
 # Relies on a rejected PL event which will never be accepted into the DAG
 # Caused by https://github.com/matrix-org/sytest/pull/911
 Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
-
-# We don't implement device lists yet
-Device list doesn't change if remote server is down
 
 # We don't implement lazy membership loading yet.
 The only membership state included in a gapped incremental sync is for senders in the timeline

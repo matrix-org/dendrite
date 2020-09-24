@@ -320,9 +320,14 @@ func (d *Database) Events(
 		if err != nil {
 			return nil, err
 		}
-		roomVersion, err = d.RoomsTable.SelectRoomVersionForRoomNID(ctx, roomNID)
-		if err != nil {
-			return nil, err
+		if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
+			roomVersion, _ = d.Cache.GetRoomVersion(roomID)
+		}
+		if roomVersion == "" {
+			roomVersion, err = d.RoomsTable.SelectRoomVersionForRoomNID(ctx, roomNID)
+			if err != nil {
+				return nil, err
+			}
 		}
 		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSON(
 			eventJSON.EventJSON, false, roomVersion,
@@ -382,7 +387,7 @@ func (d *Database) GetLatestEventsForUpdate(
 // nolint:gocyclo
 func (d *Database) StoreEvent(
 	ctx context.Context, event gomatrixserverlib.Event,
-	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
+	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID, isRejected bool,
 ) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
 	var (
 		roomNID          types.RoomNID
@@ -446,6 +451,7 @@ func (d *Database) StoreEvent(
 			event.EventReference().EventSHA256,
 			authEventNIDs,
 			event.Depth(),
+			isRejected,
 		); err != nil {
 			if err == sql.ErrNoRows {
 				// We've already inserted the event so select the numeric event ID
@@ -459,7 +465,9 @@ func (d *Database) StoreEvent(
 		if err = d.EventJSONTable.InsertEventJSON(ctx, txn, eventNID, event.JSON()); err != nil {
 			return fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 		}
-		redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
+		if !isRejected { // ignore rejected redaction events
+			redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
+		}
 		return nil
 	})
 	if err != nil {

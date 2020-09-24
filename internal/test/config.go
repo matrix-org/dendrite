@@ -25,6 +25,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/config"
@@ -146,10 +147,14 @@ func NewMatrixKey(matrixKeyPath string) (err error) {
 		err = keyOut.Close()
 	})()
 
+	keyID := base64.RawURLEncoding.EncodeToString(data[:])
+	keyID = strings.ReplaceAll(keyID, "-", "")
+	keyID = strings.ReplaceAll(keyID, "_", "")
+
 	err = pem.Encode(keyOut, &pem.Block{
 		Type: "MATRIX PRIVATE KEY",
 		Headers: map[string]string{
-			"Key-ID": "ed25519:" + base64.RawStdEncoding.EncodeToString(data[:3]),
+			"Key-ID": fmt.Sprintf("ed25519:%s", keyID[:6]),
 		},
 		Bytes: data[3:],
 	})

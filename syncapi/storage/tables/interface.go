@@ -60,6 +60,8 @@ type Events interface {
 	SelectEarlyEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int) ([]types.StreamEvent, error)
 	SelectEvents(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StreamEvent, error)
 	UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
+	// DeleteEventsForRoom removes all event information for a room. This should only be done when removing the room entirely.
+	DeleteEventsForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
 }
 
 // Topology keeps track of the depths and stream positions for all events.
@@ -77,6 +79,8 @@ type Topology interface {
 	SelectPositionInTopology(ctx context.Context, txn *sql.Tx, eventID string) (depth, spos types.StreamPosition, err error)
 	// SelectMaxPositionInTopology returns the event which has the highest depth, and if there are multiple, the event with the highest stream position.
 	SelectMaxPositionInTopology(ctx context.Context, txn *sql.Tx, roomID string) (depth types.StreamPosition, spos types.StreamPosition, err error)
+	// DeleteTopologyForRoom removes all topological information for a room. This should only be done when removing the room entirely.
+	DeleteTopologyForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
 }
 
 type CurrentRoomState interface {
@@ -84,6 +88,7 @@ type CurrentRoomState interface {
 	SelectEventsWithEventIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StreamEvent, error)
 	UpsertRoomState(ctx context.Context, txn *sql.Tx, event gomatrixserverlib.HeaderedEvent, membership *string, addedAt types.StreamPosition) error
 	DeleteRoomStateByEventID(ctx context.Context, txn *sql.Tx, eventID string) error
+	DeleteRoomStateForRoom(ctx context.Context, txn *sql.Tx, roomID string) error
 	// SelectCurrentState returns all the current state events for the given room.
 	SelectCurrentState(ctx context.Context, txn *sql.Tx, roomID string, stateFilter *gomatrixserverlib.StateFilter) ([]gomatrixserverlib.HeaderedEvent, error)
 	// SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
@@ -118,6 +123,8 @@ type BackwardsExtremities interface {
 	SelectBackwardExtremitiesForRoom(ctx context.Context, roomID string) (bwExtrems map[string][]string, err error)
 	// DeleteBackwardExtremity removes a backwards extremity for a room, if one existed.
 	DeleteBackwardExtremity(ctx context.Context, txn *sql.Tx, roomID, knownEventID string) (err error)
+	// DeleteBackwardExtremitiesFoorRoomID removes all backward extremities for a room. This should only be done when removing the room entirely.
+	DeleteBackwardExtremitiesForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
 }
 
 // SendToDevice tracks send-to-device messages which are sent to individual

@@ -149,6 +149,12 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
+	if msg.RewritesState {
+		if err = s.db.PurgeRoom(ctx, ev.RoomID()); err != nil {
+			return fmt.Errorf("s.db.PurgeRoom: %w", err)
+		}
+	}
+
 	pduPos, err := s.db.WriteEvent(
 		ctx,
 		&ev,

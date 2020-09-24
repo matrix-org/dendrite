@@ -471,3 +471,9 @@ We can't peek into rooms with invited history_visibility
 We can't peek into rooms with joined history_visibility
 Local users can peek by room alias
 Peeked rooms only turn up in the sync for the device who peeked them
+Room state at a rejected message event is the same as its predecessor
+Room state at a rejected state event is the same as its predecessor
+Inbound federation correctly soft fails events
+Inbound federation accepts a second soft-failed event
+Federation key API can act as a notary server via a POST request
+Federation key API can act as a notary server via a GET request
