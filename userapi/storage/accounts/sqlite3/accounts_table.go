@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -104,9 +105,9 @@ func (s *accountsStatements) insertAccount(
 
 	var err error
 	if appserviceID == "" {
-		_, err = txn.Stmt(stmt).ExecContext(ctx, localpart, createdTimeMS, hash, nil)
+		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, nil)
 	} else {
-		_, err = txn.Stmt(stmt).ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID)
+		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID)
 	}
 	if err != nil {
 		return nil, err
@@ -163,7 +164,7 @@ func (s *accountsStatements) selectNewNumericLocalpart(
 ) (id int64, err error) {
 	stmt := s.selectNewNumericLocalpartStmt
 	if txn != nil {
-		stmt = txn.Stmt(stmt)
+		stmt = sqlutil.TxStmt(txn, stmt)
 	}
 	err = stmt.QueryRowContext(ctx).Scan(&id)
 	return

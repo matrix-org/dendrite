@@ -87,7 +87,7 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 func (s *profilesStatements) insertProfile(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) error {
-	_, err := txn.Stmt(s.insertProfileStmt).ExecContext(ctx, localpart, "", "")
+	_, err := sqlutil.TxStmt(txn, s.insertProfileStmt).ExecContext(ctx, localpart, "", "")
 	return err
 }
 

@@ -105,12 +105,12 @@ func (s *stateBlockStatements) BulkInsertStateData(
 		return 0, nil
 	}
 	var stateBlockNID types.StateBlockNID
-	err := txn.Stmt(s.selectNextStateBlockNIDStmt).QueryRowContext(ctx).Scan(&stateBlockNID)
+	err := sqlutil.TxStmt(txn, s.selectNextStateBlockNIDStmt).QueryRowContext(ctx).Scan(&stateBlockNID)
 	if err != nil {
 		return 0, err
 	}
 	for _, entry := range entries {
-		_, err = txn.Stmt(s.insertStateDataStmt).ExecContext(
+		_, err = sqlutil.TxStmt(txn, s.insertStateDataStmt).ExecContext(
 			ctx,
 			int64(stateBlockNID),
 			int64(entry.EventTypeNID),

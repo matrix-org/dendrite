@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const profilesSchema = `
@@ -84,7 +85,7 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 func (s *profilesStatements) insertProfile(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) (err error) {
-	_, err = txn.Stmt(s.insertProfileStmt).ExecContext(ctx, localpart, "", "")
+	_, err = sqlutil.TxStmt(txn, s.insertProfileStmt).ExecContext(ctx, localpart, "", "")
 	return
 }
 

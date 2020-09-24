@@ -160,13 +160,13 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, token string, nids []types.SendToDeviceNID,
 ) (err error) {
-	_, err = txn.Stmt(s.updateSentSendToDeviceMessagesStmt).ExecContext(ctx, token, pq.Array(nids))
+	_, err = sqlutil.TxStmt(txn, s.updateSentSendToDeviceMessagesStmt).ExecContext(ctx, token, pq.Array(nids))
 	return
 }
 
 func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, nids []types.SendToDeviceNID,
 ) (err error) {
-	_, err = txn.Stmt(s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, pq.Array(nids))
+	_, err = sqlutil.TxStmt(txn, s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, pq.Array(nids))
 	return
 }
