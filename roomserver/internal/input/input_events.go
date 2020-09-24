@@ -44,6 +44,17 @@ func (r *Inputer) processRoomEvent(
 	headered := input.Event
 	event := headered.Unwrap()
 
+	// Run sanity checks against the event. This will catch any really
+	// obvious problems.
+	if err = helpers.SanityCheckEvent(&event); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"event_id": event.EventID(),
+			"type":     event.Type(),
+			"room":     event.RoomID(),
+		}).WithError(err).Info("Event failed sanity-checks")
+		return
+	}
+
 	// Check that the event passes authentication checks and work out
 	// the numeric IDs for the auth events.
 	isRejected := false
