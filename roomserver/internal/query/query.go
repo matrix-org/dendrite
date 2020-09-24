@@ -237,9 +237,10 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	if err != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
-	if info == nil {
+	if info == nil || info.IsStub {
 		return nil
 	}
+	response.RoomExists = true
 
 	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {

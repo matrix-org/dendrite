@@ -150,6 +150,8 @@ type QueryServerJoinedToRoomRequest struct {
 
 // QueryMembershipsForRoomResponse is a response to QueryServerJoinedToRoom
 type QueryServerJoinedToRoomResponse struct {
+	// True if the room exists on the server
+	RoomExists bool `json:"room_exists"`
 	// True if we still believe that we are participating in the room
 	IsInRoom bool `json:"is_in_room"`
 }

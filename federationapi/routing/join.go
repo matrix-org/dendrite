@@ -89,10 +89,16 @@ func MakeJoin(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return jsonerror.InternalServerError()
 	}
+	if !inRoomRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(fmt.Sprintf("Room ID %q was not found on this server", roomID)),
+		}
+	}
 	if !inRoomRes.IsInRoom {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("There are no remaining users in this room"),
+			JSON: jsonerror.NotFound(fmt.Sprintf("Room ID %q has no remaining users on this server", roomID)),
 		}
 	}
 
