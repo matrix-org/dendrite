@@ -79,6 +79,23 @@ func MakeJoin(
 		}
 	}
 
+	// Check if we think we are still joined to the room
+	inRoomReq := &api.QueryServerJoinedToRoomRequest{
+		ServerName: cfg.Matrix.ServerName,
+		RoomID:     roomID,
+	}
+	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
+	if err = rsAPI.QueryServerJoinedToRoom(httpReq.Context(), inRoomReq, inRoomRes); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		return jsonerror.InternalServerError()
+	}
+	if !inRoomRes.IsInRoom {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("There are no remaining users in this room"),
+		}
+	}
+
 	// Try building an event for the server
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:   userID,
