@@ -29,6 +29,7 @@ import (
 )
 
 // MakeJoin implements the /make_join API
+// nolint:gocyclo
 func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
