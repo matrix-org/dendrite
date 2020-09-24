@@ -477,3 +477,4 @@ Inbound federation correctly soft fails events
 Inbound federation accepts a second soft-failed event
 Federation key API can act as a notary server via a POST request
 Federation key API can act as a notary server via a GET request
+Inbound /make_join rejects attempts to join rooms where all users have left

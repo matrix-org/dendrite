@@ -227,6 +227,50 @@ func (r *Queryer) QueryMembershipsForRoom(
 	return nil
 }
 
+// QueryServerJoinedToRoom implements api.RoomserverInternalAPI
+func (r *Queryer) QueryServerJoinedToRoom(
+	ctx context.Context,
+	request *api.QueryServerJoinedToRoomRequest,
+	response *api.QueryServerJoinedToRoomResponse,
+) error {
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	if info == nil || info.IsStub {
+		return nil
+	}
+	response.RoomExists = true
+
+	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
+	if err != nil {
+		return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
+	}
+	if len(eventNIDs) == 0 {
+		return nil
+	}
+
+	events, err := r.DB.Events(ctx, eventNIDs)
+	if err != nil {
+		return fmt.Errorf("r.DB.Events: %w", err)
+	}
+
+	for _, e := range events {
+		if e.Type() == gomatrixserverlib.MRoomMember && e.StateKey() != nil {
+			_, serverName, err := gomatrixserverlib.SplitID('@', *e.StateKey())
+			if err != nil {
+				continue
+			}
+			if serverName == request.ServerName {
+				response.IsInRoom = true
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
 // QueryServerAllowedToSeeEvent implements api.RoomserverInternalAPI
 func (r *Queryer) QueryServerAllowedToSeeEvent(
 	ctx context.Context,

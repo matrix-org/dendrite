@@ -89,6 +89,13 @@ type RoomserverInternalAPI interface {
 		response *QueryMembershipsForRoomResponse,
 	) error
 
+	// Query if we think we're still in a room.
+	QueryServerJoinedToRoom(
+		ctx context.Context,
+		request *QueryServerJoinedToRoomRequest,
+		response *QueryServerJoinedToRoomResponse,
+	) error
+
 	// Query whether a server is allowed to see an event
 	QueryServerAllowedToSeeEvent(
 		ctx context.Context,

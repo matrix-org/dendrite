@@ -29,6 +29,7 @@ import (
 )
 
 // MakeJoin implements the /make_join API
+// nolint:gocyclo
 func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -76,6 +77,29 @@ func MakeJoin(
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("The join must be sent by the server of the user"),
+		}
+	}
+
+	// Check if we think we are still joined to the room
+	inRoomReq := &api.QueryServerJoinedToRoomRequest{
+		ServerName: cfg.Matrix.ServerName,
+		RoomID:     roomID,
+	}
+	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
+	if err = rsAPI.QueryServerJoinedToRoom(httpReq.Context(), inRoomReq, inRoomRes); err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		return jsonerror.InternalServerError()
+	}
+	if !inRoomRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(fmt.Sprintf("Room ID %q was not found on this server", roomID)),
+		}
+	}
+	if !inRoomRes.IsInRoom {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(fmt.Sprintf("Room ID %q has no remaining users on this server", roomID)),
 		}
 	}
 
