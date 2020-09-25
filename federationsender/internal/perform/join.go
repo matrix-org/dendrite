@@ -59,9 +59,15 @@ func (r joinContext) CheckSendJoinResponse(
 
 			// Try to retrieve the event from the server that sent us the send
 			// join response.
-			tx, txerr := r.federation.GetEvent(ctx, serverName, eventID)
+			tx, txerr := r.federation.GetEvent(ctx, server, eventID)
 			if txerr != nil {
-				return nil, fmt.Errorf("missingAuth r.federation.GetEvent: %w", txerr)
+				if server == serverName {
+					return nil, fmt.Errorf("missingAuth r.federation.GetEvent via %q: %w", server, txerr)
+				}
+				tx, txerr = r.federation.GetEvent(ctx, serverName, eventID)
+				if txerr != nil {
+					return nil, fmt.Errorf("missingAuth r.federation.GetEvent via %q and %q: %w", server, serverName, txerr)
+				}
 			}
 
 			// For each event returned, add it to the set of return events. We
