@@ -234,7 +234,7 @@ func (m mockReadFile) readFile(path string) ([]byte, error) {
 }
 
 func TestReadKey(t *testing.T) {
-	keyID, _, err := readKeyPEM("path/to/key", []byte(testKey))
+	keyID, _, err := readKeyPEM("path/to/key", []byte(testKey), true)
 	if err != nil {
 		t.Error("failed to load private key:", err)
 	}
