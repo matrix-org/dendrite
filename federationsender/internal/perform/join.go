@@ -38,7 +38,7 @@ func (r joinContext) CheckSendJoinResponse(
 	// Define a function which we can pass to Check to retrieve missing
 	// auth events inline. This greatly increases our chances of not having
 	// to repeat the entire set of checks just for a missing event or two.
-	missingAuth := func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+	missingAuth := func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string, serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.Event, error) {
 		returning := []gomatrixserverlib.Event{}
 
 		// See if we have retry entries for each of the supplied event IDs.
@@ -59,7 +59,7 @@ func (r joinContext) CheckSendJoinResponse(
 
 			// Try to retrieve the event from the server that sent us the send
 			// join response.
-			tx, txerr := r.federation.GetEvent(ctx, server, eventID)
+			tx, txerr := r.federation.GetEvent(ctx, serverName, eventID)
 			if txerr != nil {
 				return nil, fmt.Errorf("missingAuth r.federation.GetEvent: %w", txerr)
 			}
