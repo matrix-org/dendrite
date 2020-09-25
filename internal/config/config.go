@@ -232,6 +232,20 @@ func loadConfig(
 		return nil, err
 	}
 
+	for _, oldPrivateKey := range c.Global.OldVerifyKeys {
+		var oldPrivateKeyData []byte
+
+		oldPrivateKeyPath := absPath(basePath, oldPrivateKey.PrivateKeyPath)
+		oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
+		if err != nil {
+			return nil, err
+		}
+
+		if oldPrivateKey.KeyID, oldPrivateKey.PrivateKey, err = readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, certPath := range c.FederationAPI.FederationCertificatePaths {
 		absCertPath := absPath(basePath, certPath)
 		var pemData []byte
