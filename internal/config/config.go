@@ -241,7 +241,7 @@ func loadConfig(
 			return nil, err
 		}
 
-		// NOTSPEC: Ordinarily we should force key ID formatting, but since there are
+		// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
 		// a number of private keys out there with non-compatible symbols in them due
 		// to lack of validation in Synapse, we won't enforce that for old verify keys.
 		keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
