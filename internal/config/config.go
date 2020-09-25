@@ -228,8 +228,28 @@ func loadConfig(
 		return nil, err
 	}
 
-	if c.Global.KeyID, c.Global.PrivateKey, err = readKeyPEM(privateKeyPath, privateKeyData); err != nil {
+	if c.Global.KeyID, c.Global.PrivateKey, err = readKeyPEM(privateKeyPath, privateKeyData, true); err != nil {
 		return nil, err
+	}
+
+	for i, oldPrivateKey := range c.Global.OldVerifyKeys {
+		var oldPrivateKeyData []byte
+
+		oldPrivateKeyPath := absPath(basePath, oldPrivateKey.PrivateKeyPath)
+		oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
+		if err != nil {
+			return nil, err
+		}
+
+		// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
+		// a number of private keys out there with non-compatible symbols in them due
+		// to lack of validation in Synapse, we won't enforce that for old verify keys.
+		keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
+		if perr != nil {
+			return nil, perr
+		}
+
+		c.Global.OldVerifyKeys[i].KeyID, c.Global.OldVerifyKeys[i].PrivateKey = keyID, privateKey
 	}
 
 	for _, certPath := range c.FederationAPI.FederationCertificatePaths {
@@ -444,7 +464,7 @@ func absPath(dir string, path Path) string {
 	return filepath.Join(dir, string(path))
 }
 
-func readKeyPEM(path string, data []byte) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
+func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
 	for {
 		var keyBlock *pem.Block
 		keyBlock, data = pem.Decode(data)
@@ -462,7 +482,7 @@ func readKeyPEM(path string, data []byte) (gomatrixserverlib.KeyID, ed25519.Priv
 			if !strings.HasPrefix(keyID, "ed25519:") {
 				return "", nil, fmt.Errorf("key ID %q doesn't start with \"ed25519:\" in %q", keyID, path)
 			}
-			if !keyIDRegexp.MatchString(keyID) {
+			if enforceKeyIDFormat && !keyIDRegexp.MatchString(keyID) {
 				return "", nil, fmt.Errorf("key ID %q in %q contains illegal characters (use a-z, A-Z, 0-9 and _ only)", keyID, path)
 			}
 			_, privKey, err := ed25519.GenerateKey(bytes.NewReader(keyBlock.Bytes))
