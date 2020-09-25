@@ -232,7 +232,7 @@ func loadConfig(
 		return nil, err
 	}
 
-	for _, oldPrivateKey := range c.Global.OldVerifyKeys {
+	for i, oldPrivateKey := range c.Global.OldVerifyKeys {
 		var oldPrivateKeyData []byte
 
 		oldPrivateKeyPath := absPath(basePath, oldPrivateKey.PrivateKeyPath)
@@ -241,7 +241,7 @@ func loadConfig(
 			return nil, err
 		}
 
-		if oldPrivateKey.KeyID, oldPrivateKey.PrivateKey, err = readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData); err != nil {
+		if c.Global.OldVerifyKeys[i].KeyID, c.Global.OldVerifyKeys[i].PrivateKey, err = readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData); err != nil {
 			return nil, err
 		}
 	}
