@@ -391,13 +391,13 @@ func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 	}
 
 	respState := respPeek.ToRespState()
-	// logrus.Warnf("converted respPeek %#v to respState %#v", respPeek, respState)
+	// logrus.Warnf("got respPeek %#v", respPeek)
 	// Send the newly returned state to the roomserver to update our local view.
-	if err = roomserverAPI.SendEventWithState(
+	if err = roomserverAPI.SendEventWithRewrite(
 		ctx, r.rsAPI,
 		&respState,
-		respPeek.LatestEvent.Headered(respPeek.RoomVersion), nil,
-		respPeek.RoomVersion,
+		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
+		nil,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}

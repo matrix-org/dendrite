@@ -50,7 +50,7 @@ type Database interface {
 	GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 
-	// XXX: why don't these have contexts passed in?
+	// these don't have contexts passed in as we want things to happen regardless of the request context
 	AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error
 	RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error
 	IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error)
