@@ -64,12 +64,19 @@ func (r *InboundPeeker) PerformInboundPeek(
 	if err != nil {
 		return err
 	}
-	// XXX: is this actually the latest of the latest events?
 	latestEvents, err := r.DB.EventsFromIDs(ctx, []string{latestEventRefs[0].EventID})
 	if err != nil {
 		return err
 	}
-	response.LatestEvent = latestEvents[0].Headered(info.RoomVersion)
+	var sortedLatestEvents []gomatrixserverlib.Event
+	for _, ev := range latestEvents {
+		sortedLatestEvents = append(sortedLatestEvents, ev.Event)
+	}
+	sortedLatestEvents = gomatrixserverlib.ReverseTopologicalOrdering(
+		sortedLatestEvents,
+		gomatrixserverlib.TopologicalOrderByPrevEvents,
+	)
+	response.LatestEvent = sortedLatestEvents[0].Headered(info.RoomVersion)
 
 	// XXX: do we actually need to do a state resolution here?
 	roomState := state.NewStateResolution(r.DB, *info)
