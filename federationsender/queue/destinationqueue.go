@@ -231,12 +231,23 @@ func (oq *destinationQueue) backgroundSend() {
 		// If we are backing off this server then wait for the
 		// backoff duration to complete first, or until explicitly
 		// told to retry.
-		if _, giveUp := oq.statistics.BackoffIfRequired(oq.backingOff, oq.interruptBackoff); giveUp {
+		until, blacklisted := oq.statistics.BackoffInfo()
+		if blacklisted {
 			// It's been suggested that we should give up because the backoff
 			// has exceeded a maximum allowable value. Clean up the in-memory
 			// buffers at this point. The PDU clean-up is already on a defer.
 			log.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
 			return
+		}
+		if until != nil && until.After(time.Now()) {
+			// We haven't backed off yet, so wait for the suggested amount of
+			// time.
+			duration := time.Until(*until)
+			log.Warnf("Backing off %q for %s", oq.destination, duration)
+			select {
+			case <-time.After(duration):
+			case <-oq.interruptBackoff:
+			}
 		}
 
 		// If we have pending PDUs or EDUs then construct a transaction.

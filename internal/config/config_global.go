@@ -20,7 +20,12 @@ type Global struct {
 
 	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
 	// prefix "ed25519:".
-	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
+	KeyID gomatrixserverlib.KeyID `yaml:"-"`
+
+	// Information about old private keys that used to be used to sign requests and
+	// events on this domain. They will not be used but will be advertised to other
+	// servers that ask for them to help verify old events.
+	OldVerifyKeys []OldVerifyKeys `yaml:"old_private_keys"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers
@@ -58,6 +63,21 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 	c.Kafka.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
+}
+
+type OldVerifyKeys struct {
+	// Path to the private key.
+	PrivateKeyPath Path `yaml:"private_key"`
+
+	// The private key itself.
+	PrivateKey ed25519.PrivateKey `yaml:"-"`
+
+	// The key ID of the private key.
+	KeyID gomatrixserverlib.KeyID `yaml:"-"`
+
+	// When the private key was designed as "expired", as a UNIX timestamp
+	// in millisecond precision.
+	ExpiredAt gomatrixserverlib.Timestamp `yaml:"expired_at"`
 }
 
 // The configuration to use for Prometheus metrics

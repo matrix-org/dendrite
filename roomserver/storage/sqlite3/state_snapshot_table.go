@@ -76,7 +76,7 @@ func (s *stateSnapshotStatements) InsertState(
 	if err != nil {
 		return
 	}
-	insertStmt := txn.Stmt(s.insertStateStmt)
+	insertStmt := sqlutil.TxStmt(txn, s.insertStateStmt)
 	res, err := insertStmt.ExecContext(ctx, int64(roomNID), string(stateBlockNIDsJSON))
 	if err != nil {
 		return 0, err

@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const accountDataSchema = `
@@ -75,7 +77,7 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 func (s *accountDataStatements) insertAccountData(
 	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
-	_, err := txn.Stmt(s.insertAccountDataStmt).ExecContext(ctx, localpart, roomID, dataType, content)
+	_, err := sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, localpart, roomID, dataType, content)
 	return err
 }
 

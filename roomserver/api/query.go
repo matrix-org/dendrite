@@ -140,6 +140,22 @@ type QueryMembershipsForRoomResponse struct {
 	HasBeenInRoom bool `json:"has_been_in_room"`
 }
 
+// QueryServerJoinedToRoomRequest is a request to QueryServerJoinedToRoom
+type QueryServerJoinedToRoomRequest struct {
+	// Server name of the server to find
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	// ID of the room to see if we are still joined to
+	RoomID string `json:"room_id"`
+}
+
+// QueryMembershipsForRoomResponse is a response to QueryServerJoinedToRoom
+type QueryServerJoinedToRoomResponse struct {
+	// True if the room exists on the server
+	RoomExists bool `json:"room_exists"`
+	// True if we still believe that we are participating in the room
+	IsInRoom bool `json:"is_in_room"`
+}
+
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent
 type QueryServerAllowedToSeeEventRequest struct {
 	// The event ID to look up invites in.

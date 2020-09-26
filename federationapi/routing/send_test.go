@@ -199,6 +199,15 @@ func (t *testRoomserverAPI) QueryMembershipsForRoom(
 	return fmt.Errorf("not implemented")
 }
 
+// Query if a server is joined to a room
+func (t *testRoomserverAPI) QueryServerJoinedToRoom(
+	ctx context.Context,
+	request *api.QueryServerJoinedToRoomRequest,
+	response *api.QueryServerJoinedToRoomResponse,
+) error {
+	return fmt.Errorf("not implemented")
+}
+
 // Query whether a server is allowed to see an event
 func (t *testRoomserverAPI) QueryServerAllowedToSeeEvent(
 	ctx context.Context,

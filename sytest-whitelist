@@ -473,3 +473,10 @@ Local users can peek by room alias
 Peeked rooms only turn up in the sync for the device who peeked them
 Room state at a rejected message event is the same as its predecessor
 Room state at a rejected state event is the same as its predecessor
+Inbound federation correctly soft fails events
+Inbound federation accepts a second soft-failed event
+Federation key API can act as a notary server via a POST request
+Federation key API can act as a notary server via a GET request
+Inbound /make_join rejects attempts to join rooms where all users have left
+Inbound federation rejects invites which include invalid JSON for room version 6
+Inbound federation rejects invite rejections which include invalid JSON for room version 6
