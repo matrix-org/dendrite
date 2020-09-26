@@ -152,6 +152,7 @@ func (r *Peeker) performPeekRoomByID(
 	}
 
 	// handle federated peeks
+	// FIXME: don't create an outbound peek if we already have one going.
 	if domain != r.Cfg.Matrix.ServerName {
 		// If the server name in the room ID isn't ours then it's a
 		// possible candidate for finding the room via federation. Add
