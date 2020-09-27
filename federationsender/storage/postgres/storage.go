@@ -72,15 +72,15 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 		return nil, err
 	}
 	d.Database = shared.Database{
-		DB:                          d.db,
-		Writer:                      d.writer,
-		FederationSenderJoinedHosts: joinedHosts,
-		FederationSenderQueuePDUs:   queuePDUs,
-		FederationSenderQueueEDUs:   queueEDUs,
-		FederationSenderQueueJSON:   queueJSON,
-		FederationSenderRooms:       rooms,
-		FederationSenderBlacklist:   blacklist,
-		FederationSenderInboundPeeks: inboundPeeks,
+		DB:                            d.db,
+		Writer:                        d.writer,
+		FederationSenderJoinedHosts:   joinedHosts,
+		FederationSenderQueuePDUs:     queuePDUs,
+		FederationSenderQueueEDUs:     queueEDUs,
+		FederationSenderQueueJSON:     queueJSON,
+		FederationSenderRooms:         rooms,
+		FederationSenderBlacklist:     blacklist,
+		FederationSenderInboundPeeks:  inboundPeeks,
 		FederationSenderOutboundPeeks: outboundPeeks,
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
