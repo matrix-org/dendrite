@@ -179,7 +179,7 @@ func OnIncomingMessagesRequest(
 	}
 }
 
-// retrieveEvents retrieve events from the local database for a request on
+// retrieveEvents retrieves events from the local database for a request on
 // /messages. If there's not enough events to retrieve, it asks another
 // homeserver in the room for older events.
 // Returns an error if there was an issue talking to the database or with the

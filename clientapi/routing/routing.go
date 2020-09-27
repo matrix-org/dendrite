@@ -793,7 +793,7 @@ func Setup(
 			}
 			return GetCapabilities(req, rsAPI)
 		}),
-	).Methods(http.MethodGet)
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	// Supplying a device ID is deprecated.
 	r0mux.Handle("/keys/upload/{deviceID}",
