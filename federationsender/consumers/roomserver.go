@@ -126,6 +126,8 @@ func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPee
 	// We probably need to track orp.LatestEventID on the inbound peek, but it's
 	// unclear how we then use that to prevent the race when we start the send
 	// stream.
+	//
+	// This is making the tests flakey.
 
 	return s.db.AddInboundPeek(context.TODO(), orp.ServerName, orp.RoomID, orp.PeekID, orp.RenewalInterval)
 }
