@@ -345,17 +345,15 @@ func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverli
 }
 
 func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, isInboundTxn bool) error {
-	prevEventIDs := e.PrevEventIDs()
-
-	// Fetch the state needed to authenticate the event.
-	needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{e})
-	stateReq := api.QueryStateAfterEventsRequest{
+	// Work out if the roomserver knows everything it needs to know to auth
+	// the event.
+	stateReq := api.QueryMissingAuthPrevEventsRequest{
 		RoomID:       e.RoomID(),
-		PrevEventIDs: prevEventIDs,
-		StateToFetch: needed.Tuples(),
+		AuthEventIDs: e.AuthEventIDs(),
+		PrevEventIDs: e.PrevEventIDs(),
 	}
-	var stateResp api.QueryStateAfterEventsResponse
-	if err := t.rsAPI.QueryStateAfterEvents(ctx, &stateReq, &stateResp); err != nil {
+	var stateResp api.QueryMissingAuthPrevEventsResponse
+	if err := t.rsAPI.QueryMissingAuthPrevEvents(ctx, &stateReq, &stateResp); err != nil {
 		return err
 	}
 
@@ -369,8 +367,13 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 		return roomNotFoundError{e.RoomID()}
 	}
 
-	if !stateResp.PrevEventsExist {
+	if len(stateResp.MissingPrevEventIDs) > 0 {
 		return t.processEventWithMissingState(ctx, e, stateResp.RoomVersion, isInboundTxn)
+	}
+
+	if len(stateResp.MissingAuthEventIDs) > 0 {
+		// TODO
+		logrus.Infof("*** %d MISSING AUTH EVENTS for %q ***", len(stateResp.MissingAuthEventIDs), e.EventID())
 	}
 
 	// pass the event to the roomserver which will do auth checks
@@ -671,7 +674,7 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event
 	if missingResp == nil {
 		logger.WithError(err).Errorf(
 			"%s pushed us an event but %d server(s) couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
-			len(servers), t.Origin,
+			t.Origin, len(servers),
 		)
 		return nil, missingPrevEventsError{
 			eventID: e.EventID(),

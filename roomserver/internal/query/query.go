@@ -98,6 +98,38 @@ func (r *Queryer) QueryStateAfterEvents(
 	return nil
 }
 
+// QueryMissingAuthPrevEvents implements api.RoomserverInternalAPI
+func (r *Queryer) QueryMissingAuthPrevEvents(
+	ctx context.Context,
+	request *api.QueryMissingAuthPrevEventsRequest,
+	response *api.QueryMissingAuthPrevEventsResponse,
+) error {
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	if info == nil || info.IsStub {
+		return errors.New("room doesn't exist")
+	}
+
+	response.RoomExists = true
+	response.RoomVersion = info.RoomVersion
+
+	for _, authEventID := range request.AuthEventIDs {
+		if _, err := r.DB.EventNIDs(ctx, []string{authEventID}); err != nil {
+			response.MissingAuthEventIDs = append(response.MissingAuthEventIDs, authEventID)
+		}
+	}
+
+	for _, prevEventID := range request.PrevEventIDs {
+		if _, err := r.DB.EventNIDs(ctx, []string{prevEventID}); err != nil {
+			response.MissingPrevEventIDs = append(response.MissingPrevEventIDs, prevEventID)
+		}
+	}
+
+	return nil
+}
+
 // QueryEventsByID implements api.RoomserverInternalAPI
 func (r *Queryer) QueryEventsByID(
 	ctx context.Context,

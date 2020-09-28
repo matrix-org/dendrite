@@ -35,6 +35,7 @@ const (
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
 	RoomserverQueryStateAfterEventsPath        = "/roomserver/queryStateAfterEvents"
+	RoomserverQueryMissingAuthPrevEventsPath   = "/roomserver/queryMissingAuthPrevEvents"
 	RoomserverQueryEventsByIDPath              = "/roomserver/queryEventsByID"
 	RoomserverQueryMembershipForUserPath       = "/roomserver/queryMembershipForUser"
 	RoomserverQueryMembershipsForRoomPath      = "/roomserver/queryMembershipsForRoom"
@@ -259,6 +260,19 @@ func (h *httpRoomserverInternalAPI) QueryStateAfterEvents(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryStateAfterEvents implements RoomserverQueryAPI
+func (h *httpRoomserverInternalAPI) QueryMissingAuthPrevEvents(
+	ctx context.Context,
+	request *api.QueryMissingAuthPrevEventsRequest,
+	response *api.QueryMissingAuthPrevEventsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMissingAuthPrevEvents")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryMissingAuthPrevEventsPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
