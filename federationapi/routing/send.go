@@ -375,17 +375,8 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 				logrus.WithError(err).Warnf("Failed to unmarshal auth event %d", missingAuthEventID)
 				continue
 			}
-			err = api.SendEvents(
-				context.Background(),
-				t.rsAPI,
-				[]gomatrixserverlib.HeaderedEvent{
-					ev.Headered(stateResp.RoomVersion),
-				},
-				api.DoNotSendToOtherServers,
-				nil,
-			)
-			if err != nil {
-				logrus.WithError(err).Warnf("Failed to submit auth event %d to roomserver", missingAuthEventID)
+			if err = t.processEvent(ctx, ev, false); err != nil {
+				logrus.WithError(err).Warnf("Failed to process auth event %d", missingAuthEventID)
 			}
 		}
 	}
