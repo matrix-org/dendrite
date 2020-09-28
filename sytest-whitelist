@@ -480,3 +480,4 @@ Federation key API can act as a notary server via a GET request
 Inbound /make_join rejects attempts to join rooms where all users have left
 Inbound federation rejects invites which include invalid JSON for room version 6
 Inbound federation rejects invite rejections which include invalid JSON for room version 6
+GET /capabilities is present and well formed for registered user 
