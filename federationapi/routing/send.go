@@ -637,15 +637,43 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event
 	if minDepth < 0 {
 		minDepth = 0
 	}
-	missingResp, err := t.federation.LookupMissingEvents(ctx, t.Origin, e.RoomID(), gomatrixserverlib.MissingEvents{
-		Limit: 20,
-		// synapse uses the min depth they've ever seen in that room
-		MinDepth: minDepth,
-		// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
-		EarliestEvents: latestEvents,
-		// The event IDs to retrieve the previous events for.
-		LatestEvents: []string{e.EventID()},
-	}, roomVersion)
+
+	servers := []gomatrixserverlib.ServerName{t.Origin}
+	serverReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID: e.RoomID(),
+	}
+	serverRes := &api.QueryServerJoinedToRoomResponse{}
+	if err = t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
+		servers = append(servers, serverRes.ServerNames...)
+	}
+
+	var missingResp *gomatrixserverlib.RespMissingEvents
+	for _, server := range servers {
+		var m gomatrixserverlib.RespMissingEvents
+		if m, err = t.federation.LookupMissingEvents(ctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
+			Limit: 20,
+			// synapse uses the min depth they've ever seen in that room
+			MinDepth: minDepth,
+			// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
+			EarliestEvents: latestEvents,
+			// The event IDs to retrieve the previous events for.
+			LatestEvents: []string{e.EventID()},
+		}, roomVersion); err == nil {
+			missingResp = &m
+			break
+		}
+	}
+
+	if missingResp == nil {
+		logger.WithError(err).Errorf(
+			"%s pushed us an event but %d server(s) couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
+			len(servers), t.Origin,
+		)
+		return nil, missingPrevEventsError{
+			eventID: e.EventID(),
+			err:     err,
+		}
+	}
 
 	// security: how we handle failures depends on whether or not this event will become the new forward extremity for the room.
 	// There's 2 scenarios to consider:
@@ -658,16 +686,6 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event
 	// https://github.com/matrix-org/synapse/pull/3456
 	// https://github.com/matrix-org/synapse/blob/229eb81498b0fe1da81e9b5b333a0285acde9446/synapse/handlers/federation.py#L335
 	// For now, we do not allow Case B, so reject the event.
-	if err != nil {
-		logger.WithError(err).Errorf(
-			"%s pushed us an event but couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
-			t.Origin,
-		)
-		return nil, missingPrevEventsError{
-			eventID: e.EventID(),
-			err:     err,
-		}
-	}
 	logger.Infof("get_missing_events returned %d events", len(missingResp.Events))
 
 	// topologically sort and sanity check that we are making forward progress

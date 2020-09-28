@@ -255,17 +255,22 @@ func (r *Queryer) QueryServerJoinedToRoom(
 		return fmt.Errorf("r.DB.Events: %w", err)
 	}
 
+	servers := map[gomatrixserverlib.ServerName]struct{}{}
 	for _, e := range events {
 		if e.Type() == gomatrixserverlib.MRoomMember && e.StateKey() != nil {
 			_, serverName, err := gomatrixserverlib.SplitID('@', *e.StateKey())
 			if err != nil {
 				continue
 			}
+			servers[serverName] = struct{}{}
 			if serverName == request.ServerName {
 				response.IsInRoom = true
-				break
 			}
 		}
+	}
+
+	for server := range servers {
+		response.ServerNames = append(response.ServerNames, server)
 	}
 
 	return nil
