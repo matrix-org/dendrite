@@ -557,18 +557,12 @@ func (t *txnReq) lookupStateAfterEventLocally(ctx context.Context, roomID, event
 // lookuptStateBeforeEvent returns the room state before the event e, which is just /state_ids and/or /state depending on what
 // the server supports.
 func (t *txnReq) lookupStateBeforeEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (
-	respState *gomatrixserverlib.RespState, err error) {
+	*gomatrixserverlib.RespState, error) {
 
 	util.GetLogger(ctx).Infof("lookupStateBeforeEvent %s", eventID)
 
 	// Attempt to fetch the missing state using /state_ids and /events
-	respState, err = t.lookupMissingStateViaStateIDs(ctx, roomID, eventID, roomVersion)
-	if err != nil {
-		// Fallback to /state
-		util.GetLogger(ctx).WithError(err).Warn("lookupStateBeforeEvent failed to /state_ids, falling back to /state")
-		respState, err = t.lookupMissingStateViaState(ctx, roomID, eventID, roomVersion)
-	}
-	return
+	return t.lookupMissingStateViaStateIDs(ctx, roomID, eventID, roomVersion)
 }
 
 func (t *txnReq) resolveStatesAndCheck(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, states []*gomatrixserverlib.RespState, backwardsExtremity *gomatrixserverlib.Event) (*gomatrixserverlib.RespState, error) {
@@ -709,19 +703,6 @@ Event:
 
 	// we processed everything!
 	return nil, nil
-}
-
-func (t *txnReq) lookupMissingStateViaState(ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
-	respState *gomatrixserverlib.RespState, err error) {
-	state, err := t.federation.LookupState(ctx, t.Origin, roomID, eventID, roomVersion)
-	if err != nil {
-		return nil, err
-	}
-	// Check that the returned state is valid.
-	if err := state.Check(ctx, t.keys, nil); err != nil {
-		return nil, err
-	}
-	return &state, nil
 }
 
 func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
