@@ -367,13 +367,31 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 		return roomNotFoundError{e.RoomID()}
 	}
 
-	if len(stateResp.MissingPrevEventIDs) > 0 {
-		return t.processEventWithMissingState(ctx, e, stateResp.RoomVersion, isInboundTxn)
+	// TODO: Make this less bad
+	for _, missingAuthEventID := range stateResp.MissingAuthEventIDs {
+		if tx, err := t.federation.GetEvent(ctx, e.Origin(), missingAuthEventID); err == nil {
+			ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(tx.PDUs[0], stateResp.RoomVersion)
+			if err != nil {
+				logrus.WithError(err).Warnf("Failed to unmarshal auth event %d", missingAuthEventID)
+				continue
+			}
+			err = api.SendEvents(
+				context.Background(),
+				t.rsAPI,
+				[]gomatrixserverlib.HeaderedEvent{
+					ev.Headered(stateResp.RoomVersion),
+				},
+				api.DoNotSendToOtherServers,
+				nil,
+			)
+			if err != nil {
+				logrus.WithError(err).Warnf("Failed to submit auth event %d to roomserver", missingAuthEventID)
+			}
+		}
 	}
 
-	if len(stateResp.MissingAuthEventIDs) > 0 {
-		// TODO
-		logrus.Infof("*** %d MISSING AUTH EVENTS for %q ***", len(stateResp.MissingAuthEventIDs), e.EventID())
+	if len(stateResp.MissingPrevEventIDs) > 0 {
+		return t.processEventWithMissingState(ctx, e, stateResp.RoomVersion, isInboundTxn)
 	}
 
 	// pass the event to the roomserver which will do auth checks
