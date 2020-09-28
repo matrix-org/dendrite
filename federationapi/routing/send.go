@@ -611,6 +611,7 @@ retryAllowedState:
 // begin from. Returns an error only if we should terminate the transaction which initiated /get_missing_events
 // This function recursively calls txnReq.processEvent with the missing events, which will be processed before this function returns.
 // This means that we may recursively call this function, as we spider back up prev_events to the min depth.
+// nolint:gocyclo
 func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion, isInboundTxn bool) (backwardsExtremity *gomatrixserverlib.Event, err error) {
 	if !isInboundTxn {
 		// we've recursed here, so just take a state snapshot please!
@@ -645,6 +646,7 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event
 	serverRes := &api.QueryServerJoinedToRoomResponse{}
 	if err = t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
 		servers = append(servers, serverRes.ServerNames...)
+		logger.Infof("Found %d server(s) to query for missing events", len(servers))
 	}
 
 	var missingResp *gomatrixserverlib.RespMissingEvents
@@ -661,6 +663,8 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event
 		}, roomVersion); err == nil {
 			missingResp = &m
 			break
+		} else {
+			logger.WithError(err).Errorf("%s pushed us an event but %q did not respond to /get_missing_events", t.Origin, server)
 		}
 	}
 
