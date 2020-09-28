@@ -369,15 +369,18 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 
 	// TODO: Make this less bad
 	for _, missingAuthEventID := range stateResp.MissingAuthEventIDs {
+		logrus.WithContext(ctx).Infof("Retrieving missing auth event %q", missingAuthEventID)
 		if tx, err := t.federation.GetEvent(ctx, e.Origin(), missingAuthEventID); err == nil {
 			ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(tx.PDUs[0], stateResp.RoomVersion)
 			if err != nil {
-				logrus.WithError(err).Warnf("Failed to unmarshal auth event %d", missingAuthEventID)
+				logrus.WithContext(ctx).WithError(err).Warnf("Failed to unmarshal auth event %d", missingAuthEventID)
 				continue
 			}
 			if err = t.processEvent(ctx, ev, false); err != nil {
-				logrus.WithError(err).Warnf("Failed to process auth event %d", missingAuthEventID)
+				logrus.WithContext(ctx).WithError(err).Warnf("Failed to process auth event %d", missingAuthEventID)
 			}
+		} else {
+			logrus.WithContext(ctx).WithError(err).Warnf("Failed to retrieve unknown auth event %q", missingAuthEventID)
 		}
 	}
 
