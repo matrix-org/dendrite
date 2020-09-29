@@ -116,13 +116,13 @@ func (r *Queryer) QueryMissingAuthPrevEvents(
 	response.RoomVersion = info.RoomVersion
 
 	for _, authEventID := range request.AuthEventIDs {
-		if nids, err := r.DB.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) != 1 {
+		if nids, err := r.DB.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
 			response.MissingAuthEventIDs = append(response.MissingAuthEventIDs, authEventID)
 		}
 	}
 
 	for _, prevEventID := range request.PrevEventIDs {
-		if nids, err := r.DB.EventNIDs(ctx, []string{prevEventID}); err != nil || len(nids) != 1 {
+		if nids, err := r.DB.EventNIDs(ctx, []string{prevEventID}); err != nil || len(nids) == 0 {
 			response.MissingPrevEventIDs = append(response.MissingPrevEventIDs, prevEventID)
 		}
 	}
