@@ -51,13 +51,24 @@ func NewInternalAPI(
 		ServerKeyValidity: cfg.Matrix.KeyValidityPeriod,
 		FedClient:         fedClient,
 		OurKeyRing: gomatrixserverlib.KeyRing{
-			KeyFetchers: []gomatrixserverlib.KeyFetcher{
-				&gomatrixserverlib.DirectKeyFetcher{
-					Client: fedClient,
-				},
-			},
+			KeyFetchers: []gomatrixserverlib.KeyFetcher{},
 			KeyDatabase: serverKeyDB,
 		},
+	}
+
+	addDirectFetcher := func() {
+		internalAPI.OurKeyRing.KeyFetchers = append(
+			internalAPI.OurKeyRing.KeyFetchers,
+			&gomatrixserverlib.DirectKeyFetcher{
+				Client: fedClient,
+			},
+		)
+	}
+
+	if cfg.PreferDirectFetch {
+		addDirectFetcher()
+	} else {
+		defer addDirectFetcher()
 	}
 
 	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
