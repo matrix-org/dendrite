@@ -191,7 +191,7 @@ func (s *ServerKeyAPI) handleFetcherKeys(
 	// Try to fetch the keys.
 	fetcherResults, err := fetcher.FetchKeys(fetcherCtx, requests)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetcher.FetchKeys: %w", err)
 	}
 
 	// Build a map of the results that we want to commit to the

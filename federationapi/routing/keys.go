@@ -136,7 +136,6 @@ func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserver
 	var keys gomatrixserverlib.ServerKeys
 
 	keys.ServerName = cfg.Matrix.ServerName
-	keys.TLSFingerprints = cfg.TLSFingerPrints
 	keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(validUntil)
 
 	publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)

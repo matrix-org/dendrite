@@ -14,6 +14,9 @@ type ServerKeyAPI struct {
 	// Perspective keyservers, to use as a backup when direct key fetch
 	// requests don't succeed
 	KeyPerspectives KeyPerspectives `yaml:"key_perspectives"`
+
+	// Should we prefer direct key fetches over perspective ones?
+	PreferDirectFetch bool `yaml:"prefer_direct_fetch"`
 }
 
 func (c *ServerKeyAPI) Defaults() {

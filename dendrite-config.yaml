@@ -274,6 +274,11 @@ server_key_api:
     - key_id: ed25519:a_RXGa
       public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 
+  # This option will control whether Dendrite will prefer to look up keys directly
+  # or whether it should try perspective servers first, using direct fetches as a
+  # last resort.
+  prefer_direct_fetch: false
+
 # Configuration for the Sync API.
 sync_api:
   internal_api:

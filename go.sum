@@ -569,8 +569,14 @@ github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26 h1:Hr3zjRsq2bh
 github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26/go.mod h1:3fxX6gUjWyI/2Bt7J1OLhpCzOfO/bB3AiX0cJtEKud0=
 github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd h1:xVrqJK3xHREMNjwjljkAUaadalWc0rRbmVuQatzmgwg=
 github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd/go.mod h1:/gBX06Kw0exX1HrwmoBibFA98yBk/jxKpGVeyQbff+s=
-github.com/matrix-org/gomatrixserverlib v0.0.0-20200925165243-b9780a852681 h1:75fM7vPHiFGt+XxktT17LJD972XMtJ1n7FU1MpC08Zc=
-github.com/matrix-org/gomatrixserverlib v0.0.0-20200925165243-b9780a852681/go.mod h1:JsAzE1Ll3+gDWS9JSUHPJiiyAksvOOnGWF2nXdg4ZzU=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200929152221-6fe6457127ad h1:n0P/Oy8ZqqTPzum6FEayAjamsmvJTuIcA10WQ8GcK70=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200929152221-6fe6457127ad/go.mod h1:JsAzE1Ll3+gDWS9JSUHPJiiyAksvOOnGWF2nXdg4ZzU=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200929154026-a52e7a5f0553 h1:tiel2c3I9xr0SRS05g3UvOjj6Sgg1I3Yn2/oGA1GgLk=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200929154026-a52e7a5f0553/go.mod h1:JsAzE1Ll3+gDWS9JSUHPJiiyAksvOOnGWF2nXdg4ZzU=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200929154241-9414c4d0b5f2 h1:a07U5eFT521mFiUtA/A8NwiZp5vfRU59/QKs+pa3Fkc=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200929154241-9414c4d0b5f2/go.mod h1:JsAzE1Ll3+gDWS9JSUHPJiiyAksvOOnGWF2nXdg4ZzU=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200929155210-32fc5888d26a h1:kIwbS7eY7P/MX0oN4wRHGkoc4eTTnwOcdCawBZ3SrJI=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20200929155210-32fc5888d26a/go.mod h1:JsAzE1Ll3+gDWS9JSUHPJiiyAksvOOnGWF2nXdg4ZzU=
 github.com/matrix-org/naffka v0.0.0-20200901083833-bcdd62999a91 h1:HJ6U3S3ljJqNffYMcIeAncp5qT/i+ZMiJ2JC2F0aXP4=
 github.com/matrix-org/naffka v0.0.0-20200901083833-bcdd62999a91/go.mod h1:sjyPyRxKM5uw1nD2cJ6O2OxI6GOqyVBfNXqKjBZTBZE=
 github.com/matrix-org/util v0.0.0-20190711121626-527ce5ddefc7 h1:ntrLa/8xVzeSs8vHFHK25k0C+NV74sYMJnNSg5NoSRo=
