@@ -68,6 +68,13 @@ type RoomserverInternalAPI interface {
 		response *QueryStateAfterEventsResponse,
 	) error
 
+	// Query whether the roomserver is missing any auth or prev events.
+	QueryMissingAuthPrevEvents(
+		ctx context.Context,
+		request *QueryMissingAuthPrevEventsRequest,
+		response *QueryMissingAuthPrevEventsResponse,
+	) error
+
 	// Query a list of events by event ID.
 	QueryEventsByID(
 		ctx context.Context,

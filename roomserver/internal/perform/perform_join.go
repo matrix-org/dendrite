@@ -249,14 +249,10 @@ func (r *Joiner) performJoinRoomByID(
 			inputRes := api.InputRoomEventsResponse{}
 			r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
 			if err = inputRes.Err(); err != nil {
-				var notAllowed *gomatrixserverlib.NotAllowed
-				if errors.As(err, &notAllowed) {
-					return "", &api.PerformError{
-						Code: api.PerformErrorNotAllowed,
-						Msg:  fmt.Sprintf("InputRoomEvents auth failed: %s", err),
-					}
+				return "", &api.PerformError{
+					Code: api.PerformErrorNotAllowed,
+					Msg:  fmt.Sprintf("InputRoomEvents auth failed: %s", err),
 				}
-				return "", fmt.Errorf("r.InputRoomEvents: %w", err)
 			}
 		}
 

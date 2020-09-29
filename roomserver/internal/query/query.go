@@ -98,6 +98,38 @@ func (r *Queryer) QueryStateAfterEvents(
 	return nil
 }
 
+// QueryMissingAuthPrevEvents implements api.RoomserverInternalAPI
+func (r *Queryer) QueryMissingAuthPrevEvents(
+	ctx context.Context,
+	request *api.QueryMissingAuthPrevEventsRequest,
+	response *api.QueryMissingAuthPrevEventsResponse,
+) error {
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	if info == nil {
+		return errors.New("room doesn't exist")
+	}
+
+	response.RoomExists = !info.IsStub
+	response.RoomVersion = info.RoomVersion
+
+	for _, authEventID := range request.AuthEventIDs {
+		if nids, err := r.DB.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
+			response.MissingAuthEventIDs = append(response.MissingAuthEventIDs, authEventID)
+		}
+	}
+
+	for _, prevEventID := range request.PrevEventIDs {
+		if nids, err := r.DB.EventNIDs(ctx, []string{prevEventID}); err != nil || len(nids) == 0 {
+			response.MissingPrevEventIDs = append(response.MissingPrevEventIDs, prevEventID)
+		}
+	}
+
+	return nil
+}
+
 // QueryEventsByID implements api.RoomserverInternalAPI
 func (r *Queryer) QueryEventsByID(
 	ctx context.Context,
@@ -255,17 +287,22 @@ func (r *Queryer) QueryServerJoinedToRoom(
 		return fmt.Errorf("r.DB.Events: %w", err)
 	}
 
+	servers := map[gomatrixserverlib.ServerName]struct{}{}
 	for _, e := range events {
 		if e.Type() == gomatrixserverlib.MRoomMember && e.StateKey() != nil {
 			_, serverName, err := gomatrixserverlib.SplitID('@', *e.StateKey())
 			if err != nil {
 				continue
 			}
+			servers[serverName] = struct{}{}
 			if serverName == request.ServerName {
 				response.IsInRoom = true
-				break
 			}
 		}
+	}
+
+	for server := range servers {
+		response.ServerNames = append(response.ServerNames, server)
 	}
 
 	return nil

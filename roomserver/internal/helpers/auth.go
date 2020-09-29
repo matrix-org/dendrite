@@ -83,7 +83,7 @@ func CheckForSoftFail(
 	// Check if the event is allowed.
 	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
 		// return true, nil
-		return true, fmt.Errorf("gomatrixserverlib.Allowed: %w", err)
+		return true, err
 	}
 	return false, nil
 }
@@ -99,7 +99,7 @@ func CheckAuthEvents(
 	// Grab the numeric IDs for the supplied auth state events from the database.
 	authStateEntries, err := db.StateEntriesForEventIDs(ctx, authEventIDs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("db.StateEntriesForEventIDs: %w", err)
 	}
 	authStateEntries = types.DeduplicateStateEntries(authStateEntries)
 
@@ -109,7 +109,7 @@ func CheckAuthEvents(
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loadAuthEvents: %w", err)
 	}
 
 	// Check if the event is allowed.
