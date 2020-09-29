@@ -72,7 +72,7 @@ issue](https://github.com/matrix-org/dendrite/labels/good%20first%20issue).
 These should be well-contained, small pieces of work that can be picked up to
 help you get familiar with the code base.
 
-Once you're comfortable with hacking on Dendrite there are issues lablled as
+Once you're comfortable with hacking on Dendrite there are issues labelled as
 [help wanted](https://github.com/matrix-org/dendrite/labels/help-wanted),
 these are often slightly larger or more complicated pieces of work but are
 hopefully nonetheless fairly well-contained.
