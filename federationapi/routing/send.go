@@ -368,19 +368,35 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 	}
 
 	// TODO: Make this less bad
-	for _, missingAuthEventID := range stateResp.MissingAuthEventIDs {
-		logrus.WithContext(ctx).Infof("Retrieving missing auth event %q", missingAuthEventID)
-		if tx, err := t.federation.GetEvent(ctx, e.Origin(), missingAuthEventID); err == nil {
-			ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(tx.PDUs[0], stateResp.RoomVersion)
-			if err != nil {
-				logrus.WithContext(ctx).WithError(err).Warnf("Failed to unmarshal auth event %d", missingAuthEventID)
-				continue
+	if len(stateResp.MissingAuthEventIDs) > 0 {
+		servers := []gomatrixserverlib.ServerName{t.Origin}
+		serverReq := &api.QueryServerJoinedToRoomRequest{
+			RoomID: e.RoomID(),
+		}
+		serverRes := &api.QueryServerJoinedToRoomResponse{}
+		if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
+			servers = append(servers, serverRes.ServerNames...)
+			logrus.WithContext(ctx).Infof("Found %d server(s) to query for missing events", len(servers))
+		}
+
+	getAuthEvent:
+		for _, missingAuthEventID := range stateResp.MissingAuthEventIDs {
+			for _, server := range servers {
+				logrus.WithContext(ctx).Infof("Retrieving missing auth event %q from %q", missingAuthEventID, server)
+				tx, err := t.federation.GetEvent(ctx, server, missingAuthEventID)
+				if err != nil {
+					continue
+				}
+				ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(tx.PDUs[0], stateResp.RoomVersion)
+				if err != nil {
+					logrus.WithContext(ctx).WithError(err).Warnf("Failed to unmarshal auth event %q", missingAuthEventID)
+					continue getAuthEvent
+				}
+				if err = t.processEvent(ctx, ev, false); err != nil {
+					logrus.WithContext(ctx).WithError(err).Warnf("Failed to process auth event %q", missingAuthEventID)
+				}
+				continue getAuthEvent
 			}
-			if err = t.processEvent(ctx, ev, false); err != nil {
-				logrus.WithContext(ctx).WithError(err).Warnf("Failed to process auth event %d", missingAuthEventID)
-			}
-		} else {
-			logrus.WithContext(ctx).WithError(err).Warnf("Failed to retrieve unknown auth event %q", missingAuthEventID)
 		}
 	}
 
