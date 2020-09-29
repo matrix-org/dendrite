@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -206,10 +207,10 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 				return nil, &jsonErr
 			} else {
 				// Auth errors mean the event is 'rejected' which have to be silent to appease sytest
-				_, rejected := err.(*gomatrixserverlib.NotAllowed)
-				errMsg := err.Error()
-				if rejected {
-					errMsg = ""
+				errMsg := ""
+				rejected := errors.Is(err, &gomatrixserverlib.NotAllowed{})
+				if !rejected {
+					errMsg = err.Error()
 				}
 				util.GetLogger(ctx).WithError(err).WithField("event_id", e.EventID()).WithField("rejected", rejected).Warn(
 					"Failed to process incoming federation event, skipping",

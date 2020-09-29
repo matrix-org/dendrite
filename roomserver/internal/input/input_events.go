@@ -133,7 +133,7 @@ func (r *Inputer) processRoomEvent(
 			"soft_fail": softfail,
 			"sender":    event.Sender(),
 		}).Debug("Stored rejected event")
-		return event.EventID(), nil
+		return event.EventID(), rejectionErr
 	}
 
 	if input.Kind == api.KindRewrite {
