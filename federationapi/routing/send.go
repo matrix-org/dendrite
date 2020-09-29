@@ -345,6 +345,8 @@ func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverli
 }
 
 func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, isInboundTxn bool) error {
+	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
+
 	// Work out if the roomserver knows everything it needs to know to auth
 	// the event.
 	stateReq := api.QueryMissingAuthPrevEventsRequest{
@@ -367,7 +369,6 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 		return roomNotFoundError{e.RoomID()}
 	}
 
-	// TODO: Make this less bad
 	if len(stateResp.MissingAuthEventIDs) > 0 {
 		servers := []gomatrixserverlib.ServerName{t.Origin}
 		serverReq := &api.QueryServerJoinedToRoomRequest{
@@ -376,26 +377,26 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 		serverRes := &api.QueryServerJoinedToRoomResponse{}
 		if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
 			servers = append(servers, serverRes.ServerNames...)
-			logrus.WithContext(ctx).Infof("Found %d server(s) to query for missing events", len(servers))
+			logger.Infof("Found %d server(s) to query for missing events", len(servers))
 		}
 
 	getAuthEvent:
 		for _, missingAuthEventID := range stateResp.MissingAuthEventIDs {
 			for _, server := range servers {
-				logrus.WithContext(ctx).Infof("Retrieving missing auth event %q from %q", missingAuthEventID, server)
+				logger.Infof("Retrieving missing auth event %q from %q", missingAuthEventID, server)
 				tx, err := t.federation.GetEvent(ctx, server, missingAuthEventID)
 				if err != nil {
-					continue
+					continue // try the next server
 				}
 				ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(tx.PDUs[0], stateResp.RoomVersion)
 				if err != nil {
-					logrus.WithContext(ctx).WithError(err).Warnf("Failed to unmarshal auth event %q", missingAuthEventID)
-					continue getAuthEvent
+					logger.WithError(err).Errorf("Failed to unmarshal auth event %q", missingAuthEventID)
+					continue // try the next server
 				}
 				if err = t.processEvent(ctx, ev, false); err != nil {
-					logrus.WithContext(ctx).WithError(err).Warnf("Failed to process auth event %q", missingAuthEventID)
+					logger.WithError(err).Errorf("Failed to process auth event %q", missingAuthEventID)
 				}
-				continue getAuthEvent
+				continue getAuthEvent // move onto the next event
 			}
 		}
 	}
