@@ -108,11 +108,11 @@ func (r *Queryer) QueryMissingAuthPrevEvents(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil {
 		return errors.New("room doesn't exist")
 	}
 
-	response.RoomExists = true
+	response.RoomExists = !info.IsStub
 	response.RoomVersion = info.RoomVersion
 
 	for _, authEventID := range request.AuthEventIDs {

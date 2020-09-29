@@ -370,6 +370,8 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 	}
 
 	if len(stateResp.MissingAuthEventIDs) > 0 {
+		logger.Infof("%d missing auth_events", len(stateResp.MissingAuthEventIDs))
+
 		servers := []gomatrixserverlib.ServerName{t.Origin}
 		serverReq := &api.QueryServerJoinedToRoomRequest{
 			RoomID: e.RoomID(),
@@ -413,6 +415,7 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 	}
 
 	if len(stateResp.MissingPrevEventIDs) > 0 {
+		logger.Infof("%d missing prev_events", len(stateResp.MissingAuthEventIDs))
 		return t.processEventWithMissingState(ctx, e, stateResp.RoomVersion, isInboundTxn)
 	}
 
