@@ -253,19 +253,6 @@ Key-ID: ` + testKeyID + `
 -----END MATRIX PRIVATE KEY-----
 `
 
-func TestFingerprintPEM(t *testing.T) {
-	got := fingerprintPEM([]byte(testCert))
-	if got == nil {
-		t.Error("failed to calculate fingerprint")
-	}
-	if string(got.SHA256) != testCertFingerprint {
-		t.Errorf("bad fingerprint: wanted %q got %q", got, testCertFingerprint)
-	}
-
-}
-
-const testCertFingerprint = "56.\\SPQxE\xd4\x95\xfb\xf6\xd5\x04\x91\xcb/\x07\xb1^\x88\x08\xe3\xc1p\xdfY\x04\x19w\xcb"
-
 const testCert = `
 -----BEGIN CERTIFICATE-----
 MIIE0zCCArugAwIBAgIJAPype3u24LJeMA0GCSqGSIb3DQEBCwUAMAAwHhcNMTcw

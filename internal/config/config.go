@@ -16,7 +16,6 @@ package config
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -252,20 +251,6 @@ func loadConfig(
 		c.Global.OldVerifyKeys[i].KeyID, c.Global.OldVerifyKeys[i].PrivateKey = keyID, privateKey
 	}
 
-	for _, certPath := range c.FederationAPI.FederationCertificatePaths {
-		absCertPath := absPath(basePath, certPath)
-		var pemData []byte
-		pemData, err = readFile(absCertPath)
-		if err != nil {
-			return nil, err
-		}
-		fingerprint := fingerprintPEM(pemData)
-		if fingerprint == nil {
-			return nil, fmt.Errorf("no certificate PEM data in %q", absCertPath)
-		}
-		c.FederationAPI.TLSFingerPrints = append(c.FederationAPI.TLSFingerPrints, *fingerprint)
-	}
-
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))
 
 	// Generate data from config options
@@ -490,20 +475,6 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 				return "", nil, err
 			}
 			return gomatrixserverlib.KeyID(keyID), privKey, nil
-		}
-	}
-}
-
-func fingerprintPEM(data []byte) *gomatrixserverlib.TLSFingerprint {
-	for {
-		var certDERBlock *pem.Block
-		certDERBlock, data = pem.Decode(data)
-		if data == nil {
-			return nil
-		}
-		if certDERBlock.Type == "CERTIFICATE" {
-			digest := sha256.Sum256(certDERBlock.Bytes)
-			return &gomatrixserverlib.TLSFingerprint{SHA256: digest[:]}
 		}
 	}
 }
