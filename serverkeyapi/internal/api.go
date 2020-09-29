@@ -201,6 +201,10 @@ func (s *ServerKeyAPI) handleFetcherKeys(
 
 	// Now let's look at the results that we got from this fetcher.
 	for req, res := range fetcherResults {
+		if req.ServerName == s.ServerName {
+			continue
+		}
+
 		if prev, ok := results[req]; ok {
 			// We've already got a previous entry for this request
 			// so let's see if the newly retrieved one contains a more
@@ -208,31 +212,24 @@ func (s *ServerKeyAPI) handleFetcherKeys(
 			if res.ValidUntilTS > prev.ValidUntilTS {
 				// This key is newer than the one we had so let's store
 				// it in the database.
-				if req.ServerName != s.ServerName {
-					storeResults[req] = res
-				}
+				storeResults[req] = res
 			}
 		} else {
 			// We didn't already have a previous entry for this request
 			// so store it in the database anyway for now.
-			if req.ServerName != s.ServerName {
-				storeResults[req] = res
-			}
+			storeResults[req] = res
 		}
 
 		// Update the results map with this new result. If nothing
 		// else, we can try verifying against this key.
 		results[req] = res
 
-		// If the key is valid right now then we can remove it from the
-		// request list as we won't need to re-fetch it.
-		if res.WasValidAt(now, true) {
-			delete(requests, req)
-		}
+		// Remove it from the request list so we won't re-fetch it.
+		delete(requests, req)
 	}
 
 	// Store the keys from our store map.
-	if err = s.OurKeyRing.KeyDatabase.StoreKeys(ctx, storeResults); err != nil {
+	if err = s.OurKeyRing.KeyDatabase.StoreKeys(context.Background(), storeResults); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"fetcher_name":  fetcher.FetcherName(),
 			"database_name": s.OurKeyRing.KeyDatabase.FetcherName(),
@@ -243,7 +240,7 @@ func (s *ServerKeyAPI) handleFetcherKeys(
 	if len(storeResults) > 0 {
 		logrus.WithFields(logrus.Fields{
 			"fetcher_name": fetcher.FetcherName(),
-		}).Infof("Updated %d of %d key(s) in database", len(storeResults), len(results))
+		}).Infof("Updated %d of %d key(s) in database (%d keys remaining)", len(storeResults), len(results), len(requests))
 	}
 
 	return nil
