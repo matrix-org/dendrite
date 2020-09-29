@@ -83,7 +83,7 @@ func CheckForSoftFail(
 	// Check if the event is allowed.
 	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
 		// return true, nil
-		return true, fmt.Errorf("gomatrixserverlib.Allowed: %w", err)
+		return true, err
 	}
 	return false, nil
 }
@@ -114,7 +114,7 @@ func CheckAuthEvents(
 
 	// Check if the event is allowed.
 	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
-		return nil, fmt.Errorf("gomatrixserverlib.Allowed: %w", err)
+		return nil, err
 	}
 
 	// Return the numeric IDs for the auth events.

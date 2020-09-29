@@ -17,7 +17,6 @@ package routing
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -208,7 +207,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			} else {
 				// Auth errors mean the event is 'rejected' which have to be silent to appease sytest
 				errMsg := ""
-				rejected := errors.Is(err, &gomatrixserverlib.NotAllowed{})
+				_, rejected := err.(*gomatrixserverlib.NotAllowed)
 				if !rejected {
 					errMsg = err.Error()
 				}
@@ -371,7 +370,7 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 	}
 
 	if len(stateResp.MissingAuthEventIDs) > 0 {
-		logger.Infof("%d missing auth_events", len(stateResp.MissingAuthEventIDs))
+		logger.Infof("Event refers to %d unknown auth_events", len(stateResp.MissingAuthEventIDs))
 
 		servers := []gomatrixserverlib.ServerName{t.Origin}
 		serverReq := &api.QueryServerJoinedToRoomRequest{
@@ -416,7 +415,7 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 	}
 
 	if len(stateResp.MissingPrevEventIDs) > 0 {
-		logger.Infof("%d missing prev_events", len(stateResp.MissingAuthEventIDs))
+		logger.Infof("Event refers to %d unknown prev_events", len(stateResp.MissingPrevEventIDs))
 		return t.processEventWithMissingState(ctx, e, stateResp.RoomVersion, isInboundTxn)
 	}
 
