@@ -656,7 +656,7 @@ retryAllowedState:
 // getMissingEvents returns a nil backwardsExtremity if missing events were fetched and handled, else returns the new backwards extremity which we should
 // begin from. Returns an error only if we should terminate the transaction which initiated /get_missing_events
 // This function recursively calls txnReq.processEvent with the missing events, which will be processed before this function returns.
-// This means that we may recursively call this function, as we spider back up prev_events to the min depth.
+// This means that we may recursively call this function, as we spider back up prev_events.
 // nolint:gocyclo
 func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion, isInboundTxn bool) (backwardsExtremity *gomatrixserverlib.Event, err error) {
 	if !isInboundTxn {
@@ -679,11 +679,6 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event
 	for i := range res.LatestEvents {
 		latestEvents[i] = res.LatestEvents[i].EventID
 	}
-	// this server just sent us an event for which we do not know its prev_events - ask that server for those prev_events.
-	minDepth := int(res.Depth) - 20
-	if minDepth < 0 {
-		minDepth = 0
-	}
 
 	servers := []gomatrixserverlib.ServerName{t.Origin}
 	serverReq := &api.QueryServerJoinedToRoomRequest{
@@ -700,8 +695,6 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.Event
 		var m gomatrixserverlib.RespMissingEvents
 		if m, err = t.federation.LookupMissingEvents(ctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
 			Limit: 20,
-			// synapse uses the min depth they've ever seen in that room
-			MinDepth: minDepth,
 			// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
 			EarliestEvents: latestEvents,
 			// The event IDs to retrieve the previous events for.
