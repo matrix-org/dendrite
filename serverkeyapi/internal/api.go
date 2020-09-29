@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/serverkeyapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ type ServerKeyAPI struct {
 	ServerPublicKey   ed25519.PublicKey
 	ServerKeyID       gomatrixserverlib.KeyID
 	ServerKeyValidity time.Duration
+	OldServerKeys     []config.OldVerifyKeys
 
 	OurKeyRing gomatrixserverlib.KeyRing
 	FedClient  gomatrixserverlib.KeyClient
@@ -112,14 +114,17 @@ func (s *ServerKeyAPI) FetcherName() string {
 }
 
 // handleLocalKeys handles cases where the key request contains
-// a request for our own server keys.
+// a request for our own server keys, either current or old.
 func (s *ServerKeyAPI) handleLocalKeys(
 	_ context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) {
 	for req := range requests {
-		if req.ServerName == s.ServerName {
+		if req.ServerName != s.ServerName {
+			continue
+		}
+		if req.KeyID == s.ServerKeyID {
 			// We found a key request that is supposed to be for our own
 			// keys. Remove it from the request list so we don't hit the
 			// database or the fetchers for it.
@@ -132,6 +137,28 @@ func (s *ServerKeyAPI) handleLocalKeys(
 				},
 				ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
 				ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(s.ServerKeyValidity)),
+			}
+		} else {
+			// The key request doesn't match our current key. Let's see
+			// if it matches any of our old verify keys.
+			for _, oldVerifyKey := range s.OldServerKeys {
+				if req.KeyID == oldVerifyKey.KeyID {
+					// We found a key request that is supposed to be an expired
+					// key.
+					delete(requests, req)
+
+					// Insert our own key into the response.
+					results[req] = gomatrixserverlib.PublicKeyLookupResult{
+						VerifyKey: gomatrixserverlib.VerifyKey{
+							Key: gomatrixserverlib.Base64Bytes(oldVerifyKey.PrivateKey.Public().(ed25519.PublicKey)),
+						},
+						ExpiredTS:    oldVerifyKey.ExpiredAt,
+						ValidUntilTS: gomatrixserverlib.PublicKeyNotValid,
+					}
+
+					// No need to look at the other keys.
+					break
+				}
 			}
 		}
 	}
@@ -175,7 +202,7 @@ func (s *ServerKeyAPI) handleDatabaseKeys(
 // the remaining requests.
 func (s *ServerKeyAPI) handleFetcherKeys(
 	ctx context.Context,
-	now gomatrixserverlib.Timestamp,
+	_ gomatrixserverlib.Timestamp,
 	fetcher gomatrixserverlib.KeyFetcher,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
