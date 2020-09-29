@@ -393,10 +393,21 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 					logger.WithError(err).Errorf("Failed to unmarshal auth event %q", missingAuthEventID)
 					continue // try the next server
 				}
-				if err = t.processEvent(ctx, ev, false); err != nil {
-					logger.WithError(err).Errorf("Failed to process auth event %q", missingAuthEventID)
+				if err = api.SendInputRoomEvents(
+					context.Background(),
+					t.rsAPI,
+					[]api.InputRoomEvent{
+						{
+							Kind:         api.KindOutlier,
+							Event:        ev.Headered(stateResp.RoomVersion),
+							AuthEventIDs: ev.AuthEventIDs(),
+							SendAsServer: api.DoNotSendToOtherServers,
+						},
+					},
+				); err != nil {
+					logger.WithError(err).Errorf("Failed to send auth event %q to roomserver", missingAuthEventID)
+					continue getAuthEvent // move onto the next event
 				}
-				continue getAuthEvent // move onto the next event
 			}
 		}
 	}
