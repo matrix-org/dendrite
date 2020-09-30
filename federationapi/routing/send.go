@@ -872,7 +872,7 @@ func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, even
 		h, err = t.lookupEvent(ctx, roomVersion, missingEventID, false)
 		switch err.(type) {
 		case verifySigError:
-			break
+			return
 		case nil:
 			break
 		default:
