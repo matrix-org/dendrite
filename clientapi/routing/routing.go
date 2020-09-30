@@ -435,6 +435,15 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
+	r0mux.Handle("/account/deactivate",
+		httputil.MakeAuthAPI("deactivate", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			return Deactivate(req, userInteractiveAuth, userAPI, device)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	// Stub endpoints required by Riot
 
 	r0mux.Handle("/login",
