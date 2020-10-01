@@ -481,3 +481,4 @@ Inbound /make_join rejects attempts to join rooms where all users have left
 Inbound federation rejects invites which include invalid JSON for room version 6
 Inbound federation rejects invite rejections which include invalid JSON for room version 6
 GET /capabilities is present and well formed for registered user 
+Event with an invalid signature in the send_join response should not cause room join to fail
