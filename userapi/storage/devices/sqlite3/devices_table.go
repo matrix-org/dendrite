@@ -40,14 +40,16 @@ CREATE TABLE IF NOT EXISTS device_devices (
     localpart TEXT ,
     created_ts BIGINT,
     display_name TEXT,
+    last_used_ts BIGINT,
+    ip TEXT,
 
 		UNIQUE (localpart, device_id)
 );
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)"
+	"INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_used_ts, ip)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
 
 const selectDevicesCountSQL = "" +
 	"SELECT COUNT(access_token) FROM device_devices"
@@ -134,7 +136,7 @@ func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server go
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
-	displayName *string,
+	displayName *string, ipAddr string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
@@ -144,7 +146,7 @@ func (s *devicesStatements) insertDevice(
 		return nil, err
 	}
 	sessionID++
-	if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID); err != nil {
+	if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr); err != nil {
 		return nil, err
 	}
 	return &api.Device{
@@ -152,6 +154,8 @@ func (s *devicesStatements) insertDevice(
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
 		SessionID:   sessionID,
+		LastSeen:    createdTimeMS,
+		IPAddr:      ipAddr,
 	}, nil
 }
 

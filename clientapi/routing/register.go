@@ -543,6 +543,7 @@ func handleGuestRegistration(
 		Localpart:         res.Account.Localpart,
 		DeviceDisplayName: r.InitialDisplayName,
 		AccessToken:       token,
+		IPAddr:            req.RemoteAddr,
 	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{
@@ -691,7 +692,7 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, "", appserviceID,
+		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr,
 		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 	)
 }
@@ -710,7 +711,7 @@ func checkAndCompleteFlow(
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.Password, "",
+			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr,
 			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 		)
 	}
@@ -762,10 +763,10 @@ func LegacyRegister(
 			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
 		}
 
-		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", false, nil, nil)
+		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, false, nil, nil)
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
-		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", false, nil, nil)
+		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, false, nil, nil)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
@@ -812,7 +813,7 @@ func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *u
 func completeRegistration(
 	ctx context.Context,
 	userAPI userapi.UserInternalAPI,
-	username, password, appserviceID string,
+	username, password, appserviceID, ipAddr string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
 ) util.JSONResponse {
@@ -880,6 +881,7 @@ func completeRegistration(
 		AccessToken:       token,
 		DeviceDisplayName: displayName,
 		DeviceID:          deviceID,
+		IPAddr:            ipAddr,
 	}, &devRes)
 	if err != nil {
 		return util.JSONResponse{

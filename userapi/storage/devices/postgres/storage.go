@@ -83,7 +83,7 @@ func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]ap
 // Returns the device on success.
 func (d *Database) CreateDevice(
 	ctx context.Context, localpart string, deviceID *string, accessToken string,
-	displayName *string,
+	displayName *string, ipAddr string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
 		returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
@@ -93,7 +93,7 @@ func (d *Database) CreateDevice(
 				return err
 			}
 
-			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken, displayName)
+			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken, displayName, ipAddr)
 			return err
 		})
 	} else {
@@ -108,7 +108,7 @@ func (d *Database) CreateDevice(
 
 			returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 				var err error
-				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName)
+				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName, ipAddr)
 				return err
 			})
 			if returnErr == nil {
