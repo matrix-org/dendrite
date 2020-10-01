@@ -4,9 +4,9 @@ Dendrite is a second-generation Matrix homeserver written in Go!
 
 ## Community
 
-- [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) - General chat about the Dendrite project, for users and server admins alike
-- [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org) - The place for developers, where all Dendrite development discussion happens
-- [![Dendrite Alerts](https://img.shields.io/matrix/dendrite-alerts:matrix.org.svg?label=%23dendrite-alerts%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-alerts:matrix.org) - Release notifications and important information, highly recommended for all Dendrite server administrators
+- [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) General chat about the Dendrite project, for users and server admins alike
+- [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org) The place for developers, where all Dendrite development discussion happens
+- [![Dendrite Alerts](https://img.shields.io/matrix/dendrite-alerts:matrix.org.svg?label=%23dendrite-alerts%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-alerts:matrix.org) Release notifications and important info, highly recommended for all Dendrite server admins
 
 ## Quick start
 
