@@ -37,4 +37,5 @@ type Database interface {
 	RemoveDevices(ctx context.Context, localpart string, devices []string) error
 	// RemoveAllDevices deleted all devices for this user. Returns the devices deleted.
 	RemoveAllDevices(ctx context.Context, localpart, exceptDeviceID string) (devices []api.Device, err error)
+	UpdateDeviceLastSeen(ctx context.Context, deviceID, ipAddr string) error
 }

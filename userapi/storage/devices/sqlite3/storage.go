@@ -193,3 +193,10 @@ func (d *Database) RemoveAllDevices(
 	})
 	return
 }
+
+// UpdateDeviceLastSeen updates a the last seen timestamp and the ip address
+func (d *Database) UpdateDeviceLastSeen(ctx context.Context, deviceID, ipAddr string) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.devices.updateDeviceLastSeen(ctx, txn, deviceID, ipAddr)
+	})
+}
