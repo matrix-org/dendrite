@@ -2,7 +2,7 @@
 
 Dendrite is a second-generation Matrix homeserver written in Go!
 
-## Community
+Join us in:
 
 - **[#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org)** - General chat about the Dendrite project, for users and server admins alike
 - **[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)** - The place for developers, where all Dendrite development discussion happens
