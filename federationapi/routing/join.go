@@ -192,9 +192,7 @@ func SendJoin(
 	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(
-				fmt.Sprintf("No state key was provided in the join event."),
-			),
+			JSON: jsonerror.BadJSON("No state key was provided in the join event."),
 		}
 	}
 
