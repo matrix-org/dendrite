@@ -717,11 +717,7 @@ func ResolveConflictsAdhoc(
 		// Append the events if there is already a conflicted list for
 		// this tuple key, create it if not.
 		tuple := stateKeyTuple{event.Type(), *event.StateKey()}
-		if _, ok := eventMap[tuple]; ok {
-			eventMap[tuple] = append(eventMap[tuple], event)
-		} else {
-			eventMap[tuple] = []gomatrixserverlib.Event{event}
-		}
+		eventMap[tuple] = append(eventMap[tuple], event)
 	}
 
 	// Split out the events in the map into conflicted and unconflicted
