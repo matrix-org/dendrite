@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS device_devices (
     -- The display name, human friendlier than device_id and updatable
     display_name TEXT,
 	-- The time the device was last used, as a unix timestamp (ms resolution).
-	last_used_ts BIGINT NOT NULL,
+	last_seen_ts BIGINT NOT NULL,
 	-- The last seen IP address of this device
 	ip TEXT
                                           
@@ -92,6 +92,9 @@ const deleteDevicesSQL = "" +
 const selectDevicesByIDSQL = "" +
 	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id = ANY($1)"
 
+const updateDeviceLastSeen = "" +
+	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE device_id = $3"
+
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
@@ -99,6 +102,7 @@ type devicesStatements struct {
 	selectDevicesByLocalpartStmt *sql.Stmt
 	selectDevicesByIDStmt        *sql.Stmt
 	updateDeviceNameStmt         *sql.Stmt
+	updateDeviceLastSeenStmt     *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
 	deleteDevicesStmt            *sql.Stmt
@@ -135,6 +139,9 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 		return
 	}
 	if s.selectDevicesByIDStmt, err = db.Prepare(selectDevicesByIDSQL); err != nil {
+		return
+	}
+	if s.updateDeviceLastSeenStmt, err = db.Prepare(updateDeviceLastSeen); err != nil {
 		return
 	}
 	s.serverName = server
@@ -286,4 +293,11 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	}
 
 	return devices, rows.Err()
+}
+
+func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, txn *sql.Tx, deviceID, ipAddr string) error {
+	lastSeenTs := time.Now().UnixNano() / 1000000
+	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, deviceID)
+	return err
 }

@@ -8,13 +8,13 @@ CREATE TABLE device_devices (
     localpart TEXT ,
     created_ts BIGINT,
     display_name TEXT,
-    last_used_ts BIGINT,
+    last_seen_ts BIGINT,
     ip TEXT,
     UNIQUE (localpart, device_id)
 );
 INSERT
 INTO device_devices (
-    access_token, session_id, device_id, localpart, created_ts, display_name, last_used_ts, ip
+    access_token, session_id, device_id, localpart, created_ts, display_name, last_seen_ts, ip
 )  SELECT
        access_token, session_id, device_id, localpart, created_ts, display_name, created_ts, ''
 FROM device_devices_tmp;

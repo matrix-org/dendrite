@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS device_devices (
     localpart TEXT ,
     created_ts BIGINT,
     display_name TEXT,
-    last_used_ts BIGINT,
+    last_seen_ts BIGINT,
     ip TEXT,
 
 		UNIQUE (localpart, device_id)
@@ -78,6 +78,9 @@ const deleteDevicesSQL = "" +
 const selectDevicesByIDSQL = "" +
 	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id IN ($1)"
 
+const updateDeviceLastSeen = "" +
+	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE device_id = $3"
+
 type devicesStatements struct {
 	db                           *sql.DB
 	writer                       sqlutil.Writer
@@ -88,6 +91,7 @@ type devicesStatements struct {
 	selectDevicesByIDStmt        *sql.Stmt
 	selectDevicesByLocalpartStmt *sql.Stmt
 	updateDeviceNameStmt         *sql.Stmt
+	updateDeviceLastSeenStmt     *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
@@ -125,6 +129,9 @@ func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server go
 		return
 	}
 	if s.selectDevicesByIDStmt, err = db.Prepare(selectDevicesByIDSQL); err != nil {
+		return
+	}
+	if s.updateDeviceLastSeenStmt, err = db.Prepare(updateDeviceLastSeen); err != nil {
 		return
 	}
 	s.serverName = server
@@ -291,4 +298,11 @@ func (s *devicesStatements) selectDevicesByID(ctx context.Context, deviceIDs []s
 		devices = append(devices, dev)
 	}
 	return devices, rows.Err()
+}
+
+func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, txn *sql.Tx, deviceID, ipAddr string) error {
+	lastSeenTs := time.Now().UnixNano() / 1000000
+	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, deviceID)
+	return err
 }
