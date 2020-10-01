@@ -1,9 +1,8 @@
 # Dendrite [![Build Status](https://badge.buildkite.com/4be40938ab19f2bbc4a6c6724517353ee3ec1422e279faf374.svg?branch=master)](https://buildkite.com/matrix-dot-org/dendrite) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
 Dendrite is a second-generation Matrix homeserver written in Go.
-It intends to provide an **efficient**, **simple**, **reliable** and **scalable** alternative to Synapse:
+It intends to provide an **efficient**, **reliable** and **scalable** alternative to Synapse:
  - Efficient: A small memory footprint with better baseline performance than an out-of-the-box Synapse.
- - Simple: packaged as a single binary (monolith mode) with minimal required configuration options.
  - Reliable: uses the [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as
    a [brand new Go test suite](https://github.com/matrix-org/complement).
  - Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
@@ -58,7 +57,7 @@ Then point your favourite Matrix client at `http://localhost:8008`. For full ins
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of August 2020 we're at around 52% CS API coverage and 65% Federation coverage, though check
+updates with CI. As of October 2020 we're at around 56% CS API coverage and 77% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
 servers such as matrix.org reasonably well. There's a long list of features that are not implemented, notably:
  - Receipts
