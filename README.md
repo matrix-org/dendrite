@@ -1,6 +1,27 @@
 # Dendrite [![Build Status](https://badge.buildkite.com/4be40938ab19f2bbc4a6c6724517353ee3ec1422e279faf374.svg?branch=master)](https://buildkite.com/matrix-dot-org/dendrite) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
-Dendrite is a second-generation Matrix homeserver written in Go!
+Dendrite is a second-generation Matrix homeserver written in Go.
+It intends to provide an **efficient**, **simple**, **reliable** and **scalable** alternative to Synapse:
+ - Efficient: A small memory footprint with better baseline performance than an out-of-the-box Synapse.
+ - Simple: packaged as a single binary (monolith mode) with minimal required configuration options.
+ - Reliable: uses the [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as
+   a [brand new Go test suite](https://github.com/matrix-org/complement).
+ - Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
+
+
+As of October 2020, Dendrite has now entered **beta** which means:
+- Dendrite is ready for early adopters. We recommend running in Monolith mode with a Postgres database.
+- Dendrite has periodic semver releases. We intend to release new versions as we land significant features.
+- Dendrite supports database schema upgrades between releases. This means you should never lose your messages when upgrading Dendrite.
+- Breaking changes will not occur on minor releases. This means you can safely upgrade Dendrite without modifying your database or config file.
+
+This does not mean:
+ - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
+ - All of the CS/Federation APIs are implemented. We are tracking progress via a script called 'Are We Synapse Yet?'.
+ - Dendrite is ready for massive homeserver deployments. You cannot shard each microservice, only run each one on a different machine.
+
+Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
+In the future, we will be able to scale up to gigantic servers (equivalent to matrix.org) via polylith mode. 
 
 Join us in:
 
