@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS device_devices (
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_used_ts, ip)" +
+	"INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_seen_ts, ip)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
 
 const selectDevicesCountSQL = "" +
@@ -161,8 +161,8 @@ func (s *devicesStatements) insertDevice(
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
 		SessionID:   sessionID,
-		LastSeen:    createdTimeMS,
-		IPAddr:      ipAddr,
+		LastSeenTS:  createdTimeMS,
+		LastSeenIP:  ipAddr,
 	}, nil
 }
 

@@ -213,8 +213,8 @@ type Device struct {
 	// associated with access tokens.
 	SessionID   int64
 	DisplayName string
-	LastSeen    int64
-	IPAddr      string
+	LastSeenTS  int64
+	LastSeenIP  string
 }
 
 // Account represents a Matrix account on this home server.

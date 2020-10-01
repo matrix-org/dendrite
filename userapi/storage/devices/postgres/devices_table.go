@@ -65,7 +65,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(loca
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name, last_used_ts, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)" +
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name, last_seen_ts, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
@@ -166,8 +166,8 @@ func (s *devicesStatements) insertDevice(
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
 		SessionID:   sessionID,
-		LastSeen:    createdTimeMS,
-		IPAddr:      ipAddr,
+		LastSeenTS:  createdTimeMS,
+		LastSeenIP:  ipAddr,
 	}, nil
 }
 
