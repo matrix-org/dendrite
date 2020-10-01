@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/serverkeyapi"
 	"github.com/matrix-org/dendrite/userapi"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var (
@@ -125,7 +124,7 @@ func main() {
 	monolith := setup.Monolith{
 		Config:        base.Cfg,
 		AccountDB:     accountDB,
-		Client:        gomatrixserverlib.NewClient(cfg.FederationSender.DisableTLSValidation),
+		Client:        base.CreateClient(),
 		FedClient:     federation,
 		KeyRing:       keyRing,
 		KafkaConsumer: base.KafkaConsumer,

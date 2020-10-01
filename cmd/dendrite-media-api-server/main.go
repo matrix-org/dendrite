@@ -17,7 +17,6 @@ package main
 import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func main() {
@@ -26,7 +25,7 @@ func main() {
 	defer base.Close() // nolint: errcheck
 
 	userAPI := base.UserAPIClient()
-	client := gomatrixserverlib.NewClient(cfg.FederationSender.DisableTLSValidation)
+	client := base.CreateClient()
 
 	mediaapi.AddPublicRoutes(base.PublicMediaAPIMux, &base.Cfg.MediaAPI, userAPI, client)
 
