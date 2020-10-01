@@ -119,7 +119,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
-	apiClient := http.Client{}
+	apiClient := http.Client{Timeout: time.Minute * 10}
 	client := http.Client{Timeout: HTTPClientTimeout}
 	if cfg.FederationSender.Proxy.Enabled {
 		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
