@@ -98,7 +98,7 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	eventNIDAsString := fmt.Sprintf("%d", eventNID)
 	selectStmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
 	err := selectStmt.QueryRowContext(ctx, previousEventID, previousEventReferenceSHA256).Scan(&eventNIDs)
-	if err != sql.ErrNoRows {
+	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("selectStmt.QueryRowContext.Scan: %w", err)
 	}
 	var nids []string
