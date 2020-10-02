@@ -274,17 +274,19 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 		}
 	}
 
+	var result []gomatrixserverlib.HeaderedEvent
 	var eventsToCheck []gomatrixserverlib.HeaderedEvent
 	if joinEventIndex != -1 {
 		if r.backwardOrdering {
-			events = events[:joinEventIndex+1]
-			eventsToCheck = append(eventsToCheck, events[0])
+			result = events[:joinEventIndex+1]
+			eventsToCheck = append(eventsToCheck, result[0])
 		} else {
-			events = events[joinEventIndex:]
-			eventsToCheck = append(eventsToCheck, events[len(events)-1])
+			result = events[joinEventIndex:]
+			eventsToCheck = append(eventsToCheck, result[len(result)-1])
 		}
 	} else {
 		eventsToCheck = []gomatrixserverlib.HeaderedEvent{events[0], events[len(events)-1]}
+		result = events
 	}
 	// make sure the user was in the room for both the earliest and latest events, we need this because
 	// some backpagination results will not have the join event (e.g if they hit /messages at the join event itself)
@@ -296,6 +298,7 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 			PrevEventIDs: ev.PrevEventIDs(),
 			StateToFetch: []gomatrixserverlib.StateKeyTuple{
 				{EventType: gomatrixserverlib.MRoomMember, StateKey: r.device.UserID},
+				{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""},
 			},
 		}, &queryRes)
 		if err != nil {
@@ -306,7 +309,27 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 			wasJoined = false
 			break
 		}
-		membership, err := queryRes.StateEvents[0].Membership()
+		var hisVisEvent, membershipEvent *gomatrixserverlib.HeaderedEvent
+		for i := range queryRes.StateEvents {
+			switch queryRes.StateEvents[i].Type() {
+			case gomatrixserverlib.MRoomMember:
+				membershipEvent = &queryRes.StateEvents[i]
+			case gomatrixserverlib.MRoomHistoryVisibility:
+				hisVisEvent = &queryRes.StateEvents[i]
+			}
+		}
+		if membershipEvent == nil {
+			wasJoined = false
+			break
+		}
+		if hisVisEvent == nil {
+			return events // apply no filtering as it defaults to Shared.
+		}
+		hisVis, _ := hisVisEvent.HistoryVisibility()
+		if hisVis == "shared" {
+			return events // apply no filtering
+		}
+		membership, err := membershipEvent.Membership()
 		if err != nil {
 			wasJoined = false
 			break
@@ -320,7 +343,7 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 		util.GetLogger(r.ctx).WithField("num_events", len(events)).Warnf("%s was not joined to room during these events, omitting them", r.device.UserID)
 		return []gomatrixserverlib.HeaderedEvent{}
 	}
-	return events
+	return result
 }
 
 func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
