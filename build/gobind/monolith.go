@@ -100,7 +100,6 @@ func (m *DendriteMonolith) Start() {
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-appservice.db", m.StorageDirectory))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
-	cfg.FederationSender.FederationMaxRetries = 8
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
