@@ -69,6 +69,7 @@ type BaseDendrite struct {
 	PublicMediaAPIMux      *mux.Router
 	InternalAPIMux         *mux.Router
 	UseHTTPAPIs            bool
+	apiHttpClient          *http.Client
 	httpClient             *http.Client
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
@@ -118,6 +119,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
+	apiClient := http.Client{Timeout: time.Minute * 10}
 	client := http.Client{Timeout: HTTPClientTimeout}
 	if cfg.FederationSender.Proxy.Enabled {
 		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
@@ -148,6 +150,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
 		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
+		apiHttpClient:          &apiClient,
 		httpClient:             &client,
 		KafkaConsumer:          kafkaConsumer,
 		KafkaProducer:          kafkaProducer,
@@ -161,7 +164,7 @@ func (b *BaseDendrite) Close() error {
 
 // AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
 func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
-	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.httpClient)
+	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.apiHttpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")
 	}
@@ -170,27 +173,27 @@ func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
 
 // RoomserverHTTPClient returns RoomserverInternalAPI for hitting the roomserver over HTTP.
 func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
-	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.httpClient, b.Caches)
+	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.apiHttpClient, b.Caches)
 	if err != nil {
-		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.httpClient)
+		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.apiHttpClient)
 	}
 	return rsAPI
 }
 
 // UserAPIClient returns UserInternalAPI for hitting the userapi over HTTP.
 func (b *BaseDendrite) UserAPIClient() userapi.UserInternalAPI {
-	userAPI, err := userapiinthttp.NewUserAPIClient(b.Cfg.UserAPIURL(), b.httpClient)
+	userAPI, err := userapiinthttp.NewUserAPIClient(b.Cfg.UserAPIURL(), b.apiHttpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("UserAPIClient failed", b.httpClient)
+		logrus.WithError(err).Panic("UserAPIClient failed", b.apiHttpClient)
 	}
 	return userAPI
 }
 
 // EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
 func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
-	e, err := eduinthttp.NewEDUServerClient(b.Cfg.EDUServerURL(), b.httpClient)
+	e, err := eduinthttp.NewEDUServerClient(b.Cfg.EDUServerURL(), b.apiHttpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("EDUServerClient failed", b.httpClient)
+		logrus.WithError(err).Panic("EDUServerClient failed", b.apiHttpClient)
 	}
 	return e
 }
@@ -198,9 +201,9 @@ func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
 // FederationSenderHTTPClient returns FederationSenderInternalAPI for hitting
 // the federation sender over HTTP
 func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationSenderInternalAPI {
-	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.httpClient)
+	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.apiHttpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.httpClient)
+		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.apiHttpClient)
 	}
 	return f
 }
@@ -209,7 +212,7 @@ func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.Federati
 func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
 	f, err := skinthttp.NewServerKeyClient(
 		b.Cfg.ServerKeyAPIURL(),
-		b.httpClient,
+		b.apiHttpClient,
 		b.Caches,
 	)
 	if err != nil {
@@ -220,9 +223,9 @@ func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
 
 // KeyServerHTTPClient returns KeyInternalAPI for hitting the key server over HTTP
 func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
-	f, err := keyinthttp.NewKeyServerClient(b.Cfg.KeyServerURL(), b.httpClient)
+	f, err := keyinthttp.NewKeyServerClient(b.Cfg.KeyServerURL(), b.apiHttpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("KeyServerHTTPClient failed", b.httpClient)
+		logrus.WithError(err).Panic("KeyServerHTTPClient failed", b.apiHttpClient)
 	}
 	return f
 }
@@ -238,13 +241,25 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 	return db
 }
 
+// CreateClient creates a new client (normally used for media fetch requests).
+// Should only be called once per component.
+func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
+	client := gomatrixserverlib.NewClient(
+		b.Cfg.FederationSender.DisableTLSValidation,
+	)
+	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	return client
+}
+
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
-	return gomatrixserverlib.NewFederationClient(
+	client := gomatrixserverlib.NewFederationClient(
 		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
 		b.Cfg.FederationSender.DisableTLSValidation,
 	)
+	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	return client
 }
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on

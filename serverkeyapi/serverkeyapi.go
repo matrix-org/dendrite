@@ -49,6 +49,7 @@ func NewInternalAPI(
 		ServerPublicKey:   cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey),
 		ServerKeyID:       cfg.Matrix.KeyID,
 		ServerKeyValidity: cfg.Matrix.KeyValidityPeriod,
+		OldServerKeys:     cfg.Matrix.OldVerifyKeys,
 		FedClient:         fedClient,
 		OurKeyRing: gomatrixserverlib.KeyRing{
 			KeyFetchers: []gomatrixserverlib.KeyFetcher{},

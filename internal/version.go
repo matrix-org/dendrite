@@ -12,10 +12,11 @@ const (
 	VersionMajor = 0
 	VersionMinor = 0
 	VersionPatch = 0
+	VersionTag   = "" // example: "rc1"
 )
 
 func VersionString() string {
-	version := fmt.Sprintf("%d.%d.%d", VersionMajor, VersionMinor, VersionPatch)
+	version := fmt.Sprintf("%d.%d.%d%s", VersionMajor, VersionMinor, VersionPatch, VersionTag)
 	if branch != "" {
 		version += fmt.Sprintf("-%s", branch)
 	}

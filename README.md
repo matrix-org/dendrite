@@ -1,11 +1,14 @@
-# Dendrite [![Build Status](https://badge.buildkite.com/4be40938ab19f2bbc4a6c6724517353ee3ec1422e279faf374.svg?branch=master)](https://buildkite.com/matrix-dot-org/dendrite) [![Dendrite Dev on Matrix](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org) [![Dendrite on Matrix](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org)
+# Dendrite [![Build Status](https://badge.buildkite.com/4be40938ab19f2bbc4a6c6724517353ee3ec1422e279faf374.svg?branch=master)](https://buildkite.com/matrix-dot-org/dendrite) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
-Dendrite is a second-generation Matrix homeserver written in Go. It is not recommended to use Dendrite as
-a production homeserver at this time as there is no stable release.
+Dendrite is a second-generation Matrix homeserver written in Go!
 
-Dendrite will start to receive versioned releases stable enough to run [once we enter beta](https://github.com/matrix-org/dendrite/milestone/8).
+Join us in:
 
-# Quick start
+- **[#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org)** - General chat about the Dendrite project, for users and server admins alike
+- **[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)** - The place for developers, where all Dendrite development discussion happens
+- **[#dendrite-alerts:matrix.org](https://matrix.to/#/#dendrite-alerts:matrix.org)** - Release notifications and important info, highly recommended for all Dendrite server admins
+
+## Quick start
 
 Requires Go 1.13+ and SQLite3 (Postgres is also supported):
 
@@ -30,7 +33,7 @@ $ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config
 Then point your favourite Matrix client at `http://localhost:8008`. For full installation information, see
 [INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
 
-# Progress
+## Progress
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
@@ -59,7 +62,7 @@ This means Dendrite supports amongst others:
  - E2E keys and device lists
 
 
-# Contributing
+## Contributing
 
 We would be grateful for any help on issues marked as
 [Are We Synapse Yet](https://github.com/matrix-org/dendrite/labels/are-we-synapse-yet). These issues
@@ -101,7 +104,7 @@ look for [Good First Issues](https://github.com/matrix-org/dendrite/labels/good%
 familiar with the project, look for [Help Wanted](https://github.com/matrix-org/dendrite/labels/help-wanted)
 issues.
 
-# Hardware requirements
+## Hardware requirements
 
 Dendrite in Monolith + SQLite works in a range of environments including iOS and in-browser via WASM.
 
@@ -112,12 +115,3 @@ encrypted rooms:
  - CPU: Brief spikes when processing events, typically idles at 1% CPU.
 
 This means Dendrite should comfortably work on things like Raspberry Pis.
-
-# Discussion
-
-For questions about Dendrite we have a dedicated room on Matrix
-[#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org). Development
-discussion should happen in
-[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org).
-
-

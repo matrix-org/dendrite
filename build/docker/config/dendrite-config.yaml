@@ -38,8 +38,13 @@ global:
   # The path to the signing private key file, used to sign requests and events.
   private_key: matrix_key.pem
 
-  # A unique identifier for this private key. Must start with the prefix "ed25519:".
-  key_id: ed25519:auto
+  # The paths and expiry timestamps (as a UNIX timestamp in millisecond precision)
+  # to old signing private keys that were formerly in use on this domain. These
+  # keys will not be used for federation request or event signing, but will be
+  # provided to any other homeserver that asks when trying to verify old events.
+  # old_private_keys:
+  # - private_key: old_matrix_key.pem
+  #   expired_at: 1601024554498
 
   # How long a remote server can cache our server signing key before requesting it
   # again. Increasing this number will reduce the number of requests made by other
@@ -132,6 +137,14 @@ client_api:
     turn_shared_secret: ""
     turn_username: ""
     turn_password: ""
+
+  # Settings for rate-limited endpoints. Rate limiting will kick in after the
+  # threshold number of "slots" have been taken by requests from a specific 
+  # host. Each "slot" will be released after the cooloff time in milliseconds.
+  rate_limiting:
+    enabled: true
+    threshold: 5
+    cooloff_ms: 500
 
 # Configuration for the EDU server.
 edu_server:
@@ -260,6 +273,11 @@ server_key_api:
       public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
     - key_id: ed25519:a_RXGa
       public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+      
+  # This option will control whether Dendrite will prefer to look up keys directly
+  # or whether it should try perspective servers first, using direct fetches as a
+  # last resort.
+  prefer_direct_fetch: false
 
 # Configuration for the Sync API.
 sync_api:
@@ -291,6 +309,8 @@ user_api:
     conn_max_lifetime: -1
 
 # Configuration for Opentracing.
+# See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on
+# how this works and how to set it up.
 tracing:
   enabled: false
   jaeger:
