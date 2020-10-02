@@ -689,6 +689,7 @@ func assertInvitedToRooms(t *testing.T, res *types.Response, roomIDs []string) {
 }
 
 func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []gomatrixserverlib.HeaderedEvent) {
+	t.Helper()
 	if len(gots) != len(wants) {
 		t.Fatalf("%s response returned %d events, want %d", msg, len(gots), len(wants))
 	}

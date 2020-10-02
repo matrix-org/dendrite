@@ -769,6 +769,33 @@ func (d *Database) getJoinResponseForCompleteSync(
 		return
 	}
 
+	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
+	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
+	// which is equiv to history_visibility: joined
+	joinEventIndex := -1
+	for i := len(recentStreamEvents) - 1; i >= 0; i-- {
+		ev := recentStreamEvents[i]
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(device.UserID) {
+			membership, _ := ev.Membership()
+			if membership == "join" {
+				joinEventIndex = i
+				if i > 0 {
+					// the create event happens before the first join, so we should cut it at that point instead
+					if recentStreamEvents[i-1].Type() == gomatrixserverlib.MRoomCreate && recentStreamEvents[i-1].StateKeyEquals("") {
+						joinEventIndex = i - 1
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+	if joinEventIndex != -1 {
+		// cut all events earlier than the join (but not the join itself)
+		recentStreamEvents = recentStreamEvents[joinEventIndex:]
+		limited = false // so clients know not to try to backpaginate
+	}
+
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
 	var prevBatchStr string
