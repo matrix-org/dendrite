@@ -209,7 +209,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	}
 
 	// TODO: handle ignored users
-	if req.since == nil {
+	if req.since.PDUPosition() == 0 && req.since.EDUPosition() == 0 {
 		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
 		if err != nil {
 			return res, fmt.Errorf("rp.db.CompleteSync: %w", err)
