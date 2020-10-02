@@ -51,7 +51,7 @@ func Setup(
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], federation, rsAPI, cfg)
+		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], device, federation, rsAPI, cfg)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/filter",

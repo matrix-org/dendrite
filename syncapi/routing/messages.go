@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -41,6 +42,7 @@ type messagesReq struct {
 	from             *types.TopologyToken
 	to               *types.TopologyToken
 	fromStream       *types.StreamingToken
+	device           *userapi.Device
 	wasToProvided    bool
 	limit            int
 	backwardOrdering bool
@@ -58,7 +60,7 @@ const defaultMessagesLimit = 10
 // client-server API.
 // See: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-client-r0-rooms-roomid-messages
 func OnIncomingMessagesRequest(
-	req *http.Request, db storage.Database, roomID string,
+	req *http.Request, db storage.Database, roomID string, device *userapi.Device,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
@@ -151,6 +153,7 @@ func OnIncomingMessagesRequest(
 		wasToProvided:    wasToProvided,
 		limit:            limit,
 		backwardOrdering: backwardOrdering,
+		device:           device,
 	}
 
 	clientEvents, start, end, err := mReq.retrieveEvents()
@@ -238,6 +241,10 @@ func (r *messagesReq) retrieveEvents() (
 		}
 		events = reversed(events)
 	}
+	events = r.filterHistoryVisible(events)
+	if len(events) == 0 {
+		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
+	}
 
 	// Convert all of the events into client events.
 	clientEvents = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll)
@@ -250,6 +257,70 @@ func (r *messagesReq) retrieveEvents() (
 	start, end, err = r.getStartEnd(events)
 
 	return clientEvents, start, end, err
+}
+
+func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
+	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
+	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
+	// which is equiv to history_visibility: joined
+	joinEventIndex := -1
+	for i, ev := range events {
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(r.device.UserID) {
+			membership, _ := ev.Membership()
+			if membership == "join" {
+				joinEventIndex = i
+				break
+			}
+		}
+	}
+
+	var eventsToCheck []gomatrixserverlib.HeaderedEvent
+	if joinEventIndex != -1 {
+		if r.backwardOrdering {
+			events = events[:joinEventIndex+1]
+			eventsToCheck = append(eventsToCheck, events[0])
+		} else {
+			events = events[joinEventIndex:]
+			eventsToCheck = append(eventsToCheck, events[len(events)-1])
+		}
+	} else {
+		eventsToCheck = []gomatrixserverlib.HeaderedEvent{events[0], events[len(events)-1]}
+	}
+	// make sure the user was in the room for both the earliest and latest events, we need this because
+	// some backpagination results will not have the join event (e.g if they hit /messages at the join event itself)
+	wasJoined := true
+	for _, ev := range eventsToCheck {
+		var queryRes api.QueryStateAfterEventsResponse
+		err := r.rsAPI.QueryStateAfterEvents(r.ctx, &api.QueryStateAfterEventsRequest{
+			RoomID:       ev.RoomID(),
+			PrevEventIDs: ev.PrevEventIDs(),
+			StateToFetch: []gomatrixserverlib.StateKeyTuple{
+				{EventType: gomatrixserverlib.MRoomMember, StateKey: r.device.UserID},
+			},
+		}, &queryRes)
+		if err != nil {
+			wasJoined = false
+			break
+		}
+		if len(queryRes.StateEvents) == 0 {
+			wasJoined = false
+			break
+		}
+		membership, err := queryRes.StateEvents[0].Membership()
+		if err != nil {
+			wasJoined = false
+			break
+		}
+		if membership != "join" {
+			wasJoined = false
+			break
+		}
+	}
+	if !wasJoined {
+		util.GetLogger(r.ctx).WithField("num_events", len(events)).Warnf("%s was not joined to room during these events, omitting them", r.device.UserID)
+		return []gomatrixserverlib.HeaderedEvent{}
+	}
+	return events
 }
 
 func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
