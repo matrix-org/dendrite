@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     -- The password hash for this account. Can be NULL if this is a passwordless account.
     password_hash TEXT,
     -- Identifies which application service this account belongs to, if any.
-    appservice_id TEXT
+    appservice_id TEXT,
+    -- If the account is currently active
+    is_deactivated BOOLEAN DEFAULT 0
     -- TODO:
     -- is_guest, is_admin, upgraded_ts, devices, any email reset stuff?
 );
@@ -49,11 +51,14 @@ const insertAccountSQL = "" +
 const updatePasswordSQL = "" +
 	"UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
 
+const deactivateAccountSQL = "" +
+	"UPDATE account_accounts SET is_deactivated = 1 WHERE localpart = $1"
+
 const selectAccountByLocalpartSQL = "" +
 	"SELECT localpart, appservice_id FROM account_accounts WHERE localpart = $1"
 
 const selectPasswordHashSQL = "" +
-	"SELECT password_hash FROM account_accounts WHERE localpart = $1"
+	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
 
 const selectNewNumericLocalpartSQL = "" +
 	"SELECT COUNT(localpart) FROM account_accounts"
@@ -62,6 +67,7 @@ type accountsStatements struct {
 	db                            *sql.DB
 	insertAccountStmt             *sql.Stmt
 	updatePasswordStmt            *sql.Stmt
+	deactivateAccountStmt         *sql.Stmt
 	selectAccountByLocalpartStmt  *sql.Stmt
 	selectPasswordHashStmt        *sql.Stmt
 	selectNewNumericLocalpartStmt *sql.Stmt
@@ -79,6 +85,9 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 		return
 	}
 	if s.updatePasswordStmt, err = db.Prepare(updatePasswordSQL); err != nil {
+		return
+	}
+	if s.deactivateAccountStmt, err = db.Prepare(deactivateAccountSQL); err != nil {
 		return
 	}
 	if s.selectAccountByLocalpartStmt, err = db.Prepare(selectAccountByLocalpartSQL); err != nil {
@@ -125,6 +134,13 @@ func (s *accountsStatements) updatePassword(
 	ctx context.Context, localpart, passwordHash string,
 ) (err error) {
 	_, err = s.updatePasswordStmt.ExecContext(ctx, passwordHash, localpart)
+	return
+}
+
+func (s *accountsStatements) deactivateAccount(
+	ctx context.Context, localpart string,
+) (err error) {
+	_, err = s.deactivateAccountStmt.ExecContext(ctx, localpart)
 	return
 }
 

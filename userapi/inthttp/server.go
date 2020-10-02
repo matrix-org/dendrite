@@ -91,6 +91,19 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(PerformAccountDeactivationPath,
+		httputil.MakeInternalAPI("performAccountDeactivation", func(req *http.Request) util.JSONResponse {
+			request := api.PerformAccountDeactivationRequest{}
+			response := api.PerformAccountDeactivationResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformAccountDeactivation(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(QueryProfilePath,
 		httputil.MakeInternalAPI("queryProfile", func(req *http.Request) util.JSONResponse {
 			request := api.QueryProfileRequest{}

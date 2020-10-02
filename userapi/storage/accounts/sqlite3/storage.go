@@ -359,3 +359,8 @@ func (d *Database) SearchProfiles(ctx context.Context, searchString string, limi
 ) ([]authtypes.Profile, error) {
 	return d.profiles.selectProfilesBySearch(ctx, searchString, limit)
 }
+
+// DeactivateAccount deactivates the user's account, removing all ability for the user to login again.
+func (d *Database) DeactivateAccount(ctx context.Context, localpart string) (err error) {
+	return d.accounts.deactivateAccount(ctx, localpart)
+}
