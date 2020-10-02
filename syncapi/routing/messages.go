@@ -318,16 +318,16 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 				hisVisEvent = &queryRes.StateEvents[i]
 			}
 		}
-		if membershipEvent == nil {
-			wasJoined = false
-			break
-		}
 		if hisVisEvent == nil {
 			return events // apply no filtering as it defaults to Shared.
 		}
 		hisVis, _ := hisVisEvent.HistoryVisibility()
 		if hisVis == "shared" {
 			return events // apply no filtering
+		}
+		if membershipEvent == nil {
+			wasJoined = false
+			break
 		}
 		membership, err := membershipEvent.Membership()
 		if err != nil {
