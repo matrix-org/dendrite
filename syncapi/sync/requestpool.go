@@ -197,19 +197,14 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (*types.Response, error) {
 	res := types.NewResponse()
 
-	since := types.NewStreamToken(0, 0, nil)
-	if req.since != nil {
-		since = *req.since
-	}
-
 	// See if we have any new tasks to do for the send-to-device messaging.
-	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, since)
+	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, *req.since)
 	if err != nil {
 		return nil, fmt.Errorf("rp.db.SendToDeviceUpdatesForSync: %w", err)
 	}
 
 	// TODO: handle ignored users
-	if req.since == nil {
+	if req.since.PDUPosition() == 0 && req.since.EDUPosition() == 0 {
 		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
 		if err != nil {
 			return res, fmt.Errorf("rp.db.CompleteSync: %w", err)
@@ -226,7 +221,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	if err != nil {
 		return res, fmt.Errorf("rp.appendAccountData: %w", err)
 	}
-	res, err = rp.appendDeviceLists(res, req.device.UserID, since, latestPos)
+	res, err = rp.appendDeviceLists(res, req.device.UserID, *req.since, latestPos)
 	if err != nil {
 		return res, fmt.Errorf("rp.appendDeviceLists: %w", err)
 	}
@@ -240,7 +235,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	// Then add the updates into the sync response.
 	if len(updates) > 0 || len(deletions) > 0 {
 		// Handle the updates and deletions in the database.
-		err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, since)
+		err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, *req.since)
 		if err != nil {
 			return res, fmt.Errorf("rp.db.CleanSendToDeviceUpdates: %w", err)
 		}
