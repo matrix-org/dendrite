@@ -170,6 +170,7 @@ func (s *devicesStatements) insertDevice(
 		SessionID:   sessionID,
 		LastSeenTS:  createdTimeMS,
 		LastSeenIP:  ipAddr,
+		UserAgent:   userAgent,
 	}, nil
 }
 

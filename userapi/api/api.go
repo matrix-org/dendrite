@@ -228,6 +228,7 @@ type Device struct {
 	DisplayName string
 	LastSeenTS  int64
 	LastSeenIP  string
+	UserAgent   string
 }
 
 // Account represents a Matrix account on this home server.
