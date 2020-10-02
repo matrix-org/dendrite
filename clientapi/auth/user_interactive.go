@@ -103,7 +103,8 @@ type userInteractiveFlow struct {
 // the user already has a valid access token, but we want to double-check
 // that it isn't stolen by re-authenticating them.
 type UserInteractive struct {
-	Flows []userInteractiveFlow
+	Completed []string
+	Flows     []userInteractiveFlow
 	// Map of login type to implementation
 	Types map[string]Type
 	// Map of session ID to completed login types, will need to be extended in future
@@ -117,6 +118,7 @@ func NewUserInteractive(getAccByPass GetAccountByPassword, cfg *config.ClientAPI
 	}
 	// TODO: Add SSO login
 	return &UserInteractive{
+		Completed: []string{},
 		Flows: []userInteractiveFlow{
 			{
 				Stages: []string{typePassword.Name()},
@@ -140,6 +142,7 @@ func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
 
 func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
 	// TODO: Handle multi-stage flows
+	u.Completed = append(u.Completed, authType)
 	delete(u.Sessions, sessionID)
 }
 
@@ -148,11 +151,13 @@ func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
 	return &util.JSONResponse{
 		Code: 401,
 		JSON: struct {
-			Flows   []userInteractiveFlow `json:"flows"`
-			Session string                `json:"session"`
+			Completed []string              `json:"completed"`
+			Flows     []userInteractiveFlow `json:"flows"`
+			Session   string                `json:"session"`
 			// TODO: Return any additional `params`
 			Params map[string]interface{} `json:"params"`
 		}{
+			u.Completed,
 			u.Flows,
 			sessionID,
 			make(map[string]interface{}),
