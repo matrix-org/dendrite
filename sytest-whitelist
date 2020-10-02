@@ -478,3 +478,4 @@ Inbound federation rejects invite rejections which include invalid JSON for room
 GET /capabilities is present and well formed for registered user 
 m.room.history_visibility == "joined" allows/forbids appropriately for Guest users
 m.room.history_visibility == "joined" allows/forbids appropriately for Real users
+POST rejects invalid utf-8 in JSON
