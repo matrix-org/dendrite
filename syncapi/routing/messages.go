@@ -259,6 +259,7 @@ func (r *messagesReq) retrieveEvents() (
 	return clientEvents, start, end, err
 }
 
+// nolint:gocyclo
 func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
 	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
 	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
@@ -302,10 +303,6 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 			},
 		}, &queryRes)
 		if err != nil {
-			wasJoined = false
-			break
-		}
-		if len(queryRes.StateEvents) == 0 {
 			wasJoined = false
 			break
 		}
