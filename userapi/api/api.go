@@ -193,6 +193,8 @@ type PerformDeviceCreationRequest struct {
 	DeviceDisplayName *string
 	// IP address of this device
 	IPAddr string
+	// Useragent for this device
+	UserAgent string
 }
 
 // PerformDeviceCreationResponse is the response for PerformDeviceCreation

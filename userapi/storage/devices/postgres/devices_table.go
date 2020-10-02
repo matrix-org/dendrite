@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS device_devices (
 	-- The time the device was last used, as a unix timestamp (ms resolution).
 	last_seen_ts BIGINT NOT NULL,
 	-- The last seen IP address of this device
-	ip TEXT
+	ip TEXT,
+	-- User agent of this device
+	user_agent TEXT
                                           
     -- TODO: device keys, device display names, token restrictions (if 3rd-party OAuth app)
 );
@@ -65,7 +67,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(loca
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name, last_seen_ts, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)" +
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
 	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
@@ -153,12 +155,12 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
-	displayName *string, ipAddr string,
+	displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
 	stmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
-	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, createdTimeMS, ipAddr).Scan(&sessionID); err != nil {
+	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
 		return nil, err
 	}
 	return &api.Device{
