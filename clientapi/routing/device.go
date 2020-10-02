@@ -15,11 +15,11 @@
 package routing
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -121,9 +121,8 @@ func UpdateDeviceByID(
 
 	payload := deviceUpdateJSON{}
 
-	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("json.NewDecoder.Decode failed")
-		return jsonerror.InternalServerError()
+	if resErr := httputil.UnmarshalJSONRequest(req, &payload); resErr != nil {
+		return *resErr
 	}
 
 	var performRes api.PerformDeviceUpdateResponse
@@ -211,9 +210,8 @@ func DeleteDevices(
 	ctx := req.Context()
 	payload := devicesDeleteJSON{}
 
-	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("json.NewDecoder.Decode failed")
-		return jsonerror.InternalServerError()
+	if resErr := httputil.UnmarshalJSONRequest(req, &payload); resErr != nil {
+		return *resErr
 	}
 
 	defer req.Body.Close() // nolint: errcheck
