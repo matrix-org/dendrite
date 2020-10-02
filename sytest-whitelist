@@ -90,8 +90,6 @@ Real non-joined users can get state for world_readable rooms
 Real non-joined users can get individual state for world_readable rooms
 #Real non-joined users can get individual state for world_readable rooms after leaving
 Real non-joined users cannot send messages to guest_access rooms if not joined
-Real users can sync from world_readable guest_access rooms if joined
-Real users can sync from default guest_access rooms if joined
 Can't forget room you're still in
 Can get rooms/{roomId}/members
 Can create filter
@@ -236,13 +234,11 @@ Outbound federation can query v2 /send_join
 Inbound federation can receive v2 /send_join
 Message history can be paginated
 Getting messages going forward is limited for a departed room (SPEC-216)
-m.room.history_visibility == "world_readable" allows/forbids appropriately for Real users
 Backfill works correctly with history visibility set to joined
 Guest user cannot call /events globally
 Guest users can join guest_access rooms
 Guest user can set display names
 Guest user cannot upgrade other users
-m.room.history_visibility == "world_readable" allows/forbids appropriately for Guest users
 Guest non-joined user cannot call /events on shared room
 Guest non-joined user cannot call /events on invited room
 Guest non-joined user cannot call /events on joined room
@@ -252,8 +248,6 @@ Guest non-joined users can get individual state for world_readable rooms
 Guest non-joined users cannot room initalSync for non-world_readable rooms
 Guest non-joined users can get individual state for world_readable rooms after leaving
 Guest non-joined users cannot send messages to guest_access rooms if not joined
-Guest users can sync from world_readable guest_access rooms if joined
-Guest users can sync from default guest_access rooms if joined
 Real non-joined users cannot room initalSync for non-world_readable rooms
 Push rules come down in an initial /sync
 Regular users can add and delete aliases in the default room configuration
@@ -479,3 +473,5 @@ Inbound /make_join rejects attempts to join rooms where all users have left
 Inbound federation rejects invites which include invalid JSON for room version 6
 Inbound federation rejects invite rejections which include invalid JSON for room version 6
 GET /capabilities is present and well formed for registered user 
+m.room.history_visibility == "joined" allows/forbids appropriately for Guest users
+m.room.history_visibility == "joined" allows/forbids appropriately for Real users
