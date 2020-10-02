@@ -388,3 +388,10 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 	dev.UserID = appService.SenderLocalpart
 	return &dev, nil
 }
+
+// PerformAccountDeactivation deactivates the user's account, removing all ability for the user to login again.
+func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
+	err := a.AccountDB.DeactivateAccount(ctx, req.Localpart)
+	res.AccountDeactivated = err == nil
+	return err
+}
