@@ -6,7 +6,7 @@ CREATE TABLE account_accounts (
     created_ts BIGINT NOT NULL,
     password_hash TEXT,
     appservice_id TEXT,
-    is_active BOOLEAN DEFAULT 1
+    is_deactivated BOOLEAN DEFAULT 0
 );
 INSERT
     INTO account_accounts (

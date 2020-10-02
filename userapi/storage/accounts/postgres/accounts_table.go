@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     -- Identifies which application service this account belongs to, if any.
     appservice_id TEXT,
     -- If the account is currently active
-    is_active BOOLEAN DEFAULT TRUE
+    is_deactivated BOOLEAN DEFAULT FALSE
     -- TODO:
     -- is_guest, is_admin, upgraded_ts, devices, any email reset stuff?
 );
@@ -54,13 +54,13 @@ const updatePasswordSQL = "" +
 	"UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
 
 const deactivateAccountSQL = "" +
-	"UPDATE account_accounts SET is_active = FALSE WHERE localpart = $1"
+	"UPDATE account_accounts SET is_deactivated = TRUE WHERE localpart = $1"
 
 const selectAccountByLocalpartSQL = "" +
 	"SELECT localpart, appservice_id FROM account_accounts WHERE localpart = $1"
 
 const selectPasswordHashSQL = "" +
-	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_active = TRUE"
+	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = FALSE"
 
 const selectNewNumericLocalpartSQL = "" +
 	"SELECT nextval('numeric_username_seq')"
