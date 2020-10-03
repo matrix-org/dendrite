@@ -372,7 +372,7 @@ type healthResponse struct {
 }
 
 // AddHealthCheck adds a /health endpoint to the internal api mux
-func AddHealthCheck(router *mux.Router, dbConfig ...config.DatabaseOptions) {
+func AddHealthCheck(apiMux *mux.Router, dbConfig ...config.DatabaseOptions) {
 	if len(dbConfig) == 0 {
 		return
 	}
@@ -386,7 +386,7 @@ func AddHealthCheck(router *mux.Router, dbConfig ...config.DatabaseOptions) {
 		conns[i] = c
 	}
 
-	router.HandleFunc("/health", func(resp http.ResponseWriter, _ *http.Request) {
+	apiMux.HandleFunc("/health", func(resp http.ResponseWriter, _ *http.Request) {
 		var (
 			errMsg string
 			code   = http.StatusOK
