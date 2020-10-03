@@ -478,3 +478,6 @@ Inbound federation rejects invite rejections which include invalid JSON for room
 GET /capabilities is present and well formed for registered user 
 m.room.history_visibility == "joined" allows/forbids appropriately for Guest users
 m.room.history_visibility == "joined" allows/forbids appropriately for Real users
+Read markers appear in incremental v2 /sync
+Read markers appear in initial v2 /sync
+Read markers can be updated
