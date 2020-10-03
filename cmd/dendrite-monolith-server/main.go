@@ -145,6 +145,17 @@ func main() {
 		base.PublicMediaAPIMux,
 	)
 
+	setup.AddHealthCheck(base.InternalAPIMux,
+		base.Cfg.AppServiceAPI.Database,
+		base.Cfg.FederationSender.Database,
+		base.Cfg.KeyServer.Database,
+		base.Cfg.MediaAPI.Database,
+		base.Cfg.ServerKeyAPI.Database,
+		base.Cfg.SyncAPI.Database,
+		base.Cfg.UserAPI.AccountDatabase,
+		base.Cfg.UserAPI.DeviceDatabase,
+	)
+
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		base.SetupAndServeHTTP(

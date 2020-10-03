@@ -28,6 +28,7 @@ func main() {
 	intAPI.SetUserAPI(base.UserAPIClient())
 
 	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
+	setup.AddHealthCheck(base.InternalAPIMux, base.Cfg.KeyServer.Database)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.KeyServer.InternalAPI.Listen,
