@@ -400,6 +400,7 @@ func AddHealthCheck(apiMux *mux.Router, dbConfig ...config.DatabaseOptions) {
 			FirstError: errMsg,
 		})
 		if err != nil {
+			logrus.WithError(err).Error("Unable to encode response")
 			resp.WriteHeader(http.StatusInternalServerError)
 			return
 		}
