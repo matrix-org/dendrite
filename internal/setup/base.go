@@ -15,6 +15,8 @@
 package setup
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +25,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -360,4 +363,60 @@ func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
 		logrus.WithError(err).Panic("Failed to setup naffka")
 	}
 	return naff, naff
+}
+
+// healthResponse is returned on requests to /api/health
+type healthResponse struct {
+	Code       int    `json:"code"`
+	FirstError string `json:"error"`
+}
+
+// AddHealthCheck adds a /health endpoint to the internal api mux
+func AddHealthCheck(router *mux.Router, dbConfig ...config.DatabaseOptions) {
+	if len(dbConfig) == 0 {
+		return
+	}
+	conns := make([]*sql.DB, len(dbConfig))
+	// populate sql connections
+	for i, conf := range dbConfig {
+		c, err := sqlutil.Open(&conf)
+		if err != nil {
+			panic(err)
+		}
+		conns[i] = c
+	}
+
+	router.HandleFunc("/health", func(resp http.ResponseWriter, _ *http.Request) {
+		var (
+			errMsg string
+			code   = http.StatusOK
+		)
+		err := dbPingCheck(conns, &errMsg, &code)
+		if err != nil {
+			resp.WriteHeader(http.StatusInternalServerError)
+		}
+		data, err := json.Marshal(healthResponse{
+			Code:       code,
+			FirstError: errMsg,
+		})
+		if err != nil {
+			resp.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if _, err = resp.Write(data); err != nil {
+			logrus.WithError(err).Error("Unable to write health response")
+		}
+	})
+}
+
+func dbPingCheck(conns []*sql.DB, errMsg *string, code *int) error {
+	// check every database connection
+	for _, conn := range conns {
+		if err := conn.Ping(); err != nil {
+			*errMsg = err.Error()
+			*code = http.StatusInternalServerError
+			return err
+		}
+	}
+	return nil
 }
