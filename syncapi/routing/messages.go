@@ -503,7 +503,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	// up in responses to sync requests.
 	for i := range res.Events {
 		_, err = r.db.WriteEvent(
-			r.ctx,
+			context.Background(),
 			&res.Events[i],
 			[]gomatrixserverlib.HeaderedEvent{},
 			[]string{},
