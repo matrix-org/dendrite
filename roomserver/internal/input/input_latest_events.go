@@ -215,10 +215,27 @@ func (u *latestEventsUpdater) latestState() error {
 	var err error
 	roomState := state.NewStateResolution(u.api.DB, *u.roomInfo)
 
-	// Get a list of the current latest events.
-	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
+	// Get a list of the current room state events if available.
+	var currentState []types.StateEntry
+	if u.roomInfo.StateSnapshotNID != 0 {
+		currentState, _ = roomState.LoadStateAtSnapshot(u.ctx, u.roomInfo.StateSnapshotNID)
+	}
+
+	// Get a list of the current latest events. This will include both
+	// the current room state and the latest events after the input event.
+	// The idea is that we will perform state resolution on this set and
+	// any conflicting events will be resolved properly.
+	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest)+len(currentState))
+	offset := 0
+	for i := range currentState {
+		latestStateAtEvents[i] = types.StateAtEvent{
+			BeforeStateSnapshotNID: u.roomInfo.StateSnapshotNID,
+			StateEntry:             currentState[i],
+		}
+		offset++
+	}
 	for i := range u.latest {
-		latestStateAtEvents[i] = u.latest[i].StateAtEvent
+		latestStateAtEvents[offset+i] = u.latest[i].StateAtEvent
 	}
 
 	// Takes the NIDs of the latest events and creates a state snapshot
