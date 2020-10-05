@@ -28,11 +28,11 @@ func main() {
 	client := base.CreateClient()
 
 	mediaapi.AddPublicRoutes(base.PublicMediaAPIMux, &base.Cfg.MediaAPI, userAPI, client)
-	setup.AddHealthCheck(base.InternalAPIMux, base.Cfg.MediaAPI.Database)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.MediaAPI.InternalAPI.Listen,
 		base.Cfg.MediaAPI.ExternalAPI.Listen,
 		nil, nil,
+		base.Cfg.MediaAPI.Database,
 	)
 }

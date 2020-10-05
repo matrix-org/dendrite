@@ -28,11 +28,11 @@ func main() {
 
 	intAPI := serverkeyapi.NewInternalAPI(&base.Cfg.ServerKeyAPI, federation, base.Caches)
 	serverkeyapi.AddInternalRoutes(base.InternalAPIMux, intAPI, base.Caches)
-	setup.AddHealthCheck(base.InternalAPIMux, base.Cfg.ServerKeyAPI.Database)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.ServerKeyAPI.InternalAPI.Listen,
 		setup.NoExternalListener,
 		nil, nil,
+		base.Cfg.ServerKeyAPI.Database,
 	)
 }

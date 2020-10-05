@@ -34,11 +34,11 @@ func main() {
 		base.KeyServerHTTPClient(),
 		federation, &cfg.SyncAPI,
 	)
-	setup.AddHealthCheck(base.InternalAPIMux, base.Cfg.SyncAPI.Database)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.SyncAPI.InternalAPI.Listen,
 		base.Cfg.SyncAPI.ExternalAPI.Listen,
 		nil, nil,
+		base.Cfg.SyncAPI.Database,
 	)
 }

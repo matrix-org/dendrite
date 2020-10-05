@@ -29,11 +29,11 @@ func main() {
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, base.KeyServerHTTPClient())
 
 	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
-	setup.AddHealthCheck(base.InternalAPIMux, cfg.UserAPI.AccountDatabase, cfg.UserAPI.DeviceDatabase)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.UserAPI.InternalAPI.Listen,
 		setup.NoExternalListener,
 		nil, nil,
+		cfg.UserAPI.AccountDatabase, cfg.UserAPI.DeviceDatabase,
 	)
 }

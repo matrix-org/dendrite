@@ -145,7 +145,7 @@ func main() {
 		base.PublicMediaAPIMux,
 	)
 
-	setup.AddHealthCheck(base.InternalAPIMux,
+	dbConfigs := []config.DatabaseOptions{
 		base.Cfg.AppServiceAPI.Database,
 		base.Cfg.FederationSender.Database,
 		base.Cfg.KeyServer.Database,
@@ -154,7 +154,7 @@ func main() {
 		base.Cfg.SyncAPI.Database,
 		base.Cfg.UserAPI.AccountDatabase,
 		base.Cfg.UserAPI.DeviceDatabase,
-	)
+	}
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
@@ -162,6 +162,7 @@ func main() {
 			config.HTTPAddress(httpAddr), // internal API
 			config.HTTPAddress(httpAddr), // external API
 			nil, nil,                     // TLS settings
+			dbConfigs..., // used in health checks
 		)
 	}()
 	// Handle HTTPS if certificate and key are provided
@@ -171,6 +172,7 @@ func main() {
 				config.HTTPAddress(httpsAddr), // internal API
 				config.HTTPAddress(httpsAddr), // external API
 				certFile, keyFile,             // TLS settings
+				dbConfigs..., // used in health checks
 			)
 		}()
 	}

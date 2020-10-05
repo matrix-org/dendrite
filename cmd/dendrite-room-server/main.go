@@ -31,11 +31,11 @@ func main() {
 	rsAPI := roomserver.NewInternalAPI(base, keyRing)
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
-	setup.AddHealthCheck(base.InternalAPIMux, base.Cfg.RoomServer.Database)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.RoomServer.InternalAPI.Listen,
 		setup.NoExternalListener,
 		nil, nil,
+		base.Cfg.RoomServer.Database,
 	)
 }

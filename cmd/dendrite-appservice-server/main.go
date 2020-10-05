@@ -29,11 +29,11 @@ func main() {
 
 	intAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI)
-	setup.AddHealthCheck(base.InternalAPIMux, base.Cfg.AppServiceAPI.Database)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.AppServiceAPI.InternalAPI.Listen,
 		setup.NoExternalListener,
 		nil, nil,
+		base.Cfg.AppServiceAPI.Database,
 	)
 }
