@@ -53,3 +53,8 @@ Outbound federation requests missing prev_events and then asks for /state_ids an
 
 # We don't implement lazy membership loading yet.
 The only membership state included in a gapped incremental sync is for senders in the timeline
+
+# Blacklisted out of flakiness after #1479
+Invited user can reject local invite after originator leaves
+Invited user can reject invite for empty room
+If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
