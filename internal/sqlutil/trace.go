@@ -102,7 +102,9 @@ var dbConns = make(map[string]*sql.DB)
 // usually consisting of at least a database name and connection information. Includes tracing driver
 // if DENDRITE_TRACE_SQL=1
 func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
-	if conn, ok := dbConns[string(dbProperties.ConnectionString)]; ok {
+	// reuse connection only if not a sqlite3 test database
+	isTestDB := strings.HasSuffix(string(dbProperties.ConnectionString), "_test.db")
+	if conn, ok := dbConns[string(dbProperties.ConnectionString)]; !isTestDB && ok {
 		logrus.Debug("Reusing existing database connection")
 		return conn, nil
 	}
