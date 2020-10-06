@@ -238,7 +238,7 @@ func TestOutputRedactedEvent(t *testing.T) {
 	}
 }
 
-// This tests that rewriting state via KindRewrite works correctly.
+// This tests that rewriting state works correctly.
 // This creates a small room with a create/join/name state, then replays it
 // with a new room name. We expect the output events to contain the original events,
 // followed by a single OutputNewRoomEvent with RewritesState set to true with the
@@ -344,7 +344,7 @@ func TestOutputRewritesState(t *testing.T) {
 	for i := 0; i < len(rewriteEvents)-1; i++ {
 		ev := rewriteEvents[i]
 		inputEvents = append(inputEvents, api.InputRoomEvent{
-			Kind:          api.KindRewrite,
+			Kind:          api.KindOutlier,
 			Event:         ev,
 			AuthEventIDs:  ev.AuthEventIDs(),
 			HasState:      true,

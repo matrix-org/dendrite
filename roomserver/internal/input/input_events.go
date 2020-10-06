@@ -136,15 +136,6 @@ func (r *Inputer) processRoomEvent(
 		return event.EventID(), rejectionErr
 	}
 
-	if input.Kind == api.KindRewrite {
-		logrus.WithFields(logrus.Fields{
-			"event_id": event.EventID(),
-			"type":     event.Type(),
-			"room":     event.RoomID(),
-		}).Debug("Stored rewrite")
-		return event.EventID(), nil
-	}
-
 	if err = r.updateLatestEvents(
 		ctx,                 // context
 		roomInfo,            // room info for the room being updated
