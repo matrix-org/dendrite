@@ -195,7 +195,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			logger.Infof("returned %d PDUs which made events %+v", len(res.PDUs), result)
 			for _, res := range result {
 				if res.Error != nil {
-					logger.WithError(err).Warn("event failed PDU checks")
+					logger.WithError(res.Error).Warn("event failed PDU checks")
 					continue
 				}
 				missingMap[id] = res.Event
