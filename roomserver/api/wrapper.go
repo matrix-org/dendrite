@@ -146,7 +146,7 @@ func SendEventWithRewrite(
 		// Each of these rewrite events includes all of the rewrite events
 		// that came before in their StateEventIDs.
 		ires = append(ires, InputRoomEvent{
-			Kind:          KindRewrite,
+			Kind:          KindOutlier,
 			Event:         authOrStateEvent.Headered(event.RoomVersion),
 			AuthEventIDs:  authOrStateEvent.AuthEventIDs(),
 			HasState:      true,

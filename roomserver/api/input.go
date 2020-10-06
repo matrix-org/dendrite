@@ -35,10 +35,6 @@ const (
 	// KindBackfill event extend the contiguous graph going backwards.
 	// They always have state.
 	KindBackfill = 3
-	// KindRewrite events are used when rewriting the head of the room
-	// graph with entirely new state. The output events generated will
-	// be state events rather than timeline events.
-	KindRewrite = 4
 )
 
 // DoNotSendToOtherServers tells us not to send the event to other matrix

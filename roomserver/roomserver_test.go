@@ -344,7 +344,7 @@ func TestOutputRewritesState(t *testing.T) {
 	for i := 0; i < len(rewriteEvents)-1; i++ {
 		ev := rewriteEvents[i]
 		inputEvents = append(inputEvents, api.InputRoomEvent{
-			Kind:          api.KindRewrite,
+			Kind:          api.KindOutlier,
 			Event:         ev,
 			AuthEventIDs:  ev.AuthEventIDs(),
 			HasState:      true,
