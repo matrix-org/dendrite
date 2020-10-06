@@ -26,28 +26,30 @@ type RoomserverInternalAPI struct {
 	*perform.Leaver
 	*perform.Publisher
 	*perform.Backfiller
-	DB                   storage.Database
-	Cfg                  *config.RoomServer
-	Producer             sarama.SyncProducer
-	Cache                caching.RoomServerCaches
-	ServerName           gomatrixserverlib.ServerName
-	KeyRing              gomatrixserverlib.JSONVerifier
-	fsAPI                fsAPI.FederationSenderInternalAPI
-	OutputRoomEventTopic string // Kafka topic for new output room events
+	DB                     storage.Database
+	Cfg                    *config.RoomServer
+	Producer               sarama.SyncProducer
+	Cache                  caching.RoomServerCaches
+	ServerName             gomatrixserverlib.ServerName
+	KeyRing                gomatrixserverlib.JSONVerifier
+	fsAPI                  fsAPI.FederationSenderInternalAPI
+	OutputRoomEventTopic   string // Kafka topic for new output room events
+	PerspectiveServerNames []gomatrixserverlib.ServerName
 }
 
 func NewRoomserverAPI(
 	cfg *config.RoomServer, roomserverDB storage.Database, producer sarama.SyncProducer,
 	outputRoomEventTopic string, caches caching.RoomServerCaches,
-	keyRing gomatrixserverlib.JSONVerifier,
+	keyRing gomatrixserverlib.JSONVerifier, perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
 	a := &RoomserverInternalAPI{
-		DB:         roomserverDB,
-		Cfg:        cfg,
-		Cache:      caches,
-		ServerName: cfg.Matrix.ServerName,
-		KeyRing:    keyRing,
+		DB:                     roomserverDB,
+		Cfg:                    cfg,
+		Cache:                  caches,
+		ServerName:             cfg.Matrix.ServerName,
+		PerspectiveServerNames: perspectiveServerNames,
+		KeyRing:                keyRing,
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
@@ -105,6 +107,10 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
 		KeyRing:    r.KeyRing,
+		// Perspective servers are trusted to not lie about server keys, so we will also
+		// prefer these servers when backfilling (assuming they are in the room) rather
+		// than trying random servers
+		PreferServers: r.PerspectiveServerNames,
 	}
 }
 
