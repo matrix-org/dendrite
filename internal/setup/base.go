@@ -314,7 +314,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		logrus.Infof("Stopped %s listener on %s", b.componentName, internalServ.Addr)
 	}()
 
-	if externalAddr != NoInternalListener && internalAddr != externalAddr {
+	if internalAddr != NoInternalListener && internalAddr != externalAddr {
 		go func() {
 			logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
 			if certFile != nil && keyFile != nil {
