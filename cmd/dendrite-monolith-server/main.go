@@ -46,10 +46,11 @@ func main() {
 	cfg := setup.ParseFlags(true)
 	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
 	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
-	httpAPIAddr := config.HTTPAddress("https://" + *apiBindAddr)
+	httpAPIAddr := httpAddr
 
 	if *enableHTTPAPIs {
 		logrus.Warnf("DANGER! The -api option is enabled, exposing internal APIs on %q!", *apiBindAddr)
+		httpAPIAddr = config.HTTPAddress("http://" + *apiBindAddr)
 		// If the HTTP APIs are enabled then we need to update the Listen
 		// statements in the configuration so that we know where to find
 		// the API endpoints. They'll listen on the same port as the monolith
