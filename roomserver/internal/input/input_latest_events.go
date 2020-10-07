@@ -244,8 +244,8 @@ func (u *latestEventsUpdater) latestState() error {
 		// This really shouldn't happen.
 		// TODO: What is ultimately the best way to handle this situation?
 		return fmt.Errorf(
-			"invalid state delta wants to remove %d state but only add %d state",
-			len(u.removed), len(u.added),
+			"invalid state delta wants to remove %d state but only add %d state (between state snapshots %d and %d)",
+			len(u.removed), len(u.added), u.oldStateNID, u.newStateNID,
 		)
 	}
 
