@@ -468,12 +468,22 @@ func (d *Database) StoreEvent(
 		if !isRejected { // ignore rejected redaction events
 			redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
 		}
-		for _, prev := range event.PrevEvents() {
-			if err = d.PrevEventsTable.InsertPreviousEvent(ctx, txn, prev.EventID, prev.EventSHA256, eventNID); err != nil {
-				return fmt.Errorf("d.PrevEventsTable.InsertPreviousEvent: %w", err)
-			}
+
+		var roomInfo *types.RoomInfo
+		var updater *LatestEventsUpdater
+		roomInfo, err = d.RoomInfo(ctx, event.RoomID())
+		if err != nil {
+			return fmt.Errorf("d.RoomInfo: %w", err)
 		}
-		return nil
+		updater, err = d.GetLatestEventsForUpdate(ctx, *roomInfo)
+		if err != nil {
+			return fmt.Errorf("NewLatestEventsUpdater: %w", err)
+		}
+		if err = updater.StorePreviousEvents(eventNID, event.PrevEvents()); err != nil {
+			return fmt.Errorf("updater.StorePreviousEvents: %w", err)
+		}
+		succeeded := false
+		return sqlutil.EndTransaction(updater, &succeeded)
 	})
 	if err != nil {
 		return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.Writer.Do: %w", err)
