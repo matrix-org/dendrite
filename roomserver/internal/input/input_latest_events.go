@@ -261,8 +261,8 @@ func (u *latestEventsUpdater) calculateLatest(
 	var newLatest []types.StateAtEventAndReference
 
 	// First of all, let's see if any of the existing forward extremities
-	// now have entries in the previous events table. If they do then they
-	// are no longer forward extremities.
+	// now have entries in the previous events table. If they do then we
+	// will no longer include them as forward extremities.
 	for _, l := range oldLatest {
 		referenced, err := u.updater.IsReferenced(l.EventReference)
 		if err != nil {
@@ -274,17 +274,22 @@ func (u *latestEventsUpdater) calculateLatest(
 	}
 
 	// Then check and see if our new event is already included in that set.
+	// This ordinarily won't happen but it covers the edge-case that we've
+	// already seen this event before and it's a forward extremity, so rather
+	// than adding a duplicate, we'll just return the set as complete.
 	for _, l := range newLatest {
 		if l.EventReference.EventID == newEvent.EventReference.EventID && bytes.Equal(l.EventReference.EventSHA256, newEvent.EventReference.EventSHA256) {
-			// We've already referenced this event so we can just return
+			// We've already referenced this new event so we can just return
 			// the newly completed extremities at this point.
 			u.latest = newLatest
 			return
 		}
 	}
 
-	// If the new event isn't already in the set then we'll check if it
-	// really should be.
+	// At this point we've processed the old extremities, and we've checked
+	// that our new event isn't already in that set. Therefore now we can
+	// check if our *new* event is a forward extremity, and if it is, add
+	// it in.
 	referenced, err := u.updater.IsReferenced(newEvent.EventReference)
 	if err != nil {
 		logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", newEvent.EventReference.EventID)
