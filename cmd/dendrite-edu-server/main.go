@@ -34,8 +34,8 @@ func main() {
 	eduserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.EDUServer.InternalAPI.Listen,
-		setup.NoExternalListener,
+		base.Cfg.EDUServer.InternalAPI.Listen, // internal listener
+		setup.NoListener,                      // external listener
 		nil, nil,
 	)
 }

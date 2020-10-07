@@ -33,8 +33,8 @@ func main() {
 	roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.RoomServer.InternalAPI.Listen,
-		setup.NoExternalListener,
+		base.Cfg.RoomServer.InternalAPI.Listen, // internal listener
+		setup.NoListener,                       // external listener
 		nil, nil,
 	)
 }

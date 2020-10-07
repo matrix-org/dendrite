@@ -31,7 +31,7 @@ func main() {
 
 	base.SetupAndServeHTTP(
 		base.Cfg.SigningKeyServer.InternalAPI.Listen,
-		setup.NoExternalListener,
+		setup.NoListener,
 		nil, nil,
 	)
 }
