@@ -279,7 +279,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// now have entries in the previous events table. If they do then they
 	// are no longer forward extremities.
 	for _, l := range oldLatest {
-		referenced, err := u.api.DB.EventIsReferenced(u.ctx, l.EventReference)
+		referenced, err := u.updater.IsReferenced(l.EventReference)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", l.EventID)
 		}
@@ -300,7 +300,7 @@ func (u *latestEventsUpdater) calculateLatest(
 
 	// If the new event isn't already in the set then we'll check if it
 	// really should be.
-	referenced, err := u.api.DB.EventIsReferenced(u.ctx, newEvent.EventReference)
+	referenced, err := u.updater.IsReferenced(newEvent.EventReference)
 	if err != nil {
 		logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", newEvent.EventReference.EventID)
 	}

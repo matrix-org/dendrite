@@ -186,16 +186,6 @@ func (d *Database) EventIDs(
 	return d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
 }
 
-func (d *Database) EventIsReferenced(
-	ctx context.Context, eventRef gomatrixserverlib.EventReference,
-) (bool, error) {
-	err := d.PrevEventsTable.SelectPreviousEventExists(ctx, nil, eventRef.EventID, eventRef.EventSHA256)
-	if err != nil && err != sql.ErrNoRows {
-		return false, err
-	}
-	return err != sql.ErrNoRows, nil
-}
-
 func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
 	nidMap, err := d.EventNIDs(ctx, eventIDs)
 	if err != nil {
