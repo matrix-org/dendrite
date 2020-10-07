@@ -42,7 +42,7 @@ func NewInternalAPI(
 	cfg := &base.Cfg.RoomServer
 
 	var perspectiveServerNames []gomatrixserverlib.ServerName
-	for _, kp := range base.Cfg.ServerKeyAPI.KeyPerspectives {
+	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
 

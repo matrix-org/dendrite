@@ -46,8 +46,8 @@ import (
 	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
-	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
-	skinthttp "github.com/matrix-org/dendrite/serverkeyapi/inthttp"
+	skapi "github.com/matrix-org/dendrite/signingkeyserver/api"
+	skinthttp "github.com/matrix-org/dendrite/signingkeyserver/inthttp"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/sirupsen/logrus"
@@ -208,15 +208,15 @@ func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.Federati
 	return f
 }
 
-// ServerKeyAPIClient returns ServerKeyInternalAPI for hitting the server key API over HTTP
-func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
-	f, err := skinthttp.NewServerKeyClient(
-		b.Cfg.ServerKeyAPIURL(),
+// SigningKeyServerHTTPClient returns SigningKeyServer for hitting the signing key server over HTTP
+func (b *BaseDendrite) SigningKeyServerHTTPClient() skapi.SigningKeyServerAPI {
+	f, err := skinthttp.NewSigningKeyServerClient(
+		b.Cfg.SigningKeyServerURL(),
 		b.apiHttpClient,
 		b.Caches,
 	)
 	if err != nil {
-		logrus.WithError(err).Panic("NewServerKeyInternalAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("SigningKeyServerHTTPClient failed", b.httpClient)
 	}
 	return f
 }

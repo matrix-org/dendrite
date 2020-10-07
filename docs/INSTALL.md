@@ -109,7 +109,7 @@ Assuming that Postgres 9.5 (or later) is installed:
 * Create the component databases:
 
   ```bash
-  for i in account device mediaapi syncapi roomserver serverkey federationsender appservice e2ekey naffka; do
+  for i in account device mediaapi syncapi roomserver signingkeyserver federationsender appservice e2ekey naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```

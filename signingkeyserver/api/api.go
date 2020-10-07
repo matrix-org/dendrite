@@ -6,7 +6,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type ServerKeyInternalAPI interface {
+type SigningKeyServerAPI interface {
 	gomatrixserverlib.KeyDatabase
 
 	KeyRing() *gomatrixserverlib.KeyRing
