@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -74,16 +75,6 @@ func JoinRoomByIDOrAlias(
 		}
 	}
 
-	// This is the default response that we'll return, assuming nothing
-	// goes wrong within the timeframe.
-	ok := util.JSONResponse{
-		Code: http.StatusOK,
-		// TODO: Put the response struct somewhere internal.
-		JSON: struct {
-			RoomID string `json:"room_id"`
-		}{joinRes.RoomID},
-	}
-
 	// Ask the roomserver to perform the join.
 	done := make(chan util.JSONResponse, 1)
 	go func() {
@@ -92,15 +83,24 @@ func JoinRoomByIDOrAlias(
 		if joinRes.Error != nil {
 			done <- joinRes.Error.JSONResponse()
 		} else {
-			done <- ok
+			done <- util.JSONResponse{
+				Code: http.StatusOK,
+				// TODO: Put the response struct somewhere internal.
+				JSON: struct {
+					RoomID string `json:"room_id"`
+				}{joinRes.RoomID},
+			}
 		}
 	}()
 
 	// Wait either for the join to finish, or for us to hit a reasonable
 	// timeout, at which point we'll just return a 200 to placate clients.
 	select {
-	case <-time.After(time.Second * 15):
-		return ok
+	case <-time.After(time.Second * 20):
+		return util.JSONResponse{
+			Code: http.StatusAccepted,
+			JSON: jsonerror.Unknown("The room join will continue in the background."),
+		}
 	case result := <-done:
 		return result
 	}
