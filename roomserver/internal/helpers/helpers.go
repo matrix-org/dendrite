@@ -2,6 +2,8 @@ package helpers
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -217,6 +219,9 @@ func CheckServerAllowedToSeeEvent(
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
 		return false, err
 	}
 
