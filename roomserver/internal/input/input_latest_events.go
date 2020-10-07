@@ -241,18 +241,10 @@ func (u *latestEventsUpdater) latestState() error {
 		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
 	}
 	if len(u.removed) > len(u.added) {
-		logrus.Infof("INVALID STATE DELTA (%d removes, %d adds)", len(u.removed), len(u.added))
-		logrus.Infof("State snapshot before: %d, after: %d", u.oldStateNID, u.newStateNID)
-		logrus.Infof("Want to remove:")
-		for _, r := range u.removed {
-			logrus.Infof("* %+v", r)
-		}
-		logrus.Infof("Want to add:")
-		for _, a := range u.added {
-			logrus.Infof("* %+v", a)
-		}
+		// This really shouldn't happen.
+		// TODO: What is ultimately the best way to handle this situation?
 		return fmt.Errorf(
-			"event wants to remove %d state but only add %d state - this should be impossible",
+			"invalid state delta wants to remove %d state but only add %d state",
 			len(u.removed), len(u.added),
 		)
 	}
