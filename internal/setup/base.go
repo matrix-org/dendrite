@@ -81,6 +81,7 @@ const HTTPServerTimeout = time.Minute * 5
 const HTTPClientTimeout = time.Second * 30
 
 const NoInternalListener = ""
+const NoExternalListener = ""
 
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
