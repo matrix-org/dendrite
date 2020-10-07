@@ -252,13 +252,13 @@ room_server:
     max_idle_conns: 2
     conn_max_lifetime: -1
 
-# Configuration for the Server Key API (for server signing keys).
-server_key_api:
+# Configuration for the Signing Key Server (for server signing keys).
+signing_key_server:
   internal_api:
     listen: http://localhost:7780
     connect: http://localhost:7780
   database:
-    connection_string: file:serverkeyapi.db
+    connection_string: file:signingkeyserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
