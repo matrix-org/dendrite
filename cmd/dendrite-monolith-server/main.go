@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
 )
 
@@ -58,7 +58,7 @@ func main() {
 		cfg.KeyServer.InternalAPI.Connect = httpAddr
 		cfg.MediaAPI.InternalAPI.Connect = httpAddr
 		cfg.RoomServer.InternalAPI.Connect = httpAddr
-		cfg.ServerKeyAPI.InternalAPI.Connect = httpAddr
+		cfg.SigningKeyServer.InternalAPI.Connect = httpAddr
 		cfg.SyncAPI.InternalAPI.Connect = httpAddr
 	}
 
@@ -68,14 +68,14 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := serverkeyapi.NewInternalAPI(
-		&base.Cfg.ServerKeyAPI, federation, base.Caches,
+	skAPI := signingkeyserver.NewInternalAPI(
+		&base.Cfg.SigningKeyServer, federation, base.Caches,
 	)
 	if base.UseHTTPAPIs {
-		serverkeyapi.AddInternalRoutes(base.InternalAPIMux, serverKeyAPI, base.Caches)
-		serverKeyAPI = base.ServerKeyAPIClient()
+		signingkeyserver.AddInternalRoutes(base.InternalAPIMux, skAPI, base.Caches)
+		skAPI = base.SigningKeyServerHTTPClient()
 	}
-	keyRing := serverKeyAPI.KeyRing()
+	keyRing := skAPI.KeyRing()
 
 	rsImpl := roomserver.NewInternalAPI(
 		base, keyRing,
@@ -134,7 +134,7 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
-		ServerKeyAPI:        serverKeyAPI,
+		ServerKeyAPI:        skAPI,
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
 	}
