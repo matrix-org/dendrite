@@ -16,6 +16,7 @@ package routing
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -73,17 +74,34 @@ func JoinRoomByIDOrAlias(
 		}
 	}
 
-	// Ask the roomserver to perform the join.
-	rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
-	if joinRes.Error != nil {
-		return joinRes.Error.JSONResponse()
-	}
-
-	return util.JSONResponse{
+	// This is the default response that we'll return, assuming nothing
+	// goes wrong within the timeframe.
+	ok := util.JSONResponse{
 		Code: http.StatusOK,
 		// TODO: Put the response struct somewhere internal.
 		JSON: struct {
 			RoomID string `json:"room_id"`
 		}{joinRes.RoomID},
+	}
+
+	// Ask the roomserver to perform the join.
+	done := make(chan util.JSONResponse, 1)
+	go func() {
+		defer close(done)
+		rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
+		if joinRes.Error != nil {
+			done <- joinRes.Error.JSONResponse()
+		} else {
+			done <- ok
+		}
+	}()
+
+	// Wait either for the join to finish, or for us to hit a reasonable
+	// timeout, at which point we'll just return a 200 to placate clients.
+	select {
+	case <-time.After(time.Second * 15):
+		return ok
+	case result := <-done:
+		return result
 	}
 }
