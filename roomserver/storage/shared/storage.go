@@ -468,6 +468,11 @@ func (d *Database) StoreEvent(
 		if !isRejected { // ignore rejected redaction events
 			redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
 		}
+		for _, prev := range event.PrevEvents() {
+			if err = d.PrevEventsTable.InsertPreviousEvent(ctx, txn, prev.EventID, prev.EventSHA256, eventNID); err != nil {
+				return fmt.Errorf("d.PrevEventsTable.InsertPreviousEvent: %w", err)
+			}
+		}
 		return nil
 	})
 	if err != nil {

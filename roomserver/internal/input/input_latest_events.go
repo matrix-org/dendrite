@@ -117,7 +117,6 @@ type latestEventsUpdater struct {
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
-	prevEvents := u.event.PrevEvents()
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 	u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 
@@ -139,12 +138,6 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return fmt.Errorf("u.updater.HasEventBeenSent: %w", err)
 	} else if hasBeenSent {
 		return nil
-	}
-
-	// Update the roomserver_previous_events table with references. This
-	// is effectively tracking the structure of the DAG.
-	if err = u.updater.StorePreviousEvents(u.stateAtEvent.EventNID, prevEvents); err != nil {
-		return fmt.Errorf("u.updater.StorePreviousEvents: %w", err)
 	}
 
 	// Work out what the latest events are. This will include the new
