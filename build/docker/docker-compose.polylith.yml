@@ -128,9 +128,9 @@ services:
     networks:
         - internal
 
-  server_key_api:
-    hostname: server_key_api
-    image: matrixdotorg/dendrite:serverkeyapi
+  signing_key_server:
+    hostname: signing_key_server
+    image: matrixdotorg/dendrite:signingkeyserver
     command: [
       "--config=dendrite.yaml"
     ]

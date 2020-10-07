@@ -26,7 +26,7 @@ func main() {
 
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := base.ServerKeyAPIClient()
+	serverKeyAPI := base.SigningKeyServerHTTPClient()
 	keyRing := serverKeyAPI.KeyRing()
 
 	rsAPI := base.RoomserverHTTPClient()

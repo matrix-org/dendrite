@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/serverkeyapi/api"
+	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
 type ServerKeyAPI struct {
-	api.ServerKeyInternalAPI
+	api.SigningKeyServerAPI
 
 	ServerName        gomatrixserverlib.ServerName
 	ServerPublicKey   ed25519.PublicKey

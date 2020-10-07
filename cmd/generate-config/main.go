@@ -27,7 +27,7 @@ func main() {
 			},
 		},
 	}
-	cfg.ServerKeyAPI.KeyPerspectives = config.KeyPerspectives{
+	cfg.SigningKeyServer.KeyPerspectives = config.KeyPerspectives{
 		{
 			ServerName: "matrix.org",
 			Keys: []config.KeyPerspectiveTrustKey{

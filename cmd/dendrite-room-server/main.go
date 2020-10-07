@@ -24,7 +24,7 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, "RoomServerAPI", true)
 	defer base.Close() // nolint: errcheck
 
-	serverKeyAPI := base.ServerKeyAPIClient()
+	serverKeyAPI := base.SigningKeyServerHTTPClient()
 	keyRing := serverKeyAPI.KeyRing()
 
 	fsAPI := base.FederationSenderHTTPClient()
