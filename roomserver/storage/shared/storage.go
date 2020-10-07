@@ -496,7 +496,7 @@ func (d *Database) StoreEvent(
 		if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
 			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("updater.StorePreviousEvents: %w", err)
 		}
-		succeeded := false
+		succeeded := true
 		err = sqlutil.EndTransaction(updater, &succeeded)
 	}
 
