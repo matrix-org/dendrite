@@ -1,4 +1,4 @@
-package serverkeyapi
+package signingkeyserver
 
 import (
 	"crypto/ed25519"
@@ -7,28 +7,28 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/serverkeyapi/api"
-	"github.com/matrix-org/dendrite/serverkeyapi/internal"
-	"github.com/matrix-org/dendrite/serverkeyapi/inthttp"
-	"github.com/matrix-org/dendrite/serverkeyapi/storage"
-	"github.com/matrix-org/dendrite/serverkeyapi/storage/cache"
+	"github.com/matrix-org/dendrite/signingkeyserver/api"
+	"github.com/matrix-org/dendrite/signingkeyserver/internal"
+	"github.com/matrix-org/dendrite/signingkeyserver/inthttp"
+	"github.com/matrix-org/dendrite/signingkeyserver/storage"
+	"github.com/matrix-org/dendrite/signingkeyserver/storage/cache"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.ServerKeyInternalAPI, caches *caching.Caches) {
+func AddInternalRoutes(router *mux.Router, intAPI api.SigningKeyServerAPI, caches *caching.Caches) {
 	inthttp.AddRoutes(intAPI, router, caches)
 }
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	cfg *config.ServerKeyAPI,
+	cfg *config.SigningKeyServer,
 	fedClient gomatrixserverlib.KeyClient,
 	caches *caching.Caches,
-) api.ServerKeyInternalAPI {
+) api.SigningKeyServerAPI {
 	innerDB, err := storage.NewDatabase(
 		&cfg.Database,
 		cfg.Matrix.ServerName,

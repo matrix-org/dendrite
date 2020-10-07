@@ -13,4 +13,5 @@ docker pull matrixdotorg/dendrite:keyserver
 docker pull matrixdotorg/dendrite:mediaapi
 docker pull matrixdotorg/dendrite:roomserver
 docker pull matrixdotorg/dendrite:syncapi
+docker pull matrixdotorg/dendrite:signingkeyserver
 docker pull matrixdotorg/dendrite:userapi
