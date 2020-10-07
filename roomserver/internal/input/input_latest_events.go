@@ -267,8 +267,7 @@ func (u *latestEventsUpdater) calculateLatest(
 		referenced, err := u.updater.IsReferenced(l.EventReference)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", l.EventID)
-		}
-		if !referenced {
+		} else if !referenced {
 			newLatest = append(newLatest, l)
 		}
 	}
