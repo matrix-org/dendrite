@@ -32,9 +32,6 @@ const (
 	// there was a new event that references an event that we don't
 	// have a copy of.
 	KindNew = 2
-	// KindBackfill event extend the contiguous graph going backwards.
-	// They always have state.
-	KindBackfill = 3
 )
 
 // DoNotSendToOtherServers tells us not to send the event to other matrix
