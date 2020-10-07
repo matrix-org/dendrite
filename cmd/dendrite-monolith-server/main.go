@@ -162,9 +162,9 @@ func main() {
 	if *certFile != "" && *keyFile != "" {
 		go func() {
 			base.SetupAndServeHTTP(
-				setup.NoInternalListener, // internal API
-				httpsAddr,                // external API
-				certFile, keyFile,        // TLS settings
+				setup.NoListener,  // internal API
+				httpsAddr,         // external API
+				certFile, keyFile, // TLS settings
 			)
 		}()
 	}

@@ -36,8 +36,8 @@ func main() {
 	federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.FederationSender.InternalAPI.Listen,
-		setup.NoExternalListener,
+		base.Cfg.FederationSender.InternalAPI.Listen, // internal listener
+		setup.NoListener, // external listener
 		nil, nil,
 	)
 }

@@ -30,8 +30,8 @@ func main() {
 	serverkeyapi.AddInternalRoutes(base.InternalAPIMux, intAPI, base.Caches)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.ServerKeyAPI.InternalAPI.Listen,
-		setup.NoExternalListener,
+		base.Cfg.ServerKeyAPI.InternalAPI.Listen, // internal listener
+		setup.NoListener,                         // external listener
 		nil, nil,
 	)
 }

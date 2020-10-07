@@ -80,8 +80,7 @@ type BaseDendrite struct {
 const HTTPServerTimeout = time.Minute * 5
 const HTTPClientTimeout = time.Second * 30
 
-const NoInternalListener = ""
-const NoExternalListener = ""
+const NoListener = ""
 
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
@@ -283,7 +282,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	}
 	internalServ := externalServ
 
-	if internalAddr != NoInternalListener && externalAddr != internalAddr {
+	if internalAddr != NoListener && externalAddr != internalAddr {
 		internalRouter = mux.NewRouter().SkipClean(true).UseEncodedPath()
 		internalServ = &http.Server{
 			Addr:    string(internalAddr),
@@ -301,9 +300,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(b.PublicFederationAPIMux)
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 
-	if internalAddr != NoInternalListener && internalAddr != externalAddr {
+	if internalAddr != NoListener && internalAddr != externalAddr {
 		go func() {
-			logrus.Infof("Starting %s listener on %s", b.componentName, internalServ.Addr)
+			logrus.Infof("Starting internal %s listener on %s", b.componentName, internalServ.Addr)
 			if certFile != nil && keyFile != nil {
 				if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
 					logrus.WithError(err).Fatal("failed to serve HTTPS")
@@ -313,23 +312,25 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 					logrus.WithError(err).Fatal("failed to serve HTTP")
 				}
 			}
-			logrus.Infof("Stopped %s listener on %s", b.componentName, internalServ.Addr)
+			logrus.Infof("Stopped internal %s listener on %s", b.componentName, internalServ.Addr)
 		}()
 	}
 
-	go func() {
-		logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
-		if certFile != nil && keyFile != nil {
-			if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
-				logrus.WithError(err).Fatal("failed to serve HTTPS")
+	if externalAddr != NoListener {
+		go func() {
+			logrus.Infof("Starting external %s listener on %s", b.componentName, externalServ.Addr)
+			if certFile != nil && keyFile != nil {
+				if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+					logrus.WithError(err).Fatal("failed to serve HTTPS")
+				}
+			} else {
+				if err := externalServ.ListenAndServe(); err != nil {
+					logrus.WithError(err).Fatal("failed to serve HTTP")
+				}
 			}
-		} else {
-			if err := externalServ.ListenAndServe(); err != nil {
-				logrus.WithError(err).Fatal("failed to serve HTTP")
-			}
-		}
-		logrus.Infof("Stopped %s listener on %s", b.componentName, externalServ.Addr)
-	}()
+			logrus.Infof("Stopped external %s listener on %s", b.componentName, externalServ.Addr)
+		}()
+	}
 
 	select {}
 }
