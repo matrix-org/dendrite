@@ -87,6 +87,11 @@ type Database interface {
 	// Lookup the event IDs for a batch of event numeric IDs.
 	// Returns an error if the retrieval went wrong.
 	EventIDs(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error)
+	// EventIsReferenced returns true if the event is referenced by another event and false otherwise.
+	// This is used when working out if an event is a new forward extremity or not.
+	EventIsReferenced(
+		ctx context.Context, eventRef gomatrixserverlib.EventReference,
+	) (bool, error)
 	// Look up the latest events in a room in preparation for an update.
 	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// Returns the latest events in the room and the last eventID sent to the log along with an updater.

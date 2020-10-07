@@ -54,7 +54,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	var softfail bool
-	if input.Kind == api.KindBackfill || input.Kind == api.KindNew {
+	if input.Kind == api.KindNew {
 		// Check that the event passes authentication checks based on the
 		// current room state.
 		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)

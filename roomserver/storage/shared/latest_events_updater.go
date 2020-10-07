@@ -75,18 +75,6 @@ func (u *LatestEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previ
 	})
 }
 
-// IsReferenced implements types.RoomRecentEventsUpdater
-func (u *LatestEventsUpdater) IsReferenced(eventReference gomatrixserverlib.EventReference) (bool, error) {
-	err := u.d.PrevEventsTable.SelectPreviousEventExists(u.ctx, u.txn, eventReference.EventID, eventReference.EventSHA256)
-	if err == nil {
-		return true, nil
-	}
-	if err == sql.ErrNoRows {
-		return false, nil
-	}
-	return false, fmt.Errorf("u.d.PrevEventsTable.SelectPreviousEventExists: %w", err)
-}
-
 // SetLatestEvents implements types.RoomRecentEventsUpdater
 func (u *LatestEventsUpdater) SetLatestEvents(
 	roomNID types.RoomNID, latest []types.StateAtEventAndReference, lastEventNIDSent types.EventNID,
