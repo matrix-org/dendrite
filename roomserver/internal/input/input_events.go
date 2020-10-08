@@ -54,7 +54,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	var softfail bool
-	if input.Kind == api.KindBackfill || input.Kind == api.KindNew {
+	if input.Kind == api.KindNew {
 		// Check that the event passes authentication checks based on the
 		// current room state.
 		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
@@ -134,15 +134,6 @@ func (r *Inputer) processRoomEvent(
 			"sender":    event.Sender(),
 		}).Debug("Stored rejected event")
 		return event.EventID(), rejectionErr
-	}
-
-	if input.Kind == api.KindRewrite {
-		logrus.WithFields(logrus.Fields{
-			"event_id": event.EventID(),
-			"type":     event.Type(),
-			"room":     event.RoomID(),
-		}).Debug("Stored rewrite")
-		return event.EventID(), nil
 	}
 
 	if err = r.updateLatestEvents(

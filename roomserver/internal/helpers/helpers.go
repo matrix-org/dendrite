@@ -2,6 +2,8 @@ package helpers
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -217,6 +219,9 @@ func CheckServerAllowedToSeeEvent(
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
 		return false, err
 	}
 
@@ -304,7 +309,9 @@ BFSLoop:
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
 							"Error checking if allowed to see event",
 						)
-						return resultNIDs, err
+						// drop the error, as we will often error at the DB level if we don't have the prev_event itself. Let's
+						// just return what we have.
+						return resultNIDs, nil
 					}
 
 					// If the event hasn't been seen before and the HS

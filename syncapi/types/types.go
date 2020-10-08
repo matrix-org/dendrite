@@ -466,17 +466,31 @@ func NewJoinResponse() *JoinResponse {
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
 type InviteResponse struct {
 	InviteState struct {
-		Events json.RawMessage `json:"events"`
+		Events []json.RawMessage `json:"events"`
 	} `json:"invite_state"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
 func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
-	res.InviteState.Events = json.RawMessage{'[', ']'}
+	res.InviteState.Events = []json.RawMessage{}
+
+	// First see if there's invite_room_state in the unsigned key of the invite.
+	// If there is then unmarshal it into the response. This will contain the
+	// partial room state such as join rules, room name etc.
 	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		res.InviteState.Events = json.RawMessage(inviteRoomState.Raw)
+		_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
 	}
+
+	// Then we'll see if we can create a partial of the invite event itself.
+	// This is needed for clients to work out *who* sent the invite.
+	format, _ := event.RoomVersion.EventFormat()
+	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), format)
+	inviteEvent.Unsigned = nil
+	if ev, err := json.Marshal(inviteEvent); err == nil {
+		res.InviteState.Events = append(res.InviteState.Events, ev)
+	}
+
 	return &res
 }
 

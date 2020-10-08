@@ -62,7 +62,7 @@ type Dendrite struct {
 	KeyServer        KeyServer        `yaml:"key_server"`
 	MediaAPI         MediaAPI         `yaml:"media_api"`
 	RoomServer       RoomServer       `yaml:"room_server"`
-	ServerKeyAPI     ServerKeyAPI     `yaml:"server_key_api"`
+	SigningKeyServer SigningKeyServer `yaml:"signing_key_server"`
 	SyncAPI          SyncAPI          `yaml:"sync_api"`
 	UserAPI          UserAPI          `yaml:"user_api"`
 
@@ -302,7 +302,7 @@ func (c *Dendrite) Defaults() {
 	c.KeyServer.Defaults()
 	c.MediaAPI.Defaults()
 	c.RoomServer.Defaults()
-	c.ServerKeyAPI.Defaults()
+	c.SigningKeyServer.Defaults()
 	c.SyncAPI.Defaults()
 	c.UserAPI.Defaults()
 	c.AppServiceAPI.Defaults()
@@ -318,7 +318,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		&c.Global, &c.ClientAPI,
 		&c.EDUServer, &c.FederationAPI, &c.FederationSender,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
-		&c.ServerKeyAPI, &c.SyncAPI, &c.UserAPI,
+		&c.SigningKeyServer, &c.SyncAPI, &c.UserAPI,
 		&c.AppServiceAPI,
 	} {
 		c.Verify(configErrs, isMonolith)
@@ -333,7 +333,7 @@ func (c *Dendrite) Wiring() {
 	c.KeyServer.Matrix = &c.Global
 	c.MediaAPI.Matrix = &c.Global
 	c.RoomServer.Matrix = &c.Global
-	c.ServerKeyAPI.Matrix = &c.Global
+	c.SigningKeyServer.Matrix = &c.Global
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
@@ -524,13 +524,13 @@ func (config *Dendrite) FederationSenderURL() string {
 	return string(config.FederationSender.InternalAPI.Connect)
 }
 
-// ServerKeyAPIURL returns an HTTP URL for where the server key API is listening.
-func (config *Dendrite) ServerKeyAPIURL() string {
-	// Hard code the server key API server to talk HTTP for now.
+// SigningKeyServerURL returns an HTTP URL for where the signing key server is listening.
+func (config *Dendrite) SigningKeyServerURL() string {
+	// Hard code the signing key server to talk HTTP for now.
 	// If we support HTTPS we need to think of a practical way to do certificate validation.
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
-	return string(config.ServerKeyAPI.InternalAPI.Connect)
+	return string(config.SigningKeyServer.InternalAPI.Connect)
 }
 
 // KeyServerURL returns an HTTP URL for where the key server is listening.

@@ -30,11 +30,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// the max number of servers to backfill from per request. If this is too low we may fail to backfill when
+// we could've from another server. If this is too high we may take far too long to successfully backfill
+// as we try dead servers.
+const maxBackfillServers = 5
+
 type Backfiller struct {
 	ServerName gomatrixserverlib.ServerName
 	DB         storage.Database
 	FSAPI      federationSenderAPI.FederationSenderInternalAPI
 	KeyRing    gomatrixserverlib.JSONVerifier
+
+	// The servers which should be preferred above other servers when backfilling
+	PreferServers []gomatrixserverlib.ServerName
 }
 
 // PerformBackfill implements api.RoomServerQueryAPI
@@ -96,7 +104,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if info == nil || info.IsStub {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
-	requester := newBackfillRequester(r.DB, r.FSAPI, r.ServerName, req.BackwardsExtremities)
+	requester := newBackfillRequester(r.DB, r.FSAPI, r.ServerName, req.BackwardsExtremities, r.PreferServers)
 	// Request 100 items regardless of what the query asks for.
 	// We don't want to go much higher than this.
 	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
@@ -195,7 +203,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			logger.Infof("returned %d PDUs which made events %+v", len(res.PDUs), result)
 			for _, res := range result {
 				if res.Error != nil {
-					logger.WithError(err).Warn("event failed PDU checks")
+					logger.WithError(res.Error).Warn("event failed PDU checks")
 					continue
 				}
 				missingMap[id] = res.Event
@@ -215,10 +223,11 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 
 // backfillRequester implements gomatrixserverlib.BackfillRequester
 type backfillRequester struct {
-	db         storage.Database
-	fsAPI      federationSenderAPI.FederationSenderInternalAPI
-	thisServer gomatrixserverlib.ServerName
-	bwExtrems  map[string][]string
+	db           storage.Database
+	fsAPI        federationSenderAPI.FederationSenderInternalAPI
+	thisServer   gomatrixserverlib.ServerName
+	preferServer map[gomatrixserverlib.ServerName]bool
+	bwExtrems    map[string][]string
 
 	// per-request state
 	servers                 []gomatrixserverlib.ServerName
@@ -226,7 +235,14 @@ type backfillRequester struct {
 	eventIDMap              map[string]gomatrixserverlib.Event
 }
 
-func newBackfillRequester(db storage.Database, fsAPI federationSenderAPI.FederationSenderInternalAPI, thisServer gomatrixserverlib.ServerName, bwExtrems map[string][]string) *backfillRequester {
+func newBackfillRequester(
+	db storage.Database, fsAPI federationSenderAPI.FederationSenderInternalAPI, thisServer gomatrixserverlib.ServerName,
+	bwExtrems map[string][]string, preferServers []gomatrixserverlib.ServerName,
+) *backfillRequester {
+	preferServer := make(map[gomatrixserverlib.ServerName]bool)
+	for _, p := range preferServers {
+		preferServer[p] = true
+	}
 	return &backfillRequester{
 		db:                      db,
 		fsAPI:                   fsAPI,
@@ -234,6 +250,7 @@ func newBackfillRequester(db storage.Database, fsAPI federationSenderAPI.Federat
 		eventIDToBeforeStateIDs: make(map[string][]string),
 		eventIDMap:              make(map[string]gomatrixserverlib.Event),
 		bwExtrems:               bwExtrems,
+		preferServer:            preferServer,
 	}
 }
 
@@ -436,8 +453,16 @@ FindSuccessor:
 		if server == b.thisServer {
 			continue
 		}
-		servers = append(servers, server)
+		if b.preferServer[server] { // insert at the front
+			servers = append([]gomatrixserverlib.ServerName{server}, servers...)
+		} else { // insert at the back
+			servers = append(servers, server)
+		}
 	}
+	if len(servers) > maxBackfillServers {
+		servers = servers[:maxBackfillServers]
+	}
+
 	b.servers = servers
 	return servers
 }

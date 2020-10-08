@@ -400,8 +400,6 @@ Uninvited users cannot join the room
 Users cannot invite themselves to a room
 Users cannot invite a user that is already in the room
 Invited user can reject invite
-Invited user can reject invite for empty room
-Invited user can reject local invite after originator leaves
 PUT /rooms/:room_id/typing/:user_id sets typing notification
 Typing notification sent to local room members
 Typing notifications also sent to remote room members
@@ -431,7 +429,6 @@ A prev_batch token can be used in the v1 messages API
 We don't send redundant membership state across incremental syncs by default
 Typing notifications don't leak
 Users cannot kick users from a room they are not in
-Users cannot kick users who have already left a room
 User appears in user directory
 User directory correctly update on display name change
 User in shared private room does appear in user directory
@@ -451,7 +448,6 @@ Banned servers cannot backfill
 Inbound /v1/send_leave rejects leaves from other servers
 Guest users can accept invites to private rooms over federation
 AS user (not ghost) can join room without registering
-If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
 Can search public room list
 Can get remote public room list
 Asking for a remote rooms list, but supplying the local server's name, returns the local rooms list
@@ -478,3 +474,5 @@ Inbound federation rejects invite rejections which include invalid JSON for room
 GET /capabilities is present and well formed for registered user 
 m.room.history_visibility == "joined" allows/forbids appropriately for Guest users
 m.room.history_visibility == "joined" allows/forbids appropriately for Real users
+Users cannot kick users who have already left a room
+A prev_batch token from incremental sync can be used in the v1 messages API
