@@ -45,9 +45,11 @@ Also recommended are:
 
 The [Federation Tester](https://federationtester.matrix.org) can be used to verify your deployment.
 
-## Quick start
+## Get started
 
-The following instructions are enough to get Dendrite started as a local test deployment using SQLite databases:
+If you wish to build a fully-federating Dendrite instance, see [INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
+
+The following instructions are enough to get Dendrite started as a non-federating test deployment using self-signed certificates and SQLite databases:
 
 ```bash
 $ git clone https://github.com/matrix-org/dendrite
@@ -68,8 +70,6 @@ $ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config
 ```
 
 Then point your favourite Matrix client at `http://localhost:8008`.
-
-For full installation information, see [INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
 
 ## Progress
 
