@@ -38,7 +38,6 @@ type OutputRoomEventConsumer struct {
 	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
 	notifier   *sync.Notifier
-	keyChanges *OutputKeyChangeEventConsumer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -48,7 +47,6 @@ func NewOutputRoomEventConsumer(
 	n *sync.Notifier,
 	store storage.Database,
 	rsAPI api.RoomserverInternalAPI,
-	keyChanges *OutputKeyChangeEventConsumer,
 ) *OutputRoomEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -63,7 +61,6 @@ func NewOutputRoomEventConsumer(
 		db:         store,
 		notifier:   n,
 		rsAPI:      rsAPI,
-		keyChanges: keyChanges,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -182,24 +179,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
 
-	s.notifyKeyChanges(&ev)
-
 	return nil
-}
-
-func (s *OutputRoomEventConsumer) notifyKeyChanges(ev *gomatrixserverlib.HeaderedEvent) {
-	membership, err := ev.Membership()
-	if err != nil {
-		return
-	}
-	switch membership {
-	case gomatrixserverlib.Join:
-		s.keyChanges.OnJoinEvent(ev)
-	case gomatrixserverlib.Ban:
-		fallthrough
-	case gomatrixserverlib.Leave:
-		s.keyChanges.OnLeaveEvent(ev)
-	}
 }
 
 func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {
