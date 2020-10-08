@@ -41,6 +41,11 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
+	var perspectiveServerNames []gomatrixserverlib.ServerName
+	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {
+		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
+	}
+
 	roomserverDB, err := storage.Open(&cfg.Database, base.Caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
@@ -48,6 +53,6 @@ func NewInternalAPI(
 
 	return internal.NewRoomserverAPI(
 		cfg, roomserverDB, base.KafkaProducer, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
-		base.Caches, keyRing,
+		base.Caches, keyRing, perspectiveServerNames,
 	)
 }

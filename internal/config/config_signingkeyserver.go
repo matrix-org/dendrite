@@ -2,12 +2,12 @@ package config
 
 import "github.com/matrix-org/gomatrixserverlib"
 
-type ServerKeyAPI struct {
+type SigningKeyServer struct {
 	Matrix *Global `yaml:"-"`
 
 	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 
-	// The ServerKey database caches the public keys of remote servers.
+	// The SigningKeyServer database caches the public keys of remote servers.
 	// It may be accessed by the FederationAPI, the ClientAPI, and the MediaAPI.
 	Database DatabaseOptions `yaml:"database"`
 
@@ -19,17 +19,17 @@ type ServerKeyAPI struct {
 	PreferDirectFetch bool `yaml:"prefer_direct_fetch"`
 }
 
-func (c *ServerKeyAPI) Defaults() {
+func (c *SigningKeyServer) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7780"
 	c.InternalAPI.Connect = "http://localhost:7780"
 	c.Database.Defaults()
-	c.Database.ConnectionString = "file:serverkeyapi.db"
+	c.Database.ConnectionString = "file:signingkeyserver.db"
 }
 
-func (c *ServerKeyAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkURL(configErrs, "server_key_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "server_key_api.internal_api.bind", string(c.InternalAPI.Connect))
-	checkNotEmpty(configErrs, "server_key_api.database.connection_string", string(c.Database.ConnectionString))
+func (c *SigningKeyServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	checkURL(configErrs, "signing_key_server.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "signing_key_server.internal_api.bind", string(c.InternalAPI.Connect))
+	checkNotEmpty(configErrs, "signing_key_server.database.connection_string", string(c.Database.ConnectionString))
 }
 
 // KeyPerspectives are used to configure perspective key servers for
