@@ -309,7 +309,9 @@ BFSLoop:
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
 							"Error checking if allowed to see event",
 						)
-						return resultNIDs, err
+						// drop the error, as we will often error at the DB level if we don't have the prev_event itself. Let's
+						// just return what we have.
+						return resultNIDs, nil
 					}
 
 					// If the event hasn't been seen before and the HS
