@@ -15,6 +15,7 @@
 package httputil
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -42,12 +43,12 @@ func HealthCheckHandler(dbConfig ...config.DatabaseOptions) http.HandlerFunc {
 		conns[i] = c
 	}
 
-	return func(rw http.ResponseWriter, _ *http.Request) {
+	return func(rw http.ResponseWriter, req *http.Request) {
 		resp := &healthResponse{
 			Code:       http.StatusOK,
 			FirstError: "",
 		}
-		err := dbPingCheck(conns, resp)
+		err := dbPingCheck(conns, resp, req.Context())
 		if err != nil {
 			rw.WriteHeader(resp.Code)
 		}
@@ -58,10 +59,10 @@ func HealthCheckHandler(dbConfig ...config.DatabaseOptions) http.HandlerFunc {
 	}
 }
 
-func dbPingCheck(conns []*sql.DB, resp *healthResponse) error {
+func dbPingCheck(conns []*sql.DB, resp *healthResponse, ctx context.Context) error {
 	// check every database connection
 	for _, conn := range conns {
-		if err := conn.Ping(); err != nil {
+		if err := conn.PingContext(ctx); err != nil {
 			resp.Code = http.StatusInternalServerError
 			resp.FirstError = err.Error()
 			return err
