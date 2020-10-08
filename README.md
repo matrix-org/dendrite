@@ -10,7 +10,7 @@ It intends to provide an **efficient**, **reliable** and **scalable** alternativ
 
 
 As of October 2020, Dendrite has now entered **beta** which means:
-- Dendrite is ready for early adopters. We recommend running in Monolith mode with a Postgres database.
+- Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
 - Dendrite has periodic semver releases. We intend to release new versions as we land significant features.
 - Dendrite supports database schema upgrades between releases. This means you should never lose your messages when upgrading Dendrite.
 - Breaking changes will not occur on minor releases. This means you can safely upgrade Dendrite without modifying your database or config file.
@@ -29,9 +29,24 @@ Join us in:
 - **[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)** - The place for developers, where all Dendrite development discussion happens
 - **[#dendrite-alerts:matrix.org](https://matrix.to/#/#dendrite-alerts:matrix.org)** - Release notifications and important info, highly recommended for all Dendrite server admins
 
+## Requirements
+
+To build Dendrite, you will need Go 1.13 or later. 
+
+For a usable federating Dendrite deployment, you will also need:
+- A domain name (or subdomain) 
+- A valid TLS certificate issued by a trusted authority for that domain
+- SRV records or a well-known file pointing to your deployment
+
+Also recommended are:
+- A PostgreSQL database engine, which will perform better than SQLite with many users and/or larger rooms
+- A reverse proxy server, such as nginx, configured [like this sample](https://github.com/matrix-org/dendrite/blob/master/docs/nginx/monolith-sample.conf)
+
+The [Federation Tester](https://federationtester.matrix.org) can be used to verify your deployment.
+
 ## Quick start
 
-Requires Go 1.13+ and SQLite3 (Postgres is also supported):
+The following instructions are enough to get Dendrite started as a local test deployment using SQLite databases:
 
 ```bash
 $ git clone https://github.com/matrix-org/dendrite
@@ -51,8 +66,9 @@ $ go build ./cmd/dendrite-monolith-server
 $ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 ```
 
-Then point your favourite Matrix client at `http://localhost:8008`. For full installation information, see
-[INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
+Then point your favourite Matrix client at `http://localhost:8008`.
+
+For full installation information, see [INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
 
 ## Progress
 
