@@ -120,7 +120,10 @@ Assuming that Postgres 9.5 (or later) is installed:
 
 Each Dendrite server requires unique server keys.
 
-Generate the self-signed SSL certificate for federation and the server signing key:
+In order for an instance to federate correctly, you should have a valid
+certificate issued by a trusted authority, and private key to match. If you
+don't and just want to test locally, generate the self-signed SSL certificate
+for federation and the server signing key:
 
 ```bash
 ./bin/generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
@@ -267,12 +270,12 @@ This manages end-to-end encryption keys for users.
 ./bin/dendrite-key-server --config dendrite.yaml
 ```
 
-#### Server Key server
+#### Signing key server
 
 This manages signing keys for servers.
 
 ```bash
-./bin/dendrite-server-key-api-server --config dendrite.yaml
+./bin/dendrite-signing-key-server --config dendrite.yaml
 ```
 
 #### EDU server

@@ -1,6 +1,28 @@
 # Dendrite [![Build Status](https://badge.buildkite.com/4be40938ab19f2bbc4a6c6724517353ee3ec1422e279faf374.svg?branch=master)](https://buildkite.com/matrix-dot-org/dendrite) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
-Dendrite is a second-generation Matrix homeserver written in Go!
+Dendrite is a second-generation Matrix homeserver written in Go.
+It intends to provide an **efficient**, **reliable** and **scalable** alternative to Synapse:
+ - Efficient: A small memory footprint with better baseline performance than an out-of-the-box Synapse.
+ - Reliable: Implements the Matrix specification as written, using the
+   [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as
+   a [brand new Go test suite](https://github.com/matrix-org/complement).
+ - Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
+
+
+As of October 2020, Dendrite has now entered **beta** which means:
+- Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
+- Dendrite has periodic semver releases. We intend to release new versions as we land significant features.
+- Dendrite supports database schema upgrades between releases. This means you should never lose your messages when upgrading Dendrite.
+- Breaking changes will not occur on minor releases. This means you can safely upgrade Dendrite without modifying your database or config file.
+
+This does not mean:
+ - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
+ - All of the CS/Federation APIs are implemented. We are tracking progress via a script called 'Are We Synapse Yet?'. In particular,
+   read receipts, presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
+ - Dendrite is ready for massive homeserver deployments. You cannot shard each microservice, only run each one on a different machine.
+
+Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
+In the future, we will be able to scale up to gigantic servers (equivalent to matrix.org) via polylith mode. 
 
 Join us in:
 
@@ -8,9 +30,26 @@ Join us in:
 - **[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)** - The place for developers, where all Dendrite development discussion happens
 - **[#dendrite-alerts:matrix.org](https://matrix.to/#/#dendrite-alerts:matrix.org)** - Release notifications and important info, highly recommended for all Dendrite server admins
 
-## Quick start
+## Requirements
 
-Requires Go 1.13+ and SQLite3 (Postgres is also supported):
+To build Dendrite, you will need Go 1.13 or later. 
+
+For a usable federating Dendrite deployment, you will also need:
+- A domain name (or subdomain) 
+- A valid TLS certificate issued by a trusted authority for that domain
+- SRV records or a well-known file pointing to your deployment
+
+Also recommended are:
+- A PostgreSQL database engine, which will perform better than SQLite with many users and/or larger rooms
+- A reverse proxy server, such as nginx, configured [like this sample](https://github.com/matrix-org/dendrite/blob/master/docs/nginx/monolith-sample.conf)
+
+The [Federation Tester](https://federationtester.matrix.org) can be used to verify your deployment.
+
+## Get started
+
+If you wish to build a fully-federating Dendrite instance, see [INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
+
+The following instructions are enough to get Dendrite started as a non-federating test deployment using self-signed certificates and SQLite databases:
 
 ```bash
 $ git clone https://github.com/matrix-org/dendrite
@@ -30,14 +69,13 @@ $ go build ./cmd/dendrite-monolith-server
 $ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 ```
 
-Then point your favourite Matrix client at `http://localhost:8008`. For full installation information, see
-[INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
+Then point your favourite Matrix client at `http://localhost:8008`.
 
 ## Progress
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of August 2020 we're at around 52% CS API coverage and 65% Federation coverage, though check
+updates with CI. As of October 2020 we're at around 56% CS API coverage and 77% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
 servers such as matrix.org reasonably well. There's a long list of features that are not implemented, notably:
  - Receipts
