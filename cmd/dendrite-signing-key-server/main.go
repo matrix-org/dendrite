@@ -33,6 +33,6 @@ func main() {
 		base.Cfg.SigningKeyServer.InternalAPI.Listen,
 		setup.NoListener,
 		nil, nil,
-		base.Cfg.ServerKeyAPI.Database,
+		base.Cfg.SigningKeyServer.Database,
 	)
 }
