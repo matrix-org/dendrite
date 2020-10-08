@@ -32,9 +32,6 @@ type healthResponse struct {
 
 // HealthCheckHandler adds a /health endpoint to the internal api mux
 func HealthCheckHandler(dbConfig ...config.DatabaseOptions) http.HandlerFunc {
-	if len(dbConfig) == 0 {
-		return func(_ http.ResponseWriter, _ *http.Request) {}
-	}
 	conns := make([]*sql.DB, len(dbConfig))
 	// populate sql connections
 	for i, conf := range dbConfig {
@@ -45,36 +42,28 @@ func HealthCheckHandler(dbConfig ...config.DatabaseOptions) http.HandlerFunc {
 		conns[i] = c
 	}
 
-	return func(resp http.ResponseWriter, _ *http.Request) {
-		var (
-			errMsg string
-			code   = http.StatusOK
-		)
-		err := dbPingCheck(conns, &errMsg, &code)
-		if err != nil {
-			resp.WriteHeader(http.StatusInternalServerError)
+	return func(rw http.ResponseWriter, _ *http.Request) {
+		resp := &healthResponse{
+			Code:       http.StatusOK,
+			FirstError: "",
 		}
-		data, err := json.Marshal(healthResponse{
-			Code:       code,
-			FirstError: errMsg,
-		})
+		err := dbPingCheck(conns, resp)
 		if err != nil {
-			logrus.WithError(err).Error("Unable to encode response")
-			resp.WriteHeader(http.StatusInternalServerError)
-			return
+			rw.WriteHeader(resp.Code)
 		}
-		if _, err = resp.Write(data); err != nil {
-			logrus.WithError(err).Error("Unable to write health response")
+
+		if err := json.NewEncoder(rw).Encode(resp); err != nil {
+			logrus.WithError(err).Error("unable to encode health response")
 		}
 	}
 }
 
-func dbPingCheck(conns []*sql.DB, errMsg *string, code *int) error {
+func dbPingCheck(conns []*sql.DB, resp *healthResponse) error {
 	// check every database connection
 	for _, conn := range conns {
 		if err := conn.Ping(); err != nil {
-			*errMsg = err.Error()
-			*code = http.StatusInternalServerError
+			resp.Code = http.StatusInternalServerError
+			resp.FirstError = err.Error()
 			return err
 		}
 	}
