@@ -92,7 +92,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(database)
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(database)
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(database)
-	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(database)
+	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(database)
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(database)
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(database)
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(database)
@@ -104,7 +104,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.KeyServer.InternalAPI.Listen = assignAddress()
 	cfg.MediaAPI.InternalAPI.Listen = assignAddress()
 	cfg.RoomServer.InternalAPI.Listen = assignAddress()
-	cfg.ServerKeyAPI.InternalAPI.Listen = assignAddress()
+	cfg.SigningKeyServer.InternalAPI.Listen = assignAddress()
 	cfg.SyncAPI.InternalAPI.Listen = assignAddress()
 	cfg.UserAPI.InternalAPI.Listen = assignAddress()
 
@@ -115,7 +115,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.KeyServer.InternalAPI.Connect = cfg.KeyServer.InternalAPI.Listen
 	cfg.MediaAPI.InternalAPI.Connect = cfg.MediaAPI.InternalAPI.Listen
 	cfg.RoomServer.InternalAPI.Connect = cfg.RoomServer.InternalAPI.Listen
-	cfg.ServerKeyAPI.InternalAPI.Connect = cfg.ServerKeyAPI.InternalAPI.Listen
+	cfg.SigningKeyServer.InternalAPI.Connect = cfg.SigningKeyServer.InternalAPI.Listen
 	cfg.SyncAPI.InternalAPI.Connect = cfg.SyncAPI.InternalAPI.Listen
 	cfg.UserAPI.InternalAPI.Connect = cfg.UserAPI.InternalAPI.Listen
 

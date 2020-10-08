@@ -168,7 +168,7 @@ func main() {
 	cfg.FederationSender.Database.ConnectionString = "file:/idb/dendritejs_fedsender.db"
 	cfg.MediaAPI.Database.ConnectionString = "file:/idb/dendritejs_mediaapi.db"
 	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"
-	cfg.ServerKeyAPI.Database.ConnectionString = "file:/idb/dendritejs_serverkey.db"
+	cfg.SigningKeyServer.Database.ConnectionString = "file:/idb/dendritejs_signingkeyserver.db"
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
 	cfg.Global.Kafka.UseNaffka = true

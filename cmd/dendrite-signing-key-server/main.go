@@ -16,22 +16,22 @@ package main
 
 import (
 	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/signingkeyserver"
 )
 
 func main() {
 	cfg := setup.ParseFlags(false)
-	base := setup.NewBaseDendrite(cfg, "ServerKeyAPI", true)
+	base := setup.NewBaseDendrite(cfg, "SigningKeyServer", true)
 	defer base.Close() // nolint: errcheck
 
 	federation := base.CreateFederationClient()
 
-	intAPI := serverkeyapi.NewInternalAPI(&base.Cfg.ServerKeyAPI, federation, base.Caches)
-	serverkeyapi.AddInternalRoutes(base.InternalAPIMux, intAPI, base.Caches)
+	intAPI := signingkeyserver.NewInternalAPI(&base.Cfg.SigningKeyServer, federation, base.Caches)
+	signingkeyserver.AddInternalRoutes(base.InternalAPIMux, intAPI, base.Caches)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.ServerKeyAPI.InternalAPI.Listen,
-		setup.NoExternalListener,
+		base.Cfg.SigningKeyServer.InternalAPI.Listen,
+		setup.NoListener,
 		nil, nil,
 	)
 }

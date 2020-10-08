@@ -40,6 +40,7 @@ func GetUserDevices(
 	response := gomatrixserverlib.RespUserDevices{
 		UserID:   userID,
 		StreamID: res.StreamID,
+		Devices:  []gomatrixserverlib.RespUserDevice{},
 	}
 
 	for _, dev := range res.Devices {

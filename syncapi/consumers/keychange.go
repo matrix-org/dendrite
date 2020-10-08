@@ -125,31 +125,3 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}
 	return nil
 }
-
-func (s *OutputKeyChangeEventConsumer) OnJoinEvent(ev *gomatrixserverlib.HeaderedEvent) {
-	// work out who we are now sharing rooms with which we previously were not and notify them about the joining
-	// users keys:
-	changed, _, err := syncinternal.TrackChangedUsers(context.Background(), s.rsAPI, *ev.StateKey(), []string{ev.RoomID()}, nil)
-	if err != nil {
-		log.WithError(err).Error("OnJoinEvent: failed to work out changed users")
-		return
-	}
-	// TODO: f.e changed, wake up stream
-	for _, userID := range changed {
-		log.Infof("OnJoinEvent:Notify %s that %s should have device lists tracked", userID, *ev.StateKey())
-	}
-}
-
-func (s *OutputKeyChangeEventConsumer) OnLeaveEvent(ev *gomatrixserverlib.HeaderedEvent) {
-	// work out who we are no longer sharing any rooms with and notify them about the leaving user
-	_, left, err := syncinternal.TrackChangedUsers(context.Background(), s.rsAPI, *ev.StateKey(), nil, []string{ev.RoomID()})
-	if err != nil {
-		log.WithError(err).Error("OnLeaveEvent: failed to work out left users")
-		return
-	}
-	// TODO: f.e left, wake up stream
-	for _, userID := range left {
-		log.Infof("OnLeaveEvent:Notify %s that %s should no longer track device lists", userID, *ev.StateKey())
-	}
-
-}

@@ -1,4 +1,4 @@
-package serverkeyapi
+package signingkeyserver
 
 import (
 	"bytes"
@@ -16,18 +16,18 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/serverkeyapi/api"
+	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type server struct {
 	name      gomatrixserverlib.ServerName        // server name
 	validity  time.Duration                       // key validity duration from now
-	config    *config.ServerKeyAPI                // skeleton config, from TestMain
+	config    *config.SigningKeyServer            // skeleton config, from TestMain
 	fedconfig *config.FederationAPI               //
 	fedclient *gomatrixserverlib.FederationClient // uses MockRoundTripper
 	cache     *caching.Caches                     // server-specific cache
-	api       api.ServerKeyInternalAPI            // server-specific server key API
+	api       api.SigningKeyServerAPI             // server-specific server key API
 }
 
 func (s *server) renew() {
@@ -76,8 +76,8 @@ func TestMain(m *testing.M) {
 		cfg.Global.PrivateKey = testPriv
 		cfg.Global.KeyID = serverKeyID
 		cfg.Global.KeyValidityPeriod = s.validity
-		cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource("file::memory:")
-		s.config = &cfg.ServerKeyAPI
+		cfg.SigningKeyServer.Database.ConnectionString = config.DataSource("file::memory:")
+		s.config = &cfg.SigningKeyServer
 		s.fedconfig = &cfg.FederationAPI
 
 		// Create a transport which redirects federation requests to

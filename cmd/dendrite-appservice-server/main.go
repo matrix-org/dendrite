@@ -31,8 +31,8 @@ func main() {
 	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.AppServiceAPI.InternalAPI.Listen,
-		setup.NoExternalListener,
+		base.Cfg.AppServiceAPI.InternalAPI.Listen, // internal listener
+		setup.NoListener, // external listener
 		nil, nil,
 	)
 }

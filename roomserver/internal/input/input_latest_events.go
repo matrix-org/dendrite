@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
@@ -116,7 +117,6 @@ type latestEventsUpdater struct {
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
-	prevEvents := u.event.PrevEvents()
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 	u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 
@@ -140,30 +140,12 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return nil
 	}
 
-	// Update the roomserver_previous_events table with references. This
-	// is effectively tracking the structure of the DAG.
-	if err = u.updater.StorePreviousEvents(u.stateAtEvent.EventNID, prevEvents); err != nil {
-		return fmt.Errorf("u.updater.StorePreviousEvents: %w", err)
-	}
-
-	// Get the event reference for our new event. This will be used when
-	// determining if the event is referenced by an existing event.
-	eventReference := u.event.EventReference()
-
-	// Check if our new event is already referenced by an existing event
-	// in the room. If it is then it isn't a latest event.
-	alreadyReferenced, err := u.updater.IsReferenced(eventReference)
-	if err != nil {
-		return fmt.Errorf("u.updater.IsReferenced: %w", err)
-	}
-
-	// Work out what the latest events are.
-	u.latest = calculateLatest(
+	// Work out what the latest events are. This will include the new
+	// event if it is not already referenced.
+	u.calculateLatest(
 		oldLatest,
-		alreadyReferenced,
-		prevEvents,
 		types.StateAtEventAndReference{
-			EventReference: eventReference,
+			EventReference: u.event.EventReference(),
 			StateAtEvent:   u.stateAtEvent,
 		},
 	)
@@ -215,7 +197,9 @@ func (u *latestEventsUpdater) latestState() error {
 	var err error
 	roomState := state.NewStateResolution(u.api.DB, *u.roomInfo)
 
-	// Get a list of the current latest events.
+	// Get a list of the current latest events. This may or may not
+	// include the new event from the input path, depending on whether
+	// it is a forward extremity or not.
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
 	for i := range u.latest {
 		latestStateAtEvents[i] = u.latest[i].StateAtEvent
@@ -249,6 +233,18 @@ func (u *latestEventsUpdater) latestState() error {
 	if err != nil {
 		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
 	}
+	if len(u.removed) > len(u.added) {
+		// This really shouldn't happen.
+		// TODO: What is ultimately the best way to handle this situation?
+		logrus.Errorf(
+			"Invalid state delta on event %q wants to remove %d state but only add %d state (between state snapshots %d and %d)",
+			u.event.EventID(), len(u.removed), len(u.added), u.oldStateNID, u.newStateNID,
+		)
+		u.added = u.added[:0]
+		u.removed = u.removed[:0]
+		u.newStateNID = u.oldStateNID
+		return nil
+	}
 
 	// Also work out the state before the event removes and the event
 	// adds.
@@ -262,42 +258,49 @@ func (u *latestEventsUpdater) latestState() error {
 	return nil
 }
 
-func calculateLatest(
+func (u *latestEventsUpdater) calculateLatest(
 	oldLatest []types.StateAtEventAndReference,
-	alreadyReferenced bool,
-	prevEvents []gomatrixserverlib.EventReference,
 	newEvent types.StateAtEventAndReference,
-) []types.StateAtEventAndReference {
-	var alreadyInLatest bool
+) {
 	var newLatest []types.StateAtEventAndReference
+
+	// First of all, let's see if any of the existing forward extremities
+	// now have entries in the previous events table. If they do then we
+	// will no longer include them as forward extremities.
 	for _, l := range oldLatest {
-		keep := true
-		for _, prevEvent := range prevEvents {
-			if l.EventID == prevEvent.EventID && bytes.Equal(l.EventSHA256, prevEvent.EventSHA256) {
-				// This event can be removed from the latest events cause we've found an event that references it.
-				// (If an event is referenced by another event then it can't be one of the latest events in the room
-				//  because we have an event that comes after it)
-				keep = false
-				break
-			}
-		}
-		if l.EventNID == newEvent.EventNID {
-			alreadyInLatest = true
-		}
-		if keep {
-			// Keep the event in the latest events.
+		referenced, err := u.updater.IsReferenced(l.EventReference)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", l.EventID)
+		} else if !referenced {
 			newLatest = append(newLatest, l)
 		}
 	}
 
-	if !alreadyReferenced && !alreadyInLatest {
-		// This event is not referenced by any of the events in the room
-		// and the event is not already in the latest events.
-		// Add it to the latest events
+	// Then check and see if our new event is already included in that set.
+	// This ordinarily won't happen but it covers the edge-case that we've
+	// already seen this event before and it's a forward extremity, so rather
+	// than adding a duplicate, we'll just return the set as complete.
+	for _, l := range newLatest {
+		if l.EventReference.EventID == newEvent.EventReference.EventID && bytes.Equal(l.EventReference.EventSHA256, newEvent.EventReference.EventSHA256) {
+			// We've already referenced this new event so we can just return
+			// the newly completed extremities at this point.
+			u.latest = newLatest
+			return
+		}
+	}
+
+	// At this point we've processed the old extremities, and we've checked
+	// that our new event isn't already in that set. Therefore now we can
+	// check if our *new* event is a forward extremity, and if it is, add
+	// it in.
+	referenced, err := u.updater.IsReferenced(newEvent.EventReference)
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", newEvent.EventReference.EventID)
+	} else if !referenced || len(newLatest) == 0 {
 		newLatest = append(newLatest, newEvent)
 	}
 
-	return newLatest
+	u.latest = newLatest
 }
 
 func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error) {

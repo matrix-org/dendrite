@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/serverkeyapi/api"
+	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
 type ServerKeyAPI struct {
-	api.ServerKeyInternalAPI
+	api.SigningKeyServerAPI
 
 	ServerName        gomatrixserverlib.ServerName
 	ServerPublicKey   ed25519.PublicKey
@@ -98,10 +98,6 @@ func (s *ServerKeyAPI) FetchKeys(
 			// we've failed to satisfy it from local keys, database keys or from
 			// all of the fetchers. Report an error.
 			logrus.Warnf("Failed to retrieve key %q for server %q", req.KeyID, req.ServerName)
-			return results, fmt.Errorf(
-				"server key API failed to satisfy key request for server %q key ID %q",
-				req.ServerName, req.KeyID,
-			)
 		}
 	}
 

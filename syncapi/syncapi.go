@@ -71,7 +71,7 @@ func AddPublicRoutes(
 	}
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg, consumer, notifier, syncDB, rsAPI, keyChangeConsumer,
+		cfg, consumer, notifier, syncDB, rsAPI,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
