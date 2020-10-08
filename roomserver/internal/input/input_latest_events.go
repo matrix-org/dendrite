@@ -242,6 +242,7 @@ func (u *latestEventsUpdater) latestState() error {
 		)
 		u.added = u.added[:0]
 		u.removed = u.removed[:0]
+		u.newStateNID = u.oldStateNID
 		return nil
 	}
 
