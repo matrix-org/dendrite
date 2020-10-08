@@ -27,13 +27,15 @@ import (
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
+	"github.com/sirupsen/logrus"
 )
 
 var (
 	httpBindAddr   = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
 	httpsBindAddr  = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
+	apiBindAddr    = flag.String("api-bind-address", "localhost:18008", "The HTTP listening port for the internal HTTP APIs (if -api is enabled)")
 	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
 	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
 	enableHTTPAPIs = flag.Bool("api", false, "Use HTTP APIs instead of short-circuiting (warning: exposes API endpoints!)")
@@ -44,22 +46,25 @@ func main() {
 	cfg := setup.ParseFlags(true)
 	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
 	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
+	httpAPIAddr := httpAddr
 
 	if *enableHTTPAPIs {
+		logrus.Warnf("DANGER! The -api option is enabled, exposing internal APIs on %q!", *apiBindAddr)
+		httpAPIAddr = config.HTTPAddress("http://" + *apiBindAddr)
 		// If the HTTP APIs are enabled then we need to update the Listen
 		// statements in the configuration so that we know where to find
 		// the API endpoints. They'll listen on the same port as the monolith
 		// itself.
-		cfg.AppServiceAPI.InternalAPI.Connect = httpAddr
-		cfg.ClientAPI.InternalAPI.Connect = httpAddr
-		cfg.EDUServer.InternalAPI.Connect = httpAddr
-		cfg.FederationAPI.InternalAPI.Connect = httpAddr
-		cfg.FederationSender.InternalAPI.Connect = httpAddr
-		cfg.KeyServer.InternalAPI.Connect = httpAddr
-		cfg.MediaAPI.InternalAPI.Connect = httpAddr
-		cfg.RoomServer.InternalAPI.Connect = httpAddr
-		cfg.ServerKeyAPI.InternalAPI.Connect = httpAddr
-		cfg.SyncAPI.InternalAPI.Connect = httpAddr
+		cfg.AppServiceAPI.InternalAPI.Connect = httpAPIAddr
+		cfg.ClientAPI.InternalAPI.Connect = httpAPIAddr
+		cfg.EDUServer.InternalAPI.Connect = httpAPIAddr
+		cfg.FederationAPI.InternalAPI.Connect = httpAPIAddr
+		cfg.FederationSender.InternalAPI.Connect = httpAPIAddr
+		cfg.KeyServer.InternalAPI.Connect = httpAPIAddr
+		cfg.MediaAPI.InternalAPI.Connect = httpAPIAddr
+		cfg.RoomServer.InternalAPI.Connect = httpAPIAddr
+		cfg.SigningKeyServer.InternalAPI.Connect = httpAPIAddr
+		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
 	}
 
 	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
@@ -68,14 +73,14 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
-	serverKeyAPI := serverkeyapi.NewInternalAPI(
-		&base.Cfg.ServerKeyAPI, federation, base.Caches,
+	skAPI := signingkeyserver.NewInternalAPI(
+		&base.Cfg.SigningKeyServer, federation, base.Caches,
 	)
 	if base.UseHTTPAPIs {
-		serverkeyapi.AddInternalRoutes(base.InternalAPIMux, serverKeyAPI, base.Caches)
-		serverKeyAPI = base.ServerKeyAPIClient()
+		signingkeyserver.AddInternalRoutes(base.InternalAPIMux, skAPI, base.Caches)
+		skAPI = base.SigningKeyServerHTTPClient()
 	}
-	keyRing := serverKeyAPI.KeyRing()
+	keyRing := skAPI.KeyRing()
 
 	rsImpl := roomserver.NewInternalAPI(
 		base, keyRing,
@@ -134,7 +139,7 @@ func main() {
 		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fsAPI,
 		RoomserverAPI:       rsAPI,
-		ServerKeyAPI:        serverKeyAPI,
+		ServerKeyAPI:        skAPI,
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
 	}
@@ -148,18 +153,18 @@ func main() {
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {
 		base.SetupAndServeHTTP(
-			config.HTTPAddress(httpAddr), // internal API
-			config.HTTPAddress(httpAddr), // external API
-			nil, nil,                     // TLS settings
+			httpAPIAddr, // internal API
+			httpAddr,    // external API
+			nil, nil,    // TLS settings
 		)
 	}()
 	// Handle HTTPS if certificate and key are provided
 	if *certFile != "" && *keyFile != "" {
 		go func() {
 			base.SetupAndServeHTTP(
-				config.HTTPAddress(httpsAddr), // internal API
-				config.HTTPAddress(httpsAddr), // external API
-				certFile, keyFile,             // TLS settings
+				setup.NoListener,  // internal API
+				httpsAddr,         // external API
+				certFile, keyFile, // TLS settings
 			)
 		}()
 	}

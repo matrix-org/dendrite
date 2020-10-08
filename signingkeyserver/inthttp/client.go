@@ -7,26 +7,26 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/serverkeyapi/api"
+	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
 
 // HTTP paths for the internal HTTP APIs
 const (
-	ServerKeyInputPublicKeyPath = "/serverkeyapi/inputPublicKey"
-	ServerKeyQueryPublicKeyPath = "/serverkeyapi/queryPublicKey"
+	ServerKeyInputPublicKeyPath = "/signingkeyserver/inputPublicKey"
+	ServerKeyQueryPublicKeyPath = "/signingkeyserver/queryPublicKey"
 )
 
-// NewServerKeyClient creates a ServerKeyInternalAPI implemented by talking to a HTTP POST API.
+// NewSigningKeyServerClient creates a SigningKeyServerAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil an error is returned
-func NewServerKeyClient(
+func NewSigningKeyServerClient(
 	serverKeyAPIURL string,
 	httpClient *http.Client,
 	cache caching.ServerKeyCache,
-) (api.ServerKeyInternalAPI, error) {
+) (api.SigningKeyServerAPI, error) {
 	if httpClient == nil {
-		return nil, errors.New("NewRoomserverInternalAPIHTTP: httpClient is <nil>")
+		return nil, errors.New("NewSigningKeyServerClient: httpClient is <nil>")
 	}
 	return &httpServerKeyInternalAPI{
 		serverKeyAPIURL: serverKeyAPIURL,

@@ -253,12 +253,12 @@ room_server:
     conn_max_lifetime: -1
 
 # Configuration for the Server Key API (for server signing keys).
-server_key_api:
+signing_key_server:
   internal_api:
     listen: http://0.0.0.0:7780
-    connect: http://server_key_api:7780
+    connect: http://signing_key_server:7780
   database:
-    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_serverkey?sslmode=disable
+    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_signingkeyserver?sslmode=disable
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
