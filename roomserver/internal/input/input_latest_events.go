@@ -236,10 +236,12 @@ func (u *latestEventsUpdater) latestState() error {
 	if len(u.removed) > len(u.added) {
 		// This really shouldn't happen.
 		// TODO: What is ultimately the best way to handle this situation?
-		return fmt.Errorf(
-			"invalid state delta wants to remove %d state but only add %d state (between state snapshots %d and %d)",
-			len(u.removed), len(u.added), u.oldStateNID, u.newStateNID,
-		)
+		return &gomatrixserverlib.NotAllowed{
+			Message: fmt.Sprintf(
+				"invalid state delta wants to remove %d state but only add %d state (between state snapshots %d and %d)",
+				len(u.removed), len(u.added), u.oldStateNID, u.newStateNID,
+			),
+		}
 	}
 
 	// Also work out the state before the event removes and the event
