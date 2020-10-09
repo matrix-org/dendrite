@@ -16,7 +16,7 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 
 	"github.com/Shopify/sarama"
@@ -78,7 +78,7 @@ func (s *OutputRoomEventConsumer) Start() error {
 func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output api.OutputEvent
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
+	if err := jsoniter.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
 		return nil

@@ -17,7 +17,7 @@ package httputil
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -32,7 +32,7 @@ func PostJSON(
 	ctx context.Context, span opentracing.Span, httpClient *http.Client,
 	apiURL string, request, response interface{},
 ) error {
-	jsonBytes, err := json.Marshal(request)
+	jsonBytes, err := jsoniter.Marshal(request)
 	if err != nil {
 		return err
 	}
@@ -72,10 +72,10 @@ func PostJSON(
 		var errorBody struct {
 			Message string `json:"message"`
 		}
-		if msgerr := json.NewDecoder(res.Body).Decode(&errorBody); msgerr == nil {
+		if msgerr := jsoniter.NewDecoder(res.Body).Decode(&errorBody); msgerr == nil {
 			return fmt.Errorf("Internal API: %d from %s: %s", res.StatusCode, apiURL, errorBody.Message)
 		}
 		return fmt.Errorf("Internal API: %d from %s", res.StatusCode, apiURL)
 	}
-	return json.NewDecoder(res.Body).Decode(response)
+	return jsoniter.NewDecoder(res.Body).Decode(response)
 }

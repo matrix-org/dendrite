@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -75,7 +75,7 @@ func main() {
 			bodyBytes = append(bodyBytes, bytes...)
 		}
 		fmt.Println("Done!")
-		if err = json.Unmarshal(bodyBytes, &bodyObj); err != nil {
+		if err = jsoniter.Unmarshal(bodyBytes, &bodyObj); err != nil {
 			panic(err)
 		}
 	}
@@ -115,7 +115,7 @@ func main() {
 		panic(err)
 	}
 
-	j, err := json.MarshalIndent(res, "", "  ")
+	j, err := jsoniter.MarshalIndent(res, "", "  ")
 	if err != nil {
 		panic(err)
 	}

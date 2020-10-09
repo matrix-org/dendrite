@@ -18,7 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -225,12 +225,12 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
 	var content map[string]interface{}
-	if json.Unmarshal(event.Content(), &content) != nil {
+	if jsoniter.Unmarshal(event.Content(), &content) != nil {
 		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
 
-	headeredJSON, err := json.Marshal(event)
+	headeredJSON, err := jsoniter.Marshal(event)
 	if err != nil {
 		return err
 	}
@@ -295,7 +295,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.HeaderedEvent, error) {
 		}
 		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
-		if err := json.Unmarshal(eventBytes, &ev); err != nil {
+		if err := jsoniter.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 		result = append(result, ev)
@@ -316,7 +316,7 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 		return nil, err
 	}
 	var ev gomatrixserverlib.HeaderedEvent
-	if err = json.Unmarshal(res, &ev); err != nil {
+	if err = jsoniter.Unmarshal(res, &ev); err != nil {
 		return nil, err
 	}
 	return &ev, err

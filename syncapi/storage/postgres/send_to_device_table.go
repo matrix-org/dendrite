@@ -17,7 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"github.com/json-iterator/go"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
@@ -143,7 +143,7 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			UserID:   userID,
 			DeviceID: deviceID,
 		}
-		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
+		if err = jsoniter.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
 			return
 		}
 		if sentByToken != nil {

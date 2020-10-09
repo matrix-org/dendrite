@@ -1,7 +1,7 @@
 package inthttp
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -16,7 +16,7 @@ func AddRoutes(t api.EDUServerInputAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalAPI("inputTypingEvents", func(req *http.Request) util.JSONResponse {
 			var request api.InputTypingEventRequest
 			var response api.InputTypingEventResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := t.InputTypingEvent(req.Context(), &request, &response); err != nil {
@@ -29,7 +29,7 @@ func AddRoutes(t api.EDUServerInputAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalAPI("inputSendToDeviceEvents", func(req *http.Request) util.JSONResponse {
 			var request api.InputSendToDeviceEventRequest
 			var response api.InputSendToDeviceEventResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := t.InputSendToDeviceEvent(req.Context(), &request, &response); err != nil {

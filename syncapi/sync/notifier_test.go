@@ -16,7 +16,7 @@ package sync
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"sync"
 	"testing"
@@ -49,7 +49,7 @@ var (
 
 func init() {
 	var err error
-	err = json.Unmarshal([]byte(`{
+	err = jsoniter.Unmarshal([]byte(`{
 		"_room_version": "1",
 		"type": "m.room.message",
 		"content": {
@@ -65,7 +65,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	err = json.Unmarshal([]byte(`{
+	err = jsoniter.Unmarshal([]byte(`{
 		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",
@@ -81,7 +81,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	err = json.Unmarshal([]byte(`{
+	err = jsoniter.Unmarshal([]byte(`{
 		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",

@@ -17,7 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -88,7 +88,7 @@ func (s *filterStatements) SelectFilter(
 
 	// Unmarshal JSON into Filter struct
 	var filter gomatrixserverlib.Filter
-	if err = json.Unmarshal(filterData, &filter); err != nil {
+	if err = jsoniter.Unmarshal(filterData, &filter); err != nil {
 		return nil, err
 	}
 	return &filter, nil
@@ -100,7 +100,7 @@ func (s *filterStatements) InsertFilter(
 	var existingFilterID string
 
 	// Serialise json
-	filterJSON, err := json.Marshal(filter)
+	filterJSON, err := jsoniter.Marshal(filter)
 	if err != nil {
 		return "", err
 	}

@@ -13,7 +13,7 @@
 package routing
 
 import (
-	"encoding/json"
+	jsoniter "github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -39,7 +39,7 @@ func SendToDevice(
 	}
 
 	var httpReq struct {
-		Messages map[string]map[string]json.RawMessage `json:"messages"`
+		Messages map[string]map[string]jsoniter.RawMessage `json:"messages"`
 	}
 	resErr := httputil.UnmarshalJSONRequest(req, &httpReq)
 	if resErr != nil {

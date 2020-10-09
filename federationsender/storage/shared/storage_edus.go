@@ -17,7 +17,7 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"errors"
 	"fmt"
 
@@ -76,7 +76,7 @@ func (d *Database) GetNextTransactionEDUs(
 
 		for _, blob := range blobs {
 			var event gomatrixserverlib.EDU
-			if err := json.Unmarshal(blob, &event); err != nil {
+			if err := jsoniter.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
 			edus = append(edus, &event)

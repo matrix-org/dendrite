@@ -17,7 +17,7 @@ package input
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"sync"
 	"time"
 
@@ -73,7 +73,7 @@ func (w *inputWorker) start() {
 func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
 	messages := make([]*sarama.ProducerMessage, len(updates))
 	for i := range updates {
-		value, err := json.Marshal(updates[i])
+		value, err := jsoniter.Marshal(updates[i])
 		if err != nil {
 			return err
 		}

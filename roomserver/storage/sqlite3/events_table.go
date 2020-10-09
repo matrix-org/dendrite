@@ -18,7 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"strings"
 
@@ -488,6 +488,6 @@ func (s *eventStatements) SelectRoomNIDForEventNID(
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) string {
-	b, _ := json.Marshal(eventNIDs)
+	b, _ := jsoniter.Marshal(eventNIDs)
 	return string(b)
 }

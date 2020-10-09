@@ -1,7 +1,7 @@
 package types
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"reflect"
 	"testing"
 
@@ -101,7 +101,7 @@ func TestNewInviteResponse(t *testing.T) {
 	}
 
 	res := NewInviteResponse(ev.Headered(gomatrixserverlib.RoomVersionV5))
-	j, err := json.Marshal(res)
+	j, err := jsoniter.Marshal(res)
 	if err != nil {
 		t.Fatal(err)
 	}

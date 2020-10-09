@@ -1,7 +1,7 @@
 package inthttp
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -16,7 +16,7 @@ func AddRoutes(s api.SigningKeyServerAPI, internalAPIMux *mux.Router, cache cach
 		httputil.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryPublicKeysRequest{}
 			response := api.QueryPublicKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			keys, err := s.FetchKeys(req.Context(), request.Requests)
@@ -31,7 +31,7 @@ func AddRoutes(s api.SigningKeyServerAPI, internalAPIMux *mux.Router, cache cach
 		httputil.MakeInternalAPI("inputPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.InputPublicKeysRequest{}
 			response := api.InputPublicKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.StoreKeys(req.Context(), request.Keys); err != nil {

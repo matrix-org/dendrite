@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"net/http"
 	"strings"
 
@@ -466,7 +466,7 @@ func Setup(
 	r0mux.Handle("/pushrules/",
 		httputil.MakeExternalAPI("push_rules", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement push rules API
-			res := json.RawMessage(`{
+			res := jsoniter.RawMessage(`{
 					"global": {
 						"content": [],
 						"override": [],

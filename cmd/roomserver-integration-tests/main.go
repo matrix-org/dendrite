@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"encoding/json"
+	"github.com/json-iterator/go"
 
 	"net/http"
 
@@ -207,7 +207,7 @@ func writeToRoomServer(input []string, roomserverURL string) error {
 	var err error
 	request.InputRoomEvents = make([]api.InputRoomEvent, len(input))
 	for i := range input {
-		if err = json.Unmarshal([]byte(input[i]), &request.InputRoomEvents[i]); err != nil {
+		if err = jsoniter.Unmarshal([]byte(input[i]), &request.InputRoomEvents[i]); err != nil {
 			return err
 		}
 	}

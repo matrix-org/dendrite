@@ -16,7 +16,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -48,7 +48,7 @@ func SendToDevice(
 	ctx context.Context, eduAPI EDUServerInputAPI, sender, userID, deviceID, eventType string,
 	message interface{},
 ) error {
-	js, err := json.Marshal(message)
+	js, err := jsoniter.Marshal(message)
 	if err != nil {
 		return err
 	}

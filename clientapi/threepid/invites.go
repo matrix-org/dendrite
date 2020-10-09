@@ -16,7 +16,7 @@ package threepid
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"errors"
 	"fmt"
 	"net/http"
@@ -197,7 +197,7 @@ func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServe
 	}
 
 	var res idServerLookupResponse
-	err = json.NewDecoder(resp.Body).Decode(&res)
+	err = jsoniter.NewDecoder(resp.Body).Decode(&res)
 	return &res, err
 }
 
@@ -258,7 +258,7 @@ func queryIDServerStoreInvite(
 	}
 
 	var idResp idServerStoreInviteResponse
-	err = json.NewDecoder(resp.Body).Decode(&idResp)
+	err = jsoniter.NewDecoder(resp.Body).Decode(&idResp)
 	return &idResp, err
 }
 
@@ -287,7 +287,7 @@ func queryIDServerPubKey(ctx context.Context, idServerName string, keyID string)
 		return nil, errors.New(errMsg)
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&pubKeyRes)
+	err = jsoniter.NewDecoder(resp.Body).Decode(&pubKeyRes)
 	return pubKeyRes.PublicKey, err
 }
 
@@ -302,7 +302,7 @@ func checkIDServerSignatures(
 	ctx context.Context, body *MembershipRequest, res *idServerLookupResponse,
 ) error {
 	// Mashall the body so we can give it to VerifyJSON
-	marshalledBody, err := json.Marshal(*res)
+	marshalledBody, err := jsoniter.Marshal(*res)
 	if err != nil {
 		return err
 	}

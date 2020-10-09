@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 	"sync"
@@ -59,7 +60,7 @@ func Send(
 		EDUs []gomatrixserverlib.EDU `json:"edus"`
 	}
 
-	if err := json.Unmarshal(request.Content(), &txnEvents); err != nil {
+	if err := jsoniter.Unmarshal(request.Content(), &txnEvents); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
@@ -132,7 +133,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		var header struct {
 			RoomID string `json:"room_id"`
 		}
-		if err := json.Unmarshal(pdu, &header); err != nil {
+		if err := jsoniter.Unmarshal(pdu, &header); err != nil {
 			util.GetLogger(ctx).WithError(err).Warn("Transaction: Failed to extract room ID from event")
 			// We don't know the event ID at this point so we can't return the
 			// failure in the PDU results
@@ -295,7 +296,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				UserID string `json:"user_id"`
 				Typing bool   `json:"typing"`
 			}
-			if err := json.Unmarshal(e.Content, &typingPayload); err != nil {
+			if err := jsoniter.Unmarshal(e.Content, &typingPayload); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal typing event")
 				continue
 			}
@@ -305,7 +306,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 		case gomatrixserverlib.MDirectToDevice:
 			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
 			var directPayload gomatrixserverlib.ToDeviceMessage
-			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
+			if err := jsoniter.Unmarshal(e.Content, &directPayload); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal send-to-device events")
 				continue
 			}
@@ -331,7 +332,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 
 func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverlib.EDU) {
 	var payload gomatrixserverlib.DeviceListUpdateEvent
-	if err := json.Unmarshal(e.Content, &payload); err != nil {
+	if err := jsoniter.Unmarshal(e.Content, &payload); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal device list update event")
 		return
 	}

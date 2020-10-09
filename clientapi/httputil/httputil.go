@@ -15,7 +15,7 @@
 package httputil
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"io/ioutil"
 	"net/http"
 	"unicode/utf8"
@@ -43,7 +43,7 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 		}
 	}
 
-	if err := json.Unmarshal(body, iface); err != nil {
+	if err := jsoniter.Unmarshal(body, iface); err != nil {
 		// TODO: We may want to suppress the Error() return in production? It's useful when
 		// debugging because an error will be produced for both invalid/malformed JSON AND
 		// valid JSON with incorrect types for values.

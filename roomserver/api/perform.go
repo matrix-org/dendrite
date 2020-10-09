@@ -1,7 +1,7 @@
 package api
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 
@@ -54,7 +54,7 @@ func (p *PerformError) JSONResponse() util.JSONResponse {
 		return util.JSONResponse{
 			Code: p.RemoteCode,
 			// TODO: Should we assert this is in fact JSON? E.g gjson parse?
-			JSON: json.RawMessage(p.Msg),
+			JSON: jsoniter.RawMessage(p.Msg),
 		}
 	default:
 		return util.ErrorResponse(p)

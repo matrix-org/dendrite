@@ -17,9 +17,9 @@ package internal
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -298,17 +298,17 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 		return fmt.Errorf("cannot query account data of remote users: got %s want %s", domain, a.ServerName)
 	}
 	if req.DataType != "" {
-		var data json.RawMessage
+		var data jsoniter.RawMessage
 		data, err = a.AccountDB.GetAccountDataByType(ctx, local, req.RoomID, req.DataType)
 		if err != nil {
 			return err
 		}
-		res.RoomAccountData = make(map[string]map[string]json.RawMessage)
-		res.GlobalAccountData = make(map[string]json.RawMessage)
+		res.RoomAccountData = make(map[string]map[string]jsoniter.RawMessage)
+		res.GlobalAccountData = make(map[string]jsoniter.RawMessage)
 		if data != nil {
 			if req.RoomID != "" {
 				if _, ok := res.RoomAccountData[req.RoomID]; !ok {
-					res.RoomAccountData[req.RoomID] = make(map[string]json.RawMessage)
+					res.RoomAccountData[req.RoomID] = make(map[string]jsoniter.RawMessage)
 				}
 				res.RoomAccountData[req.RoomID][req.DataType] = data
 			} else {

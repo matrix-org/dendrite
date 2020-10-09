@@ -16,7 +16,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -44,7 +44,7 @@ type InputAccountDataRequest struct {
 	UserID      string          // required: the user to set account data for
 	RoomID      string          // optional: the room to associate the account data with
 	DataType    string          // required: the data type of the data
-	AccountData json.RawMessage // required: the message content
+	AccountData jsoniter.RawMessage // required: the message content
 }
 
 // InputAccountDataResponse is the response for InputAccountData
@@ -110,8 +110,8 @@ type QueryAccountDataRequest struct {
 
 // QueryAccountDataResponse is the response for QueryAccountData
 type QueryAccountDataResponse struct {
-	GlobalAccountData map[string]json.RawMessage            // type -> data
-	RoomAccountData   map[string]map[string]json.RawMessage // room -> type -> data
+	GlobalAccountData map[string]jsoniter.RawMessage            // type -> data
+	RoomAccountData   map[string]map[string]jsoniter.RawMessage // room -> type -> data
 }
 
 // QueryDevicesRequest is the request for QueryDevices

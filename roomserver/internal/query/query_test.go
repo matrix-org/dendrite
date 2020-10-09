@@ -16,7 +16,7 @@ package query
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"testing"
 
 	"github.com/matrix-org/dendrite/internal/test"
@@ -49,7 +49,7 @@ func (db *getEventDB) addFakeEvent(eventID string, authIDs []string) error {
 		"auth_events": authEvents,
 	}
 
-	eventJSON, err := json.Marshal(&builder)
+	eventJSON, err := jsoniter.Marshal(&builder)
 	if err != nil {
 		return err
 	}

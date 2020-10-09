@@ -13,7 +13,7 @@
 package routing
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -38,7 +38,7 @@ func GetMissingEvents(
 	roomID string,
 ) util.JSONResponse {
 	var gme getMissingEventRequest
-	if err := json.Unmarshal(request.Content(), &gme); err != nil {
+	if err := jsoniter.Unmarshal(request.Content(), &gme); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),

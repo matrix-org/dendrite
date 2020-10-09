@@ -16,7 +16,7 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 
 	"github.com/Shopify/sarama"
@@ -76,7 +76,7 @@ func (t *KeyChangeConsumer) Start() error {
 // key change events topic from the key server.
 func (t *KeyChangeConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	var m api.DeviceMessage
-	if err := json.Unmarshal(msg.Value, &m); err != nil {
+	if err := jsoniter.Unmarshal(msg.Value, &m); err != nil {
 		log.WithError(err).Errorf("failed to read device message from key change topic")
 		return nil
 	}
@@ -122,7 +122,7 @@ func (t *KeyChangeConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		Deleted:           len(m.KeyJSON) == 0,
 		Keys:              m.KeyJSON,
 	}
-	if edu.Content, err = json.Marshal(event); err != nil {
+	if edu.Content, err = jsoniter.Marshal(event); err != nil {
 		return err
 	}
 

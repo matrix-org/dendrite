@@ -18,7 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"strings"
 
@@ -72,7 +72,7 @@ func NewSqliteStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 func (s *stateSnapshotStatements) InsertState(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
 ) (stateNID types.StateSnapshotNID, err error) {
-	stateBlockNIDsJSON, err := json.Marshal(stateBlockNIDs)
+	stateBlockNIDsJSON, err := jsoniter.Marshal(stateBlockNIDs)
 	if err != nil {
 		return
 	}
@@ -115,7 +115,7 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDsJSON); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal([]byte(stateBlockNIDsJSON), &result.StateBlockNIDs); err != nil {
+		if err := jsoniter.Unmarshal([]byte(stateBlockNIDsJSON), &result.StateBlockNIDs); err != nil {
 			return nil, err
 		}
 	}

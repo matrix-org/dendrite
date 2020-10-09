@@ -18,7 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -94,7 +94,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 	ctx context.Context, txn *sql.Tx, inviteEvent gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
 	var headeredJSON []byte
-	headeredJSON, err = json.Marshal(inviteEvent)
+	headeredJSON, err = jsoniter.Marshal(inviteEvent)
 	if err != nil {
 		return
 	}
@@ -149,7 +149,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 		}
 
 		var event gomatrixserverlib.HeaderedEvent
-		if err := json.Unmarshal(eventJSON, &event); err != nil {
+		if err := jsoniter.Unmarshal(eventJSON, &event); err != nil {
 			return nil, nil, err
 		}
 

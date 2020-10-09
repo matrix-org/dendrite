@@ -2,7 +2,7 @@ package routing
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"reflect"
 	"testing"

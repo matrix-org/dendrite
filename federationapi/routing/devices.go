@@ -13,7 +13,7 @@
 package routing
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -45,7 +45,7 @@ func GetUserDevices(
 
 	for _, dev := range res.Devices {
 		var key gomatrixserverlib.RespUserDeviceKeys
-		err := json.Unmarshal(dev.DeviceKeys.KeyJSON, &key)
+		err := jsoniter.Unmarshal(dev.DeviceKeys.KeyJSON, &key)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Warnf("malformed device key: %s", string(dev.DeviceKeys.KeyJSON))
 			continue

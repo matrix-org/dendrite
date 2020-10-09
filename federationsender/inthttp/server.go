@@ -1,7 +1,7 @@
 package inthttp
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -18,7 +18,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		httputil.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryJoinedHostServerNamesInRoomRequest
 			var response api.QueryJoinedHostServerNamesInRoomResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
 			if err := intAPI.QueryJoinedHostServerNamesInRoom(req.Context(), &request, &response); err != nil {
@@ -32,7 +32,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		httputil.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			intAPI.PerformJoin(req.Context(), &request, &response)
@@ -44,7 +44,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		httputil.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := intAPI.PerformLeave(req.Context(), &request, &response); err != nil {
@@ -58,7 +58,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		httputil.MakeInternalAPI("PerformInviteRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformInviteRequest
 			var response api.PerformInviteResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := intAPI.PerformInvite(req.Context(), &request, &response); err != nil {
@@ -72,7 +72,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		httputil.MakeInternalAPI("PerformDirectoryLookupRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformDirectoryLookupRequest
 			var response api.PerformDirectoryLookupResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := intAPI.PerformDirectoryLookup(req.Context(), &request, &response); err != nil {
@@ -86,7 +86,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		httputil.MakeInternalAPI("PerformServersAliveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformServersAliveRequest
 			var response api.PerformServersAliveResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := intAPI.PerformServersAlive(req.Context(), &request, &response); err != nil {
@@ -100,7 +100,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		httputil.MakeInternalAPI("PerformBroadcastEDU", func(req *http.Request) util.JSONResponse {
 			var request api.PerformBroadcastEDURequest
 			var response api.PerformBroadcastEDUResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := intAPI.PerformBroadcastEDU(req.Context(), &request, &response); err != nil {
@@ -113,7 +113,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderGetUserDevicesPath,
 		httputil.MakeInternalAPI("GetUserDevices", func(req *http.Request) util.JSONResponse {
 			var request getUserDevices
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.GetUserDevices(req.Context(), request.S, request.UserID)
@@ -135,7 +135,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderClaimKeysPath,
 		httputil.MakeInternalAPI("ClaimKeys", func(req *http.Request) util.JSONResponse {
 			var request claimKeys
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.ClaimKeys(req.Context(), request.S, request.OneTimeKeys)
@@ -157,7 +157,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderQueryKeysPath,
 		httputil.MakeInternalAPI("QueryKeys", func(req *http.Request) util.JSONResponse {
 			var request queryKeys
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.QueryKeys(req.Context(), request.S, request.Keys)
@@ -179,7 +179,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderBackfillPath,
 		httputil.MakeInternalAPI("Backfill", func(req *http.Request) util.JSONResponse {
 			var request backfill
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.Backfill(req.Context(), request.S, request.RoomID, request.Limit, request.EventIDs)
@@ -201,7 +201,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderLookupStatePath,
 		httputil.MakeInternalAPI("LookupState", func(req *http.Request) util.JSONResponse {
 			var request lookupState
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.LookupState(req.Context(), request.S, request.RoomID, request.EventID, request.RoomVersion)
@@ -223,7 +223,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderLookupStateIDsPath,
 		httputil.MakeInternalAPI("LookupStateIDs", func(req *http.Request) util.JSONResponse {
 			var request lookupStateIDs
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.LookupStateIDs(req.Context(), request.S, request.RoomID, request.EventID)
@@ -245,7 +245,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderGetEventPath,
 		httputil.MakeInternalAPI("GetEvent", func(req *http.Request) util.JSONResponse {
 			var request getEvent
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.GetEvent(req.Context(), request.S, request.EventID)
@@ -267,7 +267,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderGetServerKeysPath,
 		httputil.MakeInternalAPI("GetServerKeys", func(req *http.Request) util.JSONResponse {
 			var request getServerKeys
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.GetServerKeys(req.Context(), request.S)
@@ -289,7 +289,7 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 		FederationSenderLookupServerKeysPath,
 		httputil.MakeInternalAPI("LookupServerKeys", func(req *http.Request) util.JSONResponse {
 			var request lookupServerKeys
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.LookupServerKeys(req.Context(), request.S, request.KeyRequests)

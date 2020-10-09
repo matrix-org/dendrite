@@ -16,7 +16,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"strings"
 	"time"
 
@@ -83,7 +83,7 @@ type OneTimeKeys struct {
 	// The device ID of this device
 	DeviceID string
 	// A map of algorithm:key_id => key JSON
-	KeyJSON map[string]json.RawMessage
+	KeyJSON map[string]jsoniter.RawMessage
 }
 
 // Split a key in KeyJSON into algorithm and key ID
@@ -142,7 +142,7 @@ type PerformClaimKeysRequest struct {
 
 type PerformClaimKeysResponse struct {
 	// Map of user_id to device_id to algorithm:key_id to key JSON
-	OneTimeKeys map[string]map[string]map[string]json.RawMessage
+	OneTimeKeys map[string]map[string]map[string]jsoniter.RawMessage
 	// Map of remote server domain to error JSON
 	Failures map[string]interface{}
 	// Set if there was a fatal error processing this action
@@ -159,7 +159,7 @@ type QueryKeysResponse struct {
 	// Map of remote server domain to error JSON
 	Failures map[string]interface{}
 	// Map of user_id to device_id to device_key
-	DeviceKeys map[string]map[string]json.RawMessage
+	DeviceKeys map[string]map[string]jsoniter.RawMessage
 	// Set if there was a fatal error processing this query
 	Error *KeyError
 }

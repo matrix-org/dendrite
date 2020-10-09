@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"io/ioutil"
 	"net/http"
 
@@ -93,7 +93,7 @@ func PutFilter(
 		}
 	}
 
-	if err = json.Unmarshal(body, &filter); err != nil {
+	if err = jsoniter.Unmarshal(body, &filter); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),

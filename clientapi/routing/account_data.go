@@ -15,8 +15,8 @@
 package routing
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/json-iterator/go"
 	"io/ioutil"
 	"net/http"
 
@@ -52,7 +52,7 @@ func GetAccountData(
 		return util.ErrorResponse(fmt.Errorf("userAPI.QueryAccountData: %w", err))
 	}
 
-	var data json.RawMessage
+	var data jsoniter.RawMessage
 	var ok bool
 	if roomID != "" {
 		data, ok = dataRes.RoomAccountData[roomID][dataType]
@@ -106,7 +106,7 @@ func SaveAccountData(
 		return jsonerror.InternalServerError()
 	}
 
-	if !json.Valid(body) {
+	if !jsoniter.Valid(body) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Bad JSON content"),
@@ -117,7 +117,7 @@ func SaveAccountData(
 		UserID:      userID,
 		DataType:    dataType,
 		RoomID:      roomID,
-		AccountData: json.RawMessage(body),
+		AccountData: jsoniter.RawMessage(body),
 	}
 	dataRes := api.InputAccountDataResponse{}
 	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
@@ -170,7 +170,7 @@ func SaveReadMarker(
 		}
 	}
 
-	data, err := json.Marshal(fullyReadEvent{EventID: r.FullyRead})
+	data, err := jsoniter.Marshal(fullyReadEvent{EventID: r.FullyRead})
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}

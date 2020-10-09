@@ -15,7 +15,7 @@
 package inthttp
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -29,7 +29,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 		httputil.MakeInternalAPI("inputDeviceListUpdate", func(req *http.Request) util.JSONResponse {
 			request := api.InputDeviceListUpdateRequest{}
 			response := api.InputDeviceListUpdateResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			s.InputDeviceListUpdate(req.Context(), &request, &response)
@@ -40,7 +40,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 		httputil.MakeInternalAPI("performClaimKeys", func(req *http.Request) util.JSONResponse {
 			request := api.PerformClaimKeysRequest{}
 			response := api.PerformClaimKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			s.PerformClaimKeys(req.Context(), &request, &response)
@@ -51,7 +51,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 		httputil.MakeInternalAPI("performUploadKeys", func(req *http.Request) util.JSONResponse {
 			request := api.PerformUploadKeysRequest{}
 			response := api.PerformUploadKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			s.PerformUploadKeys(req.Context(), &request, &response)
@@ -62,7 +62,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 		httputil.MakeInternalAPI("queryKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryKeysRequest{}
 			response := api.QueryKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			s.QueryKeys(req.Context(), &request, &response)
@@ -73,7 +73,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 		httputil.MakeInternalAPI("queryOneTimeKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryOneTimeKeysRequest{}
 			response := api.QueryOneTimeKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			s.QueryOneTimeKeys(req.Context(), &request, &response)
@@ -84,7 +84,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 		httputil.MakeInternalAPI("queryDeviceMessages", func(req *http.Request) util.JSONResponse {
 			request := api.QueryDeviceMessagesRequest{}
 			response := api.QueryDeviceMessagesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			s.QueryDeviceMessages(req.Context(), &request, &response)
@@ -95,7 +95,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 		httputil.MakeInternalAPI("queryKeyChanges", func(req *http.Request) util.JSONResponse {
 			request := api.QueryKeyChangesRequest{}
 			response := api.QueryKeyChangesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			s.QueryKeyChanges(req.Context(), &request, &response)

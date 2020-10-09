@@ -16,7 +16,7 @@ package acls
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"net"
 	"regexp"
@@ -88,7 +88,7 @@ func compileACLRegex(orig string) (*regexp.Regexp, error) {
 
 func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 	acls := &serverACL{}
-	if err := json.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
+	if err := jsoniter.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
 		logrus.WithError(err).Errorf("Failed to unmarshal state content for server ACLs")
 		return
 	}

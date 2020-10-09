@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -119,7 +119,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 
 	// Get the keys and JSON-ify them.
 	keys := routing.LocalKeys(s.fedconfig)
-	body, err := json.MarshalIndent(keys.JSON, "", "  ")
+	body, err := jsoniter.MarshalIndent(keys.JSON, "", "  ")
 	if err != nil {
 		return nil, err
 	}
