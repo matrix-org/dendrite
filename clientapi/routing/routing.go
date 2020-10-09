@@ -23,6 +23,7 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
@@ -659,8 +660,9 @@ func Setup(
 				SearchString string `json:"search_term"`
 				Limit        int    `json:"limit"`
 			}{}
-			if err := json.NewDecoder(req.Body).Decode(&postContent); err != nil {
-				return util.ErrorResponse(err)
+
+			if resErr := clientutil.UnmarshalJSONRequest(req, &postContent); resErr != nil {
+				return *resErr
 			}
 			return *SearchUserDirectory(
 				req.Context(),
