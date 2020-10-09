@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -234,17 +235,10 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 // we should stop processing the transaction, and returns false if it
 // is just some less serious error about a specific event.
 func isProcessingErrorFatal(err error) bool {
-	switch err.(type) {
-	case roomNotFoundError:
-	case *gomatrixserverlib.NotAllowed:
-	case missingPrevEventsError:
-	default:
-		switch err {
-		case context.Canceled:
-		case context.DeadlineExceeded:
-		default:
-			return true
-		}
+	switch err {
+	case sql.ErrConnDone:
+	case sql.ErrTxDone:
+		return true
 	}
 	return false
 }
