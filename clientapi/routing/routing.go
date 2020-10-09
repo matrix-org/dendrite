@@ -23,6 +23,7 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
@@ -659,8 +660,9 @@ func Setup(
 				SearchString string `json:"search_term"`
 				Limit        int    `json:"limit"`
 			}{}
-			if err := json.NewDecoder(req.Body).Decode(&postContent); err != nil {
-				return util.ErrorResponse(err)
+
+			if resErr := clientutil.UnmarshalJSONRequest(req, &postContent); resErr != nil {
+				return *resErr
 			}
 			return *SearchUserDirectory(
 				req.Context(),
@@ -695,12 +697,15 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/read_markers",
-		httputil.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_read_markers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
-			// TODO: return the read_markers.
-			return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SaveReadMarker(req, userAPI, rsAPI, syncProducer, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

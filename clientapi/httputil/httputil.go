@@ -16,7 +16,9 @@ package httputil
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
+	"unicode/utf8"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
@@ -25,7 +27,23 @@ import (
 // UnmarshalJSONRequest into the given interface pointer. Returns an error JSON response if
 // there was a problem unmarshalling. Calling this function consumes the request body.
 func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONResponse {
-	if err := json.NewDecoder(req.Body).Decode(iface); err != nil {
+	// encoding/json allows invalid utf-8, matrix does not
+	// https://matrix.org/docs/spec/client_server/r0.6.1#api-standards
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("ioutil.ReadAll failed")
+		resp := jsonerror.InternalServerError()
+		return &resp
+	}
+
+	if !utf8.Valid(body) {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("Body contains invalid UTF-8"),
+		}
+	}
+
+	if err := json.Unmarshal(body, iface); err != nil {
 		// TODO: We may want to suppress the Error() return in production? It's useful when
 		// debugging because an error will be produced for both invalid/malformed JSON AND
 		// valid JSON with incorrect types for values.
