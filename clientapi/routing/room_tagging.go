@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
@@ -183,7 +183,7 @@ func obtainSavedTags(
 	if !ok {
 		return
 	}
-	if err = jsoniter.Unmarshal(data, &tags); err != nil {
+	if err = json.Unmarshal(data, &tags); err != nil {
 		return
 	}
 	return tags, nil
@@ -197,7 +197,7 @@ func saveTagData(
 	userAPI api.UserInternalAPI,
 	Tag gomatrix.TagContent,
 ) error {
-	newTagData, err := jsoniter.Marshal(Tag)
+	newTagData, err := json.Marshal(Tag)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func saveTagData(
 		UserID:      userID,
 		RoomID:      roomID,
 		DataType:    "m.tag",
-		AccountData: jsoniter.RawMessage(newTagData),
+		AccountData: json.RawMessage(newTagData),
 	}
 	dataRes := api.InputAccountDataResponse{}
 	return userAPI.InputAccountData(req.Context(), &dataReq, &dataRes)

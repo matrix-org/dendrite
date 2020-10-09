@@ -15,7 +15,7 @@
 package inthttp
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -30,7 +30,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("performAccountCreation", func(req *http.Request) util.JSONResponse {
 			request := api.PerformAccountCreationRequest{}
 			response := api.PerformAccountCreationResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.PerformAccountCreation(req.Context(), &request, &response); err != nil {
@@ -43,7 +43,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("performPasswordUpdate", func(req *http.Request) util.JSONResponse {
 			request := api.PerformPasswordUpdateRequest{}
 			response := api.PerformPasswordUpdateResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.PerformPasswordUpdate(req.Context(), &request, &response); err != nil {
@@ -56,7 +56,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("performDeviceCreation", func(req *http.Request) util.JSONResponse {
 			request := api.PerformDeviceCreationRequest{}
 			response := api.PerformDeviceCreationResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.PerformDeviceCreation(req.Context(), &request, &response); err != nil {
@@ -69,7 +69,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("performDeviceUpdate", func(req *http.Request) util.JSONResponse {
 			request := api.PerformDeviceUpdateRequest{}
 			response := api.PerformDeviceUpdateResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.PerformDeviceUpdate(req.Context(), &request, &response); err != nil {
@@ -82,7 +82,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("performDeviceDeletion", func(req *http.Request) util.JSONResponse {
 			request := api.PerformDeviceDeletionRequest{}
 			response := api.PerformDeviceDeletionResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.PerformDeviceDeletion(req.Context(), &request, &response); err != nil {
@@ -95,7 +95,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("performAccountDeactivation", func(req *http.Request) util.JSONResponse {
 			request := api.PerformAccountDeactivationRequest{}
 			response := api.PerformAccountDeactivationResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.PerformAccountDeactivation(req.Context(), &request, &response); err != nil {
@@ -108,7 +108,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("queryProfile", func(req *http.Request) util.JSONResponse {
 			request := api.QueryProfileRequest{}
 			response := api.QueryProfileResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.QueryProfile(req.Context(), &request, &response); err != nil {
@@ -121,7 +121,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("queryAccessToken", func(req *http.Request) util.JSONResponse {
 			request := api.QueryAccessTokenRequest{}
 			response := api.QueryAccessTokenResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.QueryAccessToken(req.Context(), &request, &response); err != nil {
@@ -134,7 +134,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("queryDevices", func(req *http.Request) util.JSONResponse {
 			request := api.QueryDevicesRequest{}
 			response := api.QueryDevicesResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.QueryDevices(req.Context(), &request, &response); err != nil {
@@ -147,7 +147,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("queryAccountData", func(req *http.Request) util.JSONResponse {
 			request := api.QueryAccountDataRequest{}
 			response := api.QueryAccountDataResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.QueryAccountData(req.Context(), &request, &response); err != nil {
@@ -160,7 +160,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("queryDeviceInfos", func(req *http.Request) util.JSONResponse {
 			request := api.QueryDeviceInfosRequest{}
 			response := api.QueryDeviceInfosResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.QueryDeviceInfos(req.Context(), &request, &response); err != nil {
@@ -173,7 +173,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalAPI("querySearchProfiles", func(req *http.Request) util.JSONResponse {
 			request := api.QuerySearchProfilesRequest{}
 			response := api.QuerySearchProfilesResponse{}
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.QuerySearchProfiles(req.Context(), &request, &response); err != nil {

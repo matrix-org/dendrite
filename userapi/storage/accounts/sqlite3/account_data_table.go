@@ -17,7 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -75,7 +75,7 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 }
 
 func (s *accountDataStatements) insertAccountData(
-	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType string, content jsoniter.RawMessage,
+	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, localpart, roomID, dataType, content)
 	return err
@@ -84,8 +84,8 @@ func (s *accountDataStatements) insertAccountData(
 func (s *accountDataStatements) selectAccountData(
 	ctx context.Context, localpart string,
 ) (
-	/* global */ map[string]jsoniter.RawMessage,
-	/* rooms */ map[string]map[string]jsoniter.RawMessage,
+	/* global */ map[string]json.RawMessage,
+	/* rooms */ map[string]map[string]json.RawMessage,
 	error,
 ) {
 	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart)
@@ -93,8 +93,8 @@ func (s *accountDataStatements) selectAccountData(
 		return nil, nil, err
 	}
 
-	global := map[string]jsoniter.RawMessage{}
-	rooms := map[string]map[string]jsoniter.RawMessage{}
+	global := map[string]json.RawMessage{}
+	rooms := map[string]map[string]json.RawMessage{}
 
 	for rows.Next() {
 		var roomID string
@@ -107,7 +107,7 @@ func (s *accountDataStatements) selectAccountData(
 
 		if roomID != "" {
 			if _, ok := rooms[roomID]; !ok {
-				rooms[roomID] = map[string]jsoniter.RawMessage{}
+				rooms[roomID] = map[string]json.RawMessage{}
 			}
 			rooms[roomID][dataType] = content
 		} else {
@@ -120,7 +120,7 @@ func (s *accountDataStatements) selectAccountData(
 
 func (s *accountDataStatements) selectAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
-) (data jsoniter.RawMessage, err error) {
+) (data json.RawMessage, err error) {
 	var bytes []byte
 	stmt := s.selectAccountDataByTypeStmt
 	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&bytes); err != nil {
@@ -129,6 +129,6 @@ func (s *accountDataStatements) selectAccountDataByType(
 		}
 		return
 	}
-	data = jsoniter.RawMessage(bytes)
+	data = json.RawMessage(bytes)
 	return
 }

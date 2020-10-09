@@ -17,7 +17,7 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/tables"
@@ -50,7 +50,7 @@ func (e *Receipt) Empty() bool {
 }
 
 func (e *Receipt) String() string {
-	j, _ := jsoniter.Marshal(e.nids)
+	j, _ := json.Marshal(e.nids)
 	return string(j)
 }
 

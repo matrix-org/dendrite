@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -306,7 +306,7 @@ func (t *RoomserverInternalAPITrace) QueryServerBannedFromRoom(ctx context.Conte
 }
 
 func js(thing interface{}) string {
-	b, err := jsoniter.Marshal(thing)
+	b, err := json.Marshal(thing)
 	if err != nil {
 		return fmt.Sprintf("Marshal error:%s", err)
 	}

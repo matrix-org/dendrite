@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -73,7 +73,7 @@ func GetMemberships(
 		res.Joined = make(map[string]joinedMember)
 		for _, ev := range queryRes.JoinEvents {
 			var content joinedMember
-			if err := jsoniter.Unmarshal(ev.Content, &content); err != nil {
+			if err := json.Unmarshal(ev.Content, &content); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
 				return jsonerror.InternalServerError()
 			}

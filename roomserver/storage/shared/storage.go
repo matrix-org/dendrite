@@ -3,7 +3,7 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"sort"
 
@@ -602,7 +602,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 	var createContent gomatrixserverlib.CreateContent
 	// The m.room.create event contains an optional "room_version" key in
 	// the event content, so we need to unmarshal that first.
-	if err = jsoniter.Unmarshal(event.Content(), &createContent); err != nil {
+	if err = json.Unmarshal(event.Content(), &createContent); err != nil {
 		return gomatrixserverlib.RoomVersion(""), err
 	}
 	// A room version was specified in the event content?

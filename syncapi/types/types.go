@@ -17,7 +17,7 @@ package types
 import (
 	"errors"
 	"fmt"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"sort"
 	"strconv"
 	"strings"
@@ -372,7 +372,7 @@ func (p *syncToken) String() string {
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
 type PrevEventRef struct {
-	PrevContent   jsoniter.RawMessage `json:"prev_content"`
+	PrevContent   json.RawMessage `json:"prev_content"`
 	ReplacesState string          `json:"replaces_state"`
 	PrevSender    string          `json:"prev_sender"`
 }
@@ -466,20 +466,20 @@ func NewJoinResponse() *JoinResponse {
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
 type InviteResponse struct {
 	InviteState struct {
-		Events []jsoniter.RawMessage `json:"events"`
+		Events []json.RawMessage `json:"events"`
 	} `json:"invite_state"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
 func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
-	res.InviteState.Events = []jsoniter.RawMessage{}
+	res.InviteState.Events = []json.RawMessage{}
 
 	// First see if there's invite_room_state in the unsigned key of the invite.
 	// If there is then unmarshal it into the response. This will contain the
 	// partial room state such as join rules, room name etc.
 	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		_ = jsoniter.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
+		_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
 	}
 
 	// Then we'll see if we can create a partial of the invite event itself.
@@ -487,7 +487,7 @@ func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	format, _ := event.RoomVersion.EventFormat()
 	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), format)
 	inviteEvent.Unsigned = nil
-	if ev, err := jsoniter.Marshal(inviteEvent); err == nil {
+	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)
 	}
 

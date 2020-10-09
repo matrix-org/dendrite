@@ -13,7 +13,7 @@
 package auth
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -65,7 +65,7 @@ func HistoryVisibilityForRoom(authEvents []gomatrixserverlib.Event) string {
 		content := struct {
 			HistoryVisibility string `json:"history_visibility"`
 		}{}
-		if err := jsoniter.Unmarshal(ev.Content(), &content); err != nil {
+		if err := json.Unmarshal(ev.Content(), &content); err != nil {
 			break // value is not understood
 		}
 		for _, s := range knownStates {

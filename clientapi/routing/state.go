@@ -16,7 +16,7 @@ package routing
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 
@@ -30,7 +30,7 @@ import (
 
 type stateEventInStateResp struct {
 	gomatrixserverlib.ClientEvent
-	PrevContent   jsoniter.RawMessage `json:"prev_content,omitempty"`
+	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
 	ReplacesState string          `json:"replaces_state,omitempty"`
 }
 
@@ -63,7 +63,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	for _, ev := range stateRes.StateEvents {
 		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
 			content := map[string]string{}
-			if err := jsoniter.Unmarshal(ev.Content(), &content); err != nil {
+			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 				return jsonerror.InternalServerError()
 			}
@@ -204,7 +204,7 @@ func OnIncomingStateTypeRequest(
 	for _, ev := range stateRes.StateEvents {
 		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
 			content := map[string]string{}
-			if err := jsoniter.Unmarshal(ev.Content(), &content); err != nil {
+			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 				return jsonerror.InternalServerError()
 			}

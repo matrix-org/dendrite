@@ -18,7 +18,7 @@ package input
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -93,7 +93,7 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 		ote.ExpireTime = &expireTime
 	}
 
-	eventJSON, err := jsoniter.Marshal(ote)
+	eventJSON, err := json.Marshal(ote)
 	if err != nil {
 		return err
 	}
@@ -152,9 +152,9 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 			SendToDeviceEvent: ise.SendToDeviceEvent,
 		}
 
-		eventJSON, err := jsoniter.Marshal(ote)
+		eventJSON, err := json.Marshal(ote)
 		if err != nil {
-			logrus.WithError(err).Error("sendToDevice failed jsoniter.Marshal")
+			logrus.WithError(err).Error("sendToDevice failed json.Marshal")
 			return err
 		}
 

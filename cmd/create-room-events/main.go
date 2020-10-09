@@ -18,7 +18,7 @@ package main
 
 import (
 	"encoding/base64"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"flag"
 	"fmt"
 	"os"
@@ -124,7 +124,7 @@ func buildAndOutput() gomatrixserverlib.EventReference {
 
 // Write an event to the output.
 func writeEvent(event gomatrixserverlib.Event) {
-	encoder := jsoniter.NewEncoder(os.Stdout)
+	encoder := json.NewEncoder(os.Stdout)
 	if *format == "InputRoomEvent" {
 		var ire api.InputRoomEvent
 		ire.Kind = api.KindNew

@@ -15,13 +15,13 @@
 package jsonerror
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"testing"
 )
 
 func TestLimitExceeded(t *testing.T) {
 	e := LimitExceeded("too fast", 5000)
-	jsonBytes, err := jsoniter.Marshal(&e)
+	jsonBytes, err := json.Marshal(&e)
 	if err != nil {
 		t.Fatalf("TestLimitExceeded: Failed to marshal LimitExceeded error. %s", err.Error())
 	}
@@ -33,7 +33,7 @@ func TestLimitExceeded(t *testing.T) {
 
 func TestForbidden(t *testing.T) {
 	e := Forbidden("you shall not pass")
-	jsonBytes, err := jsoniter.Marshal(&e)
+	jsonBytes, err := json.Marshal(&e)
 	if err != nil {
 		t.Fatalf("TestForbidden: Failed to marshal Forbidden error. %s", err.Error())
 	}

@@ -333,7 +333,7 @@ func (oq *destinationQueue) nextTransaction() (bool, error) {
 	// Go through PDUs that we retrieved from the database, if any,
 	// and add them into the transaction.
 	for _, pdu := range pdus {
-		// Append the JSON of the event, since this is a jsoniter.RawMessage type in the
+		// Append the JSON of the event, since this is a json.RawMessage type in the
 		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, (*pdu).JSON())
 	}

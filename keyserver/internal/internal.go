@@ -17,7 +17,7 @@ package internal
 import (
 	"bytes"
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"sync"
 	"time"
@@ -80,7 +80,7 @@ func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perform
 }
 
 func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformClaimKeysRequest, res *api.PerformClaimKeysResponse) {
-	res.OneTimeKeys = make(map[string]map[string]map[string]jsoniter.RawMessage)
+	res.OneTimeKeys = make(map[string]map[string]map[string]json.RawMessage)
 	res.Failures = make(map[string]interface{})
 	// wrap request map in a top-level by-domain map
 	domainToDeviceKeys := make(map[string]map[string]map[string]string)
@@ -108,11 +108,11 @@ func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformC
 		for _, key := range keys {
 			_, ok := res.OneTimeKeys[key.UserID]
 			if !ok {
-				res.OneTimeKeys[key.UserID] = make(map[string]map[string]jsoniter.RawMessage)
+				res.OneTimeKeys[key.UserID] = make(map[string]map[string]json.RawMessage)
 			}
 			_, ok = res.OneTimeKeys[key.UserID][key.DeviceID]
 			if !ok {
-				res.OneTimeKeys[key.UserID][key.DeviceID] = make(map[string]jsoniter.RawMessage)
+				res.OneTimeKeys[key.UserID][key.DeviceID] = make(map[string]json.RawMessage)
 			}
 			for keyID, keyJSON := range key.KeyJSON {
 				res.OneTimeKeys[key.UserID][key.DeviceID][keyID] = keyJSON
@@ -165,11 +165,11 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 	keysClaimed := 0
 	for result := range resultCh {
 		for userID, nest := range result.OneTimeKeys {
-			res.OneTimeKeys[userID] = make(map[string]map[string]jsoniter.RawMessage)
+			res.OneTimeKeys[userID] = make(map[string]map[string]json.RawMessage)
 			for deviceID, nest2 := range nest {
-				res.OneTimeKeys[userID][deviceID] = make(map[string]jsoniter.RawMessage)
+				res.OneTimeKeys[userID][deviceID] = make(map[string]json.RawMessage)
 				for keyIDWithAlgo, otk := range nest2 {
-					keyJSON, err := jsoniter.Marshal(otk)
+					keyJSON, err := json.Marshal(otk)
 					if err != nil {
 						continue
 					}
@@ -220,7 +220,7 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 }
 
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
-	res.DeviceKeys = make(map[string]map[string]jsoniter.RawMessage)
+	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.Failures = make(map[string]interface{})
 	// make a map from domain to device keys
 	domainToDeviceKeys := make(map[string]map[string][]string)
@@ -254,7 +254,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 			}
 
 			if res.DeviceKeys[userID] == nil {
-				res.DeviceKeys[userID] = make(map[string]jsoniter.RawMessage)
+				res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 			}
 			for _, dk := range deviceKeys {
 				if len(dk.KeyJSON) == 0 {
@@ -335,9 +335,9 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 
 	for result := range resultCh {
 		for userID, nest := range result.DeviceKeys {
-			res.DeviceKeys[userID] = make(map[string]jsoniter.RawMessage)
+			res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 			for deviceID, deviceKey := range nest {
-				keyJSON, err := jsoniter.Marshal(deviceKey)
+				keyJSON, err := json.Marshal(deviceKey)
 				if err != nil {
 					continue
 				}
@@ -432,7 +432,7 @@ func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(
 		return fmt.Errorf("DeviceKeysForUser %s returned no keys but wanted all keys, falling back to remote", userID)
 	}
 	if res.DeviceKeys[userID] == nil {
-		res.DeviceKeys[userID] = make(map[string]jsoniter.RawMessage)
+		res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 	}
 
 	for _, key := range keys {

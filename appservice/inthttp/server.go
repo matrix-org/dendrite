@@ -1,7 +1,7 @@
 package inthttp
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -17,7 +17,7 @@ func AddRoutes(a api.AppServiceQueryAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {
 			var request api.RoomAliasExistsRequest
 			var response api.RoomAliasExistsResponse
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
 			if err := a.RoomAliasExists(req.Context(), &request, &response); err != nil {
@@ -31,7 +31,7 @@ func AddRoutes(a api.AppServiceQueryAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalAPI("appserviceUserIDExists", func(req *http.Request) util.JSONResponse {
 			var request api.UserIDExistsRequest
 			var response api.UserIDExistsResponse
-			if err := jsoniter.NewDecoder(req.Body).Decode(&request); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.ErrorResponse(err)
 			}
 			if err := a.UserIDExists(req.Context(), &request, &response); err != nil {

@@ -16,7 +16,7 @@ package routing
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"io"
 	"mime"
@@ -146,12 +146,12 @@ func Download(
 
 func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSONResponse) {
 	// Marshal JSON response into raw bytes to send as the HTTP body
-	resBytes, err := jsoniter.Marshal(res.JSON)
+	resBytes, err := json.Marshal(res.JSON)
 	if err != nil {
 		r.Logger.WithError(err).Error("Failed to marshal JSONResponse")
 		// this should never fail to be marshalled so drop err to the floor
 		res = util.MessageResponse(http.StatusNotFound, "Download request failed: "+err.Error())
-		resBytes, _ = jsoniter.Marshal(res.JSON)
+		resBytes, _ = json.Marshal(res.JSON)
 	}
 
 	// Set status code and write the body

@@ -16,7 +16,7 @@ package producers
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/keyserver/api"
@@ -46,7 +46,7 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 	for _, key := range keys {
 		var m sarama.ProducerMessage
 
-		value, err := jsoniter.Marshal(key)
+		value, err := json.Marshal(key)
 		if err != nil {
 			return err
 		}

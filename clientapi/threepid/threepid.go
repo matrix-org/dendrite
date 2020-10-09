@@ -16,7 +16,7 @@ package threepid
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"errors"
 	"fmt"
 	"net/http"
@@ -88,7 +88,7 @@ func CreateSession(
 	var sid struct {
 		SID string `json:"sid"`
 	}
-	err = jsoniter.NewDecoder(resp.Body).Decode(&sid)
+	err = json.NewDecoder(resp.Body).Decode(&sid)
 
 	return sid.SID, err
 }
@@ -125,7 +125,7 @@ func CheckAssociation(
 		Error       string `json:"error"`
 	}
 
-	if err = jsoniter.NewDecoder(resp.Body).Decode(&respBody); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
 		return false, "", "", err
 	}
 

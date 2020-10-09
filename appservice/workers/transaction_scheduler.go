@@ -17,7 +17,7 @@ package workers
 import (
 	"bytes"
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"math"
 	"net/http"
@@ -195,7 +195,7 @@ func createTransaction(
 		Events: ev,
 	}
 
-	transactionJSON, err = jsoniter.Marshal(transaction)
+	transactionJSON, err = json.Marshal(transaction)
 	if err != nil {
 		return
 	}

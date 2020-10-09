@@ -2,7 +2,7 @@ package auth
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"testing"
 
@@ -62,7 +62,7 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 		UserID:     fmt.Sprintf("@alice:%s", serverName),
 	}
 	// valid password requests
-	testCases := []jsoniter.RawMessage{
+	testCases := []json.RawMessage{
 		// deprecated form
 		[]byte(`{
 			"auth": {
@@ -101,7 +101,7 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 	}
 	// invalid password requests
 	testCases := []struct {
-		body    jsoniter.RawMessage
+		body    json.RawMessage
 		wantRes util.JSONResponse
 	}{
 		{

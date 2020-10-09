@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"net/http"
 	"time"
 
@@ -40,7 +40,7 @@ func QueryDeviceKeys(
 	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.KeyInternalAPI, thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	var qkr queryKeysRequest
-	err := jsoniter.Unmarshal(request.Content(), &qkr)
+	err := json.Unmarshal(request.Content(), &qkr)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -86,7 +86,7 @@ func ClaimOneTimeKeys(
 	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.KeyInternalAPI, thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	var cor claimOTKsRequest
-	err := jsoniter.Unmarshal(request.Content(), &cor)
+	err := json.Unmarshal(request.Content(), &cor)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -156,7 +156,7 @@ func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserver
 		}
 	}
 
-	toSign, err := jsoniter.Marshal(keys.ServerKeyFields)
+	toSign, err := json.Marshal(keys.ServerKeyFields)
 	if err != nil {
 		return nil, err
 	}
@@ -184,9 +184,9 @@ func NotaryKeys(
 	}
 
 	var response struct {
-		ServerKeys []jsoniter.RawMessage `json:"server_keys"`
+		ServerKeys []json.RawMessage `json:"server_keys"`
 	}
-	response.ServerKeys = []jsoniter.RawMessage{}
+	response.ServerKeys = []json.RawMessage{}
 
 	for serverName := range req.ServerKeys {
 		var keys *gomatrixserverlib.ServerKeys
@@ -207,7 +207,7 @@ func NotaryKeys(
 			continue
 		}
 
-		j, err := jsoniter.Marshal(keys)
+		j, err := json.Marshal(keys)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
 			return jsonerror.InternalServerError()

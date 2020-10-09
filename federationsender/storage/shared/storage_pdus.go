@@ -17,7 +17,7 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"errors"
 	"fmt"
 
@@ -92,7 +92,7 @@ func (d *Database) GetNextTransactionPDUs(
 
 		for _, blob := range blobs {
 			var event gomatrixserverlib.HeaderedEvent
-			if err := jsoniter.Unmarshal(blob, &event); err != nil {
+			if err := json.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
 			events = append(events, &event)

@@ -17,7 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -84,7 +84,7 @@ func (s *filterStatements) SelectFilter(
 
 	// Unmarshal JSON into Filter struct
 	var filter gomatrixserverlib.Filter
-	if err = jsoniter.Unmarshal(filterData, &filter); err != nil {
+	if err = json.Unmarshal(filterData, &filter); err != nil {
 		return nil, err
 	}
 	return &filter, nil
@@ -96,7 +96,7 @@ func (s *filterStatements) InsertFilter(
 	var existingFilterID string
 
 	// Serialise json
-	filterJSON, err := jsoniter.Marshal(filter)
+	filterJSON, err := json.Marshal(filter)
 	if err != nil {
 		return "", err
 	}

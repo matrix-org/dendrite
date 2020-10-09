@@ -19,7 +19,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -301,7 +301,7 @@ func validateRecaptcha(
 			JSON: jsonerror.Unknown("Error in contacting captcha server" + err.Error()),
 		}
 	}
-	err = jsoniter.Unmarshal(body, &r)
+	err = json.Unmarshal(body, &r)
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,

@@ -18,7 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -99,7 +99,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 	}
 
 	var headeredJSON []byte
-	headeredJSON, err = jsoniter.Marshal(inviteEvent)
+	headeredJSON, err = json.Marshal(inviteEvent)
 	if err != nil {
 		return
 	}
@@ -160,7 +160,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 		}
 
 		var event gomatrixserverlib.HeaderedEvent
-		if err := jsoniter.Unmarshal(eventJSON, &event); err != nil {
+		if err := json.Unmarshal(eventJSON, &event); err != nil {
 			return nil, nil, err
 		}
 		if deleted {

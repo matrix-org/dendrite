@@ -16,7 +16,7 @@ package auth
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -181,19 +181,19 @@ func (u *UserInteractive) NewSession() *util.JSONResponse {
 // standard challenge response.
 func (u *UserInteractive) ResponseWithChallenge(sessionID string, response interface{}) *util.JSONResponse {
 	mixedObjects := make(map[string]interface{})
-	b, err := jsoniter.Marshal(response)
+	b, err := json.Marshal(response)
 	if err != nil {
 		ise := jsonerror.InternalServerError()
 		return &ise
 	}
-	_ = jsoniter.Unmarshal(b, &mixedObjects)
+	_ = json.Unmarshal(b, &mixedObjects)
 	challenge := u.Challenge(sessionID)
-	b, err = jsoniter.Marshal(challenge.JSON)
+	b, err = json.Marshal(challenge.JSON)
 	if err != nil {
 		ise := jsonerror.InternalServerError()
 		return &ise
 	}
-	_ = jsoniter.Unmarshal(b, &mixedObjects)
+	_ = json.Unmarshal(b, &mixedObjects)
 
 	return &util.JSONResponse{
 		Code: 401,
@@ -237,7 +237,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	}
 
 	r := loginType.Request()
-	if err := jsoniter.Unmarshal([]byte(gjson.GetBytes(bodyBytes, "auth").Raw), r); err != nil {
+	if err := json.Unmarshal([]byte(gjson.GetBytes(bodyBytes, "auth").Raw), r); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),

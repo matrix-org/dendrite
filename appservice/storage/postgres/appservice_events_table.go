@@ -18,7 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -161,7 +161,7 @@ func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.
 		}
 
 		// Unmarshal eventJSON
-		if err = jsoniter.Unmarshal(eventJSON, &event); err != nil {
+		if err = json.Unmarshal(eventJSON, &event); err != nil {
 			return nil, 0, 0, false, err
 		}
 
@@ -219,7 +219,7 @@ func (s *eventsStatements) insertEvent(
 	event *gomatrixserverlib.HeaderedEvent,
 ) (err error) {
 	// Convert event to JSON before inserting
-	eventJSON, err := jsoniter.Marshal(event)
+	eventJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}

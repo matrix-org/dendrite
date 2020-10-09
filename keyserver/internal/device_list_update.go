@@ -16,7 +16,7 @@ package internal
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"hash/fnv"
 	"sync"
@@ -369,7 +369,7 @@ func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevi
 	keys := make([]api.DeviceMessage, len(res.Devices))
 	existingKeys := make([]api.DeviceMessage, len(res.Devices))
 	for i, device := range res.Devices {
-		keyJSON, err := jsoniter.Marshal(device.Keys)
+		keyJSON, err := json.Marshal(device.Keys)
 		if err != nil {
 			util.GetLogger(ctx).WithField("keys", device.Keys).Error("failed to marshal keys, skipping device")
 			continue

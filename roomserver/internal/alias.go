@@ -16,7 +16,7 @@ package internal
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"errors"
 	"fmt"
 	"time"
@@ -198,11 +198,11 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 		return err
 	}
 	content := roomAliasesContent{Aliases: aliases}
-	rawContent, err := jsoniter.Marshal(content)
+	rawContent, err := json.Marshal(content)
 	if err != nil {
 		return err
 	}
-	err = builder.SetContent(jsoniter.RawMessage(rawContent))
+	err = builder.SetContent(json.RawMessage(rawContent))
 	if err != nil {
 		return err
 	}

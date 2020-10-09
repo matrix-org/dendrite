@@ -19,7 +19,7 @@ import (
 	"crypto/ed25519"
 	"crypto/tls"
 	"encoding/hex"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -89,7 +89,7 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		if e != nil {
 			panic(err)
 		}
-		if err := jsoniter.Unmarshal([]byte(yggconf), &n.config); err != nil {
+		if err := json.Unmarshal([]byte(yggconf), &n.config); err != nil {
 			panic(err)
 		}
 	}
@@ -113,7 +113,7 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 	n.config.EncryptionPrivateKey = hex.EncodeToString(n.EncryptionPrivateKey())
 	n.config.EncryptionPublicKey = hex.EncodeToString(n.EncryptionPublicKey())
 
-	j, err := jsoniter.MarshalIndent(n.config, "", "  ")
+	j, err := json.MarshalIndent(n.config, "", "  ")
 	if err != nil {
 		panic(err)
 	}

@@ -16,7 +16,7 @@ package routing
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 
@@ -39,7 +39,7 @@ func InviteV2(
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 	inviteReq := gomatrixserverlib.InviteV2Request{}
-	err := jsoniter.Unmarshal(request.Content(), &inviteReq)
+	err := json.Unmarshal(request.Content(), &inviteReq)
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
@@ -85,7 +85,7 @@ func InviteV1(
 		}
 	}
 	var strippedState []gomatrixserverlib.InviteV2StrippedState
-	if err := jsoniter.Unmarshal(event.Unsigned(), &strippedState); err != nil {
+	if err := json.Unmarshal(event.Unsigned(), &strippedState); err != nil {
 		// just warn, they may not have added any.
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
 	}

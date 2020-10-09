@@ -16,7 +16,7 @@ package consumers
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
@@ -70,7 +70,7 @@ func (s *OutputClientDataConsumer) Start() error {
 func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	// Parse out the event JSON
 	var output eventutil.AccountData
-	if err := jsoniter.Unmarshal(msg.Value, &output); err != nil {
+	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("client API server output log: message parse failure")
 		return nil

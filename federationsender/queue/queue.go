@@ -17,7 +17,7 @@ package queue
 import (
 	"context"
 	"crypto/ed25519"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"sync"
 	"time"
@@ -159,9 +159,9 @@ func (oqs *OutgoingQueues) SendEvent(
 		"destinations": len(destmap), "event": ev.EventID(),
 	}).Infof("Sending event")
 
-	headeredJSON, err := jsoniter.Marshal(ev)
+	headeredJSON, err := json.Marshal(ev)
 	if err != nil {
-		return fmt.Errorf("jsoniter.Marshal: %w", err)
+		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
 	nid, err := oqs.db.StoreJSON(context.TODO(), string(headeredJSON))
@@ -224,9 +224,9 @@ func (oqs *OutgoingQueues) SendEDU(
 		"destinations": len(destmap), "edu_type": e.Type,
 	}).Info("Sending EDU event")
 
-	ephemeralJSON, err := jsoniter.Marshal(e)
+	ephemeralJSON, err := json.Marshal(e)
 	if err != nil {
-		return fmt.Errorf("jsoniter.Marshal: %w", err)
+		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
 	nid, err := oqs.db.StoreJSON(context.TODO(), string(ephemeralJSON))

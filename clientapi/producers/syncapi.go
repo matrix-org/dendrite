@@ -15,7 +15,7 @@
 package producers
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -36,7 +36,7 @@ func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string
 		RoomID: roomID,
 		Type:   dataType,
 	}
-	value, err := jsoniter.Marshal(data)
+	value, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}

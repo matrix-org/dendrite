@@ -16,7 +16,7 @@ package consumers
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
@@ -73,7 +73,7 @@ func (s *OutputSendToDeviceEventConsumer) Start() error {
 
 func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	var output api.OutputSendToDeviceEvent
-	if err := jsoniter.Unmarshal(msg.Value, &output); err != nil {
+	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
 		return err

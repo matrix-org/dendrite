@@ -16,7 +16,7 @@ package perform
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"strings"
 
@@ -166,7 +166,7 @@ func (r *Peeker) performPeekRoomByID(
 	ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", "")
 	if ev != nil {
 		content := map[string]string{}
-		if err = jsoniter.Unmarshal(ev.Content(), &content); err != nil {
+		if err = json.Unmarshal(ev.Content(), &content); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 			return
 		}

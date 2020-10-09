@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"os"
 	"reflect"
@@ -46,10 +46,10 @@ func (p *dummyProducer) SendMessage(msg *sarama.ProducerMessage) (partition int3
 		return 0, 0, nil
 	}
 	be := msg.Value.(sarama.ByteEncoder)
-	b := jsoniter.RawMessage(be)
+	b := json.RawMessage(be)
 	fmt.Println("SENDING >>>>>>>> ", string(b))
 	var out api.OutputEvent
-	err = jsoniter.Unmarshal(b, &out)
+	err = json.Unmarshal(b, &out)
 	if err != nil {
 		return 0, 0, err
 	}

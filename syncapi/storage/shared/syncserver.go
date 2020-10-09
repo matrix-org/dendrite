@@ -17,7 +17,7 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"time"
 
@@ -546,7 +546,7 @@ func (d *Database) addTypingDeltaToResponse(
 			ev := gomatrixserverlib.ClientEvent{
 				Type: gomatrixserverlib.MTyping,
 			}
-			ev.Content, err = jsoniter.Marshal(map[string]interface{}{
+			ev.Content, err = json.Marshal(map[string]interface{}{
 				"user_ids": typingUsers,
 			})
 			if err != nil {
@@ -1280,7 +1280,7 @@ func (d *Database) SendToDeviceUpdatesWaiting(
 func (d *Database) StoreNewSendForDeviceMessage(
 	ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
 ) (types.StreamPosition, error) {
-	j, err := jsoniter.Marshal(event)
+	j, err := json.Marshal(event)
 	if err != nil {
 		return streamPos, err
 	}

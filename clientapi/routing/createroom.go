@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 	"strings"
@@ -99,7 +99,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	// creation_content map into bytes and then unmarshalling the bytes into
 	// eventutil.CreateContent.
 
-	creationContentBytes, err := jsoniter.Marshal(r.CreationContent)
+	creationContentBytes, err := json.Marshal(r.CreationContent)
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -108,7 +108,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	}
 
 	var CreationContent gomatrixserverlib.CreateContent
-	err = jsoniter.Unmarshal(creationContentBytes, &CreationContent)
+	err = json.Unmarshal(creationContentBytes, &CreationContent)
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,

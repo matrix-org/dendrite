@@ -17,7 +17,7 @@
 package api
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"strings"
 
@@ -351,12 +351,12 @@ func (r *QueryBulkStateContentResponse) MarshalJSON() ([]byte, error) {
 			se[fmt.Sprintf("%s\x1F%s\x1F%s", roomID, tuple.EventType, tuple.StateKey)] = event
 		}
 	}
-	return jsoniter.Marshal(se)
+	return json.Marshal(se)
 }
 
 func (r *QueryBulkStateContentResponse) UnmarshalJSON(data []byte) error {
 	wireFormat := make(map[string]string)
-	err := jsoniter.Unmarshal(data, &wireFormat)
+	err := json.Unmarshal(data, &wireFormat)
 	if err != nil {
 		return err
 	}
@@ -382,12 +382,12 @@ func (r *QueryCurrentStateResponse) MarshalJSON() ([]byte, error) {
 		// use 0x1F (unit separator) as the delimiter between type/state key,
 		se[fmt.Sprintf("%s\x1F%s", k.EventType, k.StateKey)] = v
 	}
-	return jsoniter.Marshal(se)
+	return json.Marshal(se)
 }
 
 func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 	res := make(map[string]*gomatrixserverlib.HeaderedEvent)
-	err := jsoniter.Unmarshal(data, &res)
+	err := json.Unmarshal(data, &res)
 	if err != nil {
 		return err
 	}

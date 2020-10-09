@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -100,13 +100,13 @@ func createTestUser(database, username, token string) error {
 // Panics if there are any problems.
 func clientEventJSONForOutputRoomEvent(outputRoomEvent string) string {
 	var out api.OutputEvent
-	if err := jsoniter.Unmarshal([]byte(outputRoomEvent), &out); err != nil {
+	if err := json.Unmarshal([]byte(outputRoomEvent), &out); err != nil {
 		panic("failed to unmarshal output room event: " + err.Error())
 	}
 	clientEvs := gomatrixserverlib.ToClientEvents([]gomatrixserverlib.Event{
 		out.NewRoomEvent.Event.Event,
 	}, gomatrixserverlib.FormatSync)
-	b, err := jsoniter.Marshal(clientEvs[0])
+	b, err := json.Marshal(clientEvs[0])
 	if err != nil {
 		panic("failed to marshal client event as json: " + err.Error())
 	}

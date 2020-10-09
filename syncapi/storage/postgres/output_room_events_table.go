@@ -18,7 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"sort"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -167,7 +167,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 }
 
 func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
-	headeredJSON, err := jsoniter.Marshal(event)
+	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 
 		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
-		if err := jsoniter.Unmarshal(eventBytes, &ev); err != nil {
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, nil, err
 		}
 		needSet := stateNeeded[ev.RoomID()]
@@ -288,13 +288,13 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
 	var content map[string]interface{}
-	if jsoniter.Unmarshal(event.Content(), &content) != nil {
+	if json.Unmarshal(event.Content(), &content) != nil {
 		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
 
 	var headeredJSON []byte
-	headeredJSON, err = jsoniter.Marshal(event)
+	headeredJSON, err = json.Marshal(event)
 	if err != nil {
 		return
 	}
@@ -425,7 +425,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		}
 		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
-		if err := jsoniter.Unmarshal(eventBytes, &ev); err != nil {
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 

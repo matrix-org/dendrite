@@ -16,7 +16,7 @@ package consumers
 
 import (
 	"context"
-	"github.com/json-iterator/go"
+	json "github.com/json-iterator/go"
 	"sync"
 
 	"github.com/Shopify/sarama"
@@ -99,7 +99,7 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	defer s.updateOffset(msg)
 
 	var output api.DeviceMessage
-	if err := jsoniter.Unmarshal(msg.Value, &output); err != nil {
+	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Error("syncapi: failed to unmarshal key change event from key server")
 		return err
