@@ -33,7 +33,7 @@ func (n *Node) CreateClient(
 			},
 		},
 	)
-	return gomatrixserverlib.NewClientWithTransport(true, tr)
+	return gomatrixserverlib.NewClientWithTransport(tr)
 }
 
 func (n *Node) CreateFederationClient(

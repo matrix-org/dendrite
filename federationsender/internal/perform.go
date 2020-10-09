@@ -42,7 +42,7 @@ type federatedJoin struct {
 	RoomID string
 }
 
-// PerformJoinRequest implements api.FederationSenderInternalAPI
+// PerformJoin implements api.FederationSenderInternalAPI
 func (r *FederationSenderInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *api.PerformJoinRequest,
