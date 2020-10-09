@@ -178,26 +178,7 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// "If not provided, the room version is assumed to be either "1" or "2"."
 	// https://matrix.org/docs/spec/server_server/unstable#get-matrix-federation-v1-make-join-roomid-userid
 	if respMakeJoin.RoomVersion == "" {
-		// if auth events are not event references we know it must be v3+
-		// we have to do these shenanigans to satisy sytest, specifically for:
-		// "Outbound federation rejects m.room.create events with an unknown room version"
-		hasEventRefs := true
-		authEvents, ok := respMakeJoin.JoinEvent.AuthEvents.([]interface{})
-		if ok {
-			if len(authEvents) > 0 {
-				_, ok = authEvents[0].(string)
-				if ok {
-					// event refs are objects, not strings, so we know we must be dealing with a v3+ room.
-					hasEventRefs = false
-				}
-			}
-		}
-
-		if hasEventRefs {
-			respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
-		} else {
-			respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV4
-		}
+		respMakeJoin.RoomVersion = setDefaultRoomVersionFromJoinEvent(respMakeJoin.JoinEvent)
 	}
 	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
 		return fmt.Errorf("respMakeJoin.RoomVersion.EventFormat: %w", err)
@@ -476,4 +457,26 @@ func sanityCheckSendJoinResponse(respSendJoin gomatrixserverlib.RespSendJoin) er
 		}
 	}
 	return fmt.Errorf("send_join response is missing m.room.create event")
+}
+
+func setDefaultRoomVersionFromJoinEvent(joinEvent gomatrixserverlib.EventBuilder) gomatrixserverlib.RoomVersion {
+	// if auth events are not event references we know it must be v3+
+	// we have to do these shenanigans to satisfy sytest, specifically for:
+	// "Outbound federation rejects m.room.create events with an unknown room version"
+	hasEventRefs := true
+	authEvents, ok := joinEvent.AuthEvents.([]interface{})
+	if ok {
+		if len(authEvents) > 0 {
+			_, ok = authEvents[0].(string)
+			if ok {
+				// event refs are objects, not strings, so we know we must be dealing with a v3+ room.
+				hasEventRefs = false
+			}
+		}
+	}
+
+	if hasEventRefs {
+		return gomatrixserverlib.RoomVersionV1
+	}
+	return gomatrixserverlib.RoomVersionV4
 }
