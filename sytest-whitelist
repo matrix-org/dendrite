@@ -68,6 +68,8 @@ Request to logout with invalid an access token is rejected
 Request to logout without an access token is rejected
 Room creation reports m.room.create to myself
 Room creation reports m.room.member to myself
+Outbound federation rejects send_join responses with no m.room.create event
+Outbound federation rejects m.room.create events with an unknown room version
 Invited user can see room metadata
 # Blacklisted because these tests call /r0/events which we don't implement
 # New room members see their own join event
