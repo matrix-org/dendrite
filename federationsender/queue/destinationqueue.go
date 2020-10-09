@@ -349,7 +349,7 @@ func (oq *destinationQueue) nextTransaction() (bool, error) {
 	// TODO: we should check for 500-ish fails vs 400-ish here,
 	// since we shouldn't queue things indefinitely in response
 	// to a 400-ish error
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 	_, err = oq.client.SendTransaction(ctx, t)
 	switch err.(type) {
