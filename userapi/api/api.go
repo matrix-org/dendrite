@@ -192,6 +192,10 @@ type PerformDeviceCreationRequest struct {
 	DeviceID *string
 	// optional: if nil no display name will be associated with this device.
 	DeviceDisplayName *string
+	// IP address of this device
+	IPAddr string
+	// Useragent for this device
+	UserAgent string
 }
 
 // PerformDeviceCreationResponse is the response for PerformDeviceCreation
@@ -222,6 +226,9 @@ type Device struct {
 	// associated with access tokens.
 	SessionID   int64
 	DisplayName string
+	LastSeenTS  int64
+	LastSeenIP  string
+	UserAgent   string
 }
 
 // Account represents a Matrix account on this home server.

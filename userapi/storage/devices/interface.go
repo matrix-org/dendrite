@@ -31,10 +31,11 @@ type Database interface {
 	// an error will be returned.
 	// If no device ID is given one is generated.
 	// Returns the device on success.
-	CreateDevice(ctx context.Context, localpart string, deviceID *string, accessToken string, displayName *string) (dev *api.Device, returnErr error)
+	CreateDevice(ctx context.Context, localpart string, deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string) (dev *api.Device, returnErr error)
 	UpdateDevice(ctx context.Context, localpart, deviceID string, displayName *string) error
 	RemoveDevice(ctx context.Context, deviceID, localpart string) error
 	RemoveDevices(ctx context.Context, localpart string, devices []string) error
 	// RemoveAllDevices deleted all devices for this user. Returns the devices deleted.
 	RemoveAllDevices(ctx context.Context, localpart, exceptDeviceID string) (devices []api.Device, err error)
+	UpdateDeviceLastSeen(ctx context.Context, deviceID, ipAddr string) error
 }
