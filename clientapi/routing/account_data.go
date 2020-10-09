@@ -20,8 +20,10 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/util"
@@ -91,6 +93,13 @@ func SaveAccountData(
 		}
 	}
 
+	if dataType == "m.fully_read" {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Unable to set read marker"),
+		}
+	}
+
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("ioutil.ReadAll failed")
@@ -112,7 +121,7 @@ func SaveAccountData(
 	}
 	dataRes := api.InputAccountDataResponse{}
 	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
 		return util.ErrorResponse(err)
 	}
 
@@ -121,6 +130,70 @@ func SaveAccountData(
 		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
 		return jsonerror.InternalServerError()
 	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+type readMarkerJSON struct {
+	FullyRead string `json:"m.fully_read"`
+	Read      string `json:"m.read"`
+}
+
+type fullyReadEvent struct {
+	EventID string `json:"event_id"`
+}
+
+// SaveReadMarker implements POST /rooms/{roomId}/read_markers
+func SaveReadMarker(
+	req *http.Request, userAPI api.UserInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	syncProducer *producers.SyncAPIProducer, device *api.Device, roomID string,
+) util.JSONResponse {
+	// Verify that the user is a member of this room
+	resErr := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	if resErr != nil {
+		return *resErr
+	}
+
+	var r readMarkerJSON
+	resErr = httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return *resErr
+	}
+
+	if r.FullyRead == "" {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("Missing m.fully_read mandatory field"),
+		}
+	}
+
+	data, err := json.Marshal(fullyReadEvent{EventID: r.FullyRead})
+	if err != nil {
+		return jsonerror.InternalServerError()
+	}
+
+	dataReq := api.InputAccountDataRequest{
+		UserID:      device.UserID,
+		DataType:    "m.fully_read",
+		RoomID:      roomID,
+		AccountData: data,
+	}
+	dataRes := api.InputAccountDataResponse{}
+	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+		return util.ErrorResponse(err)
+	}
+
+	if err := syncProducer.SendData(device.UserID, roomID, "m.fully_read"); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
+		return jsonerror.InternalServerError()
+	}
+
+	// TODO handle the read receipt that may be included in the read marker
+	// See https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-rooms-roomid-read-markers
 
 	return util.JSONResponse{
 		Code: http.StatusOK,

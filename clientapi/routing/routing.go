@@ -695,12 +695,15 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/read_markers",
-		httputil.MakeExternalAPI("rooms_read_markers", func(req *http.Request) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_read_markers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
-			// TODO: return the read_markers.
-			return util.JSONResponse{Code: http.StatusOK, JSON: struct{}{}}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SaveReadMarker(req, userAPI, rsAPI, syncProducer, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
