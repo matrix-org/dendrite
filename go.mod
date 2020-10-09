@@ -1,5 +1,7 @@
 module github.com/matrix-org/dendrite
 
+replace github.com/matrix-org/gomatrixserverlib v0.0.0-20201006143701-222e7423a5e3 => github.com/bn4t/gomatrixserverlib v0.0.0-20201009140335-23904a431004
+
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Shopify/sarama v1.27.0
