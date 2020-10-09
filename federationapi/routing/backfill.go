@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"encoding/json"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 	"strconv"

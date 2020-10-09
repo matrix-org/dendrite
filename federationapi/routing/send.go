@@ -16,7 +16,6 @@ package routing
 
 import (
 	"context"
-	stdjson "encoding/json"
 	"fmt"
 	json "github.com/json-iterator/go"
 	"net/http"
@@ -56,7 +55,7 @@ func Send(
 	}
 
 	var txnEvents struct {
-		PDUs []stdjson.RawMessage       `json:"pdus"`
+		PDUs []json.RawMessage       `json:"pdus"`
 		EDUs []gomatrixserverlib.EDU `json:"edus"`
 	}
 

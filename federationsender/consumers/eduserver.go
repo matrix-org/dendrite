@@ -16,7 +16,6 @@ package consumers
 
 import (
 	"context"
-	stdjson "encoding/json"
 	"fmt"
 	json "github.com/json-iterator/go"
 
@@ -121,7 +120,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) err
 		Sender:    ote.Sender,
 		Type:      ote.Type,
 		MessageID: util.RandomString(32),
-		Messages: map[string]map[string]stdjson.RawMessage{
+		Messages: map[string]map[string]json.RawMessage{
 			ote.UserID: {
 				ote.DeviceID: ote.Content,
 			},

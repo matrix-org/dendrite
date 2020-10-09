@@ -3,7 +3,7 @@ package storage_test
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
+	json "github.com/json-iterator/go"
 	"fmt"
 	"os"
 	"testing"
