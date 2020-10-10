@@ -16,10 +16,11 @@ package queue
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"sync"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"

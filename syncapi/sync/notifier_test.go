@@ -16,11 +16,12 @@ package sync
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"

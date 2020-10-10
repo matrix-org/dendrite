@@ -16,11 +16,12 @@ package main
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 

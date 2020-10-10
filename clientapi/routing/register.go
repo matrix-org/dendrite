@@ -19,7 +19,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
-	json "github.com/json-iterator/go"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -31,6 +30,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"

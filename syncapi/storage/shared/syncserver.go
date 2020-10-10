@@ -17,9 +17,10 @@ package shared
 import (
 	"context"
 	"database/sql"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 

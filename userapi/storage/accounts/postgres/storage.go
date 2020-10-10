@@ -18,8 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	json "github.com/json-iterator/go"
 	"strconv"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/config"

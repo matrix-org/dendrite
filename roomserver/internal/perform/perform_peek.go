@@ -16,9 +16,10 @@ package perform
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"strings"
+
+	json "github.com/json-iterator/go"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"

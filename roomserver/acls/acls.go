@@ -16,12 +16,13 @@ package acls
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"net"
 	"regexp"
 	"strings"
 	"sync"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"

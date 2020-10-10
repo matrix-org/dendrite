@@ -16,8 +16,9 @@ package query
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"testing"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/types"

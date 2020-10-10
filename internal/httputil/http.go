@@ -17,11 +17,12 @@ package httputil
 import (
 	"bytes"
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+
+	json "github.com/json-iterator/go"
 
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"

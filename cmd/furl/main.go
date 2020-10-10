@@ -5,13 +5,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	json "github.com/json-iterator/go"
 	"encoding/pem"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/url"
 	"os"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )

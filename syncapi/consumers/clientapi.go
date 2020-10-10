@@ -16,6 +16,7 @@ package consumers
 
 import (
 	"context"
+
 	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"

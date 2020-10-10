@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"

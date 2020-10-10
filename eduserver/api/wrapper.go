@@ -16,8 +16,9 @@ package api
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )

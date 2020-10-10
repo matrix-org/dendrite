@@ -1,9 +1,10 @@
 package api
 
 import (
-	json "github.com/json-iterator/go"
 	"fmt"
 	"net/http"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"

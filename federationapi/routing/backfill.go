@@ -15,11 +15,12 @@
 package routing
 
 import (
-	json "github.com/json-iterator/go"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/config"

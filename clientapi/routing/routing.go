@@ -15,9 +15,10 @@
 package routing
 
 import (
-	json "github.com/json-iterator/go"
 	"net/http"
 	"strings"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"

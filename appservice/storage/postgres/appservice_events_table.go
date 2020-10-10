@@ -18,8 +18,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	json "github.com/json-iterator/go"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"

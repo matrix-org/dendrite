@@ -1,9 +1,10 @@
 package types
 
 import (
-	json "github.com/json-iterator/go"
 	"reflect"
 	"testing"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )

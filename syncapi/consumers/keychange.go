@@ -16,8 +16,9 @@ package consumers
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"sync"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"

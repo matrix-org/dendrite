@@ -16,10 +16,11 @@ package sync
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"net/http"
 	"strconv"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"

@@ -16,6 +16,7 @@ package api
 
 import (
 	"context"
+
 	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"

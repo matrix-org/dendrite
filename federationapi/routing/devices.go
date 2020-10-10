@@ -13,8 +13,9 @@
 package routing
 
 import (
-	json "github.com/json-iterator/go"
 	"net/http"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"

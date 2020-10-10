@@ -16,6 +16,7 @@ package storage
 
 import (
 	"context"
+
 	json "github.com/json-iterator/go"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"

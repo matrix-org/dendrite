@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"fmt"
+
 	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"

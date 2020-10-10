@@ -17,10 +17,11 @@ package types
 import (
 	"errors"
 	"fmt"
-	json "github.com/json-iterator/go"
 	"sort"
 	"strconv"
 	"strings"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"

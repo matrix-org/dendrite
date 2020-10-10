@@ -17,12 +17,13 @@ package workers
 import (
 	"bytes"
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"math"
 	"net/http"
 	"net/url"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"

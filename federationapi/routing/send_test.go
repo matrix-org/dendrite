@@ -2,11 +2,12 @@ package routing
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"

@@ -3,11 +3,12 @@ package storage_test
 import (
 	"context"
 	"crypto/ed25519"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"os"
 	"testing"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"

@@ -17,6 +17,7 @@ package shared
 import (
 	"context"
 	"database/sql"
+
 	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"

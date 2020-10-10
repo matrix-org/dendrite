@@ -17,8 +17,9 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	json "github.com/json-iterator/go"
 	"fmt"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"

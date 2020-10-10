@@ -1,8 +1,9 @@
 package inthttp
 
 import (
-	json "github.com/json-iterator/go"
 	"net/http"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/httputil"

@@ -16,13 +16,14 @@ package threepid
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal/config"
 )

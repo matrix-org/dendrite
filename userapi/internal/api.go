@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/appservice/types"

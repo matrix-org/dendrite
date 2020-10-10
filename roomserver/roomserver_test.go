@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/caching"

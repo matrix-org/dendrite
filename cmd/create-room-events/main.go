@@ -18,12 +18,13 @@ package main
 
 import (
 	"encoding/base64"
-	json "github.com/json-iterator/go"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"

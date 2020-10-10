@@ -16,8 +16,9 @@ package consumers
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/federationsender/queue"

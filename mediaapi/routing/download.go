@@ -16,7 +16,6 @@ package routing
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"io"
 	"mime"
@@ -29,6 +28,8 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/config"

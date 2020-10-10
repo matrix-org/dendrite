@@ -19,7 +19,6 @@ import (
 	"crypto/ed25519"
 	"crypto/tls"
 	"encoding/hex"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -28,6 +27,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/convert"

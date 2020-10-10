@@ -2,8 +2,9 @@ package api
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
+
+	json "github.com/json-iterator/go"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/util"

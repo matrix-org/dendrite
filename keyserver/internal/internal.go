@@ -17,10 +17,11 @@ package internal
 import (
 	"bytes"
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"sync"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	fedsenderapi "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/keyserver/api"

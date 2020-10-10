@@ -16,10 +16,11 @@ package routing
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"errors"
 	"net/http"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"

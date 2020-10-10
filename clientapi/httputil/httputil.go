@@ -15,10 +15,11 @@
 package httputil
 
 import (
-	json "github.com/json-iterator/go"
 	"io/ioutil"
 	"net/http"
 	"unicode/utf8"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"

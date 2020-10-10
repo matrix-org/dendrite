@@ -15,8 +15,9 @@
 package jsonerror
 
 import (
-	json "github.com/json-iterator/go"
 	"testing"
+
+	json "github.com/json-iterator/go"
 )
 
 func TestLimitExceeded(t *testing.T) {

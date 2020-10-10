@@ -2,9 +2,10 @@ package auth
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"fmt"
 	"testing"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/userapi/api"

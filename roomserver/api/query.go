@@ -17,9 +17,10 @@
 package api
 
 import (
-	json "github.com/json-iterator/go"
 	"fmt"
 	"strings"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"

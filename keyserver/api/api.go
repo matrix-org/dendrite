@@ -16,9 +16,10 @@ package api
 
 import (
 	"context"
-	json "github.com/json-iterator/go"
 	"strings"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"

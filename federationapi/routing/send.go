@@ -18,10 +18,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	json "github.com/json-iterator/go"
 	"net/http"
 	"sync"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"

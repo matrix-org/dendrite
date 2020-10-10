@@ -15,7 +15,6 @@
 package main
 
 import (
-	json "github.com/json-iterator/go"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -23,6 +22,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/test"
