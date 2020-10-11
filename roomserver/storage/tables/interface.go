@@ -201,3 +201,7 @@ func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
 	// this returns the empty string if this is not a string type
 	return result.Str
 }
+
+type Receipts interface {
+	UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string) error
+}

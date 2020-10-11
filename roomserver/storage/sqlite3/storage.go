@@ -119,6 +119,10 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	if err != nil {
 		return nil, err
 	}
+	receipts, err := NewSqliteReceiptsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Cache:               cache,
@@ -137,6 +141,7 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 		MembershipTable:     d.membership,
 		PublishedTable:      published,
 		RedactionsTable:     redactions,
+		ReceiptsTable:       receipts,
 	}
 	return &d, nil
 }

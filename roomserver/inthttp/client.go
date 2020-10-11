@@ -25,12 +25,13 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath   = "/roomserver/performInvite"
-	RoomserverPerformPeekPath     = "/roomserver/performPeek"
-	RoomserverPerformJoinPath     = "/roomserver/performJoin"
-	RoomserverPerformLeavePath    = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath  = "/roomserver/performPublish"
+	RoomserverPerformInvitePath        = "/roomserver/performInvite"
+	RoomserverPerformPeekPath          = "/roomserver/performPeek"
+	RoomserverPerformJoinPath          = "/roomserver/performJoin"
+	RoomserverPerformLeavePath         = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath      = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath       = "/roomserver/performPublish"
+	RoomserverPerformReceiptUpdatePath = "/roomserver/performReceiptUpdate"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -490,5 +491,17 @@ func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServerBannedFromRoomPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) PerformUserReceiptUpdate(
+	ctx context.Context,
+	req *api.PerformUserReceiptUpdate,
+	res *api.PerformUserReceiptUpdateResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUserReceiptUpdate")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformReceiptUpdatePath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

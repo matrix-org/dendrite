@@ -44,6 +44,7 @@ type Database struct {
 	MembershipTable     tables.Membership
 	PublishedTable      tables.Published
 	RedactionsTable     tables.Redactions
+	ReceiptsTable       tables.Receipts
 }
 
 func (d *Database) SupportsConcurrentRoomInputs() bool {
@@ -1023,3 +1024,10 @@ func (s stateEntryByStateKeySorter) Less(i, j int) bool {
 	return s[i].StateKeyTuple.LessThan(s[j].StateKeyTuple)
 }
 func (s stateEntryByStateKeySorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+// StoreReceipt stores user receipts
+func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.ReceiptsTable.UpsertReceipt(ctx, txn, roomId, receiptType, userId, eventId)
+	})
+}
