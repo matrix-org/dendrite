@@ -42,8 +42,8 @@ github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/bn4t/gomatrixserverlib v0.0.0-20201009140335-23904a431004 h1:tCV04ZHNonEtY4Vhdda3Juzg/zk7eFla3ixDDs8dBos=
-github.com/bn4t/gomatrixserverlib v0.0.0-20201009140335-23904a431004/go.mod h1:dV8PqfHZAzs+eyEiIdCLt3Y3R7zb4scFsdHJ/N0aAsM=
+github.com/bn4t/gomatrixserverlib v0.0.0-20201011104814-08fd27fa6e59 h1:GCncFjpDXA9EmryIzanObuHqr2oN2rXpa/gROer/nC4=
+github.com/bn4t/gomatrixserverlib v0.0.0-20201011104814-08fd27fa6e59/go.mod h1:dV8PqfHZAzs+eyEiIdCLt3Y3R7zb4scFsdHJ/N0aAsM=
 github.com/bradfitz/go-smtpd v0.0.0-20170404230938-deb6d6237625/go.mod h1:HYsPBTaaSFSlLx/70C2HPIMNZpVV8+vt/A+FMnYP11g=
 github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32/go.mod h1:DrZx5ec/dmnfpw9KyYoQyYo7d0KEvTkk/5M/vbZjAr8=
 github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c/go.mod h1:3J08xEfcugPacsc34/LKRU2yO7YmuT8yt28J8k2+rrI=
