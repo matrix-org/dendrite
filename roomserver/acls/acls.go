@@ -89,7 +89,7 @@ func compileACLRegex(orig string) (*regexp.Regexp, error) {
 
 func (s *ServerACLs) OnServerACLUpdate(state *gomatrixserverlib.Event) {
 	acls := &serverACL{}
-	if err := json.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(state.Content(), &acls.ServerACL); err != nil {
 		logrus.WithError(err).Errorf("Failed to unmarshal state content for server ACLs")
 		return
 	}

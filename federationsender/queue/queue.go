@@ -160,7 +160,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		"destinations": len(destmap), "event": ev.EventID(),
 	}).Infof("Sending event")
 
-	headeredJSON, err := json.Marshal(ev)
+	headeredJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(ev)
 	if err != nil {
 		return fmt.Errorf("json.Marshal: %w", err)
 	}
@@ -225,7 +225,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		"destinations": len(destmap), "edu_type": e.Type,
 	}).Info("Sending EDU event")
 
-	ephemeralJSON, err := json.Marshal(e)
+	ephemeralJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(e)
 	if err != nil {
 		return fmt.Errorf("json.Marshal: %w", err)
 	}

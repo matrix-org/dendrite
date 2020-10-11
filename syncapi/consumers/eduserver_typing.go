@@ -75,7 +75,7 @@ func (s *OutputTypingEventConsumer) Start() error {
 
 func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	var output api.OutputTypingEvent
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
 		return nil

@@ -76,7 +76,7 @@ func main() {
 			bodyBytes = append(bodyBytes, bytes...)
 		}
 		fmt.Println("Done!")
-		if err = json.Unmarshal(bodyBytes, &bodyObj); err != nil {
+		if err = json.ConfigCompatibleWithStandardLibrary.Unmarshal(bodyBytes, &bodyObj); err != nil {
 			panic(err)
 		}
 	}

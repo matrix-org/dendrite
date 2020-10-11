@@ -65,7 +65,7 @@ func HistoryVisibilityForRoom(authEvents []gomatrixserverlib.Event) string {
 		content := struct {
 			HistoryVisibility string `json:"history_visibility"`
 		}{}
-		if err := json.Unmarshal(ev.Content(), &content); err != nil {
+		if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(ev.Content(), &content); err != nil {
 			break // value is not understood
 		}
 		for _, s := range knownStates {

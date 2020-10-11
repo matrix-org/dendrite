@@ -199,7 +199,7 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 		return err
 	}
 	content := roomAliasesContent{Aliases: aliases}
-	rawContent, err := json.Marshal(content)
+	rawContent, err := json.ConfigCompatibleWithStandardLibrary.Marshal(content)
 	if err != nil {
 		return err
 	}

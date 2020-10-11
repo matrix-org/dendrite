@@ -144,7 +144,7 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			UserID:   userID,
 			DeviceID: deviceID,
 		}
-		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
+		if err = json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
 			return
 		}
 		if sentByToken != nil {

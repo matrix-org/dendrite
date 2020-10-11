@@ -170,7 +170,7 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 			for deviceID, nest2 := range nest {
 				res.OneTimeKeys[userID][deviceID] = make(map[string]json.RawMessage)
 				for keyIDWithAlgo, otk := range nest2 {
-					keyJSON, err := json.Marshal(otk)
+					keyJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(otk)
 					if err != nil {
 						continue
 					}
@@ -338,7 +338,7 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 		for userID, nest := range result.DeviceKeys {
 			res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 			for deviceID, deviceKey := range nest {
-				keyJSON, err := json.Marshal(deviceKey)
+				keyJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(deviceKey)
 				if err != nil {
 					continue
 				}

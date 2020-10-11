@@ -196,7 +196,7 @@ func createTransaction(
 		Events: ev,
 	}
 
-	transactionJSON, err = json.Marshal(transaction)
+	transactionJSON, err = json.ConfigCompatibleWithStandardLibrary.Marshal(transaction)
 	if err != nil {
 		return
 	}

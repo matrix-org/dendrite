@@ -50,7 +50,7 @@ var (
 
 func init() {
 	var err error
-	err = json.Unmarshal([]byte(`{
+	err = json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(`{
 		"_room_version": "1",
 		"type": "m.room.message",
 		"content": {
@@ -66,7 +66,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	err = json.Unmarshal([]byte(`{
+	err = json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(`{
 		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",
@@ -82,7 +82,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	err = json.Unmarshal([]byte(`{
+	err = json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(`{
 		"_room_version": "1",
 		"type": "m.room.member",
 		"state_key": "`+bob+`",

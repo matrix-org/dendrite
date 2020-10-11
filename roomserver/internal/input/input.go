@@ -74,7 +74,7 @@ func (w *inputWorker) start() {
 func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
 	messages := make([]*sarama.ProducerMessage, len(updates))
 	for i := range updates {
-		value, err := json.Marshal(updates[i])
+		value, err := json.ConfigCompatibleWithStandardLibrary.Marshal(updates[i])
 		if err != nil {
 			return err
 		}

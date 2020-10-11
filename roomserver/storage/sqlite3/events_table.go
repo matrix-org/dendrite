@@ -489,6 +489,6 @@ func (s *eventStatements) SelectRoomNIDForEventNID(
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) string {
-	b, _ := json.Marshal(eventNIDs)
+	b, _ := json.ConfigCompatibleWithStandardLibrary.Marshal(eventNIDs)
 	return string(b)
 }

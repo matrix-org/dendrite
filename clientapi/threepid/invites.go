@@ -303,7 +303,7 @@ func checkIDServerSignatures(
 	ctx context.Context, body *MembershipRequest, res *idServerLookupResponse,
 ) error {
 	// Mashall the body so we can give it to VerifyJSON
-	marshalledBody, err := json.Marshal(*res)
+	marshalledBody, err := json.ConfigCompatibleWithStandardLibrary.Marshal(*res)
 	if err != nil {
 		return err
 	}

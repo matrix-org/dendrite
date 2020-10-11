@@ -64,7 +64,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	for _, ev := range stateRes.StateEvents {
 		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
 			content := map[string]string{}
-			if err := json.Unmarshal(ev.Content(), &content); err != nil {
+			if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 				return jsonerror.InternalServerError()
 			}
@@ -205,7 +205,7 @@ func OnIncomingStateTypeRequest(
 	for _, ev := range stateRes.StateEvents {
 		if ev.Type() == gomatrixserverlib.MRoomHistoryVisibility {
 			content := map[string]string{}
-			if err := json.Unmarshal(ev.Content(), &content); err != nil {
+			if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 				return jsonerror.InternalServerError()
 			}

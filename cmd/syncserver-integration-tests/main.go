@@ -101,13 +101,13 @@ func createTestUser(database, username, token string) error {
 // Panics if there are any problems.
 func clientEventJSONForOutputRoomEvent(outputRoomEvent string) string {
 	var out api.OutputEvent
-	if err := json.Unmarshal([]byte(outputRoomEvent), &out); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(outputRoomEvent), &out); err != nil {
 		panic("failed to unmarshal output room event: " + err.Error())
 	}
 	clientEvs := gomatrixserverlib.ToClientEvents([]gomatrixserverlib.Event{
 		out.NewRoomEvent.Event.Event,
 	}, gomatrixserverlib.FormatSync)
-	b, err := json.Marshal(clientEvs[0])
+	b, err := json.ConfigCompatibleWithStandardLibrary.Marshal(clientEvs[0])
 	if err != nil {
 		panic("failed to marshal client event as json: " + err.Error())
 	}

@@ -162,7 +162,7 @@ func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.
 		}
 
 		// Unmarshal eventJSON
-		if err = json.Unmarshal(eventJSON, &event); err != nil {
+		if err = json.ConfigCompatibleWithStandardLibrary.Unmarshal(eventJSON, &event); err != nil {
 			return nil, 0, 0, false, err
 		}
 
@@ -220,7 +220,7 @@ func (s *eventsStatements) insertEvent(
 	event *gomatrixserverlib.HeaderedEvent,
 ) (err error) {
 	// Convert event to JSON before inserting
-	eventJSON, err := json.Marshal(event)
+	eventJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(event)
 	if err != nil {
 		return err
 	}

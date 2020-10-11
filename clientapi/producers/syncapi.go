@@ -36,7 +36,7 @@ func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string
 		RoomID: roomID,
 		Type:   dataType,
 	}
-	value, err := json.Marshal(data)
+	value, err := json.ConfigCompatibleWithStandardLibrary.Marshal(data)
 	if err != nil {
 		return err
 	}

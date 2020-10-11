@@ -171,7 +171,7 @@ func SaveReadMarker(
 		}
 	}
 
-	data, err := json.Marshal(fullyReadEvent{EventID: r.FullyRead})
+	data, err := json.ConfigCompatibleWithStandardLibrary.Marshal(fullyReadEvent{EventID: r.FullyRead})
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}

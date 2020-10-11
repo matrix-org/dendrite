@@ -307,7 +307,7 @@ func (t *RoomserverInternalAPITrace) QueryServerBannedFromRoom(ctx context.Conte
 }
 
 func js(thing interface{}) string {
-	b, err := json.Marshal(thing)
+	b, err := json.ConfigCompatibleWithStandardLibrary.Marshal(thing)
 	if err != nil {
 		return fmt.Sprintf("Marshal error:%s", err)
 	}

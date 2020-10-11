@@ -47,7 +47,7 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 	for _, key := range keys {
 		var m sarama.ProducerMessage
 
-		value, err := json.Marshal(key)
+		value, err := json.ConfigCompatibleWithStandardLibrary.Marshal(key)
 		if err != nil {
 			return err
 		}

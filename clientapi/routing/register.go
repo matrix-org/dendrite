@@ -302,7 +302,7 @@ func validateRecaptcha(
 			JSON: jsonerror.Unknown("Error in contacting captcha server" + err.Error()),
 		}
 	}
-	err = json.Unmarshal(body, &r)
+	err = json.ConfigCompatibleWithStandardLibrary.Unmarshal(body, &r)
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,

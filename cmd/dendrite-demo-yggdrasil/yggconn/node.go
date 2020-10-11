@@ -90,7 +90,7 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 		if e != nil {
 			panic(err)
 		}
-		if err := json.Unmarshal([]byte(yggconf), &n.config); err != nil {
+		if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(yggconf), &n.config); err != nil {
 			panic(err)
 		}
 	}

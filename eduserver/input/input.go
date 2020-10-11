@@ -94,7 +94,7 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 		ote.ExpireTime = &expireTime
 	}
 
-	eventJSON, err := json.Marshal(ote)
+	eventJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(ote)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 			SendToDeviceEvent: ise.SendToDeviceEvent,
 		}
 
-		eventJSON, err := json.Marshal(ote)
+		eventJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(ote)
 		if err != nil {
 			logrus.WithError(err).Error("sendToDevice failed json.Marshal")
 			return err

@@ -352,12 +352,12 @@ func (r *QueryBulkStateContentResponse) MarshalJSON() ([]byte, error) {
 			se[fmt.Sprintf("%s\x1F%s\x1F%s", roomID, tuple.EventType, tuple.StateKey)] = event
 		}
 	}
-	return json.Marshal(se)
+	return json.ConfigCompatibleWithStandardLibrary.Marshal(se)
 }
 
 func (r *QueryBulkStateContentResponse) UnmarshalJSON(data []byte) error {
 	wireFormat := make(map[string]string)
-	err := json.Unmarshal(data, &wireFormat)
+	err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(data, &wireFormat)
 	if err != nil {
 		return err
 	}
@@ -383,12 +383,12 @@ func (r *QueryCurrentStateResponse) MarshalJSON() ([]byte, error) {
 		// use 0x1F (unit separator) as the delimiter between type/state key,
 		se[fmt.Sprintf("%s\x1F%s", k.EventType, k.StateKey)] = v
 	}
-	return json.Marshal(se)
+	return json.ConfigCompatibleWithStandardLibrary.Marshal(se)
 }
 
 func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 	res := make(map[string]*gomatrixserverlib.HeaderedEvent)
-	err := json.Unmarshal(data, &res)
+	err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(data, &res)
 	if err != nil {
 		return err
 	}

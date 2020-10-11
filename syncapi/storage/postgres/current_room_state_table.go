@@ -237,12 +237,12 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
 	var content map[string]interface{}
-	if json.Unmarshal(event.Content(), &content) != nil {
+	if json.ConfigCompatibleWithStandardLibrary.Unmarshal(event.Content(), &content) != nil {
 		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
 
-	headeredJSON, err := json.Marshal(event)
+	headeredJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(event)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func rowsToEvents(rows *sql.Rows) ([]gomatrixserverlib.HeaderedEvent, error) {
 		}
 		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
-		if err := json.Unmarshal(eventBytes, &ev); err != nil {
+		if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
 		result = append(result, ev)
@@ -306,7 +306,7 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 		return nil, err
 	}
 	var ev gomatrixserverlib.HeaderedEvent
-	if err = json.Unmarshal(res, &ev); err != nil {
+	if err = json.ConfigCompatibleWithStandardLibrary.Unmarshal(res, &ev); err != nil {
 		return nil, err
 	}
 	return &ev, err

@@ -182,19 +182,19 @@ func (u *UserInteractive) NewSession() *util.JSONResponse {
 // standard challenge response.
 func (u *UserInteractive) ResponseWithChallenge(sessionID string, response interface{}) *util.JSONResponse {
 	mixedObjects := make(map[string]interface{})
-	b, err := json.Marshal(response)
+	b, err := json.ConfigCompatibleWithStandardLibrary.Marshal(response)
 	if err != nil {
 		ise := jsonerror.InternalServerError()
 		return &ise
 	}
-	_ = json.Unmarshal(b, &mixedObjects)
+	_ = json.ConfigCompatibleWithStandardLibrary.Unmarshal(b, &mixedObjects)
 	challenge := u.Challenge(sessionID)
-	b, err = json.Marshal(challenge.JSON)
+	b, err = json.ConfigCompatibleWithStandardLibrary.Marshal(challenge.JSON)
 	if err != nil {
 		ise := jsonerror.InternalServerError()
 		return &ise
 	}
-	_ = json.Unmarshal(b, &mixedObjects)
+	_ = json.ConfigCompatibleWithStandardLibrary.Unmarshal(b, &mixedObjects)
 
 	return &util.JSONResponse{
 		Code: 401,
@@ -238,7 +238,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	}
 
 	r := loginType.Request()
-	if err := json.Unmarshal([]byte(gjson.GetBytes(bodyBytes, "auth").Raw), r); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(gjson.GetBytes(bodyBytes, "auth").Raw), r); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),

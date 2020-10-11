@@ -603,7 +603,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 	var createContent gomatrixserverlib.CreateContent
 	// The m.room.create event contains an optional "room_version" key in
 	// the event content, so we need to unmarshal that first.
-	if err = json.Unmarshal(event.Content(), &createContent); err != nil {
+	if err = json.ConfigCompatibleWithStandardLibrary.Unmarshal(event.Content(), &createContent); err != nil {
 		return gomatrixserverlib.RoomVersion(""), err
 	}
 	// A room version was specified in the event content?

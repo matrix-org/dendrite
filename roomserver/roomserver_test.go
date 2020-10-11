@@ -50,7 +50,7 @@ func (p *dummyProducer) SendMessage(msg *sarama.ProducerMessage) (partition int3
 	b := json.RawMessage(be)
 	fmt.Println("SENDING >>>>>>>> ", string(b))
 	var out api.OutputEvent
-	err = json.Unmarshal(b, &out)
+	err = json.ConfigCompatibleWithStandardLibrary.Unmarshal(b, &out)
 	if err != nil {
 		return 0, 0, err
 	}

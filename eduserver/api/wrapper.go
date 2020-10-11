@@ -49,7 +49,7 @@ func SendToDevice(
 	ctx context.Context, eduAPI EDUServerInputAPI, sender, userID, deviceID, eventType string,
 	message interface{},
 ) error {
-	js, err := json.Marshal(message)
+	js, err := json.ConfigCompatibleWithStandardLibrary.Marshal(message)
 	if err != nil {
 		return err
 	}

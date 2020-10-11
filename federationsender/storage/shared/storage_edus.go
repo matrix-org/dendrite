@@ -77,7 +77,7 @@ func (d *Database) GetNextTransactionEDUs(
 
 		for _, blob := range blobs {
 			var event gomatrixserverlib.EDU
-			if err := json.Unmarshal(blob, &event); err != nil {
+			if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
 			edus = append(edus, &event)

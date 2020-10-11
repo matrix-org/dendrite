@@ -33,7 +33,7 @@ func PostJSON(
 	ctx context.Context, span opentracing.Span, httpClient *http.Client,
 	apiURL string, request, response interface{},
 ) error {
-	jsonBytes, err := json.Marshal(request)
+	jsonBytes, err := json.ConfigCompatibleWithStandardLibrary.Marshal(request)
 	if err != nil {
 		return err
 	}

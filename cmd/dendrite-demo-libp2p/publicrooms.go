@@ -111,7 +111,7 @@ func (p *publicRoomsProvider) AdvertiseRooms() error {
 	}
 	advertised := 0
 	for _, room := range ourRooms {
-		if j, err := json.Marshal(room); err == nil {
+		if j, err := json.ConfigCompatibleWithStandardLibrary.Marshal(room); err == nil {
 			if err := p.topic.Publish(context.TODO(), j); err != nil {
 				fmt.Println("Failed to publish public room:", err)
 			} else {
@@ -133,7 +133,7 @@ func (p *publicRoomsProvider) FindRooms() {
 		received := discoveredRoom{
 			time: time.Now(),
 		}
-		if err := json.Unmarshal(msg.Data, &received.room); err != nil {
+		if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(msg.Data, &received.room); err != nil {
 			fmt.Println("Unmarshal error:", err)
 			continue
 		}

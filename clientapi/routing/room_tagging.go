@@ -184,7 +184,7 @@ func obtainSavedTags(
 	if !ok {
 		return
 	}
-	if err = json.Unmarshal(data, &tags); err != nil {
+	if err = json.ConfigCompatibleWithStandardLibrary.Unmarshal(data, &tags); err != nil {
 		return
 	}
 	return tags, nil
@@ -198,7 +198,7 @@ func saveTagData(
 	userAPI api.UserInternalAPI,
 	Tag gomatrix.TagContent,
 ) error {
-	newTagData, err := json.Marshal(Tag)
+	newTagData, err := json.ConfigCompatibleWithStandardLibrary.Marshal(Tag)
 	if err != nil {
 		return err
 	}

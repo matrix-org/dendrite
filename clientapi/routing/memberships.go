@@ -74,7 +74,7 @@ func GetMemberships(
 		res.Joined = make(map[string]joinedMember)
 		for _, ev := range queryRes.JoinEvents {
 			var content joinedMember
-			if err := json.Unmarshal(ev.Content, &content); err != nil {
+			if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(ev.Content, &content); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
 				return jsonerror.InternalServerError()
 			}

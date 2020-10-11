@@ -93,7 +93,7 @@ func (d *Database) GetNextTransactionPDUs(
 
 		for _, blob := range blobs {
 			var event gomatrixserverlib.HeaderedEvent
-			if err := json.Unmarshal(blob, &event); err != nil {
+			if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
 			events = append(events, &event)

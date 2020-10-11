@@ -100,7 +100,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	// creation_content map into bytes and then unmarshalling the bytes into
 	// eventutil.CreateContent.
 
-	creationContentBytes, err := json.Marshal(r.CreationContent)
+	creationContentBytes, err := json.ConfigCompatibleWithStandardLibrary.Marshal(r.CreationContent)
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -109,7 +109,7 @@ func (r createRoomRequest) Validate() *util.JSONResponse {
 	}
 
 	var CreationContent gomatrixserverlib.CreateContent
-	err = json.Unmarshal(creationContentBytes, &CreationContent)
+	err = json.ConfigCompatibleWithStandardLibrary.Unmarshal(creationContentBytes, &CreationContent)
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,

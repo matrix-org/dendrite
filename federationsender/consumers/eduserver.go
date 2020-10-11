@@ -90,7 +90,7 @@ func (t *OutputEDUConsumer) Start() error {
 func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) error {
 	// Extract the send-to-device event from msg.
 	var ote api.OutputSendToDeviceEvent
-	if err := json.Unmarshal(msg.Value, &ote); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(msg.Value, &ote); err != nil {
 		log.WithError(err).Errorf("eduserver output log: message parse failed (expected send-to-device)")
 		return nil
 	}
@@ -127,7 +127,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) err
 			},
 		},
 	}
-	if edu.Content, err = json.Marshal(tdm); err != nil {
+	if edu.Content, err = json.ConfigCompatibleWithStandardLibrary.Marshal(tdm); err != nil {
 		return err
 	}
 
@@ -140,7 +140,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) err
 func (t *OutputEDUConsumer) onTypingEvent(msg *sarama.ConsumerMessage) error {
 	// Extract the typing event from msg.
 	var ote api.OutputTypingEvent
-	if err := json.Unmarshal(msg.Value, &ote); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(msg.Value, &ote); err != nil {
 		// Skip this msg but continue processing messages.
 		log.WithError(err).Errorf("eduserver output log: message parse failed (expected typing)")
 		return nil
@@ -168,7 +168,7 @@ func (t *OutputEDUConsumer) onTypingEvent(msg *sarama.ConsumerMessage) error {
 	}
 
 	edu := &gomatrixserverlib.EDU{Type: ote.Event.Type}
-	if edu.Content, err = json.Marshal(map[string]interface{}{
+	if edu.Content, err = json.ConfigCompatibleWithStandardLibrary.Marshal(map[string]interface{}{
 		"room_id": ote.Event.RoomID,
 		"user_id": ote.Event.UserID,
 		"typing":  ote.Event.Typing,

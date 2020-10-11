@@ -50,7 +50,7 @@ func (db *getEventDB) addFakeEvent(eventID string, authIDs []string) error {
 		"auth_events": authEvents,
 	}
 
-	eventJSON, err := json.Marshal(&builder)
+	eventJSON, err := json.ConfigCompatibleWithStandardLibrary.Marshal(&builder)
 	if err != nil {
 		return err
 	}

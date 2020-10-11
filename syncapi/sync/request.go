@@ -76,7 +76,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		if filterQuery[0] == '{' {
 			// attempt to parse the timeline limit at least
 			var f filter
-			err := json.Unmarshal([]byte(filterQuery), &f)
+			err := json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(filterQuery), &f)
 			if err == nil && f.Room.Timeline.Limit != nil {
 				timelineLimit = *f.Room.Timeline.Limit
 			}

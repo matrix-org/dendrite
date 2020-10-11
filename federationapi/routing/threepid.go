@@ -111,7 +111,7 @@ func ExchangeThirdPartyInvite(
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	var builder gomatrixserverlib.EventBuilder
-	if err := json.Unmarshal(request.Content(), &builder); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(request.Content(), &builder); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
@@ -368,7 +368,7 @@ func fillDisplayName(
 	builder *gomatrixserverlib.EventBuilder, authEvents gomatrixserverlib.AuthEvents,
 ) error {
 	var content gomatrixserverlib.MemberContent
-	if err := json.Unmarshal(builder.Content, &content); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(builder.Content, &content); err != nil {
 		return err
 	}
 
@@ -381,7 +381,7 @@ func fillDisplayName(
 	}
 
 	var thirdPartyInviteContent gomatrixserverlib.ThirdPartyInviteContent
-	if err := json.Unmarshal(thirdPartyInviteEvent.Content(), &thirdPartyInviteContent); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(thirdPartyInviteEvent.Content(), &thirdPartyInviteContent); err != nil {
 		return err
 	}
 

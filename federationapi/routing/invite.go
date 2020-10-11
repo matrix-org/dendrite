@@ -40,7 +40,7 @@ func InviteV2(
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 	inviteReq := gomatrixserverlib.InviteV2Request{}
-	err := json.Unmarshal(request.Content(), &inviteReq)
+	err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(request.Content(), &inviteReq)
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
@@ -86,7 +86,7 @@ func InviteV1(
 		}
 	}
 	var strippedState []gomatrixserverlib.InviteV2StrippedState
-	if err := json.Unmarshal(event.Unsigned(), &strippedState); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(event.Unsigned(), &strippedState); err != nil {
 		// just warn, they may not have added any.
 		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
 	}

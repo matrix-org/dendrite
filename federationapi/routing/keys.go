@@ -41,7 +41,7 @@ func QueryDeviceKeys(
 	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.KeyInternalAPI, thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	var qkr queryKeysRequest
-	err := json.Unmarshal(request.Content(), &qkr)
+	err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(request.Content(), &qkr)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -87,7 +87,7 @@ func ClaimOneTimeKeys(
 	httpReq *http.Request, request *gomatrixserverlib.FederationRequest, keyAPI api.KeyInternalAPI, thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	var cor claimOTKsRequest
-	err := json.Unmarshal(request.Content(), &cor)
+	err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(request.Content(), &cor)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -157,7 +157,7 @@ func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserver
 		}
 	}
 
-	toSign, err := json.Marshal(keys.ServerKeyFields)
+	toSign, err := json.ConfigCompatibleWithStandardLibrary.Marshal(keys.ServerKeyFields)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func NotaryKeys(
 			continue
 		}
 
-		j, err := json.Marshal(keys)
+		j, err := json.ConfigCompatibleWithStandardLibrary.Marshal(keys)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
 			return jsonerror.InternalServerError()

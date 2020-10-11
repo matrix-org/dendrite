@@ -480,7 +480,7 @@ func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	// If there is then unmarshal it into the response. This will contain the
 	// partial room state such as join rules, room name etc.
 	if inviteRoomState := gjson.GetBytes(event.Unsigned(), "invite_room_state"); inviteRoomState.Exists() {
-		_ = json.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
+		_ = json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(inviteRoomState.Raw), &res.InviteState.Events)
 	}
 
 	// Then we'll see if we can create a partial of the invite event itself.
@@ -488,7 +488,7 @@ func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	format, _ := event.RoomVersion.EventFormat()
 	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), format)
 	inviteEvent.Unsigned = nil
-	if ev, err := json.Marshal(inviteEvent); err == nil {
+	if ev, err := json.ConfigCompatibleWithStandardLibrary.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)
 	}
 

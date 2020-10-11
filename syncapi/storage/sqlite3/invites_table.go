@@ -100,7 +100,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 	}
 
 	var headeredJSON []byte
-	headeredJSON, err = json.Marshal(inviteEvent)
+	headeredJSON, err = json.ConfigCompatibleWithStandardLibrary.Marshal(inviteEvent)
 	if err != nil {
 		return
 	}
@@ -161,7 +161,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 		}
 
 		var event gomatrixserverlib.HeaderedEvent
-		if err := json.Unmarshal(eventJSON, &event); err != nil {
+		if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal(eventJSON, &event); err != nil {
 			return nil, nil, err
 		}
 		if deleted {

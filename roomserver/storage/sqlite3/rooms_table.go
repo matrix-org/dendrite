@@ -138,7 +138,7 @@ func (s *roomStatements) SelectRoomInfo(ctx context.Context, roomID string) (*ty
 		return nil, err
 	}
 	var latestNIDs []int64
-	if err = json.Unmarshal([]byte(latestNIDsJSON), &latestNIDs); err != nil {
+	if err = json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(latestNIDsJSON), &latestNIDs); err != nil {
 		return nil, err
 	}
 	info.IsStub = len(latestNIDs) == 0
@@ -181,7 +181,7 @@ func (s *roomStatements) SelectLatestEventNIDs(
 	if err != nil {
 		return nil, 0, err
 	}
-	if err := json.Unmarshal([]byte(nidsJSON), &eventNIDs); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(nidsJSON), &eventNIDs); err != nil {
 		return nil, 0, err
 	}
 	return eventNIDs, types.StateSnapshotNID(stateSnapshotNID), nil
@@ -199,7 +199,7 @@ func (s *roomStatements) SelectLatestEventsNIDsForUpdate(
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	if err := json.Unmarshal([]byte(nidsJSON), &eventNIDs); err != nil {
+	if err := json.ConfigCompatibleWithStandardLibrary.Unmarshal([]byte(nidsJSON), &eventNIDs); err != nil {
 		return nil, 0, 0, err
 	}
 	return eventNIDs, types.EventNID(lastEventSentNID), types.StateSnapshotNID(stateSnapshotNID), nil

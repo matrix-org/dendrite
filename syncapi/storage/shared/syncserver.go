@@ -547,7 +547,7 @@ func (d *Database) addTypingDeltaToResponse(
 			ev := gomatrixserverlib.ClientEvent{
 				Type: gomatrixserverlib.MTyping,
 			}
-			ev.Content, err = json.Marshal(map[string]interface{}{
+			ev.Content, err = json.ConfigCompatibleWithStandardLibrary.Marshal(map[string]interface{}{
 				"user_ids": typingUsers,
 			})
 			if err != nil {
@@ -1281,7 +1281,7 @@ func (d *Database) SendToDeviceUpdatesWaiting(
 func (d *Database) StoreNewSendForDeviceMessage(
 	ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
 ) (types.StreamPosition, error) {
-	j, err := json.Marshal(event)
+	j, err := json.ConfigCompatibleWithStandardLibrary.Marshal(event)
 	if err != nil {
 		return streamPos, err
 	}

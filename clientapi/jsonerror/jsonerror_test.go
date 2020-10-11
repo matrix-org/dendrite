@@ -22,7 +22,7 @@ import (
 
 func TestLimitExceeded(t *testing.T) {
 	e := LimitExceeded("too fast", 5000)
-	jsonBytes, err := json.Marshal(&e)
+	jsonBytes, err := json.ConfigCompatibleWithStandardLibrary.Marshal(&e)
 	if err != nil {
 		t.Fatalf("TestLimitExceeded: Failed to marshal LimitExceeded error. %s", err.Error())
 	}
@@ -34,7 +34,7 @@ func TestLimitExceeded(t *testing.T) {
 
 func TestForbidden(t *testing.T) {
 	e := Forbidden("you shall not pass")
-	jsonBytes, err := json.Marshal(&e)
+	jsonBytes, err := json.ConfigCompatibleWithStandardLibrary.Marshal(&e)
 	if err != nil {
 		t.Fatalf("TestForbidden: Failed to marshal Forbidden error. %s", err.Error())
 	}
