@@ -36,18 +36,18 @@ CREATE TABLE IF NOT EXISTS roomserver_receipts (
 	event_id TEXT NOT NULL,
 	receipt_ts BIGINT NOT NULL,
 
-	CONSTRAINT roomserver_receipts_unique UNIQUE (room_id, receipt_type, user_id, event_id)
+	CONSTRAINT roomserver_receipts_unique UNIQUE (room_id, receipt_type, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS roomserver_receipts_user_id ON roomserver_receipts(user_id);
+CREATE INDEX IF NOT EXISTS roomserver_receipts_user_id ON roomserver_receipts(room_id);
 `
 
 const upsertReceipt = "" +
 	"INSERT INTO roomserver_receipts" +
 	" (room_id, receipt_type, user_id, event_id, receipt_ts)" +
 	" VALUES ($1, $2, $3, $4, $5)" +
-	" ON CONFLICT (room_id, receipt_type, user_id, event_id)" +
-	" DO UPDATE SET receipt_ts = $5"
+	" ON CONFLICT (room_id, receipt_type, user_id)" +
+	" DO UPDATE SET event_id = $4, receipt_ts = $5"
 
 type receiptStatements struct {
 	db            *sql.DB
