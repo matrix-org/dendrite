@@ -479,8 +479,6 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 	backwardsExtremity := &newEvents[0]
 	newEvents = newEvents[1:]
 
-	fmt.Println(len(newEvents), "new events")
-
 	// at this point we know we're going to have a gap: we need to work out the room state at the new backwards extremity.
 	// Therefore, we cannot just query /state_ids with this event to get the state before. Instead, we need to query
 	// the state AFTER all the prev_events for this event, then apply state resolution to that to get the state before the event.
@@ -524,7 +522,6 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 		t.haveEventIDs(),
 	)
 	if err != nil {
-		fmt.Println("Failed to SendEventWithState")
 		return fmt.Errorf("api.SendEventWithState: %w", err)
 	}
 
@@ -536,7 +533,6 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 	for i, newEvent := range newEvents {
 		headeredNewEvents[i] = newEvent.Headered(roomVersion)
 	}
-	fmt.Println("Headered events:", len(headeredNewEvents))
 	if err = api.SendEvents(
 		context.Background(),
 		t.rsAPI,
@@ -546,7 +542,6 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 	); err != nil {
 		return fmt.Errorf("api.SendEvents: %w", err)
 	}
-	fmt.Println("SUCCESS!")
 
 	return nil
 }
