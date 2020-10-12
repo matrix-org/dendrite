@@ -224,10 +224,6 @@ func (s *ServerKeyAPI) handleFetcherKeys(
 
 	// Now let's look at the results that we got from this fetcher.
 	for req, res := range fetcherResults {
-		if req.ServerName == s.ServerName {
-			continue
-		}
-
 		if prev, ok := results[req]; ok {
 			// We've already got a previous entry for this request
 			// so let's see if the newly retrieved one contains a more
