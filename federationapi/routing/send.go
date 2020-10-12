@@ -369,20 +369,19 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event) er
 		return roomNotFoundError{e.RoomID()}
 	}
 
+	// We will need to know this when fetching missing auth or prev events.
+	t.servers = []gomatrixserverlib.ServerName{t.Origin}
+	serverReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID: e.RoomID(),
+	}
+	serverRes := &api.QueryServerJoinedToRoomResponse{}
+	if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
+		t.servers = append(t.servers, serverRes.ServerNames...)
+		logger.Infof("Found %d server(s) to query for missing events", len(t.servers))
+	}
+
 	if len(stateResp.MissingAuthEventIDs) > 0 {
 		logger.Infof("Event refers to %d unknown auth_events", len(stateResp.MissingAuthEventIDs))
-
-		if len(t.servers) == 0 {
-			t.servers = []gomatrixserverlib.ServerName{t.Origin}
-			serverReq := &api.QueryServerJoinedToRoomRequest{
-				RoomID: e.RoomID(),
-			}
-			serverRes := &api.QueryServerJoinedToRoomResponse{}
-			if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
-				t.servers = append(t.servers, serverRes.ServerNames...)
-				logger.Infof("Found %d server(s) to query for missing events", len(t.servers))
-			}
-		}
 
 		if err := t.retrieveMissingAuthEvents(ctx, e, &stateResp); err != nil {
 			return fmt.Errorf("t.retrieveMissingAuthEvents: %w", err)
