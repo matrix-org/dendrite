@@ -993,25 +993,27 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 			return &queryRes.Events[0], nil
 		}
 	}
-	var pdu json.RawMessage
+	var event gomatrixserverlib.Event
+	found := false
 	for _, serverName := range t.servers {
 		txn, err := t.federation.GetEvent(ctx, serverName, missingEventID)
 		if err != nil || len(txn.PDUs) == 0 {
 			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warn("Failed to get missing /event for event ID")
 			continue
 		}
-		pdu = txn.PDUs[0]
+		event, err = gomatrixserverlib.NewEventFromUntrustedJSON(txn.PDUs[0], roomVersion)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warnf("Transaction: Failed to parse event JSON of event")
+			continue
+		}
+		found = true
 		break
 	}
-	if len(pdu) == 0 {
+	if !found {
 		util.GetLogger(ctx).WithField("event_id", missingEventID).Warnf("Failed to get missing /event for event ID from %d server(s)", len(t.servers))
+		return nil, fmt.Errorf("wasn't able to find event via %d server(s)", len(t.servers))
 	}
-	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Failed to parse event JSON of event")
-		return nil, unmarshalError{err}
-	}
-	if err = gomatrixserverlib.VerifyAllEventSignatures(ctx, []gomatrixserverlib.Event{event}, t.keys); err != nil {
+	if err := gomatrixserverlib.VerifyAllEventSignatures(ctx, []gomatrixserverlib.Event{event}, t.keys); err != nil {
 		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}
