@@ -1008,7 +1008,7 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 	}
 	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
+		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Failed to parse event JSON of event")
 		return nil, unmarshalError{err}
 	}
 	if err = gomatrixserverlib.VerifyAllEventSignatures(ctx, []gomatrixserverlib.Event{event}, t.keys); err != nil {
