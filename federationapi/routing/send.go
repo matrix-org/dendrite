@@ -433,7 +433,7 @@ withNextEvent:
 				logger.WithError(err).Warnf("Failed to unmarshal auth event %q", missingAuthEventID)
 				continue withNextServer
 			}
-			if err = t.processEvent(ctx, ev, false); err != nil {
+			if err = t.processEvent(ctx, ev); err != nil {
 				return fmt.Errorf("recursive t.processEvent: %w", err)
 			}
 			delete(missingAuthEvents, missingAuthEventID)
