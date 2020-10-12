@@ -962,26 +962,22 @@ func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, even
 func (t *txnReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib.RespStateIDs) (
 	*gomatrixserverlib.RespState, error) {
 	// create a RespState response using the response to /state_ids as a guide
-	respState := gomatrixserverlib.RespState{
-		AuthEvents:  make([]gomatrixserverlib.Event, len(stateIDs.AuthEventIDs)),
-		StateEvents: make([]gomatrixserverlib.Event, len(stateIDs.StateEventIDs)),
-	}
+	respState := gomatrixserverlib.RespState{}
 
 	for i := range stateIDs.StateEventIDs {
 		ev, ok := t.haveEvents[stateIDs.StateEventIDs[i]]
 		if !ok {
 			return nil, fmt.Errorf("missing state event %s", stateIDs.StateEventIDs[i])
 		}
-		respState.StateEvents[i] = ev.Unwrap()
+		respState.StateEvents = append(respState.StateEvents, ev.Unwrap())
 	}
 	for i := range stateIDs.AuthEventIDs {
 		ev, ok := t.haveEvents[stateIDs.AuthEventIDs[i]]
 		if !ok {
-			//return nil, fmt.Errorf("missing auth event %s", stateIDs.AuthEventIDs[i])
-			logrus.Warnf("Missing auth event in createRespStateFromStateIDs:", stateIDs.AuthEventIDs[i])
+			logrus.Warnf("Missing auth event in createRespStateFromStateIDs: %s", stateIDs.AuthEventIDs[i])
 			continue
 		}
-		respState.AuthEvents[i] = ev.Unwrap()
+		respState.AuthEvents = append(respState.AuthEvents, ev.Unwrap())
 	}
 	// We purposefully do not do auth checks on the returned events, as they will still
 	// be processed in the exact same way, just as a 'rejected' event
