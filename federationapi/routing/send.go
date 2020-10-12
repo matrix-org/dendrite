@@ -573,7 +573,7 @@ func (t *txnReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrix
 
 	respState, err := t.lookupStateBeforeEvent(ctx, roomVersion, roomID, eventID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("t.lookupStateBeforeEvent: %w", err)
 	}
 
 	// fetch the event we're missing and add it to the pile
@@ -584,7 +584,7 @@ func (t *txnReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrix
 	case nil:
 		// do nothing
 	default:
-		return nil, err
+		return nil, fmt.Errorf("t.lookupEvent: %w", err)
 	}
 	t.haveEvents[h.EventID()] = h
 	if h.StateKey() != nil {
@@ -993,14 +993,20 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 			return &queryRes.Events[0], nil
 		}
 	}
-	txn, err := t.federation.GetEvent(ctx, t.Origin, missingEventID)
-	if err != nil || len(txn.PDUs) == 0 {
-		util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warn("failed to get missing /event for event ID")
-		return nil, err
+	var pdu json.RawMessage
+	for _, serverName := range t.servers {
+		txn, err := t.federation.GetEvent(ctx, serverName, missingEventID)
+		if err != nil || len(txn.PDUs) == 0 {
+			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warn("Failed to get missing /event for event ID")
+			continue
+		}
+		pdu = txn.PDUs[0]
+		break
 	}
-	pdu := txn.PDUs[0]
-	var event gomatrixserverlib.Event
-	event, err = gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
+	if len(pdu) == 0 {
+		util.GetLogger(ctx).WithField("event_id", missingEventID).Warnf("Failed to get missing /event for event ID from %d server(s)", len(t.servers))
+	}
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(pdu, roomVersion)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %q", event.EventID())
 		return nil, unmarshalError{err}
