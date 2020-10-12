@@ -960,14 +960,15 @@ func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, even
 }
 
 func (t *txnReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib.RespStateIDs) (
-	*gomatrixserverlib.RespState, error) {
+	*gomatrixserverlib.RespState, error) { // nolint:unparam
 	// create a RespState response using the response to /state_ids as a guide
 	respState := gomatrixserverlib.RespState{}
 
 	for i := range stateIDs.StateEventIDs {
 		ev, ok := t.haveEvents[stateIDs.StateEventIDs[i]]
 		if !ok {
-			return nil, fmt.Errorf("missing state event %s", stateIDs.StateEventIDs[i])
+			logrus.Warnf("Missing state event in createRespStateFromStateIDs: %s", stateIDs.StateEventIDs[i])
+			continue
 		}
 		respState.StateEvents = append(respState.StateEvents, ev.Unwrap())
 	}
