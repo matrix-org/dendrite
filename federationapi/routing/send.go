@@ -421,10 +421,14 @@ func (t *txnReq) retrieveMissingAuthEvents(
 		missingAuthEvents[missingAuthEventID] = struct{}{}
 	}
 
+	numServers := len(t.servers)
+	if numServers > 5 {
+		numServers = 5
+	}
 withNextEvent:
 	for missingAuthEventID := range missingAuthEvents {
 	withNextServer:
-		for _, server := range append([]gomatrixserverlib.ServerName{t.Origin}, t.servers...) {
+		for _, server := range append([]gomatrixserverlib.ServerName{t.Origin}, t.servers[:numServers]...) {
 			logger.Infof("Retrieving missing auth event %q from %q", missingAuthEventID, server)
 			tx, err := t.federation.GetEvent(ctx, server, missingAuthEventID)
 			if err != nil {
@@ -973,7 +977,9 @@ func (t *txnReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib.RespStat
 	for i := range stateIDs.AuthEventIDs {
 		ev, ok := t.haveEvents[stateIDs.AuthEventIDs[i]]
 		if !ok {
-			return nil, fmt.Errorf("missing auth event %s", stateIDs.AuthEventIDs[i])
+			//return nil, fmt.Errorf("missing auth event %s", stateIDs.AuthEventIDs[i])
+			logrus.Warnf("Missing auth event in createRespStateFromStateIDs:", stateIDs.AuthEventIDs[i])
+			continue
 		}
 		respState.AuthEvents[i] = ev.Unwrap()
 	}
@@ -998,7 +1004,11 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 	}
 	var event gomatrixserverlib.Event
 	found := false
-	for _, serverName := range append([]gomatrixserverlib.ServerName{t.Origin}, t.servers...) {
+	numServers := len(t.servers)
+	if numServers > 5 {
+		numServers = 5
+	}
+	for _, serverName := range append([]gomatrixserverlib.ServerName{t.Origin}, t.servers[:numServers]...) {
 		txn, err := t.federation.GetEvent(ctx, serverName, missingEventID)
 		if err != nil || len(txn.PDUs) == 0 {
 			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warn("Failed to get missing /event for event ID")
