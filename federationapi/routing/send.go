@@ -183,7 +183,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 
 	// Process the events.
 	for _, e := range pdus {
-		if err := t.processEvent(ctx, e.Unwrap(), true); err != nil {
+		if err := t.processEvent(ctx, e.Unwrap()); err != nil {
 			// If the error is due to the event itself being bad then we skip
 			// it and move onto the next event. We report an error so that the
 			// sender knows that we have skipped processing it.
@@ -338,7 +338,7 @@ func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverli
 	}
 }
 
-func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, isInboundTxn bool) error {
+func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event) error {
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
 
 	// Work out if the roomserver knows everything it needs to know to auth
@@ -414,7 +414,7 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event, is
 
 	if len(stateResp.MissingPrevEventIDs) > 0 {
 		logger.Infof("Event refers to %d unknown prev_events", len(stateResp.MissingPrevEventIDs))
-		return t.processEventWithMissingState(ctx, e, stateResp.RoomVersion, isInboundTxn)
+		return t.processEventWithMissingState(ctx, e, stateResp.RoomVersion)
 	}
 
 	// pass the event to the roomserver which will do auth checks
@@ -442,7 +442,7 @@ func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserver
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
-func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion, isInboundTxn bool) error {
+func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) error {
 	// Do this with a fresh context, so that we keep working even if the
 	// original request times out. With any luck, by the time the remote
 	// side retries, we'll have fetched the missing state.
