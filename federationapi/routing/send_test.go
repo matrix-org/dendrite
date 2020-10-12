@@ -349,6 +349,10 @@ func (t *testRoomserverAPI) QueryServerBannedFromRoom(ctx context.Context, req *
 	return nil
 }
 
+func (t *testRoomserverAPI) PerformUserReceiptUpdate(ctx context.Context, req *api.PerformUserReceiptUpdateRequest, res *api.PerformUserReceiptUpdateResponse) error {
+	return nil
+}
+
 type txnFedClient struct {
 	state            map[string]gomatrixserverlib.RespState    // event_id to response
 	stateIDs         map[string]gomatrixserverlib.RespStateIDs // event_id to response
