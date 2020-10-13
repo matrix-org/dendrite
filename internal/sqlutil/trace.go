@@ -93,7 +93,7 @@ func trackGoID(query string) {
 	if strings.HasPrefix(q, "SELECT") {
 		return // SELECTs can go on other goroutines
 	}
-	logrus.Warnf("unsafe goid: SQL executed not on an ExclusiveWriter: %s", q)
+	logrus.Warnf("unsafe goid %d: SQL executed not on an ExclusiveWriter: %s", thisGoID, q)
 }
 
 // Open opens a database specified by its database driver name and a driver-specific data source name,
