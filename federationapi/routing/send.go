@@ -380,7 +380,6 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event) er
 
 	if len(stateResp.MissingAuthEventIDs) > 0 {
 		logger.Infof("Event refers to %d unknown auth_events", len(stateResp.MissingAuthEventIDs))
-
 		getServers()
 		if err := t.retrieveMissingAuthEvents(ctx, e, &stateResp); err != nil {
 			return fmt.Errorf("t.retrieveMissingAuthEvents: %w", err)
@@ -436,8 +435,16 @@ withNextEvent:
 				logger.WithError(err).Warnf("Failed to unmarshal auth event %q", missingAuthEventID)
 				continue withNextServer
 			}
-			if err = t.processEvent(ctx, ev); err != nil {
-				return fmt.Errorf("recursive t.processEvent: %w", err)
+			if err = api.SendEvents(
+				context.Background(),
+				t.rsAPI,
+				[]gomatrixserverlib.HeaderedEvent{
+					ev.Headered(stateResp.RoomVersion),
+				},
+				api.DoNotSendToOtherServers,
+				nil,
+			); err != nil {
+				return fmt.Errorf("api.SendEvents: %w", err)
 			}
 			delete(missingAuthEvents, missingAuthEventID)
 			continue withNextEvent
