@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sqlite3
+package postgres
 
 import (
 	"context"
@@ -29,7 +29,7 @@ const receiptsSchema = `
 -- Stores data about receipts
 CREATE TABLE IF NOT EXISTS roomserver_receipts (
 	-- The ID
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	id INTEGER PRIMARY KEY,
 	room_id TEXT NOT NULL,
 	receipt_type TEXT NOT NULL,
 	user_id TEXT NOT NULL,
@@ -54,7 +54,7 @@ type receiptStatements struct {
 	upsertReceipt *sql.Stmt
 }
 
-func NewSqliteReceiptsTable(db *sql.DB) (tables.Receipts, error) {
+func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 	_, err := db.Exec(receiptsSchema)
 	if err != nil {
 		return nil, err

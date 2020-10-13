@@ -97,6 +97,10 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	if err != nil {
 		return nil, err
 	}
+	receipts, err := NewPostgresReceiptsTable(db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  db,
 		Cache:               cache,
@@ -115,6 +119,7 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 		MembershipTable:     membership,
 		PublishedTable:      published,
 		RedactionsTable:     redactions,
+		ReceiptsTable:       receipts,
 	}
 	return &d, nil
 }
