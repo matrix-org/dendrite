@@ -196,6 +196,11 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
 	}
 
+	// No longer reuse the request context from this point forward.
+	// We don't want the client timing out to interrupt the join.
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(context.Background())
+
 	// Try to perform a send_join using the newly built event.
 	respSendJoin, err := r.federation.SendJoin(
 		ctx,
@@ -205,11 +210,16 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	)
 	if err != nil {
 		r.statistics.ForServer(serverName).Failure()
+		cancel()
 		return fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
 	r.statistics.ForServer(serverName).Success()
+
+	// Sanity-check the join response to ensure that it has a create
+	// event, that the room version is known, etc.
 	if err := sanityCheckSendJoinResponse(respSendJoin); err != nil {
-		return err
+		cancel()
+		return fmt.Errorf("sanityCheckSendJoinResponse: %w", err)
 	}
 
 	// Process the join response in a goroutine. The idea here is
@@ -217,8 +227,6 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// to complete, but if the client does give up waiting, we'll
 	// still continue to process the join anyway so that we don't
 	// waste the effort.
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(context.Background())
 	go func() {
 		defer cancel()
 
