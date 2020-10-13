@@ -416,38 +416,13 @@ func (t *txnReq) retrieveMissingAuthEvents(
 	if len(servers) > 5 {
 		servers = servers[:5]
 	}
-withNextEvent:
+
 	for missingAuthEventID := range missingAuthEvents {
-	withNextServer:
-		for _, server := range servers {
-			logger.Infof("Retrieving missing auth event %q from %q", missingAuthEventID, server)
-			tx, err := t.federation.GetEvent(ctx, server, missingAuthEventID)
-			if err != nil {
-				logger.WithError(err).Warnf("Failed to retrieve auth event %q", missingAuthEventID)
-				continue withNextServer
-			}
-			ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(tx.PDUs[0], stateResp.RoomVersion)
-			if err != nil {
-				logger.WithError(err).Warnf("Failed to unmarshal auth event %q", missingAuthEventID)
-				continue withNextServer
-			}
-			if err = api.SendInputRoomEvents(
-				context.Background(),
-				t.rsAPI,
-				[]api.InputRoomEvent{
-					{
-						Kind:         api.KindOutlier,
-						Event:        ev.Headered(stateResp.RoomVersion),
-						AuthEventIDs: ev.AuthEventIDs(),
-						SendAsServer: api.DoNotSendToOtherServers,
-					},
-				},
-			); err != nil {
-				return fmt.Errorf("api.SendEvents: %w", err)
-			}
-			delete(missingAuthEvents, missingAuthEventID)
-			continue withNextEvent
+		if _, err := t.lookupEvent(ctx, stateResp.RoomVersion, missingAuthEventID, true, servers); err != nil {
+			logger.WithError(err).Warnf("Failed to retrieve auth event %q", missingAuthEventID)
+			continue
 		}
+		delete(missingAuthEvents, missingAuthEventID)
 	}
 
 	if missing := len(missingAuthEvents); missing > 0 {
@@ -1041,6 +1016,20 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 		return nil, verifySigError{event.EventID(), err}
 	}
 	h := event.Headered(roomVersion)
+	if err := api.SendInputRoomEvents(
+		context.Background(),
+		t.rsAPI,
+		[]api.InputRoomEvent{
+			{
+				Kind:         api.KindOutlier,
+				Event:        h,
+				AuthEventIDs: h.AuthEventIDs(),
+				SendAsServer: api.DoNotSendToOtherServers,
+			},
+		},
+	); err != nil {
+		return nil, fmt.Errorf("api.SendInputRoomEvents: %w", err)
+	}
 	t.newEvents[h.EventID()] = true
 	return &h, nil
 }
