@@ -22,12 +22,21 @@ func NewMembershipUpdater(
 	ctx context.Context, d *Database, txn *sql.Tx, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
 ) (*MembershipUpdater, error) {
-	roomNID, err := d.assignRoomNID(ctx, txn, roomID, roomVersion)
-	if err != nil {
-		return nil, err
-	}
+	var roomNID types.RoomNID
+	var targetUserNID types.EventStateKeyNID
+	var err error
+	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+		roomNID, err = d.assignRoomNID(ctx, txn, roomID, roomVersion)
+		if err != nil {
+			return err
+		}
 
-	targetUserNID, err := d.assignStateKeyNID(ctx, txn, targetUserID)
+		targetUserNID, err = d.assignStateKeyNID(ctx, txn, targetUserID)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
