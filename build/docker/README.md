@@ -38,21 +38,38 @@ go run github.com/matrix-org/dendrite/cmd/generate-keys \
   --tls-key=server.key
 ```
 
-## Starting Dendrite
+## Starting Dendrite as a monolith deployment
 
-Once in place, start the dependencies:
+Create your config based on the `dendrite.yaml` configuration file in the `docker/config`
+folder in the [Dendrite repository](https://github.com/matrix-org/dendrite). Additionally,
+make the following changes to the configuration:
+
+- Enable Naffka: `use_naffka: true`
+
+Once in place, start the PostgreSQL dependency:
 
 ```
-docker-compose -f docker-compose.deps.yml up
+docker-compose -f docker-compose.deps.yml up postgres
 ```
 
-Wait a few seconds for Kafka and Postgres to finish starting up, and then start a monolith:
+Wait a few seconds for PostgreSQL to finish starting up, and then start a monolith:
 
 ```
 docker-compose -f docker-compose.monolith.yml up
 ```
 
-... or start the polylith components:
+## Starting Dendrite as a polylith deployment
+
+Create your config based on the `dendrite.yaml` configuration file in the `docker/config`
+folder in the [Dendrite repository](https://github.com/matrix-org/dendrite).
+
+Once in place, start all the dependencies:
+
+```
+docker-compose -f docker-compose.deps.yml up
+```
+
+Wait a few seconds for PostgreSQL and Kafka to finish starting up, and then start a polylith:
 
 ```
 docker-compose -f docker-compose.polylith.yml up

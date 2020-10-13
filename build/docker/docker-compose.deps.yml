@@ -6,6 +6,9 @@ services:
     restart: always
     volumes:
       - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
+    # To persist your PostgreSQL databases outside of the Docker image, to 
+    # prevent data loss, you will need to add something like this:
+    #  - ./path/to/persistent/storage:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: itsasecret
       POSTGRES_USER: dendrite
