@@ -53,6 +53,7 @@ const (
 	RoomserverQuerySharedUsersPath             = "/roomserver/querySharedUsers"
 	RoomserverQueryKnownUsersPath              = "/roomserver/queryKnownUsers"
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
+	RoomserverQueryRoomReceiptsPath            = "/roomserver/queryRoomReceipts"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -503,5 +504,17 @@ func (h *httpRoomserverInternalAPI) PerformUserReceiptUpdate(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformReceiptUpdatePath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) QueryRoomReceipts(
+	ctx context.Context,
+	req *api.QueryRoomReceiptRequest,
+	res *api.QueryRoomReceiptResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "RoomserverQueryRoomReceiptsPath")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryRoomReceiptsPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

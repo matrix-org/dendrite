@@ -155,3 +155,11 @@ func (r *RoomserverInternalAPI) PerformUserReceiptUpdate(
 ) error {
 	return r.Receipter.PerformUserReceiptUpdate(ctx, req, res)
 }
+
+func (r *RoomserverInternalAPI) QueryRoomReceipts(
+	ctx context.Context,
+	req *api.QueryRoomReceiptRequest,
+	res *api.QueryRoomReceiptResponse,
+) error {
+	return r.Receipter.QueryRoomReceipts(ctx, req, res)
+}

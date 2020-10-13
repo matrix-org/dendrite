@@ -685,3 +685,16 @@ func (r *Queryer) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryS
 	res.Banned = r.ServerACLs.IsServerBannedFromRoom(req.ServerName, req.RoomID)
 	return nil
 }
+
+func (r *Queryer) QueryRoomReceipts(
+	ctx context.Context,
+	req *api.QueryRoomReceiptRequest,
+	res *api.QueryRoomReceiptResponse,
+) error {
+	receipts, err := r.DB.GetRoomReceipts(ctx, req.RoomID, req.TS)
+	if err != nil {
+		return err
+	}
+	res.Receipts = receipts
+	return nil
+}
