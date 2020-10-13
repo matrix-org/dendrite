@@ -19,10 +19,10 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/pkg/errors"
 )
 
 const receiptsSchema = `
@@ -49,9 +49,15 @@ const upsertReceipt = "" +
 	" ON CONFLICT (room_id, receipt_type, user_id)" +
 	" DO UPDATE SET event_id = $4, receipt_ts = $5"
 
+const selectRoomReceipts = "" +
+	"SELECT id, room_id, receipt_type, user_id, event_id, receipt_ts" +
+	" FROM roomserver_receipts" +
+	" WHERE room_id = $1 AND receipt_ts > $2"
+
 type receiptStatements struct {
-	db            *sql.DB
-	upsertReceipt *sql.Stmt
+	db                 *sql.DB
+	upsertReceipt      *sql.Stmt
+	selectRoomReceipts *sql.Stmt
 }
 
 func NewSqliteReceiptsTable(db *sql.DB) (tables.Receipts, error) {
@@ -65,13 +71,37 @@ func NewSqliteReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 	if r.upsertReceipt, err = db.Prepare(upsertReceipt); err != nil {
 		return nil, errors.Wrap(err, "unable to prepare upsertReceipt statement")
 	}
-
+	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
+		return nil, errors.Wrap(err, "unable to prepare selectRoomReceipts statement")
+	}
 	return r, nil
 }
 
+// UpsertReceipt creates new user receipts
 func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string) error {
 	receiptTs := time.Now().UnixNano() / int64(time.Millisecond)
 	stmt := sqlutil.TxStmt(txn, r.upsertReceipt)
 	_, err := stmt.ExecContext(ctx, roomId, receiptType, userId, eventId, receiptTs)
 	return err
+}
+
+// SelectRoomReceiptsAfter select all receipts for a given room after a specific timestamp
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomId string, timestamp int) ([]types.Receipt, error) {
+	rows, err := r.selectRoomReceipts.QueryContext(ctx, roomId, timestamp)
+	if err != nil {
+		return []types.Receipt{}, errors.Wrap(err, "unable to query room receipts")
+	}
+	var res []types.Receipt
+	for rows.Next() {
+		r := types.Receipt{}
+		err = rows.Scan(&r.ID, &r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.TS)
+		if err != nil {
+			return res, errors.Wrap(err, "unable to scan row to types.Receipts")
+		}
+		res = append(res, r)
+	}
+	if rows.Err() != nil {
+		return res, errors.Wrap(err, "error while scanning rows")
+	}
+	return res, rows.Close()
 }

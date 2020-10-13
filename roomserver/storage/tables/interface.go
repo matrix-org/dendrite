@@ -204,4 +204,5 @@ func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
 
 type Receipts interface {
 	UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string) error
+	SelectRoomReceiptsAfter(ctx context.Context, roomId string, timestamp int) ([]types.Receipt, error)
 }

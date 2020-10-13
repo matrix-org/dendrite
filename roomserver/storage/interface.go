@@ -158,5 +158,6 @@ type Database interface {
 	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
 	// GetKnownRooms returns a list of all rooms we know about.
 	GetKnownRooms(ctx context.Context) ([]string, error)
-	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string) error
+	StoreReceipt(ctx context.Context, roomID, receiptType, userID, eventID string) error
+	GetRoomReceipts(ctx context.Context, roomID string, timestamp int) ([]types.Receipt, error)
 }

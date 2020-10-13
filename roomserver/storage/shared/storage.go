@@ -1031,3 +1031,7 @@ func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId
 		return d.ReceiptsTable.UpsertReceipt(ctx, txn, roomId, receiptType, userId, eventId)
 	})
 }
+
+func (d *Database) GetRoomReceipts(ctx context.Context, roomId string, timestamp int) ([]types.Receipt, error) {
+	return d.ReceiptsTable.SelectRoomReceiptsAfter(ctx, roomId, timestamp)
+}
