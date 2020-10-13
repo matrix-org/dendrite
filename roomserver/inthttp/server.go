@@ -427,4 +427,17 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(RoomserverPerformReceiptUpdatePath,
+		httputil.MakeInternalAPI("performReceiptUpdate", func(req *http.Request) util.JSONResponse {
+			request := api.PerformUserReceiptUpdateRequest{}
+			response := api.PerformUserReceiptUpdateResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.PerformUserReceiptUpdate(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

@@ -150,7 +150,7 @@ func (r *RoomserverInternalAPI) PerformLeave(
 
 func (r *RoomserverInternalAPI) PerformUserReceiptUpdate(
 	ctx context.Context,
-	req *api.PerformUserReceiptUpdate,
+	req *api.PerformUserReceiptUpdateRequest,
 	res *api.PerformUserReceiptUpdateResponse,
 ) error {
 	return r.Receipter.PerformUserReceiptUpdate(ctx, req, res)

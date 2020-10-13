@@ -315,10 +315,10 @@ func js(thing interface{}) string {
 
 func (t *RoomserverInternalAPITrace) PerformUserReceiptUpdate(
 	ctx context.Context,
-	req *PerformUserReceiptUpdate,
+	req *PerformUserReceiptUpdateRequest,
 	res *PerformUserReceiptUpdateResponse,
 ) error {
 	err := t.Impl.PerformUserReceiptUpdate(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("PerformUserReceiptUpdate req=%+v res=%+v", js(req), js(res))
+	util.GetLogger(ctx).WithError(err).Infof("PerformUserReceiptUpdateRequest req=%+v res=%+v", js(req), js(res))
 	return err
 }

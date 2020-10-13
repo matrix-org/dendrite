@@ -30,7 +30,7 @@ func SetReceipt(req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI, de
 		"eventId":     eventId,
 		"userId":      device.UserID,
 	}).Debug("Setting receipt")
-	userReq := &roomserverAPI.PerformUserReceiptUpdate{
+	userReq := &roomserverAPI.PerformUserReceiptUpdateRequest{
 		RoomID:      roomId,
 		ReceiptType: receiptType,
 		EventID:     eventId,

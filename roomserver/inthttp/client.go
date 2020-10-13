@@ -496,10 +496,10 @@ func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
 
 func (h *httpRoomserverInternalAPI) PerformUserReceiptUpdate(
 	ctx context.Context,
-	req *api.PerformUserReceiptUpdate,
+	req *api.PerformUserReceiptUpdateRequest,
 	res *api.PerformUserReceiptUpdateResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUserReceiptUpdate")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUserReceiptUpdateRequest")
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformReceiptUpdatePath

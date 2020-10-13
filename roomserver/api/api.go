@@ -196,5 +196,5 @@ type RoomserverInternalAPI interface {
 		response *RemoveRoomAliasResponse,
 	) error
 
-	PerformUserReceiptUpdate(ctx context.Context, req *PerformUserReceiptUpdate, res *PerformUserReceiptUpdateResponse) error
+	PerformUserReceiptUpdate(ctx context.Context, req *PerformUserReceiptUpdateRequest, res *PerformUserReceiptUpdateResponse) error
 }

@@ -11,6 +11,6 @@ type Receipter struct {
 	DB storage.Database
 }
 
-func (r *Receipter) PerformUserReceiptUpdate(ctx context.Context, req *api.PerformUserReceiptUpdate, res *api.PerformUserReceiptUpdateResponse) error {
+func (r *Receipter) PerformUserReceiptUpdate(ctx context.Context, req *api.PerformUserReceiptUpdateRequest, res *api.PerformUserReceiptUpdateResponse) error {
 	return r.DB.StoreReceipt(ctx, req.RoomID, req.ReceiptType, req.UserID, req.EventID)
 }

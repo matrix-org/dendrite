@@ -1,6 +1,6 @@
 package api
 
-type PerformUserReceiptUpdate struct {
+type PerformUserReceiptUpdateRequest struct {
 	RoomID      string
 	ReceiptType string
 	EventID     string
