@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -400,4 +401,13 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 		}] = v
 	}
 	return nil
+}
+
+type QueryRoomReceiptRequest struct {
+	RoomID string `json:"room_id"`
+	TS     int    `json:"ts"`
+}
+
+type QueryRoomReceiptResponse struct {
+	Receipts []types.Receipt `json:"receipts"`
 }

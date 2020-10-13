@@ -322,3 +322,9 @@ func (t *RoomserverInternalAPITrace) PerformUserReceiptUpdate(
 	util.GetLogger(ctx).WithError(err).Infof("PerformUserReceiptUpdateRequest req=%+v res=%+v", js(req), js(res))
 	return err
 }
+
+func (t *RoomserverInternalAPITrace) QueryRoomReceipts(ctx context.Context, req *QueryRoomReceiptRequest, res *QueryRoomReceiptResponse) error {
+	err := t.Impl.QueryRoomReceipts(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryRoomReceiptRequest req=%+v res=%+v", js(req), js(res))
+	return err
+}
