@@ -84,6 +84,10 @@ type testRoomserverAPI struct {
 	queryLatestEventsAndState  func(*api.QueryLatestEventsAndStateRequest) api.QueryLatestEventsAndStateResponse
 }
 
+func (t *testRoomserverAPI) QueryRoomReceipts(ctx context.Context, req *api.QueryRoomReceiptRequest, res *api.QueryRoomReceiptResponse) error {
+	return nil
+}
+
 func (t *testRoomserverAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {}
 
 func (t *testRoomserverAPI) InputRoomEvents(
