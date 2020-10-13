@@ -248,9 +248,6 @@ func isProcessingErrorFatal(err error) bool {
 type roomNotFoundError struct {
 	roomID string
 }
-type unmarshalError struct {
-	err error
-}
 type verifySigError struct {
 	eventID string
 	err     error
@@ -261,7 +258,6 @@ type missingPrevEventsError struct {
 }
 
 func (e roomNotFoundError) Error() string { return fmt.Sprintf("room %q not found", e.roomID) }
-func (e unmarshalError) Error() string    { return fmt.Sprintf("unable to parse event: %s", e.err) }
 func (e verifySigError) Error() string {
 	return fmt.Sprintf("unable to verify signature of event %q: %s", e.eventID, e.err)
 }

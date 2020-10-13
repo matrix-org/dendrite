@@ -491,7 +491,7 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 		queryMissingAuthPrevEvents: func(req *api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse {
 			return api.QueryMissingAuthPrevEventsResponse{
 				RoomExists:          true,
-				MissingAuthEventIDs: []string{"create_event"},
+				MissingAuthEventIDs: []string{},
 				MissingPrevEventIDs: []string{},
 			}
 		},
