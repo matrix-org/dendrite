@@ -76,7 +76,7 @@ global:
 
     # Naffka database options. Not required when using Kafka.
     naffka_database:
-      connection_string: file:naffka.db
+      connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_naffka?sslmode=disable
       max_open_conns: 100
       max_idle_conns: 2
       conn_max_lifetime: -1
