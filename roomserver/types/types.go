@@ -176,3 +176,12 @@ type RoomInfo struct {
 	StateSnapshotNID StateSnapshotNID
 	IsStub           bool
 }
+
+type Receipt struct {
+	ID      int
+	RoomID  string
+	Type    string
+	UserID  string
+	EventID string
+	TS      int
+}
