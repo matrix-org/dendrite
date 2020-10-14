@@ -508,13 +508,12 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 	// Therefore, we cannot just query /state_ids with this event to get the state before. Instead, we need to query
 	// the state AFTER all the prev_events for this event, then apply state resolution to that to get the state before the event.
 	var states []*gomatrixserverlib.RespState
-	needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{*backwardsExtremity}).Tuples()
 	for _, prevEventID := range backwardsExtremity.PrevEventIDs() {
 		// Look up what the state is after the backward extremity. This will either
 		// come from the roomserver, if we know all the required events, or it will
 		// come from a remote server via /state_ids if not.
 		var prevState *gomatrixserverlib.RespState
-		prevState, err = t.lookupStateAfterEvent(gmectx, roomVersion, backwardsExtremity.RoomID(), prevEventID, needed)
+		prevState, err = t.lookupStateAfterEvent(gmectx, roomVersion, backwardsExtremity.RoomID(), prevEventID)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("Failed to lookup state after prev_event: %s", prevEventID)
 			return err
@@ -573,9 +572,9 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 
 // lookupStateAfterEvent returns the room state after `eventID`, which is the state before eventID with the state of `eventID` (if it's a state event)
 // added into the mix.
-func (t *txnReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string, needed []gomatrixserverlib.StateKeyTuple) (*gomatrixserverlib.RespState, error) {
+func (t *txnReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (*gomatrixserverlib.RespState, error) {
 	// try doing all this locally before we resort to querying federation
-	respState := t.lookupStateAfterEventLocally(ctx, roomID, eventID, needed)
+	respState := t.lookupStateAfterEventLocally(ctx, roomID, eventID)
 	if respState != nil {
 		return respState, nil
 	}
@@ -619,12 +618,11 @@ func (t *txnReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrix
 	return respState, nil
 }
 
-func (t *txnReq) lookupStateAfterEventLocally(ctx context.Context, roomID, eventID string, needed []gomatrixserverlib.StateKeyTuple) *gomatrixserverlib.RespState {
+func (t *txnReq) lookupStateAfterEventLocally(ctx context.Context, roomID, eventID string) *gomatrixserverlib.RespState {
 	var res api.QueryStateAfterEventsResponse
 	err := t.rsAPI.QueryStateAfterEvents(ctx, &api.QueryStateAfterEventsRequest{
 		RoomID:       roomID,
 		PrevEventIDs: []string{eventID},
-		StateToFetch: needed,
 	}, &res)
 	if err != nil || !res.PrevEventsExist {
 		util.GetLogger(ctx).WithError(err).Warnf("failed to query state after %s locally", eventID)
