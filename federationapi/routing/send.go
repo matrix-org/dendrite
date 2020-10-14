@@ -295,7 +295,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				continue
 			}
 			if domain != t.Origin {
-				util.GetLogger(ctx).Warnf("Dropping typing event where sender domain (%d) doesn't match origin (%d)", domain, t.Origin)
+				util.GetLogger(ctx).Warnf("Dropping typing event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
 				continue
 			}
 			if err := eduserverAPI.SendTyping(ctx, t.eduAPI, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
