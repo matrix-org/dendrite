@@ -289,6 +289,15 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal typing event")
 				continue
 			}
+			_, domain, err := gomatrixserverlib.SplitID('@', typingPayload.UserID)
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to split domain from typing event sender")
+				continue
+			}
+			if domain != t.Origin {
+				util.GetLogger(ctx).Warnf("Dropping typing event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
+				continue
+			}
 			if err := eduserverAPI.SendTyping(ctx, t.eduAPI, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to edu server")
 			}
