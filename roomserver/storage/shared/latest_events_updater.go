@@ -22,7 +22,7 @@ func rollback(txn *sql.Tx) {
 	if txn == nil {
 		return
 	}
-	txn.Rollback() // noline: errcheck
+	txn.Rollback() // nolint: errcheck
 }
 
 func NewLatestEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo types.RoomInfo) (*LatestEventsUpdater, error) {
