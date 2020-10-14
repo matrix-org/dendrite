@@ -78,10 +78,19 @@ func (r *Queryer) QueryStateAfterEvents(
 	}
 	response.PrevEventsExist = true
 
-	// Look up the currrent state for the requested tuples.
-	stateEntries, err := roomState.LoadStateAfterEventsForStringTuples(
-		ctx, prevStates, request.StateToFetch,
-	)
+	var stateEntries []types.StateEntry
+	if len(request.StateToFetch) == 0 {
+		// Look up all of the current room state.
+		// TODO: This can return duplicate state-key tuples, is this a problem?
+		stateEntries, err = roomState.LoadCombinedStateAfterEvents(
+			ctx, prevStates,
+		)
+	} else {
+		// Look up the current state for the requested tuples.
+		stateEntries, err = roomState.LoadStateAfterEventsForStringTuples(
+			ctx, prevStates, request.StateToFetch,
+		)
+	}
 	if err != nil {
 		return err
 	}
