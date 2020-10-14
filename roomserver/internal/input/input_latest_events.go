@@ -133,8 +133,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 	// If the event has already been written to the output log then we
 	// don't need to do anything, as we've handled it already.
-	hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID)
-	if err != nil {
+	if hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID); err != nil {
 		return fmt.Errorf("u.updater.HasEventBeenSent: %w", err)
 	} else if hasBeenSent {
 		return nil
@@ -142,17 +141,19 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 	// Work out what the latest events are. This will include the new
 	// event if it is not already referenced.
-	u.calculateLatest(
+	if err := u.calculateLatest(
 		oldLatest,
 		types.StateAtEventAndReference{
 			EventReference: u.event.EventReference(),
 			StateAtEvent:   u.stateAtEvent,
 		},
-	)
+	); err != nil {
+		return fmt.Errorf("u.calculateLatest: %w", err)
+	}
 
 	// Now that we know what the latest events are, it's time to get the
 	// latest state.
-	if err = u.latestState(); err != nil {
+	if err := u.latestState(); err != nil {
 		return fmt.Errorf("u.latestState: %w", err)
 	}
 
@@ -261,7 +262,7 @@ func (u *latestEventsUpdater) latestState() error {
 func (u *latestEventsUpdater) calculateLatest(
 	oldLatest []types.StateAtEventAndReference,
 	newEvent types.StateAtEventAndReference,
-) {
+) error {
 	var newLatest []types.StateAtEventAndReference
 
 	// First of all, let's see if any of the existing forward extremities
@@ -271,6 +272,7 @@ func (u *latestEventsUpdater) calculateLatest(
 		referenced, err := u.updater.IsReferenced(l.EventReference)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", l.EventID)
+			return fmt.Errorf("u.updater.IsReferenced (old): %w", err)
 		} else if !referenced {
 			newLatest = append(newLatest, l)
 		}
@@ -285,7 +287,7 @@ func (u *latestEventsUpdater) calculateLatest(
 			// We've already referenced this new event so we can just return
 			// the newly completed extremities at this point.
 			u.latest = newLatest
-			return
+			return nil
 		}
 	}
 
@@ -296,11 +298,13 @@ func (u *latestEventsUpdater) calculateLatest(
 	referenced, err := u.updater.IsReferenced(newEvent.EventReference)
 	if err != nil {
 		logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", newEvent.EventReference.EventID)
+		return fmt.Errorf("u.updater.IsReferenced (new): %w", err)
 	} else if !referenced || len(newLatest) == 0 {
 		newLatest = append(newLatest, newEvent)
 	}
 
 	u.latest = newLatest
+	return nil
 }
 
 func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error) {
