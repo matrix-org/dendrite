@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -47,6 +48,7 @@ type Database struct {
 	BackwardExtremities tables.BackwardsExtremities
 	SendToDevice        tables.SendToDevice
 	Filter              tables.Filter
+	Receipts            tables.Receipts
 	EDUCache            *cache.EDUCache
 }
 
@@ -563,6 +565,44 @@ func (d *Database) addTypingDeltaToResponse(
 	return nil
 }
 
+func (d *Database) addReceiptDeltaToResponse(since types.StreamPosition, joinedRoomIDs []string, res *types.Response) error {
+	var jr types.JoinResponse
+	// check all joinedRooms for receipts
+	for _, roomID := range joinedRoomIDs {
+		receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), roomID, since)
+		if err != nil {
+			return err
+		}
+
+		for _, receipt := range receipts {
+			data := map[string]interface{}{
+				receipt.EventID: map[string]interface{}{
+					"m.read": map[string]interface{}{
+						receipt.UserID: struct {
+							gomatrixserverlib.Timestamp `json:"ts"`
+						}{
+							receipt.Timestamp,
+						},
+					},
+				},
+			}
+
+			ev := gomatrixserverlib.ClientEvent{
+				Type:   "m.receipt",
+				RoomID: roomID,
+			}
+			ev.Content, err = json.Marshal(data)
+			if err != nil {
+				return err
+			}
+			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
+			res.Rooms.Join[roomID] = jr
+		}
+	}
+
+	return nil
+}
+
 // addEDUDeltaToResponse adds updates for EDUs of each type since fromPos if
 // the positions of that type are not equal in fromPos and toPos.
 func (d *Database) addEDUDeltaToResponse(
@@ -570,11 +610,15 @@ func (d *Database) addEDUDeltaToResponse(
 	joinedRoomIDs []string,
 	res *types.Response,
 ) (err error) {
-
 	if fromPos.EDUPosition() != toPos.EDUPosition() {
-		err = d.addTypingDeltaToResponse(
-			fromPos, joinedRoomIDs, res,
-		)
+		// add typing deltas
+		if err := d.addTypingDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
+			return
+		}
+		// add receipt deltas
+		if err := d.addReceiptDeltaToResponse(fromPos.EDUPosition(), joinedRoomIDs, res); err != nil {
+			return
+		}
 	}
 
 	return
@@ -1412,4 +1456,16 @@ type stateDelta struct {
 	// The PDU stream position of the latest membership event for this user, if applicable.
 	// Can be 0 if there is no membership event in this delta.
 	membershipPos types.StreamPosition
+}
+
+// StoreReceipt stores user receipts
+func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		_, err := d.Receipts.UpsertReceipt(ctx, txn, roomId, receiptType, userId, eventId, timestamp)
+		return err
+	})
+}
+
+func (d *Database) GetRoomReceipts(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]eduAPI.InputReceiptEvent, error) {
+	return d.Receipts.SelectRoomReceiptsAfter(ctx, roomId, streamPos)
 }
