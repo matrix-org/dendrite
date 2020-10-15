@@ -38,7 +38,7 @@ func AddRoutes(t api.EDUServerInputAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(EDUServerInputSendToDeviceEventPath,
+	internalAPIMux.Handle(EDUServerInputReceiptEventPath,
 		httputil.MakeInternalAPI("inputReceiptEvent", func(req *http.Request) util.JSONResponse {
 			var request api.InputReceiptEventRequest
 			var response api.InputReceiptEventResponse
