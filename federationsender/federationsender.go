@@ -55,6 +55,8 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
+	consumer, _ := setup.SetupConsumerProducer(&cfg.Matrix.Kafka)
+
 	queues := queue.NewOutgoingQueues(
 		federationSenderDB, cfg.Matrix.ServerName, federation,
 		rsAPI, stats,
@@ -66,7 +68,7 @@ func NewInternalAPI(
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg, base.KafkaConsumer, queues,
+		cfg, consumer, queues,
 		federationSenderDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
@@ -74,13 +76,13 @@ func NewInternalAPI(
 	}
 
 	tsConsumer := consumers.NewOutputEDUConsumer(
-		cfg, base.KafkaConsumer, queues, federationSenderDB,
+		cfg, consumer, queues, federationSenderDB,
 	)
 	if err := tsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
-		&base.Cfg.KeyServer, base.KafkaConsumer, queues, federationSenderDB, rsAPI,
+		&base.Cfg.KeyServer, consumer, queues, federationSenderDB, rsAPI,
 	)
 	if err := keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")

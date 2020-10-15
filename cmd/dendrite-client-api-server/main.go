@@ -22,6 +22,7 @@ import (
 
 func main() {
 	cfg := setup.ParseFlags(false)
+	_, producer := setup.SetupConsumerProducer(&cfg.Global.Kafka)
 
 	base := setup.NewBaseDendrite(cfg, "ClientAPI", true)
 	defer base.Close() // nolint: errcheck
@@ -37,7 +38,7 @@ func main() {
 	keyAPI := base.KeyServerHTTPClient()
 
 	clientapi.AddPublicRoutes(
-		base.PublicClientAPIMux, &base.Cfg.ClientAPI, base.KafkaProducer, accountDB, federation,
+		base.PublicClientAPIMux, &base.Cfg.ClientAPI, producer, accountDB, federation,
 		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI, keyAPI, nil,
 	)
 

@@ -41,6 +41,8 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
+	_, producer := setup.SetupConsumerProducer(&cfg.Matrix.Kafka)
+
 	var perspectiveServerNames []gomatrixserverlib.ServerName
 	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
@@ -52,7 +54,7 @@ func NewInternalAPI(
 	}
 
 	return internal.NewRoomserverAPI(
-		cfg, roomserverDB, base.KafkaProducer, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
+		cfg, roomserverDB, producer, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
 		base.Caches, keyRing, perspectiveServerNames,
 	)
 }

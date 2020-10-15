@@ -169,9 +169,8 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 		t.Fatalf("failed to make caches: %s", err)
 	}
 	base := &setup.BaseDendrite{
-		KafkaProducer: dp,
-		Caches:        cache,
-		Cfg:           cfg,
+		Caches: cache,
+		Cfg:    cfg,
 	}
 
 	return NewInternalAPI(base, &test.NopJSONVerifier{}), dp

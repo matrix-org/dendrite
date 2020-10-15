@@ -47,6 +47,8 @@ func NewInternalAPI(
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
+	consumer, _ := setup.SetupConsumerProducer(&base.Cfg.Global.Kafka)
+
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(&base.Cfg.AppServiceAPI.Database)
 	if err != nil {
@@ -86,7 +88,7 @@ func NewInternalAPI(
 	// We can't add ASes at runtime so this is safe to do.
 	if len(workerStates) > 0 {
 		consumer := consumers.NewOutputRoomEventConsumer(
-			base.Cfg, base.KafkaConsumer, appserviceDB,
+			base.Cfg, consumer, appserviceDB,
 			rsAPI, workerStates,
 		)
 		if err := consumer.Start(); err != nil {
