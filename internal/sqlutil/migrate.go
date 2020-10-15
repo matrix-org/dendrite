@@ -49,9 +49,13 @@ func (m *Migrations) RunDeltas(db *sql.DB, props *config.DatabaseOptions) error 
 		return fmt.Errorf("RunDeltas: Failed to collect migrations: %w", err)
 	}
 	if props.ConnectionString.IsPostgres() {
-		goose.SetDialect("postgres")
+		if err = goose.SetDialect("postgres"); err != nil {
+			return err
+		}
 	} else if props.ConnectionString.IsSQLite() {
-		goose.SetDialect("sqlite3")
+		if err = goose.SetDialect("sqlite3"); err != nil {
+			return err
+		}
 	} else {
 		return fmt.Errorf("Unknown connection string: %s", props.ConnectionString)
 	}

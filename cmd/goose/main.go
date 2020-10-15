@@ -39,6 +39,7 @@ var (
 	}
 )
 
+// nolint: gocyclo
 func main() {
 	err := flags.Parse(os.Args[1:])
 	if err != nil {
