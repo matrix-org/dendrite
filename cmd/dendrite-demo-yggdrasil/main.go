@@ -96,7 +96,7 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -129,13 +129,11 @@ func main() {
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
 	monolith := setup.Monolith{
-		Config:        base.Cfg,
-		AccountDB:     accountDB,
-		Client:        ygg.CreateClient(base),
-		FedClient:     federation,
-		KeyRing:       keyRing,
-		KafkaConsumer: base.KafkaConsumer,
-		KafkaProducer: base.KafkaProducer,
+		Config:    base.Cfg,
+		AccountDB: accountDB,
+		Client:    ygg.CreateClient(base),
+		FedClient: federation,
+		KeyRing:   keyRing,
 
 		AppserviceAPI:       asAPI,
 		EDUInternalAPI:      eduInputAPI,

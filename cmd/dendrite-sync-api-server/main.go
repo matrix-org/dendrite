@@ -21,6 +21,7 @@ import (
 
 func main() {
 	cfg := setup.ParseFlags(false)
+
 	base := setup.NewBaseDendrite(cfg, "SyncAPI", true)
 	defer base.Close() // nolint: errcheck
 
@@ -30,7 +31,7 @@ func main() {
 	rsAPI := base.RoomserverHTTPClient()
 
 	syncapi.AddPublicRoutes(
-		base.PublicClientAPIMux, base.KafkaConsumer, userAPI, rsAPI,
+		base.PublicClientAPIMux, userAPI, rsAPI,
 		base.KeyServerHTTPClient(),
 		federation, &cfg.SyncAPI,
 	)

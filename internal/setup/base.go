@@ -26,13 +26,9 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/matrix-org/naffka"
-	naffkaStorage "github.com/matrix-org/naffka/storage"
-
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 
-	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -73,8 +69,8 @@ type BaseDendrite struct {
 	httpClient             *http.Client
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
-	KafkaConsumer          sarama.Consumer
-	KafkaProducer          sarama.SyncProducer
+	//	KafkaConsumer          sarama.Consumer
+	//	KafkaProducer          sarama.SyncProducer
 }
 
 const HTTPServerTimeout = time.Minute * 5
@@ -104,14 +100,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")
-	}
-
-	var kafkaConsumer sarama.Consumer
-	var kafkaProducer sarama.SyncProducer
-	if cfg.Global.Kafka.UseNaffka {
-		kafkaConsumer, kafkaProducer = setupNaffka(cfg)
-	} else {
-		kafkaConsumer, kafkaProducer = setupKafka(cfg)
 	}
 
 	cache, err := caching.NewInMemoryLRUCache(true)
@@ -152,8 +140,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		apiHttpClient:          &apiClient,
 		httpClient:             &client,
-		KafkaConsumer:          kafkaConsumer,
-		KafkaProducer:          kafkaProducer,
 	}
 }
 
@@ -333,32 +319,4 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	}
 
 	select {}
-}
-
-// setupKafka creates kafka consumer/producer pair from the config.
-func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	consumer, err := sarama.NewConsumer(cfg.Global.Kafka.Addresses, nil)
-	if err != nil {
-		logrus.WithError(err).Panic("failed to start kafka consumer")
-	}
-
-	producer, err := sarama.NewSyncProducer(cfg.Global.Kafka.Addresses, nil)
-	if err != nil {
-		logrus.WithError(err).Panic("failed to setup kafka producers")
-	}
-
-	return consumer, producer
-}
-
-// setupNaffka creates kafka consumer/producer pair from the config.
-func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	naffkaDB, err := naffkaStorage.NewDatabase(string(cfg.Global.Kafka.Database.ConnectionString))
-	if err != nil {
-		logrus.WithError(err).Panic("Failed to setup naffka database")
-	}
-	naff, err := naffka.New(naffkaDB)
-	if err != nil {
-		logrus.WithError(err).Panic("Failed to setup naffka")
-	}
-	return naff, naff
 }

@@ -17,7 +17,10 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -160,7 +163,9 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	cfg.Defaults()
 	cfg.Global.ServerName = testOrigin
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(roomserverDBFileURI)
+	cfg.RoomServer.Database = config.DatabaseOptions{
+		ConnectionString: roomserverDBFileURI,
+	}
 	dp := &dummyProducer{
 		topic: cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
 	}
@@ -169,12 +174,17 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 		t.Fatalf("failed to make caches: %s", err)
 	}
 	base := &setup.BaseDendrite{
-		KafkaProducer: dp,
-		Caches:        cache,
-		Cfg:           cfg,
+		Caches: cache,
+		Cfg:    cfg,
 	}
-
-	return NewInternalAPI(base, &test.NopJSONVerifier{}), dp
+	roomserverDB, err := storage.Open(&cfg.RoomServer.Database, base.Caches)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to room server db")
+	}
+	return internal.NewRoomserverAPI(
+		&cfg.RoomServer, roomserverDB, dp, string(cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent)),
+		base.Caches, &test.NopJSONVerifier{}, nil,
+	), dp
 }
 
 func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) (api.RoomserverInternalAPI, *dummyProducer, []gomatrixserverlib.HeaderedEvent) {

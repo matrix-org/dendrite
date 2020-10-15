@@ -112,7 +112,7 @@ func (m *DendriteMonolith) Start() {
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -146,13 +146,11 @@ func (m *DendriteMonolith) Start() {
 	rsAPI.SetFederationSenderAPI(fsAPI)
 
 	monolith := setup.Monolith{
-		Config:        base.Cfg,
-		AccountDB:     accountDB,
-		Client:        ygg.CreateClient(base),
-		FedClient:     federation,
-		KeyRing:       keyRing,
-		KafkaConsumer: base.KafkaConsumer,
-		KafkaProducer: base.KafkaProducer,
+		Config:    base.Cfg,
+		AccountDB: accountDB,
+		Client:    ygg.CreateClient(base),
+		FedClient: federation,
+		KeyRing:   keyRing,
 
 		AppserviceAPI:       asAPI,
 		EDUInternalAPI:      eduInputAPI,

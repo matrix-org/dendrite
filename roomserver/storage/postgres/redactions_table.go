@@ -39,7 +39,8 @@ CREATE INDEX IF NOT EXISTS roomserver_redactions_redacts_event_id ON roomserver_
 
 const insertRedactionSQL = "" +
 	"INSERT INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
-	" VALUES ($1, $2, $3)"
+	" VALUES ($1, $2, $3)" +
+	" ON CONFLICT DO NOTHING"
 
 const selectRedactionInfoByRedactionEventIDSQL = "" +
 	"SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
