@@ -546,12 +546,16 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 	// 1. Ensures that the state is deduplicated fully for each state-key tuple
 	// 2. Ensures that we pick the latest events from both sets, in the case that
 	//    one of the prev_events is quite a bit older than the others
-	var resolvedState *gomatrixserverlib.RespState
+	resolvedState := &gomatrixserverlib.RespState{}
 	switch len(states) {
 	case 0:
-		// There are no previous states - this is an error condition!
-		util.GetLogger(ctx).WithError(err).Errorf("Failed to lookup any state after prev_events")
-		return fmt.Errorf("expected %d states but got %d", len(backwardsExtremity.PrevEventIDs()), len(states))
+		extremityIsCreate := backwardsExtremity.Type() == gomatrixserverlib.MRoomCreate && backwardsExtremity.StateKeyEquals("")
+		if !extremityIsCreate {
+			// There are no previous states and this isn't the beginning of the
+			// room - this is an error condition!
+			util.GetLogger(ctx).Errorf("Failed to lookup any state after prev_events")
+			return fmt.Errorf("expected %d states but got %d", len(backwardsExtremity.PrevEventIDs()), len(states))
+		}
 	case 1:
 		// There's only one previous state - if it's trustworthy (came from a
 		// local state snapshot which will already have been through state res),
