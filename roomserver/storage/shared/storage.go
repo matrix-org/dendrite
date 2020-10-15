@@ -458,7 +458,7 @@ func (d *Database) StoreEvent(
 				eventNID, stateNID, err = d.EventsTable.SelectEvent(ctx, txn, event.EventID())
 			}
 			if err != nil {
-				return err
+				return fmt.Errorf("d.EventsTable.SelectEvent: %w", err)
 			}
 		}
 
@@ -467,6 +467,9 @@ func (d *Database) StoreEvent(
 		}
 		if !isRejected { // ignore rejected redaction events
 			redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
+			if err != nil {
+				return fmt.Errorf("d.handleRedactions: %w", err)
+			}
 		}
 		return nil
 	})
@@ -627,6 +630,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 // to cross-reference with other tables when loading.
 //
 // Returns the redaction event and the event ID of the redacted event if this call resulted in a redaction.
+// nolint:gocyclo
 func (d *Database) handleRedactions(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event,
 ) (*gomatrixserverlib.Event, string, error) {
@@ -644,13 +648,13 @@ func (d *Database) handleRedactions(
 			RedactsEventID:   event.Redacts(),
 		})
 		if err != nil {
-			return nil, "", err
+			return nil, "", fmt.Errorf("d.RedactionsTable.InsertRedaction: %w", err)
 		}
 	}
 
 	redactionEvent, redactedEvent, validated, err := d.loadRedactionPair(ctx, txn, eventNID, event)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("d.loadRedactionPair: %w", err)
 	}
 	if validated || redactedEvent == nil || redactionEvent == nil {
 		// we've seen this redaction before or there is nothing to redact
@@ -664,7 +668,7 @@ func (d *Database) handleRedactions(
 	// mark the event as redacted
 	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("redactedEvent.SetUnsignedField: %w", err)
 	}
 	if redactionsArePermanent {
 		redactedEvent.Event = redactedEvent.Redact()
@@ -672,10 +676,15 @@ func (d *Database) handleRedactions(
 	// overwrite the eventJSON table
 	err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 	}
 
-	return &redactionEvent.Event, redactedEvent.EventID(), d.RedactionsTable.MarkRedactionValidated(ctx, txn, redactionEvent.EventID(), true)
+	err = d.RedactionsTable.MarkRedactionValidated(ctx, txn, redactionEvent.EventID(), true)
+	if err != nil {
+		err = fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
+	}
+
+	return &redactionEvent.Event, redactedEvent.EventID(), err
 }
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.
