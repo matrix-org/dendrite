@@ -8,19 +8,38 @@ import (
 	"log"
 	"os"
 
-	// Example complex Go migration import:
-	// _ "github.com/matrix-org/dendrite/serverkeyapi/storage/postgres/deltas"
+	pgaccounts "github.com/matrix-org/dendrite/userapi/storage/accounts/postgres/deltas"
+	slaccounts "github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3/deltas"
+	pgdevices "github.com/matrix-org/dendrite/userapi/storage/devices/postgres/deltas"
+	sldevices "github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3/deltas"
 	"github.com/pressly/goose"
 
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var (
-	flags = flag.NewFlagSet("goose", flag.ExitOnError)
-	dir   = flags.String("dir", ".", "directory with migration files")
+const (
+	AppService       = "appservice"
+	FederationSender = "federationsender"
+	KeyServer        = "keyserver"
+	MediaAPI         = "mediaapi"
+	RoomServer       = "roomserver"
+	SigningKeyServer = "signingkeyserver"
+	SyncAPI          = "syncapi"
+	UserAPIAccounts  = "userapi_accounts"
+	UserAPIDevices   = "userapi_devices"
 )
 
+var (
+	dir       = flags.String("dir", "", "directory with migration files")
+	flags     = flag.NewFlagSet("goose", flag.ExitOnError)
+	component = flags.String("component", "", "dendrite component name")
+	knownDBs  = []string{
+		AppService, FederationSender, KeyServer, MediaAPI, RoomServer, SigningKeyServer, SyncAPI, UserAPIAccounts, UserAPIDevices,
+	}
+)
+
+// nolint: gocyclo
 func main() {
 	err := flags.Parse(os.Args[1:])
 	if err != nil {
@@ -37,19 +56,20 @@ Drivers:
     sqlite3
 
 Examples:
-    goose -d roomserver/storage/sqlite3/deltas sqlite3 ./roomserver.db status
-    goose -d roomserver/storage/sqlite3/deltas sqlite3 ./roomserver.db up
+    goose -component roomserver sqlite3 ./roomserver.db status
+    goose -component roomserver sqlite3 ./roomserver.db up
 
-    goose -d roomserver/storage/postgres/deltas postgres "user=dendrite dbname=dendrite sslmode=disable" status
+    goose -component roomserver postgres "user=dendrite dbname=dendrite sslmode=disable" status
 
 Options:
-
-  -dir string
-    	directory with migration files (default ".")
+  -component string
+    	Dendrite component name e.g roomserver, signingkeyserver, clientapi, syncapi
   -table string
     	migrations table name (default "goose_db_version")
   -h	print help
   -v	enable verbose mode
+  -dir string
+        directory with migration files, only relevant when creating new migrations.
   -version
     	print version
 
@@ -74,6 +94,25 @@ Commands:
 		fmt.Println("engine must be one of 'sqlite3' or 'postgres'")
 		return
 	}
+
+	knownComponent := false
+	for _, c := range knownDBs {
+		if c == *component {
+			knownComponent = true
+			break
+		}
+	}
+	if !knownComponent {
+		fmt.Printf("component must be one of %v\n", knownDBs)
+		return
+	}
+
+	if engine == "sqlite3" {
+		loadSQLiteDeltas(*component)
+	} else {
+		loadPostgresDeltas(*component)
+	}
+
 	dbstring, command := args[1], args[2]
 
 	db, err := goose.OpenDBWithDriver(engine, dbstring)
@@ -92,7 +131,30 @@ Commands:
 		arguments = append(arguments, args[3:]...)
 	}
 
-	if err := goose.Run(command, db, *dir, arguments...); err != nil {
+	// goose demands a directory even though we don't use it for upgrades
+	d := *dir
+	if d == "" {
+		d = os.TempDir()
+	}
+	if err := goose.Run(command, db, d, arguments...); err != nil {
 		log.Fatalf("goose %v: %v", command, err)
+	}
+}
+
+func loadSQLiteDeltas(component string) {
+	switch component {
+	case UserAPIAccounts:
+		slaccounts.LoadFromGoose()
+	case UserAPIDevices:
+		sldevices.LoadFromGoose()
+	}
+}
+
+func loadPostgresDeltas(component string) {
+	switch component {
+	case UserAPIAccounts:
+		pgaccounts.LoadFromGoose()
+	case UserAPIDevices:
+		pgdevices.LoadFromGoose()
 	}
 }
