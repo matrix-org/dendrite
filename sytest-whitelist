@@ -489,3 +489,4 @@ Receipts must be m.read
 Read receipts appear in initial v2 /sync
 New read receipts appear in incremental v2 /sync
 Outbound federation sends receipts
+Inbound federation rejects receipts from wrong remote
