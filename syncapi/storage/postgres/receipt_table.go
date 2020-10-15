@@ -52,7 +52,7 @@ const upsertReceipt = "" +
 	" RETURNING id"
 
 const selectRoomReceipts = "" +
-	"SELECT id, room_id, receipt_type, user_id, event_id, receipt_ts" +
+	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
 	" WHERE room_id = $1 AND id > $2"
 
