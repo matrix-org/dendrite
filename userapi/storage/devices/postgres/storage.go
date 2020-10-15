@@ -46,7 +46,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
 	// and THEN prepare statements so we don't fail due to referencing new columns
-	d.execSchema(db)
+	if err = d.execSchema(db); err != nil {
+		return nil, err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadLastSeenTSIP(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
