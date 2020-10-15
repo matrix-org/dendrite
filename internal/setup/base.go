@@ -351,20 +351,20 @@ func setupKafka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 // consuming the same topic from more than one place like we do with Kafka.
 // Therefore, we will only open one Naffka connection in case Naffka is
 // running on SQLite.
-var naffkaDatabase *naffka.Naffka
+var naffkaInstance *naffka.Naffka
 
 // setupNaffka creates kafka consumer/producer pair from the config.
 func setupNaffka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
-	if naffkaDatabase != nil {
-		return naffkaDatabase, naffkaDatabase
+	if naffkaInstance != nil {
+		return naffkaInstance, naffkaInstance
 	}
 	naffkaDB, err := naffkaStorage.NewDatabase(string(cfg.Database.ConnectionString))
 	if err != nil {
 		logrus.WithError(err).Panic("Failed to setup naffka database")
 	}
-	naffkaDatabase, err = naffka.New(naffkaDB)
+	naffkaInstance, err = naffka.New(naffkaDB)
 	if err != nil {
 		logrus.WithError(err).Panic("Failed to setup naffka")
 	}
-	return naffkaDatabase, naffkaDatabase
+	return naffkaInstance, naffkaInstance
 }
