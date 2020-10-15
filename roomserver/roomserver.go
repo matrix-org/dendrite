@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/internal/setup/kafka"
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/sirupsen/logrus"
@@ -41,7 +42,7 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
-	_, producer := setup.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
 	var perspectiveServerNames []gomatrixserverlib.ServerName
 	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {

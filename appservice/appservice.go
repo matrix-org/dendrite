@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice/workers"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/internal/setup/kafka"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
@@ -47,7 +48,7 @@ func NewInternalAPI(
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
-	consumer, _ := setup.SetupConsumerProducer(&base.Cfg.Global.Kafka)
+	consumer, _ := kafka.SetupConsumerProducer(&base.Cfg.Global.Kafka)
 
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(&base.Cfg.AppServiceAPI.Database)

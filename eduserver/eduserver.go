@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/inthttp"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/internal/setup/kafka"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -42,7 +43,7 @@ func NewInternalAPI(
 ) api.EDUServerInputAPI {
 	cfg := &base.Cfg.EDUServer
 
-	_, producer := setup.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
 	return &input.EDUServerInputAPI{
 		Cache:                        eduCache,

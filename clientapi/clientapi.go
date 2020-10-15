@@ -15,7 +15,6 @@
 package clientapi
 
 import (
-	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -24,6 +23,7 @@ import (
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/setup/kafka"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -36,7 +36,6 @@ import (
 func AddPublicRoutes(
 	router *mux.Router,
 	cfg *config.ClientAPI,
-	producer sarama.SyncProducer,
 	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
@@ -48,6 +47,8 @@ func AddPublicRoutes(
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
+	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+
 	syncProducer := &producers.SyncAPIProducer{
 		Producer: producer,
 		Topic:    cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData),
