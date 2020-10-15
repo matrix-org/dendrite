@@ -43,13 +43,21 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, err
 	}
 	d := devicesStatements{}
+
+	// Create tables before executing migrations so we don't fail if the table is missing,
+	// and THEN prepare statements so we don't fail due to referencing new columns
+	d.execSchema(db)
+	m := sqlutil.NewMigrations()
+	deltas.LoadLastSeenTSIP(m)
+	if err = m.RunDeltas(db, dbProperties); err != nil {
+		return nil, err
+	}
+
 	if err = d.prepare(db, serverName); err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadLastSeenTSIP(m)
 
-	return &Database{db, d}, m.RunDeltas(db, dbProperties)
+	return &Database{db, d}, nil
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.

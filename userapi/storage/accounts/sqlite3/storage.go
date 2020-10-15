@@ -61,6 +61,18 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		db:         db,
 		writer:     sqlutil.NewExclusiveWriter(),
 	}
+
+	// Create tables before executing migrations so we don't fail if the table is missing,
+	// and THEN prepare statements so we don't fail due to referencing new columns
+	if err = d.accounts.execSchema(db); err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadIsActive(m)
+	if err = m.RunDeltas(db, dbProperties); err != nil {
+		return nil, err
+	}
+
 	partitions := sqlutil.PartitionOffsetStatements{}
 	if err = partitions.Prepare(db, d.writer, "account"); err != nil {
 		return nil, err
@@ -77,10 +89,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = d.threepids.prepare(db); err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadIsActive(m)
 
-	return d, m.RunDeltas(db, dbProperties)
+	return d, nil
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.

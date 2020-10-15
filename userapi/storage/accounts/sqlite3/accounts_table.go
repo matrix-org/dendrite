@@ -74,13 +74,13 @@ type accountsStatements struct {
 	serverName                    gomatrixserverlib.ServerName
 }
 
+func (s *accountsStatements) execSchema(db *sql.DB) error {
+	_, err := db.Exec(accountsSchema)
+	return err
+}
+
 func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
-
-	_, err = db.Exec(accountsSchema)
-	if err != nil {
-		return
-	}
 	if s.insertAccountStmt, err = db.Prepare(insertAccountSQL); err != nil {
 		return
 	}
