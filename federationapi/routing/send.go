@@ -476,6 +476,7 @@ func checkAllowedByState(e gomatrixserverlib.Event, stateEvents []gomatrixserver
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
+// nolint:gocyclo
 func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) error {
 	// Do this with a fresh context, so that we keep working even if the
 	// original request times out. With any luck, by the time the remote
