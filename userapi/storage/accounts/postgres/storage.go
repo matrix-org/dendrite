@@ -25,6 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts/postgres/deltas"
+	_ "github.com/matrix-org/dendrite/userapi/storage/accounts/postgres/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 
@@ -55,6 +57,18 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		db:         db,
 		writer:     sqlutil.NewDummyWriter(),
 	}
+
+	// Create tables before executing migrations so we don't fail if the table is missing,
+	// and THEN prepare statements so we don't fail due to referencing new columns
+	if err = d.accounts.execSchema(db); err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadIsActive(m)
+	if err = m.RunDeltas(db, dbProperties); err != nil {
+		return nil, err
+	}
+
 	if err = d.PartitionOffsetStatements.Prepare(db, d.writer, "account"); err != nil {
 		return nil, err
 	}
@@ -70,6 +84,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = d.threepids.prepare(db); err != nil {
 		return nil, err
 	}
+
 	return d, nil
 }
 

@@ -98,13 +98,14 @@ type devicesStatements struct {
 	serverName                   gomatrixserverlib.ServerName
 }
 
+func (s *devicesStatements) execSchema(db *sql.DB) error {
+	_, err := db.Exec(devicesSchema)
+	return err
+}
+
 func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
 	s.writer = writer
-	_, err = db.Exec(devicesSchema)
-	if err != nil {
-		return
-	}
 	if s.insertDeviceStmt, err = db.Prepare(insertDeviceSQL); err != nil {
 		return
 	}
