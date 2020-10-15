@@ -1,6 +1,19 @@
--- +goose Up
--- +goose StatementBegin
-ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
+package deltas
+
+import (
+	"database/sql"
+	"fmt"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+)
+
+func LoadIsActive(m *sqlutil.Migrations) {
+	m.AddMigration(UpIsActive, DownIsActive)
+}
+
+func UpIsActive(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
 CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
     created_ts BIGINT NOT NULL,
@@ -15,12 +28,16 @@ INSERT
         localpart, created_ts, password_hash, appservice_id
     FROM account_accounts_tmp
 ;
-DROP TABLE account_accounts_tmp;
--- +goose StatementEnd
+DROP TABLE account_accounts_tmp;`)
+	if err != nil {
+		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
+	return nil
+}
 
--- +goose Down
--- +goose StatementBegin
-ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
+func DownIsActive(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
 CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
     created_ts BIGINT NOT NULL,
@@ -34,5 +51,9 @@ INSERT
         localpart, created_ts, password_hash, appservice_id
     FROM account_accounts_tmp
 ;
-DROP TABLE account_accounts_tmp;
--- +goose StatementEnd
+DROP TABLE account_accounts_tmp;`)
+	if err != nil {
+		return fmt.Errorf("failed to execute downgrade: %w", err)
+	}
+	return nil
+}

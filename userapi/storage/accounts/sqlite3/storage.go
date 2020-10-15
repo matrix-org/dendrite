@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	// Import the sqlite3 database driver.
@@ -76,7 +77,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = d.threepids.prepare(db); err != nil {
 		return nil, err
 	}
-	return d, nil
+	m := sqlutil.NewMigrations()
+	deltas.LoadIsActive(m)
+
+	return d, m.RunDeltas(db, dbProperties)
 }
 
 // GetAccountByPassword returns the account associated with the given localpart and password.
