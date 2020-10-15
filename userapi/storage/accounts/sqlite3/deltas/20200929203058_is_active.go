@@ -5,7 +5,12 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/pressly/goose"
 )
+
+func LoadFromGoose() {
+	goose.AddMigration(UpIsActive, DownIsActive)
+}
 
 func LoadIsActive(m *sqlutil.Migrations) {
 	m.AddMigration(UpIsActive, DownIsActive)
