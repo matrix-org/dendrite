@@ -49,3 +49,20 @@ type OutputSendToDeviceEvent struct {
 	DeviceID string `json:"device_id"`
 	gomatrixserverlib.SendToDeviceEvent
 }
+
+type ReceiptEvent struct {
+	UserID    string                      `json:"user_id"`
+	RoomID    string                      `json:"room_id"`
+	EventID   string                      `json:"event_id"`
+	Type      string                      `json:"type"`
+	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+}
+
+// OutputReceiptEvent is an entry in the receipt output kafka log
+type OutputReceiptEvent struct {
+	UserID    string                      `json:"user_id"`
+	RoomID    string                      `json:"room_id"`
+	EventID   string                      `json:"event_id"`
+	Type      string                      `json:"type"`
+	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+}

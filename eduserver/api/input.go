@@ -59,6 +59,22 @@ type InputSendToDeviceEventRequest struct {
 // InputSendToDeviceEventResponse is a response to InputSendToDeviceEventRequest
 type InputSendToDeviceEventResponse struct{}
 
+type InputReceiptEvent struct {
+	UserID    string                      `json:"user_id"`
+	RoomID    string                      `json:"room_id"`
+	EventID   string                      `json:"event_id"`
+	Type      string                      `json:"type"`
+	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+}
+
+// InputReceiptEventRequest is a request to EDUServerInputAPI
+type InputReceiptEventRequest struct {
+	InputReceiptEvent InputReceiptEvent `json:"input_receipt_event"`
+}
+
+// InputReceiptEventResponse is a response to InputReceiptEventRequest
+type InputReceiptEventResponse struct{}
+
 // EDUServerInputAPI is used to write events to the typing server.
 type EDUServerInputAPI interface {
 	InputTypingEvent(
@@ -71,5 +87,11 @@ type EDUServerInputAPI interface {
 		ctx context.Context,
 		request *InputSendToDeviceEventRequest,
 		response *InputSendToDeviceEventResponse,
+	) error
+
+	InputReceiptEvent(
+		ctx context.Context,
+		request *InputReceiptEventRequest,
+		response *InputReceiptEventResponse,
 	) error
 }
