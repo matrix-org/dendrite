@@ -15,7 +15,6 @@
 package setup
 
 import (
-	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi"
@@ -38,13 +37,11 @@ import (
 // Monolith represents an instantiation of all dependencies required to build
 // all components of Dendrite, for use in monolith mode.
 type Monolith struct {
-	Config        *config.Dendrite
-	AccountDB     accounts.Database
-	KeyRing       *gomatrixserverlib.KeyRing
-	Client        *gomatrixserverlib.Client
-	FedClient     *gomatrixserverlib.FederationClient
-	KafkaConsumer sarama.Consumer
-	KafkaProducer sarama.SyncProducer
+	Config    *config.Dendrite
+	AccountDB accounts.Database
+	KeyRing   *gomatrixserverlib.KeyRing
+	Client    *gomatrixserverlib.Client
+	FedClient *gomatrixserverlib.FederationClient
 
 	AppserviceAPI       appserviceAPI.AppServiceQueryAPI
 	EDUInternalAPI      eduServerAPI.EDUServerInputAPI
@@ -61,7 +58,7 @@ type Monolith struct {
 // AddAllPublicRoutes attaches all public paths to the given router
 func (m *Monolith) AddAllPublicRoutes(csMux, ssMux, keyMux, mediaMux *mux.Router) {
 	clientapi.AddPublicRoutes(
-		csMux, &m.Config.ClientAPI, m.KafkaProducer, m.AccountDB,
+		csMux, &m.Config.ClientAPI, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationSenderAPI, m.UserAPI, m.KeyAPI, m.ExtPublicRoomsProvider,
@@ -73,7 +70,7 @@ func (m *Monolith) AddAllPublicRoutes(csMux, ssMux, keyMux, mediaMux *mux.Router
 	)
 	mediaapi.AddPublicRoutes(mediaMux, &m.Config.MediaAPI, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(
-		csMux, m.KafkaConsumer, m.UserAPI, m.RoomserverAPI,
+		csMux, m.UserAPI, m.RoomserverAPI,
 		m.KeyAPI, m.FedClient, &m.Config.SyncAPI,
 	)
 }

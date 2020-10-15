@@ -63,7 +63,8 @@ type QueryStateAfterEventsRequest struct {
 	RoomID string `json:"room_id"`
 	// The list of previous events to return the events after.
 	PrevEventIDs []string `json:"prev_event_ids"`
-	// The state key tuples to fetch from the state
+	// The state key tuples to fetch from the state. If none are specified then
+	// the entire resolved room state will be returned.
 	StateToFetch []gomatrixserverlib.StateKeyTuple `json:"state_to_fetch"`
 }
 

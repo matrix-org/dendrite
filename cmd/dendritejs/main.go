@@ -190,7 +190,7 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	federation := createFederationClient(cfg, node)
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -212,13 +212,11 @@ func main() {
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
 
 	monolith := setup.Monolith{
-		Config:        base.Cfg,
-		AccountDB:     accountDB,
-		Client:        createClient(node),
-		FedClient:     federation,
-		KeyRing:       &keyRing,
-		KafkaConsumer: base.KafkaConsumer,
-		KafkaProducer: base.KafkaProducer,
+		Config:    base.Cfg,
+		AccountDB: accountDB,
+		Client:    createClient(node),
+		FedClient: federation,
+		KeyRing:   &keyRing,
 
 		AppserviceAPI:       asQuery,
 		EDUInternalAPI:      eduInputAPI,
