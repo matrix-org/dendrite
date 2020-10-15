@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/devices/postgres/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -45,7 +46,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = d.prepare(db, serverName); err != nil {
 		return nil, err
 	}
-	return &Database{db, d}, nil
+	m := sqlutil.NewMigrations()
+	deltas.LoadLastSeenTSIP(m)
+
+	return &Database{db, d}, m.RunDeltas(db, dbProperties)
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.
