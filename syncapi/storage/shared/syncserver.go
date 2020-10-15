@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
+
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
@@ -565,11 +567,17 @@ func (d *Database) addTypingDeltaToResponse(
 	return nil
 }
 
-func (d *Database) addReceiptDeltaToResponse(since types.StreamPosition, joinedRoomIDs []string, res *types.Response) error {
+// addReceiptDeltaToResponse adds all receipt information to a sync response
+// since the specified position
+func (d *Database) addReceiptDeltaToResponse(
+	since types.StreamingToken,
+	joinedRoomIDs []string,
+	res *types.Response,
+) error {
 	var jr types.JoinResponse
 	// check all joinedRooms for receipts
 	for _, roomID := range joinedRoomIDs {
-		receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), roomID, since)
+		receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), roomID, since.EDUPosition())
 		if err != nil {
 			return err
 		}
@@ -609,19 +617,20 @@ func (d *Database) addEDUDeltaToResponse(
 	fromPos, toPos types.StreamingToken,
 	joinedRoomIDs []string,
 	res *types.Response,
-) (err error) {
+) error {
 	if fromPos.EDUPosition() != toPos.EDUPosition() {
 		// add typing deltas
 		if err := d.addTypingDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
-			return
-		}
-		// add receipt deltas
-		if err := d.addReceiptDeltaToResponse(fromPos.EDUPosition(), joinedRoomIDs, res); err != nil {
-			return
+			return errors.Wrap(err, "unable to apply typing delta to response")
 		}
 	}
 
-	return
+	// always check for receipt deltas; otherwise an initial sync won't receive receipts
+	if err := d.addReceiptDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
+		return errors.Wrap(err, "unable to apply receipts to response")
+	}
+
+	return nil
 }
 
 func (d *Database) GetFilter(
@@ -1459,11 +1468,12 @@ type stateDelta struct {
 }
 
 // StoreReceipt stores user receipts
-func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		_, err := d.Receipts.UpsertReceipt(ctx, txn, roomId, receiptType, userId, eventId, timestamp)
+func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		pos, err = d.Receipts.UpsertReceipt(ctx, txn, roomId, receiptType, userId, eventId, timestamp)
 		return err
 	})
+	return
 }
 
 func (d *Database) GetRoomReceipts(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]eduAPI.InputReceiptEvent, error) {

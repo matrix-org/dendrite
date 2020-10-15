@@ -49,7 +49,7 @@ const upsertReceipt = "" +
 	" (id, room_id, receipt_type, user_id, event_id, receipt_ts)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT (room_id, receipt_type, user_id)" +
-	" DO UPDATE SET id = $1, event_id = $4, receipt_ts = $5"
+	" DO UPDATE SET id = $1, event_id = $5, receipt_ts = $6"
 
 const selectRoomReceipts = "" +
 	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +

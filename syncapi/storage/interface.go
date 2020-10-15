@@ -150,7 +150,7 @@ type Database interface {
 	// RedactEvent wipes an event in the database and sets the unsigned.redacted_because key to the redaction event
 	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error
 	// StoreReceipt stores new receipt events ofr
-	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) error
+	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
 	// GetRoomReceipts gets all receipts for a given roomID
 	GetRoomReceipts(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]eduAPI.InputReceiptEvent, error)
 }
