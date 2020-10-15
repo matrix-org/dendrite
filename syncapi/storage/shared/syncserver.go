@@ -582,24 +582,23 @@ func (d *Database) addReceiptDeltaToResponse(
 			return err
 		}
 
+		ev := gomatrixserverlib.ClientEvent{
+			Type:   "m.receipt",
+			RoomID: roomID,
+		}
+		content := map[string]interface{}{}
 		for _, receipt := range receipts {
-			data := map[string]interface{}{
-				receipt.EventID: map[string]interface{}{
-					"m.read": map[string]interface{}{
-						receipt.UserID: struct {
-							gomatrixserverlib.Timestamp `json:"ts"`
-						}{
-							receipt.Timestamp,
-						},
+			content[receipt.EventID] = map[string]interface{}{
+				"m.read": map[string]interface{}{
+					receipt.UserID: struct {
+						gomatrixserverlib.Timestamp `json:"ts"`
+					}{
+						receipt.Timestamp,
 					},
 				},
 			}
 
-			ev := gomatrixserverlib.ClientEvent{
-				Type:   "m.receipt",
-				RoomID: roomID,
-			}
-			ev.Content, err = json.Marshal(data)
+			ev.Content, err = json.Marshal(content)
 			if err != nil {
 				return err
 			}
