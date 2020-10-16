@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -39,7 +40,7 @@ func SetReceipt(req *http.Request, eduAPI api.EDUServerInputAPI, device *userapi
 
 	// currently only m.read is accepted
 	if receiptType != "m.read" {
-		return util.MessageResponse(400, "Bad Request")
+		return util.MessageResponse(400, fmt.Sprintf("receipt type must be m.read not '%s'", receiptType))
 	}
 
 	if err := api.SendReceipt(req.Context(), eduAPI, device.UserID, roomId, eventId, receiptType, timestamp); err != nil {
