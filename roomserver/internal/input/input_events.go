@@ -54,7 +54,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	var softfail bool
-	if input.Kind == api.KindNew {
+	if input.Kind != api.KindOutlier {
 		// Check that the event passes authentication checks based on the
 		// current room state.
 		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
@@ -136,16 +136,18 @@ func (r *Inputer) processRoomEvent(
 		return event.EventID(), rejectionErr
 	}
 
-	if err = r.updateLatestEvents(
-		ctx,                 // context
-		roomInfo,            // room info for the room being updated
-		stateAtEvent,        // state at event (below)
-		event,               // event
-		input.SendAsServer,  // send as server
-		input.TransactionID, // transaction ID
-		input.HasState,      // rewrites state?
-	); err != nil {
-		return "", fmt.Errorf("r.updateLatestEvents: %w", err)
+	if input.Kind == api.KindNew {
+		if err = r.updateLatestEvents(
+			ctx,                 // context
+			roomInfo,            // room info for the room being updated
+			stateAtEvent,        // state at event (below)
+			event,               // event
+			input.SendAsServer,  // send as server
+			input.TransactionID, // transaction ID
+			input.HasState,      // rewrites state?
+		); err != nil {
+			return "", fmt.Errorf("r.updateLatestEvents: %w", err)
+		}
 	}
 
 	// processing this event resulted in an event (which may not be the one we're processing)

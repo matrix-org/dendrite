@@ -24,13 +24,14 @@ import (
 
 // SendEvents to the roomserver The events are written with KindNew.
 func SendEvents(
-	ctx context.Context, rsAPI RoomserverInternalAPI, events []gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, rsAPI RoomserverInternalAPI,
+	kind Kind, events []gomatrixserverlib.HeaderedEvent,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
 ) error {
 	ires := make([]InputRoomEvent, len(events))
 	for i, event := range events {
 		ires[i] = InputRoomEvent{
-			Kind:          KindNew,
+			Kind:          kind,
 			Event:         event,
 			AuthEventIDs:  event.AuthEventIDs(),
 			SendAsServer:  string(sendAsServer),
@@ -44,8 +45,9 @@ func SendEvents(
 // with the state at the event as KindOutlier before it. Will not send any event that is
 // marked as `true` in haveEventIDs
 func SendEventWithState(
-	ctx context.Context, rsAPI RoomserverInternalAPI, state *gomatrixserverlib.RespState,
-	event gomatrixserverlib.HeaderedEvent, haveEventIDs map[string]bool,
+	ctx context.Context, rsAPI RoomserverInternalAPI, kind Kind,
+	state *gomatrixserverlib.RespState, event gomatrixserverlib.HeaderedEvent,
+	haveEventIDs map[string]bool,
 ) error {
 	outliers, err := state.Events()
 	if err != nil {
@@ -58,7 +60,7 @@ func SendEventWithState(
 			continue
 		}
 		ires = append(ires, InputRoomEvent{
-			Kind:         KindOutlier,
+			Kind:         kind,
 			Event:        outlier.Headered(event.RoomVersion),
 			AuthEventIDs: outlier.AuthEventIDs(),
 		})
