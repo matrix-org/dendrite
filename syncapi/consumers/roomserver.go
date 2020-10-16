@@ -159,7 +159,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
-		!msg.IsForwardExtremity,
+		false,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
