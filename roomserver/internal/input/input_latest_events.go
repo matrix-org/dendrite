@@ -52,6 +52,7 @@ func (r *Inputer) updateLatestEvents(
 	ctx context.Context,
 	roomInfo *types.RoomInfo,
 	stateAtEvent types.StateAtEvent,
+	kind api.Kind,
 	event gomatrixserverlib.Event,
 	sendAsServer string,
 	transactionID *api.TransactionID,
@@ -70,6 +71,7 @@ func (r *Inputer) updateLatestEvents(
 		updater:       updater,
 		roomInfo:      roomInfo,
 		stateAtEvent:  stateAtEvent,
+		kind:          kind,
 		event:         event,
 		sendAsServer:  sendAsServer,
 		transactionID: transactionID,
@@ -95,6 +97,7 @@ type latestEventsUpdater struct {
 	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent
 	event         gomatrixserverlib.Event
+	kind          api.Kind
 	transactionID *api.TransactionID
 	rewritesState bool
 	// Which server to send this event as.
@@ -139,33 +142,36 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return nil
 	}
 
-	// Work out what the latest events are. This will include the new
-	// event if it is not already referenced.
-	if err := u.calculateLatest(
-		oldLatest,
-		types.StateAtEventAndReference{
-			EventReference: u.event.EventReference(),
-			StateAtEvent:   u.stateAtEvent,
-		},
-	); err != nil {
-		return fmt.Errorf("u.calculateLatest: %w", err)
+	var updates []api.OutputEvent
+	var err error
+	if u.kind == api.KindNew {
+		// Work out what the latest events are. This will include the new
+		// event if it is not already referenced.
+		if err = u.calculateLatest(
+			oldLatest,
+			types.StateAtEventAndReference{
+				EventReference: u.event.EventReference(),
+				StateAtEvent:   u.stateAtEvent,
+			},
+		); err != nil {
+			return fmt.Errorf("u.calculateLatest: %w", err)
+		}
+
+		// Now that we know what the latest events are, it's time to get the
+		// latest state.
+		if err = u.latestState(); err != nil {
+			return fmt.Errorf("u.latestState: %w", err)
+		}
+
+		// If we need to generate any output events then here's where we do it.
+		// TODO: Move this!
+		updates, err = u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added)
+		if err != nil {
+			return fmt.Errorf("u.api.updateMemberships: %w", err)
+		}
 	}
 
-	// Now that we know what the latest events are, it's time to get the
-	// latest state.
-	if err := u.latestState(); err != nil {
-		return fmt.Errorf("u.latestState: %w", err)
-	}
-
-	// If we need to generate any output events then here's where we do it.
-	// TODO: Move this!
-	updates, err := u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added)
-	if err != nil {
-		return fmt.Errorf("u.api.updateMemberships: %w", err)
-	}
-
-	var update *api.OutputEvent
-	update, err = u.makeOutputNewRoomEvent()
+	update, err := u.makeOutputNewRoomEvent()
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
 	}

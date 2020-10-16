@@ -136,18 +136,17 @@ func (r *Inputer) processRoomEvent(
 		return event.EventID(), rejectionErr
 	}
 
-	if input.Kind == api.KindNew {
-		if err = r.updateLatestEvents(
-			ctx,                 // context
-			roomInfo,            // room info for the room being updated
-			stateAtEvent,        // state at event (below)
-			event,               // event
-			input.SendAsServer,  // send as server
-			input.TransactionID, // transaction ID
-			input.HasState,      // rewrites state?
-		); err != nil {
-			return "", fmt.Errorf("r.updateLatestEvents: %w", err)
-		}
+	if err = r.updateLatestEvents(
+		ctx,                 // context
+		roomInfo,            // room info for the room being updated
+		stateAtEvent,        // state at event (below)
+		input.Kind,          // kind of event
+		event,               // event
+		input.SendAsServer,  // send as server
+		input.TransactionID, // transaction ID
+		input.HasState,      // rewrites state?
+	); err != nil {
+		return "", fmt.Errorf("r.updateLatestEvents: %w", err)
 	}
 
 	// processing this event resulted in an event (which may not be the one we're processing)
