@@ -71,7 +71,7 @@ func SendToDevice(
 // SendReceipt sends a receipt event to EDU Server
 func SendReceipt(
 	ctx context.Context,
-	eduAPI EDUServerInputAPI, userID, roomID, eventID, eventType string,
+	eduAPI EDUServerInputAPI, userID, roomID, eventID, receiptType string,
 	timestamp gomatrixserverlib.Timestamp,
 ) error {
 	request := InputReceiptEventRequest{
@@ -79,7 +79,7 @@ func SendReceipt(
 			UserID:    userID,
 			RoomID:    roomID,
 			EventID:   eventID,
-			Type:      eventType,
+			Type:      receiptType,
 			Timestamp: timestamp,
 		},
 	}

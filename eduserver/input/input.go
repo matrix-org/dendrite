@@ -177,6 +177,7 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 }
 
 // InputReceiptEvent implements api.EDUServerInputAPI
+// TODO: Intelligently batch requests sent by the same user (e.g wait a few milliseconds before emitting output events)
 func (t *EDUServerInputAPI) InputReceiptEvent(
 	ctx context.Context,
 	request *api.InputReceiptEventRequest,
