@@ -146,7 +146,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
-	if msg.RewritesState {
+	if msg.IsForwardExtremity && msg.RewritesState {
 		if err = s.db.PurgeRoom(ctx, ev.RoomID()); err != nil {
 			return fmt.Errorf("s.db.PurgeRoom: %w", err)
 		}
@@ -159,7 +159,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
-		false,
+		!msg.IsForwardExtremity,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
