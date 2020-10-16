@@ -540,10 +540,10 @@ func (d *Database) addTypingDeltaToResponse(
 	joinedRoomIDs []string,
 	res *types.Response,
 ) error {
-	var jr types.JoinResponse
 	var ok bool
 	var err error
 	for _, roomID := range joinedRoomIDs {
+		var jr types.JoinResponse
 		if typingUsers, updated := d.EDUCache.GetTypingUsersIfUpdatedAfter(
 			roomID, int64(since.EDUPosition()),
 		); updated {
@@ -574,9 +574,16 @@ func (d *Database) addReceiptDeltaToResponse(
 	joinedRoomIDs []string,
 	res *types.Response,
 ) error {
-	var jr types.JoinResponse
+	// TODO: pass joinedRoomIDs to SelectRoomReceiptsAfter instead of iterating over every room
 	// check all joinedRooms for receipts
 	for _, roomID := range joinedRoomIDs {
+		var jr types.JoinResponse
+		var ok bool
+		// Check if there's already a JoinResponse for this room,
+		// otherwise use a new one
+		if jr, ok = res.Rooms.Join[roomID]; !ok {
+			jr = types.JoinResponse{}
+		}
 		receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), roomID, since.EDUPosition())
 		if err != nil {
 			return err
@@ -603,6 +610,11 @@ func (d *Database) addReceiptDeltaToResponse(
 				return err
 			}
 			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
+			res.Rooms.Join[roomID] = jr
+		}
+		// Only add new events if we didn't find the room in the map.
+		// If we found the room, they should already be added
+		if !ok {
 			res.Rooms.Join[roomID] = jr
 		}
 	}
