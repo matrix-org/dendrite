@@ -146,7 +146,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
-	if msg.IsForwardExtremity && msg.RewritesState {
+	if msg.RewritesState {
 		if err = s.db.PurgeRoom(ctx, ev.RoomID()); err != nil {
 			return fmt.Errorf("s.db.PurgeRoom: %w", err)
 		}
