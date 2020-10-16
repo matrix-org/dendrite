@@ -32,11 +32,13 @@ const (
 	// KindNew event extend the contiguous graph going forwards.
 	// They usually don't need state, but may include state if the
 	// there was a new event that references an event that we don't
-	// have a copy of.
+	// have a copy of. New events will influence the fwd extremities
+	// of the room and output events will be generated as a result.
 	KindNew
 	// KindOld event extend the graph backwards, or fill gaps in
-	// history. They may or may not include state, and they will not
-	// be considered as candidates for forward extremities.
+	// history. They may or may not include state. They will not be
+	// considered for forward extremities, and output events will NOT
+	// be generated for them.
 	KindOld
 )
 
