@@ -248,7 +248,6 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		// returned state to the roomserver to update our local view.
 		if err = roomserverAPI.SendEventWithState(
 			ctx, r.rsAPI,
-			roomserverAPI.KindNew,
 			respState,
 			event.Headered(respMakeJoin.RoomVersion),
 			nil,
