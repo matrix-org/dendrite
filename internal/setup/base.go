@@ -15,8 +15,10 @@
 package setup
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -25,6 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -107,7 +111,15 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
-	apiClient := http.Client{Timeout: time.Minute * 10}
+	apiClient := http.Client{
+		Timeout: time.Minute * 10,
+		Transport: &http2.Transport{
+			AllowHTTP: true,
+			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+				return net.Dial(network, addr)
+			},
+		},
+	}
 	client := http.Client{Timeout: HTTPClientTimeout}
 	if cfg.FederationSender.Proxy.Enabled {
 		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
@@ -269,10 +281,11 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	internalServ := externalServ
 
 	if internalAddr != NoListener && externalAddr != internalAddr {
+		internalH2S := &http2.Server{}
 		internalRouter = mux.NewRouter().SkipClean(true).UseEncodedPath()
 		internalServ = &http.Server{
 			Addr:    string(internalAddr),
-			Handler: internalRouter,
+			Handler: h2c.NewHandler(internalRouter, internalH2S),
 		}
 	}
 
