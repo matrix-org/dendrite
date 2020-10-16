@@ -17,15 +17,14 @@ package postgres
 import (
 	"context"
 	"database/sql"
-
-	"github.com/matrix-org/dendrite/syncapi/types"
-
-	"github.com/matrix-org/gomatrixserverlib"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
-	"github.com/pkg/errors"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const receiptsSchema = `
@@ -71,10 +70,10 @@ func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 		db: db,
 	}
 	if r.upsertReceipt, err = db.Prepare(upsertReceipt); err != nil {
-		return nil, errors.Wrap(err, "unable to prepare upsertReceipt statement")
+		return nil, fmt.Errorf("unable to prepare upsertReceipt statement: %w", err)
 	}
 	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
-		return nil, errors.Wrap(err, "unable to prepare selectRoomReceipts statement")
+		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
 	}
 	return r, nil
 }
@@ -85,22 +84,20 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 	return
 }
 
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]api.InputReceiptEvent, error) {
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]api.OutputReceiptEvent, error) {
 	rows, err := r.selectRoomReceipts.QueryContext(ctx, roomId, streamPos)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to query room receipts")
+		return nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}
-	var res []api.InputReceiptEvent
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomReceiptsAfter: rows.close() failed")
+	var res []api.OutputReceiptEvent
 	for rows.Next() {
-		r := api.InputReceiptEvent{}
+		r := api.OutputReceiptEvent{}
 		err = rows.Scan(&r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
 		if err != nil {
-			return res, errors.Wrap(err, "unable to scan row to api.Receipts")
+			return res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
 		}
 		res = append(res, r)
 	}
-	if rows.Err() != nil || rows.Close() != nil {
-		return res, errors.Wrap(err, "error while scanning rows or error closing rows")
-	}
-	return res, nil
+	return res, rows.Err()
 }

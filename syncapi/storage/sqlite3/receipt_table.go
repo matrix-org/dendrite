@@ -17,16 +17,14 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-
-	"github.com/matrix-org/dendrite/syncapi/types"
-
-	"github.com/matrix-org/gomatrixserverlib"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/eduserver/api"
-
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
-	"github.com/pkg/errors"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const receiptsSchema = `
@@ -49,7 +47,7 @@ const upsertReceipt = "" +
 	" (id, room_id, receipt_type, user_id, event_id, receipt_ts)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT (room_id, receipt_type, user_id)" +
-	" DO UPDATE SET id = $1, event_id = $5, receipt_ts = $6"
+	" DO UPDATE SET id = $7, event_id = $8, receipt_ts = $9"
 
 const selectRoomReceipts = "" +
 	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
@@ -73,10 +71,10 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Re
 		streamIDStatements: streamID,
 	}
 	if r.upsertReceipt, err = db.Prepare(upsertReceipt); err != nil {
-		return nil, errors.Wrap(err, "unable to prepare upsertReceipt statement")
+		return nil, fmt.Errorf("unable to prepare upsertReceipt statement: %w", err)
 	}
 	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
-		return nil, errors.Wrap(err, "unable to prepare selectRoomReceipts statement")
+		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
 	}
 	return r, nil
 }
@@ -88,27 +86,25 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 		return
 	}
 	stmt := sqlutil.TxStmt(txn, r.upsertReceipt)
-	_, err = stmt.ExecContext(ctx, pos, roomId, receiptType, userId, eventId, timestamp)
+	_, err = stmt.ExecContext(ctx, pos, roomId, receiptType, userId, eventId, timestamp, pos, eventId, timestamp)
 	return
 }
 
 // SelectRoomReceiptsAfter select all receipts for a given room after a specific timestamp
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]api.InputReceiptEvent, error) {
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]api.OutputReceiptEvent, error) {
 	rows, err := r.selectRoomReceipts.QueryContext(ctx, roomId, streamPos)
 	if err != nil {
-		return []api.InputReceiptEvent{}, errors.Wrap(err, "unable to query room receipts")
+		return nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}
-	var res []api.InputReceiptEvent
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomReceiptsAfter: rows.close() failed")
+	var res []api.OutputReceiptEvent
 	for rows.Next() {
-		r := api.InputReceiptEvent{}
+		r := api.OutputReceiptEvent{}
 		err = rows.Scan(&r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
 		if err != nil {
-			return res, errors.Wrap(err, "unable to scan row to types.Receipts")
+			return res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
 		}
 		res = append(res, r)
 	}
-	if rows.Err() != nil {
-		return res, errors.Wrap(err, "error while scanning rows")
-	}
-	return res, rows.Close()
+	return res, rows.Err()
 }
