@@ -85,7 +85,6 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 			logger = logger.WithFields(log.Fields{
 				"event_type":     updates[i].NewRoomEvent.Event.Type(),
 				"event_id":       updates[i].NewRoomEvent.Event.EventID(),
-				"is_fwd_extrem":  updates[i].NewRoomEvent.IsForwardExtremity,
 				"adds_state":     len(updates[i].NewRoomEvent.AddsStateEventIDs),
 				"removes_state":  len(updates[i].NewRoomEvent.RemovesStateEventIDs),
 				"send_as_server": updates[i].NewRoomEvent.SendAsServer,

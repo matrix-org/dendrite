@@ -103,8 +103,6 @@ type latestEventsUpdater struct {
 	lastEventIDSent string
 	// The latest events in the room after processing this event.
 	latest []types.StateAtEventAndReference
-	// Is the event now a current forward extremity?
-	isForwardExtremity bool
 	// The state entries removed from and added to the current state of the
 	// room as a result of processing this event. They are sorted lists.
 	removed []types.StateEntry
@@ -290,7 +288,6 @@ func (u *latestEventsUpdater) calculateLatest(
 			// We've already referenced this new event so we can just return
 			// the newly completed extremities at this point.
 			u.latest = newLatest
-			u.isForwardExtremity = true
 			return nil
 		}
 	}
@@ -305,7 +302,6 @@ func (u *latestEventsUpdater) calculateLatest(
 		return fmt.Errorf("u.updater.IsReferenced (new): %w", err)
 	} else if !referenced || len(newLatest) == 0 {
 		newLatest = append(newLatest, newEvent)
-		u.isForwardExtremity = true
 	}
 
 	u.latest = newLatest
@@ -320,31 +316,28 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:              u.event.Headered(u.roomInfo.RoomVersion),
-		IsForwardExtremity: u.isForwardExtremity,
-		RewritesState:      u.rewritesState,
-		LastSentEventID:    u.lastEventIDSent,
-		LatestEventIDs:     latestEventIDs,
-		TransactionID:      u.transactionID,
+		Event:           u.event.Headered(u.roomInfo.RoomVersion),
+		RewritesState:   u.rewritesState,
+		LastSentEventID: u.lastEventIDSent,
+		LatestEventIDs:  latestEventIDs,
+		TransactionID:   u.transactionID,
 	}
 
-	if u.isForwardExtremity {
-		eventIDMap, err := u.stateEventMap()
-		if err != nil {
-			return nil, err
-		}
-		for _, entry := range u.added {
-			ore.AddsStateEventIDs = append(ore.AddsStateEventIDs, eventIDMap[entry.EventNID])
-		}
-		for _, entry := range u.removed {
-			ore.RemovesStateEventIDs = append(ore.RemovesStateEventIDs, eventIDMap[entry.EventNID])
-		}
-		for _, entry := range u.stateBeforeEventRemoves {
-			ore.StateBeforeRemovesEventIDs = append(ore.StateBeforeRemovesEventIDs, eventIDMap[entry.EventNID])
-		}
-		for _, entry := range u.stateBeforeEventAdds {
-			ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
-		}
+	eventIDMap, err := u.stateEventMap()
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range u.added {
+		ore.AddsStateEventIDs = append(ore.AddsStateEventIDs, eventIDMap[entry.EventNID])
+	}
+	for _, entry := range u.removed {
+		ore.RemovesStateEventIDs = append(ore.RemovesStateEventIDs, eventIDMap[entry.EventNID])
+	}
+	for _, entry := range u.stateBeforeEventRemoves {
+		ore.StateBeforeRemovesEventIDs = append(ore.StateBeforeRemovesEventIDs, eventIDMap[entry.EventNID])
+	}
+	for _, entry := range u.stateBeforeEventAdds {
+		ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
 	}
 
 	ore.SendAsServer = u.sendAsServer

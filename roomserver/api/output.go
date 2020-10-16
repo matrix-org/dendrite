@@ -91,9 +91,6 @@ const (
 type OutputNewRoomEvent struct {
 	// The Event.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
-	// Is the event a forward extremity in the room at the time of the output event
-	// being generated?
-	IsForwardExtremity bool `json:"is_forward_extremity"`
 	// Does the event completely rewrite the room state? If so, then AddsStateEventIDs
 	// will contain the entire room state.
 	RewritesState bool `json:"rewrites_state"`

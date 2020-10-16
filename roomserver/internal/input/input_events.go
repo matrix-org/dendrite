@@ -119,7 +119,7 @@ func (r *Inputer) processRoomEvent(
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, input, *roomInfo, &stateAtEvent, event, isRejected)
-		if err != nil {
+		if err != nil && input.Kind != api.KindOld {
 			return "", fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
 	}
