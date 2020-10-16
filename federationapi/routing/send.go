@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -393,7 +392,7 @@ func (t *txnReq) processReceiptEvent(ctx context.Context,
 		}
 		resp := eduserverAPI.InputReceiptEventResponse{}
 		if err := t.eduAPI.InputReceiptEvent(ctx, &req, &resp); err != nil {
-			return errors.Wrap(err, "unable to set receipt event")
+			return fmt.Errorf("unable to set receipt event: %w", err)
 		}
 	}
 
