@@ -73,8 +73,13 @@ func (l *rateLimits) rateLimit(req *http.Request) *util.JSONResponse {
 	// let's create one.
 	rateLimit, ok := l.limits[caller]
 	if !ok {
-		l.limits[caller] = make(chan struct{}, l.requestThreshold)
-		rateLimit = l.limits[caller]
+		rateLimit = make(chan struct{}, l.requestThreshold)
+
+		l.limitsMutex.RUnlock()
+		l.limitsMutex.Lock()
+		l.limits[caller] = rateLimit
+		l.limitsMutex.Unlock()
+		l.limitsMutex.RLock()
 	}
 
 	// Check if the user has got free resource slots for this request.
