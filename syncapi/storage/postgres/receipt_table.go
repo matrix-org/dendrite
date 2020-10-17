@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -53,7 +54,7 @@ const upsertReceipt = "" +
 const selectRoomReceipts = "" +
 	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
-	" WHERE room_id = $1 AND id > $2"
+	" WHERE room_id in $1 AND id > $2"
 
 type receiptStatements struct {
 	db                 *sql.DB
@@ -84,8 +85,8 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 	return
 }
 
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]api.OutputReceiptEvent, error) {
-	rows, err := r.selectRoomReceipts.QueryContext(ctx, roomId, streamPos)
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]api.OutputReceiptEvent, error) {
+	rows, err := r.selectRoomReceipts.QueryContext(ctx, pq.Array(roomIDs), streamPos)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}

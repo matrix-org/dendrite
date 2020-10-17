@@ -574,19 +574,25 @@ func (d *Database) addReceiptDeltaToResponse(
 	joinedRoomIDs []string,
 	res *types.Response,
 ) error {
-	// TODO: pass joinedRoomIDs to SelectRoomReceiptsAfter instead of iterating over every room
-	// check all joinedRooms for receipts
-	for _, roomID := range joinedRoomIDs {
+	receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), joinedRoomIDs, since.EDUPosition())
+	if err != nil {
+		return fmt.Errorf("unable to select receipts for rooms: %w", err)
+	}
+
+	// Group receipts by room, so we can create one ClientEvent for every room
+	receiptsByRoom := make(map[string][]eduAPI.OutputReceiptEvent)
+	for _, receipt := range receipts {
+		receiptsByRoom[receipt.RoomID] = append(receiptsByRoom[receipt.RoomID], receipt)
+	}
+
+	for roomID, receipts := range receiptsByRoom {
 		var jr types.JoinResponse
 		var ok bool
-		// Check if there's already a JoinResponse for this room,
-		// otherwise use a new one
+
+		// Make sure we use an existing JoinResponse if there is one.
+		// If not, we'll create a new one
 		if jr, ok = res.Rooms.Join[roomID]; !ok {
 			jr = types.JoinResponse{}
-		}
-		receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), roomID, since.EDUPosition())
-		if err != nil {
-			return err
 		}
 
 		ev := gomatrixserverlib.ClientEvent{
@@ -604,19 +610,14 @@ func (d *Database) addReceiptDeltaToResponse(
 					},
 				},
 			}
+		}
+		ev.Content, err = json.Marshal(content)
+		if err != nil {
+			return err
+		}
 
-			ev.Content, err = json.Marshal(content)
-			if err != nil {
-				return err
-			}
-			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
-			res.Rooms.Join[roomID] = jr
-		}
-		// Only add new events if we didn't find the room in the map.
-		// If we found the room, they should already be added
-		if !ok {
-			res.Rooms.Join[roomID] = jr
-		}
+		jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
+		res.Rooms.Join[roomID] = jr
 	}
 
 	return nil
@@ -1487,6 +1488,6 @@ func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId
 	return
 }
 
-func (d *Database) GetRoomReceipts(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error) {
-	return d.Receipts.SelectRoomReceiptsAfter(ctx, roomId, streamPos)
+func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error) {
+	return d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
 }

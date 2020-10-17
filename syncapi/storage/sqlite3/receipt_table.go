@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -52,7 +53,7 @@ const upsertReceipt = "" +
 const selectRoomReceipts = "" +
 	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
-	" WHERE room_id = $1 AND id > $2"
+	" WHERE id > $1 and room_id in ($2)"
 
 type receiptStatements struct {
 	db                 *sql.DB
@@ -91,8 +92,15 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 }
 
 // SelectRoomReceiptsAfter select all receipts for a given room after a specific timestamp
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomId string, streamPos types.StreamPosition) ([]api.OutputReceiptEvent, error) {
-	rows, err := r.selectRoomReceipts.QueryContext(ctx, roomId, streamPos)
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]api.OutputReceiptEvent, error) {
+	selectSQL := strings.Replace(selectRoomReceipts, "($2)", sqlutil.QueryVariadicOffset(len(roomIDs), 1), 1)
+
+	params := make([]interface{}, len(roomIDs)+1)
+	params[0] = streamPos
+	for k, v := range roomIDs {
+		params[k+1] = v
+	}
+	rows, err := r.db.QueryContext(ctx, selectSQL, params...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}
