@@ -54,7 +54,7 @@ const upsertReceipt = "" +
 const selectRoomReceipts = "" +
 	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
-	" WHERE room_id in $1 AND id > $2"
+	" WHERE room_id = $1 AND id > $2"
 
 type receiptStatements struct {
 	db                 *sql.DB
@@ -63,10 +63,7 @@ type receiptStatements struct {
 }
 
 func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
-	_, err := db.Exec(receiptsSchema)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 	r := &receiptStatements{
 		db: db,
 	}
@@ -77,6 +74,11 @@ func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
 	}
 	return r, nil
+}
+
+func (r *receiptStatements) execSchema(db *sql.DB) error {
+	_, err := db.Exec(receiptsSchema)
+	return err
 }
 
 func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error) {
