@@ -37,6 +37,8 @@ type SyncServerDatasource struct {
 	sqlutil.PartitionOffsetStatements
 }
 
+const createSequence = "CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;"
+
 // NewDatabase creates a new sync server database
 func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
@@ -45,6 +47,11 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		return nil, err
 	}
 	d.writer = sqlutil.NewDummyWriter()
+
+	// Make sure the required, for most tables, exists.
+	if _, err = d.db.Exec(createSequence); err != nil {
+		return nil, err
+	}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
 	// and THEN prepare statements so we don't fail due to referencing new columns
