@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"bytes"
 	"mime"
 	"net/http"
 	"net/url"
@@ -692,16 +694,36 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 	defer resp.Body.Close() // nolint: errcheck
 
-	// get metadata from request and set metadata on response
-	contentLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
-	if err != nil {
-		r.Logger.WithError(err).Warn("Failed to parse content length")
-		return "", false, errors.Wrap(err, "invalid response from remote server")
+	var reader io.Reader
+	var contentLength int64
+	
+	if resp.Header.Get("Content-Length") != "" {
+		parsedLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
+
+		if err != nil {
+			r.Logger.WithError(err).Warn("Failed to parse content length")
+			return "", false, errors.Wrap(err, "invalid response from remote server")
+		}
+
+		reader = resp.Body
+		contentLength = parsedLength
+	} else {
+		// Content-Length header is missing, we need to read the whole body to get its length
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			r.Logger.WithError(err).Warn("Could not read response body from remote server")	
+			return "", false, fmt.Errorf("file could not be downloaded from remote server")
+		}
+
+		contentLength = int64(len(bodyBytes))
+		reader = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))		
 	}
+	
 	if contentLength > int64(maxFileSizeBytes) {
 		// TODO: Bubble up this as a 413
 		return "", false, fmt.Errorf("remote file is too large (%v > %v bytes)", contentLength, maxFileSizeBytes)
 	}
+
 	r.MediaMetadata.FileSizeBytes = types.FileSizeBytes(contentLength)
 	r.MediaMetadata.ContentType = types.ContentType(resp.Header.Get("Content-Type"))
 
@@ -728,7 +750,7 @@ func (r *downloadRequest) fetchRemoteFile(
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	// Data is truncated to maxFileSizeBytes. Content-Length was reported as 0 < Content-Length <= maxFileSizeBytes so this is OK.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, resp.Body, maxFileSizeBytes, absBasePath)
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reader, maxFileSizeBytes, absBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": maxFileSizeBytes,
