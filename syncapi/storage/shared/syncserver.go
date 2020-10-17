@@ -596,7 +596,7 @@ func (d *Database) addReceiptDeltaToResponse(
 		}
 
 		ev := gomatrixserverlib.ClientEvent{
-			Type:   "m.receipt",
+			Type:   gomatrixserverlib.MReceipt,
 			RoomID: roomID,
 		}
 		content := map[string]interface{}{}

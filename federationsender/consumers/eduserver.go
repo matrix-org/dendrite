@@ -242,7 +242,7 @@ func (t *OutputEDUConsumer) onReceiptEvent(msg *sarama.ConsumerMessage) error {
 	}
 
 	edu := &gomatrixserverlib.EDU{
-		Type:   "m.receipt",
+		Type:   gomatrixserverlib.MReceipt,
 		Origin: string(t.ServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {

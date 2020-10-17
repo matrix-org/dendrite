@@ -322,7 +322,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			}
 		case gomatrixserverlib.MDeviceListUpdate:
 			t.processDeviceListUpdate(ctx, e)
-		case "m.receipt": // to be replaced by gomatrixserverlib.MReceipt
+		case gomatrixserverlib.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
 			payload := receiptPayload{}
 
