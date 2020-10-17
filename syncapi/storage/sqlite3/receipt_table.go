@@ -63,7 +63,10 @@ type receiptStatements struct {
 }
 
 func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Receipts, error) {
-	var err error
+	_, err := db.Exec(receiptsSchema)
+	if err != nil {
+		return nil, err
+	}
 	r := &receiptStatements{
 		db:                 db,
 		streamIDStatements: streamID,
@@ -75,11 +78,6 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Re
 		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
 	}
 	return r, nil
-}
-
-func (r *receiptStatements) execSchema(db *sql.DB) error {
-	_, err := db.Exec(receiptsSchema)
-	return err
 }
 
 // UpsertReceipt creates new user receipts

@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
-	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -47,18 +46,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		return nil, err
 	}
 	d.writer = sqlutil.NewExclusiveWriter()
-
-	// Create tables before executing migrations so we don't fail if the table is missing,
-	// and THEN prepare statements so we don't fail due to referencing new columns
-	r := receiptStatements{}
-	if err = r.execSchema(d.db); err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadCreateReceiptTable(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
-		return nil, err
-	}
 	if err = d.prepare(); err != nil {
 		return nil, err
 	}
