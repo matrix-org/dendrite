@@ -108,7 +108,7 @@ func main() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsImpl.SetFederationSenderAPI(fsAPI)
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI, base.KafkaProducer)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -127,13 +127,11 @@ func main() {
 	}
 
 	monolith := setup.Monolith{
-		Config:        base.Cfg,
-		AccountDB:     accountDB,
-		Client:        base.CreateClient(),
-		FedClient:     federation,
-		KeyRing:       keyRing,
-		KafkaConsumer: base.KafkaConsumer,
-		KafkaProducer: base.KafkaProducer,
+		Config:    base.Cfg,
+		AccountDB: accountDB,
+		Client:    base.CreateClient(),
+		FedClient: federation,
+		KeyRing:   keyRing,
 
 		AppserviceAPI:       asAPI,
 		EDUInternalAPI:      eduInputAPI,

@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS roomserver_redactions (
 `
 
 const insertRedactionSQL = "" +
-	"INSERT INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
+	"INSERT OR IGNORE INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
 	" VALUES ($1, $2, $3)"
 
 const selectRedactionInfoByRedactionEventIDSQL = "" +

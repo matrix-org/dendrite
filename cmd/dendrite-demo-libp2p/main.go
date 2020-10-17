@@ -89,7 +89,7 @@ func createClient(
 		"matrix",
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
-	return gomatrixserverlib.NewClientWithTransport(true, tr)
+	return gomatrixserverlib.NewClientWithTransport(tr)
 }
 
 func main() {
@@ -139,7 +139,7 @@ func main() {
 
 	accountDB := base.Base.CreateAccountsDB()
 	federation := createFederationClient(base)
-	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation, base.Base.KafkaProducer)
+	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -169,13 +169,11 @@ func main() {
 	}
 
 	monolith := setup.Monolith{
-		Config:        base.Base.Cfg,
-		AccountDB:     accountDB,
-		Client:        createClient(base),
-		FedClient:     federation,
-		KeyRing:       keyRing,
-		KafkaConsumer: base.Base.KafkaConsumer,
-		KafkaProducer: base.Base.KafkaProducer,
+		Config:    base.Base.Cfg,
+		AccountDB: accountDB,
+		Client:    createClient(base),
+		FedClient: federation,
+		KeyRing:   keyRing,
 
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,

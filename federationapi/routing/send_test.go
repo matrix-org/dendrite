@@ -491,7 +491,7 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 		queryMissingAuthPrevEvents: func(req *api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse {
 			return api.QueryMissingAuthPrevEventsResponse{
 				RoomExists:          true,
-				MissingAuthEventIDs: []string{"create_event"},
+				MissingAuthEventIDs: []string{},
 				MissingPrevEventIDs: []string{},
 			}
 		},
@@ -516,6 +516,23 @@ func TestTransactionFetchMissingPrevEvents(t *testing.T) {
 
 	var rsAPI *testRoomserverAPI // ref here so we can refer to inputRoomEvents inside these functions
 	rsAPI = &testRoomserverAPI{
+		queryEventsByID: func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse {
+			res := api.QueryEventsByIDResponse{}
+			for _, ev := range testEvents {
+				for _, id := range req.EventIDs {
+					if ev.EventID() == id {
+						res.Events = append(res.Events, ev)
+					}
+				}
+			}
+			return res
+		},
+		queryStateAfterEvents: func(req *api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse {
+			return api.QueryStateAfterEventsResponse{
+				PrevEventsExist: true,
+				StateEvents:     testEvents[:5],
+			}
+		},
 		queryMissingAuthPrevEvents: func(req *api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse {
 			missingPrevEvent := []string{"missing_prev_event"}
 			if len(req.PrevEventIDs) == 1 {

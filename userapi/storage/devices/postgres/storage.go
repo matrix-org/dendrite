@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/devices/postgres/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -42,9 +43,22 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, err
 	}
 	d := devicesStatements{}
+
+	// Create tables before executing migrations so we don't fail if the table is missing,
+	// and THEN prepare statements so we don't fail due to referencing new columns
+	if err = d.execSchema(db); err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadLastSeenTSIP(m)
+	if err = m.RunDeltas(db, dbProperties); err != nil {
+		return nil, err
+	}
+
 	if err = d.prepare(db, serverName); err != nil {
 		return nil, err
 	}
+
 	return &Database{db, d}, nil
 }
 

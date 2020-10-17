@@ -6,6 +6,9 @@ services:
     restart: always
     volumes:
       - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
+    # To persist your PostgreSQL databases outside of the Docker image, to 
+    # prevent data loss, you will need to add something like this:
+    #  - ./path/to/persistent/storage:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: itsasecret
       POSTGRES_USER: dendrite
@@ -26,6 +29,8 @@ services:
       KAFKA_ADVERTISED_HOST_NAME: "kafka"
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+    ports:
+      - 9092:9092
     depends_on:
       - zookeeper
     networks:

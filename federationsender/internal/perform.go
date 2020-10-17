@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -42,7 +43,7 @@ type federatedJoin struct {
 	RoomID string
 }
 
-// PerformJoinRequest implements api.FederationSenderInternalAPI
+// PerformJoin implements api.FederationSenderInternalAPI
 func (r *FederationSenderInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *api.PerformJoinRequest,
@@ -174,8 +175,10 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 
 	// Work out if we support the room version that has been supplied in
 	// the make_join response.
+	// "If not provided, the room version is assumed to be either "1" or "2"."
+	// https://matrix.org/docs/spec/server_server/unstable#get-matrix-federation-v1-make-join-roomid-userid
 	if respMakeJoin.RoomVersion == "" {
-		respMakeJoin.RoomVersion = gomatrixserverlib.RoomVersionV1
+		respMakeJoin.RoomVersion = setDefaultRoomVersionFromJoinEvent(respMakeJoin.JoinEvent)
 	}
 	if _, err = respMakeJoin.RoomVersion.EventFormat(); err != nil {
 		return fmt.Errorf("respMakeJoin.RoomVersion.EventFormat: %w", err)
@@ -193,6 +196,11 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
 	}
 
+	// No longer reuse the request context from this point forward.
+	// We don't want the client timing out to interrupt the join.
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(context.Background())
+
 	// Try to perform a send_join using the newly built event.
 	respSendJoin, err := r.federation.SendJoin(
 		ctx,
@@ -202,17 +210,23 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	)
 	if err != nil {
 		r.statistics.ForServer(serverName).Failure()
+		cancel()
 		return fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
 	r.statistics.ForServer(serverName).Success()
+
+	// Sanity-check the join response to ensure that it has a create
+	// event, that the room version is known, etc.
+	if err := sanityCheckSendJoinResponse(respSendJoin); err != nil {
+		cancel()
+		return fmt.Errorf("sanityCheckSendJoinResponse: %w", err)
+	}
 
 	// Process the join response in a goroutine. The idea here is
 	// that we'll try and wait for as long as possible for the work
 	// to complete, but if the client does give up waiting, we'll
 	// still continue to process the join anyway so that we don't
 	// waste the effort.
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(context.Background())
 	go func() {
 		defer cancel()
 
@@ -423,4 +437,54 @@ func (r *FederationSenderInternalAPI) PerformBroadcastEDU(
 	}
 
 	return nil
+}
+
+func sanityCheckSendJoinResponse(respSendJoin gomatrixserverlib.RespSendJoin) error {
+	// sanity check we have a create event and it has a known room version
+	for _, ev := range respSendJoin.AuthEvents {
+		if ev.Type() == gomatrixserverlib.MRoomCreate && ev.StateKeyEquals("") {
+			// make sure the room version is known
+			content := ev.Content()
+			verBody := struct {
+				Version string `json:"room_version"`
+			}{}
+			err := json.Unmarshal(content, &verBody)
+			if err != nil {
+				return err
+			}
+			if verBody.Version == "" {
+				// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-create
+				// The version of the room. Defaults to "1" if the key does not exist.
+				verBody.Version = "1"
+			}
+			knownVersions := gomatrixserverlib.RoomVersions()
+			if _, ok := knownVersions[gomatrixserverlib.RoomVersion(verBody.Version)]; !ok {
+				return fmt.Errorf("send_join m.room.create event has an unknown room version: %s", verBody.Version)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("send_join response is missing m.room.create event")
+}
+
+func setDefaultRoomVersionFromJoinEvent(joinEvent gomatrixserverlib.EventBuilder) gomatrixserverlib.RoomVersion {
+	// if auth events are not event references we know it must be v3+
+	// we have to do these shenanigans to satisfy sytest, specifically for:
+	// "Outbound federation rejects m.room.create events with an unknown room version"
+	hasEventRefs := true
+	authEvents, ok := joinEvent.AuthEvents.([]interface{})
+	if ok {
+		if len(authEvents) > 0 {
+			_, ok = authEvents[0].(string)
+			if ok {
+				// event refs are objects, not strings, so we know we must be dealing with a v3+ room.
+				hasEventRefs = false
+			}
+		}
+	}
+
+	if hasEventRefs {
+		return gomatrixserverlib.RoomVersionV1
+	}
+	return gomatrixserverlib.RoomVersionV4
 }

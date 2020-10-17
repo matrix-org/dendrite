@@ -141,14 +141,14 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 	fed := gomatrixserverlib.NewFederationClient(
 		cfg.Global.ServerName, cfg.Global.KeyID, cfg.Global.PrivateKey, true,
 	)
-	fed.Client = *gomatrixserverlib.NewClientWithTransport(true, tr)
+	fed.Client = *gomatrixserverlib.NewClientWithTransport(tr)
 
 	return fed
 }
 
 func createClient(node *go_http_js_libp2p.P2pLocalNode) *gomatrixserverlib.Client {
 	tr := go_http_js_libp2p.NewP2pTransport(node)
-	return gomatrixserverlib.NewClientWithTransport(true, tr)
+	return gomatrixserverlib.NewClientWithTransport(tr)
 }
 
 func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
@@ -190,7 +190,7 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	federation := createFederationClient(cfg, node)
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -212,13 +212,11 @@ func main() {
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
 
 	monolith := setup.Monolith{
-		Config:        base.Cfg,
-		AccountDB:     accountDB,
-		Client:        createClient(node),
-		FedClient:     federation,
-		KeyRing:       &keyRing,
-		KafkaConsumer: base.KafkaConsumer,
-		KafkaProducer: base.KafkaProducer,
+		Config:    base.Cfg,
+		AccountDB: accountDB,
+		Client:    createClient(node),
+		FedClient: federation,
+		KeyRing:   &keyRing,
 
 		AppserviceAPI:       asQuery,
 		EDUInternalAPI:      eduInputAPI,

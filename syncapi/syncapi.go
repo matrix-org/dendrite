@@ -17,11 +17,11 @@ package syncapi
 import (
 	"context"
 
-	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/internal/setup/kafka"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -37,13 +37,14 @@ import (
 // component.
 func AddPublicRoutes(
 	router *mux.Router,
-	consumer sarama.Consumer,
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
 	keyAPI keyapi.KeyInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
+	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+
 	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
