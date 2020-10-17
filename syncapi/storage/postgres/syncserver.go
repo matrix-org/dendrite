@@ -48,7 +48,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	}
 	d.writer = sqlutil.NewDummyWriter()
 
-	// Make sure the required, for most tables, exists.
+	// Make sure the required sequence, for most tables, exists. Must be executed before anything else.
 	if _, err = d.db.Exec(createSequence); err != nil {
 		return nil, err
 	}
