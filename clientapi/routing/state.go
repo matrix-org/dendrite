@@ -141,7 +141,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
 			return jsonerror.InternalServerError()
 		}
-		for _, ev := range stateRes.StateEvents {
+		for _, ev := range stateAfterRes.StateEvents {
 			stateEvents = append(
 				stateEvents,
 				gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll),
