@@ -30,6 +30,9 @@ If you want to run a polylith deployment, you also need:
 
 * Apache Kafka 0.10.2+
 
+Depending on your environment additional packages might be required for building to succeed.
+On Debian 10 install "build-essential" to be on the safe side: `apt install build-essential`
+
 ## Building up a monolith deploment
 
 Start by cloning the code:
@@ -109,7 +112,7 @@ Assuming that Postgres 9.5 (or later) is installed:
 * Create the component databases:
 
   ```bash
-  for i in account device mediaapi syncapi roomserver signingkeyserver federationsender appservice e2ekey naffka; do
+  for i in account device mediaapi syncapi roomserver signingkeyserver federationsender appservice e2ekey naffka userapi_accounts userapi_devices keyserver ; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
@@ -123,8 +126,17 @@ Each Dendrite server requires unique server keys.
 In order for an instance to federate correctly, you should have a valid
 certificate issued by a trusted authority, and private key to match. If you
 don't and just want to test locally, generate the self-signed SSL certificate
-for federation and the server signing key:
+for federation and the server signing key.
 
+`./bin/generate-keys` is used to generate keys and certificates.
+
+In order to just generate the Matrix private key use this:
+
+```bash
+./bin/generate-keys --private-key matrix_key.pem 
+```
+
+If you also need self-signed TLS-certificates use the following command: 
 ```bash
 ./bin/generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 ```
@@ -154,7 +166,7 @@ the monolith server. To do this, set `use_naffka: true` in your `dendrite.yaml`
 configuration and uncomment the relevant Naffka line in the `database` section.
 Be sure to update the database username and password if needed.
 
-The monolith server can be started as shown below. By default it listens for
+The monolith server can be started as shown below. By default, it listens for
 HTTP connections on port 8008, so you can configure your Matrix client to use
 `http://localhost:8008` as the server. If you set `--tls-cert` and `--tls-key`
 as shown below, it will also listen for HTTPS connections on port 8448.
@@ -295,3 +307,27 @@ amongst other things.
 ./bin/dendrite-user-api-server --config dendrite.yaml
 ```
 
+### Set up Systemd Services _(polylith)_
+
+In order to run the whole polylith deployment daemonized with Systemd
+the following script can set them up for you **(root-privileges required)**:
+```bash
+# ./install-polylith-systemd-units.sh
+```
+
+
+Example:
+
+```bash
+# ./install-polylith-systemd-units.sh -u dendrite -d /home/dendrite/server/ all
+```
+* user: dendrite
+* path: /home/dendrite/server/
+* selection: all
+
+In order to start all installed services the wrapper "polyDendrite.service" can be used:
+```bash
+# systemctl start polyDendrite.service
+```
+
+Monitor with
