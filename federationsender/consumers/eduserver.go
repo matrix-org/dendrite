@@ -189,13 +189,6 @@ func (t *OutputEDUConsumer) onTypingEvent(msg *sarama.ConsumerMessage) error {
 	return t.queues.SendEDU(edu, t.ServerName, names)
 }
 
-type userData struct {
-	Data struct {
-		Ts gomatrixserverlib.Timestamp `json:"ts"`
-	} `json:"data"`
-	EventIds []string `json:"event_ids"`
-}
-
 // onReceiptEvent is called in response to a message received on the receipt
 // events topic from the EDU server.
 func (t *OutputEDUConsumer) onReceiptEvent(msg *sarama.ConsumerMessage) error {

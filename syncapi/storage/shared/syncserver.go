@@ -604,7 +604,7 @@ func (d *Database) addReceiptDeltaToResponse(
 			User: make(map[string]eduAPI.ReceiptTS),
 		}
 		for _, receipt := range receipts {
-			read.User[receipt.UserID] = eduAPI.ReceiptTS{receipt.Timestamp}
+			read.User[receipt.UserID] = eduAPI.ReceiptTS{TS: receipt.Timestamp}
 			content[receipt.EventID] = read
 		}
 		ev.Content, err = json.Marshal(content)
