@@ -66,3 +66,22 @@ type OutputReceiptEvent struct {
 	Type      string                      `json:"type"`
 	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
 }
+
+// Helper structs for receipts json creation
+type ReceiptMRead struct {
+	User map[string]ReceiptTS `json:"m.read"`
+}
+
+type ReceiptTS struct {
+	TS gomatrixserverlib.Timestamp `json:"ts"`
+}
+
+// FederationSender output
+type FederationReceiptMRead struct {
+	User map[string]FederationReceiptData `json:"m.read"`
+}
+
+type FederationReceiptData struct {
+	Data     ReceiptTS `json:"data"`
+	EventIDs []string  `json:"event_ids"`
+}

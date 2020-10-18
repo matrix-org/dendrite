@@ -228,15 +228,14 @@ func (t *OutputEDUConsumer) onReceiptEvent(msg *sarama.ConsumerMessage) error {
 		names[i] = joined[i].ServerName
 	}
 
-	// TODO: easier/nicer creation of receipt EDUs
-	content := map[string]interface{}{}
-	content[receipt.RoomID] = map[string]interface{}{
-		"m.read": map[string]interface{}{
-			receipt.UserID: userData{
-				Data: struct {
-					Ts gomatrixserverlib.Timestamp `json:"ts"`
-				}{receipt.Timestamp},
-				EventIds: []string{receipt.EventID},
+	content := map[string]api.FederationReceiptMRead{}
+	content[receipt.RoomID] = api.FederationReceiptMRead{
+		User: map[string]api.FederationReceiptData{
+			receipt.UserID: {
+				Data: api.ReceiptTS{
+					TS: receipt.Timestamp,
+				},
+				EventIDs: []string{receipt.EventID},
 			},
 		},
 	}

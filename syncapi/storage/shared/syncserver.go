@@ -599,17 +599,13 @@ func (d *Database) addReceiptDeltaToResponse(
 			Type:   gomatrixserverlib.MReceipt,
 			RoomID: roomID,
 		}
-		content := map[string]interface{}{}
+		content := make(map[string]eduAPI.ReceiptMRead)
+		read := eduAPI.ReceiptMRead{
+			User: make(map[string]eduAPI.ReceiptTS),
+		}
 		for _, receipt := range receipts {
-			content[receipt.EventID] = map[string]interface{}{
-				"m.read": map[string]interface{}{
-					receipt.UserID: struct {
-						gomatrixserverlib.Timestamp `json:"ts"`
-					}{
-						receipt.Timestamp,
-					},
-				},
-			}
+			read.User[receipt.UserID] = eduAPI.ReceiptTS{receipt.Timestamp}
+			content[receipt.EventID] = read
 		}
 		ev.Content, err = json.Marshal(content)
 		if err != nil {
