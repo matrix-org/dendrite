@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"bytes"
 	"net/http"
 	"sync"
 
@@ -78,6 +79,29 @@ func SendEvent(
 	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, rsAPI)
 	if resErr != nil {
 		return *resErr
+	}
+
+	stateRes := api.QueryLatestEventsAndStateResponse{}
+	if err := rsAPI.QueryLatestEventsAndState(req.Context(), &api.QueryLatestEventsAndStateRequest{
+		RoomID:       roomID,
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{},
+	}, &stateRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
+		return jsonerror.InternalServerError()
+	}
+
+	// Check that currnet event doesn't match previous events
+	// If so return previous event
+	for _, ev := range stateRes.StateEvents {
+		if ev.Event.Type() == e.Type() &&
+			ev.Event.StateKeyEquals(*stateKey) &&
+			bytes.Equal(ev.Event.Content(), e.Content()) {
+			res := util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: sendEventResponse{ev.EventID()},
+			}
+			return res
+		}
 	}
 
 	var txnAndSessionID *api.TransactionID
