@@ -164,8 +164,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return fmt.Errorf("u.api.updateMemberships: %w", err)
 	}
 
-	var update *api.OutputEvent
-	update, err = u.makeOutputNewRoomEvent()
+	update, err := u.makeOutputNewRoomEvent()
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
 	}
@@ -259,6 +258,8 @@ func (u *latestEventsUpdater) latestState() error {
 	return nil
 }
 
+// calculateLatest works out the new set of forward extremities. Returns
+// true if the new event is included in those extremites, false otherwise.
 func (u *latestEventsUpdater) calculateLatest(
 	oldLatest []types.StateAtEventAndReference,
 	newEvent types.StateAtEventAndReference,
@@ -326,7 +327,6 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	if err != nil {
 		return nil, err
 	}
-
 	for _, entry := range u.added {
 		ore.AddsStateEventIDs = append(ore.AddsStateEventIDs, eventIDMap[entry.EventNID])
 	}
@@ -339,13 +339,14 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	for _, entry := range u.stateBeforeEventAdds {
 		ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
 	}
+
 	ore.SendAsServer = u.sendAsServer
 
 	// include extra state events if they were added as nearly every downstream component will care about it
 	// and we'd rather not have them all hit QueryEventsByID at the same time!
 	if len(ore.AddsStateEventIDs) > 0 {
-		ore.AddStateEvents, err = u.extraEventsForIDs(u.roomInfo.RoomVersion, ore.AddsStateEventIDs)
-		if err != nil {
+		var err error
+		if ore.AddStateEvents, err = u.extraEventsForIDs(u.roomInfo.RoomVersion, ore.AddsStateEventIDs); err != nil {
 			return nil, fmt.Errorf("failed to load add_state_events from db: %w", err)
 		}
 	}

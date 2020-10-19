@@ -403,6 +403,7 @@ func (t *txnReq) processEvent(ctx context.Context, e gomatrixserverlib.Event) er
 	return api.SendEvents(
 		context.Background(),
 		t.rsAPI,
+		api.KindNew,
 		[]gomatrixserverlib.HeaderedEvent{
 			e.Headered(stateResp.RoomVersion),
 		},
@@ -586,6 +587,7 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 	err = api.SendEventWithState(
 		context.Background(),
 		t.rsAPI,
+		api.KindOld,
 		resolvedState,
 		backwardsExtremity.Headered(roomVersion),
 		t.haveEventIDs(),
@@ -605,6 +607,7 @@ func (t *txnReq) processEventWithMissingState(ctx context.Context, e gomatrixser
 	if err = api.SendEvents(
 		context.Background(),
 		t.rsAPI,
+		api.KindOld,
 		append(headeredNewEvents, e.Headered(roomVersion)),
 		api.DoNotSendToOtherServers,
 		nil,

@@ -119,7 +119,7 @@ func (r *Inputer) processRoomEvent(
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, input, *roomInfo, &stateAtEvent, event, isRejected)
-		if err != nil {
+		if err != nil && input.Kind != api.KindOld {
 			return "", fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
 	}
@@ -136,16 +136,31 @@ func (r *Inputer) processRoomEvent(
 		return event.EventID(), rejectionErr
 	}
 
-	if err = r.updateLatestEvents(
-		ctx,                 // context
-		roomInfo,            // room info for the room being updated
-		stateAtEvent,        // state at event (below)
-		event,               // event
-		input.SendAsServer,  // send as server
-		input.TransactionID, // transaction ID
-		input.HasState,      // rewrites state?
-	); err != nil {
-		return "", fmt.Errorf("r.updateLatestEvents: %w", err)
+	switch input.Kind {
+	case api.KindNew:
+		if err = r.updateLatestEvents(
+			ctx,                 // context
+			roomInfo,            // room info for the room being updated
+			stateAtEvent,        // state at event (below)
+			event,               // event
+			input.SendAsServer,  // send as server
+			input.TransactionID, // transaction ID
+			input.HasState,      // rewrites state?
+		); err != nil {
+			return "", fmt.Errorf("r.updateLatestEvents: %w", err)
+		}
+	case api.KindOld:
+		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
+			{
+				Type: api.OutputTypeOldRoomEvent,
+				OldRoomEvent: &api.OutputOldRoomEvent{
+					Event: headered,
+				},
+			},
+		})
+		if err != nil {
+			return "", fmt.Errorf("r.WriteOutputEvents (old): %w", err)
+		}
 	}
 
 	// processing this event resulted in an event (which may not be the one we're processing)
@@ -163,7 +178,7 @@ func (r *Inputer) processRoomEvent(
 			},
 		})
 		if err != nil {
-			return "", fmt.Errorf("r.WriteOutputEvents: %w", err)
+			return "", fmt.Errorf("r.WriteOutputEvents (redactions): %w", err)
 		}
 	}
 

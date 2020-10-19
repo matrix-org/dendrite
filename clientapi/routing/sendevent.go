@@ -92,6 +92,7 @@ func SendEvent(
 	// event ID in case of duplicate transaction is discarded
 	if err := api.SendEvents(
 		req.Context(), rsAPI,
+		api.KindNew,
 		[]gomatrixserverlib.HeaderedEvent{
 			e.Headered(verRes.RoomVersion),
 		},
