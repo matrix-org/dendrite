@@ -183,8 +183,14 @@ func (ore *OutputNewRoomEvent) AddsState() []gomatrixserverlib.HeaderedEvent {
 }
 
 // An OutputOldRoomEvent is written when the roomserver receives an old event.
+// This will typically happen as a result of getting either missing events
+// or backfilling. Downstream components may wish to send these events to
+// clients when it is advantageous to do so, but with the consideration that
+// the event is likely a historic event.
+//
 // Old events do not update forward extremities or the current room state,
-// therefore they must not be treated as if they do.
+// therefore they must not be treated as if they do. Downstream components
+// should build their current room state up from OutputNewRoomEvents only.
 type OutputOldRoomEvent struct {
 	// The Event.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
