@@ -6,6 +6,7 @@ ARG component=monolith
 ENV entrypoint=${component}
 
 COPY --from=base /build/bin/${component} /usr/bin
+COPY --from=base /build/bin/goose /usr/bin
 
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
