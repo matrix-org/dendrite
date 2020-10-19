@@ -485,3 +485,4 @@ A prev_batch token from incremental sync can be used in the v1 messages API
 Event with an invalid signature in the send_join response should not cause room join to fail
 Inbound federation rejects typing notifications from wrong remote
 Should not be able to take over the room by pretending there is no PL event
+Can get rooms/{roomId}/state for a departed room (SPEC-216)
