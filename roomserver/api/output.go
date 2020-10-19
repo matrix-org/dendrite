@@ -24,6 +24,8 @@ type OutputType string
 const (
 	// OutputTypeNewRoomEvent indicates that the event is an OutputNewRoomEvent
 	OutputTypeNewRoomEvent OutputType = "new_room_event"
+	// OutputTypeOldRoomEvent indicates that the event is an OutputOldRoomEvent
+	OutputTypeOldRoomEvent OutputType = "old_room_event"
 	// OutputTypeNewInviteEvent indicates that the event is an OutputNewInviteEvent
 	OutputTypeNewInviteEvent OutputType = "new_invite_event"
 	// OutputTypeRetireInviteEvent indicates that the event is an OutputRetireInviteEvent
@@ -58,6 +60,8 @@ type OutputEvent struct {
 	Type OutputType `json:"type"`
 	// The content of event with type OutputTypeNewRoomEvent
 	NewRoomEvent *OutputNewRoomEvent `json:"new_room_event,omitempty"`
+	// The content of event with type OutputTypeOldRoomEvent
+	OldRoomEvent *OutputOldRoomEvent `json:"old_room_event,omitempty"`
 	// The content of event with type OutputTypeNewInviteEvent
 	NewInviteEvent *OutputNewInviteEvent `json:"new_invite_event,omitempty"`
 	// The content of event with type OutputTypeRetireInviteEvent
@@ -176,6 +180,14 @@ func (ore *OutputNewRoomEvent) AddsState() []gomatrixserverlib.HeaderedEvent {
 		return ore.AddStateEvents
 	}
 	return append(ore.AddStateEvents, ore.Event)
+}
+
+// An OutputOldRoomEvent is written when the roomserver receives an old event.
+// Old events do not update forward extremities or the current room state,
+// therefore they must not be treated as if they do.
+type OutputOldRoomEvent struct {
+	// The Event.
+	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 // An OutputNewInviteEvent is written whenever an invite becomes active.

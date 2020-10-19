@@ -136,7 +136,8 @@ func (r *Inputer) processRoomEvent(
 		return event.EventID(), rejectionErr
 	}
 
-	if input.Kind == api.KindNew {
+	switch input.Kind {
+	case api.KindNew:
 		if err = r.updateLatestEvents(
 			ctx,                 // context
 			roomInfo,            // room info for the room being updated
@@ -147,6 +148,18 @@ func (r *Inputer) processRoomEvent(
 			input.HasState,      // rewrites state?
 		); err != nil {
 			return "", fmt.Errorf("r.updateLatestEvents: %w", err)
+		}
+	case api.KindOld:
+		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
+			{
+				Type: api.OutputTypeOldRoomEvent,
+				OldRoomEvent: &api.OutputOldRoomEvent{
+					Event: headered,
+				},
+			},
+		})
+		if err != nil {
+			return "", fmt.Errorf("r.WriteOutputEvents (old): %w", err)
 		}
 	}
 
@@ -165,7 +178,7 @@ func (r *Inputer) processRoomEvent(
 			},
 		})
 		if err != nil {
-			return "", fmt.Errorf("r.WriteOutputEvents: %w", err)
+			return "", fmt.Errorf("r.WriteOutputEvents (redactions): %w", err)
 		}
 	}
 
