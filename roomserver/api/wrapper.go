@@ -41,7 +41,7 @@ func SendEvents(
 	return SendInputRoomEvents(ctx, rsAPI, ires)
 }
 
-// SendEventWithState writes an event with KindNew to the roomserver
+// SendEventWithState writes an event with the specified kind to the roomserver
 // with the state at the event as KindOutlier before it. Will not send any event that is
 // marked as `true` in haveEventIDs
 func SendEventWithState(
@@ -60,7 +60,7 @@ func SendEventWithState(
 			continue
 		}
 		ires = append(ires, InputRoomEvent{
-			Kind:         kind,
+			Kind:         KindOutlier,
 			Event:        outlier.Headered(event.RoomVersion),
 			AuthEventIDs: outlier.AuthEventIDs(),
 		})
@@ -72,7 +72,7 @@ func SendEventWithState(
 	}
 
 	ires = append(ires, InputRoomEvent{
-		Kind:          KindNew,
+		Kind:          kind,
 		Event:         event,
 		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
