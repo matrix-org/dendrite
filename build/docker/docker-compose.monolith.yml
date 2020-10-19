@@ -2,7 +2,7 @@ version: "3.4"
 services:
   monolith:
     hostname: monolith
-    image: matrixdotorg/dendrite:monolith
+    image: matrixdotorg/dendrite-monolith:latest
     command: [
       "--config=dendrite.yaml",
       "--tls-cert=server.crt",

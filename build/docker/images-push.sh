@@ -1,17 +1,15 @@
 #!/bin/bash
 
-docker push matrixdotorg/dendrite:monolith
+docker push matrixdotorg/dendrite-monolith:latest
 
-docker push matrixdotorg/dendrite:appservice
-docker push matrixdotorg/dendrite:clientapi
-docker push matrixdotorg/dendrite:clientproxy
-docker push matrixdotorg/dendrite:eduserver
-docker push matrixdotorg/dendrite:federationapi
-docker push matrixdotorg/dendrite:federationsender
-docker push matrixdotorg/dendrite:federationproxy
-docker push matrixdotorg/dendrite:keyserver
-docker push matrixdotorg/dendrite:mediaapi
-docker push matrixdotorg/dendrite:roomserver
-docker push matrixdotorg/dendrite:syncapi
-docker push matrixdotorg/dendrite:signingkeyserver
-docker push matrixdotorg/dendrite:userapi
+docker push matrixdotorg/dendrite-appservice:latest
+docker push matrixdotorg/dendrite-clientapi:latest
+docker push matrixdotorg/dendrite-eduserver:latest
+docker push matrixdotorg/dendrite-federationapi:latest
+docker push matrixdotorg/dendrite-federationsender:latest
+docker push matrixdotorg/dendrite-keyserver:latest
+docker push matrixdotorg/dendrite-mediaapi:latest
+docker push matrixdotorg/dendrite-roomserver:latest
+docker push matrixdotorg/dendrite-syncapi:latest
+docker push matrixdotorg/dendrite-signingkeyserver:latest
+docker push matrixdotorg/dendrite-userapi:latest
