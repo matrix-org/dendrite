@@ -115,7 +115,14 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		Timeout: time.Minute * 10,
 		Transport: &http2.Transport{
 			AllowHTTP: true,
-			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
+				// Ordinarily HTTP/2 would expect TLS, but the remote listener is
+				// H2C-enabled (HTTP/2 without encryption). Overriding the DialTLS
+				// function with a plain Dial allows us to trick the HTTP client
+				// into establishing a HTTP/2 connection without TLS.
+				// TODO: Eventually we will want to look at authenticating and
+				// encrypting these internal HTTP APIs, at which point we will have
+				// to reconsider H2C and change all this anyway.
 				return net.Dial(network, addr)
 			},
 		},
@@ -281,6 +288,12 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	internalServ := externalServ
 
 	if internalAddr != NoListener && externalAddr != internalAddr {
+		// H2C allows us to accept HTTP/2 connections without TLS
+		// encryption. Since we don't currently require any form of
+		// authentication or encryption on these internal HTTP APIs,
+		// H2C gives us all of the advantages of HTTP/2 (such as
+		// stream multiplexing and avoiding head-of-line blocking)
+		// without enabling TLS.
 		internalH2S := &http2.Server{}
 		internalRouter = mux.NewRouter().SkipClean(true).UseEncodedPath()
 		internalServ = &http.Server{
