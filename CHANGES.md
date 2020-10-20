@@ -16,9 +16,9 @@
 * Dendrite polylith deployments now use a special multi-personality binary, rather than separate binaries
   * This is cleaner, builds faster and simplifies deployment
   * The first command line argument states the component to run, e.g. `./dendrite-polylith-multi roomserver`
-* Database migrations are now ran at startup
-* Invalid UTF-8 in requests is now rejected
-* Fully read markers are now implemented in the client API
+* Database migrations are now run at startup
+* Invalid UTF-8 in requests is now rejected (contributed by [Pestdoktor](https://github.com/Pestdoktor))
+* Fully read markers are now implemented in the client API (contributed by [Lesterpig](https://github.com/Lesterpig))
 * Missing auth events are now retrieved from other servers in the room, rather than just the event origin
 * `m.room.create` events are now validated properly when processing a `/send_join` response
 * The roomserver now implements `KindOld` for handling historic events without them becoming forward extremity candidates, i.e. for backfilled or missing events
@@ -31,7 +31,7 @@
 * The client API `/state` endpoint now correctly returns state after the leave event, if the user has left the room
 * The client API `/createRoom` endpoint now sends cumulative state to the roomserver for the initial room events
 * The federation API `/send` endpoint now correctly requests the entire room state from the roomserver when needed
-* Some internal HTTP API paths have been fixed in the user API
+* Some internal HTTP API paths have been fixed in the user API (contributed by [S7evinK](https://github.com/S7evinK))
 * A race condition in the rate limiting code resulting in concurrent map writes has been fixed
 * Each component now correctly starts a consumer/producer connection in monolith mode (when using Kafka)
 * State resolution is no longer run for single trusted state snapshots that have been verified before
@@ -42,6 +42,7 @@
 * `QueryMissingAuthPrevEvents` now returns events that have no associated state as if they are missing
 * Signing key fetchers no longer ignore keys for the local domain, if retrieving a key that is not known in the local config
 * Federation timeouts have been adjusted so we don't give up on remote requests so quickly
+* `create-account` no longer relies on the device database (contributed by [ThatNerdyPikachu](https://github.com/ThatNerdyPikachu))
 
 ## Dendrite 0.1.0 (2020-10-08)
 
