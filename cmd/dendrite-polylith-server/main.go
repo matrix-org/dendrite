@@ -2,23 +2,22 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"os"
+	"strings"
 
-	"github.com/matrix-org/dendrite/cmd/dendrite/personalities"
+	"github.com/matrix-org/dendrite/cmd/dendrite-polylith-server/personalities"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/sirupsen/logrus"
 )
 
 type starter func(base *setup.BaseDendrite, cfg *config.Dendrite)
 
 // nolint:gocyclo
 func main() {
-	cfg := setup.ParseFlags(true)
+	flag.Parse()
+
 	component := flag.Arg(0)
-
-	base := setup.NewBaseDendrite(cfg, component, false) // TODO
-	defer base.Close()                                   // nolint: errcheck
-
 	components := map[string]starter{
 		"appservice":       personalities.Appservice,
 		"clientapi":        personalities.ClientAPI,
@@ -33,13 +32,25 @@ func main() {
 		"userapi":          personalities.UserAPI,
 	}
 
-	if start, ok := components[component]; ok {
-		start(base, cfg)
-	} else {
-		fmt.Printf("dendrite: unknown component %q\n", component)
-		fmt.Println("valid components:")
+	start, ok := components[component]
+	if !ok {
+		logrus.Errorf("Unknown component %q specified", component)
+
+		var list []string
 		for c := range components {
-			fmt.Printf("- %s\n", c)
+			list = append(list, c)
 		}
+
+		logrus.Infof("Valid components: %s", strings.Join(list, ", "))
+		os.Exit(1)
 	}
+
+	logrus.Infof("Starting %q component", component)
+
+	cfg := setup.ParseFlags(true)
+
+	base := setup.NewBaseDendrite(cfg, component, false) // TODO
+	defer base.Close()                                   // nolint: errcheck
+
+	start(base, cfg)
 }
