@@ -27,7 +27,6 @@ func main() {
 		"federationsender": personalities.FederationSender,
 		"keyserver":        personalities.KeyServer,
 		"mediaapi":         personalities.MediaAPI,
-		"monolith":         personalities.Monolith,
 		"roomserver":       personalities.RoomServer,
 		"signingkeyserver": personalities.SigningKeyServer,
 		"syncapi":          personalities.SyncAPI,
