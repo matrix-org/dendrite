@@ -191,7 +191,7 @@ func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []js
 	t.Helper()
 	rsAPI, dp := mustCreateRoomserverAPI(t)
 	hevents := mustLoadRawEvents(t, ver, events)
-	if err := api.SendEvents(ctx, rsAPI, hevents, testOrigin, nil); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, hevents, testOrigin, nil); err != nil {
 		t.Errorf("failed to SendEvents: %s", err)
 	}
 	return rsAPI, dp, hevents
@@ -337,7 +337,7 @@ func TestOutputRewritesState(t *testing.T) {
 	deleteDatabase()
 	rsAPI, producer := mustCreateRoomserverAPI(t)
 	defer deleteDatabase()
-	err := api.SendEvents(context.Background(), rsAPI, originalEvents, testOrigin, nil)
+	err := api.SendEvents(context.Background(), rsAPI, api.KindNew, originalEvents, testOrigin, nil)
 	if err != nil {
 		t.Fatalf("failed to send original events: %s", err)
 	}

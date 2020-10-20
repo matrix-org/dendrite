@@ -58,3 +58,6 @@ The only membership state included in a gapped incremental sync is for senders i
 Invited user can reject local invite after originator leaves
 Invited user can reject invite for empty room
 If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
+
+# Blacklisted due to flakiness
+A prev_batch token from incremental sync can be used in the v1 messages API

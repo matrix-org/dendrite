@@ -256,6 +256,7 @@ func SendLeave(
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if err = api.SendEvents(
 		httpReq.Context(), rsAPI,
+		api.KindNew,
 		[]gomatrixserverlib.HeaderedEvent{
 			event.Headered(verRes.RoomVersion),
 		},
