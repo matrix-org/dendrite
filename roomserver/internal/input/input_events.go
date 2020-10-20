@@ -49,11 +49,11 @@ func (r *Inputer) processRoomEvent(
 	// if we have already got this event then do not process it again, if the input kind is an outlier.
 	// Outliers contain no extra information which may warrant a re-processing.
 	if input.Kind == api.KindOutlier {
-		evs, err := r.DB.EventsFromIDs(ctx, []string{event.EventID()})
-		if err == nil && len(evs) == 1 {
+		evs, err2 := r.DB.EventsFromIDs(ctx, []string{event.EventID()})
+		if err2 == nil && len(evs) == 1 {
 			// check hash matches if we're on early room versions where the event ID was a random string
-			idFormat, err := headered.RoomVersion.EventIDFormat()
-			if err == nil {
+			idFormat, err2 := headered.RoomVersion.EventIDFormat()
+			if err2 == nil {
 				switch idFormat {
 				case gomatrixserverlib.EventIDFormatV1:
 					if bytes.Equal(event.EventReference().EventSHA256, evs[0].EventReference().EventSHA256) {
