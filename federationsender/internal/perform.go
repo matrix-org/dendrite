@@ -408,8 +408,9 @@ func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 	respState := respPeek.ToRespState()
 	// logrus.Warnf("got respPeek %#v", respPeek)
 	// Send the newly returned state to the roomserver to update our local view.
-	if err = roomserverAPI.SendEventWithRewrite(
+	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI,
+		roomserverAPI.KindNew,
 		&respState,
 		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
 		nil,
