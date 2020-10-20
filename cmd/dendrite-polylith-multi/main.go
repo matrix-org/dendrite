@@ -47,13 +47,12 @@ func main() {
 
 	start, ok := components[component]
 	if !ok {
-		logrus.Errorf("Unknown component %q specified", component)
-
 		var list []string
 		for c := range components {
 			list = append(list, c)
 		}
 
+		logrus.Errorf("Unknown component %q specified", component)
 		logrus.Infof("Valid components: %s", strings.Join(list, ", "))
 		os.Exit(1)
 	}
