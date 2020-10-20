@@ -6,7 +6,6 @@ services:
     command: clientapi
     volumes:
       - ./config:/etc/dendrite
-      - room_server
     networks:
       - internal
 
@@ -94,10 +93,7 @@ services:
   appservice_api:
     hostname: appservice_api
     image: matrixdotorg/dendrite-polylith:latest
-    command: [
-      "appservice",
-      "--config=dendrite.yaml"
-    ]
+    command: appservice
     volumes:
       - ./config:/etc/dendrite
     networks:

@@ -24,7 +24,7 @@ use in production environments just yet!
 Dendrite requires:
 
 * Go 1.13 or higher
-* Postgres 9.5 or higher (if using Postgres databases, not needed for SQLite)
+* Postgres 9.6 or higher (if using Postgres databases, not needed for SQLite)
 
 If you want to run a polylith deployment, you also need:
 
@@ -98,7 +98,7 @@ create them automatically at startup.
 
 ### Postgres database setup
 
-Assuming that Postgres 9.5 (or later) is installed:
+Assuming that Postgres 9.6 (or later) is installed:
 
 * Create role, choosing a new password when prompted:
 
