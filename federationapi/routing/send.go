@@ -332,7 +332,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			}
 
 			for roomID, receipt := range payload {
-				for userID := range receipt.User {
+				for userID, mread := range receipt.User {
 					_, domain, err := gomatrixserverlib.SplitID('@', userID)
 					if err != nil {
 						util.GetLogger(ctx).WithError(err).Error("Failed to split domain from receipt event sender")
@@ -342,14 +342,12 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 						util.GetLogger(ctx).Warnf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
 						continue
 					}
-					ts := receipt.User[userID].Data.TS
-					events := receipt.User[userID].EventIDs
-					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", ts, events); err != nil {
+					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
 						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 							"sender":  t.Origin,
 							"user_id": userID,
 							"room_id": roomID,
-							"events":  receipt.User[userID].EventIDs,
+							"events":  mread.EventIDs,
 						}).Error("Failed to send receipt event to edu server")
 						continue
 					}
