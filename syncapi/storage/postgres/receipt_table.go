@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -54,7 +55,7 @@ const upsertReceipt = "" +
 const selectRoomReceipts = "" +
 	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
-	" WHERE room_id = $1 AND id > $2"
+	" WHERE room_id = ANY($1) AND id > $2"
 
 type receiptStatements struct {
 	db                 *sql.DB
