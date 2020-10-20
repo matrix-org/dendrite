@@ -4,7 +4,6 @@ services:
     hostname: monolith
     image: matrixdotorg/dendrite-monolith:latest
     command: [
-      "--config=dendrite.yaml",
       "--tls-cert=server.crt",
       "--tls-key=server.key"
     ]

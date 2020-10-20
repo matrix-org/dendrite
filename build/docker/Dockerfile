@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.13.7-alpine3.11 AS builder
+FROM docker.io/golang:1.15-alpine AS builder
 
 RUN apk --update --no-cache add bash build-base
 

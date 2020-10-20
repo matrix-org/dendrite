@@ -24,7 +24,7 @@ use in production environments just yet!
 Dendrite requires:
 
 * Go 1.13 or higher
-* Postgres 9.5 or higher (if using Postgres databases, not needed for SQLite)
+* Postgres 9.6 or higher (if using Postgres databases, not needed for SQLite)
 
 If you want to run a polylith deployment, you also need:
 
@@ -98,7 +98,7 @@ create them automatically at startup.
 
 ### Postgres database setup
 
-Assuming that Postgres 9.5 (or later) is installed:
+Assuming that Postgres 9.6 (or later) is installed:
 
 * Create role, choosing a new password when prompted:
 
@@ -189,7 +189,7 @@ This is what implements CS API endpoints. Clients talk to this via the proxy in
 order to send messages, create and join rooms, etc.
 
 ```bash
-./bin/dendrite-client-api-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml clientapi
 ```
 
 ### Sync server
@@ -198,7 +198,7 @@ This is what implements `/sync` requests. Clients talk to this via the proxy
 in order to receive messages.
 
 ```bash
-./bin/dendrite-sync-api-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml syncapi
 ```
 
 ### Media server
@@ -207,7 +207,7 @@ This implements `/media` requests. Clients talk to this via the proxy in
 order to upload and retrieve media.
 
 ```bash
-./bin/dendrite-media-api-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml mediaapi
 ```
 
 ### Federation API server
@@ -217,7 +217,7 @@ order to send transactions.  This is only required if you want to support
 federation.
 
 ```bash
-./bin/dendrite-federation-api-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml federationapi
 ```
 
 ### Internal components
@@ -230,7 +230,7 @@ contacted by other components. This includes the following components.
 This is what implements the room DAG. Clients do not talk to this.
 
 ```bash
-./bin/dendrite-room-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml roomserver
 ```
 
 #### Federation sender
@@ -239,7 +239,7 @@ This sends events from our users to other servers.  This is only required if
 you want to support federation.
 
 ```bash
-./bin/dendrite-federation-sender-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml federationsender
 ```
 
 #### Appservice server
@@ -250,7 +250,7 @@ running locally.  This is only required if you want to support running
 application services on your homeserver.
 
 ```bash
-./bin/dendrite-appservice-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml appservice
 ```
 
 #### Key server
@@ -258,7 +258,7 @@ application services on your homeserver.
 This manages end-to-end encryption keys for users.
 
 ```bash
-./bin/dendrite-key-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml keyserver
 ```
 
 #### Signing key server
@@ -266,7 +266,7 @@ This manages end-to-end encryption keys for users.
 This manages signing keys for servers.
 
 ```bash
-./bin/dendrite-signing-key-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml signingkeyserver
 ```
 
 #### EDU server
@@ -274,7 +274,7 @@ This manages signing keys for servers.
 This manages processing EDUs such as typing, send-to-device events and presence. Clients do not talk to
 
 ```bash
-./bin/dendrite-edu-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml eduserver
 ```
 
 #### User server
@@ -283,6 +283,6 @@ This manages user accounts, device access tokens and user account data,
 amongst other things.
 
 ```bash
-./bin/dendrite-user-api-server --config dendrite.yaml
+./bin/dendrite-polylith-multi --config=dendrite.yaml userapi
 ```
 
