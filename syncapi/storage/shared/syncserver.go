@@ -633,9 +633,12 @@ func (d *Database) addEDUDeltaToResponse(
 		}
 	}
 
-	// always check for receipt deltas; otherwise an initial sync won't receive receipts
-	if err := d.addReceiptDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
-		return errors.Wrap(err, "unable to apply receipts to response")
+	// Check on initial sync and if EDUPositions differ
+	if (fromPos.EDUPosition() == 0 && toPos.EDUPosition() == 0) ||
+		fromPos.EDUPosition() != toPos.EDUPosition() {
+		if err := d.addReceiptDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
+			return errors.Wrap(err, "unable to apply receipts to response")
+		}
 	}
 
 	return nil
