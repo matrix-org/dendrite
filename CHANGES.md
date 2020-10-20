@@ -44,6 +44,10 @@
 * Federation timeouts have been adjusted so we don't give up on remote requests so quickly
 * `create-account` no longer relies on the device database (contributed by [ThatNerdyPikachu](https://github.com/ThatNerdyPikachu))
 
+### Known issues
+
+* Old events can incorrectly appear in `/sync` as if they are new when retrieving missing events from federated servers, causing them to appear at the bottom of the timeline in clients
+
 ## Dendrite 0.1.0 (2020-10-08)
 
 First versioned release of Dendrite.
