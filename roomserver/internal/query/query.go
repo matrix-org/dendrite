@@ -107,7 +107,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		}
 		authEventIDs = util.UniqueStrings(authEventIDs)
 
-		authEvents, err := getAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
+		authEvents, err := GetAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
 		if err != nil {
 			return fmt.Errorf("getAuthChain: %w", err)
 		}
