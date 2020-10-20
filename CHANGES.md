@@ -4,12 +4,13 @@
 
 ### Important
 
-* We are now publishing images to Docker Hub in separate repositories for monolith and polylith so that they can be tagged with versions properly
-  * New repositories are as follows: `matrixdotorg/dendrite-monolith` and `matrixdotorg/dendrite-polylith`
-  * The `latest` tag will be updated with the latest release, and versioned tags, e.g. `v0.2.0`, will preserve specific release versions
+* This release makes breaking changes for polylith deployments, since they now use the multi-personality binary rather than separate binary files
+  * Users of polylith deployments should revise their setups to use the new binary - see the Features section below
+* This release also makes breaking changes for Docker deployments, as are now publishing images to Docker Hub in separate repositories for monolith and polylith
+  * New repositories are as follows: [matrixdotorg/dendrite-monolith](https://hub.docker.com/repository/docker/matrixdotorg/dendrite-monolith) and [matrixdotorg/dendrite-polylith](https://hub.docker.com/repository/docker/matrixdotorg/dendrite-polylith)
+  * The new `latest` tag will be updated with the latest release, and new versioned tags, e.g. `v0.2.0`, will preserve specific release versions
   * [Sample Compose configs](https://github.com/matrix-org/dendrite/tree/master/build/docker) have been updated - if you are running a Docker deployment, please review the changes
   * Images for the client API proxy and federation API proxy are no longer provided as they are unsupported - please use [nginx](docs/nginx/) (or another reverse proxy) instead
-* Polylith deployments will also require attention, since they will now use `./dendrite-polylith-multi` rather than separate binary files
 
 ### Features
 
