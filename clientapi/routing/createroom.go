@@ -344,6 +344,7 @@ func createRoom(
 		if err = roomserverAPI.SendEventWithState(
 			req.Context(),
 			rsAPI,
+			roomserverAPI.KindNew,
 			&gomatrixserverlib.RespState{
 				StateEvents: accumulated,
 				AuthEvents:  accumulated,
