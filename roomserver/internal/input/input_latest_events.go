@@ -233,18 +233,6 @@ func (u *latestEventsUpdater) latestState() error {
 	if err != nil {
 		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
 	}
-	if !u.stateAtEvent.Overwrite && len(u.removed) > len(u.added) {
-		// This really shouldn't happen.
-		// TODO: What is ultimately the best way to handle this situation?
-		logrus.Errorf(
-			"Invalid state delta on event %q wants to remove %d state but only add %d state (between state snapshots %d and %d)",
-			u.event.EventID(), len(u.removed), len(u.added), u.oldStateNID, u.newStateNID,
-		)
-		u.added = u.added[:0]
-		u.removed = u.removed[:0]
-		u.newStateNID = u.oldStateNID
-		return nil
-	}
 
 	// Also work out the state before the event removes and the event
 	// adds.
