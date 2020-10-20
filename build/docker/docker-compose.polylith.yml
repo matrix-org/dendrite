@@ -1,28 +1,8 @@
 version: "3.4"
 services:
-  client_api_proxy:
-    hostname: client_api_proxy
-    image: matrixdotorg/dendrite:clientproxy
-    command: [
-      "--bind-address=:8008",
-      "--client-api-server-url=http://client_api:8071",
-      "--sync-api-server-url=http://sync_api:8073",
-      "--media-api-server-url=http://media_api:8074"
-    ]
-    volumes:
-      - ./config:/etc/dendrite
-    networks:
-      - internal
-    depends_on:
-      - sync_api
-      - client_api
-      - media_api
-    ports:
-      - "8008:8008"
-
   client_api:
     hostname: client_api
-    image: matrixdotorg/dendrite:clientapi
+    image: matrixdotorg/dendrite-clientapi:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -34,7 +14,7 @@ services:
 
   media_api:
     hostname: media_api
-    image: matrixdotorg/dendrite:mediaapi
+    image: matrixdotorg/dendrite-mediaapi:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -45,7 +25,7 @@ services:
 
   sync_api:
     hostname: sync_api
-    image: matrixdotorg/dendrite:syncapi
+    image: matrixdotorg/dendrite-syncapi:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -56,7 +36,7 @@ services:
 
   room_server:
     hostname: room_server
-    image: matrixdotorg/dendrite:roomserver
+    image: matrixdotorg/dendrite-roomserver:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -67,7 +47,7 @@ services:
 
   edu_server:
     hostname: edu_server
-    image: matrixdotorg/dendrite:eduserver
+    image: matrixdotorg/dendrite-eduserver:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -76,28 +56,9 @@ services:
     networks:
       - internal
 
-  federation_api_proxy:
-    hostname: federation_api_proxy
-    image: matrixdotorg/dendrite:federationproxy
-    command: [
-      "--bind-address=:8448",
-      "--federation-api-url=http://federation_api:8072",
-      "--media-api-server-url=http://media_api:8074"
-    ]
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - federation_api
-      - federation_sender
-      - media_api
-    networks:
-      - internal
-    ports:
-      - "8448:8448"
-
   federation_api:
     hostname: federation_api
-    image: matrixdotorg/dendrite:federationapi
+    image: matrixdotorg/dendrite-federationapi:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -108,7 +69,7 @@ services:
 
   federation_sender:
     hostname: federation_sender
-    image: matrixdotorg/dendrite:federationsender
+    image: matrixdotorg/dendrite-federationsender:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -119,7 +80,7 @@ services:
       
   key_server:
     hostname: key_server
-    image: matrixdotorg/dendrite:keyserver
+    image: matrixdotorg/dendrite-keyserver:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -130,7 +91,7 @@ services:
 
   signing_key_server:
     hostname: signing_key_server
-    image: matrixdotorg/dendrite:signingkeyserver
+    image: matrixdotorg/dendrite-signingkeyserver:latest
     command: [
       "--config=dendrite.yaml"
     ]
@@ -141,7 +102,7 @@ services:
 
   user_api:
     hostname: user_api
-    image: matrixdotorg/dendrite:userapi
+    image: matrixdotorg/dendrite-userapi:latest
     command: [
         "--config=dendrite.yaml"
     ]
@@ -152,7 +113,7 @@ services:
 
   appservice_api:
     hostname: appservice_api
-    image: matrixdotorg/dendrite:appservice
+    image: matrixdotorg/dendrite-appservice:latest
     command: [
       "--config=dendrite.yaml"
     ]

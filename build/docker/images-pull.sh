@@ -1,17 +1,19 @@
 #!/bin/bash
 
-docker pull matrixdotorg/dendrite:monolith
+TAG=${1:-latest}
 
-docker pull matrixdotorg/dendrite:appservice
-docker pull matrixdotorg/dendrite:clientapi
-docker pull matrixdotorg/dendrite:clientproxy
-docker pull matrixdotorg/dendrite:eduserver
-docker pull matrixdotorg/dendrite:federationapi
-docker pull matrixdotorg/dendrite:federationsender
-docker pull matrixdotorg/dendrite:federationproxy
-docker pull matrixdotorg/dendrite:keyserver
-docker pull matrixdotorg/dendrite:mediaapi
-docker pull matrixdotorg/dendrite:roomserver
-docker pull matrixdotorg/dendrite:syncapi
-docker pull matrixdotorg/dendrite:signingkeyserver
-docker pull matrixdotorg/dendrite:userapi
+echo "Pulling tag '${TAG}'"
+
+docker pull matrixdotorg/dendrite-monolith:${TAG}
+
+docker pull matrixdotorg/dendrite-appservice:${TAG}
+docker pull matrixdotorg/dendrite-clientapi:${TAG}
+docker pull matrixdotorg/dendrite-eduserver:${TAG}
+docker pull matrixdotorg/dendrite-federationapi:${TAG}
+docker pull matrixdotorg/dendrite-federationsender:${TAG}
+docker pull matrixdotorg/dendrite-keyserver:${TAG}
+docker pull matrixdotorg/dendrite-mediaapi:${TAG}
+docker pull matrixdotorg/dendrite-roomserver:${TAG}
+docker pull matrixdotorg/dendrite-syncapi:${TAG}
+docker pull matrixdotorg/dendrite-signingkeyserver:${TAG}
+docker pull matrixdotorg/dendrite-userapi:${TAG}
