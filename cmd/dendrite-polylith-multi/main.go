@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/matrix-org/dendrite/cmd/dendrite-polylith-server/personalities"
+	"github.com/matrix-org/dendrite/cmd/dendrite-polylith-multi/personalities"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/sirupsen/logrus"
