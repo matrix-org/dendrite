@@ -290,6 +290,7 @@ func SendJoin(
 	if !alreadyJoined {
 		if err = api.SendEvents(
 			httpReq.Context(), rsAPI,
+			api.KindNew,
 			[]gomatrixserverlib.HeaderedEvent{
 				event.Headered(stateAndAuthChainResponse.RoomVersion),
 			},
