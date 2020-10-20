@@ -224,7 +224,7 @@ func (oq *destinationQueue) backgroundSend() {
 			// The worker is idle so stop the goroutine. It'll get
 			// restarted automatically the next time we have an event to
 			// send.
-			log.Debugf("Queue %q has been idle for %s, going to sleep", oq.destination, queueIdleTimeout)
+			log.Tracef("Queue %q has been idle for %s, going to sleep", oq.destination, queueIdleTimeout)
 			return
 		}
 
@@ -349,7 +349,7 @@ func (oq *destinationQueue) nextTransaction() (bool, error) {
 	// TODO: we should check for 500-ish fails vs 400-ish here,
 	// since we shouldn't queue things indefinitely in response
 	// to a 400-ish error
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 	_, err = oq.client.SendTransaction(ctx, t)
 	switch err.(type) {

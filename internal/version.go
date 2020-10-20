@@ -1,6 +1,12 @@
 package internal
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
+
+// the final version string
+var version string
 
 // -ldflags "-X github.com/matrix-org/dendrite/internal.branch=master"
 var branch string
@@ -10,17 +16,28 @@ var build string
 
 const (
 	VersionMajor = 0
-	VersionMinor = 0
+	VersionMinor = 2
 	VersionPatch = 0
+	VersionTag   = "" // example: "rc1"
 )
 
 func VersionString() string {
-	version := fmt.Sprintf("%d.%d.%d", VersionMajor, VersionMinor, VersionPatch)
-	if branch != "" {
-		version += fmt.Sprintf("-%s", branch)
-	}
-	if build != "" {
-		version += fmt.Sprintf("+%s", build)
-	}
 	return version
+}
+
+func init() {
+	version = fmt.Sprintf("%d.%d.%d", VersionMajor, VersionMinor, VersionPatch)
+	if VersionTag != "" {
+		version += "-" + VersionTag
+	}
+	parts := []string{}
+	if build != "" {
+		parts = append(parts, build)
+	}
+	if branch != "" {
+		parts = append(parts, branch)
+	}
+	if len(parts) > 0 {
+		version += "+" + strings.Join(parts, ".")
+	}
 }

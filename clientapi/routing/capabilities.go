@@ -23,8 +23,8 @@ import (
 	"github.com/matrix-org/util"
 )
 
-// SendMembership implements PUT /rooms/{roomID}/(join|kick|ban|unban|leave|invite)
-// by building a m.room.member event then sending it to the room server
+// GetCapabilities returns information about the server's supported feature set
+// and other relevant capabilities to an authenticated user.
 func GetCapabilities(
 	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
@@ -41,6 +41,9 @@ func GetCapabilities(
 
 	response := map[string]interface{}{
 		"capabilities": map[string]interface{}{
+			"m.change_password": map[string]bool{
+				"enabled": true,
+			},
 			"m.room_versions": roomVersionsQueryRes,
 		},
 	}

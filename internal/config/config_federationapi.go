@@ -1,7 +1,5 @@
 package config
 
-import "github.com/matrix-org/gomatrixserverlib"
-
 type FederationAPI struct {
 	Matrix *Global `yaml:"-"`
 
@@ -14,10 +12,6 @@ type FederationAPI struct {
 	// to match one of these certificates.
 	// The certificates should be in PEM format.
 	FederationCertificatePaths []Path `yaml:"federation_certificates"`
-
-	// A list of SHA256 TLS fingerprints for the X509 certificates used by the
-	// federation listener for this server.
-	TLSFingerPrints []gomatrixserverlib.TLSFingerprint `yaml:"-"`
 }
 
 func (c *FederationAPI) Defaults() {

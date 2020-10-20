@@ -17,7 +17,10 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -160,7 +163,9 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	cfg.Defaults()
 	cfg.Global.ServerName = testOrigin
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(roomserverDBFileURI)
+	cfg.RoomServer.Database = config.DatabaseOptions{
+		ConnectionString: roomserverDBFileURI,
+	}
 	dp := &dummyProducer{
 		topic: cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
 	}
@@ -169,19 +174,24 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 		t.Fatalf("failed to make caches: %s", err)
 	}
 	base := &setup.BaseDendrite{
-		KafkaProducer: dp,
-		Caches:        cache,
-		Cfg:           cfg,
+		Caches: cache,
+		Cfg:    cfg,
 	}
-
-	return NewInternalAPI(base, &test.NopJSONVerifier{}), dp
+	roomserverDB, err := storage.Open(&cfg.RoomServer.Database, base.Caches)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to room server db")
+	}
+	return internal.NewRoomserverAPI(
+		&cfg.RoomServer, roomserverDB, dp, string(cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent)),
+		base.Caches, &test.NopJSONVerifier{}, nil,
+	), dp
 }
 
 func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) (api.RoomserverInternalAPI, *dummyProducer, []gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
 	rsAPI, dp := mustCreateRoomserverAPI(t)
 	hevents := mustLoadRawEvents(t, ver, events)
-	if err := api.SendEvents(ctx, rsAPI, hevents, testOrigin, nil); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, hevents, testOrigin, nil); err != nil {
 		t.Errorf("failed to SendEvents: %s", err)
 	}
 	return rsAPI, dp, hevents
@@ -238,7 +248,7 @@ func TestOutputRedactedEvent(t *testing.T) {
 	}
 }
 
-// This tests that rewriting state via KindRewrite works correctly.
+// This tests that rewriting state works correctly.
 // This creates a small room with a create/join/name state, then replays it
 // with a new room name. We expect the output events to contain the original events,
 // followed by a single OutputNewRoomEvent with RewritesState set to true with the
@@ -327,7 +337,7 @@ func TestOutputRewritesState(t *testing.T) {
 	deleteDatabase()
 	rsAPI, producer := mustCreateRoomserverAPI(t)
 	defer deleteDatabase()
-	err := api.SendEvents(context.Background(), rsAPI, originalEvents, testOrigin, nil)
+	err := api.SendEvents(context.Background(), rsAPI, api.KindNew, originalEvents, testOrigin, nil)
 	if err != nil {
 		t.Fatalf("failed to send original events: %s", err)
 	}
@@ -344,7 +354,7 @@ func TestOutputRewritesState(t *testing.T) {
 	for i := 0; i < len(rewriteEvents)-1; i++ {
 		ev := rewriteEvents[i]
 		inputEvents = append(inputEvents, api.InputRoomEvent{
-			Kind:          api.KindRewrite,
+			Kind:          api.KindOutlier,
 			Event:         ev,
 			AuthEventIDs:  ev.AuthEventIDs(),
 			HasState:      true,

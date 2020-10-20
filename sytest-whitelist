@@ -68,6 +68,8 @@ Request to logout with invalid an access token is rejected
 Request to logout without an access token is rejected
 Room creation reports m.room.create to myself
 Room creation reports m.room.member to myself
+Outbound federation rejects send_join responses with no m.room.create event
+Outbound federation rejects m.room.create events with an unknown room version
 Invited user can see room metadata
 # Blacklisted because these tests call /r0/events which we don't implement
 # New room members see their own join event
@@ -90,8 +92,6 @@ Real non-joined users can get state for world_readable rooms
 Real non-joined users can get individual state for world_readable rooms
 #Real non-joined users can get individual state for world_readable rooms after leaving
 Real non-joined users cannot send messages to guest_access rooms if not joined
-Real users can sync from world_readable guest_access rooms if joined
-Real users can sync from default guest_access rooms if joined
 Can't forget room you're still in
 Can get rooms/{roomId}/members
 Can create filter
@@ -221,6 +221,9 @@ Regular users cannot create room aliases within the AS namespace
 Deleting a non-existent alias should return a 404
 Users can't delete other's aliases
 Outbound federation can query room alias directory
+Can deactivate account
+Can't deactivate account with wrong password
+After deactivating account, can't log in with password
 After deactivating account, can't log in with an email
 Remote room alias queries can handle Unicode
 Newly joined room is included in an incremental sync after invite
@@ -236,13 +239,11 @@ Outbound federation can query v2 /send_join
 Inbound federation can receive v2 /send_join
 Message history can be paginated
 Getting messages going forward is limited for a departed room (SPEC-216)
-m.room.history_visibility == "world_readable" allows/forbids appropriately for Real users
 Backfill works correctly with history visibility set to joined
 Guest user cannot call /events globally
 Guest users can join guest_access rooms
 Guest user can set display names
 Guest user cannot upgrade other users
-m.room.history_visibility == "world_readable" allows/forbids appropriately for Guest users
 Guest non-joined user cannot call /events on shared room
 Guest non-joined user cannot call /events on invited room
 Guest non-joined user cannot call /events on joined room
@@ -252,8 +253,6 @@ Guest non-joined users can get individual state for world_readable rooms
 Guest non-joined users cannot room initalSync for non-world_readable rooms
 Guest non-joined users can get individual state for world_readable rooms after leaving
 Guest non-joined users cannot send messages to guest_access rooms if not joined
-Guest users can sync from world_readable guest_access rooms if joined
-Guest users can sync from default guest_access rooms if joined
 Real non-joined users cannot room initalSync for non-world_readable rooms
 Push rules come down in an initial /sync
 Regular users can add and delete aliases in the default room configuration
@@ -396,8 +395,6 @@ GET /rooms/:room_id/state fetches entire room state
 Setting room topic reports m.room.topic to myself
 setting 'm.room.name' respects room powerlevel
 Syncing a new room with a large timeline limit isn't limited
-Left rooms appear in the leave section of sync
-Banned rooms appear in the leave section of sync
 Getting state checks the events requested belong to the room
 Getting state IDs checks the events requested belong to the room
 Can invite users to invite-only rooms
@@ -405,8 +402,6 @@ Uninvited users cannot join the room
 Users cannot invite themselves to a room
 Users cannot invite a user that is already in the room
 Invited user can reject invite
-Invited user can reject invite for empty room
-Invited user can reject local invite after originator leaves
 PUT /rooms/:room_id/typing/:user_id sets typing notification
 Typing notification sent to local room members
 Typing notifications also sent to remote room members
@@ -436,7 +431,6 @@ A prev_batch token can be used in the v1 messages API
 We don't send redundant membership state across incremental syncs by default
 Typing notifications don't leak
 Users cannot kick users from a room they are not in
-Users cannot kick users who have already left a room
 User appears in user directory
 User directory correctly update on display name change
 User in shared private room does appear in user directory
@@ -456,7 +450,6 @@ Banned servers cannot backfill
 Inbound /v1/send_leave rejects leaves from other servers
 Guest users can accept invites to private rooms over federation
 AS user (not ghost) can join room without registering
-If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
 Can search public room list
 Can get remote public room list
 Asking for a remote rooms list, but supplying the local server's name, returns the local rooms list
@@ -465,6 +458,9 @@ After changing password, can log in with new password
 After changing password, existing session still works
 After changing password, different sessions can optionally be kept
 After changing password, a different session no longer works by default
+Read markers appear in incremental v2 /sync
+Read markers appear in initial v2 /sync
+Read markers can be updated
 Local users can peek into world_readable rooms by room ID
 We can't peek into rooms with shared history_visibility
 We can't peek into rooms with invited history_visibility
@@ -480,3 +476,13 @@ Federation key API can act as a notary server via a GET request
 Inbound /make_join rejects attempts to join rooms where all users have left
 Inbound federation rejects invites which include invalid JSON for room version 6
 Inbound federation rejects invite rejections which include invalid JSON for room version 6
+GET /capabilities is present and well formed for registered user 
+m.room.history_visibility == "joined" allows/forbids appropriately for Guest users
+m.room.history_visibility == "joined" allows/forbids appropriately for Real users
+POST rejects invalid utf-8 in JSON
+Users cannot kick users who have already left a room
+Event with an invalid signature in the send_join response should not cause room join to fail
+Inbound federation rejects typing notifications from wrong remote
+Should not be able to take over the room by pretending there is no PL event
+Can get rooms/{roomId}/state for a departed room (SPEC-216)
+Users cannot set notifications powerlevel higher than their own

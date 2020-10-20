@@ -670,7 +670,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 // nolint:nakedret
 func (d *Database) getResponseWithPDUsForCompleteSync(
 	ctx context.Context, res *types.Response,
-	userID string, deviceID string,
+	userID string, device userapi.Device,
 	numRecentEventsPerRoom int,
 ) (
 	toPos types.StreamingToken,
@@ -712,7 +712,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	for _, roomID := range joinedRoomIDs {
 		var jr *types.JoinResponse
 		jr, err = d.getJoinResponseForCompleteSync(
-			ctx, txn, roomID, r, &stateFilter, numRecentEventsPerRoom,
+			ctx, txn, roomID, r, &stateFilter, numRecentEventsPerRoom, device,
 		)
 		if err != nil {
 			return
@@ -721,7 +721,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 
 	// Add peeked rooms.
-	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, deviceID, r)
+	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
 	if err != nil {
 		return
 	}
@@ -729,7 +729,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = d.getJoinResponseForCompleteSync(
-				ctx, txn, peek.RoomID, r, &stateFilter, numRecentEventsPerRoom,
+				ctx, txn, peek.RoomID, r, &stateFilter, numRecentEventsPerRoom, device,
 			)
 			if err != nil {
 				return
@@ -751,7 +751,7 @@ func (d *Database) getJoinResponseForCompleteSync(
 	roomID string,
 	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
-	numRecentEventsPerRoom int,
+	numRecentEventsPerRoom int, device userapi.Device,
 ) (jr *types.JoinResponse, err error) {
 	var stateEvents []gomatrixserverlib.HeaderedEvent
 	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
@@ -769,6 +769,33 @@ func (d *Database) getJoinResponseForCompleteSync(
 		return
 	}
 
+	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
+	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
+	// which is equiv to history_visibility: joined
+	joinEventIndex := -1
+	for i := len(recentStreamEvents) - 1; i >= 0; i-- {
+		ev := recentStreamEvents[i]
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(device.UserID) {
+			membership, _ := ev.Membership()
+			if membership == "join" {
+				joinEventIndex = i
+				if i > 0 {
+					// the create event happens before the first join, so we should cut it at that point instead
+					if recentStreamEvents[i-1].Type() == gomatrixserverlib.MRoomCreate && recentStreamEvents[i-1].StateKeyEquals("") {
+						joinEventIndex = i - 1
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+	if joinEventIndex != -1 {
+		// cut all events earlier than the join (but not the join itself)
+		recentStreamEvents = recentStreamEvents[joinEventIndex:]
+		limited = false // so clients know not to try to backpaginate
+	}
+
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
 	var prevBatchStr string
@@ -784,8 +811,9 @@ func (d *Database) getJoinResponseForCompleteSync(
 	}
 
 	// We don't include a device here as we don't need to send down
-	// transaction IDs for complete syncs
-	recentEvents := d.StreamEventsToEvents(nil, recentStreamEvents)
+	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
+	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
+	recentEvents := d.StreamEventsToEvents(&device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
 	jr = types.NewJoinResponse()
 	jr.Timeline.PrevBatch = prevBatchStr
@@ -800,7 +828,7 @@ func (d *Database) CompleteSync(
 	device userapi.Device, numRecentEventsPerRoom int,
 ) (*types.Response, error) {
 	toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
-		ctx, res, device.UserID, device.ID, numRecentEventsPerRoom,
+		ctx, res, device.UserID, device, numRecentEventsPerRoom,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("d.getResponseWithPDUsForCompleteSync: %w", err)

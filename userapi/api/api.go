@@ -30,6 +30,7 @@ type UserInternalAPI interface {
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
 	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
+	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
@@ -191,12 +192,26 @@ type PerformDeviceCreationRequest struct {
 	DeviceID *string
 	// optional: if nil no display name will be associated with this device.
 	DeviceDisplayName *string
+	// IP address of this device
+	IPAddr string
+	// Useragent for this device
+	UserAgent string
 }
 
 // PerformDeviceCreationResponse is the response for PerformDeviceCreation
 type PerformDeviceCreationResponse struct {
 	DeviceCreated bool
 	Device        *Device
+}
+
+// PerformAccountDeactivationRequest is the request for PerformAccountDeactivation
+type PerformAccountDeactivationRequest struct {
+	Localpart string
+}
+
+// PerformAccountDeactivationResponse is the response for PerformAccountDeactivation
+type PerformAccountDeactivationResponse struct {
+	AccountDeactivated bool
 }
 
 // Device represents a client's device (mobile, web, etc)
@@ -211,6 +226,9 @@ type Device struct {
 	// associated with access tokens.
 	SessionID   int64
 	DisplayName string
+	LastSeenTS  int64
+	LastSeenIP  string
+	UserAgent   string
 }
 
 // Account represents a Matrix account on this home server.

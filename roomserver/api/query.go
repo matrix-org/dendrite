@@ -63,7 +63,8 @@ type QueryStateAfterEventsRequest struct {
 	RoomID string `json:"room_id"`
 	// The list of previous events to return the events after.
 	PrevEventIDs []string `json:"prev_event_ids"`
-	// The state key tuples to fetch from the state
+	// The state key tuples to fetch from the state. If none are specified then
+	// the entire resolved room state will be returned.
 	StateToFetch []gomatrixserverlib.StateKeyTuple `json:"state_to_fetch"`
 }
 
@@ -80,6 +81,27 @@ type QueryStateAfterEventsResponse struct {
 	// The state events requested.
 	// This list will be in an arbitrary order.
 	StateEvents []gomatrixserverlib.HeaderedEvent `json:"state_events"`
+}
+
+type QueryMissingAuthPrevEventsRequest struct {
+	// The room ID to query the state in.
+	RoomID string `json:"room_id"`
+	// The list of auth events to check the existence of.
+	AuthEventIDs []string `json:"auth_event_ids"`
+	// The list of previous events to check the existence of.
+	PrevEventIDs []string `json:"prev_event_ids"`
+}
+
+type QueryMissingAuthPrevEventsResponse struct {
+	// Does the room exist on this roomserver?
+	// If the room doesn't exist all other fields will be empty.
+	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
+	// The event IDs of the auth events that we don't know locally.
+	MissingAuthEventIDs []string `json:"missing_auth_event_ids"`
+	// The event IDs of the previous events that we don't know locally.
+	MissingPrevEventIDs []string `json:"missing_prev_event_ids"`
 }
 
 // QueryEventsByIDRequest is a request to QueryEventsByID
@@ -154,6 +176,8 @@ type QueryServerJoinedToRoomResponse struct {
 	RoomExists bool `json:"room_exists"`
 	// True if we still believe that we are participating in the room
 	IsInRoom bool `json:"is_in_room"`
+	// List of servers that are also in the room
+	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
 }
 
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent

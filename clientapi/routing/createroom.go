@@ -339,12 +339,22 @@ func createRoom(
 			util.GetLogger(req.Context()).WithError(err).Error("authEvents.AddEvent failed")
 			return jsonerror.InternalServerError()
 		}
-	}
 
-	// send events to the room server
-	if err = roomserverAPI.SendEvents(req.Context(), rsAPI, builtEvents, cfg.Matrix.ServerName, nil); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError()
+		accumulated := gomatrixserverlib.UnwrapEventHeaders(builtEvents)
+		if err = roomserverAPI.SendEventWithState(
+			req.Context(),
+			rsAPI,
+			roomserverAPI.KindNew,
+			&gomatrixserverlib.RespState{
+				StateEvents: accumulated,
+				AuthEvents:  accumulated,
+			},
+			ev.Headered(roomVersion),
+			nil,
+		); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("SendEventWithState failed")
+			return jsonerror.InternalServerError()
+		}
 	}
 
 	// TODO(#269): Reserve room alias while we create the room. This stops us

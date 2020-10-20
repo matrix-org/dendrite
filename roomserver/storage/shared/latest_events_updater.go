@@ -18,23 +18,30 @@ type LatestEventsUpdater struct {
 	currentStateSnapshotNID types.StateSnapshotNID
 }
 
+func rollback(txn *sql.Tx) {
+	if txn == nil {
+		return
+	}
+	txn.Rollback() // nolint: errcheck
+}
+
 func NewLatestEventsUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo types.RoomInfo) (*LatestEventsUpdater, error) {
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomInfo.RoomNID)
 	if err != nil {
-		txn.Rollback() // nolint: errcheck
+		rollback(txn)
 		return nil, err
 	}
 	stateAndRefs, err := d.EventsTable.BulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
 	if err != nil {
-		txn.Rollback() // nolint: errcheck
+		rollback(txn)
 		return nil, err
 	}
 	var lastEventIDSent string
 	if lastEventNIDSent != 0 {
 		lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, txn, lastEventNIDSent)
 		if err != nil {
-			txn.Rollback() // nolint: errcheck
+			rollback(txn)
 			return nil, err
 		}
 	}
@@ -63,16 +70,14 @@ func (u *LatestEventsUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
 	return u.currentStateSnapshotNID
 }
 
-// StorePreviousEvents implements types.RoomRecentEventsUpdater
+// StorePreviousEvents implements types.RoomRecentEventsUpdater - This must be called from a Writer
 func (u *LatestEventsUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
-	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		for _, ref := range previousEventReferences {
-			if err := u.d.PrevEventsTable.InsertPreviousEvent(u.ctx, txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
-				return fmt.Errorf("u.d.PrevEventsTable.InsertPreviousEvent: %w", err)
-			}
+	for _, ref := range previousEventReferences {
+		if err := u.d.PrevEventsTable.InsertPreviousEvent(u.ctx, u.txn, ref.EventID, ref.EventSHA256, eventNID); err != nil {
+			return fmt.Errorf("u.d.PrevEventsTable.InsertPreviousEvent: %w", err)
 		}
-		return nil
-	})
+	}
+	return nil
 }
 
 // IsReferenced implements types.RoomRecentEventsUpdater

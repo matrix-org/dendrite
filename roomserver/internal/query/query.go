@@ -49,6 +49,7 @@ func (r *Queryer) QueryLatestEventsAndState(
 }
 
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
+// nolint:gocyclo
 func (r *Queryer) QueryStateAfterEvents(
 	ctx context.Context,
 	request *api.QueryStateAfterEventsRequest,
@@ -78,10 +79,18 @@ func (r *Queryer) QueryStateAfterEvents(
 	}
 	response.PrevEventsExist = true
 
-	// Look up the currrent state for the requested tuples.
-	stateEntries, err := roomState.LoadStateAfterEventsForStringTuples(
-		ctx, prevStates, request.StateToFetch,
-	)
+	var stateEntries []types.StateEntry
+	if len(request.StateToFetch) == 0 {
+		// Look up all of the current room state.
+		stateEntries, err = roomState.LoadCombinedStateAfterEvents(
+			ctx, prevStates,
+		)
+	} else {
+		// Look up the current state for the requested tuples.
+		stateEntries, err = roomState.LoadStateAfterEventsForStringTuples(
+			ctx, prevStates, request.StateToFetch,
+		)
+	}
 	if err != nil {
 		return err
 	}
@@ -91,8 +100,58 @@ func (r *Queryer) QueryStateAfterEvents(
 		return err
 	}
 
+	if len(request.PrevEventIDs) > 1 && len(request.StateToFetch) == 0 {
+		var authEventIDs []string
+		for _, e := range stateEvents {
+			authEventIDs = append(authEventIDs, e.AuthEventIDs()...)
+		}
+		authEventIDs = util.UniqueStrings(authEventIDs)
+
+		authEvents, err := getAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
+		if err != nil {
+			return fmt.Errorf("getAuthChain: %w", err)
+		}
+
+		stateEvents, err = state.ResolveConflictsAdhoc(info.RoomVersion, stateEvents, authEvents)
+		if err != nil {
+			return fmt.Errorf("state.ResolveConflictsAdhoc: %w", err)
+		}
+	}
+
 	for _, event := range stateEvents {
 		response.StateEvents = append(response.StateEvents, event.Headered(info.RoomVersion))
+	}
+
+	return nil
+}
+
+// QueryMissingAuthPrevEvents implements api.RoomserverInternalAPI
+func (r *Queryer) QueryMissingAuthPrevEvents(
+	ctx context.Context,
+	request *api.QueryMissingAuthPrevEventsRequest,
+	response *api.QueryMissingAuthPrevEventsResponse,
+) error {
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	if info == nil {
+		return errors.New("room doesn't exist")
+	}
+
+	response.RoomExists = !info.IsStub
+	response.RoomVersion = info.RoomVersion
+
+	for _, authEventID := range request.AuthEventIDs {
+		if nids, err := r.DB.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
+			response.MissingAuthEventIDs = append(response.MissingAuthEventIDs, authEventID)
+		}
+	}
+
+	for _, prevEventID := range request.PrevEventIDs {
+		if state, err := r.DB.StateAtEventIDs(ctx, []string{prevEventID}); err != nil || len(state) == 0 {
+			response.MissingPrevEventIDs = append(response.MissingPrevEventIDs, prevEventID)
+		}
 	}
 
 	return nil
@@ -255,17 +314,22 @@ func (r *Queryer) QueryServerJoinedToRoom(
 		return fmt.Errorf("r.DB.Events: %w", err)
 	}
 
+	servers := map[gomatrixserverlib.ServerName]struct{}{}
 	for _, e := range events {
 		if e.Type() == gomatrixserverlib.MRoomMember && e.StateKey() != nil {
 			_, serverName, err := gomatrixserverlib.SplitID('@', *e.StateKey())
 			if err != nil {
 				continue
 			}
+			servers[serverName] = struct{}{}
 			if serverName == request.ServerName {
 				response.IsInRoom = true
-				break
 			}
 		}
+	}
+
+	for server := range servers {
+		response.ServerNames = append(response.ServerNames, server)
 	}
 
 	return nil

@@ -73,13 +73,12 @@ func main() {
 	cfg.Global.PrivateKey = ygg.SigningPrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.FederationSender.FederationMaxRetries = 8
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
+	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-signingkeyserver.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
 	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
@@ -97,7 +96,7 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation, base.KafkaProducer)
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -130,13 +129,11 @@ func main() {
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
 	monolith := setup.Monolith{
-		Config:        base.Cfg,
-		AccountDB:     accountDB,
-		Client:        ygg.CreateClient(base),
-		FedClient:     federation,
-		KeyRing:       keyRing,
-		KafkaConsumer: base.KafkaConsumer,
-		KafkaProducer: base.KafkaProducer,
+		Config:    base.Cfg,
+		AccountDB: accountDB,
+		Client:    ygg.CreateClient(base),
+		FedClient: federation,
+		KeyRing:   keyRing,
 
 		AppserviceAPI:       asAPI,
 		EDUInternalAPI:      eduInputAPI,

@@ -28,11 +28,12 @@ import (
 const (
 	InputAccountDataPath = "/userapi/inputAccountData"
 
-	PerformDeviceCreationPath  = "/userapi/performDeviceCreation"
-	PerformAccountCreationPath = "/userapi/performAccountCreation"
-	PerformPasswordUpdatePath  = "/userapi/performPasswordUpdate"
-	PerformDeviceDeletionPath  = "/userapi/performDeviceDeletion"
-	PerformDeviceUpdatePath    = "/userapi/performDeviceUpdate"
+	PerformDeviceCreationPath      = "/userapi/performDeviceCreation"
+	PerformAccountCreationPath     = "/userapi/performAccountCreation"
+	PerformPasswordUpdatePath      = "/userapi/performPasswordUpdate"
+	PerformDeviceDeletionPath      = "/userapi/performDeviceDeletion"
+	PerformDeviceUpdatePath        = "/userapi/performDeviceUpdate"
+	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
 
 	QueryProfilePath        = "/userapi/queryProfile"
 	QueryAccessTokenPath    = "/userapi/queryAccessToken"
@@ -123,6 +124,14 @@ func (h *httpUserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.
 	defer span.Finish()
 
 	apiURL := h.apiURL + PerformDeviceUpdatePath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAccountDeactivation")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformAccountDeactivationPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 

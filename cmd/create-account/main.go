@@ -22,7 +22,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -39,7 +38,6 @@ var (
 	username      = flag.String("username", "", "The user ID localpart to register e.g 'alice' in '@alice:localhost'.")
 	password      = flag.String("password", "", "Optional. The password to register with. If not specified, this account will be password-less.")
 	serverNameStr = flag.String("servername", "localhost", "The Matrix server domain which will form the domain part of the user ID.")
-	accessToken   = flag.String("token", "", "Optional. The desired access_token to have. If not specified, a random access_token will be made.")
 )
 
 func main() {
@@ -78,29 +76,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	deviceDB, err := devices.NewDatabase(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(*database),
-	}, serverName)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	if *accessToken == "" {
-		t := "token_" + *username
-		accessToken = &t
-	}
-
-	device, err := deviceDB.CreateDevice(
-		context.Background(), *username, nil, *accessToken, nil,
-	)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	fmt.Println("Created account:")
-	fmt.Printf("user_id      = %s\n", device.UserID)
-	fmt.Printf("device_id    = %s\n", device.ID)
-	fmt.Printf("access_token = %s\n", device.AccessToken)
+	fmt.Println("Created account")
 }

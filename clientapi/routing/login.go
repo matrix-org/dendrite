@@ -79,7 +79,7 @@ func Login(
 			return *authErr
 		}
 		// make a device/access token
-		return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login)
+		return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
@@ -89,6 +89,7 @@ func Login(
 
 func completeAuth(
 	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI userapi.UserInternalAPI, login *auth.Login,
+	ipAddr, userAgent string,
 ) util.JSONResponse {
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
@@ -108,6 +109,8 @@ func completeAuth(
 		DeviceID:          login.DeviceID,
 		AccessToken:       token,
 		Localpart:         localpart,
+		IPAddr:            ipAddr,
+		UserAgent:         userAgent,
 	}, &performRes)
 	if err != nil {
 		return util.JSONResponse{

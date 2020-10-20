@@ -40,14 +40,17 @@ CREATE TABLE IF NOT EXISTS device_devices (
     localpart TEXT ,
     created_ts BIGINT,
     display_name TEXT,
+    last_seen_ts BIGINT,
+    ip TEXT,
+    user_agent TEXT,
 
 		UNIQUE (localpart, device_id)
 );
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)"
+	"INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_seen_ts, ip, user_agent)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
 
 const selectDevicesCountSQL = "" +
 	"SELECT COUNT(access_token) FROM device_devices"
@@ -76,6 +79,9 @@ const deleteDevicesSQL = "" +
 const selectDevicesByIDSQL = "" +
 	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id IN ($1)"
 
+const updateDeviceLastSeen = "" +
+	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE device_id = $3"
+
 type devicesStatements struct {
 	db                           *sql.DB
 	writer                       sqlutil.Writer
@@ -86,18 +92,20 @@ type devicesStatements struct {
 	selectDevicesByIDStmt        *sql.Stmt
 	selectDevicesByLocalpartStmt *sql.Stmt
 	updateDeviceNameStmt         *sql.Stmt
+	updateDeviceLastSeenStmt     *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
 }
 
+func (s *devicesStatements) execSchema(db *sql.DB) error {
+	_, err := db.Exec(devicesSchema)
+	return err
+}
+
 func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
 	s.writer = writer
-	_, err = db.Exec(devicesSchema)
-	if err != nil {
-		return
-	}
 	if s.insertDeviceStmt, err = db.Prepare(insertDeviceSQL); err != nil {
 		return
 	}
@@ -125,6 +133,9 @@ func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server go
 	if s.selectDevicesByIDStmt, err = db.Prepare(selectDevicesByIDSQL); err != nil {
 		return
 	}
+	if s.updateDeviceLastSeenStmt, err = db.Prepare(updateDeviceLastSeen); err != nil {
+		return
+	}
 	s.serverName = server
 	return
 }
@@ -134,7 +145,7 @@ func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server go
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
-	displayName *string,
+	displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
@@ -144,7 +155,7 @@ func (s *devicesStatements) insertDevice(
 		return nil, err
 	}
 	sessionID++
-	if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID); err != nil {
+	if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr, userAgent); err != nil {
 		return nil, err
 	}
 	return &api.Device{
@@ -152,6 +163,9 @@ func (s *devicesStatements) insertDevice(
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
 		SessionID:   sessionID,
+		LastSeenTS:  createdTimeMS,
+		LastSeenIP:  ipAddr,
+		UserAgent:   userAgent,
 	}, nil
 }
 
@@ -287,4 +301,11 @@ func (s *devicesStatements) selectDevicesByID(ctx context.Context, deviceIDs []s
 		devices = append(devices, dev)
 	}
 	return devices, rows.Err()
+}
+
+func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, txn *sql.Tx, deviceID, ipAddr string) error {
+	lastSeenTs := time.Now().UnixNano() / 1000000
+	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, deviceID)
+	return err
 }

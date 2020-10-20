@@ -15,8 +15,10 @@
 package setup
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -25,14 +27,12 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/matrix-org/naffka"
-	naffkaStorage "github.com/matrix-org/naffka/storage"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 
-	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -46,8 +46,8 @@ import (
 	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
-	serverKeyAPI "github.com/matrix-org/dendrite/serverkeyapi/api"
-	skinthttp "github.com/matrix-org/dendrite/serverkeyapi/inthttp"
+	skapi "github.com/matrix-org/dendrite/signingkeyserver/api"
+	skinthttp "github.com/matrix-org/dendrite/signingkeyserver/inthttp"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/sirupsen/logrus"
@@ -69,17 +69,18 @@ type BaseDendrite struct {
 	PublicMediaAPIMux      *mux.Router
 	InternalAPIMux         *mux.Router
 	UseHTTPAPIs            bool
+	apiHttpClient          *http.Client
 	httpClient             *http.Client
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
-	KafkaConsumer          sarama.Consumer
-	KafkaProducer          sarama.SyncProducer
+	//	KafkaConsumer          sarama.Consumer
+	//	KafkaProducer          sarama.SyncProducer
 }
 
 const HTTPServerTimeout = time.Minute * 5
 const HTTPClientTimeout = time.Second * 30
 
-const NoExternalListener = ""
+const NoListener = ""
 
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
@@ -105,19 +106,27 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}
 
-	var kafkaConsumer sarama.Consumer
-	var kafkaProducer sarama.SyncProducer
-	if cfg.Global.Kafka.UseNaffka {
-		kafkaConsumer, kafkaProducer = setupNaffka(cfg)
-	} else {
-		kafkaConsumer, kafkaProducer = setupKafka(cfg)
-	}
-
 	cache, err := caching.NewInMemoryLRUCache(true)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
 
+	apiClient := http.Client{
+		Timeout: time.Minute * 10,
+		Transport: &http2.Transport{
+			AllowHTTP: true,
+			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
+				// Ordinarily HTTP/2 would expect TLS, but the remote listener is
+				// H2C-enabled (HTTP/2 without encryption). Overriding the DialTLS
+				// function with a plain Dial allows us to trick the HTTP client
+				// into establishing a HTTP/2 connection without TLS.
+				// TODO: Eventually we will want to look at authenticating and
+				// encrypting these internal HTTP APIs, at which point we will have
+				// to reconsider H2C and change all this anyway.
+				return net.Dial(network, addr)
+			},
+		},
+	}
 	client := http.Client{Timeout: HTTPClientTimeout}
 	if cfg.FederationSender.Proxy.Enabled {
 		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
@@ -148,9 +157,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
 		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
+		apiHttpClient:          &apiClient,
 		httpClient:             &client,
-		KafkaConsumer:          kafkaConsumer,
-		KafkaProducer:          kafkaProducer,
 	}
 }
 
@@ -161,7 +169,7 @@ func (b *BaseDendrite) Close() error {
 
 // AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
 func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
-	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.httpClient)
+	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.apiHttpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")
 	}
@@ -170,27 +178,27 @@ func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
 
 // RoomserverHTTPClient returns RoomserverInternalAPI for hitting the roomserver over HTTP.
 func (b *BaseDendrite) RoomserverHTTPClient() roomserverAPI.RoomserverInternalAPI {
-	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.httpClient, b.Caches)
+	rsAPI, err := rsinthttp.NewRoomserverClient(b.Cfg.RoomServerURL(), b.apiHttpClient, b.Caches)
 	if err != nil {
-		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.httpClient)
+		logrus.WithError(err).Panic("RoomserverHTTPClient failed", b.apiHttpClient)
 	}
 	return rsAPI
 }
 
 // UserAPIClient returns UserInternalAPI for hitting the userapi over HTTP.
 func (b *BaseDendrite) UserAPIClient() userapi.UserInternalAPI {
-	userAPI, err := userapiinthttp.NewUserAPIClient(b.Cfg.UserAPIURL(), b.httpClient)
+	userAPI, err := userapiinthttp.NewUserAPIClient(b.Cfg.UserAPIURL(), b.apiHttpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("UserAPIClient failed", b.httpClient)
+		logrus.WithError(err).Panic("UserAPIClient failed", b.apiHttpClient)
 	}
 	return userAPI
 }
 
 // EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
 func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
-	e, err := eduinthttp.NewEDUServerClient(b.Cfg.EDUServerURL(), b.httpClient)
+	e, err := eduinthttp.NewEDUServerClient(b.Cfg.EDUServerURL(), b.apiHttpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("EDUServerClient failed", b.httpClient)
+		logrus.WithError(err).Panic("EDUServerClient failed", b.apiHttpClient)
 	}
 	return e
 }
@@ -198,31 +206,31 @@ func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
 // FederationSenderHTTPClient returns FederationSenderInternalAPI for hitting
 // the federation sender over HTTP
 func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationSenderInternalAPI {
-	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.httpClient)
+	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.apiHttpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.httpClient)
+		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.apiHttpClient)
 	}
 	return f
 }
 
-// ServerKeyAPIClient returns ServerKeyInternalAPI for hitting the server key API over HTTP
-func (b *BaseDendrite) ServerKeyAPIClient() serverKeyAPI.ServerKeyInternalAPI {
-	f, err := skinthttp.NewServerKeyClient(
-		b.Cfg.ServerKeyAPIURL(),
-		b.httpClient,
+// SigningKeyServerHTTPClient returns SigningKeyServer for hitting the signing key server over HTTP
+func (b *BaseDendrite) SigningKeyServerHTTPClient() skapi.SigningKeyServerAPI {
+	f, err := skinthttp.NewSigningKeyServerClient(
+		b.Cfg.SigningKeyServerURL(),
+		b.apiHttpClient,
 		b.Caches,
 	)
 	if err != nil {
-		logrus.WithError(err).Panic("NewServerKeyInternalAPIHTTP failed", b.httpClient)
+		logrus.WithError(err).Panic("SigningKeyServerHTTPClient failed", b.httpClient)
 	}
 	return f
 }
 
 // KeyServerHTTPClient returns KeyInternalAPI for hitting the key server over HTTP
 func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
-	f, err := keyinthttp.NewKeyServerClient(b.Cfg.KeyServerURL(), b.httpClient)
+	f, err := keyinthttp.NewKeyServerClient(b.Cfg.KeyServerURL(), b.apiHttpClient)
 	if err != nil {
-		logrus.WithError(err).Panic("KeyServerHTTPClient failed", b.httpClient)
+		logrus.WithError(err).Panic("KeyServerHTTPClient failed", b.apiHttpClient)
 	}
 	return f
 }
@@ -238,13 +246,25 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 	return db
 }
 
+// CreateClient creates a new client (normally used for media fetch requests).
+// Should only be called once per component.
+func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
+	client := gomatrixserverlib.NewClient(
+		b.Cfg.FederationSender.DisableTLSValidation,
+	)
+	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	return client
+}
+
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
-	return gomatrixserverlib.NewFederationClient(
+	client := gomatrixserverlib.NewFederationClientWithTimeout(
 		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
-		b.Cfg.FederationSender.DisableTLSValidation,
+		b.Cfg.FederationSender.DisableTLSValidation, time.Minute*5,
 	)
+	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	return client
 }
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
@@ -257,22 +277,28 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	internalAddr, _ := internalHTTPAddr.Address()
 	externalAddr, _ := externalHTTPAddr.Address()
 
-	internalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	externalRouter := internalRouter
+	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
+	internalRouter := externalRouter
 
-	internalServ := &http.Server{
-		Addr:         string(internalAddr),
+	externalServ := &http.Server{
+		Addr:         string(externalAddr),
 		WriteTimeout: HTTPServerTimeout,
-		Handler:      internalRouter,
+		Handler:      externalRouter,
 	}
-	externalServ := internalServ
+	internalServ := externalServ
 
-	if externalAddr != NoExternalListener && externalAddr != internalAddr {
-		externalRouter = mux.NewRouter().SkipClean(true).UseEncodedPath()
-		externalServ = &http.Server{
-			Addr:         string(externalAddr),
-			WriteTimeout: HTTPServerTimeout,
-			Handler:      externalRouter,
+	if internalAddr != NoListener && externalAddr != internalAddr {
+		// H2C allows us to accept HTTP/2 connections without TLS
+		// encryption. Since we don't currently require any form of
+		// authentication or encryption on these internal HTTP APIs,
+		// H2C gives us all of the advantages of HTTP/2 (such as
+		// stream multiplexing and avoiding head-of-line blocking)
+		// without enabling TLS.
+		internalH2S := &http2.Server{}
+		internalRouter = mux.NewRouter().SkipClean(true).UseEncodedPath()
+		internalServ = &http.Server{
+			Addr:    string(internalAddr),
+			Handler: h2c.NewHandler(internalRouter, internalH2S),
 		}
 	}
 
@@ -286,23 +312,25 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(b.PublicFederationAPIMux)
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 
-	go func() {
-		logrus.Infof("Starting %s listener on %s", b.componentName, internalServ.Addr)
-		if certFile != nil && keyFile != nil {
-			if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
-				logrus.WithError(err).Fatal("failed to serve HTTPS")
-			}
-		} else {
-			if err := internalServ.ListenAndServe(); err != nil {
-				logrus.WithError(err).Fatal("failed to serve HTTP")
-			}
-		}
-		logrus.Infof("Stopped %s listener on %s", b.componentName, internalServ.Addr)
-	}()
-
-	if externalAddr != NoExternalListener && internalAddr != externalAddr {
+	if internalAddr != NoListener && internalAddr != externalAddr {
 		go func() {
-			logrus.Infof("Starting %s listener on %s", b.componentName, externalServ.Addr)
+			logrus.Infof("Starting internal %s listener on %s", b.componentName, internalServ.Addr)
+			if certFile != nil && keyFile != nil {
+				if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+					logrus.WithError(err).Fatal("failed to serve HTTPS")
+				}
+			} else {
+				if err := internalServ.ListenAndServe(); err != nil {
+					logrus.WithError(err).Fatal("failed to serve HTTP")
+				}
+			}
+			logrus.Infof("Stopped internal %s listener on %s", b.componentName, internalServ.Addr)
+		}()
+	}
+
+	if externalAddr != NoListener {
+		go func() {
+			logrus.Infof("Starting external %s listener on %s", b.componentName, externalServ.Addr)
 			if certFile != nil && keyFile != nil {
 				if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
 					logrus.WithError(err).Fatal("failed to serve HTTPS")
@@ -312,37 +340,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 					logrus.WithError(err).Fatal("failed to serve HTTP")
 				}
 			}
-			logrus.Infof("Stopped %s listener on %s", b.componentName, externalServ.Addr)
+			logrus.Infof("Stopped external %s listener on %s", b.componentName, externalServ.Addr)
 		}()
 	}
 
 	select {}
-}
-
-// setupKafka creates kafka consumer/producer pair from the config.
-func setupKafka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	consumer, err := sarama.NewConsumer(cfg.Global.Kafka.Addresses, nil)
-	if err != nil {
-		logrus.WithError(err).Panic("failed to start kafka consumer")
-	}
-
-	producer, err := sarama.NewSyncProducer(cfg.Global.Kafka.Addresses, nil)
-	if err != nil {
-		logrus.WithError(err).Panic("failed to setup kafka producers")
-	}
-
-	return consumer, producer
-}
-
-// setupNaffka creates kafka consumer/producer pair from the config.
-func setupNaffka(cfg *config.Dendrite) (sarama.Consumer, sarama.SyncProducer) {
-	naffkaDB, err := naffkaStorage.NewDatabase(string(cfg.Global.Kafka.Database.ConnectionString))
-	if err != nil {
-		logrus.WithError(err).Panic("Failed to setup naffka database")
-	}
-	naff, err := naffka.New(naffkaDB)
-	if err != nil {
-		logrus.WithError(err).Panic("Failed to setup naffka")
-	}
-	return naff, naff
 }

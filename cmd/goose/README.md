@@ -104,4 +104,6 @@ You __must__ import the package in `/cmd/goose/main.go` so `func init()` gets ca
 #### Database limitations
 
 - SQLite3 does NOT support `ALTER TABLE table_name DROP COLUMN` - you would have to rename the column or drop the table
-  entirely and recreate it.
+  entirely and recreate it. ([example](https://github.com/matrix-org/dendrite/blob/master/userapi/storage/accounts/sqlite3/deltas/20200929203058_is_active.sql))
+  
+  More information: [sqlite.org](https://www.sqlite.org/lang_altertable.html)

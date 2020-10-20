@@ -118,7 +118,7 @@ func (v StateResolution) LoadCombinedStateAfterEvents(
 	// the snapshot of the room state before them was the same.
 	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, uniqueStateSnapshotNIDs(stateNIDs))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("v.db.StateBlockNIDs: %w", err)
 	}
 
 	var stateBlockNIDs []types.StateBlockNID
@@ -131,7 +131,7 @@ func (v StateResolution) LoadCombinedStateAfterEvents(
 	// multiple snapshots.
 	stateEntryLists, err := v.db.StateEntries(ctx, uniqueStateBlockNIDs(stateBlockNIDs))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("v.db.StateEntries: %w", err)
 	}
 	stateBlockNIDsMap := stateBlockNIDListMap(stateBlockNIDLists)
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
@@ -623,7 +623,7 @@ func (v StateResolution) calculateAndStoreStateAfterManyEvents(
 		v.calculateStateAfterManyEvents(ctx, v.roomInfo.RoomVersion, prevStates)
 	metrics.algorithm = algorithm
 	if err != nil {
-		return metrics.stop(0, err)
+		return metrics.stop(0, fmt.Errorf("v.calculateStateAfterManyEvents: %w", err))
 	}
 
 	// TODO: Check if we can encode the new state as a delta against the
@@ -642,6 +642,7 @@ func (v StateResolution) calculateStateAfterManyEvents(
 	// First stage: load the state after each of the prev events.
 	combined, err = v.LoadCombinedStateAfterEvents(ctx, prevStates)
 	if err != nil {
+		err = fmt.Errorf("v.LoadCombinedStateAfterEvents: %w", err)
 		algorithm = "_load_combined_state"
 		return
 	}
@@ -672,6 +673,7 @@ func (v StateResolution) calculateStateAfterManyEvents(
 		var resolved []types.StateEntry
 		resolved, err = v.resolveConflicts(ctx, roomVersion, notConflicted, conflicts)
 		if err != nil {
+			err = fmt.Errorf("v.resolveConflits: %w", err)
 			algorithm = "_resolve_conflicts"
 			return
 		}
@@ -717,11 +719,7 @@ func ResolveConflictsAdhoc(
 		// Append the events if there is already a conflicted list for
 		// this tuple key, create it if not.
 		tuple := stateKeyTuple{event.Type(), *event.StateKey()}
-		if _, ok := eventMap[tuple]; ok {
-			eventMap[tuple] = append(eventMap[tuple], event)
-		} else {
-			eventMap[tuple] = []gomatrixserverlib.Event{event}
-		}
+		eventMap[tuple] = append(eventMap[tuple], event)
 	}
 
 	// Split out the events in the map into conflicted and unconflicted

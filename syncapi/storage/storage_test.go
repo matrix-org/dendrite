@@ -81,7 +81,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 	}))
 	state = append(state, events[len(events)-1])
 	events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(fmt.Sprintf(`{"membership":"join"}`)),
+		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &userA,
 		Sender:   userA,
@@ -97,7 +97,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 		}))
 	}
 	events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(fmt.Sprintf(`{"membership":"join"}`)),
+		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &userB,
 		Sender:   userB,
@@ -348,7 +348,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Depth:    int64(len(events) + 1),
 	}))
 	events = append(events, MustCreateEvent(t, testRoomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(fmt.Sprintf(`{"membership":"join"}`)),
+		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &testUserIDA,
 		Sender:   testUserIDA,
@@ -367,7 +367,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 	}
 	// merge the fork, prev_events are all 3 messages, depth is increased by 1.
 	events = append(events, MustCreateEvent(t, testRoomID, events[len(events)-3:], &gomatrixserverlib.EventBuilder{
-		Content: []byte(fmt.Sprintf(`{"body":"Message merge"}`)),
+		Content: []byte(`{"body":"Message merge"}`),
 		Type:    "m.room.message",
 		Sender:  testUserIDA,
 		Depth:   depth + 1,
@@ -438,7 +438,7 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 			Depth:    int64(len(events) + 1),
 		}))
 		events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-			Content:  []byte(fmt.Sprintf(`{"membership":"join"}`)),
+			Content:  []byte(`{"membership":"join"}`),
 			Type:     "m.room.member",
 			StateKey: &testUserIDA,
 			Sender:   testUserIDA,
@@ -484,7 +484,7 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 	// "federation" join
 	userC := fmt.Sprintf("@radiance:%s", testOrigin)
 	joinEvent := MustCreateEvent(t, testRoomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(fmt.Sprintf(`{"membership":"join"}`)),
+		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &userC,
 		Sender:   userC,
@@ -615,14 +615,14 @@ func TestInviteBehaviour(t *testing.T) {
 	db := MustCreateDatabase(t)
 	inviteRoom1 := "!inviteRoom1:somewhere"
 	inviteEvent1 := MustCreateEvent(t, inviteRoom1, nil, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(fmt.Sprintf(`{"membership":"invite"}`)),
+		Content:  []byte(`{"membership":"invite"}`),
 		Type:     "m.room.member",
 		StateKey: &testUserIDA,
 		Sender:   "@inviteUser1:somewhere",
 	})
 	inviteRoom2 := "!inviteRoom2:somewhere"
 	inviteEvent2 := MustCreateEvent(t, inviteRoom2, nil, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(fmt.Sprintf(`{"membership":"invite"}`)),
+		Content:  []byte(`{"membership":"invite"}`),
 		Type:     "m.room.member",
 		StateKey: &testUserIDA,
 		Sender:   "@inviteUser2:somewhere",
@@ -689,6 +689,7 @@ func assertInvitedToRooms(t *testing.T, res *types.Response, roomIDs []string) {
 }
 
 func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []gomatrixserverlib.HeaderedEvent) {
+	t.Helper()
 	if len(gots) != len(wants) {
 		t.Fatalf("%s response returned %d events, want %d", msg, len(gots), len(wants))
 	}

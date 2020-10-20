@@ -136,14 +136,10 @@ func (r *Inviter) PerformInvite(
 			log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
 				"processInviteEvent.checkAuthEvents failed for event",
 			)
-			if _, ok := err.(*gomatrixserverlib.NotAllowed); ok {
-				res.Error = &api.PerformError{
-					Msg:  err.Error(),
-					Code: api.PerformErrorNotAllowed,
-				}
-				return nil, nil
+			res.Error = &api.PerformError{
+				Msg:  err.Error(),
+				Code: api.PerformErrorNotAllowed,
 			}
-			return nil, fmt.Errorf("checkAuthEvents: %w", err)
 		}
 
 		// If the invite originated from us and the target isn't local then we
@@ -160,7 +156,7 @@ func (r *Inviter) PerformInvite(
 			if err = r.FSAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
 				res.Error = &api.PerformError{
 					Msg:  err.Error(),
-					Code: api.PerformErrorNoOperation,
+					Code: api.PerformErrorNotAllowed,
 				}
 				log.WithError(err).WithField("event_id", event.EventID()).Error("r.FSAPI.PerformInvite failed")
 				return nil, nil
@@ -185,7 +181,12 @@ func (r *Inviter) PerformInvite(
 		inputRes := &api.InputRoomEventsResponse{}
 		r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
 		if err = inputRes.Err(); err != nil {
-			return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
+			res.Error = &api.PerformError{
+				Msg:  fmt.Sprintf("r.InputRoomEvents: %s", err.Error()),
+				Code: api.PerformErrorNotAllowed,
+			}
+			log.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+			return nil, nil
 		}
 	} else {
 		// The invite originated over federation. Process the membership

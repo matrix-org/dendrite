@@ -458,7 +458,7 @@ func (d *Database) StoreEvent(
 				eventNID, stateNID, err = d.EventsTable.SelectEvent(ctx, txn, event.EventID())
 			}
 			if err != nil {
-				return err
+				return fmt.Errorf("d.EventsTable.SelectEvent: %w", err)
 			}
 		}
 
@@ -467,11 +467,57 @@ func (d *Database) StoreEvent(
 		}
 		if !isRejected { // ignore rejected redaction events
 			redactionEvent, redactedEventID, err = d.handleRedactions(ctx, txn, eventNID, event)
+			if err != nil {
+				return fmt.Errorf("d.handleRedactions: %w", err)
+			}
 		}
 		return nil
 	})
 	if err != nil {
 		return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.Writer.Do: %w", err)
+	}
+
+	// We should attempt to update the previous events table with any
+	// references that this new event makes. We do this using a latest
+	// events updater because it somewhat works as a mutex, ensuring
+	// that there's a row-level lock on the latest room events (well,
+	// on Postgres at least).
+	var roomInfo *types.RoomInfo
+	var updater *LatestEventsUpdater
+	if prevEvents := event.PrevEvents(); len(prevEvents) > 0 {
+		roomInfo, err = d.RoomInfo(ctx, event.RoomID())
+		if err != nil {
+			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
+		}
+		if roomInfo == nil && len(prevEvents) > 0 {
+			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("expected room %q to exist", event.RoomID())
+		}
+		// Create an updater - NB: on sqlite this WILL create a txn as we are directly calling the shared DB form of
+		// GetLatestEventsForUpdate - not via the SQLiteDatabase form which has `nil` txns. This
+		// function only does SELECTs though so the created txn (at this point) is just a read txn like
+		// any other so this is fine. If we ever update GetLatestEventsForUpdate or NewLatestEventsUpdater
+		// to do writes however then this will need to go inside `Writer.Do`.
+		updater, err = d.GetLatestEventsForUpdate(ctx, *roomInfo)
+		if err != nil {
+			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("NewLatestEventsUpdater: %w", err)
+		}
+		// Ensure that we atomically store prev events AND commit them. If we don't wrap StorePreviousEvents
+		// and EndTransaction in a writer then it's possible for a new write txn to be made between the two
+		// function calls which will then fail with 'database is locked'. This new write txn would HAVE to be
+		// something like SetRoomAlias/RemoveRoomAlias as normal input events are already done sequentially due to
+		// SupportsConcurrentRoomInputs() == false on sqlite, though this does not apply to setting room aliases
+		// as they don't go via InputRoomEvents
+		err = d.Writer.Do(d.DB, updater.txn, func(txn *sql.Tx) error {
+			if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
+				return fmt.Errorf("updater.StorePreviousEvents: %w", err)
+			}
+			succeeded := true
+			err = sqlutil.EndTransaction(updater, &succeeded)
+			return err
+		})
+		if err != nil {
+			return 0, types.StateAtEvent{}, nil, "", err
+		}
 	}
 
 	return roomNID, types.StateAtEvent{
@@ -483,7 +529,7 @@ func (d *Database) StoreEvent(
 			},
 			EventNID: eventNID,
 		},
-	}, redactionEvent, redactedEventID, nil
+	}, redactionEvent, redactedEventID, err
 }
 
 func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
@@ -601,6 +647,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 // to cross-reference with other tables when loading.
 //
 // Returns the redaction event and the event ID of the redacted event if this call resulted in a redaction.
+// nolint:gocyclo
 func (d *Database) handleRedactions(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event,
 ) (*gomatrixserverlib.Event, string, error) {
@@ -618,13 +665,13 @@ func (d *Database) handleRedactions(
 			RedactsEventID:   event.Redacts(),
 		})
 		if err != nil {
-			return nil, "", err
+			return nil, "", fmt.Errorf("d.RedactionsTable.InsertRedaction: %w", err)
 		}
 	}
 
 	redactionEvent, redactedEvent, validated, err := d.loadRedactionPair(ctx, txn, eventNID, event)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("d.loadRedactionPair: %w", err)
 	}
 	if validated || redactedEvent == nil || redactionEvent == nil {
 		// we've seen this redaction before or there is nothing to redact
@@ -638,7 +685,7 @@ func (d *Database) handleRedactions(
 	// mark the event as redacted
 	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("redactedEvent.SetUnsignedField: %w", err)
 	}
 	if redactionsArePermanent {
 		redactedEvent.Event = redactedEvent.Redact()
@@ -646,10 +693,15 @@ func (d *Database) handleRedactions(
 	// overwrite the eventJSON table
 	err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("d.EventJSONTable.InsertEventJSON: %w", err)
 	}
 
-	return &redactionEvent.Event, redactedEvent.EventID(), d.RedactionsTable.MarkRedactionValidated(ctx, txn, redactionEvent.EventID(), true)
+	err = d.RedactionsTable.MarkRedactionValidated(ctx, txn, redactionEvent.EventID(), true)
+	if err != nil {
+		err = fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
+	}
+
+	return &redactionEvent.Event, redactedEvent.EventID(), err
 }
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.

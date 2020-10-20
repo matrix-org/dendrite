@@ -36,7 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/serverkeyapi"
+	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -89,7 +89,7 @@ func createClient(
 		"matrix",
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
-	return gomatrixserverlib.NewClientWithTransport(true, tr)
+	return gomatrixserverlib.NewClientWithTransport(tr)
 }
 
 func main() {
@@ -125,7 +125,7 @@ func main() {
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.ServerKeyAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-serverkey.db", *instanceName))
+	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-signingkeyserver.db", *instanceName))
 	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
@@ -139,12 +139,12 @@ func main() {
 
 	accountDB := base.Base.CreateAccountsDB()
 	federation := createFederationClient(base)
-	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation, base.Base.KafkaProducer)
+	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
-	serverKeyAPI := serverkeyapi.NewInternalAPI(
-		&base.Base.Cfg.ServerKeyAPI, federation, base.Base.Caches,
+	serverKeyAPI := signingkeyserver.NewInternalAPI(
+		&base.Base.Cfg.SigningKeyServer, federation, base.Base.Caches,
 	)
 	keyRing := serverKeyAPI.KeyRing()
 	createKeyDB(
@@ -169,13 +169,11 @@ func main() {
 	}
 
 	monolith := setup.Monolith{
-		Config:        base.Base.Cfg,
-		AccountDB:     accountDB,
-		Client:        createClient(base),
-		FedClient:     federation,
-		KeyRing:       keyRing,
-		KafkaConsumer: base.Base.KafkaConsumer,
-		KafkaProducer: base.Base.KafkaProducer,
+		Config:    base.Base.Cfg,
+		AccountDB: accountDB,
+		Client:    createClient(base),
+		FedClient: federation,
+		KeyRing:   keyRing,
 
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,

@@ -113,7 +113,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		"device_id":    req.DeviceID,
 		"display_name": req.DeviceDisplayName,
 	}).Info("PerformDeviceCreation")
-	dev, err := a.DeviceDB.CreateDevice(ctx, req.Localpart, req.DeviceID, req.AccessToken, req.DeviceDisplayName)
+	dev, err := a.DeviceDB.CreateDevice(ctx, req.Localpart, req.DeviceID, req.AccessToken, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
 	if err != nil {
 		return err
 	}
@@ -387,4 +387,11 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 	// AS is not masquerading as any user, so use AS's sender_localpart
 	dev.UserID = appService.SenderLocalpart
 	return &dev, nil
+}
+
+// PerformAccountDeactivation deactivates the user's account, removing all ability for the user to login again.
+func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
+	err := a.AccountDB.DeactivateAccount(ctx, req.Localpart)
+	res.AccountDeactivated = err == nil
+	return err
 }

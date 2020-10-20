@@ -38,7 +38,6 @@ type OutputRoomEventConsumer struct {
 	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
 	notifier   *sync.Notifier
-	keyChanges *OutputKeyChangeEventConsumer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -48,7 +47,6 @@ func NewOutputRoomEventConsumer(
 	n *sync.Notifier,
 	store storage.Database,
 	rsAPI api.RoomserverInternalAPI,
-	keyChanges *OutputKeyChangeEventConsumer,
 ) *OutputRoomEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -63,7 +61,6 @@ func NewOutputRoomEventConsumer(
 		db:         store,
 		notifier:   n,
 		rsAPI:      rsAPI,
-		keyChanges: keyChanges,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -100,6 +97,8 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			}
 		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
+	case api.OutputTypeOldRoomEvent:
+		return s.onOldRoomEvent(context.TODO(), *output.OldRoomEvent)
 	case api.OutputTypeNewInviteEvent:
 		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
@@ -171,7 +170,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 			log.ErrorKey: err,
 			"add":        msg.AddsStateEventIDs,
 			"del":        msg.RemovesStateEventIDs,
-		}).Panicf("roomserver output log: write event failure")
+		}).Panicf("roomserver output log: write new event failure")
 		return nil
 	}
 
@@ -182,24 +181,40 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
 
-	s.notifyKeyChanges(&ev)
-
 	return nil
 }
 
-func (s *OutputRoomEventConsumer) notifyKeyChanges(ev *gomatrixserverlib.HeaderedEvent) {
-	membership, err := ev.Membership()
+func (s *OutputRoomEventConsumer) onOldRoomEvent(
+	ctx context.Context, msg api.OutputOldRoomEvent,
+) error {
+	ev := msg.Event
+
+	pduPos, err := s.db.WriteEvent(
+		ctx,
+		&ev,
+		[]gomatrixserverlib.HeaderedEvent{},
+		[]string{}, // adds no state
+		[]string{}, // removes no state
+		nil,        // no transaction
+		false,      // not excluded from sync
+	)
 	if err != nil {
-		return
+		// panic rather than continue with an inconsistent database
+		log.WithFields(log.Fields{
+			"event":      string(ev.JSON()),
+			log.ErrorKey: err,
+		}).Panicf("roomserver output log: write old event failure")
+		return nil
 	}
-	switch membership {
-	case gomatrixserverlib.Join:
-		s.keyChanges.OnJoinEvent(ev)
-	case gomatrixserverlib.Ban:
-		fallthrough
-	case gomatrixserverlib.Leave:
-		s.keyChanges.OnLeaveEvent(ev)
+
+	if pduPos, err = s.notifyJoinedPeeks(ctx, &ev, pduPos); err != nil {
+		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		return err
 	}
+
+	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
+
+	return nil
 }
 
 func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, sp types.StreamPosition) (types.StreamPosition, error) {

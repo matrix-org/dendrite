@@ -51,8 +51,15 @@ CREATE TABLE IF NOT EXISTS device_devices (
     -- When this devices was first recognised on the network, as a unix timestamp (ms resolution).
     created_ts BIGINT NOT NULL,
     -- The display name, human friendlier than device_id and updatable
-    display_name TEXT
-    -- TODO: device keys, device display names, last used ts and IP address?, token restrictions (if 3rd-party OAuth app)
+    display_name TEXT,
+	-- The time the device was last used, as a unix timestamp (ms resolution).
+	last_seen_ts BIGINT NOT NULL,
+	-- The last seen IP address of this device
+	ip TEXT,
+	-- User agent of this device
+	user_agent TEXT
+                                          
+    -- TODO: device keys, device display names, token restrictions (if 3rd-party OAuth app)
 );
 
 -- Device IDs must be unique for a given user.
@@ -60,7 +67,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(loca
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name) VALUES ($1, $2, $3, $4, $5)" +
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
 	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
@@ -87,6 +94,9 @@ const deleteDevicesSQL = "" +
 const selectDevicesByIDSQL = "" +
 	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id = ANY($1)"
 
+const updateDeviceLastSeen = "" +
+	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE device_id = $3"
+
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
@@ -94,17 +104,19 @@ type devicesStatements struct {
 	selectDevicesByLocalpartStmt *sql.Stmt
 	selectDevicesByIDStmt        *sql.Stmt
 	updateDeviceNameStmt         *sql.Stmt
+	updateDeviceLastSeenStmt     *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
 	deleteDevicesStmt            *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
 }
 
+func (s *devicesStatements) execSchema(db *sql.DB) error {
+	_, err := db.Exec(devicesSchema)
+	return err
+}
+
 func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
-	_, err = db.Exec(devicesSchema)
-	if err != nil {
-		return
-	}
 	if s.insertDeviceStmt, err = db.Prepare(insertDeviceSQL); err != nil {
 		return
 	}
@@ -132,6 +144,9 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 	if s.selectDevicesByIDStmt, err = db.Prepare(selectDevicesByIDSQL); err != nil {
 		return
 	}
+	if s.updateDeviceLastSeenStmt, err = db.Prepare(updateDeviceLastSeen); err != nil {
+		return
+	}
 	s.serverName = server
 	return
 }
@@ -141,12 +156,12 @@ func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerN
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
-	displayName *string,
+	displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
 	stmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
-	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName).Scan(&sessionID); err != nil {
+	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
 		return nil, err
 	}
 	return &api.Device{
@@ -154,6 +169,9 @@ func (s *devicesStatements) insertDevice(
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
 		SessionID:   sessionID,
+		LastSeenTS:  createdTimeMS,
+		LastSeenIP:  ipAddr,
+		UserAgent:   userAgent,
 	}, nil
 }
 
@@ -279,4 +297,11 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	}
 
 	return devices, rows.Err()
+}
+
+func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, txn *sql.Tx, deviceID, ipAddr string) error {
+	lastSeenTs := time.Now().UnixNano() / 1000000
+	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, deviceID)
+	return err
 }

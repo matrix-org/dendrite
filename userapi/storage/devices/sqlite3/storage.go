@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -46,6 +47,17 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	}
 	writer := sqlutil.NewExclusiveWriter()
 	d := devicesStatements{}
+
+	// Create tables before executing migrations so we don't fail if the table is missing,
+	// and THEN prepare statements so we don't fail due to referencing new columns
+	if err = d.execSchema(db); err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadLastSeenTSIP(m)
+	if err = m.RunDeltas(db, dbProperties); err != nil {
+		return nil, err
+	}
 	if err = d.prepare(db, writer, serverName); err != nil {
 		return nil, err
 	}
@@ -87,7 +99,7 @@ func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]ap
 // Returns the device on success.
 func (d *Database) CreateDevice(
 	ctx context.Context, localpart string, deviceID *string, accessToken string,
-	displayName *string,
+	displayName *string, ipAddr, userAgent string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
 		returnErr = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
@@ -97,7 +109,7 @@ func (d *Database) CreateDevice(
 				return err
 			}
 
-			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken, displayName)
+			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken, displayName, ipAddr, userAgent)
 			return err
 		})
 	} else {
@@ -112,7 +124,7 @@ func (d *Database) CreateDevice(
 
 			returnErr = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 				var err error
-				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName)
+				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName, ipAddr, userAgent)
 				return err
 			})
 			if returnErr == nil {
@@ -192,4 +204,11 @@ func (d *Database) RemoveAllDevices(
 		return nil
 	})
 	return
+}
+
+// UpdateDeviceLastSeen updates a the last seen timestamp and the ip address
+func (d *Database) UpdateDeviceLastSeen(ctx context.Context, deviceID, ipAddr string) error {
+	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		return d.devices.updateDeviceLastSeen(ctx, txn, deviceID, ipAddr)
+	})
 }

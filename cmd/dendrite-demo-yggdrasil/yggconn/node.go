@@ -205,13 +205,11 @@ func (n *Node) SessionCount() int {
 
 func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
 	nodemap := map[string]struct{}{
-		"b5ae50589e50991dd9dd7d59c5c5f7a4521e8da5b603b7f57076272abc58b374": {},
+		//"b5ae50589e50991dd9dd7d59c5c5f7a4521e8da5b603b7f57076272abc58b374": {},
 	}
-	/*
-		for _, peer := range n.core.GetSwitchPeers() {
-			nodemap[hex.EncodeToString(peer.PublicKey[:])] = struct{}{}
-		}
-	*/
+	for _, peer := range n.core.GetSwitchPeers() {
+		nodemap[hex.EncodeToString(peer.SigPublicKey[:])] = struct{}{}
+	}
 	n.sessions.Range(func(_, v interface{}) bool {
 		session, ok := v.(quic.Session)
 		if !ok {

@@ -51,6 +51,7 @@ type Database interface {
 	CheckAccountAvailability(ctx context.Context, localpart string) (bool, error)
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
 	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
+	DeactivateAccount(ctx context.Context, localpart string) (err error)
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving
