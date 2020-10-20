@@ -22,97 +22,51 @@ print_param_options()
 	done
 }
 
-
+declare PARAM_TEMPLATED="yes"
 
 
 #Array with all servers
-SERVERS=( "client-api-proxy" \
-	"federation-api-proxy" \
-	"dendrite-client-api-server" \
-	"dendrite-sync-api-server" \
-	"dendrite-media-api-server" \
-	"dendrite-federation-api-server" \
-	"dendrite-room-server" \
-	"dendrite-federation-sender-server" \
-	"dendrite-appservice-server" \
-	"dendrite-key-server" \
-	"dendrite-signing-key-server" \
-	"dendrite-edu-server" \
-	"dendrite-user-api-server" \
+SERVERS=( "clientapi" \
+	"syncapi" \
+	"mediaapi" \
+	"federationapi" \
+	"roomserver" \
+	"federationsender" \
+	"appservice" \
+	"keyserver" \
+	"signingkeyserver" \
+	"eduserver" \
+	"userapi" \
 	)
 
 #Generate unit files and output into /etc/systemd/system/<unit-file-name>
 function generateServiceUnit()
 {
-	declare SERVER=$1
-	declare USER=$2
-	declare DENDRITEDIR=$3
 
-	#
-	# Declaration of executin lines
-	#
-	declare -A EXECS
-	nl=$'\n'
-	read -r -d '' EXECS[clientapiproxy] <<EOF
-	/bin/client-api-proxy \
-	--bind-address ":8008" \
-	--client-api-server-url "http://localhost:7771" \
-	--sync-api-server-url "http://localhost:7773" \
-	--media-api-server-url "http://localhost:7774" \
-EOF
-
-
-	read -r -d '' EXECS[federationapiproxy] <<EOF
-	/bin/federation-api-proxy \ $nl
-	--bind-address ":8448" \ $nl
-	--federation-api-url "http://localhost:7772" \ $nl
-	--media-api-server-url "http://localhost:7774" \ $nl
-EOF
-
-
-	for ENTRY in $DENDRITEDIR/bin/dendrite-*-server; do
-	    BINARY=$(basename $ENTRY)
-	    EXECS[$(echo "${BINARY//-}")]="$ENTRY --config=dendrite.yaml"
-	done
 
 
 	#Check if already existent
-	CHECK=0
-	if [[ -f /etc/systemd/system/$SERVER.service && ( "$PARAM_FORCE" != "yes" || -z "$PARAM_FORCE" ) ]]; then
-		echo "Systemd-Unit file for $SERVER already exists."
-		while [[ "$CHECK" -ne 1 ]]
-		do
-			read -p " Overwrite? (Y/N):" -n1 -r INPUT
-	  		if [[ $INPUT =~ ^[Nn]$ ]]; then
-				echo "Skipping...";
-				return 0
-			elif [[ $INPUT =~ ^[Yy]$ ]]; then
-				CHECK=1
-			else
-				echo "Invalid input, try again!"
-				CHECK=0
-			fi
-		done
+
+	if [[ -f /etc/systemd/system/dendrite@.service && ( "$PARAM_FORCE" != "yes" || -z "$PARAM_FORCE" ) ]]; then
+		echo "Systemd-Unit-Template file \"dendrite@.service\" already exists."
+		echo "Add \"-x|--force\" to overwrite!"
+		return 0
 	fi
-	current="${EXECS[$(echo "${SERVER//-}")]}"
-	cat <<-EOF > /etc/systemd/system/$SERVER.service
+	cat <<-EOF > /etc/systemd/system/dendrite@.service
 	[Unit]
-	Description= $SERVER 1
-	# When systemd stops or restarts the app.service, the action is propagated to this unit
+	Description= Dendrite PolyLit Multi - %I
 	PartOf=polyDendrite.service
-	# Start this unit after the app.service start
-	After=polyDendrite.service
+	After=network.target
 
 	[Service]
 	User=$USER
 	WorkingDirectory=$DENDRITEDIR
-	# Pretend that the component is running
-	ExecStart=/home/dendrite/server$current
+	Type=forking
+	ExecStart=/home/dendrite/server/bin/dendrite-polylith-multi --config=dendrite.yaml %i
 	Restart=on-failure
 
 	[Install]
-	# This unit should start when app.service is starting
-	WantedBy=polyDendrite.service
+	WantedBy=multi-user.target
 EOF
 
 	if [[ $? -ne 0 ]]; then
@@ -120,60 +74,11 @@ EOF
 		exit 1
 	fi
 	/usr/bin/systemctl daemon-reload
-	echo "Enabling $SERVER.service..."
-	/usr/bin/systemctl enable $SERVER.service
-	echo "$SERVER Unit-File created..."
+	echo "Enabling dendrite@.service..."
+	/usr/bin/systemctl enable dendrite@.service
 	return 0
 }
 
-function generateServiceWrapper()
-{
-	if [[ -f /etc/systemd/system/polyDendrite.service && ( "$PARAM_FORCE" != "yes" || -z "$PARAM_FORCE" ) ]]; then
-	echo "Systemd-Unit file for Dendrite Polylith Service wrapper already exists."
-	CHECK=0
-	while [[ "$CHECK" -ne 1 ]]
-	do
-		read -p " Overwrite? (Y/N):" -n1 -r INPUT
-  		if [[ $INPUT =~ ^[Nn]$ ]]; then
-  			echo
-			echo "Skipping...";
-			return 0
-		elif [[ $INPUT =~ ^[Yy]$ ]]; then
-			CHECK=1
-		else
-			echo "Invalid input, try again!"
-			CHECK=0
-		fi
-	done
-	fi
-	read -r -d '' polyUnit <<EOF
-[Unit]
-Description=Dendrite Polylith Service wrapper
-
-[Service]
-# The dummy program will exit
-Type=oneshot
-# Execute a dummy program
-ExecStart=/bin/true
-# This service shall be considered active after start
-RemainAfterExit=yes
-
-[Install]
-# Components of this application should be started at boot time
-WantedBy=multi-user.target
-EOF
-	echo "$polyUnit" > /etc/systemd/system/polyDendrite.service
-
-	if [[ $? -ne 0 ]]; then
-		echo "An error occurred. Exiting..."
-		exit 1
-	fi
-	/usr/bin/systemctl daemon-reload
-	echo "Enabling polyDendrite.service..."
-	/usr/bin/systemctl enable polyDendrite.service
-	echo "$SERVER Unit-File created..."
-	return 0
-}
 function command_help()
 {
 	echo "\
@@ -262,20 +167,22 @@ if [[ -z "${inputarray[@]}" || "${inputarray[@]}" = "" ]]; then
 	done
 fi
 
+generateServiceUnit
 
 if [[ "${inputarray[@]}" = "" || "${inputarray[@]}" = "all" ]]; then
     for part in "${SERVERS[@]}"; do
-    	echo "$( generateServiceUnit $part $USER $DENDRITEDIR )"
+    	/usr/bin/systemctl enable dendrite@${part}.service &&	/usr/bin/systemctl start dendrite@${part}.service
     done
 else
     for choice in "${inputarray[@]}"; do
-        echo "$( generateServiceUnit $choice $USER $DENDRITEDIR )"
+    	/usr/bin/systemctl enable dendrite@${choice}.service &&	/usr/bin/systemctl start dendrite@${choice}.service
     done
 fi
-generateServiceWrapper
 
 echo "Done.."
 echo "You can start all Services by typing:
-systemctl start polyDendrite.service"
-echo "To start single servers use the appropriate service name instead."
+systemctl start dendrite@*"
+echo "To start single servers use:
+systemctl start dendrite@<servicename>
+"
 exit 0
