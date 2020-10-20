@@ -324,15 +324,15 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			t.processDeviceListUpdate(ctx, e)
 		case gomatrixserverlib.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
-			payload := receiptPayload{}
+			payload := map[string]eduserverAPI.FederationReceiptMRead{}
 
-			if err := json.Unmarshal(e.Content, &payload.Data); err != nil {
+			if err := json.Unmarshal(e.Content, &payload); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal receipt event")
 				continue
 			}
 
-			for roomID, receipt := range payload.Data {
-				for userID := range receipt.MRead {
+			for roomID, receipt := range payload {
+				for userID := range receipt.User {
 					_, domain, err := gomatrixserverlib.SplitID('@', userID)
 					if err != nil {
 						util.GetLogger(ctx).WithError(err).Error("Failed to split domain from receipt event sender")
@@ -342,14 +342,14 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 						util.GetLogger(ctx).Warnf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
 						continue
 					}
-					ts := receipt.MRead[userID].Data.TS
-					events := receipt.MRead[userID].EventIDs
+					ts := receipt.User[userID].Data.TS
+					events := receipt.User[userID].EventIDs
 					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", ts, events); err != nil {
 						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 							"sender":  t.Origin,
 							"user_id": userID,
 							"room_id": roomID,
-							"events":  receipt.MRead[userID].EventIDs,
+							"events":  receipt.User[userID].EventIDs,
 						}).Error("Failed to send receipt event to edu server")
 						continue
 					}
@@ -359,18 +359,6 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}
 	}
-}
-
-// ReceiptPayload is the receipt payload passed between servers
-type receiptPayload struct {
-	Data map[string]struct {
-		MRead map[string]struct {
-			Data struct {
-				TS gomatrixserverlib.Timestamp `json:"ts"`
-			} `json:"data"`
-			EventIDs []string `json:"event_ids"`
-		} `json:"m.read"`
-	} `json:"data"`
 }
 
 // processReceiptEvent sends receipt events to the edu server
