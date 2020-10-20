@@ -17,6 +17,7 @@
 package input
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -43,6 +45,28 @@ func (r *Inputer) processRoomEvent(
 	// Parse and validate the event JSON
 	headered := input.Event
 	event := headered.Unwrap()
+
+	// if we have already got this event then do not process it again, if the input kind is an outlier.
+	// Outliers contain no extra information which may warrant a re-processing.
+	if input.Kind == api.KindOutlier {
+		evs, err := r.DB.EventsFromIDs(ctx, []string{event.EventID()})
+		if err == nil && len(evs) == 1 {
+			// check hash matches if we're on early room versions where the event ID was a random string
+			idFormat, err := headered.RoomVersion.EventIDFormat()
+			if err == nil {
+				switch idFormat {
+				case gomatrixserverlib.EventIDFormatV1:
+					if bytes.Equal(event.EventReference().EventSHA256, evs[0].EventReference().EventSHA256) {
+						util.GetLogger(ctx).WithField("event_id", event.EventID()).Infof("Already processed event; ignoring")
+						return event.EventID(), nil
+					}
+				default:
+					util.GetLogger(ctx).WithField("event_id", event.EventID()).Infof("Already processed event; ignoring")
+					return event.EventID(), nil
+				}
+			}
+		}
+	}
 
 	// Check that the event passes authentication checks and work out
 	// the numeric IDs for the auth events.

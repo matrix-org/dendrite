@@ -233,7 +233,7 @@ func (u *latestEventsUpdater) latestState() error {
 	if err != nil {
 		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
 	}
-	if len(u.removed) > len(u.added) {
+	if !u.stateAtEvent.Overwrite && len(u.removed) > len(u.added) {
 		// This really shouldn't happen.
 		// TODO: What is ultimately the best way to handle this situation?
 		logrus.Errorf(
