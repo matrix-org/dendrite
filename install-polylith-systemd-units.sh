@@ -22,8 +22,6 @@ print_param_options()
 	done
 }
 
-declare PARAM_TEMPLATED="yes"
-
 
 #Array with all servers
 SERVERS=( "clientapi" \
@@ -54,7 +52,7 @@ function generateServiceUnit()
 	fi
 	cat <<-EOF > /etc/systemd/system/dendrite@.service
 	[Unit]
-	Description= Dendrite PolyLit Multi - %I
+	Description= Dendrite PolyLith Multi - %I
 	PartOf=polyDendrite.service
 	After=network.target
 

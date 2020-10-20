@@ -316,9 +316,23 @@ Example:
 * path: /home/dendrite/server/
 * selection: all
 
-In order to start all installed services the wrapper "polyDendrite.service" can be used:
+How to start a specific service (e.g clientapi):
 ```bash
-# systemctl start polyDendrite.service
+# systemctl start dendrite@clientapi
 ```
 
-Monitor with
+...or all services using a wildcard:
+```bash
+# systemctl start dendrite@*
+```
+
+Monitor with journalctl:
+
+```bash
+# journalctl -fu dendrite@clientapi
+```
+or
+
+```bash
+# journalctl -fu dendrite@*
+```
