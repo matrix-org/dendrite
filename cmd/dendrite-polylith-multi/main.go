@@ -29,7 +29,13 @@ type entrypoint func(base *setup.BaseDendrite, cfg *config.Dendrite)
 
 func main() {
 	cfg := setup.ParseFlags(true)
-	component := flag.Arg(0)
+
+	component := ""
+	if flag.NFlag() > 0 {
+		component = flag.Arg(0) // ./dendrite-polylith-multi --config=... clientapi
+	} else if len(os.Args) > 1 {
+		component = os.Args[1] // ./dendrite-polylith-multi clientapi
+	}
 
 	components := map[string]entrypoint{
 		"appservice":       personalities.Appservice,
@@ -47,13 +53,19 @@ func main() {
 
 	start, ok := components[component]
 	if !ok {
+		if component == "" {
+			logrus.Errorf("No component specified")
+			logrus.Info("The first argument on the command line must be the name of the component to run")
+		} else {
+			logrus.Errorf("Unknown component %q specified", component)
+		}
+
 		var list []string
 		for c := range components {
 			list = append(list, c)
 		}
-
-		logrus.Errorf("Unknown component %q specified", component)
 		logrus.Infof("Valid components: %s", strings.Join(list, ", "))
+
 		os.Exit(1)
 	}
 
