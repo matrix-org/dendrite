@@ -1,43 +1,18 @@
 version: "3.4"
 services:
-  client_api_proxy:
-    hostname: client_api_proxy
-    image: matrixdotorg/dendrite:clientproxy
-    command: [
-      "--bind-address=:8008",
-      "--client-api-server-url=http://client_api:8071",
-      "--sync-api-server-url=http://sync_api:8073",
-      "--media-api-server-url=http://media_api:8074"
-    ]
-    volumes:
-      - ./config:/etc/dendrite
-    networks:
-      - internal
-    depends_on:
-      - sync_api
-      - client_api
-      - media_api
-    ports:
-      - "8008:8008"
-
   client_api:
     hostname: client_api
-    image: matrixdotorg/dendrite:clientapi
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: clientapi
     volumes:
       - ./config:/etc/dendrite
-      - room_server
     networks:
       - internal
 
   media_api:
     hostname: media_api
-    image: matrixdotorg/dendrite:mediaapi
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: mediaapi
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -45,10 +20,8 @@ services:
 
   sync_api:
     hostname: sync_api
-    image: matrixdotorg/dendrite:syncapi
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: syncapi
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -56,10 +29,8 @@ services:
 
   room_server:
     hostname: room_server
-    image: matrixdotorg/dendrite:roomserver
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: roomserver
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -67,40 +38,17 @@ services:
 
   edu_server:
     hostname: edu_server
-    image: matrixdotorg/dendrite:eduserver
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: eduserver
     volumes:
       - ./config:/etc/dendrite
     networks:
       - internal
-
-  federation_api_proxy:
-    hostname: federation_api_proxy
-    image: matrixdotorg/dendrite:federationproxy
-    command: [
-      "--bind-address=:8448",
-      "--federation-api-url=http://federation_api:8072",
-      "--media-api-server-url=http://media_api:8074"
-    ]
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - federation_api
-      - federation_sender
-      - media_api
-    networks:
-      - internal
-    ports:
-      - "8448:8448"
 
   federation_api:
     hostname: federation_api
-    image: matrixdotorg/dendrite:federationapi
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: federationapi
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -108,10 +56,8 @@ services:
 
   federation_sender:
     hostname: federation_sender
-    image: matrixdotorg/dendrite:federationsender
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: federationsender
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -119,10 +65,8 @@ services:
       
   key_server:
     hostname: key_server
-    image: matrixdotorg/dendrite:keyserver
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: keyserver
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -130,10 +74,8 @@ services:
 
   signing_key_server:
     hostname: signing_key_server
-    image: matrixdotorg/dendrite:signingkeyserver
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: signingkeyserver
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -141,10 +83,8 @@ services:
 
   user_api:
     hostname: user_api
-    image: matrixdotorg/dendrite:userapi
-    command: [
-        "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: userapi
     volumes:
         - ./config:/etc/dendrite
     networks:
@@ -152,10 +92,8 @@ services:
 
   appservice_api:
     hostname: appservice_api
-    image: matrixdotorg/dendrite:appservice
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: appservice
     volumes:
       - ./config:/etc/dendrite
     networks:

@@ -1,0 +1,13 @@
+FROM matrixdotorg/dendrite:latest AS base
+
+FROM alpine:latest
+
+COPY --from=base /build/bin/dendrite-polylith-multi /usr/bin
+COPY --from=base /build/bin/goose /usr/bin
+COPY --from=base /build/bin/create-account /usr/bin
+COPY --from=base /build/bin/generate-keys /usr/bin
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
+
+ENTRYPOINT ["/usr/bin/dendrite-polylith-multi"]

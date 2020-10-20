@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package personalities
 
 import (
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/mediaapi"
+	"github.com/matrix-org/dendrite/syncapi"
 )
 
-func main() {
-	cfg := setup.ParseFlags(false)
-	base := setup.NewBaseDendrite(cfg, "MediaAPI", true)
-	defer base.Close() // nolint: errcheck
-
+func SyncAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
-	client := base.CreateClient()
+	federation := base.CreateFederationClient()
 
-	mediaapi.AddPublicRoutes(base.PublicMediaAPIMux, &base.Cfg.MediaAPI, userAPI, client)
+	rsAPI := base.RoomserverHTTPClient()
+
+	syncapi.AddPublicRoutes(
+		base.PublicClientAPIMux, userAPI, rsAPI,
+		base.KeyServerHTTPClient(),
+		federation, &cfg.SyncAPI,
+	)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.MediaAPI.InternalAPI.Listen,
-		base.Cfg.MediaAPI.ExternalAPI.Listen,
+		base.Cfg.SyncAPI.InternalAPI.Listen,
+		base.Cfg.SyncAPI.ExternalAPI.Listen,
 		nil, nil,
 	)
 }
