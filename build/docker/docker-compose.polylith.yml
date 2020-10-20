@@ -2,22 +2,17 @@ version: "3.4"
 services:
   client_api:
     hostname: client_api
-    image: matrixdotorg/dendrite-clientapi:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: clientapi
     volumes:
       - ./config:/etc/dendrite
-      - room_server
     networks:
       - internal
 
   media_api:
     hostname: media_api
-    image: matrixdotorg/dendrite-mediaapi:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: mediaapi
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -25,10 +20,8 @@ services:
 
   sync_api:
     hostname: sync_api
-    image: matrixdotorg/dendrite-syncapi:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: syncapi
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -36,10 +29,8 @@ services:
 
   room_server:
     hostname: room_server
-    image: matrixdotorg/dendrite-roomserver:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: roomserver
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -47,10 +38,8 @@ services:
 
   edu_server:
     hostname: edu_server
-    image: matrixdotorg/dendrite-eduserver:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: eduserver
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -58,10 +47,8 @@ services:
 
   federation_api:
     hostname: federation_api
-    image: matrixdotorg/dendrite-federationapi:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: federationapi
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -69,10 +56,8 @@ services:
 
   federation_sender:
     hostname: federation_sender
-    image: matrixdotorg/dendrite-federationsender:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: federationsender
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -80,10 +65,8 @@ services:
       
   key_server:
     hostname: key_server
-    image: matrixdotorg/dendrite-keyserver:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: keyserver
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -91,10 +74,8 @@ services:
 
   signing_key_server:
     hostname: signing_key_server
-    image: matrixdotorg/dendrite-signingkeyserver:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: signingkeyserver
     volumes:
       - ./config:/etc/dendrite
     networks:
@@ -102,10 +83,8 @@ services:
 
   user_api:
     hostname: user_api
-    image: matrixdotorg/dendrite-userapi:latest
-    command: [
-        "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: userapi
     volumes:
         - ./config:/etc/dendrite
     networks:
@@ -113,10 +92,8 @@ services:
 
   appservice_api:
     hostname: appservice_api
-    image: matrixdotorg/dendrite-appservice:latest
-    command: [
-      "--config=dendrite.yaml"
-    ]
+    image: matrixdotorg/dendrite-polylith:latest
+    command: appservice
     volumes:
       - ./config:/etc/dendrite
     networks:
