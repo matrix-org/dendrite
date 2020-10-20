@@ -1,89 +1,140 @@
-# Dendrite 0.1.0 (2020-10-08)
+# Changelog
+
+## Dendrite 0.2.0 (2020-10-20)
+
+### Important
+
+* We are now publishing images to Docker Hub in separate repositories so that they can be tagged with versions properly
+  * New repositories are as follows: `matrixdotorg/dendrite-monolith`, `matrixdotorg/dendrite-appservice`, `matrixdotorg/dendrite-clientapi`, `matrixdotorg/dendrite-eduserver`, `matrixdotorg/dendrite-federationapi`, `matrixdotorg/dendrite-federationsender`, `matrixdotorg/dendrite-keyserver`, `matrixdotorg/dendrite-mediaapi`, `matrixdotorg/dendrite-roomserver`, `matrixdotorg/dendrite-syncapi`, `matrixdotorg/dendrite-signingkeyserver`, `matrixdotorg/dendrite-userapi`
+  * Sample Compose configs have been updated - if you are running a Docker deployment, please review the changes
+  * The `matrixdotorg/dendrite` repository will no longer be updated
+  * The `latest` tag will be updated with the latest release, and versioned tags, e.g. `v0.2.0`, will preserve specific release versions
+  * Images for the client API proxy and federation API proxy are no longer provided - please use [nginx](docs/nginx/) (or another reverse proxy) instead
+
+### Features
+
+* Database migrations are now ran at startup
+* Invalid UTF-8 in requests is now rejected
+* Fully read markers are now implemented in the client API
+* Missing auth events are now retrieved from other servers in the room, rather than just the event origin
+* `m.room.create` events are now validated properly when processing a `/send_join` response
+* The roomserver now implements `KindOld` for handling historic events without them becoming forward extremity candidates, i.e. for backfilled or missing events
+
+### Fixes
+
+* State resolution v2 performance has been improved dramatically when dealing with large state sets
+* The roomserver no longer processes outlier events if they are already known
+* A SQLite locking issue in the previous events updater has been fixed
+* The client API `/state` endpoint now correctly returns state after the leave event, if the user has left the room
+* The client API `/createRoom` endpoint now sends cumulative state to the roomserver for the initial room events
+* The federation API `/send` endpoint now correctly requests the entire room state from the roomserver when needed
+* Some internal HTTP API paths have been fixed in the user API
+* A race condition in the rate limiting code resulting in concurrent map writes has been fixed
+* Each component now correctly starts a consumer/producer connection in monolith mode (when using Kafka)
+* State resolution is no longer run for single trusted state snapshots that have been verified before
+* A crash when rolling back the transaction in the latest events updater has been fixed
+* Typing events are now ignored when the sender domain does not match the origin server
+* Duplicate redaction entries no longer result in database errors
+* Recursion has been removed from the code path for retrieving missing events
+* `QueryMissingAuthPrevEvents` now returns events that have no associated state as if they are missing
+* Signing key fetchers no longer ignore keys for the local domain, if retrieving a key that is not known in the local config
+* Federation timeouts have been adjusted so we don't give up on remote requests so quickly
+
+## Dendrite 0.1.0 (2020-10-08)
 
 First versioned release of Dendrite.
 
 ## Client-Server API Features
 
 ### Account registration and management
-- Registration: By password only.
-- Login: By password only. No fallback.
-- Logout: Yes.
-- Change password: Yes.
-- Link email/msisdn to account: No.
-- Deactivate account: Yes.
-- Check if username is available: Yes.
-- Account data: Yes.
-- OpenID: No.
+
+* Registration: By password only.
+* Login: By password only. No fallback.
+* Logout: Yes.
+* Change password: Yes.
+* Link email/msisdn to account: No.
+* Deactivate account: Yes.
+* Check if username is available: Yes.
+* Account data: Yes.
+* OpenID: No.
 
 ### Rooms
-- Room creation: Yes, including presets.
-- Joining rooms: Yes, including by alias or `?server_name=`.
-- Event sending: Yes, including transaction IDs.
-- Aliases: Yes.
-- Published room directory: Yes.
-- Kicking users: Yes.
-- Banning users: Yes.
-- Inviting users: Yes, but not third-party invites.
-- Forgetting rooms: No.
-- Room versions: All (v1 - v6)
-- Tagging: Yes.
+
+* Room creation: Yes, including presets.
+* Joining rooms: Yes, including by alias or `?server_name=`.
+* Event sending: Yes, including transaction IDs.
+* Aliases: Yes.
+* Published room directory: Yes.
+* Kicking users: Yes.
+* Banning users: Yes.
+* Inviting users: Yes, but not third-party invites.
+* Forgetting rooms: No.
+* Room versions: All (v1 * v6)
+* Tagging: Yes.
 
 ### User management
-- User directory: Basic support.
-- Ignoring users: No.
-- Groups/Communities: No.
+
+* User directory: Basic support.
+* Ignoring users: No.
+* Groups/Communities: No.
 
 ### Device management
-- Creating devices: Yes.
-- Deleting devices: Yes.
-- Send-to-device messaging: Yes.
+
+* Creating devices: Yes.
+* Deleting devices: Yes.
+* Send-to-device messaging: Yes.
 
 ### Sync
-- Filters: Timeline limit only. Rest unimplemented.
-- Deprecated `/events` and `/initialSync`: No.
+
+* Filters: Timeline limit only. Rest unimplemented.
+* Deprecated `/events` and `/initialSync`: No.
 
 ### Room events
-- Typing: Yes.
-- Receipts: No.
-- Read Markers: No.
-- Presence: No.
-- Content repository (attachments): Yes.
-- History visibility: No, defaults to `joined`.
-- Push notifications: No.
-- Event context: No.
-- Reporting content: No.
+
+* Typing: Yes.
+* Receipts: No.
+* Read Markers: No.
+* Presence: No.
+* Content repository (attachments): Yes.
+* History visibility: No, defaults to `joined`.
+* Push notifications: No.
+* Event context: No.
+* Reporting content: No.
 
 ### End-to-End Encryption
-- Uploading device keys: Yes.
-- Downloading device keys: Yes.
-- Claiming one-time keys: Yes.
-- Querying key changes: Yes.
-- Cross-Signing: No.
+
+* Uploading device keys: Yes.
+* Downloading device keys: Yes.
+* Claiming one-time keys: Yes.
+* Querying key changes: Yes.
+* Cross-Signing: No.
 
 ### Misc
-- Server-side search: No.
-- Guest access: Partial.
-- Room previews: No, partial support for Peeking via MSC2753.
-- Third-Party networks: No.
-- Server notices: No.
-- Policy lists: No.
+
+* Server-side search: No.
+* Guest access: Partial.
+* Room previews: No, partial support for Peeking via MSC2753.
+* Third-Party networks: No.
+* Server notices: No.
+* Policy lists: No.
 
 ## Federation Features
-- Querying keys (incl. notary): Yes.
-- Server ACLs: Yes.
-- Sending transactions: Yes.
-- Joining rooms: Yes.
-- Inviting to rooms: Yes, but not third-party invites.
-- Leaving rooms: Yes.
-- Content repository: Yes.
-- Backfilling / get_missing_events: Yes.
-- Retrieving state of the room (`/state` and `/state_ids`): Yes.
-- Public rooms: Yes.
-- Querying profile data: Yes.
-- Device management: Yes.
-- Send-to-Device messaging: Yes.
-- Querying/Claiming E2E Keys: Yes.
-- Typing: Yes.
-- Presence: No.
-- Receipts: No.
-- OpenID: No.
+
+* Querying keys (incl. notary): Yes.
+* Server ACLs: Yes.
+* Sending transactions: Yes.
+* Joining rooms: Yes.
+* Inviting to rooms: Yes, but not third-party invites.
+* Leaving rooms: Yes.
+* Content repository: Yes.
+* Backfilling / get_missing_events: Yes.
+* Retrieving state of the room (`/state` and `/state_ids`): Yes.
+* Public rooms: Yes.
+* Querying profile data: Yes.
+* Device management: Yes.
+* Send-to-Device messaging: Yes.
+* Querying/Claiming E2E Keys: Yes.
+* Typing: Yes.
+* Presence: No.
+* Receipts: No.
+* OpenID: No.
