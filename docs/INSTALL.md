@@ -93,7 +93,7 @@ brew services start kafka
 ### SQLite database setup
 
 Dendrite can use the built-in SQLite database engine for small setups.
-The SQLite databases do not need to be preconfigured - Dendrite will
+The SQLite databases do not need to be pre-built - Dendrite will
 create them automatically at startup.
 
 ### Postgres database setup
@@ -109,7 +109,7 @@ Assuming that Postgres 9.5 (or later) is installed:
 * Create the component databases:
 
   ```bash
-  for i in account device mediaapi syncapi roomserver signingkeyserver federationsender appservice e2ekey naffka; do
+  for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_account userapi_device naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
@@ -135,8 +135,8 @@ Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Th
 
 * The `server_name` entry to reflect the hostname of your Dendrite server
 * The `database` lines with an updated connection string based on your
-  desired setup, e.g. replacing `component` with the name of the component:
-  * For Postgres: `postgres://dendrite:password@localhost/component`
+  desired setup, e.g. replacing `database` with the name of the database:
+  * For Postgres: `postgres://dendrite:password@localhost/database`
   * For SQLite on disk: `file:component.db` or `file:///path/to/component.db`
   * Postgres and SQLite can be mixed and matched.
 * The `use_naffka` option if using Naffka in a monolith deployment
@@ -146,6 +146,10 @@ if you are trying to federate from your Dendrite instance into public rooms
 then configuring `key_perspectives` (like `matrix.org` in the sample) can
 help to improve reliability considerably by allowing your homeserver to fetch
 public keys for dead homeservers from somewhere else.
+
+**WARNING:** Dendrite supports running all components from the same database in
+Postgres mode, but this is **NOT** a supported configuration with SQLite. When
+using SQLite, all components **MUST** use their own database file.
 
 ## Starting a monolith server
 
@@ -167,30 +171,17 @@ as shown below, it will also listen for HTTPS connections on port 8448.
 
 The following contains scripts which will run all the required processes in order to point a Matrix client at Dendrite.
 
-### Client proxy
+### nginx (or other reverse proxy)
 
-This is what Matrix clients will talk to. If you use the script below, point
-your client at `http://localhost:8008`.
+This is what your clients and federated hosts will talk to. It must forward
+requests onto the correct API server based on URL:
 
-```bash
-./bin/client-api-proxy \
---bind-address ":8008" \
---client-api-server-url "http://localhost:7771" \
---sync-api-server-url "http://localhost:7773" \
---media-api-server-url "http://localhost:7774" \
-```
+* `/_matrix/client` to the client API server
+* `/_matrix/federation` to the federation API server
+* `/_matrix/key` to the federation API server
+* `/_matrix/media` to the media API server
 
-### Federation proxy
-
-This is what Matrix servers will talk to. This is only required if you want
-to support federation.
-
-```bash
-./bin/federation-api-proxy \
---bind-address ":8448" \
---federation-api-url "http://localhost:7772" \
---media-api-server-url "http://localhost:7774" \
-```
+See `docs/nginx/polylith-sample.conf` for a sample configuration.
 
 ### Client API server
 
@@ -198,7 +189,7 @@ This is what implements CS API endpoints. Clients talk to this via the proxy in
 order to send messages, create and join rooms, etc.
 
 ```bash
-./bin/dendrite-client-api-server --config=dendrite.yaml
+./bin/dendrite-client-api-server --config dendrite.yaml
 ```
 
 ### Sync server
@@ -239,7 +230,7 @@ contacted by other components. This includes the following components.
 This is what implements the room DAG. Clients do not talk to this.
 
 ```bash
-./bin/dendrite-room-server --config=dendrite.yaml
+./bin/dendrite-room-server --config dendrite.yaml
 ```
 
 #### Federation sender
