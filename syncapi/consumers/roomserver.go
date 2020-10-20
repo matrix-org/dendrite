@@ -196,7 +196,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		[]string{}, // adds no state
 		[]string{}, // removes no state
 		nil,        // no transaction
-		false,      // not excluded from sync
+		true,       // not excluded from sync
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
