@@ -40,6 +40,7 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20201006093556-760d9a7fd5ee
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/net v0.0.0-20200528225125-3c3fba18258b
 	gopkg.in/h2non/bimg.v1 v1.1.4
 	gopkg.in/yaml.v2 v2.3.0
 )
