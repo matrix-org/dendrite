@@ -7,7 +7,7 @@
 * We are now publishing images to Docker Hub in separate repositories for monolith and polylith so that they can be tagged with versions properly
   * New repositories are as follows: `matrixdotorg/dendrite-monolith` and `matrixdotorg/dendrite-polylith`
   * The `latest` tag will be updated with the latest release, and versioned tags, e.g. `v0.2.0`, will preserve specific release versions
-  * Sample Compose configs have been updated - if you are running a Docker deployment, please review the changes
+  * [Sample Compose configs](https://github.com/matrix-org/dendrite/tree/master/build/docker) have been updated - if you are running a Docker deployment, please review the changes
   * Images for the client API proxy and federation API proxy are no longer provided as they are unsupported - please use [nginx](docs/nginx/) (or another reverse proxy) instead
 * Polylith deployments will also require attention, since they will now use `./dendrite-polylith-multi` rather than separate binary files
 
