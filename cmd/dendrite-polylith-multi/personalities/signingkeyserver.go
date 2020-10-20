@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,27 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package personalities
 
 import (
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/dendrite/signingkeyserver"
 )
 
-func main() {
-	cfg := setup.ParseFlags(false)
-	base := setup.NewBaseDendrite(cfg, "UserAPI", true)
-	defer base.Close() // nolint: errcheck
+func SigningKeyServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
+	federation := base.CreateFederationClient()
 
-	accountDB := base.CreateAccountsDB()
-
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, base.KeyServerHTTPClient())
-
-	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
+	intAPI := signingkeyserver.NewInternalAPI(&base.Cfg.SigningKeyServer, federation, base.Caches)
+	signingkeyserver.AddInternalRoutes(base.InternalAPIMux, intAPI, base.Caches)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.UserAPI.InternalAPI.Listen, // internal listener
-		setup.NoListener,                    // external listener
+		base.Cfg.SigningKeyServer.InternalAPI.Listen,
+		setup.NoListener,
 		nil, nil,
 	)
 }
