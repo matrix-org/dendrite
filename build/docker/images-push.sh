@@ -1,17 +1,8 @@
 #!/bin/bash
 
-docker push matrixdotorg/dendrite:monolith
+TAG=${1:-latest}
 
-docker push matrixdotorg/dendrite:appservice
-docker push matrixdotorg/dendrite:clientapi
-docker push matrixdotorg/dendrite:clientproxy
-docker push matrixdotorg/dendrite:eduserver
-docker push matrixdotorg/dendrite:federationapi
-docker push matrixdotorg/dendrite:federationsender
-docker push matrixdotorg/dendrite:federationproxy
-docker push matrixdotorg/dendrite:keyserver
-docker push matrixdotorg/dendrite:mediaapi
-docker push matrixdotorg/dendrite:roomserver
-docker push matrixdotorg/dendrite:syncapi
-docker push matrixdotorg/dendrite:signingkeyserver
-docker push matrixdotorg/dendrite:userapi
+echo "Pushing tag '${TAG}'"
+
+docker push matrixdotorg/dendrite-monolith:${TAG}
+docker push matrixdotorg/dendrite-polylith:${TAG}
