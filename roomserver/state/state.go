@@ -526,13 +526,7 @@ func (v StateResolution) CalculateAndStoreStateBeforeEvent(
 	isRejected bool,
 ) (types.StateSnapshotNID, error) {
 	// Load the state at the prev events.
-	prevEventRefs := event.PrevEvents()
-	prevEventIDs := make([]string, len(prevEventRefs))
-	for i := range prevEventRefs {
-		prevEventIDs[i] = prevEventRefs[i].EventID
-	}
-
-	prevStates, err := v.db.StateAtEventIDs(ctx, prevEventIDs)
+	prevStates, err := v.db.StateAtEventIDs(ctx, event.PrevEventIDs())
 	if err != nil {
 		return 0, err
 	}
