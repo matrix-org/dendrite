@@ -17,7 +17,6 @@
 package input
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -28,7 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
@@ -142,7 +140,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// Work out what the latest events are. This will include the new
 	// event if it is not already referenced.
 	if err := u.calculateLatest(
-		oldLatest,
+		oldLatest, &u.event,
 		types.StateAtEventAndReference{
 			EventReference: u.event.EventReference(),
 			StateAtEvent:   u.stateAtEvent,
@@ -250,46 +248,56 @@ func (u *latestEventsUpdater) latestState() error {
 // true if the new event is included in those extremites, false otherwise.
 func (u *latestEventsUpdater) calculateLatest(
 	oldLatest []types.StateAtEventAndReference,
-	newEvent types.StateAtEventAndReference,
+	newEvent *gomatrixserverlib.Event,
+	newStateAndRef types.StateAtEventAndReference,
 ) error {
-	var newLatest []types.StateAtEventAndReference
+	// First of all, get a list of all of the events that our current
+	// forward extremities reference.
+	existingIDs := make(map[string]*types.StateAtEventAndReference)
+	existingRefMap := make(map[string]struct{})
+	existingNIDs := []types.EventNID{}
+	for i, old := range oldLatest {
+		existingIDs[old.EventID] = &oldLatest[i]
+		existingNIDs = append(existingNIDs, old.EventNID)
+	}
 
-	// First of all, let's see if any of the existing forward extremities
-	// now have entries in the previous events table. If they do then we
-	// will no longer include them as forward extremities.
-	for _, l := range oldLatest {
-		referenced, err := u.updater.IsReferenced(l.EventReference)
-		if err != nil {
-			logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", l.EventID)
-			return fmt.Errorf("u.updater.IsReferenced (old): %w", err)
-		} else if !referenced {
-			newLatest = append(newLatest, l)
+	// Look up the old extremity events. This allows us to find their
+	// prev events.
+	events, err := u.api.DB.Events(u.ctx, existingNIDs)
+	if err != nil {
+		return fmt.Errorf("u.api.DB.Events: %w", err)
+	}
+	for _, old := range events {
+		for _, prevEventID := range old.PrevEventIDs() {
+			existingRefMap[prevEventID] = struct{}{}
 		}
 	}
 
-	// Then check and see if our new event is already included in that set.
-	// This ordinarily won't happen but it covers the edge-case that we've
-	// already seen this event before and it's a forward extremity, so rather
-	// than adding a duplicate, we'll just return the set as complete.
-	for _, l := range newLatest {
-		if l.EventReference.EventID == newEvent.EventReference.EventID && bytes.Equal(l.EventReference.EventSHA256, newEvent.EventReference.EventSHA256) {
-			// We've already referenced this new event so we can just return
-			// the newly completed extremities at this point.
-			u.latest = newLatest
+	// If the "new" event is already referenced by a forward extremity
+	// then do nothing - it's not a candidate to be a new extremity.
+	if _, ok := existingRefMap[newEvent.EventID()]; ok {
+		return nil
+	}
+
+	// If the "new" event is already a forward extremity then do nothing
+	// either - we won't add it twice.
+	for _, event := range events {
+		if event.EventID() == newEvent.EventID() {
 			return nil
 		}
 	}
 
-	// At this point we've processed the old extremities, and we've checked
-	// that our new event isn't already in that set. Therefore now we can
-	// check if our *new* event is a forward extremity, and if it is, add
-	// it in.
-	referenced, err := u.updater.IsReferenced(newEvent.EventReference)
-	if err != nil {
-		logrus.WithError(err).Errorf("Failed to retrieve event reference for %q", newEvent.EventReference.EventID)
-		return fmt.Errorf("u.updater.IsReferenced (new): %w", err)
-	} else if !referenced || len(newLatest) == 0 {
-		newLatest = append(newLatest, newEvent)
+	// Include our new event in the extremities.
+	newLatest := []types.StateAtEventAndReference{newStateAndRef}
+
+	// Then run through and see if the other extremities are still valid.
+	for _, prevEventID := range newEvent.PrevEventIDs() {
+		delete(existingIDs, prevEventID)
+	}
+
+	// Then re-add any old extremities that are still valid.
+	for _, old := range existingIDs {
+		newLatest = append(newLatest, *old)
 	}
 
 	u.latest = newLatest
