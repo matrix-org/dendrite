@@ -139,27 +139,30 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 	// Work out what the latest events are. This will include the new
 	// event if it is not already referenced.
-	if err := u.calculateLatest(
+	extremitiesChanged, err := u.calculateLatest(
 		oldLatest, &u.event,
 		types.StateAtEventAndReference{
 			EventReference: u.event.EventReference(),
 			StateAtEvent:   u.stateAtEvent,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("u.calculateLatest: %w", err)
 	}
 
 	// Now that we know what the latest events are, it's time to get the
 	// latest state.
-	if err := u.latestState(); err != nil {
-		return fmt.Errorf("u.latestState: %w", err)
-	}
+	var updates []api.OutputEvent
+	if extremitiesChanged {
+		if err = u.latestState(); err != nil {
+			return fmt.Errorf("u.latestState: %w", err)
+		}
 
-	// If we need to generate any output events then here's where we do it.
-	// TODO: Move this!
-	updates, err := u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added)
-	if err != nil {
-		return fmt.Errorf("u.api.updateMemberships: %w", err)
+		// If we need to generate any output events then here's where we do it.
+		// TODO: Move this!
+		if updates, err = u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added); err != nil {
+			return fmt.Errorf("u.api.updateMemberships: %w", err)
+		}
 	}
 
 	update, err := u.makeOutputNewRoomEvent()
@@ -250,7 +253,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	oldLatest []types.StateAtEventAndReference,
 	newEvent *gomatrixserverlib.Event,
 	newStateAndRef types.StateAtEventAndReference,
-) error {
+) (bool, error) {
 	// First of all, get a list of all of the events in our current
 	// set of forward extremities.
 	existingRefs := make(map[string]*types.StateAtEventAndReference)
@@ -264,7 +267,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// prev events.
 	events, err := u.api.DB.Events(u.ctx, existingNIDs)
 	if err != nil {
-		return fmt.Errorf("u.api.DB.Events: %w", err)
+		return false, fmt.Errorf("u.api.DB.Events: %w", err)
 	}
 
 	// Make a list of all of the prev events as referenced by all of
@@ -280,14 +283,14 @@ func (u *latestEventsUpdater) calculateLatest(
 	// then do nothing - it's not a candidate to be a new extremity if
 	// it has been referenced.
 	if _, ok := existingPrevs[newEvent.EventID()]; ok {
-		return nil
+		return false, nil
 	}
 
 	// If the "new" event is already a forward extremity then stop, as
 	// nothing changes.
 	for _, event := range events {
 		if event.EventID() == newEvent.EventID() {
-			return nil
+			return false, nil
 		}
 	}
 
@@ -315,7 +318,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	}
 
 	u.latest = newLatest
-	return nil
+	return true, nil
 }
 
 func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error) {
