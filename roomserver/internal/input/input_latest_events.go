@@ -255,10 +255,10 @@ func (u *latestEventsUpdater) calculateLatest(
 	// forward extremities reference.
 	existingIDs := make(map[string]*types.StateAtEventAndReference)
 	existingPrevs := make(map[string]struct{})
-	existingNIDs := []types.EventNID{}
+	existingNIDs := make([]types.EventNID, len(oldLatest))
 	for i, old := range oldLatest {
 		existingIDs[old.EventID] = &oldLatest[i]
-		existingNIDs = append(existingNIDs, old.EventNID)
+		existingNIDs[i] = old.EventNID
 	}
 
 	// Look up the old extremity events. This allows us to find their
