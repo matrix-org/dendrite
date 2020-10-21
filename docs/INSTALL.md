@@ -300,39 +300,4 @@ amongst other things.
 
 ### Set up Systemd Services _(polylith)_
 
-In order to run the whole polylith deployment daemonized with Systemd
-the following script can set them up for you **(root-privileges required)**:
-```bash
-# ./install-polylith-systemd-units.sh
-```
-
-
-Example:
-
-```bash
-# ./install-polylith-systemd-units.sh -u dendrite -d /home/dendrite/server/ all
-```
-* user: dendrite
-* path: /home/dendrite/server/
-* selection: all
-
-How to start a specific service (e.g clientapi):
-```bash
-# systemctl start dendrite@clientapi
-```
-
-...or all services using a wildcard:
-```bash
-# systemctl start dendrite@*
-```
-
-Monitor with journalctl:
-
-```bash
-# journalctl -fu dendrite@clientapi
-```
-or
-
-```bash
-# journalctl -fu dendrite@*
-```
+Go to [SYSTEMD.md](docs/systemd/SYSTEMD.md) for instructions on how to set up dendrite as a daemonized service. 

@@ -60,7 +60,7 @@ function generateServiceUnit()
 	User=$USER
 	WorkingDirectory=$DENDRITEDIR
 	Type=forking
-	ExecStart=/home/dendrite/server/bin/dendrite-polylith-multi --config=dendrite.yaml %i
+	ExecStart=$DENDRITEDIR/bin/dendrite-polylith-multi --config=dendrite.yaml %i
 	Restart=on-failure
 
 	[Install]

@@ -1,0 +1,14 @@
+[Unit]
+	Description= Dendrite Polylith Multi - %I
+	PartOf=polyDendrite.service
+	After=network.target
+
+	[Service]
+	User=dendrite
+	WorkingDirectory=/opt/dendrite
+	Type=forking
+	ExecStart=/opt/dendrite/bin/dendrite-polylith-multi --config=dendrite.yaml %i
+	Restart=on-failure
+
+	[Install]
+	WantedBy=multi-user.target
