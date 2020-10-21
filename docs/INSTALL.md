@@ -298,6 +298,6 @@ amongst other things.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml userapi
 ```
 
-### Set up Systemd Services _(polylith)_
+### Set up Systemd Services
 
 Go to [SYSTEMD.md](docs/systemd/SYSTEMD.md) for instructions on how to set up dendrite as a daemonized service. 
