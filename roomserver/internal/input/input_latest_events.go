@@ -254,7 +254,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// First of all, get a list of all of the events that our current
 	// forward extremities reference.
 	existingIDs := make(map[string]*types.StateAtEventAndReference)
-	existingRefMap := make(map[string]struct{})
+	existingPrevs := make(map[string]struct{})
 	existingNIDs := []types.EventNID{}
 	for i, old := range oldLatest {
 		existingIDs[old.EventID] = &oldLatest[i]
@@ -267,20 +267,24 @@ func (u *latestEventsUpdater) calculateLatest(
 	if err != nil {
 		return fmt.Errorf("u.api.DB.Events: %w", err)
 	}
+
+	// Make a list of all of the prev events as referenced by all of
+	// the current forward extremities.
 	for _, old := range events {
 		for _, prevEventID := range old.PrevEventIDs() {
-			existingRefMap[prevEventID] = struct{}{}
+			existingPrevs[prevEventID] = struct{}{}
 		}
 	}
 
 	// If the "new" event is already referenced by a forward extremity
-	// then do nothing - it's not a candidate to be a new extremity.
-	if _, ok := existingRefMap[newEvent.EventID()]; ok {
+	// then do nothing - it's not a candidate to be a new extremity if
+	// it has been referenced.
+	if _, ok := existingPrevs[newEvent.EventID()]; ok {
 		return nil
 	}
 
-	// If the "new" event is already a forward extremity then do nothing
-	// either - we won't add it twice.
+	// If the "new" event is already a forward extremity then stop, as
+	// nothing changes.
 	for _, event := range events {
 		if event.EventID() == newEvent.EventID() {
 			return nil
@@ -291,11 +295,21 @@ func (u *latestEventsUpdater) calculateLatest(
 	newLatest := []types.StateAtEventAndReference{newStateAndRef}
 
 	// Then run through and see if the other extremities are still valid.
+	// If our new event references them then they are no longer good
+	// candidates.
 	for _, prevEventID := range newEvent.PrevEventIDs() {
 		delete(existingIDs, prevEventID)
 	}
 
-	// Then re-add any old extremities that are still valid.
+	// Ensure that we don't add any candidate forward extremities from
+	// the old set that are, themselves, referenced by the old set of
+	// forward extremities. This shouldn't happen but guards against
+	// the possibility anyway.
+	for prevEventID := range existingPrevs {
+		delete(existingIDs, prevEventID)
+	}
+
+	// Then re-add any old extremities that are still valid after all.
 	for _, old := range existingIDs {
 		newLatest = append(newLatest, *old)
 	}
