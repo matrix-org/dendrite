@@ -163,13 +163,13 @@ func (r *Inputer) processRoomEvent(
 	switch input.Kind {
 	case api.KindNew:
 		if err = r.updateLatestEvents(
-			ctx,                 // context
-			roomInfo,            // room info for the room being updated
-			stateAtEvent,        // state at event (below)
-			event,               // event
-			input.SendAsServer,  // send as server
-			input.TransactionID, // transaction ID
-			input.HasState,      // rewrites state?
+			ctx,                    // context
+			roomInfo,               // room info for the room being updated
+			stateAtEvent,           // state at event (below)
+			event,                  // event
+			input.SendAsServer,     // send as server
+			input.TransactionID,    // transaction ID
+			stateAtEvent.Overwrite, // rewrites state?
 		); err != nil {
 			return "", fmt.Errorf("r.updateLatestEvents: %w", err)
 		}

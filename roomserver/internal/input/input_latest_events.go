@@ -117,9 +117,6 @@ type latestEventsUpdater struct {
 // nolint:gocyclo
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	u.lastEventIDSent = u.updater.LastEventIDSent()
-	if !u.stateAtEvent.Overwrite {
-		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
-	}
 
 	// If we are doing a regular event update then we will get the
 	// previous latest events to use as a part of the calculation. If
@@ -128,7 +125,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// then start with an empty set - none of the forward extremities
 	// that we knew about before matter anymore.
 	oldLatest := []types.StateAtEventAndReference{}
-	if !u.stateAtEvent.Overwrite {
+	if !u.rewritesState {
+		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 		oldLatest = u.updater.LatestEvents()
 	}
 
