@@ -19,6 +19,9 @@ import (
 // against real snapshots in an actual database.
 // It takes one or more state snapshot NIDs as arguments, along with a room version
 // to use for unmarshalling events, and will produce resolved output.
+//
+// Usage: ./resolve-state --roomversion=version snapshot [snapshot ...]
+//   e.g. ./resolve-state --roomversion=5 1254 1235 1282
 
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 
