@@ -363,11 +363,6 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 			return nil, fmt.Errorf("failed to load add_state_events from db: %w", err)
 		}
 	}
-	// State is rewritten if the input room event HasState and we actually produced a delta on state events.
-	// Without this check, /get_missing_events which produce events with associated (but not complete) state
-	// will incorrectly purge the room and set it to no state. TODO: This is likely flakey, as if /gme produced
-	// a state conflict res which just so happens to include 2+ events we might purge the room state downstream.
-	ore.RewritesState = len(ore.AddsStateEventIDs) > 1
 
 	return &api.OutputEvent{
 		Type:         api.OutputTypeNewRoomEvent,
