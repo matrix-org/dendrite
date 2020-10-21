@@ -163,6 +163,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		if updates, err = u.api.updateMemberships(u.ctx, u.updater, u.removed, u.added); err != nil {
 			return fmt.Errorf("u.api.updateMemberships: %w", err)
 		}
+	} else {
+		u.newStateNID = u.oldStateNID
 	}
 
 	update, err := u.makeOutputNewRoomEvent()
