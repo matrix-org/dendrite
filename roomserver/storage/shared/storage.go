@@ -27,23 +27,24 @@ import (
 const redactionsArePermanent = true
 
 type Database struct {
-	DB                  *sql.DB
-	Cache               caching.RoomServerCaches
-	Writer              sqlutil.Writer
-	EventsTable         tables.Events
-	EventJSONTable      tables.EventJSON
-	EventTypesTable     tables.EventTypes
-	EventStateKeysTable tables.EventStateKeys
-	RoomsTable          tables.Rooms
-	TransactionsTable   tables.Transactions
-	StateSnapshotTable  tables.StateSnapshot
-	StateBlockTable     tables.StateBlock
-	RoomAliasesTable    tables.RoomAliases
-	PrevEventsTable     tables.PreviousEvents
-	InvitesTable        tables.Invites
-	MembershipTable     tables.Membership
-	PublishedTable      tables.Published
-	RedactionsTable     tables.Redactions
+	DB                         *sql.DB
+	Cache                      caching.RoomServerCaches
+	Writer                     sqlutil.Writer
+	EventsTable                tables.Events
+	EventJSONTable             tables.EventJSON
+	EventTypesTable            tables.EventTypes
+	EventStateKeysTable        tables.EventStateKeys
+	RoomsTable                 tables.Rooms
+	TransactionsTable          tables.Transactions
+	StateSnapshotTable         tables.StateSnapshot
+	StateBlockTable            tables.StateBlock
+	RoomAliasesTable           tables.RoomAliases
+	PrevEventsTable            tables.PreviousEvents
+	InvitesTable               tables.Invites
+	MembershipTable            tables.Membership
+	PublishedTable             tables.Published
+	RedactionsTable            tables.Redactions
+	GetLatestEventsForUpdateFn func(ctx context.Context, roomInfo types.RoomInfo) (*LatestEventsUpdater, error)
 }
 
 func (d *Database) SupportsConcurrentRoomInputs() bool {
@@ -372,6 +373,9 @@ func (d *Database) MembershipUpdater(
 func (d *Database) GetLatestEventsForUpdate(
 	ctx context.Context, roomInfo types.RoomInfo,
 ) (*LatestEventsUpdater, error) {
+	if d.GetLatestEventsForUpdateFn != nil {
+		return d.GetLatestEventsForUpdateFn(ctx, roomInfo)
+	}
 	txn, err := d.DB.Begin()
 	if err != nil {
 		return nil, err
