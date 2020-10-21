@@ -28,7 +28,7 @@ func main() {
 	cfg := setup.ParseFlags(true)
 	args := os.Args[1:]
 
-	fmt.Println("Room version:", *roomVersion)
+	fmt.Println("Room version", *roomVersion)
 
 	snapshotNIDs := []types.StateSnapshotNID{}
 	for _, arg := range args {
@@ -120,7 +120,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Resolved state:")
+	fmt.Println("Resolved state contains", len(resolved), "events")
 	for _, event := range resolved {
 		fmt.Println()
 		fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
