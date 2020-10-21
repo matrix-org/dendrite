@@ -600,10 +600,13 @@ func (d *Database) addReceiptDeltaToResponse(
 			RoomID: roomID,
 		}
 		content := make(map[string]eduAPI.ReceiptMRead)
-		read := eduAPI.ReceiptMRead{
-			User: make(map[string]eduAPI.ReceiptTS),
-		}
 		for _, receipt := range receipts {
+			var read eduAPI.ReceiptMRead
+			if read, ok = content[receipt.EventID]; !ok {
+				read = eduAPI.ReceiptMRead{
+					User: make(map[string]eduAPI.ReceiptTS),
+				}
+			}
 			read.User[receipt.UserID] = eduAPI.ReceiptTS{TS: receipt.Timestamp}
 			content[receipt.EventID] = read
 		}
