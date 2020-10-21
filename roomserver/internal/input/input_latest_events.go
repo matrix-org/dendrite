@@ -251,13 +251,12 @@ func (u *latestEventsUpdater) calculateLatest(
 	newEvent *gomatrixserverlib.Event,
 	newStateAndRef types.StateAtEventAndReference,
 ) error {
-	// First of all, get a list of all of the events that our current
-	// forward extremities reference.
-	existingIDs := make(map[string]*types.StateAtEventAndReference)
-	existingPrevs := make(map[string]struct{})
+	// First of all, get a list of all of the events in our current
+	// set of forward extremities.
+	existingRefs := make(map[string]*types.StateAtEventAndReference)
 	existingNIDs := make([]types.EventNID, len(oldLatest))
 	for i, old := range oldLatest {
-		existingIDs[old.EventID] = &oldLatest[i]
+		existingRefs[old.EventID] = &oldLatest[i]
 		existingNIDs[i] = old.EventNID
 	}
 
@@ -270,6 +269,7 @@ func (u *latestEventsUpdater) calculateLatest(
 
 	// Make a list of all of the prev events as referenced by all of
 	// the current forward extremities.
+	existingPrevs := make(map[string]struct{})
 	for _, old := range events {
 		for _, prevEventID := range old.PrevEventIDs() {
 			existingPrevs[prevEventID] = struct{}{}
@@ -298,7 +298,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// If our new event references them then they are no longer good
 	// candidates.
 	for _, prevEventID := range newEvent.PrevEventIDs() {
-		delete(existingIDs, prevEventID)
+		delete(existingRefs, prevEventID)
 	}
 
 	// Ensure that we don't add any candidate forward extremities from
@@ -306,11 +306,11 @@ func (u *latestEventsUpdater) calculateLatest(
 	// forward extremities. This shouldn't happen but guards against
 	// the possibility anyway.
 	for prevEventID := range existingPrevs {
-		delete(existingIDs, prevEventID)
+		delete(existingRefs, prevEventID)
 	}
 
 	// Then re-add any old extremities that are still valid after all.
-	for _, old := range existingIDs {
+	for _, old := range existingRefs {
 		newLatest = append(newLatest, *old)
 	}
 
