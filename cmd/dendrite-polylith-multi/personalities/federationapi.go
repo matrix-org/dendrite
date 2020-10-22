@@ -1,4 +1,4 @@
-// Copyright 2017 Vector Creations Ltd
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,32 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package personalities
 
 import (
-	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
 )
 
-func main() {
-	cfg := setup.ParseFlags(false)
-	base := setup.NewBaseDendrite(cfg, "FederationSender", true)
-	defer base.Close() // nolint: errcheck
-
+func FederationAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
+	userAPI := base.UserAPIClient()
 	federation := base.CreateFederationClient()
-
 	serverKeyAPI := base.SigningKeyServerHTTPClient()
 	keyRing := serverKeyAPI.KeyRing()
-
+	fsAPI := base.FederationSenderHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+	keyAPI := base.KeyServerHTTPClient()
+
+	federationapi.AddPublicRoutes(
+		base.PublicFederationAPIMux, base.PublicKeyAPIMux,
+		&base.Cfg.FederationAPI, userAPI, federation, keyRing,
+		rsAPI, fsAPI, base.EDUServerClient(), keyAPI,
 	)
-	federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.FederationSender.InternalAPI.Listen, // internal listener
-		setup.NoListener, // external listener
+		base.Cfg.FederationAPI.InternalAPI.Listen,
+		base.Cfg.FederationAPI.ExternalAPI.Listen,
 		nil, nil,
 	)
 }
