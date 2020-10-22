@@ -114,7 +114,6 @@ type latestEventsUpdater struct {
 	newStateNID types.StateSnapshotNID
 }
 
-// nolint:gocyclo
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 
