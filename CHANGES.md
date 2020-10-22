@@ -4,7 +4,7 @@
 
 ### Fixes
 
-* Forward extremities are now calculated using only references from other extremities, rather than including outliers, which should fix some state resets
+* Forward extremities are now calculated using only references from other extremities, rather than including outliers, which should fix cases where state can become corrupted
 * Old state events will no longer be processed by the sync API as new, which should fix some cases where clients incorrectly believe they have joined or left rooms
 * Internal HTTP API calls are now made using H2C (HTTP/2) in polylith mode, mitigating some potential head-of-line blocking issues
 * Roomserver output events no longer incorrectly flag state rewrites
