@@ -50,6 +50,7 @@ type FederationSenderQueueJSON interface {
 type FederationSenderJoinedHosts interface {
 	InsertJoinedHosts(ctx context.Context, txn *sql.Tx, roomID, eventID string, serverName gomatrixserverlib.ServerName) error
 	DeleteJoinedHosts(ctx context.Context, txn *sql.Tx, eventIDs []string) error
+	DeleteJoinedHostsForRoom(ctx context.Context, txn *sql.Tx, roomID string) error
 	SelectJoinedHostsWithTx(ctx context.Context, txn *sql.Tx, roomID string) ([]types.JoinedHost, error)
 	SelectJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 	SelectAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error)

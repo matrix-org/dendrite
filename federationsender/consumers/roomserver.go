@@ -87,6 +87,12 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	case api.OutputTypeNewRoomEvent:
 		ev := &output.NewRoomEvent.Event
 
+		if output.NewRoomEvent.RewritesState {
+			if err := s.db.PurgeRoomState(context.TODO(), ev.RoomID()); err != nil {
+				return fmt.Errorf("s.db.PurgeRoom: %w", err)
+			}
+		}
+
 		if err := s.processMessage(*output.NewRoomEvent); err != nil {
 			// panic rather than continue with an inconsistent database
 			log.WithFields(log.Fields{

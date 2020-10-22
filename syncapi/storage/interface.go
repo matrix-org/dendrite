@@ -43,9 +43,9 @@ type Database interface {
 	// Returns an error if there was a problem inserting this event.
 	WriteEvent(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, addStateEvents []gomatrixserverlib.HeaderedEvent,
 		addStateEventIDs []string, removeStateEventIDs []string, transactionID *api.TransactionID, excludeFromSync bool) (types.StreamPosition, error)
-	// PurgeRoom completely purges room state from the sync API. This is done when
+	// PurgeRoomState completely purges room state from the sync API. This is done when
 	// receiving an output event that completely resets the state.
-	PurgeRoom(ctx context.Context, roomID string) error
+	PurgeRoomState(ctx context.Context, roomID string) error
 	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
