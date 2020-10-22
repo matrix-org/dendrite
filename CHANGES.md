@@ -8,8 +8,8 @@
 * Old state events will no longer be processed by the sync API as new, which should fix some cases where clients incorrectly believe they have joined or left rooms
 * Internal HTTP API calls are now made using H2C (HTTP/2) in polylith mode, mitigating some potential head-of-line blocking issues
 * Roomserver output events no longer incorrectly flag state rewrites
-* Notification levels are now parsed correctly in power level events
-* Invalid UTF-8 is now correctly rejected when making federation requests
+* Notification levels are now parsed correctly in power level events (contributed by [Pestdoktor](https://github.com/Pestdoktor))
+* Invalid UTF-8 is now correctly rejected when making federation requests (contributed by [Pestdoktor](https://github.com/Pestdoktor))
 
 ## Dendrite 0.2.0 (2020-10-20)
 
