@@ -189,14 +189,20 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 ) error {
 	ev := msg.Event
 
+	// TODO: The state key check when excluding from sync is designed
+	// to stop us from lying to clients with old state, whilst still
+	// allowing normal timeline events through. This is an absolute
+	// hack but until we have some better strategy for dealing with
+	// old events in the sync API, this should at least prevent us
+	// from confusing clients into thinking they've joined/left rooms.
 	pduPos, err := s.db.WriteEvent(
 		ctx,
 		&ev,
 		[]gomatrixserverlib.HeaderedEvent{},
-		[]string{}, // adds no state
-		[]string{}, // removes no state
-		nil,        // no transaction
-		false,      // not excluded from sync
+		[]string{},           // adds no state
+		[]string{},           // removes no state
+		nil,                  // no transaction
+		ev.StateKey() != nil, // exclude from sync?
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
