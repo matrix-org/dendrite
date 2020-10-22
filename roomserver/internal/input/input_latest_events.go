@@ -116,7 +116,6 @@ type latestEventsUpdater struct {
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	u.lastEventIDSent = u.updater.LastEventIDSent()
-	u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 
 	// If we are doing a regular event update then we will get the
 	// previous latest events to use as a part of the calculation. If
@@ -125,7 +124,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// then start with an empty set - none of the forward extremities
 	// that we knew about before matter anymore.
 	oldLatest := []types.StateAtEventAndReference{}
-	if !u.stateAtEvent.Overwrite {
+	if !u.rewritesState {
+		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 		oldLatest = u.updater.LatestEvents()
 	}
 
@@ -153,7 +153,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// Now that we know what the latest events are, it's time to get the
 	// latest state.
 	var updates []api.OutputEvent
-	if extremitiesChanged {
+	if extremitiesChanged || u.rewritesState {
 		if err = u.latestState(); err != nil {
 			return fmt.Errorf("u.latestState: %w", err)
 		}
@@ -324,7 +324,6 @@ func (u *latestEventsUpdater) calculateLatest(
 }
 
 func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error) {
-
 	latestEventIDs := make([]string, len(u.latest))
 	for i := range u.latest {
 		latestEventIDs[i] = u.latest[i].EventID
@@ -365,11 +364,6 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 			return nil, fmt.Errorf("failed to load add_state_events from db: %w", err)
 		}
 	}
-	// State is rewritten if the input room event HasState and we actually produced a delta on state events.
-	// Without this check, /get_missing_events which produce events with associated (but not complete) state
-	// will incorrectly purge the room and set it to no state. TODO: This is likely flakey, as if /gme produced
-	// a state conflict res which just so happens to include 2+ events we might purge the room state downstream.
-	ore.RewritesState = len(ore.AddsStateEventIDs) > 1
 
 	return &api.OutputEvent{
 		Type:         api.OutputTypeNewRoomEvent,
