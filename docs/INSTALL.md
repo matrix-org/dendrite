@@ -141,6 +141,10 @@ If you also need self-signed TLS-certificates use the following command:
 ./bin/generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 ```
 
+If you have server keys from an older synapse instance, 
+[convert them](serverkeyformat.md#converting-synapse-keys) to Dendrite's PEM 
+format and configure them as `old_private_keys` in your config.
+
 ### Configuration file
 
 Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Things that will need editing include *at least*:
