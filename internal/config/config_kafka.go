@@ -24,6 +24,8 @@ type Kafka struct {
 	UseNaffka bool `yaml:"use_naffka"`
 	// The Naffka database is used internally by the naffka library, if used.
 	Database DatabaseOptions `yaml:"naffka_database"`
+	// The max size a message can have
+	MaxMessageBytes *int `yaml:"max_message_bytes"`
 }
 
 func (k *Kafka) TopicFor(name string) string {
@@ -36,6 +38,9 @@ func (c *Kafka) Defaults() {
 	c.Addresses = []string{"localhost:2181"}
 	c.Database.ConnectionString = DataSource("file:naffka.db")
 	c.TopicPrefix = "Dendrite"
+
+	maxBytes := 2 << 22 // about 8MB
+	c.MaxMessageBytes = &maxBytes
 }
 
 func (c *Kafka) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -50,4 +55,5 @@ func (c *Kafka) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		checkNotZero(configErrs, "global.kafka.addresses", int64(len(c.Addresses)))
 	}
 	checkNotEmpty(configErrs, "global.kafka.topic_prefix", string(c.TopicPrefix))
+	checkPositive(configErrs, "global.kafka.max_message_bytes", int64(*c.MaxMessageBytes))
 }
