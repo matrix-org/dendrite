@@ -102,7 +102,13 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 			Value: sarama.ByteEncoder(value),
 		}
 	}
-	return r.Producer.SendMessages(messages)
+	errs := r.Producer.SendMessages(messages)
+	if errs != nil {
+		for _, err := range errs.(sarama.ProducerErrors) {
+			log.WithError(err).WithField("message_bytes", err.Msg.Value.Length()).Error("Write to kafka failed")
+		}
+	}
+	return errs
 }
 
 // InputRoomEvents implements api.RoomserverInternalAPI
