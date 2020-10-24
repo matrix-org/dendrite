@@ -74,6 +74,9 @@ global:
     # Kafka.
     use_naffka: true
 
+    # The maximal size of messages passed between Kafka producers and consumers
+    max_message_bytes: 1048576
+
     # Naffka database options. Not required when using Kafka.
     naffka_database:
       connection_string: file:naffka.db
