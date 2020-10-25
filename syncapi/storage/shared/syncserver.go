@@ -276,7 +276,7 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 	return nil
 }
 
-func (d *Database) PurgeRoom(
+func (d *Database) PurgeRoomState(
 	ctx context.Context, roomID string,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -285,15 +285,6 @@ func (d *Database) PurgeRoom(
 		// to us in this way is if we're about to receive the entire room state.
 		if err := d.CurrentRoomState.DeleteRoomStateForRoom(ctx, txn, roomID); err != nil {
 			return fmt.Errorf("d.CurrentRoomState.DeleteRoomStateForRoom: %w", err)
-		}
-		if err := d.OutputEvents.DeleteEventsForRoom(ctx, txn, roomID); err != nil {
-			return fmt.Errorf("d.Events.DeleteEventsForRoom: %w", err)
-		}
-		if err := d.Topology.DeleteTopologyForRoom(ctx, txn, roomID); err != nil {
-			return fmt.Errorf("d.Topology.DeleteTopologyForRoom: %w", err)
-		}
-		if err := d.BackwardExtremities.DeleteBackwardExtremitiesForRoom(ctx, txn, roomID); err != nil {
-			return fmt.Errorf("d.BackwardExtremities.DeleteBackwardExtremitiesForRoom: %w", err)
 		}
 		return nil
 	})

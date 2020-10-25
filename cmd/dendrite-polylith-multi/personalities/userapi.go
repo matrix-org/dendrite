@@ -12,26 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package personalities
 
 import (
+	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/userapi"
 )
 
-func main() {
-	cfg := setup.ParseFlags(false)
-	base := setup.NewBaseDendrite(cfg, "KeyServer", true)
-	defer base.Close() // nolint: errcheck
+func UserAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
+	accountDB := base.CreateAccountsDB()
 
-	intAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, base.CreateFederationClient())
-	intAPI.SetUserAPI(base.UserAPIClient())
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, base.KeyServerHTTPClient())
 
-	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
+	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.KeyServer.InternalAPI.Listen, // internal listener
-		setup.NoListener,                      // external listener
+		base.Cfg.UserAPI.InternalAPI.Listen, // internal listener
+		setup.NoListener,                    // external listener
 		nil, nil,
 	)
 }

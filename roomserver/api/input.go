@@ -21,17 +21,25 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+type Kind int
+
 const (
 	// KindOutlier event fall outside the contiguous event graph.
 	// We do not have the state for these events.
 	// These events are state events used to authenticate other events.
 	// They can become part of the contiguous event graph via backfill.
-	KindOutlier = 1
+	KindOutlier Kind = iota + 1
 	// KindNew event extend the contiguous graph going forwards.
 	// They usually don't need state, but may include state if the
 	// there was a new event that references an event that we don't
-	// have a copy of.
-	KindNew = 2
+	// have a copy of. New events will influence the fwd extremities
+	// of the room and output events will be generated as a result.
+	KindNew
+	// KindOld event extend the graph backwards, or fill gaps in
+	// history. They may or may not include state. They will not be
+	// considered for forward extremities, and output events will NOT
+	// be generated for them.
+	KindOld
 )
 
 // DoNotSendToOtherServers tells us not to send the event to other matrix
@@ -43,7 +51,7 @@ const DoNotSendToOtherServers = ""
 type InputRoomEvent struct {
 	// Whether this event is new, backfilled or an outlier.
 	// This controls how the event is processed.
-	Kind int `json:"kind"`
+	Kind Kind `json:"kind"`
 	// The event JSON for the event to add.
 	Event gomatrixserverlib.HeaderedEvent `json:"event"`
 	// List of state event IDs that authenticate this event.

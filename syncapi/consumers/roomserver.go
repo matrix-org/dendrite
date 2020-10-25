@@ -97,6 +97,8 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			}
 		}
 		return s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
+	case api.OutputTypeOldRoomEvent:
+		return s.onOldRoomEvent(context.TODO(), *output.OldRoomEvent)
 	case api.OutputTypeNewInviteEvent:
 		return s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
@@ -147,7 +149,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	if msg.RewritesState {
-		if err = s.db.PurgeRoom(ctx, ev.RoomID()); err != nil {
+		if err = s.db.PurgeRoomState(ctx, ev.RoomID()); err != nil {
 			return fmt.Errorf("s.db.PurgeRoom: %w", err)
 		}
 	}
@@ -168,7 +170,46 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 			log.ErrorKey: err,
 			"add":        msg.AddsStateEventIDs,
 			"del":        msg.RemovesStateEventIDs,
-		}).Panicf("roomserver output log: write event failure")
+		}).Panicf("roomserver output log: write new event failure")
+		return nil
+	}
+
+	if pduPos, err = s.notifyJoinedPeeks(ctx, &ev, pduPos); err != nil {
+		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		return err
+	}
+
+	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
+
+	return nil
+}
+
+func (s *OutputRoomEventConsumer) onOldRoomEvent(
+	ctx context.Context, msg api.OutputOldRoomEvent,
+) error {
+	ev := msg.Event
+
+	// TODO: The state key check when excluding from sync is designed
+	// to stop us from lying to clients with old state, whilst still
+	// allowing normal timeline events through. This is an absolute
+	// hack but until we have some better strategy for dealing with
+	// old events in the sync API, this should at least prevent us
+	// from confusing clients into thinking they've joined/left rooms.
+	pduPos, err := s.db.WriteEvent(
+		ctx,
+		&ev,
+		[]gomatrixserverlib.HeaderedEvent{},
+		[]string{},           // adds no state
+		[]string{},           // removes no state
+		nil,                  // no transaction
+		ev.StateKey() != nil, // exclude from sync?
+	)
+	if err != nil {
+		// panic rather than continue with an inconsistent database
+		log.WithFields(log.Fields{
+			"event":      string(ev.JSON()),
+			log.ErrorKey: err,
+		}).Panicf("roomserver output log: write old event failure")
 		return nil
 	}
 

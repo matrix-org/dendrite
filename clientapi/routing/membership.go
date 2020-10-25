@@ -76,6 +76,7 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 
 	if err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
+		api.KindNew,
 		[]gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
 		cfg.Matrix.ServerName,
 		nil,
