@@ -12,6 +12,8 @@ Dendrite can be run in one of two configurations:
    lightweight implementation called [Naffka](https://github.com/matrix-org/naffka). This
    will usually be the preferred model for low-volume, low-user or experimental deployments.
 
+For most deployments, it is **recommended to run in monolith mode with PostgreSQL databases**.
+
 Regardless of whether you are running in polylith or monolith mode, each Dendrite component that
 requires storage has its own database. Both Postgres and SQLite are supported and can be
 mixed-and-matched across components as needed in the configuration file.
@@ -30,7 +32,7 @@ If you want to run a polylith deployment, you also need:
 
 * Apache Kafka 0.10.2+
 
-Please note that Kafka is **not required** for a monolith deployment - see the "Starting a monolith server" section below!
+Please note that Kafka is **not required** for a monolith deployment.
 
 ## Building Dendrite
 
