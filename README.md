@@ -54,22 +54,24 @@ The following instructions are enough to get Dendrite started as a non-federatin
 ```bash
 $ git clone https://github.com/matrix-org/dendrite
 $ cd dendrite
+$ ./build.sh
 
-# generate self-signed certificate and an event signing key for federation
-$ go build ./cmd/generate-keys
-$ ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
+# Generate a Matrix signing key for federation (required)
+$ ./generate-keys --private-key matrix_key.pem
 
-# Copy and modify the config file:
-# you'll need to set a server name and paths to the keys at the very least, along with setting
-# up the database filenames
+# Generate a self-signed certificate (optional, but a valid TLS certificate is normally
+# needed for Matrix federation/clients to work properly!)
+$ ./generate-keys --tls-cert server.crt --tls-key server.key
+
+# Copy and modify the config file - you'll need to set a server name and paths to the keys
+# at the very least, along with setting up the database connection strings.
 $ cp dendrite-config.yaml dendrite.yaml
 
-# build and run the server
-$ go build ./cmd/dendrite-monolith-server
+# Build and run the server:
 $ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 ```
 
-Then point your favourite Matrix client at `http://localhost:8008`.
+Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
 
 ## Progress
 

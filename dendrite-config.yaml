@@ -36,6 +36,8 @@ global:
   server_name: localhost
 
   # The path to the signing private key file, used to sign requests and events.
+  # Note that this is NOT the same private key as used for TLS! To generate a
+  # signing key, use "./bin/generate-keys --private-key matrix_key.pem".
   private_key: matrix_key.pem
 
   # The paths and expiry timestamps (as a UNIX timestamp in millisecond precision)
