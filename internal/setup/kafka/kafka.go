@@ -20,6 +20,7 @@ func setupKafka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 	sCfg := sarama.NewConfig()
 	sCfg.Producer.MaxMessageBytes = *cfg.MaxMessageBytes
 	sCfg.Producer.Return.Successes = true
+	sCfg.Consumer.Fetch.Default = int32(*cfg.MaxMessageBytes)
 
 	consumer, err := sarama.NewConsumer(cfg.Addresses, sCfg)
 	if err != nil {

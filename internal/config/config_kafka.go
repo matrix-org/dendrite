@@ -24,7 +24,8 @@ type Kafka struct {
 	UseNaffka bool `yaml:"use_naffka"`
 	// The Naffka database is used internally by the naffka library, if used.
 	Database DatabaseOptions `yaml:"naffka_database"`
-	// The max size a message can have
+	// The max size a Kafka message passed between consumer/producer can have
+	// Equals roughly max.message.bytes / fetch.message.max.bytes in Kafka
 	MaxMessageBytes *int `yaml:"max_message_bytes"`
 }
 
@@ -39,7 +40,7 @@ func (c *Kafka) Defaults() {
 	c.Database.ConnectionString = DataSource("file:naffka.db")
 	c.TopicPrefix = "Dendrite"
 
-	maxBytes := 2 << 22 // about 8MB
+	maxBytes := 1024 * 1024 * 8 // about 8MB
 	c.MaxMessageBytes = &maxBytes
 }
 
