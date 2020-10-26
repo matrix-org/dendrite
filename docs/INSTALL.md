@@ -30,23 +30,9 @@ If you want to run a polylith deployment, you also need:
 
 * Apache Kafka 0.10.2+
 
-## Building up a monolith deploment
+Please note that Kafka is **not required** for a monolith deployment - see the "Starting a monolith server" section below!
 
-Start by cloning the code:
-
-```bash
-git clone https://github.com/matrix-org/dendrite
-cd dendrite
-```
-
-Then build it:
-
-```bash
-go build -o bin/dendrite-monolith-server ./cmd/dendrite-monolith-server
-go build -o bin/generate-keys ./cmd/generate-keys
-```
-
-## Building up a polylith deployment
+## Building Dendrite
 
 Start by cloning the code:
 
@@ -60,6 +46,8 @@ Then build it:
 ```bash
 ./build.sh
 ```
+
+## Install Kafka (polylith only)
 
 Install and start Kafka (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
 
@@ -96,9 +84,9 @@ Dendrite can use the built-in SQLite database engine for small setups.
 The SQLite databases do not need to be pre-built - Dendrite will
 create them automatically at startup.
 
-### Postgres database setup
+### PostgreSQL database setup
 
-Assuming that Postgres 9.6 (or later) is installed:
+Assuming that PostgreSQL 9.6 (or later) is installed:
 
 * Create role, choosing a new password when prompted:
 
@@ -118,18 +106,28 @@ Assuming that Postgres 9.6 (or later) is installed:
 
 ### Server key generation
 
-Each Dendrite server requires unique server keys.
+Each Dendrite installation requires:
 
-In order for an instance to federate correctly, you should have a valid
-certificate issued by a trusted authority, and private key to match. If you
-don't and just want to test locally, generate the self-signed SSL certificate
-for federation and the server signing key:
+- A unique Matrix signing private key
+- A valid and trusted TLS certificate and private key
+
+To generate a Matrix signing private key:
 
 ```bash
-./bin/generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
+./bin/generate-keys --private-key matrix_key.pem
 ```
 
-If you have server keys from an older synapse instance, 
+**Warning:** Make sure take a safe backup of this key! You will likely need it if you want to reinstall Dendrite, or
+any other Matrix homeserver, on the same domain name in the future. If you lose this key, you may have trouble joining
+federated rooms.
+
+For testing, you can generate a self-signed certificate and key, although this will not work for public federation:
+
+```bash
+./bin/generate-keys --tls-cert server.crt --tls-key server.key
+```
+
+If you have server keys from an older Synapse instance, 
 [convert them](serverkeyformat.md#converting-synapse-keys) to Dendrite's PEM 
 format and configure them as `old_private_keys` in your config.
 
@@ -140,9 +138,9 @@ Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Th
 * The `server_name` entry to reflect the hostname of your Dendrite server
 * The `database` lines with an updated connection string based on your
   desired setup, e.g. replacing `database` with the name of the database:
-  * For Postgres: `postgres://dendrite:password@localhost/database`
-  * For SQLite on disk: `file:component.db` or `file:///path/to/component.db`
-  * Postgres and SQLite can be mixed and matched.
+  * For Postgres: `postgres://dendrite:password@localhost/database`, e.g. `postgres://dendrite:password@localhost/dendrite_userapi_account.db`
+  * For SQLite on disk: `file:component.db` or `file:///path/to/component.db`, e.g. `file:userapi_account.db`
+  * Postgres and SQLite can be mixed and matched on different components as desired.
 * The `use_naffka` option if using Naffka in a monolith deployment
 
 There are other options which may be useful so review them all. In particular,
@@ -152,7 +150,7 @@ help to improve reliability considerably by allowing your homeserver to fetch
 public keys for dead homeservers from somewhere else.
 
 **WARNING:** Dendrite supports running all components from the same database in
-Postgres mode, but this is **NOT** a supported configuration with SQLite. When
+PostgreSQL mode, but this is **NOT** a supported configuration with SQLite. When
 using SQLite, all components **MUST** use their own database file.
 
 ## Starting a monolith server
@@ -164,8 +162,14 @@ Be sure to update the database username and password if needed.
 
 The monolith server can be started as shown below. By default it listens for
 HTTP connections on port 8008, so you can configure your Matrix client to use
-`http://localhost:8008` as the server. If you set `--tls-cert` and `--tls-key`
-as shown below, it will also listen for HTTPS connections on port 8448.
+`http://servername:8008` as the server:
+
+```bash
+./bin/dendrite-monolith-server
+```
+
+If you set `--tls-cert` and `--tls-key` as shown below, it will also listen
+for HTTPS connections on port 8448:
 
 ```bash
 ./bin/dendrite-monolith-server --tls-cert=server.crt --tls-key=server.key
