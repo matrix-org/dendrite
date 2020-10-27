@@ -76,6 +76,12 @@ global:
     # Kafka.
     use_naffka: true
 
+    # The max size a Kafka message is allowed to use.
+    # You only need to change this value, if you encounter issues with too large messages.
+    # Must be less than/equal to "max.message.bytes" configured in Kafka.
+    # Defaults to 8388608 bytes.
+    # max_message_bytes: 8388608
+
     # Naffka database options. Not required when using Kafka.
     naffka_database:
       connection_string: file:naffka.db
