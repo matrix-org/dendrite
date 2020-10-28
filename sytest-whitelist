@@ -486,3 +486,7 @@ Inbound federation rejects typing notifications from wrong remote
 Should not be able to take over the room by pretending there is no PL event
 Can get rooms/{roomId}/state for a departed room (SPEC-216)
 Users cannot set notifications powerlevel higher than their own
+Forgotten room messages cannot be paginated
+Forgetting room does not show up in v2 /sync
+Can forget room you've been kicked from
+Can re-join room if re-invited
