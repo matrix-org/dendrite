@@ -159,3 +159,11 @@ type PerformPublishResponse struct {
 	// If non-nil, the publish request failed. Contains more information why it failed.
 	Error *PerformError
 }
+
+// PerformForgetRequest is a request to PerformForget
+type PerformForgetRequest struct {
+	RoomID string `json:"room_id"`
+	UserID string `json:"user_id"`
+}
+
+type PerformForgetResponse struct{}

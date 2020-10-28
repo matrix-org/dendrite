@@ -140,7 +140,9 @@ type QueryMembershipForUserResponse struct {
 	// True if the user is in room.
 	IsInRoom bool `json:"is_in_room"`
 	// The current membership
-	Membership string
+	Membership string `json:"membership"`
+	// True if the user asked to forget this room.
+	IsRoomForgotten bool `json:"is_room_forgotten"`
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
@@ -160,6 +162,8 @@ type QueryMembershipsForRoomResponse struct {
 	// True if the user has been in room before and has either stayed in it or
 	// left it.
 	HasBeenInRoom bool `json:"has_been_in_room"`
+	// True if the user asked to forget this room.
+	IsRoomForgotten bool `json:"is_room_forgotten"`
 }
 
 // QueryServerJoinedToRoomRequest is a request to QueryServerJoinedToRoom

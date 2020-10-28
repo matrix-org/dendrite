@@ -194,6 +194,16 @@ func (t *RoomserverInternalAPITrace) PerformBackfill(
 	return err
 }
 
+func (t *RoomserverInternalAPITrace) PerformForget(
+	ctx context.Context,
+	req *PerformForgetRequest,
+	res *PerformForgetResponse,
+) error {
+	err := t.Impl.PerformForget(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformForget req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func (t *RoomserverInternalAPITrace) QueryRoomVersionCapabilities(
 	ctx context.Context,
 	req *QueryRoomVersionCapabilitiesRequest,
