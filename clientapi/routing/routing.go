@@ -718,7 +718,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendForget(req, device, vars["roomID"], cfg, rsAPI, asAPI)
+			return SendForget(req, device, vars["roomID"], rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

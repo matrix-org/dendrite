@@ -410,8 +410,7 @@ func checkMemberInRoom(ctx context.Context, rsAPI api.RoomserverInternalAPI, use
 
 func SendForget(
 	req *http.Request, device *userapi.Device,
-	roomID string, cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	roomID string, rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 	ctx := req.Context()
 	logger := util.GetLogger(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
