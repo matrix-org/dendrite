@@ -96,17 +96,16 @@ func trackGoID(query string) {
 	logrus.Warnf("unsafe goid %d: SQL executed not on an ExclusiveWriter: %s", thisGoID, q)
 }
 
-var dbConns = make(map[string]*sql.DB)
+// Use a sync.Map to avoid rare concurrent read/write
+var dbConns sync.Map
 
 // Open opens a database specified by its database driver name and a driver-specific data source name,
 // usually consisting of at least a database name and connection information. Includes tracing driver
 // if DENDRITE_TRACE_SQL=1
 func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
-	// reuse connection only if not a sqlite3 test database
-	isTestDB := strings.HasSuffix(string(dbProperties.ConnectionString), "_test.db")
-	if conn, ok := dbConns[string(dbProperties.ConnectionString)]; !isTestDB && ok {
+	if conn, ok := dbConns.Load(dbProperties.ConnectionString); ok {
 		logrus.Debug("Reusing existing database connection")
-		return conn, nil
+		return conn.(*sql.DB), nil
 	}
 	var err error
 	var driverName, dsn string
@@ -142,7 +141,7 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 		db.SetMaxIdleConns(dbProperties.MaxIdleConns())
 		db.SetConnMaxLifetime(dbProperties.ConnMaxLifetime())
 	}
-	dbConns[string(dbProperties.ConnectionString)] = db
+	dbConns.Store(dbProperties.ConnectionString, db)
 	return db, nil
 }
 

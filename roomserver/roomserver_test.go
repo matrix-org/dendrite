@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -25,11 +26,6 @@ import (
 
 const (
 	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
-	// we have to use an on-disk DB because we open multiple connections due to the *Updater structs.
-	// Using :memory: results in a brand new DB for each open connection, and sharing memory via
-	// ?cache=shared just allows read-only sharing, so writes to the database on other connections are lost.
-	roomserverDBFileURI  = "file:roomserver_test.db"
-	roomserverDBFilePath = "./roomserver_test.db"
 )
 
 var (
@@ -79,10 +75,10 @@ func (p *dummyProducer) Close() error {
 	return nil
 }
 
-func deleteDatabase() {
-	err := os.Remove(roomserverDBFilePath)
+func deleteDatabase(dbFile string) {
+	err := os.Remove(dbFile)
 	if err != nil {
-		fmt.Printf("failed to delete database %s: %s\n", roomserverDBFilePath, err)
+		fmt.Printf("failed to delete database %s: %s\n", dbFile, err)
 	}
 }
 
@@ -157,14 +153,30 @@ func mustLoadRawEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events [
 	return hs
 }
 
-func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyProducer) {
+func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyProducer, string) {
 	t.Helper()
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
 	cfg.Global.ServerName = testOrigin
 	cfg.Global.Kafka.UseNaffka = true
+
+	// create a TempFile for every test
+	dbFile, err := ioutil.TempFile(".", "roomserver_*.db")
+	if err != nil {
+		t.Error("unable to create temp database file")
+		return nil, nil, ""
+	}
+	if err = dbFile.Close(); err != nil {
+		t.Error("unable to close temp database file")
+		return nil, nil, ""
+	}
+
+	// we have to use an on-disk DB because we open multiple connections due to the *Updater structs.
+	// Using :memory: results in a brand new DB for each open connection, and sharing memory via
+	// ?cache=shared just allows read-only sharing, so writes to the database on other connections are lost.
+	connectionString := config.DataSource("file:" + dbFile.Name())
 	cfg.RoomServer.Database = config.DatabaseOptions{
-		ConnectionString: roomserverDBFileURI,
+		ConnectionString: connectionString,
 	}
 	dp := &dummyProducer{
 		topic: cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
@@ -184,17 +196,17 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	return internal.NewRoomserverAPI(
 		&cfg.RoomServer, roomserverDB, dp, string(cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent)),
 		base.Caches, &test.NopJSONVerifier{}, nil,
-	), dp
+	), dp, dbFile.Name()
 }
 
-func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) (api.RoomserverInternalAPI, *dummyProducer, []gomatrixserverlib.HeaderedEvent) {
+func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) (api.RoomserverInternalAPI, *dummyProducer, []gomatrixserverlib.HeaderedEvent, string) {
 	t.Helper()
-	rsAPI, dp := mustCreateRoomserverAPI(t)
+	rsAPI, dp, dbFile := mustCreateRoomserverAPI(t)
 	hevents := mustLoadRawEvents(t, ver, events)
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, hevents, testOrigin, nil); err != nil {
 		t.Errorf("failed to SendEvents: %s", err)
 	}
-	return rsAPI, dp, hevents
+	return rsAPI, dp, hevents, dbFile
 }
 
 func TestOutputRedactedEvent(t *testing.T) {
@@ -213,9 +225,8 @@ func TestOutputRedactedEvent(t *testing.T) {
 		[]byte(`{"auth_events":[["$N4us6vqqq3RjvpKd:kaer.morhen",{"sha256":"SylirfgfXFhscZL7p10NmOa1nFFEckiwz0lAideQMIM"}],["$6sUiGPQ0a3tqYGKo:kaer.morhen",{"sha256":"IS4HSMqpqVUGh1Z3qgC99YcaizjCoO4yFhYYe8j53IE"}]],"content":{"reason":"Spamming more"},"depth":5,"event_id":"$UpsE8belb2gJItJG:kaer.morhen","hashes":{"sha256":"zU8PWJOld/I7OtjdpltFSKC+DMNm2ZyEXAHcprsafD0"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$o8KHsgSIYbJrddnd:kaer.morhen",{"sha256":"UgjMuCFXH4warIjKuwlRq9zZ6dSJrZWCd+CkqtgLSHM"}]],"redacts":"$o8KHsgSIYbJrddnd:kaer.morhen","room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"zxFGr/7aGOzqOEN6zRNrBpFkkMnfGFPbCteYL33wC+PycBPIK+2WRa5qlAR2+lcLiK3HjIzwRYkKNsVFTqvRAw"}},"type":"m.room.redaction"}`),
 	}
 	var redactedOutputs []api.OutputEvent
-	deleteDatabase()
-	_, producer, hevents := mustSendEvents(t, gomatrixserverlib.RoomVersionV1, redactionEvents)
-	defer deleteDatabase()
+	_, producer, hevents, dbFile := mustSendEvents(t, gomatrixserverlib.RoomVersionV1, redactionEvents)
+	defer deleteDatabase(dbFile)
 	for _, msg := range producer.producedMessages {
 		if msg.Type == api.OutputTypeRedactedEvent {
 			redactedOutputs = append(redactedOutputs, *msg)
@@ -334,9 +345,9 @@ func TestOutputRewritesState(t *testing.T) {
 			Type:     "m.room.message",
 		},
 	})
-	deleteDatabase()
-	rsAPI, producer := mustCreateRoomserverAPI(t)
-	defer deleteDatabase()
+
+	rsAPI, producer, dbFile := mustCreateRoomserverAPI(t)
+	defer deleteDatabase(dbFile)
 	err := api.SendEvents(context.Background(), rsAPI, api.KindNew, originalEvents, testOrigin, nil)
 	if err != nil {
 		t.Fatalf("failed to send original events: %s", err)
