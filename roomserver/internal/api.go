@@ -153,5 +153,5 @@ func (r *RoomserverInternalAPI) PerformForget(
 	req *api.PerformForgetRequest,
 	resp *api.PerformForgetResponse,
 ) error {
-	return r.DB.ForgetRoom(ctx, req.UserID, req.RoomID, true)
+	return r.Forgetter.PerformForget(ctx, req, resp)
 }
