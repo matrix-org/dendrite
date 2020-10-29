@@ -162,6 +162,11 @@ func NewPostgresMembershipTable(db *sql.DB) (tables.Membership, error) {
 	}.Prepare(db)
 }
 
+func (s *membershipStatements) execSchema(db *sql.DB) error {
+	_, err := db.Exec(membershipSchema)
+	return err
+}
+
 func (s *membershipStatements) InsertMembership(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
