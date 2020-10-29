@@ -1,5 +1,6 @@
 version: "3.4"
 services:
+  # PostgreSQL is needed for both polylith and monolith modes.
   postgres:
     hostname: postgres
     image: postgres:9.6
@@ -15,12 +16,14 @@ services:
     networks:
       - internal
 
+  # Zookeeper is only needed for polylith mode!
   zookeeper:
     hostname: zookeeper
     image: zookeeper
     networks:
       - internal
 
+  # Kafka is only needed for polylith mode!
   kafka:
     container_name: dendrite_kafka
     hostname: kafka
@@ -29,8 +32,6 @@ services:
       KAFKA_ADVERTISED_HOST_NAME: "kafka"
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-    ports:
-      - 9092:9092
     depends_on:
       - zookeeper
     networks:

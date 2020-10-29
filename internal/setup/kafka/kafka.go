@@ -17,12 +17,17 @@ func SetupConsumerProducer(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProdu
 
 // setupKafka creates kafka consumer/producer pair from the config.
 func setupKafka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
-	consumer, err := sarama.NewConsumer(cfg.Addresses, nil)
+	sCfg := sarama.NewConfig()
+	sCfg.Producer.MaxMessageBytes = *cfg.MaxMessageBytes
+	sCfg.Producer.Return.Successes = true
+	sCfg.Consumer.Fetch.Default = int32(*cfg.MaxMessageBytes)
+
+	consumer, err := sarama.NewConsumer(cfg.Addresses, sCfg)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start kafka consumer")
 	}
 
-	producer, err := sarama.NewSyncProducer(cfg.Addresses, nil)
+	producer, err := sarama.NewSyncProducer(cfg.Addresses, sCfg)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to setup kafka producers")
 	}

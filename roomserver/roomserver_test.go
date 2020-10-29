@@ -379,7 +379,7 @@ func TestOutputRewritesState(t *testing.T) {
 	if len(producer.producedMessages) != 1 {
 		t.Fatalf("Rewritten events got output, want only 1 got %d", len(producer.producedMessages))
 	}
-	outputEvent := producer.producedMessages[0]
+	outputEvent := producer.producedMessages[len(producer.producedMessages)-1]
 	if !outputEvent.NewRoomEvent.RewritesState {
 		t.Errorf("RewritesState flag not set on output event")
 	}
