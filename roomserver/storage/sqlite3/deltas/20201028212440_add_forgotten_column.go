@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-
 	"github.com/pressly/goose"
 )
 
