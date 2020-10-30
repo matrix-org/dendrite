@@ -36,6 +36,9 @@ func NewPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		CONSTRAINT msc2836_relationships_unique UNIQUE (parent_event_id, child_event_id)
 	);
 	`)
+	if err != nil {
+		return nil, err
+	}
 	if p.insertRelationStmt, err = p.db.Prepare(`
 		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, parent_room_id) VALUES($1, $2, $3) ON CONFLICT DO NOTHING
 	`); err != nil {
@@ -84,6 +87,9 @@ func NewSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		UNIQUE (parent_event_id, child_event_id)
 	);
 	`)
+	if err != nil {
+		return nil, err
+	}
 	if s.insertRelationStmt, err = s.db.Prepare(`
 		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, room_id) VALUES($1, $2, $3) ON CONFLICT (parent_event_id, child_event_id) DO NOTHING
 	`); err != nil {
