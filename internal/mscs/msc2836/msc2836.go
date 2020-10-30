@@ -31,7 +31,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-type eventRelationshipRequest struct {
+type EventRelationshipRequest struct {
 	EventID         string `json:"event_id"`
 	MaxDepth        int    `json:"max_depth"`
 	MaxBreadth      int    `json:"max_breadth"`
@@ -44,7 +44,7 @@ type eventRelationshipRequest struct {
 	Batch           string `json:"batch"`
 }
 
-func (r *eventRelationshipRequest) applyDefaults() {
+func (r *EventRelationshipRequest) applyDefaults() {
 	if r.Limit > 100 || r.Limit < 1 {
 		r.Limit = 100
 	}
@@ -80,7 +80,7 @@ type eventRelationshipResponse struct {
 }
 
 // Enable this MSC
-func Enable(base *setup.BaseDendrite, monolith *setup.Monolith) error {
+func Enable(base *setup.BaseDendrite, userAPI userapi.UserInternalAPI) error {
 	db, err := NewDatabase(&base.Cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("Cannot enable MSC2836: %w", err)
@@ -97,8 +97,8 @@ func Enable(base *setup.BaseDendrite, monolith *setup.Monolith) error {
 	})
 
 	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
-		httputil.MakeAuthAPI("eventRelationships", monolith.UserAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			var relation eventRelationshipRequest
+		httputil.MakeAuthAPI("eventRelationships", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			var relation EventRelationshipRequest
 			if err := json.NewDecoder(req.Body).Decode(&relation); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
 				return util.JSONResponse{
