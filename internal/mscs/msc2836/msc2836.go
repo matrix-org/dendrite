@@ -16,14 +16,17 @@
 package msc2836
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -42,10 +45,20 @@ type eventRelationshipRequest struct {
 
 // Enable this MSC
 func Enable(base *setup.BaseDendrite, monolith *setup.Monolith) error {
-	_, err := NewDatabase(&base.Cfg.MSCs.Database)
+	db, err := NewDatabase(&base.Cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("Cannot enable MSC2836: %w", err)
 	}
+	hooks.Enable()
+	hooks.Attach(hooks.KindNewEvent, func(headeredEvent interface{}) {
+		he := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
+		hookErr := db.StoreRelation(context.Background(), he)
+		if hookErr != nil {
+			util.GetLogger(context.Background()).WithError(hookErr).Error(
+				"failed to StoreRelation",
+			)
+		}
+	})
 
 	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
 		httputil.MakeAuthAPI("eventRelationships", monolith.UserAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

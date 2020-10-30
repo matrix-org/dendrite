@@ -3,6 +3,7 @@ package msc2836
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -15,7 +16,8 @@ type Database interface {
 }
 
 type Postgres struct {
-	db *sql.DB
+	db                 *sql.DB
+	insertRelationStmt *sql.Stmt
 }
 
 func NewPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
@@ -24,16 +26,35 @@ func NewPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	if p.db, err = sqlutil.Open(dbOpts); err != nil {
 		return nil, err
 	}
-	return &p, nil
+	_, err = p.db.Exec(`
+	CREATE TABLE IF NOT EXISTS msc2836_relationships (
+		parent_event_id TEXT NOT NULL,
+		child_event_id TEXT NOT NULL,
+		parent_room_id TEXT NOT NULL,
+		CONSTRAINT msc2836_relationships_unique UNIQUE (parent_event_id, child_event_id)
+	);
+	`)
+	if p.insertRelationStmt, err = p.db.Prepare(`
+		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, parent_room_id) VALUES($1, $2, $3) ON CONFLICT DO NOTHING
+	`); err != nil {
+		return nil, err
+	}
+	return &p, err
 }
 
-func (db *Postgres) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
-	return nil
+func (p *Postgres) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
+	parent, child := parentChildEventIDs(ev)
+	if parent == "" || child == "" {
+		return nil
+	}
+	_, err := p.insertRelationStmt.ExecContext(ctx, parent, child, "")
+	return err
 }
 
 type SQLite struct {
-	db     *sql.DB
-	writer sqlutil.Writer
+	db                 *sql.DB
+	insertRelationStmt *sql.Stmt
+	writer             sqlutil.Writer
 }
 
 func NewSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
@@ -43,11 +64,29 @@ func NewSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		return nil, err
 	}
 	s.writer = sqlutil.NewExclusiveWriter()
+	_, err = s.db.Exec(`
+	CREATE TABLE IF NOT EXISTS msc2836_relationships (
+		parent_event_id TEXT NOT NULL,
+		child_event_id TEXT NOT NULL,
+		room_id TEXT NOT NULL,
+		UNIQUE (parent_event_id, child_event_id)
+	);
+	`)
+	if s.insertRelationStmt, err = s.db.Prepare(`
+		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, room_id) VALUES($1, $2, $3) ON CONFLICT (parent_event_id, child_event_id) DO NOTHING
+	`); err != nil {
+		return nil, err
+	}
 	return &s, nil
 }
 
-func (db *SQLite) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
-	return nil
+func (s *SQLite) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
+	parent, child := parentChildEventIDs(ev)
+	if parent == "" || child == "" {
+		return nil
+	}
+	_, err := s.insertRelationStmt.ExecContext(ctx, parent, child, "")
+	return err
 }
 
 // NewDatabase loads the database for msc2836
@@ -56,4 +95,23 @@ func NewDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		return NewPostgresDatabase(dbOpts)
 	}
 	return NewSQLiteDatabase(dbOpts)
+}
+
+func parentChildEventIDs(ev *gomatrixserverlib.HeaderedEvent) (parent string, child string) {
+	if ev == nil {
+		return
+	}
+	body := struct {
+		Relationship struct {
+			RelType string `json:"rel_type"`
+			EventID string `json:"event_id"`
+		} `json:"m.relationship"`
+	}{}
+	if err := json.Unmarshal(ev.Content(), &body); err != nil {
+		return
+	}
+	if body.Relationship.RelType == "m.reference" && body.Relationship.EventID != "" {
+		return body.Relationship.EventID, ev.EventID()
+	}
+	return
 }

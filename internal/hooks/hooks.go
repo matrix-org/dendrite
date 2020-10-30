@@ -16,6 +16,50 @@
 // Hooks can only be run in monolith mode.
 package hooks
 
-func Attach() {
+import "sync"
 
+const (
+	// KindNewEvent is a hook which is called with *gomatrixserverlib.HeaderedEvent
+	// It is run when a new event is persisted in the roomserver.
+	// Usage:
+	//   hooks.Attach(hooks.KindNewEvent, func(headeredEvent interface{}) { ... })
+	KindNewEvent = "new_event"
+)
+
+var (
+	hookMap = make(map[string][]func(interface{}))
+	hookMu  = sync.Mutex{}
+	enabled = false
+)
+
+// Enable all hooks. This may slow down the server slightly. Required for MSCs to work.
+func Enable() {
+	enabled = true
+}
+
+// Run any hooks
+func Run(kind string, data interface{}) {
+	if !enabled {
+		return
+	}
+	cbs := callbacks(kind)
+	for _, cb := range cbs {
+		cb(data)
+	}
+}
+
+// Attach a hook
+func Attach(kind string, callback func(interface{})) {
+	if !enabled {
+		return
+	}
+	hookMu.Lock()
+	defer hookMu.Unlock()
+	hookMap[kind] = append(hookMap[kind], callback)
+}
+
+func callbacks(kind string) []func(interface{}) {
+	hookMu.Lock()
+	defer hookMu.Unlock()
+	return hookMap[kind]
 }
