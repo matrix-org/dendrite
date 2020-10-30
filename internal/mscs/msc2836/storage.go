@@ -13,11 +13,13 @@ import (
 type Database interface {
 	// StoreRelation stores the parent->child and child->parent relationship for later querying.
 	StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error
+	ChildrenForParent(ctx context.Context, eventID string) ([]string, error)
 }
 
 type Postgres struct {
-	db                 *sql.DB
-	insertRelationStmt *sql.Stmt
+	db                          *sql.DB
+	insertRelationStmt          *sql.Stmt
+	selectChildrenForParentStmt *sql.Stmt
 }
 
 func NewPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
@@ -39,6 +41,11 @@ func NewPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	`); err != nil {
 		return nil, err
 	}
+	if p.selectChildrenForParentStmt, err = p.db.Prepare(`
+		SELECT child_event_id FROM msc2836_relationships WHERE parent_event_id = $1
+	`); err != nil {
+		return nil, err
+	}
 	return &p, err
 }
 
@@ -51,10 +58,15 @@ func (p *Postgres) StoreRelation(ctx context.Context, ev *gomatrixserverlib.Head
 	return err
 }
 
+func (p *Postgres) ChildrenForParent(ctx context.Context, eventID string) ([]string, error) {
+	return childrenForParent(ctx, eventID, p.selectChildrenForParentStmt)
+}
+
 type SQLite struct {
-	db                 *sql.DB
-	insertRelationStmt *sql.Stmt
-	writer             sqlutil.Writer
+	db                          *sql.DB
+	insertRelationStmt          *sql.Stmt
+	selectChildrenForParentStmt *sql.Stmt
+	writer                      sqlutil.Writer
 }
 
 func NewSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
@@ -77,6 +89,11 @@ func NewSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	`); err != nil {
 		return nil, err
 	}
+	if s.selectChildrenForParentStmt, err = s.db.Prepare(`
+		SELECT child_event_id FROM msc2836_relationships WHERE parent_event_id = $1
+	`); err != nil {
+		return nil, err
+	}
 	return &s, nil
 }
 
@@ -87,6 +104,10 @@ func (s *SQLite) StoreRelation(ctx context.Context, ev *gomatrixserverlib.Header
 	}
 	_, err := s.insertRelationStmt.ExecContext(ctx, parent, child, "")
 	return err
+}
+
+func (s *SQLite) ChildrenForParent(ctx context.Context, eventID string) ([]string, error) {
+	return childrenForParent(ctx, eventID, s.selectChildrenForParentStmt)
 }
 
 // NewDatabase loads the database for msc2836
@@ -114,4 +135,21 @@ func parentChildEventIDs(ev *gomatrixserverlib.HeaderedEvent) (parent string, ch
 		return body.Relationship.EventID, ev.EventID()
 	}
 	return
+}
+
+func childrenForParent(ctx context.Context, eventID string, stmt *sql.Stmt) ([]string, error) {
+	rows, err := stmt.QueryContext(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() // nolint: errcheck
+	var children []string
+	for rows.Next() {
+		var childID string
+		if err := rows.Scan(&childID); err != nil {
+			return nil, err
+		}
+		children = append(children, childID)
+	}
+	return children, nil
 }
