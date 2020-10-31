@@ -426,7 +426,7 @@ FindSuccessor:
 	}
 
 	// possibly return all joined servers depending on history visiblity
-	memberEventsFromVis, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries)
+	memberEventsFromVis, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries, b.thisServer)
 	if err != nil {
 		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
 		return nil
@@ -501,11 +501,12 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 	return events, nil
 }
 
-// joinEventsFromHistoryVisibility returns all CURRENTLY joined members if the provided state indicated a 'shared' history visibility.
+// joinEventsFromHistoryVisibility returns all CURRENTLY joined members if our server can read the room history
 // TODO: Long term we probably want a history_visibility table which stores eventNID | visibility_enum so we can just
 //       pull all events and then filter by that table.
 func joinEventsFromHistoryVisibility(
-	ctx context.Context, db storage.Database, roomID string, stateEntries []types.StateEntry) ([]types.Event, error) {
+	ctx context.Context, db storage.Database, roomID string, stateEntries []types.StateEntry,
+	thisServer gomatrixserverlib.ServerName) ([]types.Event, error) {
 
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
@@ -525,9 +526,11 @@ func joinEventsFromHistoryVisibility(
 	for i := range stateEvents {
 		events[i] = stateEvents[i].Event
 	}
-	visibility := auth.HistoryVisibilityForRoom(events)
-	if visibility != "shared" {
-		logrus.Infof("ServersAtEvent history visibility not shared: %s", visibility)
+
+	// Can we see events in the room?
+	canSeeEvents := auth.IsServerAllowed(thisServer, true, events)
+	if !canSeeEvents {
+		logrus.Infof("ServersAtEvent history not visible to us: %s", auth.HistoryVisibilityForRoom(events))
 		return nil, nil
 	}
 	// get joined members
