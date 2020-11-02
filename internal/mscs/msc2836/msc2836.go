@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
+	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -80,7 +81,7 @@ type eventRelationshipResponse struct {
 }
 
 // Enable this MSC
-func Enable(base *setup.BaseDendrite, userAPI userapi.UserInternalAPI) error {
+func Enable(base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI) error {
 	db, err := NewDatabase(&base.Cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("Cannot enable MSC2836: %w", err)
@@ -112,7 +113,7 @@ func Enable(base *setup.BaseDendrite, userAPI userapi.UserInternalAPI) error {
 			var returnEvents []*gomatrixserverlib.HeaderedEvent
 
 			// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
-			event := getEventIfVisible(req.Context(), relation.EventID, device.UserID)
+			event := getEventIfVisible(req.Context(), rsAPI, relation.EventID, device.UserID)
 			if event == nil {
 				return util.JSONResponse{
 					Code: 403,
@@ -124,7 +125,7 @@ func Enable(base *setup.BaseDendrite, userAPI userapi.UserInternalAPI) error {
 			returnEvents = append(returnEvents, event)
 
 			if *relation.IncludeParent {
-				if parentEvent := includeParent(req.Context(), event, device.UserID); parentEvent != nil {
+				if parentEvent := includeParent(req.Context(), rsAPI, event, device.UserID); parentEvent != nil {
 					returnEvents = append(returnEvents, parentEvent)
 				}
 			}
@@ -132,7 +133,7 @@ func Enable(base *setup.BaseDendrite, userAPI userapi.UserInternalAPI) error {
 			if *relation.IncludeChildren {
 				remaining := relation.Limit - len(returnEvents)
 				if remaining > 0 {
-					children, resErr := includeChildren(req.Context(), db, event.EventID(), remaining, *relation.RecentFirst, device.UserID)
+					children, resErr := includeChildren(req.Context(), rsAPI, db, event.EventID(), remaining, *relation.RecentFirst, device.UserID)
 					if resErr != nil {
 						return *resErr
 					}
@@ -166,18 +167,18 @@ func Enable(base *setup.BaseDendrite, userAPI userapi.UserInternalAPI) error {
 
 // If include_parent: true and there is a valid m.relationship field in the event,
 // retrieve the referenced event. Apply history visibility check to that event and if it passes, add it to the response array.
-func includeParent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, userID string) (parent *gomatrixserverlib.HeaderedEvent) {
+func includeParent(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, event *gomatrixserverlib.HeaderedEvent, userID string) (parent *gomatrixserverlib.HeaderedEvent) {
 	parentID, _ := parentChildEventIDs(event)
 	if parentID == "" {
 		return nil
 	}
-	return getEventIfVisible(ctx, parentID, userID)
+	return getEventIfVisible(ctx, rsAPI, parentID, userID)
 }
 
 // If include_children: true, lookup all events which have event_id as an m.relationship
 // Apply history visibility checks to all these events and add the ones which pass into the response array,
 // honouring the recent_first flag and the limit.
-func includeChildren(ctx context.Context, db Database, parentID string, limit int, recentFirst bool, userID string) ([]*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
+func includeChildren(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, db Database, parentID string, limit int, recentFirst bool, userID string) ([]*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
 	children, err := db.ChildrenForParent(ctx, parentID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("failed to get ChildrenForParent")
@@ -186,7 +187,7 @@ func includeChildren(ctx context.Context, db Database, parentID string, limit in
 	}
 	var childEvents []*gomatrixserverlib.HeaderedEvent
 	for _, child := range children {
-		childEvent := getEventIfVisible(ctx, child, userID)
+		childEvent := getEventIfVisible(ctx, rsAPI, child, userID)
 		if childEvent != nil {
 			childEvents = append(childEvents, childEvent)
 		}
@@ -208,6 +209,36 @@ func walkThread(ctx context.Context, db Database, limit int) ([]*gomatrixserverl
 	return nil, false
 }
 
-func getEventIfVisible(ctx context.Context, eventID, userID string) *gomatrixserverlib.HeaderedEvent {
-	return nil
+func getEventIfVisible(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, eventID, userID string) *gomatrixserverlib.HeaderedEvent {
+	var queryEventsRes roomserver.QueryEventsByIDResponse
+	err := rsAPI.QueryEventsByID(ctx, &roomserver.QueryEventsByIDRequest{
+		EventIDs: []string{eventID},
+	}, &queryEventsRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("getEventIfVisible: failed to QueryEventsByID")
+		return nil
+	}
+	if len(queryEventsRes.Events) == 0 {
+		util.GetLogger(ctx).Infof("event does not exist")
+		return nil // event does not exist
+	}
+	event := queryEventsRes.Events[0]
+
+	// Allow events if the member is in the room
+	// TODO: This does not honour history_visibility
+	// TODO: This does not honour m.room.create content
+	var queryMembershipRes roomserver.QueryMembershipForUserResponse
+	err = rsAPI.QueryMembershipForUser(ctx, &roomserver.QueryMembershipForUserRequest{
+		RoomID: event.RoomID(),
+		UserID: userID,
+	}, &queryMembershipRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("getEventIfVisible: failed to QueryMembershipForUser")
+		return nil
+	}
+	if !queryMembershipRes.IsInRoom {
+		util.GetLogger(ctx).Infof("user not in room")
+		return nil
+	}
+	return &event
 }
