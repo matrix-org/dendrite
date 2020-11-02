@@ -74,7 +74,7 @@ func (r *EventRelationshipRequest) applyDefaults() {
 	}
 }
 
-type eventRelationshipResponse struct {
+type EventRelationshipResponse struct {
 	Events    []gomatrixserverlib.ClientEvent `json:"events"`
 	NextBatch string                          `json:"next_batch"`
 	Limited   bool                            `json:"limited"`
@@ -109,7 +109,7 @@ func Enable(base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, us
 			}
 			// Sanity check request and set defaults.
 			relation.applyDefaults()
-			var res eventRelationshipResponse
+			var res EventRelationshipResponse
 			var returnEvents []*gomatrixserverlib.HeaderedEvent
 
 			// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.

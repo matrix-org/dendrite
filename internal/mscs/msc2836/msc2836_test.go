@@ -6,11 +6,10 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
-
-	nethttputil "net/http/httputil"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -27,8 +26,7 @@ var (
 	client = &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	constTrue  = true
-	constFalse = false
+	constTrue = true
 )
 
 // Basic sanity check of MSC2836 logic. Injects a thread that looks like:
@@ -41,7 +39,7 @@ var (
 //   E F G
 //   |
 //   H
-// And makes sure POST /relationships works with various parameters
+// And makes sure POST /event_relationships works with various parameters
 func TestMSC2836(t *testing.T) {
 	alice := "@alice:localhost"
 	bob := "@bob:localhost"
@@ -68,7 +66,7 @@ func TestMSC2836(t *testing.T) {
 		DisplayName: "Charles",
 		UserID:      charlie,
 	}
-	eventA := mustCreateEvent(t, gomatrixserverlib.RoomVersionV6, fledglingEvent{
+	eventA := mustCreateEvent(t, fledglingEvent{
 		RoomID: roomIDA,
 		Sender: alice,
 		Type:   "m.room.message",
@@ -76,7 +74,7 @@ func TestMSC2836(t *testing.T) {
 			"body": "[A] Do you know shelties?",
 		},
 	})
-	eventB := mustCreateEvent(t, gomatrixserverlib.RoomVersionV6, fledglingEvent{
+	eventB := mustCreateEvent(t, fledglingEvent{
 		RoomID: roomIDB,
 		Sender: bob,
 		Type:   "m.room.message",
@@ -88,7 +86,7 @@ func TestMSC2836(t *testing.T) {
 			},
 		},
 	})
-	eventC := mustCreateEvent(t, gomatrixserverlib.RoomVersionV6, fledglingEvent{
+	eventC := mustCreateEvent(t, fledglingEvent{
 		RoomID: roomIDB,
 		Sender: bob,
 		Type:   "m.room.message",
@@ -100,7 +98,7 @@ func TestMSC2836(t *testing.T) {
 			},
 		},
 	})
-	eventD := mustCreateEvent(t, gomatrixserverlib.RoomVersionV6, fledglingEvent{
+	eventD := mustCreateEvent(t, fledglingEvent{
 		RoomID: roomIDA,
 		Sender: alice,
 		Type:   "m.room.message",
@@ -112,7 +110,7 @@ func TestMSC2836(t *testing.T) {
 			},
 		},
 	})
-	eventE := mustCreateEvent(t, gomatrixserverlib.RoomVersionV6, fledglingEvent{
+	eventE := mustCreateEvent(t, fledglingEvent{
 		RoomID: roomIDB,
 		Sender: bob,
 		Type:   "m.room.message",
@@ -124,7 +122,7 @@ func TestMSC2836(t *testing.T) {
 			},
 		},
 	})
-	eventF := mustCreateEvent(t, gomatrixserverlib.RoomVersionV6, fledglingEvent{
+	eventF := mustCreateEvent(t, fledglingEvent{
 		RoomID: roomIDC,
 		Sender: charlie,
 		Type:   "m.room.message",
@@ -136,7 +134,7 @@ func TestMSC2836(t *testing.T) {
 			},
 		},
 	})
-	eventG := mustCreateEvent(t, gomatrixserverlib.RoomVersionV6, fledglingEvent{
+	eventG := mustCreateEvent(t, fledglingEvent{
 		RoomID: roomIDA,
 		Sender: alice,
 		Type:   "m.room.message",
@@ -148,7 +146,7 @@ func TestMSC2836(t *testing.T) {
 			},
 		},
 	})
-	eventH := mustCreateEvent(t, gomatrixserverlib.RoomVersionV6, fledglingEvent{
+	eventH := mustCreateEvent(t, fledglingEvent{
 		RoomID: roomIDB,
 		Sender: bob,
 		Type:   "m.room.message",
@@ -185,24 +183,44 @@ func TestMSC2836(t *testing.T) {
 	defer cancel()
 
 	t.Run("returns 403 on invalid event IDs", func(t *testing.T) {
-		res := postRelationships(t, "alice", &msc2836.EventRelationshipRequest{
+		_ = postRelationships(t, 403, "alice", &msc2836.EventRelationshipRequest{
 			EventID: "$invalid",
 		})
-		if res.StatusCode != 403 {
-			out, _ := nethttputil.DumpResponse(res, true)
-			t.Fatalf("failed to perform request: %s", string(out))
+	})
+	t.Run("returns 403 if not joined to the room of specified event in request", func(t *testing.T) {
+		nopUserAPI.accessTokens["frank"] = userapi.Device{
+			AccessToken: "frank",
+			DisplayName: "Frank Not In Room",
+			UserID:      "@frank:localhost",
 		}
+		_ = postRelationships(t, 403, "frank", &msc2836.EventRelationshipRequest{
+			EventID:       eventB.EventID(),
+			Limit:         1,
+			IncludeParent: &constTrue,
+		})
+	})
+	t.Run("omits parent if not joined to the room of parent of event", func(t *testing.T) {
+		nopUserAPI.accessTokens["frank2"] = userapi.Device{
+			AccessToken: "frank2",
+			DisplayName: "Frank2 Not In Room",
+			UserID:      "@frank2:localhost",
+		}
+		// Event B is in roomB, Event A is in roomA, so make frank2 joined to roomB
+		nopRsAPI.userToJoinedRooms["@frank2:localhost"] = []string{roomIDB}
+		body := postRelationships(t, 200, "frank2", &msc2836.EventRelationshipRequest{
+			EventID:       eventB.EventID(),
+			Limit:         1,
+			IncludeParent: &constTrue,
+		})
+		assertContains(t, body, []string{eventB.EventID()})
 	})
 	t.Run("returns the parent if include_parent is true", func(t *testing.T) {
-		res := postRelationships(t, "alice", &msc2836.EventRelationshipRequest{
+		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
 			EventID:       eventB.EventID(),
 			IncludeParent: &constTrue,
 			Limit:         1,
 		})
-		if res.StatusCode != 200 {
-			out, _ := nethttputil.DumpResponse(res, true)
-			t.Fatalf("failed to perform request: %s", string(out))
-		}
+		assertContains(t, body, []string{eventB.EventID(), eventA.EventID()})
 	})
 }
 
@@ -214,10 +232,7 @@ func runServer(t *testing.T, router *mux.Router) func() {
 		Handler:      router,
 	}
 	go func() {
-		err := externalServ.ListenAndServe()
-		if err != nil {
-			t.Logf("ListenAndServe: %s", err)
-		}
+		externalServ.ListenAndServe()
 	}()
 	// wait to listen on the port
 	time.Sleep(500 * time.Millisecond)
@@ -226,7 +241,7 @@ func runServer(t *testing.T, router *mux.Router) func() {
 	}
 }
 
-func postRelationships(t *testing.T, accessToken string, req *msc2836.EventRelationshipRequest) *http.Response {
+func postRelationships(t *testing.T, expectCode int, accessToken string, req *msc2836.EventRelationshipRequest) *msc2836.EventRelationshipResponse {
 	t.Helper()
 	data, err := json.Marshal(req)
 	if err != nil {
@@ -244,7 +259,34 @@ func postRelationships(t *testing.T, accessToken string, req *msc2836.EventRelat
 	if err != nil {
 		t.Fatalf("failed to do request: %s", err)
 	}
-	return res
+	if res.StatusCode != expectCode {
+		body, _ := ioutil.ReadAll(res.Body)
+		t.Fatalf("wrong response code, got %d want %d - body: %s", res.StatusCode, expectCode, string(body))
+	}
+	if res.StatusCode == 200 {
+		var result msc2836.EventRelationshipResponse
+		if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+			t.Fatalf("response 200 OK but failed to deserialise JSON : %s", err)
+		}
+		return &result
+	}
+	return nil
+}
+
+func assertContains(t *testing.T, result *msc2836.EventRelationshipResponse, wantEventIDs []string) {
+	t.Helper()
+	gotEventIDs := make([]string, len(result.Events))
+	for i, ev := range result.Events {
+		gotEventIDs[i] = ev.EventID
+	}
+	if len(gotEventIDs) != len(wantEventIDs) {
+		t.Fatalf("length mismatch: got %v want %v", gotEventIDs, wantEventIDs)
+	}
+	for i := range gotEventIDs {
+		if gotEventIDs[i] != wantEventIDs[i] {
+			t.Errorf("wrong item in position %d - got %s want %s", i, gotEventIDs[i], wantEventIDs[i])
+		}
+	}
 }
 
 type testUserAPI struct {
@@ -358,8 +400,9 @@ type fledglingEvent struct {
 	RoomID   string
 }
 
-func mustCreateEvent(t *testing.T, roomVer gomatrixserverlib.RoomVersion, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
+func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
+	roomVer := gomatrixserverlib.RoomVersionV6
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
 	eb := gomatrixserverlib.EventBuilder{
