@@ -12,14 +12,18 @@ import (
 
 type Database interface {
 	// StoreRelation stores the parent->child and child->parent relationship for later querying.
+	// Also stores the event metadata e.g timestamp
 	StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error
+	// ChildrenForParent returns the event IDs of events who have the given `eventID` as an m.relationship with the
+	// provided `relType`.
 	ChildrenForParent(ctx context.Context, eventID, relType string) ([]string, error)
 }
 
 type DB struct {
 	db                          *sql.DB
 	writer                      sqlutil.Writer
-	insertRelationStmt          *sql.Stmt
+	insertEdgeStmt              *sql.Stmt
+	insertNodeStmt              *sql.Stmt
 	selectChildrenForParentStmt *sql.Stmt
 }
 
@@ -46,12 +50,23 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		rel_type TEXT NOT NULL,
 		CONSTRAINT msc2836_edges UNIQUE (parent_event_id, child_event_id, rel_type)
 	);
+
+	CREATE TABLE IF NOT EXISTS msc2836_nodes (
+		event_id TEXT PRIMARY KEY NOT NULL,
+		origin_server_ts BIGINT NOT NULL,
+		room_id TEXT NOT NULL
+	);
 	`)
 	if err != nil {
 		return nil, err
 	}
-	if d.insertRelationStmt, err = d.db.Prepare(`
+	if d.insertEdgeStmt, err = d.db.Prepare(`
 		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type) VALUES($1, $2, $3) ON CONFLICT DO NOTHING
+	`); err != nil {
+		return nil, err
+	}
+	if d.insertNodeStmt, err = d.db.Prepare(`
+		INSERT INTO msc2836_nodes(event_id, origin_server_ts, room_id) VALUES($1, $2, $3) ON CONFLICT DO NOTHING
 	`); err != nil {
 		return nil, err
 	}
@@ -78,12 +93,23 @@ func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		rel_type TEXT NOT NULL,
 		UNIQUE (parent_event_id, child_event_id, rel_type)
 	);
+
+	CREATE TABLE IF NOT EXISTS msc2836_nodes (
+		event_id TEXT PRIMARY KEY NOT NULL,
+		origin_server_ts BIGINT NOT NULL,
+		room_id TEXT NOT NULL
+	);
 	`)
 	if err != nil {
 		return nil, err
 	}
-	if d.insertRelationStmt, err = d.db.Prepare(`
+	if d.insertEdgeStmt, err = d.db.Prepare(`
 		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type) VALUES($1, $2, $3) ON CONFLICT (parent_event_id, child_event_id, rel_type) DO NOTHING
+	`); err != nil {
+		return nil, err
+	}
+	if d.insertNodeStmt, err = d.db.Prepare(`
+		INSERT INTO msc2836_nodes(event_id, origin_server_ts, room_id) VALUES($1, $2, $3) ON CONFLICT DO NOTHING
 	`); err != nil {
 		return nil, err
 	}
@@ -100,8 +126,14 @@ func (p *DB) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEv
 	if parent == "" || child == "" {
 		return nil
 	}
-	_, err := p.insertRelationStmt.ExecContext(ctx, parent, child, relType)
-	return err
+	return p.writer.Do(p.db, nil, func(txn *sql.Tx) error {
+		_, err := txn.Stmt(p.insertEdgeStmt).ExecContext(ctx, parent, child, relType)
+		if err != nil {
+			return err
+		}
+		_, err = txn.Stmt(p.insertNodeStmt).ExecContext(ctx, ev.EventID(), ev.OriginServerTS(), ev.RoomID())
+		return err
+	})
 }
 
 func (p *DB) ChildrenForParent(ctx context.Context, eventID, relType string) ([]string, error) {
