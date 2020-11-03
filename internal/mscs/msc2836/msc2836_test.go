@@ -26,7 +26,8 @@ var (
 	client = &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	constTrue = true
+	constTrue  = true
+	constFalse = false
 )
 
 // Basic sanity check of MSC2836 logic. Injects a thread that looks like:
@@ -222,6 +223,22 @@ func TestMSC2836(t *testing.T) {
 		})
 		assertContains(t, body, []string{eventB.EventID(), eventA.EventID()})
 	})
+	t.Run("returns the children in the right order if include_children is true", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:         eventD.EventID(),
+			IncludeChildren: &constTrue,
+			RecentFirst:     &constTrue,
+			Limit:           10,
+		})
+		assertContains(t, body, []string{eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
+		body = postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:         eventD.EventID(),
+			IncludeChildren: &constTrue,
+			RecentFirst:     &constFalse,
+			Limit:           10,
+		})
+		assertContains(t, body, []string{eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
+	})
 }
 
 func runServer(t *testing.T, router *mux.Router) func() {
@@ -416,6 +433,8 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to marshal event content %+v", ev.Content)
 	}
+	// make sure the origin_server_ts changes so we can test recency
+	time.Sleep(1 * time.Millisecond)
 	signedEvent, err := eb.Build(time.Now(), gomatrixserverlib.ServerName("localhost"), "ed25519:test", key, roomVer)
 	if err != nil {
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
