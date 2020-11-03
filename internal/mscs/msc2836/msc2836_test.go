@@ -228,14 +228,14 @@ func TestMSC2836(t *testing.T) {
 			EventID:         eventD.EventID(),
 			IncludeChildren: &constTrue,
 			RecentFirst:     &constTrue,
-			Limit:           10,
+			Limit:           4,
 		})
 		assertContains(t, body, []string{eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
 		body = postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
 			EventID:         eventD.EventID(),
 			IncludeChildren: &constTrue,
 			RecentFirst:     &constFalse,
-			Limit:           10,
+			Limit:           4,
 		})
 		assertContains(t, body, []string{eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
 	})
