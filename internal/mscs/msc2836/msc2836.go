@@ -154,8 +154,6 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 			for _, ev := range returnEvents {
 				depths[ev.EventID()] = 1
 			}
-			// Begin to walk the thread DAG in the direction specified, either depth or breadth first according to the depth_first flag,
-			// honouring the limit, max_depth and max_breadth values according to the following rules
 			var events []*gomatrixserverlib.HeaderedEvent
 			events, walkLimited = walkThread(
 				req.Context(), db, rsAPI, device.UserID, &relation, depths, remaining,
@@ -215,6 +213,8 @@ func includeChildren(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI
 	return childEvents, nil
 }
 
+// Begin to walk the thread DAG in the direction specified, either depth or breadth first according to the depth_first flag,
+// honouring the limit, max_depth and max_breadth values according to the following rules
 // nolint: unparam
 func walkThread(
 	ctx context.Context, db Database, rsAPI roomserver.RoomserverInternalAPI, userID string, req *EventRelationshipRequest, included map[string]int, limit int,

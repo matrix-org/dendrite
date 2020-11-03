@@ -33,6 +33,7 @@ func NewPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		parent_event_id TEXT NOT NULL,
 		child_event_id TEXT NOT NULL,
 		parent_room_id TEXT NOT NULL,
+		parent_origin_server_ts BIGINT NOT NULL,
 		CONSTRAINT msc2836_relationships_unique UNIQUE (parent_event_id, child_event_id)
 	);
 	`)
@@ -40,7 +41,7 @@ func NewPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		return nil, err
 	}
 	if p.insertRelationStmt, err = p.db.Prepare(`
-		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, parent_room_id) VALUES($1, $2, $3) ON CONFLICT DO NOTHING
+		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, parent_room_id, parent_origin_server_ts) VALUES($1, $2, $3, $4) ON CONFLICT DO NOTHING
 	`); err != nil {
 		return nil, err
 	}
@@ -57,7 +58,7 @@ func (p *Postgres) StoreRelation(ctx context.Context, ev *gomatrixserverlib.Head
 	if parent == "" || child == "" {
 		return nil
 	}
-	_, err := p.insertRelationStmt.ExecContext(ctx, parent, child, "")
+	_, err := p.insertRelationStmt.ExecContext(ctx, parent, child, ev.RoomID(), ev.OriginServerTS())
 	return err
 }
 
@@ -83,7 +84,8 @@ func NewSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	CREATE TABLE IF NOT EXISTS msc2836_relationships (
 		parent_event_id TEXT NOT NULL,
 		child_event_id TEXT NOT NULL,
-		room_id TEXT NOT NULL,
+		parent_room_id TEXT NOT NULL,
+		parent_origin_server_ts BIGINT NOT NULL,
 		UNIQUE (parent_event_id, child_event_id)
 	);
 	`)
@@ -91,7 +93,7 @@ func NewSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		return nil, err
 	}
 	if s.insertRelationStmt, err = s.db.Prepare(`
-		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, room_id) VALUES($1, $2, $3) ON CONFLICT (parent_event_id, child_event_id) DO NOTHING
+		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, parent_room_id, parent_origin_server_ts) VALUES($1, $2, $3, $4) ON CONFLICT (parent_event_id, child_event_id) DO NOTHING
 	`); err != nil {
 		return nil, err
 	}
@@ -108,7 +110,7 @@ func (s *SQLite) StoreRelation(ctx context.Context, ev *gomatrixserverlib.Header
 	if parent == "" || child == "" {
 		return nil
 	}
-	_, err := s.insertRelationStmt.ExecContext(ctx, parent, child, "")
+	_, err := s.insertRelationStmt.ExecContext(ctx, parent, child, ev.RoomID(), ev.OriginServerTS())
 	return err
 }
 
