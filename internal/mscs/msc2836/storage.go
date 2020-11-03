@@ -13,140 +13,99 @@ import (
 type Database interface {
 	// StoreRelation stores the parent->child and child->parent relationship for later querying.
 	StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error
-	ChildrenForParent(ctx context.Context, eventID string) ([]string, error)
+	ChildrenForParent(ctx context.Context, eventID, relType string) ([]string, error)
 }
 
-type Postgres struct {
+type DB struct {
 	db                          *sql.DB
-	insertRelationStmt          *sql.Stmt
-	selectChildrenForParentStmt *sql.Stmt
-}
-
-func NewPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
-	var p Postgres
-	var err error
-	if p.db, err = sqlutil.Open(dbOpts); err != nil {
-		return nil, err
-	}
-	_, err = p.db.Exec(`
-	CREATE TABLE IF NOT EXISTS msc2836_relationships (
-		parent_event_id TEXT NOT NULL,
-		child_event_id TEXT NOT NULL,
-		parent_room_id TEXT NOT NULL,
-		parent_origin_server_ts BIGINT NOT NULL,
-		CONSTRAINT msc2836_relationships_unique UNIQUE (parent_event_id, child_event_id)
-	);
-	`)
-	if err != nil {
-		return nil, err
-	}
-	if p.insertRelationStmt, err = p.db.Prepare(`
-		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, parent_room_id, parent_origin_server_ts) VALUES($1, $2, $3, $4) ON CONFLICT DO NOTHING
-	`); err != nil {
-		return nil, err
-	}
-	if p.selectChildrenForParentStmt, err = p.db.Prepare(`
-		SELECT child_event_id FROM msc2836_relationships WHERE parent_event_id = $1
-	`); err != nil {
-		return nil, err
-	}
-	return &p, err
-}
-
-func (p *Postgres) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
-	parent, child := parentChildEventIDs(ev)
-	if parent == "" || child == "" {
-		return nil
-	}
-	_, err := p.insertRelationStmt.ExecContext(ctx, parent, child, ev.RoomID(), ev.OriginServerTS())
-	return err
-}
-
-func (p *Postgres) ChildrenForParent(ctx context.Context, eventID string) ([]string, error) {
-	return childrenForParent(ctx, eventID, p.selectChildrenForParentStmt)
-}
-
-type SQLite struct {
-	db                          *sql.DB
-	insertRelationStmt          *sql.Stmt
-	selectChildrenForParentStmt *sql.Stmt
 	writer                      sqlutil.Writer
-}
-
-func NewSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
-	var s SQLite
-	var err error
-	if s.db, err = sqlutil.Open(dbOpts); err != nil {
-		return nil, err
-	}
-	s.writer = sqlutil.NewExclusiveWriter()
-	_, err = s.db.Exec(`
-	CREATE TABLE IF NOT EXISTS msc2836_relationships (
-		parent_event_id TEXT NOT NULL,
-		child_event_id TEXT NOT NULL,
-		parent_room_id TEXT NOT NULL,
-		parent_origin_server_ts BIGINT NOT NULL,
-		UNIQUE (parent_event_id, child_event_id)
-	);
-	`)
-	if err != nil {
-		return nil, err
-	}
-	if s.insertRelationStmt, err = s.db.Prepare(`
-		INSERT INTO msc2836_relationships(parent_event_id, child_event_id, parent_room_id, parent_origin_server_ts) VALUES($1, $2, $3, $4) ON CONFLICT (parent_event_id, child_event_id) DO NOTHING
-	`); err != nil {
-		return nil, err
-	}
-	if s.selectChildrenForParentStmt, err = s.db.Prepare(`
-		SELECT child_event_id FROM msc2836_relationships WHERE parent_event_id = $1
-	`); err != nil {
-		return nil, err
-	}
-	return &s, nil
-}
-
-func (s *SQLite) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
-	parent, child := parentChildEventIDs(ev)
-	if parent == "" || child == "" {
-		return nil
-	}
-	_, err := s.insertRelationStmt.ExecContext(ctx, parent, child, ev.RoomID(), ev.OriginServerTS())
-	return err
-}
-
-func (s *SQLite) ChildrenForParent(ctx context.Context, eventID string) ([]string, error) {
-	return childrenForParent(ctx, eventID, s.selectChildrenForParentStmt)
+	insertRelationStmt          *sql.Stmt
+	selectChildrenForParentStmt *sql.Stmt
 }
 
 // NewDatabase loads the database for msc2836
 func NewDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	if dbOpts.ConnectionString.IsPostgres() {
-		return NewPostgresDatabase(dbOpts)
+		return newPostgresDatabase(dbOpts)
 	}
-	return NewSQLiteDatabase(dbOpts)
+	return newSQLiteDatabase(dbOpts)
 }
 
-func parentChildEventIDs(ev *gomatrixserverlib.HeaderedEvent) (parent string, child string) {
-	if ev == nil {
-		return
+func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
+	d := DB{
+		writer: sqlutil.NewDummyWriter(),
 	}
-	body := struct {
-		Relationship struct {
-			RelType string `json:"rel_type"`
-			EventID string `json:"event_id"`
-		} `json:"m.relationship"`
-	}{}
-	if err := json.Unmarshal(ev.Content(), &body); err != nil {
-		return
+	var err error
+	if d.db, err = sqlutil.Open(dbOpts); err != nil {
+		return nil, err
 	}
-	if body.Relationship.RelType == "m.reference" && body.Relationship.EventID != "" {
-		return body.Relationship.EventID, ev.EventID()
+	_, err = d.db.Exec(`
+	CREATE TABLE IF NOT EXISTS msc2836_edges (
+		parent_event_id TEXT NOT NULL,
+		child_event_id TEXT NOT NULL,
+		rel_type TEXT NOT NULL,
+		CONSTRAINT msc2836_edges UNIQUE (parent_event_id, child_event_id, rel_type)
+	);
+	`)
+	if err != nil {
+		return nil, err
 	}
-	return
+	if d.insertRelationStmt, err = d.db.Prepare(`
+		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type) VALUES($1, $2, $3) ON CONFLICT DO NOTHING
+	`); err != nil {
+		return nil, err
+	}
+	if d.selectChildrenForParentStmt, err = d.db.Prepare(`
+		SELECT child_event_id FROM msc2836_edges WHERE parent_event_id = $1 AND rel_type = $2
+	`); err != nil {
+		return nil, err
+	}
+	return &d, err
 }
 
-func childrenForParent(ctx context.Context, eventID string, stmt *sql.Stmt) ([]string, error) {
-	rows, err := stmt.QueryContext(ctx, eventID)
+func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
+	d := DB{
+		writer: sqlutil.NewExclusiveWriter(),
+	}
+	var err error
+	if d.db, err = sqlutil.Open(dbOpts); err != nil {
+		return nil, err
+	}
+	_, err = d.db.Exec(`
+	CREATE TABLE IF NOT EXISTS msc2836_edges (
+		parent_event_id TEXT NOT NULL,
+		child_event_id TEXT NOT NULL,
+		rel_type TEXT NOT NULL,
+		UNIQUE (parent_event_id, child_event_id, rel_type)
+	);
+	`)
+	if err != nil {
+		return nil, err
+	}
+	if d.insertRelationStmt, err = d.db.Prepare(`
+		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type) VALUES($1, $2, $3) ON CONFLICT (parent_event_id, child_event_id, rel_type) DO NOTHING
+	`); err != nil {
+		return nil, err
+	}
+	if d.selectChildrenForParentStmt, err = d.db.Prepare(`
+		SELECT child_event_id FROM msc2836_edges WHERE parent_event_id = $1 AND rel_type = $2
+	`); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (p *DB) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
+	parent, child, relType := parentChildEventIDs(ev)
+	if parent == "" || child == "" {
+		return nil
+	}
+	_, err := p.insertRelationStmt.ExecContext(ctx, parent, child, relType)
+	return err
+}
+
+func (p *DB) ChildrenForParent(ctx context.Context, eventID, relType string) ([]string, error) {
+	rows, err := p.selectChildrenForParentStmt.QueryContext(ctx, eventID, relType)
 	if err != nil {
 		return nil, err
 	}
@@ -160,4 +119,23 @@ func childrenForParent(ctx context.Context, eventID string, stmt *sql.Stmt) ([]s
 		children = append(children, childID)
 	}
 	return children, nil
+}
+
+func parentChildEventIDs(ev *gomatrixserverlib.HeaderedEvent) (parent, child, relType string) {
+	if ev == nil {
+		return
+	}
+	body := struct {
+		Relationship struct {
+			RelType string `json:"rel_type"`
+			EventID string `json:"event_id"`
+		} `json:"m.relationship"`
+	}{}
+	if err := json.Unmarshal(ev.Content(), &body); err != nil {
+		return
+	}
+	if body.Relationship.EventID == "" || body.Relationship.RelType == "" {
+		return
+	}
+	return body.Relationship.EventID, ev.EventID(), body.Relationship.RelType
 }

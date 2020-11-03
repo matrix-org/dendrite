@@ -176,7 +176,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 // If include_parent: true and there is a valid m.relationship field in the event,
 // retrieve the referenced event. Apply history visibility check to that event and if it passes, add it to the response array.
 func includeParent(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, event *gomatrixserverlib.HeaderedEvent, userID string) (parent *gomatrixserverlib.HeaderedEvent) {
-	parentID, _ := parentChildEventIDs(event)
+	parentID, _, _ := parentChildEventIDs(event)
 	if parentID == "" {
 		return nil
 	}
@@ -187,7 +187,7 @@ func includeParent(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, 
 // Apply history visibility checks to all these events and add the ones which pass into the response array,
 // honouring the recent_first flag and the limit.
 func includeChildren(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, db Database, parentID string, limit int, recentFirst bool, userID string) ([]*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
-	children, err := db.ChildrenForParent(ctx, parentID)
+	children, err := db.ChildrenForParent(ctx, parentID, "m.reference")
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("failed to get ChildrenForParent")
 		resErr := jsonerror.InternalServerError()
@@ -219,6 +219,10 @@ func includeChildren(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI
 func walkThread(
 	ctx context.Context, db Database, rsAPI roomserver.RoomserverInternalAPI, userID string, req *EventRelationshipRequest, included map[string]int, limit int,
 ) ([]*gomatrixserverlib.HeaderedEvent, bool) {
+	if req.Direction != "down" {
+		util.GetLogger(ctx).Error("not implemented: direction=up")
+		return nil, false
+	}
 	var result []*gomatrixserverlib.HeaderedEvent
 	eventsToWalk := newWalker(req)
 	parent, siblingNum, current := eventsToWalk.Next()
@@ -295,22 +299,33 @@ func getEventIfVisible(ctx context.Context, rsAPI roomserver.RoomserverInternalA
 	return &event
 }
 
+// walker walks the thread DAG
 type walker interface {
+	// Next returns the next event. `current` is the event ID being walked.
+	// `parent` is the parent of `current`. `siblingNum` is the sibling number of `current`, starting
+	// from one.
 	Next() (parent string, siblingNum int, current string)
 }
 
 func newWalker(req *EventRelationshipRequest) walker {
 	if *req.DepthFirst {
-		return &depthWalker{req}
+		return &depthWalker{
+			req:     req,
+			current: req.EventID,
+		}
 	}
 	return &breadthWalker{req}
 }
 
 type depthWalker struct {
-	req *EventRelationshipRequest
+	req     *EventRelationshipRequest
+	db      Database
+	current string
 }
 
 func (w *depthWalker) Next() (parent string, siblingNum int, current string) {
+	//var events []string
+	//children, err := w.db.ChildrenForParent(w.ctx, w.current)
 	return "", 0, ""
 }
 
