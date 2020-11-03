@@ -31,6 +31,8 @@ import (
 	"github.com/matrix-org/util"
 )
 
+const constRelType = "m.reference"
+
 type EventRelationshipRequest struct {
 	EventID         string `json:"event_id"`
 	MaxDepth        int    `json:"max_depth"`
@@ -186,7 +188,7 @@ func includeParent(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, 
 // Apply history visibility checks to all these events and add the ones which pass into the response array,
 // honouring the recent_first flag and the limit.
 func includeChildren(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, db Database, parentID string, limit int, recentFirst bool, userID string) ([]*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
-	children, err := db.ChildrenForParent(ctx, parentID, "m.reference", recentFirst)
+	children, err := db.ChildrenForParent(ctx, parentID, constRelType, recentFirst)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("failed to get ChildrenForParent")
 		resErr := jsonerror.InternalServerError()
@@ -216,25 +218,29 @@ func walkThread(
 		return nil, false
 	}
 	var result []*gomatrixserverlib.HeaderedEvent
-	eventsToWalk := newWalker(req)
-	parent, siblingNum, current := eventsToWalk.Next()
-	for current != "" {
+	eventWalker := walker{
+		ctx: ctx,
+		req: req,
+		db:  db,
+	}
+	parent, current := eventWalker.Next()
+	for current.EventID != "" {
 		// If the response array is >= limit, stop.
 		if len(result) >= limit {
 			return result, true
 		}
 		// If already processed event, skip.
-		if included[current] > 0 {
+		if included[current.EventID] > 0 {
 			continue
 		}
 
 		// Check how deep the event is compared to event_id, does it exceed (greater than) max_depth? If yes, skip.
 		parentDepth := included[parent]
 		if parentDepth == 0 {
-			util.GetLogger(ctx).Errorf("parent has unknown depth; this should be impossible, parent=%s curr=%s map=%v", parent, current, included)
+			util.GetLogger(ctx).Errorf("parent has unknown depth; this should be impossible, parent=%s curr=%v map=%v", parent, current, included)
 			// set these at the max to stop walking this part of the DAG
 			included[parent] = req.MaxDepth
-			included[current] = req.MaxDepth
+			included[current.EventID] = req.MaxDepth
 			continue
 		}
 		depth := parentDepth + 1
@@ -243,16 +249,16 @@ func walkThread(
 		}
 
 		// Check what number child this event is (ordered by recent_first) compared to its parent, does it exceed (greater than) max_breadth? If yes, skip.
-		if siblingNum > req.MaxBreadth {
+		if current.SiblingNumber > req.MaxBreadth {
 			continue
 		}
 
 		// Process the event.
-		event := getEventIfVisible(ctx, rsAPI, current, userID)
+		event := getEventIfVisible(ctx, rsAPI, current.EventID, userID)
 		if event != nil {
 			result = append(result, event)
 		}
-		included[current] = depth
+		included[current.EventID] = depth
 	}
 	return result, false
 }
@@ -291,40 +297,28 @@ func getEventIfVisible(ctx context.Context, rsAPI roomserver.RoomserverInternalA
 	return &event
 }
 
-// walker walks the thread DAG
-type walker interface {
-	// Next returns the next event. `current` is the event ID being walked.
-	// `parent` is the parent of `current`. `siblingNum` is the sibling number of `current`, starting
-	// from one.
-	Next() (parent string, siblingNum int, current string)
+type walkInfo struct {
+	eventInfo
+	SiblingNumber int
 }
 
-func newWalker(req *EventRelationshipRequest) walker {
-	if *req.DepthFirst {
-		return &depthWalker{
-			req:     req,
-			current: req.EventID,
-		}
-	}
-	return &breadthWalker{req}
-}
-
-type depthWalker struct {
-	req *EventRelationshipRequest
-	//	db      Database
+type walker struct {
+	ctx     context.Context
+	req     *EventRelationshipRequest
+	db      Database
 	current string
+	//toProcess []walkInfo
 }
 
-func (w *depthWalker) Next() (parent string, siblingNum int, current string) {
+// Next returns the next event to process.
+func (w *walker) Next() (parent string, current walkInfo) {
 	//var events []string
-	//children, err := w.db.ChildrenForParent(w.ctx, w.current)
-	return "", 0, ""
-}
 
-type breadthWalker struct {
-	req *EventRelationshipRequest
-}
+	_, err := w.db.ChildrenForParent(w.ctx, w.current, constRelType, *w.req.RecentFirst)
+	if err != nil {
+		util.GetLogger(w.ctx).WithError(err).Error("Next() failed, cannot walk")
+		return
+	}
 
-func (w *breadthWalker) Next() (parent string, siblingNum int, current string) {
-	return "", 0, ""
+	return
 }
