@@ -651,6 +651,16 @@ func Setup(
 		}),
 	).Methods(http.MethodGet)
 
+	r0mux.Handle("/admin/whois/{userID}",
+		httputil.MakeAuthAPI("admin_whois", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetAdminWhois(req, userAPI, device, vars["userID"])
+		}),
+	).Methods(http.MethodGet)
+
 	r0mux.Handle("/user_directory/search",
 		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {

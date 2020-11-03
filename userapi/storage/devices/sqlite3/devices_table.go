@@ -62,7 +62,7 @@ const selectDeviceByIDSQL = "" +
 	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name FROM device_devices WHERE localpart = $1 AND device_id != $2"
+	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2"
 
 const updateDeviceNameSQL = "" +
 	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
@@ -256,8 +256,9 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 
 	for rows.Next() {
 		var dev api.Device
-		var id, displayname sql.NullString
-		err = rows.Scan(&id, &displayname)
+		var lastseents sql.NullInt64
+		var id, displayname, ip, useragent sql.NullString
+		err = rows.Scan(&id, &displayname, &lastseents, &ip, &useragent)
 		if err != nil {
 			return devices, err
 		}
@@ -267,6 +268,16 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 		if displayname.Valid {
 			dev.DisplayName = displayname.String
 		}
+		if lastseents.Valid {
+			dev.LastSeenTS = lastseents.Int64
+		}
+		if ip.Valid {
+			dev.LastSeenIP = ip.String
+		}
+		if useragent.Valid {
+			dev.UserAgent = useragent.String
+		}
+
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		devices = append(devices, dev)
 	}
