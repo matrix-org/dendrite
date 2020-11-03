@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/hooks"
@@ -187,7 +186,7 @@ func includeParent(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, 
 // Apply history visibility checks to all these events and add the ones which pass into the response array,
 // honouring the recent_first flag and the limit.
 func includeChildren(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, db Database, parentID string, limit int, recentFirst bool, userID string) ([]*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
-	children, err := db.ChildrenForParent(ctx, parentID, "m.reference")
+	children, err := db.ChildrenForParent(ctx, parentID, "m.reference", recentFirst)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("failed to get ChildrenForParent")
 		resErr := jsonerror.InternalServerError()
@@ -195,18 +194,11 @@ func includeChildren(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI
 	}
 	var childEvents []*gomatrixserverlib.HeaderedEvent
 	for _, child := range children {
-		childEvent := getEventIfVisible(ctx, rsAPI, child, userID)
+		childEvent := getEventIfVisible(ctx, rsAPI, child.EventID, userID)
 		if childEvent != nil {
 			childEvents = append(childEvents, childEvent)
 		}
 	}
-	// sort childEvents by origin_server_ts in ASC or DESC depending on recent_first
-	sort.SliceStable(childEvents, func(i, j int) bool {
-		if recentFirst {
-			return childEvents[i].OriginServerTS().Time().After(childEvents[j].OriginServerTS().Time())
-		}
-		return childEvents[i].OriginServerTS().Time().Before(childEvents[j].OriginServerTS().Time())
-	})
 	if len(childEvents) > limit {
 		return childEvents[:limit], nil
 	}
@@ -318,8 +310,8 @@ func newWalker(req *EventRelationshipRequest) walker {
 }
 
 type depthWalker struct {
-	req     *EventRelationshipRequest
-	db      Database
+	req *EventRelationshipRequest
+	//	db      Database
 	current string
 }
 
