@@ -219,7 +219,7 @@ func TestMSC2836(t *testing.T) {
 		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
 			EventID:       eventB.EventID(),
 			IncludeParent: &constTrue,
-			Limit:         1,
+			Limit:         2,
 		})
 		assertContains(t, body, []string{eventB.EventID(), eventA.EventID()})
 	})
@@ -238,6 +238,118 @@ func TestMSC2836(t *testing.T) {
 			Limit:           4,
 		})
 		assertContains(t, body, []string{eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
+	})
+	t.Run("walks the graph depth first", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:     eventB.EventID(),
+			RecentFirst: &constFalse,
+			DepthFirst:  &constTrue,
+			Limit:       6,
+		})
+		// Oldest first so:
+		//   A
+		//   |
+		//   B1
+		//  / \
+		// C2  D3
+		//    /| \
+		//  4E 6F G
+		//   |
+		//  5H
+		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventH.EventID(), eventF.EventID()})
+		body = postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:     eventB.EventID(),
+			RecentFirst: &constTrue,
+			DepthFirst:  &constTrue,
+			Limit:       6,
+		})
+		// Recent first so:
+		//   A
+		//   |
+		//   B1
+		//  / \
+		// C   D2
+		//    /| \
+		//  E5 F4 G3
+		//   |
+		//  H6
+		assertContains(t, body, []string{eventB.EventID(), eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID(), eventH.EventID()})
+	})
+	t.Run("walks the graph breadth first", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:     eventB.EventID(),
+			RecentFirst: &constFalse,
+			DepthFirst:  &constFalse,
+			Limit:       6,
+		})
+		// Oldest first so:
+		//   A
+		//   |
+		//   B1
+		//  / \
+		// C2  D3
+		//    /| \
+		//  E4 F5 G6
+		//   |
+		//   H
+		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
+		body = postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:     eventB.EventID(),
+			RecentFirst: &constTrue,
+			DepthFirst:  &constFalse,
+			Limit:       6,
+		})
+		// Recent first so:
+		//   A
+		//   |
+		//   B1
+		//  / \
+		// C3  D2
+		//    /| \
+		//  E6 F5 G4
+		//   |
+		//   H
+		assertContains(t, body, []string{eventB.EventID(), eventD.EventID(), eventC.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
+	})
+	t.Run("caps via max_breadth", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:     eventB.EventID(),
+			RecentFirst: &constFalse,
+			DepthFirst:  &constFalse,
+			MaxBreadth:  2,
+			Limit:       10,
+		})
+		// Event G gets omitted because of max_breadth
+		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventH.EventID()})
+	})
+	t.Run("caps via max_depth", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:     eventB.EventID(),
+			RecentFirst: &constFalse,
+			DepthFirst:  &constFalse,
+			MaxDepth:    2,
+			Limit:       10,
+		})
+		// Event H gets omitted because of max_depth
+		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
+	})
+	t.Run("terminates when reaching the limit", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:     eventB.EventID(),
+			RecentFirst: &constFalse,
+			DepthFirst:  &constFalse,
+			Limit:       4,
+		})
+		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID()})
+	})
+	t.Run("returns all events with a high enough limit", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
+			EventID:     eventB.EventID(),
+			RecentFirst: &constFalse,
+			DepthFirst:  &constFalse,
+			Limit:       400,
+		})
+		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID(), eventH.EventID()})
 	})
 }
 
