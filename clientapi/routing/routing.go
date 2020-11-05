@@ -709,6 +709,19 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
+	r0mux.Handle("/rooms/{roomID}/forget",
+		httputil.MakeAuthAPI("rooms_forget", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendForget(req, device, vars["roomID"], rsAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	r0mux.Handle("/devices",
 		httputil.MakeAuthAPI("get_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetDevicesByLocalpart(req, userAPI, device)

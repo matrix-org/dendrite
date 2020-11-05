@@ -258,30 +258,28 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	})
 }
 
-func (d *Database) GetMembership(
-	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
-) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
+func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
 		return err
 	})
 	if err != nil {
-		return 0, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
+		return 0, false, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
 	}
 
-	senderMembershipEventNID, senderMembership, err :=
+	senderMembershipEventNID, senderMembership, isRoomforgotten, err :=
 		d.MembershipTable.SelectMembershipFromRoomAndTarget(
 			ctx, roomNID, requestSenderUserNID,
 		)
 	if err == sql.ErrNoRows {
 		// The user has never been a member of that room
-		return 0, false, nil
+		return 0, false, false, nil
 	} else if err != nil {
 		return
 	}
 
-	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, nil
+	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, isRoomforgotten, nil
 }
 
 func (d *Database) GetMembershipEventNIDsForRoom(
@@ -990,6 +988,25 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 // GetKnownRooms returns a list of all rooms we know about.
 func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
 	return d.RoomsTable.SelectRoomIDs(ctx)
+}
+
+// ForgetRoom sets a users room to forgotten
+func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error {
+	roomNIDs, err := d.RoomsTable.BulkSelectRoomNIDs(ctx, []string{roomID})
+	if err != nil {
+		return err
+	}
+	if len(roomNIDs) > 1 {
+		return fmt.Errorf("expected one room, got %d", len(roomNIDs))
+	}
+	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
+	if err != nil {
+		return err
+	}
+
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.MembershipTable.UpdateForgetMembership(ctx, nil, roomNIDs[0], stateKeyNID, forget)
+	})
 }
 
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops

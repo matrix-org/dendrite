@@ -19,127 +19,138 @@ import (
 	"context"
 	"database/sql"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
-	"github.com/matrix-org/dendrite/roomserver/storage/tables"
+	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // A Database is used to store room events and stream offsets.
 type Database struct {
 	shared.Database
-	events         tables.Events
-	eventJSON      tables.EventJSON
-	eventTypes     tables.EventTypes
-	eventStateKeys tables.EventStateKeys
-	rooms          tables.Rooms
-	transactions   tables.Transactions
-	prevEvents     tables.PreviousEvents
-	invites        tables.Invites
-	membership     tables.Membership
-	db             *sql.DB
-	writer         sqlutil.Writer
 }
 
 // Open a sqlite database.
-// nolint: gocyclo
 func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
+	var db *sql.DB
 	var err error
-	if d.db, err = sqlutil.Open(dbProperties); err != nil {
+	if db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewExclusiveWriter()
-	//d.db.Exec("PRAGMA journal_mode=WAL;")
-	//d.db.Exec("PRAGMA read_uncommitted = true;")
+
+	//db.Exec("PRAGMA journal_mode=WAL;")
+	//db.Exec("PRAGMA read_uncommitted = true;")
 
 	// FIXME: We are leaking connections somewhere. Setting this to 2 will eventually
 	// cause the roomserver to be unresponsive to new events because something will
 	// acquire the global mutex and never unlock it because it is waiting for a connection
 	// which it will never obtain.
-	d.db.SetMaxOpenConns(20)
+	db.SetMaxOpenConns(20)
 
-	d.eventStateKeys, err = NewSqliteEventStateKeysTable(d.db)
-	if err != nil {
+	// Create tables before executing migrations so we don't fail if the table is missing,
+	// and THEN prepare statements so we don't fail due to referencing new columns
+	ms := membershipStatements{}
+	if err := ms.execSchema(db); err != nil {
 		return nil, err
 	}
-	d.eventTypes, err = NewSqliteEventTypesTable(d.db)
-	if err != nil {
+	m := sqlutil.NewMigrations()
+	deltas.LoadAddForgottenColumn(m)
+	if err := m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
-	d.eventJSON, err = NewSqliteEventJSONTable(d.db)
-	if err != nil {
+	if err := d.prepare(db, cache); err != nil {
 		return nil, err
 	}
-	d.events, err = NewSqliteEventsTable(d.db)
+
+	return &d, nil
+}
+
+// nolint: gocyclo
+func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
+	var err error
+	eventStateKeys, err := NewSqliteEventStateKeysTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	d.rooms, err = NewSqliteRoomsTable(d.db)
+	eventTypes, err := NewSqliteEventTypesTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	d.transactions, err = NewSqliteTransactionsTable(d.db)
+	eventJSON, err := NewSqliteEventJSONTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	stateBlock, err := NewSqliteStateBlockTable(d.db)
+	events, err := NewSqliteEventsTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	stateSnapshot, err := NewSqliteStateSnapshotTable(d.db)
+	rooms, err := NewSqliteRoomsTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	d.prevEvents, err = NewSqlitePrevEventsTable(d.db)
+	transactions, err := NewSqliteTransactionsTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	roomAliases, err := NewSqliteRoomAliasesTable(d.db)
+	stateBlock, err := NewSqliteStateBlockTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	d.invites, err = NewSqliteInvitesTable(d.db)
+	stateSnapshot, err := NewSqliteStateSnapshotTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	d.membership, err = NewSqliteMembershipTable(d.db)
+	prevEvents, err := NewSqlitePrevEventsTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	published, err := NewSqlitePublishedTable(d.db)
+	roomAliases, err := NewSqliteRoomAliasesTable(db)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	redactions, err := NewSqliteRedactionsTable(d.db)
+	invites, err := NewSqliteInvitesTable(db)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	membership, err := NewSqliteMembershipTable(db)
+	if err != nil {
+		return err
+	}
+	published, err := NewSqlitePublishedTable(db)
+	if err != nil {
+		return err
+	}
+	redactions, err := NewSqliteRedactionsTable(db)
+	if err != nil {
+		return err
 	}
 	d.Database = shared.Database{
-		DB:                         d.db,
+		DB:                         db,
 		Cache:                      cache,
-		Writer:                     d.writer,
-		EventsTable:                d.events,
-		EventTypesTable:            d.eventTypes,
-		EventStateKeysTable:        d.eventStateKeys,
-		EventJSONTable:             d.eventJSON,
-		RoomsTable:                 d.rooms,
-		TransactionsTable:          d.transactions,
+		Writer:                     sqlutil.NewExclusiveWriter(),
+		EventsTable:                events,
+		EventTypesTable:            eventTypes,
+		EventStateKeysTable:        eventStateKeys,
+		EventJSONTable:             eventJSON,
+		RoomsTable:                 rooms,
+		TransactionsTable:          transactions,
 		StateBlockTable:            stateBlock,
 		StateSnapshotTable:         stateSnapshot,
-		PrevEventsTable:            d.prevEvents,
+		PrevEventsTable:            prevEvents,
 		RoomAliasesTable:           roomAliases,
-		InvitesTable:               d.invites,
-		MembershipTable:            d.membership,
+		InvitesTable:               invites,
+		MembershipTable:            membership,
 		PublishedTable:             published,
 		RedactionsTable:            redactions,
 		GetLatestEventsForUpdateFn: d.GetLatestEventsForUpdate,
 	}
-	return &d, nil
+	return nil
 }
 
 func (d *Database) SupportsConcurrentRoomInputs() bool {

@@ -31,6 +31,7 @@ const (
 	RoomserverPerformLeavePath    = "/roomserver/performLeave"
 	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
 	RoomserverPerformPublishPath  = "/roomserver/performPublish"
+	RoomserverPerformForgetPath   = "/roomserver/performForget"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -491,4 +492,13 @@ func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
 
 	apiURL := h.roomserverURL + RoomserverQueryServerBannedFromRoomPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) PerformForget(ctx context.Context, req *api.PerformForgetRequest, res *api.PerformForgetResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformForget")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformForgetPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+
 }
