@@ -42,12 +42,14 @@ type Database struct {
 	profiles     profilesStatements
 	accountDatas accountDataStatements
 	threepids    threepidStatements
+	openIDTokens tokenStatements
 	serverName   gomatrixserverlib.ServerName
 
 	accountsMu     sync.Mutex
 	profilesMu     sync.Mutex
 	accountDatasMu sync.Mutex
 	threepidsMu    sync.Mutex
+	openIDsMu      sync.Mutex
 }
 
 // NewDatabase creates a new accounts and profiles database
@@ -87,6 +89,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, err
 	}
 	if err = d.threepids.prepare(db); err != nil {
+		return nil, err
+	}
+	if err = d.openIDTokens.prepare(db, serverName); err != nil {
 		return nil, err
 	}
 
@@ -377,4 +382,26 @@ func (d *Database) SearchProfiles(ctx context.Context, searchString string, limi
 // DeactivateAccount deactivates the user's account, removing all ability for the user to login again.
 func (d *Database) DeactivateAccount(ctx context.Context, localpart string) (err error) {
 	return d.accounts.deactivateAccount(ctx, localpart)
+}
+
+// CreateOpenIDToken creates a new token for the
+func (d *Database) CreateOpenIDToken(
+	ctx context.Context,
+	token, localpart string,
+	createdTS, expirationTS int64,
+	rp string,
+) error {
+	d.openIDsMu.Lock()
+	defer d.openIDsMu.Unlock()
+	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		return d.openIDTokens.insertToken(ctx, txn, token, localpart, createdTS, expirationTS, rp)
+	})
+}
+
+// GetOpenIDToken returns an OpenIDToken struct from the token string
+func (d *Database) GetOpenIDToken(
+	ctx context.Context,
+	token string,
+) (*api.OpenIDToken, error) {
+	return d.openIDTokens.selectToken(ctx, token)
 }

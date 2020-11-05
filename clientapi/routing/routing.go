@@ -661,6 +661,19 @@ func Setup(
 		}),
 	).Methods(http.MethodGet)
 
+	r0mux.Handle("/user/{userId}/openid/request_token",
+		httputil.MakeAuthAPI("openid_request_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return CreateOpenIDToken(req, userAPI, device, vars["userId"], vars["relyingParty"], cfg)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	r0mux.Handle("/user_directory/search",
 		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {

@@ -52,6 +52,8 @@ type Database interface {
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
 	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
 	DeactivateAccount(ctx context.Context, localpart string) (err error)
+	CreateOpenIDToken(ctx context.Context, token, localpart string, creationTS, expirationTS int64, rp string) (err error)
+	GetOpenIDToken(ctx context.Context, token string) (*api.OpenIDToken, error)
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

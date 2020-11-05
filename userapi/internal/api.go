@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -394,4 +395,44 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	err := a.AccountDB.DeactivateAccount(ctx, req.Localpart)
 	res.AccountDeactivated = err == nil
 	return err
+}
+
+// PerformOpenIDTokenCreation creates a new token from an optional relying party.
+func (a *UserInternalAPI) PerformOpenIDTokenCreation(ctx context.Context, req *api.PerformOpenIDTokenCreationRequest, res *api.PerformOpenIDTokenCreationResponse) error {
+	localpart, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot create OpenID token for accounts not on this sercer: got %s want %s", domain, a.ServerName)
+	}
+
+	tokenString := util.RandomString(24)
+	createdMS := time.Now().UnixNano() / int64(time.Millisecond)
+	expiresMS := createdMS + (3600 * 1000) // 60 minutes
+
+	err = a.AccountDB.CreateOpenIDToken(ctx, tokenString, localpart, createdMS, expiresMS, req.RelyingParty)
+
+	res.Token = api.OpenIDToken{
+		Token:        tokenString,
+		UserID:       userutil.MakeUserID(localpart, a.ServerName),
+		CreatedTS:    createdMS,
+		ExpiresTS:    expiresMS,
+		RelyingParty: req.RelyingParty,
+	}
+
+	return err
+}
+
+// QueryOpenIDToken returns the user information from the provided token string
+func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOpenIDTokenRequest, res *api.QueryOpenIDTokenResponse) error {
+	token, err := a.AccountDB.GetOpenIDToken(ctx, req.Token)
+	if err != nil {
+		return err
+	}
+
+	res.Token = *token
+
+	return nil
 }
