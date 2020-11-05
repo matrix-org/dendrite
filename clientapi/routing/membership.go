@@ -426,13 +426,13 @@ func SendForget(
 	}
 	if membershipRes.IsInRoom {
 		return util.JSONResponse{
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.Forbidden("user is still a member of the room"),
 		}
 	}
 	if !membershipRes.HasBeenInRoom {
 		return util.JSONResponse{
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest,
 			JSON: jsonerror.Forbidden("user did not belong to room"),
 		}
 	}
