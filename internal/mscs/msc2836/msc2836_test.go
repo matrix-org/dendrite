@@ -353,6 +353,10 @@ func TestMSC2836(t *testing.T) {
 	})
 }
 
+// TODO: TestMSC2836TerminatesLoops (short and long)
+// TODO: TestMSC2836UnknownEventsSkipped
+// TODO: TestMSC2836SkipEventIfNotInRoom
+
 func runServer(t *testing.T, router *mux.Router) func() {
 	t.Helper()
 	externalServ := &http.Server{
