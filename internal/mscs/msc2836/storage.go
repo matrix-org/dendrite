@@ -56,7 +56,7 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		parent_event_id TEXT NOT NULL,
 		child_event_id TEXT NOT NULL,
 		rel_type TEXT NOT NULL,
-		CONSTRAINT msc2836_edges UNIQUE (parent_event_id, child_event_id, rel_type)
+		CONSTRAINT msc2836_edges_uniq UNIQUE (parent_event_id, child_event_id, rel_type)
 	);
 
 	CREATE TABLE IF NOT EXISTS msc2836_nodes (
