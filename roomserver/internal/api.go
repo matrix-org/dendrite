@@ -26,6 +26,7 @@ type RoomserverInternalAPI struct {
 	*perform.Leaver
 	*perform.Publisher
 	*perform.Backfiller
+	*perform.Forgetter
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
 	Producer               sarama.SyncProducer
@@ -112,6 +113,9 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		// than trying random servers
 		PreferServers: r.PerspectiveServerNames,
 	}
+	r.Forgetter = &perform.Forgetter{
+		DB: r.DB,
+	}
 }
 
 func (r *RoomserverInternalAPI) PerformInvite(
@@ -142,4 +146,12 @@ func (r *RoomserverInternalAPI) PerformLeave(
 		return nil
 	}
 	return r.WriteOutputEvents(req.RoomID, outputEvents)
+}
+
+func (r *RoomserverInternalAPI) PerformForget(
+	ctx context.Context,
+	req *api.PerformForgetRequest,
+	resp *api.PerformForgetResponse,
+) error {
+	return r.Forgetter.PerformForget(ctx, req, resp)
 }

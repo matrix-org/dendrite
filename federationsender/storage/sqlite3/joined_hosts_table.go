@@ -53,6 +53,9 @@ const insertJoinedHostsSQL = "" +
 const deleteJoinedHostsSQL = "" +
 	"DELETE FROM federationsender_joined_hosts WHERE event_id = $1"
 
+const deleteJoinedHostsForRoomSQL = "" +
+	"DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
+
 const selectJoinedHostsSQL = "" +
 	"SELECT event_id, server_name FROM federationsender_joined_hosts" +
 	" WHERE room_id = $1"
@@ -64,11 +67,12 @@ const selectJoinedHostsForRoomsSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
 
 type joinedHostsStatements struct {
-	db                       *sql.DB
-	insertJoinedHostsStmt    *sql.Stmt
-	deleteJoinedHostsStmt    *sql.Stmt
-	selectJoinedHostsStmt    *sql.Stmt
-	selectAllJoinedHostsStmt *sql.Stmt
+	db                           *sql.DB
+	insertJoinedHostsStmt        *sql.Stmt
+	deleteJoinedHostsStmt        *sql.Stmt
+	deleteJoinedHostsForRoomStmt *sql.Stmt
+	selectJoinedHostsStmt        *sql.Stmt
+	selectAllJoinedHostsStmt     *sql.Stmt
 	// selectJoinedHostsForRoomsStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
@@ -84,6 +88,9 @@ func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error)
 		return
 	}
 	if s.deleteJoinedHostsStmt, err = db.Prepare(deleteJoinedHostsSQL); err != nil {
+		return
+	}
+	if s.deleteJoinedHostsForRoomStmt, err = s.db.Prepare(deleteJoinedHostsForRoomSQL); err != nil {
 		return
 	}
 	if s.selectJoinedHostsStmt, err = db.Prepare(selectJoinedHostsSQL); err != nil {
@@ -116,6 +123,14 @@ func (s *joinedHostsStatements) DeleteJoinedHosts(
 		}
 	}
 	return nil
+}
+
+func (s *joinedHostsStatements) DeleteJoinedHostsForRoom(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsForRoomStmt)
+	_, err := stmt.ExecContext(ctx, roomID)
+	return err
 }
 
 func (s *joinedHostsStatements) SelectJoinedHostsWithTx(

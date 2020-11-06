@@ -36,6 +36,8 @@ global:
   server_name: localhost
 
   # The path to the signing private key file, used to sign requests and events.
+  # Note that this is NOT the same private key as used for TLS! To generate a
+  # signing key, use "./bin/generate-keys --private-key matrix_key.pem".
   private_key: matrix_key.pem
 
   # The paths and expiry timestamps (as a UNIX timestamp in millisecond precision)
@@ -73,6 +75,12 @@ global:
     # mode, but means that you can run a single-process server without requiring
     # Kafka.
     use_naffka: true
+
+    # The max size a Kafka message is allowed to use.
+    # You only need to change this value, if you encounter issues with too large messages.
+    # Must be less than/equal to "max.message.bytes" configured in Kafka.
+    # Defaults to 8388608 bytes.
+    # max_message_bytes: 8388608
 
     # Naffka database options. Not required when using Kafka.
     naffka_database:

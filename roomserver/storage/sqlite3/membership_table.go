@@ -36,13 +36,15 @@ const membershipSchema = `
 		membership_nid INTEGER NOT NULL DEFAULT 1,
 		event_nid INTEGER NOT NULL DEFAULT 0,
 		target_local BOOLEAN NOT NULL DEFAULT false,
+		forgotten BOOLEAN NOT NULL DEFAULT false,
 		UNIQUE (room_nid, target_nid)
 	);
 `
 
 var selectJoinedUsersSetForRoomsSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership WHERE room_nid IN ($1) AND" +
-	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " GROUP BY target_nid"
+	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
+	" GROUP BY target_nid"
 
 // Insert a row in to membership table so that it can be locked by the
 // SELECT FOR UPDATE
@@ -52,37 +54,41 @@ const insertMembershipSQL = "" +
 	" ON CONFLICT DO NOTHING"
 
 const selectMembershipFromRoomAndTargetSQL = "" +
-	"SELECT membership_nid, event_nid FROM roomserver_membership" +
+	"SELECT membership_nid, event_nid, forgotten FROM roomserver_membership" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 const selectMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND membership_nid = $2"
+	" WHERE room_nid = $1 AND membership_nid = $2 and forgotten = false"
 
 const selectLocalMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1 AND membership_nid = $2" +
-	" AND target_local = true"
+	" AND target_local = true and forgotten = false"
 
 const selectMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1"
+	" WHERE room_nid = $1 and forgotten = false"
 
 const selectLocalMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1" +
-	" AND target_local = true"
+	" AND target_local = true and forgotten = false"
 
 const selectMembershipForUpdateSQL = "" +
 	"SELECT membership_nid FROM roomserver_membership" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 const updateMembershipSQL = "" +
-	"UPDATE roomserver_membership SET sender_nid = $1, membership_nid = $2, event_nid = $3" +
-	" WHERE room_nid = $4 AND target_nid = $5"
+	"UPDATE roomserver_membership SET sender_nid = $1, membership_nid = $2, event_nid = $3, forgotten = $4" +
+	" WHERE room_nid = $5 AND target_nid = $6"
+
+const updateMembershipForgetRoom = "" +
+	"UPDATE roomserver_membership SET forgotten = $1" +
+	" WHERE room_nid = $2 AND target_nid = $3"
 
 const selectRoomsWithMembershipSQL = "" +
-	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2"
+	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2 and forgotten = false"
 
 // selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
 // joined to. Since this information is used to populate the user directory, we will
@@ -106,15 +112,12 @@ type membershipStatements struct {
 	selectRoomsWithMembershipStmt                   *sql.Stmt
 	updateMembershipStmt                            *sql.Stmt
 	selectKnownUsersStmt                            *sql.Stmt
+	updateMembershipForgetRoomStmt                  *sql.Stmt
 }
 
 func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
 	s := &membershipStatements{
 		db: db,
-	}
-	_, err := db.Exec(membershipSchema)
-	if err != nil {
-		return nil, err
 	}
 
 	return s, shared.StatementList{
@@ -128,7 +131,13 @@ func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.updateMembershipStmt, updateMembershipSQL},
 		{&s.selectRoomsWithMembershipStmt, selectRoomsWithMembershipSQL},
 		{&s.selectKnownUsersStmt, selectKnownUsersSQL},
+		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 	}.Prepare(db)
+}
+
+func (s *membershipStatements) execSchema(db *sql.DB) error {
+	_, err := db.Exec(membershipSchema)
+	return err
 }
 
 func (s *membershipStatements) InsertMembership(
@@ -155,10 +164,10 @@ func (s *membershipStatements) SelectMembershipForUpdate(
 func (s *membershipStatements) SelectMembershipFromRoomAndTarget(
 	ctx context.Context,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
-) (eventNID types.EventNID, membership tables.MembershipState, err error) {
+) (eventNID types.EventNID, membership tables.MembershipState, forgotten bool, err error) {
 	err = s.selectMembershipFromRoomAndTargetStmt.QueryRowContext(
 		ctx, roomNID, targetUserNID,
-	).Scan(&membership, &eventNID)
+	).Scan(&membership, &eventNID, &forgotten)
 	return
 }
 
@@ -216,13 +225,12 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 
 func (s *membershipStatements) UpdateMembership(
 	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
-	senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
-	eventNID types.EventNID,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
+	eventNID types.EventNID, forgotten bool,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.updateMembershipStmt)
 	_, err := stmt.ExecContext(
-		ctx, senderUserNID, membership, eventNID, roomNID, targetUserNID,
+		ctx, senderUserNID, membership, eventNID, forgotten, roomNID, targetUserNID,
 	)
 	return err
 }
@@ -284,4 +292,15 @@ func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID type
 		result = append(result, userID)
 	}
 	return result, rows.Err()
+}
+
+func (s *membershipStatements) UpdateForgetMembership(
+	ctx context.Context,
+	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+	forget bool,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.updateMembershipForgetRoomStmt).ExecContext(
+		ctx, forget, roomNID, targetUserNID,
+	)
+	return err
 }

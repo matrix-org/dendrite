@@ -204,10 +204,12 @@ func (r *Queryer) QueryMembershipForUser(
 		return fmt.Errorf("QueryMembershipForUser: unknown room %s", request.RoomID)
 	}
 
-	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, info.RoomNID, request.UserID)
+	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.UserID)
 	if err != nil {
 		return err
 	}
+
+	response.IsRoomForgotten = isRoomforgotten
 
 	if membershipEventNID == 0 {
 		response.HasBeenInRoom = false
@@ -241,10 +243,12 @@ func (r *Queryer) QueryMembershipsForRoom(
 		return err
 	}
 
-	membershipEventNID, stillInRoom, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
+	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
 	if err != nil {
 		return err
 	}
+
+	response.IsRoomForgotten = isRoomforgotten
 
 	if membershipEventNID == 0 {
 		response.HasBeenInRoom = false
