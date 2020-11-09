@@ -82,6 +82,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if err != nil {
 		return nil, err
 	}
+	receipts, err := NewPostgresReceiptsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Writer:              d.writer,
@@ -94,6 +98,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		BackwardExtremities: backwardExtremities,
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
+		Receipts:            receipts,
 		EDUCache:            cache.New(),
 	}
 	return &d, nil

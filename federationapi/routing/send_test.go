@@ -76,6 +76,14 @@ func (p *testEDUProducer) InputSendToDeviceEvent(
 	return nil
 }
 
+func (o *testEDUProducer) InputReceiptEvent(
+	ctx context.Context,
+	request *eduAPI.InputReceiptEventRequest,
+	response *eduAPI.InputReceiptEventResponse,
+) error {
+	return nil
+}
+
 type testRoomserverAPI struct {
 	inputRoomEvents            []api.InputRoomEvent
 	queryMissingAuthPrevEvents func(*api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse

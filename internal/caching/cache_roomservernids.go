@@ -1,6 +1,8 @@
 package caching
 
 import (
+	"strconv"
+
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -83,11 +85,11 @@ func (c Caches) GetRoomServerRoomNID(roomID string) (types.RoomNID, bool) {
 
 func (c Caches) StoreRoomServerRoomNID(roomID string, roomNID types.RoomNID) {
 	c.RoomServerRoomNIDs.Set(roomID, roomNID)
-	c.RoomServerRoomIDs.Set(string(roomNID), roomID)
+	c.RoomServerRoomIDs.Set(strconv.Itoa(int(roomNID)), roomID)
 }
 
 func (c Caches) GetRoomServerRoomID(roomNID types.RoomNID) (string, bool) {
-	val, found := c.RoomServerRoomIDs.Get(string(roomNID))
+	val, found := c.RoomServerRoomIDs.Get(strconv.Itoa(int(roomNID)))
 	if found && val != nil {
 		if roomID, ok := val.(string); ok {
 			return roomID, true

@@ -34,6 +34,7 @@ import (
 type OutputEDUConsumer struct {
 	typingConsumer       *internal.ContinualConsumer
 	sendToDeviceConsumer *internal.ContinualConsumer
+	receiptConsumer      *internal.ContinualConsumer
 	db                   storage.Database
 	queues               *queue.OutgoingQueues
 	ServerName           gomatrixserverlib.ServerName
@@ -51,24 +52,31 @@ func NewOutputEDUConsumer(
 	c := &OutputEDUConsumer{
 		typingConsumer: &internal.ContinualConsumer{
 			ComponentName:  "eduserver/typing",
-			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
+			Topic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		sendToDeviceConsumer: &internal.ContinualConsumer{
 			ComponentName:  "eduserver/sendtodevice",
-			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
+			Topic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent),
+			Consumer:       kafkaConsumer,
+			PartitionStore: store,
+		},
+		receiptConsumer: &internal.ContinualConsumer{
+			ComponentName:  "eduserver/receipt",
+			Topic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		queues:            queues,
 		db:                store,
 		ServerName:        cfg.Matrix.ServerName,
-		TypingTopic:       string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
-		SendToDeviceTopic: string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
+		TypingTopic:       cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent),
+		SendToDeviceTopic: cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent),
 	}
 	c.typingConsumer.ProcessMessage = c.onTypingEvent
 	c.sendToDeviceConsumer.ProcessMessage = c.onSendToDeviceEvent
+	c.receiptConsumer.ProcessMessage = c.onReceiptEvent
 
 	return c
 }
@@ -80,6 +88,9 @@ func (t *OutputEDUConsumer) Start() error {
 	}
 	if err := t.sendToDeviceConsumer.Start(); err != nil {
 		return fmt.Errorf("t.sendToDeviceConsumer.Start: %w", err)
+	}
+	if err := t.receiptConsumer.Start(); err != nil {
+		return fmt.Errorf("t.receiptConsumer.Start: %w", err)
 	}
 	return nil
 }
@@ -172,6 +183,61 @@ func (t *OutputEDUConsumer) onTypingEvent(msg *sarama.ConsumerMessage) error {
 		"user_id": ote.Event.UserID,
 		"typing":  ote.Event.Typing,
 	}); err != nil {
+		return err
+	}
+
+	return t.queues.SendEDU(edu, t.ServerName, names)
+}
+
+// onReceiptEvent is called in response to a message received on the receipt
+// events topic from the EDU server.
+func (t *OutputEDUConsumer) onReceiptEvent(msg *sarama.ConsumerMessage) error {
+	// Extract the typing event from msg.
+	var receipt api.OutputReceiptEvent
+	if err := json.Unmarshal(msg.Value, &receipt); err != nil {
+		// Skip this msg but continue processing messages.
+		log.WithError(err).Errorf("eduserver output log: message parse failed (expected receipt)")
+		return nil
+	}
+
+	// only send receipt events which originated from us
+	_, receiptServerName, err := gomatrixserverlib.SplitID('@', receipt.UserID)
+	if err != nil {
+		log.WithError(err).WithField("user_id", receipt.UserID).Error("Failed to extract domain from receipt sender")
+		return nil
+	}
+	if receiptServerName != t.ServerName {
+		log.WithField("other_server", receiptServerName).Info("Suppressing receipt notif: originated elsewhere")
+		return nil
+	}
+
+	joined, err := t.db.GetJoinedHosts(context.TODO(), receipt.RoomID)
+	if err != nil {
+		return err
+	}
+
+	names := make([]gomatrixserverlib.ServerName, len(joined))
+	for i := range joined {
+		names[i] = joined[i].ServerName
+	}
+
+	content := map[string]api.FederationReceiptMRead{}
+	content[receipt.RoomID] = api.FederationReceiptMRead{
+		User: map[string]api.FederationReceiptData{
+			receipt.UserID: {
+				Data: api.ReceiptTS{
+					TS: receipt.Timestamp,
+				},
+				EventIDs: []string{receipt.EventID},
+			},
+		},
+	}
+
+	edu := &gomatrixserverlib.EDU{
+		Type:   gomatrixserverlib.MReceipt,
+		Origin: string(t.ServerName),
+	}
+	if edu.Content, err = json.Marshal(content); err != nil {
 		return err
 	}
 

@@ -483,6 +483,12 @@ POST rejects invalid utf-8 in JSON
 Users cannot kick users who have already left a room
 Event with an invalid signature in the send_join response should not cause room join to fail
 Inbound federation rejects typing notifications from wrong remote
+POST /rooms/:room_id/receipt can create receipts
+Receipts must be m.read
+Read receipts appear in initial v2 /sync
+New read receipts appear in incremental v2 /sync
+Outbound federation sends receipts
+Inbound federation rejects receipts from wrong remote
 Should not be able to take over the room by pretending there is no PL event
 Can get rooms/{roomId}/state for a departed room (SPEC-216)
 Users cannot set notifications powerlevel higher than their own
