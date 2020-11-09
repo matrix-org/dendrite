@@ -35,8 +35,6 @@ type SyncServerDatasource struct {
 	sqlutil.PartitionOffsetStatements
 }
 
-const createSequence = "CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;"
-
 // NewDatabase creates a new sync server database
 func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource

@@ -621,7 +621,7 @@ func (d *Database) addEDUDeltaToResponse(
 	if fromPos.EDUPosition() != toPos.EDUPosition() {
 		// add typing deltas
 		if err := d.addTypingDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
-			return fmt.Errorf("unable to apply typing delta to response: %w")
+			return fmt.Errorf("unable to apply typing delta to response: %w", err)
 		}
 	}
 
@@ -629,7 +629,7 @@ func (d *Database) addEDUDeltaToResponse(
 	if (fromPos.EDUPosition() == 0 && toPos.EDUPosition() == 0) ||
 		fromPos.EDUPosition() != toPos.EDUPosition() {
 		if err := d.addReceiptDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
-			return fmt.Errorf("unable to apply receipts to response: %w")
+			return fmt.Errorf("unable to apply receipts to response: %w", err)
 		}
 	}
 

@@ -30,6 +30,7 @@ import (
 )
 
 const receiptsSchema = `
+CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
 -- Stores data about receipts
 CREATE TABLE IF NOT EXISTS syncapi_receipts (
 	-- The ID
