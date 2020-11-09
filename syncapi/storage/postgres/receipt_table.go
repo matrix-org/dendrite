@@ -55,7 +55,7 @@ const upsertReceipt = "" +
 const selectRoomReceipts = "" +
 	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
-	" WHERE room_id in $1 AND id > $2"
+	" WHERE room_id = ANY($1) AND id > $2"
 
 type receiptStatements struct {
 	db                 *sql.DB
