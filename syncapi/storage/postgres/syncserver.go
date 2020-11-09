@@ -20,11 +20,9 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 
@@ -47,73 +45,48 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		return nil, err
 	}
 	d.writer = sqlutil.NewDummyWriter()
-
-	// Make sure the required sequence, for most tables, exists. Must be executed before anything else.
-	if _, err = d.db.Exec(createSequence); err != nil {
-		return nil, err
-	}
-
-	// Create tables before executing migrations so we don't fail if the table is missing,
-	// and THEN prepare statements so we don't fail due to referencing new columns
-	r := receiptStatements{}
-	if err = r.execSchema(d.db); err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadCreateReceiptTable(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
-		return nil, err
-	}
-	if err = d.prepare(); err != nil {
-		return nil, err
-	}
-
-	return &d, nil
-}
-
-func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
-		return err
+		return nil, err
 	}
 	accountData, err := NewPostgresAccountDataTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	events, err := NewPostgresEventsTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	currState, err := NewPostgresCurrentRoomStateTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	invites, err := NewPostgresInvitesTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	peeks, err := NewPostgresPeeksTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	topology, err := NewPostgresTopologyTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	backwardExtremities, err := NewPostgresBackwardsExtremitiesTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sendToDevice, err := NewPostgresSendToDeviceTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	filter, err := NewPostgresFilterTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	receipts, err := NewPostgresReceiptsTable(d.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	d.Database = shared.Database{
 		DB:                  d.db,
@@ -130,5 +103,5 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		Receipts:            receipts,
 		EDUCache:            cache.New(),
 	}
-	return nil
+	return &d, nil
 }
