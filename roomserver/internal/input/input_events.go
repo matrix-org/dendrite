@@ -77,6 +77,12 @@ func (r *Inputer) processRoomEvent(
 		isRejected = true
 	}
 
+	var isPLRejected bool
+	var isPLRejectedErr error
+	if event.Type() == gomatrixserverlib.MRoomPowerLevels {
+		isPLRejected, isPLRejectedErr = r.checkPowerLevels(ctx, event)
+	}
+
 	var softfail bool
 	if input.Kind == api.KindNew {
 		// Check that the event passes authentication checks based on the
@@ -149,7 +155,10 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
-	if isRejected || softfail {
+	if isRejected || isPLRejected || softfail {
+		if rejectionErr == nil {
+			rejectionErr = isPLRejectedErr
+		}
 		logrus.WithFields(logrus.Fields{
 			"event_id":  event.EventID(),
 			"type":      event.Type(),
@@ -208,6 +217,34 @@ func (r *Inputer) processRoomEvent(
 
 	// Update the extremities of the event graph for the room
 	return event.EventID(), nil
+}
+
+func (r *Inputer) checkPowerLevels(
+	ctx context.Context, event gomatrixserverlib.Event,
+) (isRejected bool, err error) {
+	req := &api.QueryLatestEventsAndStateRequest{RoomID: event.RoomID()}
+	resp := &api.QueryLatestEventsAndStateResponse{}
+	if err := helpers.QueryLatestEventsAndState(ctx, r.DB, req, resp); err != nil {
+		logrus.WithError(err).Error("helpers.QueryLatestEventsAndState failed to get latest events and state")
+		return true, err
+	}
+	var creator string
+	for _, v := range resp.StateEvents {
+		if v.Type() == gomatrixserverlib.MRoomCreate {
+			creator = v.Sender()
+			break
+		}
+	}
+	if event.Sender() != creator && r.ServerName != event.Origin() {
+		logrus.WithFields(logrus.Fields{
+			"event_id":   event.EventID(),
+			"origin":     event.Origin(),
+			"servername": r.ServerName,
+		}).Error("remote server is not allowed to set powerlevels, rejecting event")
+
+		return true, &gomatrixserverlib.NotAllowed{Message: "remote server is not allowed to set powerlevels"}
+	}
+	return false, nil
 }
 
 func (r *Inputer) calculateAndSetState(
