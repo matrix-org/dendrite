@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"net/http"
 	"sync"
 
@@ -80,6 +81,12 @@ func SendEvent(
 		return *resErr
 	}
 
+	if e.Type() == gomatrixserverlib.MRoomPowerLevels {
+		if ok, plErr := checkPowerLevels(req.Context(), roomID, rsAPI, e); !ok {
+			return *plErr
+		}
+	}
+
 	var txnAndSessionID *api.TransactionID
 	if txnID != nil {
 		txnAndSessionID = &api.TransactionID{
@@ -118,6 +125,46 @@ func SendEvent(
 	}
 
 	return res
+}
+
+func checkPowerLevels(
+	ctx context.Context,
+	roomID string,
+	rsAPI api.RoomserverInternalAPI,
+	event *gomatrixserverlib.Event,
+) (ok bool, response *util.JSONResponse) {
+	req := api.QueryLatestEventsAndStateRequest{RoomID: roomID}
+	res := api.QueryLatestEventsAndStateResponse{}
+	if err := rsAPI.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
+		return false, &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: err.Error(),
+		}
+	}
+
+	var creator string
+	for _, v := range res.StateEvents {
+		pl, _ := v.PowerLevels() // we only care about the existence of power levels, so ignore any errors
+		if pl != nil {
+			return true, nil
+		}
+		if v.Type() == gomatrixserverlib.MRoomCreate {
+			creator = v.Sender()
+		}
+	}
+
+	if creator != "" && event.Sender() != creator {
+		logrus.WithFields(logrus.Fields{
+			"creator": creator,
+			"sender":  event.Sender(),
+		}).Warnf("rejecting request to set initial powerlevel, no powerlevels defined and sender != creator")
+		return false, &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("non room creator is not allowed to set initial powerlevels"),
+		}
+	}
+
+	return true, nil
 }
 
 func generateSendEvent(
