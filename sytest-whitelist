@@ -496,3 +496,5 @@ Forgotten room messages cannot be paginated
 Forgetting room does not show up in v2 /sync
 Can forget room you've been kicked from
 Can re-join room if re-invited
+Remote servers should reject attempts by non-creators to set the power levels
+Remote servers cannot set power levels in rooms without existing powerlevels
