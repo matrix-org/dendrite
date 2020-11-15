@@ -80,7 +80,6 @@ test rig with around 900 tests. The script works out how many of these tests are
 updates with CI. As of October 2020 we're at around 57% CS API coverage and 81% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
 servers such as matrix.org reasonably well. There's a long list of features that are not implemented, notably:
- - Receipts
  - Push
  - Search and Context
  - User Directory
@@ -100,6 +99,7 @@ This means Dendrite supports amongst others:
  - Redaction
  - Tagging
  - E2E keys and device lists
+ - Receipts
 
 
 ## Contributing
