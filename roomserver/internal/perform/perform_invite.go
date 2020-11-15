@@ -17,6 +17,7 @@ package perform
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -158,6 +159,12 @@ func (r *Inviter) PerformInvite(
 					Msg:  err.Error(),
 					Code: api.PerformErrorNotAllowed,
 				}
+
+				if strings.Contains(err.Error(), "value is outside of safe range") {
+					log.Debug("setting error to PerformErrCanonicalJSON")
+					res.Error.Code = api.PerformErrCanonicalJSON
+				}
+
 				log.WithError(err).WithField("event_id", event.EventID()).Error("r.FSAPI.PerformInvite failed")
 				return nil, nil
 			}

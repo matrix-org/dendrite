@@ -56,6 +56,11 @@ func (p *PerformError) JSONResponse() util.JSONResponse {
 			// TODO: Should we assert this is in fact JSON? E.g gjson parse?
 			JSON: json.RawMessage(p.Msg),
 		}
+	case PerformErrCanonicalJSON:
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(p.Msg),
+		}
 	default:
 		return util.ErrorResponse(p)
 	}
@@ -72,6 +77,8 @@ const (
 	PerformErrorNoOperation PerformErrorCode = 4
 	// PerformErrRemote means that the request failed and the PerformError.Msg is the raw remote JSON error response
 	PerformErrRemote PerformErrorCode = 5
+	// PerformErrCanonicalJSON means that the request failed due to invalid json
+	PerformErrCanonicalJSON PerformErrorCode = 6
 )
 
 type PerformJoinRequest struct {
