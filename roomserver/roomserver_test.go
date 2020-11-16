@@ -94,7 +94,7 @@ type fledglingEvent struct {
 	RoomID   string
 }
 
-func mustCreateEvents(t *testing.T, roomVer gomatrixserverlib.RoomVersion, events []fledglingEvent) (result []gomatrixserverlib.HeaderedEvent) {
+func mustCreateEvents(t *testing.T, roomVer gomatrixserverlib.RoomVersion, events []fledglingEvent) (result []*gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
 	depth := int64(1)
 	seed := make([]byte, ed25519.SeedSize) // zero seed
@@ -143,16 +143,15 @@ func mustCreateEvents(t *testing.T, roomVer gomatrixserverlib.RoomVersion, event
 	return
 }
 
-func mustLoadRawEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) []gomatrixserverlib.HeaderedEvent {
+func mustLoadRawEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) []*gomatrixserverlib.HeaderedEvent {
 	t.Helper()
-	hs := make([]gomatrixserverlib.HeaderedEvent, len(events))
+	hs := make([]*gomatrixserverlib.HeaderedEvent, len(events))
 	for i := range events {
 		e, err := gomatrixserverlib.NewEventFromTrustedJSON(events[i], false, ver)
 		if err != nil {
 			t.Fatalf("cannot load test data: " + err.Error())
 		}
-		h := e.Headered(ver)
-		hs[i] = h
+		hs[i] = e.Headered(ver)
 	}
 	return hs
 }
@@ -187,7 +186,7 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	), dp
 }
 
-func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) (api.RoomserverInternalAPI, *dummyProducer, []gomatrixserverlib.HeaderedEvent) {
+func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) (api.RoomserverInternalAPI, *dummyProducer, []*gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
 	rsAPI, dp := mustCreateRoomserverAPI(t)
 	hevents := mustLoadRawEvents(t, ver, events)

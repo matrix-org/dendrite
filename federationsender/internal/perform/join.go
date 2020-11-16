@@ -26,20 +26,20 @@ func JoinContext(f *gomatrixserverlib.FederationClient, k *gomatrixserverlib.Key
 // and that the join is allowed by the supplied state.
 func (r joinContext) CheckSendJoinResponse(
 	ctx context.Context,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 	server gomatrixserverlib.ServerName,
 	respMakeJoin gomatrixserverlib.RespMakeJoin,
 	respSendJoin gomatrixserverlib.RespSendJoin,
 ) (*gomatrixserverlib.RespState, error) {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
-	retries := map[string][]gomatrixserverlib.Event{}
+	retries := map[string][]*gomatrixserverlib.Event{}
 
 	// Define a function which we can pass to Check to retrieve missing
 	// auth events inline. This greatly increases our chances of not having
 	// to repeat the entire set of checks just for a missing event or two.
-	missingAuth := func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.Event, error) {
-		returning := []gomatrixserverlib.Event{}
+	missingAuth := func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
+		returning := []*gomatrixserverlib.Event{}
 
 		// See if we have retry entries for each of the supplied event IDs.
 		for _, eventID := range eventIDs {
@@ -75,7 +75,7 @@ func (r joinContext) CheckSendJoinResponse(
 				}
 
 				// Check the signatures of the event.
-				if res, err := gomatrixserverlib.VerifyEventSignatures(ctx, []gomatrixserverlib.Event{ev}, r.keyRing); err != nil {
+				if res, err := gomatrixserverlib.VerifyEventSignatures(ctx, []*gomatrixserverlib.Event{ev}, r.keyRing); err != nil {
 					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
 				} else {
 					for _, err := range res {

@@ -388,7 +388,7 @@ func (d *Database) GetLatestEventsForUpdate(
 
 // nolint:gocyclo
 func (d *Database) StoreEvent(
-	ctx context.Context, event gomatrixserverlib.Event,
+	ctx context.Context, event *gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID, isRejected bool,
 ) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
 	var (
@@ -611,7 +611,7 @@ func (d *Database) assignStateKeyNID(
 	return eventStateKeyNID, err
 }
 
-func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
+func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 	gomatrixserverlib.RoomVersion, error,
 ) {
 	var err error
@@ -651,7 +651,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 // Returns the redaction event and the event ID of the redacted event if this call resulted in a redaction.
 // nolint:gocyclo
 func (d *Database) handleRedactions(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event *gomatrixserverlib.Event,
 ) (*gomatrixserverlib.Event, string, error) {
 	var err error
 	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
@@ -703,12 +703,12 @@ func (d *Database) handleRedactions(
 		err = fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
 	}
 
-	return &redactionEvent.Event, redactedEvent.EventID(), err
+	return redactionEvent.Event, redactedEvent.EventID(), err
 }
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.
 func (d *Database) loadRedactionPair(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event *gomatrixserverlib.Event,
 ) (*types.Event, *types.Event, bool, error) {
 	var redactionEvent, redactedEvent *types.Event
 	var info *tables.RedactionInfo
@@ -814,8 +814,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			if err != nil {
 				return nil, err
 			}
-			h := ev.Headered(roomInfo.RoomVersion)
-			return &h, nil
+			return ev.Headered(roomInfo.RoomVersion), nil
 		}
 	}
 
@@ -934,12 +933,11 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 		if err != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event NID %v : %w", events[i].EventNID, err)
 		}
-		hev := ev.Headered(roomVer)
 		result[i] = tables.StrippedEvent{
 			EventType:    ev.Type(),
 			RoomID:       ev.RoomID(),
 			StateKey:     *ev.StateKey(),
-			ContentValue: tables.ExtractContentValue(&hev),
+			ContentValue: tables.ExtractContentValue(ev.Headered(roomVer)),
 		}
 	}
 
