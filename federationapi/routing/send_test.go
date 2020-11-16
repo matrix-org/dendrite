@@ -76,12 +76,24 @@ func (p *testEDUProducer) InputSendToDeviceEvent(
 	return nil
 }
 
+func (o *testEDUProducer) InputReceiptEvent(
+	ctx context.Context,
+	request *eduAPI.InputReceiptEventRequest,
+	response *eduAPI.InputReceiptEventResponse,
+) error {
+	return nil
+}
+
 type testRoomserverAPI struct {
 	inputRoomEvents            []api.InputRoomEvent
 	queryMissingAuthPrevEvents func(*api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse
 	queryStateAfterEvents      func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse
 	queryEventsByID            func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse
 	queryLatestEventsAndState  func(*api.QueryLatestEventsAndStateRequest) api.QueryLatestEventsAndStateResponse
+}
+
+func (t *testRoomserverAPI) PerformForget(ctx context.Context, req *api.PerformForgetRequest, resp *api.PerformForgetResponse) error {
+	return nil
 }
 
 func (t *testRoomserverAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {}

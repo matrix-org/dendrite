@@ -18,6 +18,8 @@ import (
 	"context"
 	"time"
 
+	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
+
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -147,4 +149,8 @@ type Database interface {
 	PutFilter(ctx context.Context, localpart string, filter *gomatrixserverlib.Filter) (string, error)
 	// RedactEvent wipes an event in the database and sets the unsigned.redacted_because key to the redaction event
 	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error
+	// StoreReceipt stores new receipt events
+	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
+	// GetRoomReceipts gets all receipts for a given roomID
+	GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error)
 }

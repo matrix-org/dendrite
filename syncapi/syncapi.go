@@ -99,5 +99,12 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
+	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
+		cfg, consumer, notifier, syncDB,
+	)
+	if err = receiptConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start receipts consumer")
+	}
+
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
 }

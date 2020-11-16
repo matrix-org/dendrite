@@ -322,10 +322,67 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			}
 		case gomatrixserverlib.MDeviceListUpdate:
 			t.processDeviceListUpdate(ctx, e)
+		case gomatrixserverlib.MReceipt:
+			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
+			payload := map[string]eduserverAPI.FederationReceiptMRead{}
+
+			if err := json.Unmarshal(e.Content, &payload); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal receipt event")
+				continue
+			}
+
+			for roomID, receipt := range payload {
+				for userID, mread := range receipt.User {
+					_, domain, err := gomatrixserverlib.SplitID('@', userID)
+					if err != nil {
+						util.GetLogger(ctx).WithError(err).Error("Failed to split domain from receipt event sender")
+						continue
+					}
+					if t.Origin != domain {
+						util.GetLogger(ctx).Warnf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
+						continue
+					}
+					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
+						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+							"sender":  t.Origin,
+							"user_id": userID,
+							"room_id": roomID,
+							"events":  mread.EventIDs,
+						}).Error("Failed to send receipt event to edu server")
+						continue
+					}
+				}
+			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}
 	}
+}
+
+// processReceiptEvent sends receipt events to the edu server
+func (t *txnReq) processReceiptEvent(ctx context.Context,
+	userID, roomID, receiptType string,
+	timestamp gomatrixserverlib.Timestamp,
+	eventIDs []string,
+) error {
+	// store every event
+	for _, eventID := range eventIDs {
+		req := eduserverAPI.InputReceiptEventRequest{
+			InputReceiptEvent: eduserverAPI.InputReceiptEvent{
+				UserID:    userID,
+				RoomID:    roomID,
+				EventID:   eventID,
+				Type:      receiptType,
+				Timestamp: timestamp,
+			},
+		}
+		resp := eduserverAPI.InputReceiptEventResponse{}
+		if err := t.eduAPI.InputReceiptEvent(ctx, &req, &resp); err != nil {
+			return fmt.Errorf("unable to set receipt event: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverlib.EDU) {
