@@ -1,4 +1,4 @@
-#!/bin/bash -eu
+#!/bin/sh -eu
 
 # Put installed packages into ./bin
 export GOBIN=$PWD/`dirname $0`/bin
@@ -7,7 +7,7 @@ if [ -d ".git" ]
 then
     export BUILD=`git rev-parse --short HEAD || ""`
     export BRANCH=`(git symbolic-ref --short HEAD | tr -d \/ ) || ""`
-    if [[ $BRANCH == "master" ]]
+    if [ "$BRANCH" = master ]
     then
         export BRANCH=""
     fi
