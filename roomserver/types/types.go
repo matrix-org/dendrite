@@ -126,7 +126,7 @@ type StateAtEventAndReference struct {
 // It is when performing bulk event lookup in the database.
 type Event struct {
 	EventNID EventNID
-	gomatrixserverlib.Event
+	*gomatrixserverlib.Event
 }
 
 const (

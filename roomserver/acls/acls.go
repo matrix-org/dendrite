@@ -61,7 +61,7 @@ func NewServerACLs(db ServerACLDatabase) *ServerACLs {
 			continue
 		}
 		if state != nil {
-			acls.OnServerACLUpdate(&state.Event)
+			acls.OnServerACLUpdate(state.Event)
 		}
 	}
 	return acls

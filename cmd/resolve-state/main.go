@@ -82,7 +82,7 @@ func main() {
 	authEventIDMap := make(map[string]struct{})
 	eventPtrs := make([]*gomatrixserverlib.Event, len(eventEntries))
 	for i := range eventEntries {
-		eventPtrs[i] = &eventEntries[i].Event
+		eventPtrs[i] = eventEntries[i].Event
 		for _, authEventID := range eventEntries[i].AuthEventIDs() {
 			authEventIDMap[authEventID] = struct{}{}
 		}
@@ -101,16 +101,16 @@ func main() {
 
 	authEventPtrs := make([]*gomatrixserverlib.Event, len(authEventEntries))
 	for i := range authEventEntries {
-		authEventPtrs[i] = &authEventEntries[i].Event
+		authEventPtrs[i] = authEventEntries[i].Event
 	}
 
-	events := make([]gomatrixserverlib.Event, len(eventEntries))
-	authEvents := make([]gomatrixserverlib.Event, len(authEventEntries))
+	events := make([]*gomatrixserverlib.Event, len(eventEntries))
+	authEvents := make([]*gomatrixserverlib.Event, len(authEventEntries))
 	for i, ptr := range eventPtrs {
-		events[i] = *ptr
+		events[i] = ptr
 	}
 	for i, ptr := range authEventPtrs {
-		authEvents[i] = *ptr
+		authEvents[i] = ptr
 	}
 
 	fmt.Println("Resolving state")

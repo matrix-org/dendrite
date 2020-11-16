@@ -267,7 +267,7 @@ func OnIncomingStateTypeRequest(
 		// to find the state event, if provided.
 		for _, ev := range stateRes.StateEvents {
 			if ev.Type() == evType && ev.StateKeyEquals(stateKey) {
-				event = &ev
+				event = ev
 				break
 			}
 		}
@@ -290,7 +290,7 @@ func OnIncomingStateTypeRequest(
 			return jsonerror.InternalServerError()
 		}
 		if len(stateAfterRes.StateEvents) > 0 {
-			event = &stateAfterRes.StateEvents[0]
+			event = stateAfterRes.StateEvents[0]
 		}
 	}
 
@@ -304,7 +304,7 @@ func OnIncomingStateTypeRequest(
 	}
 
 	stateEvent := stateEventInStateResp{
-		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(*event, gomatrixserverlib.FormatAll),
+		ClientEvent: gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll),
 	}
 
 	var res interface{}

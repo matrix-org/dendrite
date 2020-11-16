@@ -416,7 +416,7 @@ func (r *Queryer) QueryMissingEvents(
 		return err
 	}
 
-	response.Events = make([]gomatrixserverlib.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
+	response.Events = make([]*gomatrixserverlib.HeaderedEvent, 0, len(loadedEvents)-len(eventsToFilter))
 	for _, event := range loadedEvents {
 		if !eventsToFilter[event.EventID()] {
 			roomVersion, verr := r.roomVersion(event.RoomID())
@@ -485,7 +485,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	return err
 }
 
-func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomInfo, eventIDs []string) ([]gomatrixserverlib.Event, error) {
+func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
@@ -516,13 +516,13 @@ type eventsFromIDs func(context.Context, []string) ([]types.Event, error)
 // given events. Will *not* error if we don't have all auth events.
 func getAuthChain(
 	ctx context.Context, fn eventsFromIDs, authEventIDs []string,
-) ([]gomatrixserverlib.Event, error) {
+) ([]*gomatrixserverlib.Event, error) {
 	// List of event IDs to fetch. On each pass, these events will be requested
 	// from the database and the `eventsToFetch` will be updated with any new
 	// events that we have learned about and need to find. When `eventsToFetch`
 	// is eventually empty, we should have reached the end of the chain.
 	eventsToFetch := authEventIDs
-	authEventsMap := make(map[string]gomatrixserverlib.Event)
+	authEventsMap := make(map[string]*gomatrixserverlib.Event)
 
 	for len(eventsToFetch) > 0 {
 		// Try to retrieve the events from the database.
@@ -553,7 +553,7 @@ func getAuthChain(
 
 	// We've now retrieved all of the events we can. Flatten them down into an
 	// array and return them.
-	var authEvents []gomatrixserverlib.Event
+	var authEvents []*gomatrixserverlib.Event
 	for _, event := range authEventsMap {
 		authEvents = append(authEvents, event)
 	}

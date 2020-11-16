@@ -32,7 +32,7 @@ type getEventRequest struct {
 	eventID        string
 	cfg            *config.ClientAPI
 	federation     *gomatrixserverlib.FederationClient
-	requestedEvent gomatrixserverlib.Event
+	requestedEvent *gomatrixserverlib.Event
 }
 
 // GetEvent implements GET /_matrix/client/r0/rooms/{roomId}/event/{eventId}

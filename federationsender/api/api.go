@@ -118,12 +118,12 @@ type PerformLeaveResponse struct {
 
 type PerformInviteRequest struct {
 	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
-	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
+	Event           *gomatrixserverlib.HeaderedEvent          `json:"event"`
 	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
 }
 
 type PerformInviteResponse struct {
-	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 type PerformServersAliveRequest struct {

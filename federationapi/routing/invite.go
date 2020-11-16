@@ -97,7 +97,7 @@ func InviteV1(
 func processInvite(
 	ctx context.Context,
 	isInviteV2 bool,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 	roomVer gomatrixserverlib.RoomVersion,
 	strippedState []gomatrixserverlib.InviteV2StrippedState,
 	roomID string,
@@ -171,12 +171,12 @@ func processInvite(
 		if isInviteV2 {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
+				JSON: gomatrixserverlib.RespInviteV2{Event: &signedEvent},
 			}
 		} else {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: gomatrixserverlib.RespInvite{Event: signedEvent},
+				JSON: gomatrixserverlib.RespInvite{Event: &signedEvent},
 			}
 		}
 	default:

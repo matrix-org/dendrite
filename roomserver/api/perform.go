@@ -98,7 +98,7 @@ type PerformLeaveResponse struct {
 
 type PerformInviteRequest struct {
 	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
-	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
+	Event           *gomatrixserverlib.HeaderedEvent          `json:"event"`
 	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
 	SendAsServer    string                                    `json:"send_as_server"`
 	TransactionID   *TransactionID                            `json:"transaction_id"`
@@ -147,7 +147,7 @@ func (r *PerformBackfillRequest) PrevEventIDs() []string {
 // PerformBackfillResponse is a response to PerformBackfill.
 type PerformBackfillResponse struct {
 	// Missing events, arbritrary order.
-	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
+	Events []*gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
 type PerformPublishRequest struct {
