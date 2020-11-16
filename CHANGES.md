@@ -1,5 +1,21 @@
 # Changelog
 
+## Dendrite 0.3.0 (2020-11-16)
+
+### Features
+
+* Read receipts (both inbound and outbound) are now supported
+* Forgetting rooms is now supported
+* The `-version` command line flag has been added
+
+### Fixes
+
+* User accounts that contain the `=` character can now be registered
+* Backfilling should now work properly on rooms with world-readable history visibility
+* The `gjson` dependency has been updated for correct JSON integer ranges
+* Some more client event fields have been marked as omit-when-empty
+* The `build.sh` script has been updated to work properly on all POSIX platforms
+
 ## Dendrite 0.2.1 (2020-10-22)
 
 ### Fixes

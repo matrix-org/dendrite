@@ -77,7 +77,7 @@ Then point your favourite Matrix client at `http://localhost:8008` or `https://l
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of October 2020 we're at around 57% CS API coverage and 81% Federation coverage, though check
+updates with CI. As of November 2020 we're at around 58% CS API coverage and 83% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
 servers such as matrix.org reasonably well. There's a long list of features that are not implemented, notably:
  - Push
