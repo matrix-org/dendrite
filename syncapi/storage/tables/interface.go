@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 
+	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -155,4 +156,9 @@ type SendToDevice interface {
 type Filter interface {
 	SelectFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
 	InsertFilter(ctx context.Context, filter *gomatrixserverlib.Filter, localpart string) (filterID string, err error)
+}
+
+type Receipts interface {
+	UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
+	SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error)
 }

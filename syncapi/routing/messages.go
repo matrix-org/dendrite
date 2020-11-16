@@ -59,6 +59,7 @@ const defaultMessagesLimit = 10
 // OnIncomingMessagesRequest implements the /messages endpoint from the
 // client-server API.
 // See: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-client-r0-rooms-roomid-messages
+// nolint:gocyclo
 func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string, device *userapi.Device,
 	federation *gomatrixserverlib.FederationClient,
@@ -66,6 +67,19 @@ func OnIncomingMessagesRequest(
 	cfg *config.SyncAPI,
 ) util.JSONResponse {
 	var err error
+
+	// check if the user has already forgotten about this room
+	isForgotten, err := checkIsRoomForgotten(req.Context(), roomID, device.UserID, rsAPI)
+	if err != nil {
+		return jsonerror.InternalServerError()
+	}
+
+	if isForgotten {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user already forgot about this room"),
+		}
+	}
 
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
@@ -180,6 +194,19 @@ func OnIncomingMessagesRequest(
 			End:   end.String(),
 		},
 	}
+}
+
+func checkIsRoomForgotten(ctx context.Context, roomID, userID string, rsAPI api.RoomserverInternalAPI) (bool, error) {
+	req := api.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: userID,
+	}
+	resp := api.QueryMembershipForUserResponse{}
+	if err := rsAPI.QueryMembershipForUser(ctx, &req, &resp); err != nil {
+		return false, err
+	}
+
+	return resp.IsRoomForgotten, nil
 }
 
 // retrieveEvents retrieves events from the local database for a request on

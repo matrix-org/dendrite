@@ -149,6 +149,16 @@ func (n *Notifier) OnNewSendToDevice(
 	n.wakeupUserDevice(userID, deviceIDs, latestPos)
 }
 
+// OnNewReceipt updates the current position
+func (n *Notifier) OnNewReceipt(
+	posUpdate types.StreamingToken,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+	latestPos := n.currPos.WithUpdates(posUpdate)
+	n.currPos = latestPos
+}
+
 func (n *Notifier) OnNewKeyChange(
 	posUpdate types.StreamingToken, wakeUserID, keyChangeUserID string,
 ) {

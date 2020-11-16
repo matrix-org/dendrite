@@ -49,8 +49,9 @@ func NewInternalAPI(
 		Cache:                        eduCache,
 		UserAPI:                      userAPI,
 		Producer:                     producer,
-		OutputTypingEventTopic:       string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
-		OutputSendToDeviceEventTopic: string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
+		OutputTypingEventTopic:       cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent),
+		OutputSendToDeviceEventTopic: cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent),
+		OutputReceiptEventTopic:      cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
 		ServerName:                   cfg.Matrix.ServerName,
 	}
 }
