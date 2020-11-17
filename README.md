@@ -18,7 +18,7 @@ As of October 2020, Dendrite has now entered **beta** which means:
 This does not mean:
  - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
  - All of the CS/Federation APIs are implemented. We are tracking progress via a script called 'Are We Synapse Yet?'. In particular,
-   read receipts, presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
+   presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
  - Dendrite is ready for massive homeserver deployments. You cannot shard each microservice, only run each one on a different machine.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
