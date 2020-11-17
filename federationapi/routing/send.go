@@ -1096,7 +1096,7 @@ func (t *txnReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib.RespStat
 	respState := gomatrixserverlib.RespState{}
 
 	t.haveEventsMutex.RLock()
-	t.haveEventsMutex.RUnlock()
+	defer t.haveEventsMutex.RUnlock()
 
 	for i := range stateIDs.StateEventIDs {
 		ev, ok := t.haveEvents[stateIDs.StateEventIDs[i]]
