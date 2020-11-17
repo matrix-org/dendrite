@@ -522,7 +522,7 @@ func init() {
 // Returns a numeric ID for the snapshot of the state before the event.
 func (v StateResolution) CalculateAndStoreStateBeforeEvent(
 	ctx context.Context,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 	isRejected bool,
 ) (types.StateSnapshotNID, error) {
 	// Load the state at the prev events.
@@ -689,17 +689,17 @@ func (v StateResolution) calculateStateAfterManyEvents(
 // TODO: Some of this can possibly be deduplicated
 func ResolveConflictsAdhoc(
 	version gomatrixserverlib.RoomVersion,
-	events []gomatrixserverlib.Event,
-	authEvents []gomatrixserverlib.Event,
-) ([]gomatrixserverlib.Event, error) {
+	events []*gomatrixserverlib.Event,
+	authEvents []*gomatrixserverlib.Event,
+) ([]*gomatrixserverlib.Event, error) {
 	type stateKeyTuple struct {
 		Type     string
 		StateKey string
 	}
 
 	// Prepare our data structures.
-	eventMap := make(map[stateKeyTuple][]gomatrixserverlib.Event)
-	var conflicted, notConflicted, resolved []gomatrixserverlib.Event
+	eventMap := make(map[stateKeyTuple][]*gomatrixserverlib.Event)
+	var conflicted, notConflicted, resolved []*gomatrixserverlib.Event
 
 	// Run through all of the events that we were given and sort them
 	// into a map, sorted by (event_type, state_key) tuple. This means
@@ -868,15 +868,15 @@ func (v StateResolution) resolveConflictsV2(
 
 	// For each conflicted event, we will add a new set of auth events. Auth
 	// events may be duplicated across these sets but that's OK.
-	authSets := make(map[string][]gomatrixserverlib.Event)
-	var authEvents []gomatrixserverlib.Event
-	var authDifference []gomatrixserverlib.Event
+	authSets := make(map[string][]*gomatrixserverlib.Event)
+	var authEvents []*gomatrixserverlib.Event
+	var authDifference []*gomatrixserverlib.Event
 
 	// For each conflicted event, let's try and get the needed auth events.
 	for _, conflictedEvent := range conflictedEvents {
 		// Work out which auth events we need to load.
 		key := conflictedEvent.EventID()
-		needed := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{conflictedEvent})
+		needed := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{conflictedEvent})
 
 		// Find the numeric IDs for the necessary state keys.
 		var neededStateKeys []string
@@ -909,7 +909,7 @@ func (v StateResolution) resolveConflictsV2(
 
 	// This function helps us to work out whether an event exists in one of the
 	// auth sets.
-	isInAuthList := func(k string, event gomatrixserverlib.Event) bool {
+	isInAuthList := func(k string, event *gomatrixserverlib.Event) bool {
 		for _, e := range authSets[k] {
 			if e.EventID() == event.EventID() {
 				return true
@@ -919,7 +919,7 @@ func (v StateResolution) resolveConflictsV2(
 	}
 
 	// This function works out if an event exists in all of the auth sets.
-	isInAllAuthLists := func(event gomatrixserverlib.Event) bool {
+	isInAllAuthLists := func(event *gomatrixserverlib.Event) bool {
 		found := true
 		for k := range authSets {
 			found = found && isInAuthList(k, event)
@@ -1006,7 +1006,7 @@ func (v StateResolution) stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.Ev
 // Returns an error if there was a problem talking to the database.
 func (v StateResolution) loadStateEvents(
 	ctx context.Context, entries []types.StateEntry,
-) ([]gomatrixserverlib.Event, map[string]types.StateEntry, error) {
+) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
 	eventNIDs := make([]types.EventNID, len(entries))
 	for i := range entries {
 		eventNIDs[i] = entries[i].EventNID
@@ -1016,7 +1016,7 @@ func (v StateResolution) loadStateEvents(
 		return nil, nil, err
 	}
 	eventIDMap := map[string]types.StateEntry{}
-	result := make([]gomatrixserverlib.Event, len(entries))
+	result := make([]*gomatrixserverlib.Event, len(entries))
 	for i := range entries {
 		event, ok := eventMap(events).lookup(entries[i].EventNID)
 		if !ok {

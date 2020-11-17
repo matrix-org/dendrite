@@ -92,7 +92,7 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 			})
 			if updates[i].NewRoomEvent.Event.Type() == "m.room.server_acl" && updates[i].NewRoomEvent.Event.StateKeyEquals("") {
 				ev := updates[i].NewRoomEvent.Event.Unwrap()
-				defer r.ACLs.OnServerACLUpdate(&ev)
+				defer r.ACLs.OnServerACLUpdate(ev)
 			}
 		}
 		logger.Infof("Producing to topic '%s'", r.OutputRoomEventTopic)

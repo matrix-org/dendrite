@@ -362,8 +362,8 @@ func emit3PIDInviteEvent(
 	return api.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
-		[]gomatrixserverlib.HeaderedEvent{
-			(*event).Headered(queryRes.RoomVersion),
+		[]*gomatrixserverlib.HeaderedEvent{
+			event.Headered(queryRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,
 		nil,

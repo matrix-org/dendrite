@@ -93,7 +93,7 @@ func SendEvent(
 	if err := api.SendEvents(
 		req.Context(), rsAPI,
 		api.KindNew,
-		[]gomatrixserverlib.HeaderedEvent{
+		[]*gomatrixserverlib.HeaderedEvent{
 			e.Headered(verRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,
@@ -189,7 +189,7 @@ func generateSendEvent(
 	// check to see if this user can perform this operation
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i].Event
+		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(e.Event, &provider); err != nil {
@@ -198,5 +198,5 @@ func generateSendEvent(
 			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
 		}
 	}
-	return &e.Event, nil
+	return e.Event, nil
 }

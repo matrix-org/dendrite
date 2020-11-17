@@ -77,7 +77,7 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 	if err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
-		[]gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
+		[]*gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
 		cfg.Matrix.ServerName,
 		nil,
 	); err != nil {
@@ -214,7 +214,7 @@ func SendInvite(
 
 	err = roomserverAPI.SendInvite(
 		req.Context(), rsAPI,
-		*event,
+		event,
 		nil, // ask the roomserver to draw up invite room state for us
 		cfg.Matrix.ServerName,
 		nil,
