@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	fs "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/setup"
@@ -31,7 +32,11 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const constRelType = "m.reference"
+const (
+	constRelType     = "m.reference"
+	constRoomIDKey   = "relationship_room_id"
+	constRoomServers = "relationship_servers"
+)
 
 type EventRelationshipRequest struct {
 	EventID         string `json:"event_id"`
@@ -83,7 +88,7 @@ type EventRelationshipResponse struct {
 }
 
 // Enable this MSC
-func Enable(base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI) error {
+func Enable(base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI, userAPI userapi.UserInternalAPI) error {
 	db, err := NewDatabase(&base.Cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("Cannot enable MSC2836: %w", err)
@@ -96,6 +101,55 @@ func Enable(base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, us
 			util.GetLogger(context.Background()).WithError(hookErr).Error(
 				"failed to StoreRelation",
 			)
+		}
+	})
+	hooks.Attach(hooks.KindModifyNewEvent, func(headeredEvent interface{}) {
+		he := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
+		ctx := context.Background()
+		// we only inject metadata for events our server sends
+		userID := he.Sender()
+		_, domain, err := gomatrixserverlib.SplitID('@', userID)
+		if err != nil {
+			return
+		}
+		if domain != base.Cfg.Global.ServerName {
+			return
+		}
+		// if this event has an m.relationship, add on the room_id and servers to unsigned
+		parent, child, relType := parentChildEventIDs(he)
+		if parent == "" || child == "" || relType == "" {
+			return
+		}
+		event, joinedToRoom := getEventIfVisible(ctx, rsAPI, parent, userID)
+		if !joinedToRoom {
+			return
+		}
+		err = he.SetUnsignedField(constRoomIDKey, event.RoomID())
+		if err != nil {
+			util.GetLogger(context.Background()).WithError(err).Warn("Failed to SetUnsignedField")
+			return
+		}
+
+		var servers []gomatrixserverlib.ServerName
+		if fsAPI != nil {
+			var res fs.QueryJoinedHostServerNamesInRoomResponse
+			err = fsAPI.QueryJoinedHostServerNamesInRoom(ctx, &fs.QueryJoinedHostServerNamesInRoomRequest{
+				RoomID: event.RoomID(),
+			}, &res)
+			if err != nil {
+				util.GetLogger(context.Background()).WithError(err).Warn("Failed to QueryJoinedHostServerNamesInRoom")
+				return
+			}
+			servers = res.ServerNames
+		} else {
+			servers = []gomatrixserverlib.ServerName{
+				base.Cfg.Global.ServerName,
+			}
+		}
+		err = he.SetUnsignedField(constRoomServers, servers)
+		if err != nil {
+			util.GetLogger(context.Background()).WithError(err).Warn("Failed to SetUnsignedField")
+			return
 		}
 	})
 
@@ -264,34 +318,12 @@ func walkThread(
 }
 
 func (rc *reqCtx) getEventIfVisible(eventID string) *gomatrixserverlib.HeaderedEvent {
-	var queryEventsRes roomserver.QueryEventsByIDResponse
-	err := rc.rsAPI.QueryEventsByID(rc.ctx, &roomserver.QueryEventsByIDRequest{
-		EventIDs: []string{eventID},
-	}, &queryEventsRes)
-	if err != nil {
-		util.GetLogger(rc.ctx).WithError(err).Error("getEventIfVisible: failed to QueryEventsByID")
+	event, joinedToRoom := getEventIfVisible(rc.ctx, rc.rsAPI, eventID, rc.userID)
+	if event == nil {
 		return nil
 	}
-	if len(queryEventsRes.Events) == 0 {
-		util.GetLogger(rc.ctx).Infof("event does not exist")
-		return nil // event does not exist
-	}
-	event := queryEventsRes.Events[0]
-
-	// Allow events if the member is in the room
-	// TODO: This does not honour history_visibility
-	// TODO: This does not honour m.room.create content
-	var queryMembershipRes roomserver.QueryMembershipForUserResponse
-	err = rc.rsAPI.QueryMembershipForUser(rc.ctx, &roomserver.QueryMembershipForUserRequest{
-		RoomID: event.RoomID(),
-		UserID: rc.userID,
-	}, &queryMembershipRes)
-	if err != nil {
-		util.GetLogger(rc.ctx).WithError(err).Error("getEventIfVisible: failed to QueryMembershipForUser")
-		return nil
-	}
-	if queryMembershipRes.IsInRoom {
-		return &event
+	if joinedToRoom {
+		return event
 	}
 	if rc.req.AutoJoin {
 		var joinRes roomserver.PerformJoinResponse
@@ -305,10 +337,40 @@ func (rc *reqCtx) getEventIfVisible(eventID string) *gomatrixserverlib.HeaderedE
 			util.GetLogger(rc.ctx).WithError(joinRes.Error).WithField("room_id", event.RoomID()).Error("Failed to auto-join room")
 			return nil
 		}
-		return &event
+		return event
 	}
 	util.GetLogger(rc.ctx).Infof("user not in room and auto_join disabled")
 	return nil
+}
+
+func getEventIfVisible(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, eventID, userID string) (*gomatrixserverlib.HeaderedEvent, bool) {
+	var queryEventsRes roomserver.QueryEventsByIDResponse
+	err := rsAPI.QueryEventsByID(ctx, &roomserver.QueryEventsByIDRequest{
+		EventIDs: []string{eventID},
+	}, &queryEventsRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("getEventIfVisible: failed to QueryEventsByID")
+		return nil, false
+	}
+	if len(queryEventsRes.Events) == 0 {
+		util.GetLogger(ctx).Infof("event does not exist")
+		return nil, false // event does not exist
+	}
+	event := queryEventsRes.Events[0]
+
+	// Allow events if the member is in the room
+	// TODO: This does not honour history_visibility
+	// TODO: This does not honour m.room.create content
+	var queryMembershipRes roomserver.QueryMembershipForUserResponse
+	err = rsAPI.QueryMembershipForUser(ctx, &roomserver.QueryMembershipForUserRequest{
+		RoomID: event.RoomID(),
+		UserID: userID,
+	}, &queryMembershipRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("getEventIfVisible: failed to QueryMembershipForUser")
+		return nil, false
+	}
+	return &event, queryMembershipRes.IsInRoom
 }
 
 type walkInfo struct {

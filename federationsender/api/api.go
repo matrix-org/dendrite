@@ -48,6 +48,7 @@ type FederationSenderInternalAPI interface {
 	// Query the server names of the joined hosts in a room.
 	// Unlike QueryJoinedHostsInRoom, this function returns a de-duplicated slice
 	// containing only the server names (without information for membership events).
+	// The response will include this server if they are joined to the room.
 	QueryJoinedHostServerNamesInRoom(
 		ctx context.Context,
 		request *QueryJoinedHostServerNamesInRoomRequest,

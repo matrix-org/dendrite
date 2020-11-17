@@ -62,6 +62,7 @@ func (w *inputWorker) start() {
 	for {
 		select {
 		case task := <-w.input:
+			hooks.Run(hooks.KindModifyNewEvent, &task.event.Event)
 			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
 			if task.err == nil {
 				hooks.Run(hooks.KindNewEvent, &task.event.Event)

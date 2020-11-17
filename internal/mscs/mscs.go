@@ -35,7 +35,7 @@ func Enable(base *setup.BaseDendrite, monolith *setup.Monolith) error {
 func EnableMSC(base *setup.BaseDendrite, monolith *setup.Monolith, msc string) error {
 	switch msc {
 	case "msc2836":
-		return msc2836.Enable(base, monolith.RoomserverAPI, monolith.UserAPI)
+		return msc2836.Enable(base, monolith.RoomserverAPI, monolith.FederationSenderAPI, monolith.UserAPI)
 	default:
 		return fmt.Errorf("EnableMSC: unknown msc '%s'", msc)
 	}

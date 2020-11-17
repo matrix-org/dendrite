@@ -24,6 +24,15 @@ const (
 	// Usage:
 	//   hooks.Attach(hooks.KindNewEvent, func(headeredEvent interface{}) { ... })
 	KindNewEvent = "new_event"
+	// KindModifyNewEvent is a hook which is called with *gomatrixserverlib.HeaderedEvent
+	// It is run before a new event is processed by the roomserver. This hook can be used
+	// to modify the event before it is persisted by adding data to `unsigned`.
+	// Usage:
+	//   hooks.Attach(hooks.KindModifyNewEvent, func(headeredEvent interface{}) {
+	//     ev := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
+	//     _ = ev.SetUnsignedField("key", "val")
+	//   })
+	KindModifyNewEvent = "modify_new_event"
 )
 
 var (
