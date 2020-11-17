@@ -496,3 +496,4 @@ Forgetting room does not show up in v2 /sync
 Can forget room you've been kicked from
 Can re-join room if re-invited
 /whois
+Outbound federation rejects invite response which include invalid JSON for room version 6

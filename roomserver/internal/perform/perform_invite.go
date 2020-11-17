@@ -16,8 +16,8 @@ package perform
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/config"
@@ -160,8 +160,10 @@ func (r *Inviter) PerformInvite(
 					Code: api.PerformErrorNotAllowed,
 				}
 
-				if strings.Contains(err.Error(), "value is outside of safe range") {
-					log.Debug("setting error to PerformErrCanonicalJSON")
+				// Ensure we send the correct http code if the json is invalid for
+				// room version 6.
+				if req.RoomVersion == gomatrixserverlib.RoomVersionV6 &&
+					errors.Is(err, gomatrixserverlib.ErrCanonicalJSON) {
 					res.Error.Code = api.PerformErrCanonicalJSON
 				}
 
