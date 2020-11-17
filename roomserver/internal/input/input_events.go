@@ -111,11 +111,11 @@ func (r *Inputer) processRoomEvent(
 
 	// if storing this event results in it being redacted then do so.
 	if !isRejected && redactedEventID == event.EventID() {
-		r, rerr := eventutil.RedactEvent(redactionEvent, &event)
+		r, rerr := eventutil.RedactEvent(redactionEvent, event)
 		if rerr != nil {
 			return "", fmt.Errorf("eventutil.RedactEvent: %w", rerr)
 		}
-		event = *r
+		event = r
 	}
 
 	// For outliers we can stop after we've stored the event itself as it
@@ -215,7 +215,7 @@ func (r *Inputer) calculateAndSetState(
 	input *api.InputRoomEvent,
 	roomInfo types.RoomInfo,
 	stateAtEvent *types.StateAtEvent,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 	isRejected bool,
 ) error {
 	var err error

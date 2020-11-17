@@ -185,7 +185,7 @@ func createTransaction(
 		}
 	}
 
-	var ev []gomatrixserverlib.Event
+	var ev []*gomatrixserverlib.Event
 	for _, e := range events {
 		ev = append(ev, e.Event)
 	}

@@ -138,7 +138,7 @@ func MakeJoin(
 	// Check that the join is allowed or not
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i].Event
+		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
 
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
@@ -291,7 +291,7 @@ func SendJoin(
 		if err = api.SendEvents(
 			httpReq.Context(), rsAPI,
 			api.KindNew,
-			[]gomatrixserverlib.HeaderedEvent{
+			[]*gomatrixserverlib.HeaderedEvent{
 				event.Headered(stateAndAuthChainResponse.RoomVersion),
 			},
 			cfg.Matrix.ServerName,
@@ -319,7 +319,7 @@ func SendJoin(
 	}
 }
 
-type eventsByDepth []gomatrixserverlib.HeaderedEvent
+type eventsByDepth []*gomatrixserverlib.HeaderedEvent
 
 func (e eventsByDepth) Len() int {
 	return len(e)
