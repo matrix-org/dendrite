@@ -16,6 +16,13 @@ POST /register rejects registration of usernames with '£'
 POST /register rejects registration of usernames with 'é'
 POST /register rejects registration of usernames with '\n'
 POST /register rejects registration of usernames with '''
+POST /register allows registration of usernames with 'q'
+POST /register allows registration of usernames with '3'
+POST /register allows registration of usernames with '.'
+POST /register allows registration of usernames with '_'
+POST /register allows registration of usernames with '='
+POST /register allows registration of usernames with '-'
+POST /register allows registration of usernames with '/'
 GET /login yields a set of flows
 POST /login can log in as a user
 POST /login returns the same device_id as that in the request
