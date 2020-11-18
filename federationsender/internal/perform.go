@@ -105,6 +105,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		}
 
 		// We're all good.
+		response.JoinedVia = serverName
 		return
 	}
 

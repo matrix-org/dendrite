@@ -105,6 +105,7 @@ type PerformJoinRequest struct {
 }
 
 type PerformJoinResponse struct {
+	JoinedVia gomatrixserverlib.ServerName
 	LastError *gomatrix.HTTPError
 }
 

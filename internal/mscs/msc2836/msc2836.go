@@ -101,6 +101,7 @@ type EventRelationshipResponse struct {
 }
 
 // Enable this MSC
+// nolint:gocyclo
 func Enable(
 	base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
@@ -170,7 +171,7 @@ func Enable(
 	})
 
 	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
-		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI, fsAPI)),
+		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	base.PublicFederationAPIMux.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
@@ -191,13 +192,12 @@ type reqCtx struct {
 	ctx                context.Context
 	rsAPI              roomserver.RoomserverInternalAPI
 	db                 Database
-	fsAPI              fs.FederationSenderInternalAPI
 	req                *EventRelationshipRequest
 	userID             string
 	isFederatedRequest bool
 }
 
-func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
+func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		relation, err := NewEventRelationshipRequest(req.Body)
 		if err != nil {
@@ -332,7 +332,8 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	}
 	var childEvents []*gomatrixserverlib.HeaderedEvent
 	for _, child := range children {
-		childEvent := rc.getEventIfVisible(child.EventID, child.RoomID, child.Servers)
+		// in order for us to even know about the children the server must be joined to those rooms, hence pass no claimed room ID or servers.
+		childEvent := rc.getEventIfVisible(child.EventID, "", nil)
 		if childEvent != nil {
 			childEvents = append(childEvents, childEvent)
 		}
@@ -370,6 +371,7 @@ func walkThread(
 			}
 
 			// Process the event.
+			// TODO: Include edge information: room ID and servers
 			event := rc.getEventIfVisible(wi.EventID, "", nil)
 			if event != nil {
 				result = append(result, event)
@@ -394,6 +396,10 @@ func (rc *reqCtx) getEventIfVisible(eventID string, claimedRoomID string, claime
 	if !rc.req.AutoJoin {
 		return nil
 	}
+	// if we're doing this on behalf of a random server don't auto-join rooms regardless of what the request says
+	if rc.isFederatedRequest {
+		return nil
+	}
 	roomID := claimedRoomID
 	var servers []gomatrixserverlib.ServerName
 	if event != nil {
@@ -416,7 +422,7 @@ func (rc *reqCtx) getEventIfVisible(eventID string, claimedRoomID string, claime
 	if event != nil {
 		return event
 	}
-	// TODO: fetch the event in question
+	// TODO: hit /event_relationships on the server we joined via
 	util.GetLogger(rc.ctx).Infof("joined room but need to fetch event TODO")
 	return nil
 }
