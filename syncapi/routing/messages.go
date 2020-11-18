@@ -235,7 +235,7 @@ func (r *messagesReq) retrieveEvents() (
 		return
 	}
 
-	var events []gomatrixserverlib.HeaderedEvent
+	var events []*gomatrixserverlib.HeaderedEvent
 	util.GetLogger(r.ctx).WithField("start", start).WithField("end", end).Infof("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
@@ -259,8 +259,8 @@ func (r *messagesReq) retrieveEvents() (
 	// Sort the events to ensure we send them in the right order.
 	if r.backwardOrdering {
 		// This reverses the array from old->new to new->old
-		reversed := func(in []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
-			out := make([]gomatrixserverlib.HeaderedEvent, len(in))
+		reversed := func(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
+			out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
 			for i := 0; i < len(in); i++ {
 				out[i] = in[len(in)-i-1]
 			}
@@ -287,7 +287,7 @@ func (r *messagesReq) retrieveEvents() (
 }
 
 // nolint:gocyclo
-func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
+func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
 	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
 	// which is equiv to history_visibility: joined
@@ -302,8 +302,8 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 		}
 	}
 
-	var result []gomatrixserverlib.HeaderedEvent
-	var eventsToCheck []gomatrixserverlib.HeaderedEvent
+	var result []*gomatrixserverlib.HeaderedEvent
+	var eventsToCheck []*gomatrixserverlib.HeaderedEvent
 	if joinEventIndex != -1 {
 		if r.backwardOrdering {
 			result = events[:joinEventIndex+1]
@@ -313,7 +313,7 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 			eventsToCheck = append(eventsToCheck, result[len(result)-1])
 		}
 	} else {
-		eventsToCheck = []gomatrixserverlib.HeaderedEvent{events[0], events[len(events)-1]}
+		eventsToCheck = []*gomatrixserverlib.HeaderedEvent{events[0], events[len(events)-1]}
 		result = events
 	}
 	// make sure the user was in the room for both the earliest and latest events, we need this because
@@ -337,9 +337,9 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 		for i := range queryRes.StateEvents {
 			switch queryRes.StateEvents[i].Type() {
 			case gomatrixserverlib.MRoomMember:
-				membershipEvent = &queryRes.StateEvents[i]
+				membershipEvent = queryRes.StateEvents[i]
 			case gomatrixserverlib.MRoomHistoryVisibility:
-				hisVisEvent = &queryRes.StateEvents[i]
+				hisVisEvent = queryRes.StateEvents[i]
 			}
 		}
 		if hisVisEvent == nil {
@@ -365,12 +365,12 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 	}
 	if !wasJoined {
 		util.GetLogger(r.ctx).WithField("num_events", len(events)).Warnf("%s was not joined to room during these events, omitting them", r.device.UserID)
-		return []gomatrixserverlib.HeaderedEvent{}
+		return []*gomatrixserverlib.HeaderedEvent{}
 	}
 	return result
 }
 
-func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	start, err = r.db.EventPositionInTopology(
 		r.ctx, events[0].EventID(),
 	)
@@ -410,7 +410,7 @@ func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (sta
 // Returns an error if there was an issue talking with the database or
 // backfilling.
 func (r *messagesReq) handleEmptyEventsSlice() (
-	events []gomatrixserverlib.HeaderedEvent, err error,
+	events []*gomatrixserverlib.HeaderedEvent, err error,
 ) {
 	backwardExtremities, err := r.db.BackwardExtremitiesForRoom(r.ctx, r.roomID)
 
@@ -424,7 +424,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 	} else {
 		// If not, it means the slice was empty because we reached the room's
 		// creation, so return an empty slice.
-		events = []gomatrixserverlib.HeaderedEvent{}
+		events = []*gomatrixserverlib.HeaderedEvent{}
 	}
 
 	return
@@ -436,7 +436,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 // through backfilling if needed.
 // Returns an error if there was an issue while backfilling.
 func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent) (
-	events []gomatrixserverlib.HeaderedEvent, err error,
+	events []*gomatrixserverlib.HeaderedEvent, err error,
 ) {
 	// Check if we have enough events.
 	isSetLargeEnough := len(streamEvents) >= r.limit
@@ -464,7 +464,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	// Backfill is needed if we've reached a backward extremity and need more
 	// events. It's only needed if the direction is backward.
 	if len(backwardExtremities) > 0 && !isSetLargeEnough && r.backwardOrdering {
-		var pdus []gomatrixserverlib.HeaderedEvent
+		var pdus []*gomatrixserverlib.HeaderedEvent
 		// Only ask the remote server for enough events to reach the limit.
 		pdus, err = r.backfill(r.roomID, backwardExtremities, r.limit-len(streamEvents))
 		if err != nil {
@@ -482,7 +482,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	return
 }
 
-type eventsByDepth []gomatrixserverlib.HeaderedEvent
+type eventsByDepth []*gomatrixserverlib.HeaderedEvent
 
 func (e eventsByDepth) Len() int {
 	return len(e)
@@ -503,7 +503,7 @@ func (e eventsByDepth) Less(i, j int) bool {
 // event, or if there is no remote homeserver to contact.
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
-func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
+func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	var res api.PerformBackfillResponse
 	err := r.rsAPI.PerformBackfill(context.Background(), &api.PerformBackfillRequest{
 		RoomID:               roomID,
@@ -531,8 +531,8 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	for i := range res.Events {
 		_, err = r.db.WriteEvent(
 			context.Background(),
-			&res.Events[i],
-			[]gomatrixserverlib.HeaderedEvent{},
+			res.Events[i],
+			[]*gomatrixserverlib.HeaderedEvent{},
 			[]string{},
 			[]string{},
 			nil, true,

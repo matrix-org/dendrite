@@ -67,7 +67,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 	if err != nil {
 		return false, err
 	}
-	gmslEvents := make([]gomatrixserverlib.Event, len(events))
+	gmslEvents := make([]*gomatrixserverlib.Event, len(events))
 	for i := range events {
 		gmslEvents[i] = events[i].Event
 	}
@@ -190,13 +190,13 @@ func StateBeforeEvent(ctx context.Context, db storage.Database, info types.RoomI
 
 func LoadEvents(
 	ctx context.Context, db storage.Database, eventNIDs []types.EventNID,
-) ([]gomatrixserverlib.Event, error) {
+) ([]*gomatrixserverlib.Event, error) {
 	stateEvents, err := db.Events(ctx, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]gomatrixserverlib.Event, len(stateEvents))
+	result := make([]*gomatrixserverlib.Event, len(stateEvents))
 	for i := range stateEvents {
 		result[i] = stateEvents[i].Event
 	}
@@ -205,7 +205,7 @@ func LoadEvents(
 
 func LoadStateEvents(
 	ctx context.Context, db storage.Database, stateEntries []types.StateEntry,
-) ([]gomatrixserverlib.Event, error) {
+) ([]*gomatrixserverlib.Event, error) {
 	eventNIDs := make([]types.EventNID, len(stateEntries))
 	for i := range stateEntries {
 		eventNIDs[i] = stateEntries[i].EventNID

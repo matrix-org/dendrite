@@ -94,7 +94,7 @@ const (
 // prev_events.
 type OutputNewRoomEvent struct {
 	// The Event.
-	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
 	// Does the event completely rewrite the room state? If so, then AddsStateEventIDs
 	// will contain the entire room state.
 	RewritesState bool `json:"rewrites_state"`
@@ -111,7 +111,7 @@ type OutputNewRoomEvent struct {
 	// may decide a bunch of state events on one branch are now valid, so they will be
 	// present in this list. This is useful when trying to maintain the current state of a room
 	// as to do so you need to include both these events and `Event`.
-	AddStateEvents []gomatrixserverlib.HeaderedEvent `json:"adds_state_events"`
+	AddStateEvents []*gomatrixserverlib.HeaderedEvent `json:"adds_state_events"`
 
 	// The state event IDs that were removed from the state of the room by this event.
 	RemovesStateEventIDs []string `json:"removes_state_event_ids"`
@@ -168,7 +168,7 @@ type OutputNewRoomEvent struct {
 // the original event to save space, so you cannot use that slice alone.
 // Instead, use this function which will add the original event if it is present
 // in `AddsStateEventIDs`.
-func (ore *OutputNewRoomEvent) AddsState() []gomatrixserverlib.HeaderedEvent {
+func (ore *OutputNewRoomEvent) AddsState() []*gomatrixserverlib.HeaderedEvent {
 	includeOutputEvent := false
 	for _, id := range ore.AddsStateEventIDs {
 		if id == ore.Event.EventID() {
@@ -193,7 +193,7 @@ func (ore *OutputNewRoomEvent) AddsState() []gomatrixserverlib.HeaderedEvent {
 // should build their current room state up from OutputNewRoomEvents only.
 type OutputOldRoomEvent struct {
 	// The Event.
-	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 // An OutputNewInviteEvent is written whenever an invite becomes active.
@@ -203,7 +203,7 @@ type OutputNewInviteEvent struct {
 	// The room version of the invited room.
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The "m.room.member" invite event.
-	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 // An OutputRetireInviteEvent is written whenever an existing invite is no longer
@@ -230,7 +230,7 @@ type OutputRedactedEvent struct {
 	// The event ID that was redacted
 	RedactedEventID string
 	// The value of `unsigned.redacted_because` - the redaction event itself
-	RedactedBecause gomatrixserverlib.HeaderedEvent
+	RedactedBecause *gomatrixserverlib.HeaderedEvent
 }
 
 // An OutputNewPeek is written whenever a user starts peeking into a room

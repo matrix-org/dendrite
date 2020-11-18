@@ -85,7 +85,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
-		ev := &output.NewRoomEvent.Event
+		ev := output.NewRoomEvent.Event
 
 		if output.NewRoomEvent.RewritesState {
 			if err := s.db.PurgeRoomState(context.TODO(), ev.RoomID()); err != nil {
@@ -158,7 +158,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 
 	// Send the event.
 	return s.queues.SendEvent(
-		&ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
+		ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
 	)
 }
 
@@ -226,7 +226,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 // joinedHostsFromEvents turns a list of state events into a list of joined hosts.
 // This errors if one of the events was invalid.
 // It should be impossible for an invalid event to get this far in the pipeline.
-func joinedHostsFromEvents(evs []gomatrixserverlib.Event) ([]types.JoinedHost, error) {
+func joinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, error) {
 	var joinedHosts []types.JoinedHost
 	for _, ev := range evs {
 		if ev.Type() != "m.room.member" || ev.StateKey() == nil {
@@ -291,8 +291,8 @@ func combineDeltas(adds1, removes1, adds2, removes2 []string) (adds, removes []s
 
 // lookupStateEvents looks up the state events that are added by a new event.
 func (s *OutputRoomEventConsumer) lookupStateEvents(
-	addsStateEventIDs []string, event gomatrixserverlib.Event,
-) ([]gomatrixserverlib.Event, error) {
+	addsStateEventIDs []string, event *gomatrixserverlib.Event,
+) ([]*gomatrixserverlib.Event, error) {
 	// Fast path if there aren't any new state events.
 	if len(addsStateEventIDs) == 0 {
 		return nil, nil
@@ -300,11 +300,11 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 
 	// Fast path if the only state event added is the event itself.
 	if len(addsStateEventIDs) == 1 && addsStateEventIDs[0] == event.EventID() {
-		return []gomatrixserverlib.Event{event}, nil
+		return []*gomatrixserverlib.Event{event}, nil
 	}
 
 	missing := addsStateEventIDs
-	var result []gomatrixserverlib.Event
+	var result []*gomatrixserverlib.Event
 
 	// Check if event itself is being added.
 	for _, eventID := range missing {
@@ -343,7 +343,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	return result, nil
 }
 
-func missingEventsFrom(events []gomatrixserverlib.Event, required []string) []string {
+func missingEventsFrom(events []*gomatrixserverlib.Event, required []string) []string {
 	have := map[string]bool{}
 	for _, event := range events {
 		have[event.EventID()] = true

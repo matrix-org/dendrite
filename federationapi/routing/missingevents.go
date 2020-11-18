@@ -73,8 +73,8 @@ func GetMissingEvents(
 
 // filterEvents returns only those events with matching roomID
 func filterEvents(
-	events []gomatrixserverlib.HeaderedEvent, roomID string,
-) []gomatrixserverlib.HeaderedEvent {
+	events []*gomatrixserverlib.HeaderedEvent, roomID string,
+) []*gomatrixserverlib.HeaderedEvent {
 	ref := events[:0]
 	for _, ev := range events {
 		if ev.RoomID() == roomID {

@@ -25,7 +25,7 @@ import (
 // SendEvents to the roomserver The events are written with KindNew.
 func SendEvents(
 	ctx context.Context, rsAPI RoomserverInternalAPI,
-	kind Kind, events []gomatrixserverlib.HeaderedEvent,
+	kind Kind, events []*gomatrixserverlib.HeaderedEvent,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
 ) error {
 	ires := make([]InputRoomEvent, len(events))
@@ -46,7 +46,7 @@ func SendEvents(
 // marked as `true` in haveEventIDs
 func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, kind Kind,
-	state *gomatrixserverlib.RespState, event gomatrixserverlib.HeaderedEvent,
+	state *gomatrixserverlib.RespState, event *gomatrixserverlib.HeaderedEvent,
 	haveEventIDs map[string]bool,
 ) error {
 	outliers, err := state.Events()
@@ -97,7 +97,7 @@ func SendInputRoomEvents(
 // If we are in the room then the event should be sent using the SendEvents method.
 func SendInvite(
 	ctx context.Context,
-	rsAPI RoomserverInternalAPI, inviteEvent gomatrixserverlib.HeaderedEvent,
+	rsAPI RoomserverInternalAPI, inviteEvent *gomatrixserverlib.HeaderedEvent,
 	inviteRoomState []gomatrixserverlib.InviteV2StrippedState,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
 ) error {
@@ -134,7 +134,7 @@ func GetEvent(ctx context.Context, rsAPI RoomserverInternalAPI, eventID string) 
 	if len(res.Events) != 1 {
 		return nil
 	}
-	return &res.Events[0]
+	return res.Events[0]
 }
 
 // GetStateEvent returns the current state event in the room or nil.

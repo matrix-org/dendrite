@@ -123,7 +123,7 @@ func buildAndOutput() gomatrixserverlib.EventReference {
 }
 
 // Write an event to the output.
-func writeEvent(event gomatrixserverlib.Event) {
+func writeEvent(event *gomatrixserverlib.Event) {
 	encoder := json.NewEncoder(os.Stdout)
 	if *format == "InputRoomEvent" {
 		var ire api.InputRoomEvent

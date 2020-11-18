@@ -198,7 +198,7 @@ func (r *Inviter) PerformInvite(
 		}
 
 		unwrapped := event.Unwrap()
-		outputUpdates, err := helpers.UpdateToInviteMembership(updater, &unwrapped, nil, req.Event.RoomVersion)
+		outputUpdates, err := helpers.UpdateToInviteMembership(updater, unwrapped, nil, req.Event.RoomVersion)
 		if err != nil {
 			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 		}
@@ -248,11 +248,11 @@ func buildInviteStrippedState(
 		return nil, err
 	}
 	inviteState := []gomatrixserverlib.InviteV2StrippedState{
-		gomatrixserverlib.NewInviteV2StrippedState(&input.Event.Event),
+		gomatrixserverlib.NewInviteV2StrippedState(input.Event.Event),
 	}
 	stateEvents = append(stateEvents, types.Event{Event: input.Event.Unwrap()})
 	for _, event := range stateEvents {
-		inviteState = append(inviteState, gomatrixserverlib.NewInviteV2StrippedState(&event.Event))
+		inviteState = append(inviteState, gomatrixserverlib.NewInviteV2StrippedState(event.Event))
 	}
 	return inviteState, nil
 }
