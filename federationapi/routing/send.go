@@ -111,7 +111,8 @@ type txnReq struct {
 	// which the roomserver is unaware of.
 	haveEvents map[string]*gomatrixserverlib.HeaderedEvent
 	// new events which the roomserver does not know about
-	newEvents map[string]bool
+	newEvents      map[string]bool
+	newEventsMutex sync.RWMutex
 }
 
 // A subset of FederationClient functionality that txn requires. Useful for testing.
@@ -264,6 +265,8 @@ func (e missingPrevEventsError) Error() string {
 }
 
 func (t *txnReq) haveEventIDs() map[string]bool {
+	t.newEventsMutex.RLock()
+	defer t.newEventsMutex.RUnlock()
 	result := make(map[string]bool, len(t.haveEvents))
 	for eventID := range t.haveEvents {
 		if t.newEvents[eventID] {
@@ -1144,6 +1147,8 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 		return nil, verifySigError{event.EventID(), err}
 	}
 	h := event.Headered(roomVersion)
+	t.newEventsMutex.Lock()
 	t.newEvents[h.EventID()] = true
+	t.newEventsMutex.Unlock()
 	return h, nil
 }
