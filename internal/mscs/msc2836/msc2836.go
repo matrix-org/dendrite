@@ -188,7 +188,8 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 		}
 
 		// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
-		event := rc.getEventIfVisible(relation.EventID, nil)
+		// We should have the event being referenced so don't give any claimed room ID / servers
+		event := rc.getEventIfVisible(relation.EventID, "", nil)
 		if event == nil {
 			return util.JSONResponse{
 				Code: 403,
@@ -249,7 +250,8 @@ func (rc *reqCtx) includeParent(event *gomatrixserverlib.HeaderedEvent) (parent 
 	if parentID == "" {
 		return nil
 	}
-	return rc.getEventIfVisible(parentID, event)
+	claimedRoomID, claimedServers := roomIDAndServers(event)
+	return rc.getEventIfVisible(parentID, claimedRoomID, claimedServers)
 }
 
 // If include_children: true, lookup all events which have event_id as an m.relationship
@@ -264,7 +266,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	}
 	var childEvents []*gomatrixserverlib.HeaderedEvent
 	for _, child := range children {
-		childEvent := rc.getEventIfVisible(child.EventID, nil)
+		childEvent := rc.getEventIfVisible(child.EventID, child.RoomID, child.Servers)
 		if childEvent != nil {
 			childEvents = append(childEvents, childEvent)
 		}
@@ -302,7 +304,7 @@ func walkThread(
 			}
 
 			// Process the event.
-			event := rc.getEventIfVisible(wi.EventID, nil)
+			event := rc.getEventIfVisible(wi.EventID, "", nil)
 			if event != nil {
 				result = append(result, event)
 			}
@@ -317,29 +319,39 @@ func walkThread(
 	return result, limited
 }
 
-func (rc *reqCtx) getEventIfVisible(eventID string, child *gomatrixserverlib.HeaderedEvent) *gomatrixserverlib.HeaderedEvent {
+func (rc *reqCtx) getEventIfVisible(eventID string, claimedRoomID string, claimedServers []string) *gomatrixserverlib.HeaderedEvent {
 	event, joinedToRoom := getEventIfVisible(rc.ctx, rc.rsAPI, eventID, rc.userID)
-	if event == nil {
+	if event != nil && joinedToRoom {
+		return event
+	}
+	// either we don't have the event or we aren't joined to the room, regardless we should try joining if auto join is enabled
+	if !rc.req.AutoJoin {
 		return nil
 	}
-	if joinedToRoom {
+	roomID := claimedRoomID
+	var servers []gomatrixserverlib.ServerName
+	if event != nil {
+		roomID = event.RoomID()
+	}
+	for _, s := range claimedServers {
+		servers = append(servers, gomatrixserverlib.ServerName(s))
+	}
+	var joinRes roomserver.PerformJoinResponse
+	rc.rsAPI.PerformJoin(rc.ctx, &roomserver.PerformJoinRequest{
+		UserID:        rc.userID,
+		Content:       map[string]interface{}{},
+		RoomIDOrAlias: roomID,
+		ServerNames:   servers,
+	}, &joinRes)
+	if joinRes.Error != nil {
+		util.GetLogger(rc.ctx).WithError(joinRes.Error).WithField("room_id", roomID).Error("Failed to auto-join room")
+		return nil
+	}
+	if event != nil {
 		return event
 	}
-	if rc.req.AutoJoin {
-		var joinRes roomserver.PerformJoinResponse
-		rc.rsAPI.PerformJoin(rc.ctx, &roomserver.PerformJoinRequest{
-			UserID:        rc.userID,
-			Content:       map[string]interface{}{},
-			RoomIDOrAlias: event.RoomID(),
-			// TODO: Add server_names from linked room, currently this join will only work if the HS is already in the room
-		}, &joinRes)
-		if joinRes.Error != nil {
-			util.GetLogger(rc.ctx).WithError(joinRes.Error).WithField("room_id", event.RoomID()).Error("Failed to auto-join room")
-			return nil
-		}
-		return event
-	}
-	util.GetLogger(rc.ctx).Infof("user not in room and auto_join disabled")
+	// TODO: fetch the event in question
+	util.GetLogger(rc.ctx).Infof("joined room but need to fetch event TODO")
 	return nil
 }
 
