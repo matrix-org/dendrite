@@ -16,10 +16,13 @@
 package msc2836
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationsender/api"
@@ -50,6 +53,16 @@ type EventRelationshipRequest struct {
 	Direction       string `json:"direction"`
 	Batch           string `json:"batch"`
 	AutoJoin        bool   `json:"auto_join"`
+}
+
+func NewEventRelationshipRequest(body io.Reader) (*EventRelationshipRequest, error) {
+	var relation EventRelationshipRequest
+	if err := json.NewDecoder(body).Decode(&relation); err != nil {
+		return nil, err
+	}
+	// Sanity check request and set defaults.
+	relation.applyDefaults()
+	return &relation, nil
 }
 
 func (r *EventRelationshipRequest) applyDefaults() {
@@ -88,7 +101,10 @@ type EventRelationshipResponse struct {
 }
 
 // Enable this MSC
-func Enable(base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI, userAPI userapi.UserInternalAPI) error {
+func Enable(
+	base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
+	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
+) error {
 	db, err := NewDatabase(&base.Cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("Cannot enable MSC2836: %w", err)
@@ -154,93 +170,143 @@ func Enable(base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fs
 	})
 
 	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
-		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI)),
+		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI, fsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	base.PublicFederationAPIMux.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
+		"msc2836_event_relationships", func(req *http.Request) util.JSONResponse {
+			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
+				req, time.Now(), base.Cfg.Global.ServerName, keyRing,
+			)
+			if fedReq == nil {
+				return errResp
+			}
+			return federatedEventRelationship(req.Context(), fedReq, db, rsAPI)
+		},
+	)).Methods(http.MethodPost, http.MethodOptions)
 	return nil
 }
 
 type reqCtx struct {
-	ctx    context.Context
-	rsAPI  roomserver.RoomserverInternalAPI
-	req    *EventRelationshipRequest
-	userID string
+	ctx                context.Context
+	rsAPI              roomserver.RoomserverInternalAPI
+	db                 Database
+	fsAPI              fs.FederationSenderInternalAPI
+	req                *EventRelationshipRequest
+	userID             string
+	isFederatedRequest bool
 }
 
-func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
+func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
-		var relation EventRelationshipRequest
-		if err := json.NewDecoder(req.Body).Decode(&relation); err != nil {
+		relation, err := NewEventRelationshipRequest(req.Body)
+		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
 			return util.JSONResponse{
 				Code: 400,
 				JSON: jsonerror.BadJSON(fmt.Sprintf("invalid json: %s", err)),
 			}
 		}
-		// Sanity check request and set defaults.
-		relation.applyDefaults()
-		var res EventRelationshipResponse
-		var returnEvents []*gomatrixserverlib.HeaderedEvent
 		rc := reqCtx{
-			ctx:    req.Context(),
-			req:    &relation,
-			userID: device.UserID,
-			rsAPI:  rsAPI,
+			ctx:                req.Context(),
+			req:                relation,
+			userID:             device.UserID,
+			rsAPI:              rsAPI,
+			isFederatedRequest: false,
+			db:                 db,
 		}
-
-		// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
-		// We should have the event being referenced so don't give any claimed room ID / servers
-		event := rc.getEventIfVisible(relation.EventID, "", nil)
-		if event == nil {
-			return util.JSONResponse{
-				Code: 403,
-				JSON: jsonerror.Forbidden("Event does not exist or you are not authorised to see it"),
-			}
+		res, resErr := rc.process()
+		if resErr != nil {
+			return *resErr
 		}
-
-		// Retrieve the event. Add it to response array.
-		returnEvents = append(returnEvents, event)
-
-		if *relation.IncludeParent {
-			if parentEvent := rc.includeParent(event); parentEvent != nil {
-				returnEvents = append(returnEvents, parentEvent)
-			}
-		}
-
-		if *relation.IncludeChildren {
-			remaining := relation.Limit - len(returnEvents)
-			if remaining > 0 {
-				children, resErr := rc.includeChildren(db, event.EventID(), remaining, *relation.RecentFirst)
-				if resErr != nil {
-					return *resErr
-				}
-				returnEvents = append(returnEvents, children...)
-			}
-		}
-
-		remaining := relation.Limit - len(returnEvents)
-		var walkLimited bool
-		if remaining > 0 {
-			included := make(map[string]bool, len(returnEvents))
-			for _, ev := range returnEvents {
-				included[ev.EventID()] = true
-			}
-			var events []*gomatrixserverlib.HeaderedEvent
-			events, walkLimited = walkThread(
-				req.Context(), db, &rc, included, remaining,
-			)
-			returnEvents = append(returnEvents, events...)
-		}
-		res.Events = make([]gomatrixserverlib.ClientEvent, len(returnEvents))
-		for i, ev := range returnEvents {
-			res.Events[i] = gomatrixserverlib.HeaderedToClientEvent(*ev, gomatrixserverlib.FormatAll)
-		}
-		res.Limited = remaining == 0 || walkLimited
 
 		return util.JSONResponse{
 			Code: 200,
 			JSON: res,
 		}
 	}
+}
+
+func federatedEventRelationship(ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI) util.JSONResponse {
+	relation, err := NewEventRelationshipRequest(bytes.NewBuffer(fedReq.Content()))
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("failed to decode HTTP request as JSON")
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("invalid json: %s", err)),
+		}
+	}
+	rc := reqCtx{
+		ctx:                ctx,
+		req:                relation,
+		userID:             "",
+		rsAPI:              rsAPI,
+		isFederatedRequest: true,
+		db:                 db,
+	}
+	res, resErr := rc.process()
+	if resErr != nil {
+		return *resErr
+	}
+
+	return util.JSONResponse{
+		Code: 200,
+		JSON: res,
+	}
+}
+
+func (rc *reqCtx) process() (*EventRelationshipResponse, *util.JSONResponse) {
+	var res EventRelationshipResponse
+	var returnEvents []*gomatrixserverlib.HeaderedEvent
+	// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
+	// We should have the event being referenced so don't give any claimed room ID / servers
+	event := rc.getEventIfVisible(rc.req.EventID, "", nil)
+	if event == nil {
+		return nil, &util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("Event does not exist or you are not authorised to see it"),
+		}
+	}
+
+	// Retrieve the event. Add it to response array.
+	returnEvents = append(returnEvents, event)
+
+	if *rc.req.IncludeParent {
+		if parentEvent := rc.includeParent(event); parentEvent != nil {
+			returnEvents = append(returnEvents, parentEvent)
+		}
+	}
+
+	if *rc.req.IncludeChildren {
+		remaining := rc.req.Limit - len(returnEvents)
+		if remaining > 0 {
+			children, resErr := rc.includeChildren(rc.db, event.EventID(), remaining, *rc.req.RecentFirst)
+			if resErr != nil {
+				return nil, resErr
+			}
+			returnEvents = append(returnEvents, children...)
+		}
+	}
+
+	remaining := rc.req.Limit - len(returnEvents)
+	var walkLimited bool
+	if remaining > 0 {
+		included := make(map[string]bool, len(returnEvents))
+		for _, ev := range returnEvents {
+			included[ev.EventID()] = true
+		}
+		var events []*gomatrixserverlib.HeaderedEvent
+		events, walkLimited = walkThread(
+			rc.ctx, rc.db, rc, included, remaining,
+		)
+		returnEvents = append(returnEvents, events...)
+	}
+	res.Events = make([]gomatrixserverlib.ClientEvent, len(returnEvents))
+	for i, ev := range returnEvents {
+		res.Events[i] = gomatrixserverlib.HeaderedToClientEvent(*ev, gomatrixserverlib.FormatAll)
+	}
+	res.Limited = remaining == 0 || walkLimited
+	return &res, nil
 }
 
 // If include_parent: true and there is a valid m.relationship field in the event,
