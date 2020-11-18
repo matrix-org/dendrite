@@ -57,18 +57,18 @@ $ cd dendrite
 $ ./build.sh
 
 # Generate a Matrix signing key for federation (required)
-$ ./generate-keys --private-key matrix_key.pem
+$ ./bin/generate-keys --private-key matrix_key.pem
 
 # Generate a self-signed certificate (optional, but a valid TLS certificate is normally
 # needed for Matrix federation/clients to work properly!)
-$ ./generate-keys --tls-cert server.crt --tls-key server.key
+$ ./bin/generate-keys --tls-cert server.crt --tls-key server.key
 
 # Copy and modify the config file - you'll need to set a server name and paths to the keys
 # at the very least, along with setting up the database connection strings.
 $ cp dendrite-config.yaml dendrite.yaml
 
 # Build and run the server:
-$ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+$ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 ```
 
 Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
