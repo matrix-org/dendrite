@@ -14,6 +14,7 @@ type eventInfo struct {
 	EventID        string
 	OriginServerTS gomatrixserverlib.Timestamp
 	RoomID         string
+	Servers        []string
 }
 
 type Database interface {
@@ -56,6 +57,8 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		parent_event_id TEXT NOT NULL,
 		child_event_id TEXT NOT NULL,
 		rel_type TEXT NOT NULL,
+		parent_room_id TEXT NOT NULL,
+		parent_servers TEXT NOT NULL,
 		CONSTRAINT msc2836_edges_uniq UNIQUE (parent_event_id, child_event_id, rel_type)
 	);
 
@@ -69,7 +72,7 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		return nil, err
 	}
 	if d.insertEdgeStmt, err = d.db.Prepare(`
-		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type) VALUES($1, $2, $3) ON CONFLICT DO NOTHING
+		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type, parent_room_id, parent_servers) VALUES($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING
 	`); err != nil {
 		return nil, err
 	}
@@ -106,6 +109,8 @@ func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		parent_event_id TEXT NOT NULL,
 		child_event_id TEXT NOT NULL,
 		rel_type TEXT NOT NULL,
+		parent_room_id TEXT NOT NULL,
+		parent_servers TEXT NOT NULL,
 		UNIQUE (parent_event_id, child_event_id, rel_type)
 	);
 
@@ -119,7 +124,7 @@ func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 		return nil, err
 	}
 	if d.insertEdgeStmt, err = d.db.Prepare(`
-		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type) VALUES($1, $2, $3) ON CONFLICT (parent_event_id, child_event_id, rel_type) DO NOTHING
+		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type, parent_room_id, parent_servers) VALUES($1, $2, $3, $4, $5) ON CONFLICT (parent_event_id, child_event_id, rel_type) DO NOTHING
 	`); err != nil {
 		return nil, err
 	}
@@ -148,8 +153,13 @@ func (p *DB) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEv
 	if parent == "" || child == "" {
 		return nil
 	}
+	relationRoomID, relationServers := roomIDAndServers(ev)
+	relationServersJSON, err := json.Marshal(relationServers)
+	if err != nil {
+		return err
+	}
 	return p.writer.Do(p.db, nil, func(txn *sql.Tx) error {
-		_, err := txn.Stmt(p.insertEdgeStmt).ExecContext(ctx, parent, child, relType)
+		_, err := txn.Stmt(p.insertEdgeStmt).ExecContext(ctx, parent, child, relType, relationRoomID, string(relationServersJSON))
 		if err != nil {
 			return err
 		}
@@ -198,4 +208,19 @@ func parentChildEventIDs(ev *gomatrixserverlib.HeaderedEvent) (parent, child, re
 		return
 	}
 	return body.Relationship.EventID, ev.EventID(), body.Relationship.RelType
+}
+
+func roomIDAndServers(ev *gomatrixserverlib.HeaderedEvent) (roomID string, servers []string) {
+	servers = []string{}
+	if ev == nil {
+		return
+	}
+	body := struct {
+		RoomID  string   `json:"relationship_room_id"`
+		Servers []string `json:"relationship_servers"`
+	}{}
+	if err := json.Unmarshal(ev.Unsigned(), &body); err != nil {
+		return
+	}
+	return body.RoomID, body.Servers
 }

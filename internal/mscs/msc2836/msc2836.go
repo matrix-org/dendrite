@@ -188,7 +188,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 		}
 
 		// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
-		event := rc.getEventIfVisible(relation.EventID)
+		event := rc.getEventIfVisible(relation.EventID, nil)
 		if event == nil {
 			return util.JSONResponse{
 				Code: 403,
@@ -249,7 +249,7 @@ func (rc *reqCtx) includeParent(event *gomatrixserverlib.HeaderedEvent) (parent 
 	if parentID == "" {
 		return nil
 	}
-	return rc.getEventIfVisible(parentID)
+	return rc.getEventIfVisible(parentID, event)
 }
 
 // If include_children: true, lookup all events which have event_id as an m.relationship
@@ -264,7 +264,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	}
 	var childEvents []*gomatrixserverlib.HeaderedEvent
 	for _, child := range children {
-		childEvent := rc.getEventIfVisible(child.EventID)
+		childEvent := rc.getEventIfVisible(child.EventID, nil)
 		if childEvent != nil {
 			childEvents = append(childEvents, childEvent)
 		}
@@ -302,7 +302,7 @@ func walkThread(
 			}
 
 			// Process the event.
-			event := rc.getEventIfVisible(wi.EventID)
+			event := rc.getEventIfVisible(wi.EventID, nil)
 			if event != nil {
 				result = append(result, event)
 			}
@@ -317,7 +317,7 @@ func walkThread(
 	return result, limited
 }
 
-func (rc *reqCtx) getEventIfVisible(eventID string) *gomatrixserverlib.HeaderedEvent {
+func (rc *reqCtx) getEventIfVisible(eventID string, child *gomatrixserverlib.HeaderedEvent) *gomatrixserverlib.HeaderedEvent {
 	event, joinedToRoom := getEventIfVisible(rc.ctx, rc.rsAPI, eventID, rc.userID)
 	if event == nil {
 		return nil
