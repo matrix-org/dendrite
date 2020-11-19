@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -61,7 +62,11 @@ func (w *inputWorker) start() {
 	for {
 		select {
 		case task := <-w.input:
+			hooks.Run(hooks.KindNewEventReceived, &task.event.Event)
 			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
+			if task.err == nil {
+				hooks.Run(hooks.KindNewEventPersisted, &task.event.Event)
+			}
 			task.wg.Done()
 		case <-time.After(time.Second * 5):
 			return

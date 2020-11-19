@@ -83,7 +83,8 @@ type PerformJoinRequest struct {
 
 type PerformJoinResponse struct {
 	// The room ID, populated on success.
-	RoomID string `json:"room_id"`
+	RoomID    string `json:"room_id"`
+	JoinedVia gomatrixserverlib.ServerName
 	// If non-nil, the join request failed. Contains more information why it failed.
 	Error *PerformError
 }
