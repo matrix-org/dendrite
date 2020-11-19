@@ -46,10 +46,10 @@ type EventRelationshipRequest struct {
 	MaxDepth        int    `json:"max_depth"`
 	MaxBreadth      int    `json:"max_breadth"`
 	Limit           int    `json:"limit"`
-	DepthFirst      *bool  `json:"depth_first"`
-	RecentFirst     *bool  `json:"recent_first"`
-	IncludeParent   *bool  `json:"include_parent"`
-	IncludeChildren *bool  `json:"include_children"`
+	DepthFirst      bool   `json:"depth_first"`
+	RecentFirst     bool   `json:"recent_first"`
+	IncludeParent   bool   `json:"include_parent"`
+	IncludeChildren bool   `json:"include_children"`
 	Direction       string `json:"direction"`
 	Batch           string `json:"batch"`
 	AutoJoin        bool   `json:"auto_join"`
@@ -57,41 +57,22 @@ type EventRelationshipRequest struct {
 
 func NewEventRelationshipRequest(body io.Reader) (*EventRelationshipRequest, error) {
 	var relation EventRelationshipRequest
+	relation.Defaults()
 	if err := json.NewDecoder(body).Decode(&relation); err != nil {
 		return nil, err
 	}
-	// Sanity check request and set defaults.
-	relation.applyDefaults()
 	return &relation, nil
 }
 
-func (r *EventRelationshipRequest) applyDefaults() {
-	if r.Limit > 100 || r.Limit < 1 {
-		r.Limit = 100
-	}
-	if r.MaxBreadth == 0 {
-		r.MaxBreadth = 10
-	}
-	if r.MaxDepth == 0 {
-		r.MaxDepth = 3
-	}
-	t := true
-	f := false
-	if r.DepthFirst == nil {
-		r.DepthFirst = &f
-	}
-	if r.RecentFirst == nil {
-		r.RecentFirst = &t
-	}
-	if r.IncludeParent == nil {
-		r.IncludeParent = &f
-	}
-	if r.IncludeChildren == nil {
-		r.IncludeChildren = &f
-	}
-	if r.Direction != "up" {
-		r.Direction = "down"
-	}
+func (r *EventRelationshipRequest) Defaults() {
+	r.Limit = 100
+	r.MaxBreadth = 10
+	r.MaxDepth = 3
+	r.DepthFirst = false
+	r.RecentFirst = true
+	r.IncludeParent = false
+	r.IncludeChildren = false
+	r.Direction = "down"
 }
 
 type EventRelationshipResponse struct {
@@ -111,7 +92,7 @@ func Enable(
 		return fmt.Errorf("Cannot enable MSC2836: %w", err)
 	}
 	hooks.Enable()
-	hooks.Attach(hooks.KindNewEvent, func(headeredEvent interface{}) {
+	hooks.Attach(hooks.KindNewEventPersisted, func(headeredEvent interface{}) {
 		he := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
 		hookErr := db.StoreRelation(context.Background(), he)
 		if hookErr != nil {
@@ -120,7 +101,7 @@ func Enable(
 			)
 		}
 	})
-	hooks.Attach(hooks.KindModifyNewEvent, func(headeredEvent interface{}) {
+	hooks.Attach(hooks.KindNewEventReceived, func(headeredEvent interface{}) {
 		he := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
 		ctx := context.Background()
 		// we only inject metadata for events our server sends
@@ -271,16 +252,16 @@ func (rc *reqCtx) process() (*EventRelationshipResponse, *util.JSONResponse) {
 	// Retrieve the event. Add it to response array.
 	returnEvents = append(returnEvents, event)
 
-	if *rc.req.IncludeParent {
+	if rc.req.IncludeParent {
 		if parentEvent := rc.includeParent(event); parentEvent != nil {
 			returnEvents = append(returnEvents, parentEvent)
 		}
 	}
 
-	if *rc.req.IncludeChildren {
+	if rc.req.IncludeChildren {
 		remaining := rc.req.Limit - len(returnEvents)
 		if remaining > 0 {
-			children, resErr := rc.includeChildren(rc.db, event.EventID(), remaining, *rc.req.RecentFirst)
+			children, resErr := rc.includeChildren(rc.db, event.EventID(), remaining, rc.req.RecentFirst)
 			if resErr != nil {
 				return nil, resErr
 			}
@@ -303,7 +284,7 @@ func (rc *reqCtx) process() (*EventRelationshipResponse, *util.JSONResponse) {
 	}
 	res.Events = make([]gomatrixserverlib.ClientEvent, len(returnEvents))
 	for i, ev := range returnEvents {
-		res.Events[i] = gomatrixserverlib.HeaderedToClientEvent(*ev, gomatrixserverlib.FormatAll)
+		res.Events[i] = gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll)
 	}
 	res.Limited = remaining == 0 || walkLimited
 	return &res, nil
@@ -454,7 +435,7 @@ func getEventIfVisible(ctx context.Context, rsAPI roomserver.RoomserverInternalA
 		util.GetLogger(ctx).WithError(err).Error("getEventIfVisible: failed to QueryMembershipForUser")
 		return nil, false
 	}
-	return &event, queryMembershipRes.IsInRoom
+	return event, queryMembershipRes.IsInRoom
 }
 
 type walkInfo struct {
@@ -472,7 +453,7 @@ type walker struct {
 
 // WalkFrom the event ID given
 func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
-	children, err := w.db.ChildrenForParent(w.ctx, eventID, constRelType, *w.req.RecentFirst)
+	children, err := w.db.ChildrenForParent(w.ctx, eventID, constRelType, w.req.RecentFirst)
 	if err != nil {
 		util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() ChildrenForParent failed, cannot walk")
 		return false, err
@@ -486,7 +467,7 @@ func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 			return true, nil
 		}
 		// find the children's children
-		children, err = w.db.ChildrenForParent(w.ctx, next.EventID, constRelType, *w.req.RecentFirst)
+		children, err = w.db.ChildrenForParent(w.ctx, next.EventID, constRelType, w.req.RecentFirst)
 		if err != nil {
 			util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() ChildrenForParent failed, cannot walk")
 			return false, err
@@ -509,7 +490,7 @@ func (w *walker) addChildren(toWalk []walkInfo, children []eventInfo, depthOfChi
 		return toWalk
 	}
 
-	if *w.req.DepthFirst {
+	if w.req.DepthFirst {
 		// the slice is a stack so push them in reverse order so we pop them in the correct order
 		// e.g [3,2,1] => [3,2] , 1 => [3] , 2 => [] , 3
 		for i := len(children) - 1; i >= 0; i-- {
@@ -538,7 +519,7 @@ func (w *walker) nextChild(toWalk []walkInfo) (*walkInfo, []walkInfo) {
 		return nil, nil
 	}
 	var child walkInfo
-	if *w.req.DepthFirst {
+	if w.req.DepthFirst {
 		// toWalk is a stack so pop the child off
 		child, toWalk = toWalk[len(toWalk)-1], toWalk[:len(toWalk)-1]
 		return &child, toWalk

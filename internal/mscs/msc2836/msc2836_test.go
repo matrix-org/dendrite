@@ -26,8 +26,6 @@ var (
 	client = &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	constTrue  = true
-	constFalse = false
 )
 
 // Basic sanity check of MSC2836 logic. Injects a thread that looks like:
@@ -184,9 +182,9 @@ func TestMSC2836(t *testing.T) {
 	defer cancel()
 
 	t.Run("returns 403 on invalid event IDs", func(t *testing.T) {
-		_ = postRelationships(t, 403, "alice", &msc2836.EventRelationshipRequest{
-			EventID: "$invalid",
-		})
+		_ = postRelationships(t, 403, "alice", newReq(t, map[string]interface{}{
+			"event_id": "$invalid",
+		}))
 	})
 	t.Run("returns 403 if not joined to the room of specified event in request", func(t *testing.T) {
 		nopUserAPI.accessTokens["frank"] = userapi.Device{
@@ -194,11 +192,11 @@ func TestMSC2836(t *testing.T) {
 			DisplayName: "Frank Not In Room",
 			UserID:      "@frank:localhost",
 		}
-		_ = postRelationships(t, 403, "frank", &msc2836.EventRelationshipRequest{
-			EventID:       eventB.EventID(),
-			Limit:         1,
-			IncludeParent: &constTrue,
-		})
+		_ = postRelationships(t, 403, "frank", newReq(t, map[string]interface{}{
+			"event_id":       eventB.EventID(),
+			"limit":          1,
+			"include_parent": true,
+		}))
 	})
 	t.Run("omits parent if not joined to the room of parent of event", func(t *testing.T) {
 		nopUserAPI.accessTokens["frank2"] = userapi.Device{
@@ -208,44 +206,44 @@ func TestMSC2836(t *testing.T) {
 		}
 		// Event B is in roomB, Event A is in roomA, so make frank2 joined to roomB
 		nopRsAPI.userToJoinedRooms["@frank2:localhost"] = []string{roomIDB}
-		body := postRelationships(t, 200, "frank2", &msc2836.EventRelationshipRequest{
-			EventID:       eventB.EventID(),
-			Limit:         1,
-			IncludeParent: &constTrue,
-		})
+		body := postRelationships(t, 200, "frank2", newReq(t, map[string]interface{}{
+			"event_id":       eventB.EventID(),
+			"limit":          1,
+			"include_parent": true,
+		}))
 		assertContains(t, body, []string{eventB.EventID()})
 	})
 	t.Run("returns the parent if include_parent is true", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:       eventB.EventID(),
-			IncludeParent: &constTrue,
-			Limit:         2,
-		})
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":       eventB.EventID(),
+			"include_parent": true,
+			"limit":          2,
+		}))
 		assertContains(t, body, []string{eventB.EventID(), eventA.EventID()})
 	})
 	t.Run("returns the children in the right order if include_children is true", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:         eventD.EventID(),
-			IncludeChildren: &constTrue,
-			RecentFirst:     &constTrue,
-			Limit:           4,
-		})
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":         eventD.EventID(),
+			"include_children": true,
+			"recent_first":     true,
+			"limit":            4,
+		}))
 		assertContains(t, body, []string{eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
-		body = postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:         eventD.EventID(),
-			IncludeChildren: &constTrue,
-			RecentFirst:     &constFalse,
-			Limit:           4,
-		})
+		body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":         eventD.EventID(),
+			"include_children": true,
+			"recent_first":     false,
+			"limit":            4,
+		}))
 		assertContains(t, body, []string{eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
 	})
 	t.Run("walks the graph depth first", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:     eventB.EventID(),
-			RecentFirst: &constFalse,
-			DepthFirst:  &constTrue,
-			Limit:       6,
-		})
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": false,
+			"depth_first":  true,
+			"limit":        6,
+		}))
 		// Oldest first so:
 		//   A
 		//   |
@@ -257,12 +255,12 @@ func TestMSC2836(t *testing.T) {
 		//   |
 		//  5H
 		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventH.EventID(), eventF.EventID()})
-		body = postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:     eventB.EventID(),
-			RecentFirst: &constTrue,
-			DepthFirst:  &constTrue,
-			Limit:       6,
-		})
+		body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": true,
+			"depth_first":  true,
+			"limit":        6,
+		}))
 		// Recent first so:
 		//   A
 		//   |
@@ -276,12 +274,12 @@ func TestMSC2836(t *testing.T) {
 		assertContains(t, body, []string{eventB.EventID(), eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID(), eventH.EventID()})
 	})
 	t.Run("walks the graph breadth first", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:     eventB.EventID(),
-			RecentFirst: &constFalse,
-			DepthFirst:  &constFalse,
-			Limit:       6,
-		})
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": false,
+			"depth_first":  false,
+			"limit":        6,
+		}))
 		// Oldest first so:
 		//   A
 		//   |
@@ -293,12 +291,12 @@ func TestMSC2836(t *testing.T) {
 		//   |
 		//   H
 		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
-		body = postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:     eventB.EventID(),
-			RecentFirst: &constTrue,
-			DepthFirst:  &constFalse,
-			Limit:       6,
-		})
+		body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": true,
+			"depth_first":  false,
+			"limit":        6,
+		}))
 		// Recent first so:
 		//   A
 		//   |
@@ -312,43 +310,43 @@ func TestMSC2836(t *testing.T) {
 		assertContains(t, body, []string{eventB.EventID(), eventD.EventID(), eventC.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
 	})
 	t.Run("caps via max_breadth", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:     eventB.EventID(),
-			RecentFirst: &constFalse,
-			DepthFirst:  &constFalse,
-			MaxBreadth:  2,
-			Limit:       10,
-		})
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": false,
+			"depth_first":  false,
+			"max_breadth":  2,
+			"limit":        10,
+		}))
 		// Event G gets omitted because of max_breadth
 		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventH.EventID()})
 	})
 	t.Run("caps via max_depth", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:     eventB.EventID(),
-			RecentFirst: &constFalse,
-			DepthFirst:  &constFalse,
-			MaxDepth:    2,
-			Limit:       10,
-		})
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": false,
+			"depth_first":  false,
+			"max_depth":    2,
+			"limit":        10,
+		}))
 		// Event H gets omitted because of max_depth
 		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
 	})
 	t.Run("terminates when reaching the limit", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:     eventB.EventID(),
-			RecentFirst: &constFalse,
-			DepthFirst:  &constFalse,
-			Limit:       4,
-		})
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": false,
+			"depth_first":  false,
+			"limit":        4,
+		}))
 		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID()})
 	})
 	t.Run("returns all events with a high enough limit", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", &msc2836.EventRelationshipRequest{
-			EventID:     eventB.EventID(),
-			RecentFirst: &constFalse,
-			DepthFirst:  &constFalse,
-			Limit:       400,
-		})
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": false,
+			"depth_first":  false,
+			"limit":        400,
+		}))
 		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID(), eventH.EventID()})
 	})
 }
@@ -356,6 +354,19 @@ func TestMSC2836(t *testing.T) {
 // TODO: TestMSC2836TerminatesLoops (short and long)
 // TODO: TestMSC2836UnknownEventsSkipped
 // TODO: TestMSC2836SkipEventIfNotInRoom
+
+func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2836.EventRelationshipRequest {
+	t.Helper()
+	b, err := json.Marshal(jsonBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %s", err)
+	}
+	r, err := msc2836.NewEventRelationshipRequest(bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatalf("Failed to NewEventRelationshipRequest: %s", err)
+	}
+	return r
+}
 
 func runServer(t *testing.T, router *mux.Router) func() {
 	t.Helper()
@@ -376,6 +387,8 @@ func runServer(t *testing.T, router *mux.Router) func() {
 
 func postRelationships(t *testing.T, expectCode int, accessToken string, req *msc2836.EventRelationshipRequest) *msc2836.EventRelationshipResponse {
 	t.Helper()
+	var r msc2836.EventRelationshipRequest
+	r.Defaults()
 	data, err := json.Marshal(req)
 	if err != nil {
 		t.Fatalf("failed to marshal request: %s", err)
@@ -484,7 +497,7 @@ func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver
 	for _, eventID := range req.EventIDs {
 		ev := r.events[eventID]
 		if ev != nil {
-			res.Events = append(res.Events, *ev)
+			res.Events = append(res.Events, ev)
 		}
 	}
 	return nil
@@ -521,7 +534,7 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 		t.Fatalf("failed to enable MSC2836: %s", err)
 	}
 	for _, ev := range events {
-		hooks.Run(hooks.KindNewEvent, ev)
+		hooks.Run(hooks.KindNewEventPersisted, ev)
 	}
 	return base.PublicClientAPIMux
 }
@@ -557,5 +570,5 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib
 		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
 	}
 	h := signedEvent.Headered(roomVer)
-	return &h
+	return h
 }
