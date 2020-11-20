@@ -74,6 +74,14 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		"limit":     syncReq.limit,
 	})
 
+	lsreq := &userapi.PerformLastSeenUpdateRequest{
+		UserID:     device.UserID,
+		DeviceID:   device.ID,
+		RemoteAddr: req.RemoteAddr,
+	}
+	lsres := &userapi.PerformLastSeenUpdateResponse{}
+	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
+
 	currPos := rp.notifier.CurrentPosition()
 
 	if rp.shouldReturnImmediately(syncReq) {

@@ -17,6 +17,7 @@ package httputil
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -59,6 +60,20 @@ func MakeAuthAPI(
 		logger := util.GetLogger((req.Context()))
 		logger = logger.WithField("user_id", device.UserID)
 		req = req.WithContext(util.ContextWithLogger(req.Context(), logger))
+
+		// check if the forwarding proxy, if there is one, has provided a real address.
+		if realIP := req.Header.Get("X-Real-IP"); realIP != "" {
+			if ip := net.ParseIP(realIP); ip != nil {
+				req.RemoteAddr = realIP
+			}
+		} else if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+			addresses := strings.Split(forwardedFor, ",")
+			if len(addresses) > 0 {
+				if ip := net.ParseIP(addresses[0]); ip != nil {
+					req.RemoteAddr = addresses[0]
+				}
+			}
+		}
 
 		return f(req, device)
 	}
