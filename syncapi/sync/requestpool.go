@@ -61,7 +61,6 @@ func (rp *RequestPool) cleanLastSeen() {
 			lastseen := value.(time.Time)
 			if time.Since(lastseen) > time.Minute*2 {
 				rp.lastseen.Delete(key)
-				fmt.Println("CLEANING", key)
 			}
 			return true
 		})
@@ -73,10 +72,8 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 	value, _ := rp.lastseen.LoadOrStore(device.UserID+device.ID, time.Now().Add(-time.Minute))
 	lastseen := value.(time.Time)
 	if time.Since(lastseen) < time.Minute {
-		fmt.Println("TOO SOON")
 		return
 	}
-	fmt.Println("UPDATING")
 
 	lsreq := &userapi.PerformLastSeenUpdateRequest{
 		UserID:     device.UserID,
