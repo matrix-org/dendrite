@@ -101,55 +101,6 @@ func Enable(
 			)
 		}
 	})
-	hooks.Attach(hooks.KindNewEventReceived, func(headeredEvent interface{}) {
-		he := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
-		ctx := context.Background()
-		// we only inject metadata for events our server sends
-		userID := he.Sender()
-		_, domain, err := gomatrixserverlib.SplitID('@', userID)
-		if err != nil {
-			return
-		}
-		if domain != base.Cfg.Global.ServerName {
-			return
-		}
-		// if this event has an m.relationship, add on the room_id and servers to unsigned
-		parent, child, relType := parentChildEventIDs(he)
-		if parent == "" || child == "" || relType == "" {
-			return
-		}
-		event, joinedToRoom := getEventIfVisible(ctx, rsAPI, parent, userID)
-		if !joinedToRoom {
-			return
-		}
-		err = he.SetUnsignedField(constRoomIDKey, event.RoomID())
-		if err != nil {
-			util.GetLogger(context.Background()).WithError(err).Warn("Failed to SetUnsignedField")
-			return
-		}
-
-		var servers []gomatrixserverlib.ServerName
-		if fsAPI != nil {
-			var res fs.QueryJoinedHostServerNamesInRoomResponse
-			err = fsAPI.QueryJoinedHostServerNamesInRoom(ctx, &fs.QueryJoinedHostServerNamesInRoomRequest{
-				RoomID: event.RoomID(),
-			}, &res)
-			if err != nil {
-				util.GetLogger(context.Background()).WithError(err).Warn("Failed to QueryJoinedHostServerNamesInRoom")
-				return
-			}
-			servers = res.ServerNames
-		} else {
-			servers = []gomatrixserverlib.ServerName{
-				base.Cfg.Global.ServerName,
-			}
-		}
-		err = he.SetUnsignedField(constRoomServers, servers)
-		if err != nil {
-			util.GetLogger(context.Background()).WithError(err).Warn("Failed to SetUnsignedField")
-			return
-		}
-	})
 
 	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
 		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI)),
@@ -220,7 +171,7 @@ func federatedEventRelationship(ctx context.Context, fedReq *gomatrixserverlib.F
 	rc := reqCtx{
 		ctx:                ctx,
 		req:                relation,
-		userID:             "",
+		userID:             string(fedReq.Origin()),
 		rsAPI:              rsAPI,
 		isFederatedRequest: true,
 		db:                 db,
@@ -368,6 +319,16 @@ func walkThread(
 	return result, limited
 }
 
+// walkEventFromServer performs an /event_relationships request to a remote server, injecting the resulting events
+// into the roomserver as KindOutlier, with auth chains.
+func (rc *reqCtx) walkEventFromServer(eventID string) {
+	//var fsAPI fs.FederationSenderInternalAPI
+
+}
+
+// TODO:
+// getEventIfVisible returns the event if it is visible to the user. Does not perform any federated requests.
+// getEvent returns the event, retrieving it if necessary from a remote server.
 func (rc *reqCtx) getEventIfVisible(eventID string, claimedRoomID string, claimedServers []string) *gomatrixserverlib.HeaderedEvent {
 	event, joinedToRoom := getEventIfVisible(rc.ctx, rc.rsAPI, eventID, rc.userID)
 	if event != nil && joinedToRoom {
