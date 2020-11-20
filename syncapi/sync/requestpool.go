@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,11 +62,8 @@ func NewRequestPool(
 
 func (rp *RequestPool) cleanLastSeen() {
 	for {
-		rp.lastseen.Range(func(key interface{}, value interface{}) bool {
-			lastseen := value.(time.Time)
-			if time.Since(lastseen) > time.Minute*2 {
-				rp.lastseen.Delete(key)
-			}
+		rp.lastseen.Range(func(key interface{}, _ interface{}) bool {
+			rp.lastseen.Delete(key)
 			return true
 		})
 		time.Sleep(time.Minute)
@@ -73,17 +71,19 @@ func (rp *RequestPool) cleanLastSeen() {
 }
 
 func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
-	value, _ := rp.lastseen.LoadOrStore(device.UserID+device.ID, time.Now().Add(-time.Minute))
-	lastseen := value.(time.Time)
-	if time.Since(lastseen) < time.Minute {
+	if _, ok := rp.lastseen.LoadOrStore(device.UserID+device.ID, struct{}{}); ok {
 		return
 	}
 
 	remoteAddr := req.RemoteAddr
 	if rp.cfg.RealIPHeader != "" {
-		if realIP := req.Header.Get(rp.cfg.RealIPHeader); realIP != "" {
-			if ip := net.ParseIP(realIP); ip != nil {
-				remoteAddr = realIP
+		if header := req.Header.Get(rp.cfg.RealIPHeader); header != "" {
+			// TODO: Maybe this isn't great but it will satisfy both X-Real-IP
+			// and X-Forwarded-For (which can be a list where the real client
+			// address is the first listed address). Make more intelligent?
+			addresses := strings.Split(header, ",")
+			if ip := net.ParseIP(addresses[0]); ip != nil {
+				remoteAddr = addresses[0]
 			}
 		}
 	}
