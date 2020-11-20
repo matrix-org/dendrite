@@ -19,10 +19,14 @@ package sync
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/config"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/internal"
@@ -37,18 +41,62 @@ import (
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
 	db       storage.Database
+	cfg      *config.SyncAPI
 	userAPI  userapi.UserInternalAPI
 	notifier *Notifier
 	keyAPI   keyapi.KeyInternalAPI
 	rsAPI    roomserverAPI.RoomserverInternalAPI
+	lastseen sync.Map
 }
 
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
-	db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
+	db storage.Database, cfg *config.SyncAPI, n *Notifier,
+	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *RequestPool {
-	return &RequestPool{db, userAPI, n, keyAPI, rsAPI}
+	rp := &RequestPool{db, cfg, userAPI, n, keyAPI, rsAPI, sync.Map{}}
+	go rp.cleanLastSeen()
+	return rp
+}
+
+func (rp *RequestPool) cleanLastSeen() {
+	for {
+		rp.lastseen.Range(func(key interface{}, _ interface{}) bool {
+			rp.lastseen.Delete(key)
+			return true
+		})
+		time.Sleep(time.Minute)
+	}
+}
+
+func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
+	if _, ok := rp.lastseen.LoadOrStore(device.UserID+device.ID, struct{}{}); ok {
+		return
+	}
+
+	remoteAddr := req.RemoteAddr
+	if rp.cfg.RealIPHeader != "" {
+		if header := req.Header.Get(rp.cfg.RealIPHeader); header != "" {
+			// TODO: Maybe this isn't great but it will satisfy both X-Real-IP
+			// and X-Forwarded-For (which can be a list where the real client
+			// address is the first listed address). Make more intelligent?
+			addresses := strings.Split(header, ",")
+			if ip := net.ParseIP(addresses[0]); ip != nil {
+				remoteAddr = addresses[0]
+			}
+		}
+	}
+
+	lsreq := &userapi.PerformLastSeenUpdateRequest{
+		UserID:     device.UserID,
+		DeviceID:   device.ID,
+		RemoteAddr: remoteAddr,
+	}
+	lsres := &userapi.PerformLastSeenUpdateResponse{}
+	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
+
+	rp.lastseen.Store(device.UserID+device.ID, time.Now())
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -73,6 +121,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		"timeout":   syncReq.timeout,
 		"limit":     syncReq.limit,
 	})
+
+	rp.updateLastSeen(req, device)
 
 	currPos := rp.notifier.CurrentPosition()
 
