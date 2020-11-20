@@ -1,5 +1,21 @@
 # Changelog
 
+## Dendrite 0.3.1 (2020-11-20)
+
+### Features
+
+* Memory optimisation by reference passing, significantly reducing the number of allocations and duplication in memory
+* A hook API has been added for experimental MSCs, with an early implementation of MSC2836
+* The last seen timestamp and IP address are now updated automatically when calling `/sync`
+* The last seen timestamp and IP address are now reported in `/_matrix/client/r0/devices` (contributed by [alexkursell](https://github.com/alexkursell))
+* An optional configuration option `sync_api.real_ip_header` has been added for specifying which HTTP header contains the real client IP address (for if Dendrite is running behind a reverse HTTP proxy)
+* Partial implementation of `/_matrix/client/r0/admin/whois` (contributed by [DavidSpenler](https://github.com/DavidSpenler))
+
+### Fixes
+
+* A concurrency bug has been fixed in the federation API that could cause Dendrite to crash
+* The error when registering a username with invalid characters has been corrected (contributed by [bodqhrohro](https://github.com/bodqhrohro))
+
 ## Dendrite 0.3.0 (2020-11-16)
 
 ### Features
