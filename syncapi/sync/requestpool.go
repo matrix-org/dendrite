@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -41,6 +42,7 @@ type RequestPool struct {
 	notifier *Notifier
 	keyAPI   keyapi.KeyInternalAPI
 	rsAPI    roomserverAPI.RoomserverInternalAPI
+	lastseen sync.Map
 }
 
 // NewRequestPool makes a new RequestPool
@@ -48,7 +50,43 @@ func NewRequestPool(
 	db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *RequestPool {
-	return &RequestPool{db, userAPI, n, keyAPI, rsAPI}
+	rp := &RequestPool{db, userAPI, n, keyAPI, rsAPI, sync.Map{}}
+	go rp.cleanLastSeen()
+	return rp
+}
+
+func (rp *RequestPool) cleanLastSeen() {
+	for {
+		rp.lastseen.Range(func(key interface{}, value interface{}) bool {
+			lastseen := value.(time.Time)
+			if time.Since(lastseen) > time.Minute*2 {
+				rp.lastseen.Delete(key)
+				fmt.Println("CLEANING", key)
+			}
+			return true
+		})
+		time.Sleep(time.Minute)
+	}
+}
+
+func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
+	value, _ := rp.lastseen.LoadOrStore(device.UserID+device.ID, time.Now().Add(-time.Minute))
+	lastseen := value.(time.Time)
+	if time.Since(lastseen) < time.Minute {
+		fmt.Println("TOO SOON")
+		return
+	}
+	fmt.Println("UPDATING")
+
+	lsreq := &userapi.PerformLastSeenUpdateRequest{
+		UserID:     device.UserID,
+		DeviceID:   device.ID,
+		RemoteAddr: req.RemoteAddr,
+	}
+	lsres := &userapi.PerformLastSeenUpdateResponse{}
+	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
+
+	rp.lastseen.Store(device.UserID+device.ID, time.Now())
 }
 
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
@@ -74,13 +112,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		"limit":     syncReq.limit,
 	})
 
-	lsreq := &userapi.PerformLastSeenUpdateRequest{
-		UserID:     device.UserID,
-		DeviceID:   device.ID,
-		RemoteAddr: req.RemoteAddr,
-	}
-	lsres := &userapi.PerformLastSeenUpdateResponse{}
-	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
+	rp.updateLastSeen(req, device)
 
 	currPos := rp.notifier.CurrentPosition()
 
