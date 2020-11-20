@@ -7,6 +7,8 @@ type SyncAPI struct {
 	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
 
 	Database DatabaseOptions `yaml:"database"`
+
+	RealIPHeader string `yaml:"real_ip_header"`
 }
 
 func (c *SyncAPI) Defaults() {

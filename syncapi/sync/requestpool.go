@@ -19,11 +19,13 @@ package sync
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/config"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/internal"
@@ -38,6 +40,7 @@ import (
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
 	db       storage.Database
+	cfg      *config.SyncAPI
 	userAPI  userapi.UserInternalAPI
 	notifier *Notifier
 	keyAPI   keyapi.KeyInternalAPI
@@ -47,10 +50,11 @@ type RequestPool struct {
 
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
-	db storage.Database, n *Notifier, userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
+	db storage.Database, cfg *config.SyncAPI, n *Notifier,
+	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *RequestPool {
-	rp := &RequestPool{db, userAPI, n, keyAPI, rsAPI, sync.Map{}}
+	rp := &RequestPool{db, cfg, userAPI, n, keyAPI, rsAPI, sync.Map{}}
 	go rp.cleanLastSeen()
 	return rp
 }
@@ -75,10 +79,19 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 		return
 	}
 
+	remoteAddr := req.RemoteAddr
+	if rp.cfg.RealIPHeader != "" {
+		if realIP := req.Header.Get(rp.cfg.RealIPHeader); realIP != "" {
+			if ip := net.ParseIP(realIP); ip != nil {
+				remoteAddr = realIP
+			}
+		}
+	}
+
 	lsreq := &userapi.PerformLastSeenUpdateRequest{
 		UserID:     device.UserID,
 		DeviceID:   device.ID,
-		RemoteAddr: req.RemoteAddr,
+		RemoteAddr: remoteAddr,
 	}
 	lsres := &userapi.PerformLastSeenUpdateResponse{}
 	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
