@@ -125,6 +125,7 @@ type reqCtx struct {
 	rsAPI              roomserver.RoomserverInternalAPI
 	db                 Database
 	req                *EventRelationshipRequest
+	fsAPI              fs.FederationSenderInternalAPI
 	userID             string
 	isFederatedRequest bool
 }
