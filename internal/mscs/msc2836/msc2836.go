@@ -124,7 +124,7 @@ type reqCtx struct {
 	db                Database
 	req               *EventRelationshipRequest
 	userID            string
-	authorisedRoomIDs map[string]bool // events from these rooms can be returned
+	authorisedRoomIDs map[string]gomatrixserverlib.RoomVersion // events from these rooms can be returned
 
 	// federated request args
 	isFederatedRequest bool
@@ -149,6 +149,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 			rsAPI:              rsAPI,
 			isFederatedRequest: false,
 			db:                 db,
+			authorisedRoomIDs:  make(map[string]gomatrixserverlib.RoomVersion),
 		}
 		res, resErr := rc.process()
 		if resErr != nil {
@@ -174,10 +175,11 @@ func federatedEventRelationship(
 		}
 	}
 	rc := reqCtx{
-		ctx:   ctx,
-		req:   relation,
-		rsAPI: rsAPI,
-		db:    db,
+		ctx:               ctx,
+		req:               relation,
+		rsAPI:             rsAPI,
+		db:                db,
+		authorisedRoomIDs: make(map[string]gomatrixserverlib.RoomVersion),
 		// federation args
 		isFederatedRequest: true,
 		fsAPI:              fsAPI,
@@ -254,7 +256,7 @@ func (rc *reqCtx) includeParent(childEvent *gomatrixserverlib.HeaderedEvent) (pa
 	if parentID == "" {
 		return nil
 	}
-	return rc.getLocalEventIfVisible(parentID)
+	return rc.lookForEvent(parentID)
 }
 
 // If include_children: true, lookup all events which have event_id as an m.relationship
@@ -269,7 +271,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	}
 	var childEvents []*gomatrixserverlib.HeaderedEvent
 	for _, child := range children {
-		childEvent := rc.getLocalEventIfVisible(child.EventID)
+		childEvent := rc.lookForEvent(child.EventID)
 		if childEvent != nil {
 			childEvents = append(childEvents, childEvent)
 		}
@@ -307,8 +309,11 @@ func walkThread(
 			}
 
 			// Process the event.
-			// TODO: Include edge information: room ID and servers
-			event := rc.getLocalEventIfVisible(wi.EventID)
+			// TODO XXX: if event is not found, use remoteEventRelationships to explore that part of the thread remotely.
+			// This will probably be easiest if the event relationships response is directly pumped into the database
+			// so the next walk will do the right thing. This requires those events to be authed and likely injected as
+			// outliers into the roomserver DB, which will de-dupe appropriately.
+			event := rc.lookForEvent(wi.EventID)
 			if event != nil {
 				result = append(result, event)
 			}
@@ -343,14 +348,12 @@ func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverli
 
 }
 
-// TODO: getRemoteEventIfVisible: if event ID is unknown, blindly attempt to join (which room? Origin, via who?) then hit /event_relationships.
-
 // authorisedToSeeEvent authenticates that the user or server is allowed to see this event. Returns true if allowed to
 // see this request.
 func (rc *reqCtx) authorisedToSeeEvent(event *gomatrixserverlib.HeaderedEvent) bool {
 	authorised, ok := rc.authorisedRoomIDs[event.RoomID()]
 	if ok {
-		return authorised
+		return len(authorised) > 0
 	}
 	if rc.isFederatedRequest {
 		// make sure the server is in this room
@@ -364,7 +367,7 @@ func (rc *reqCtx) authorisedToSeeEvent(event *gomatrixserverlib.HeaderedEvent) b
 		}
 		for _, srv := range res.ServerNames {
 			if srv == rc.serverName {
-				rc.authorisedRoomIDs[event.RoomID()] = true
+				rc.authorisedRoomIDs[event.RoomID()] = event.Version()
 				return true
 			}
 		}
@@ -375,15 +378,95 @@ func (rc *reqCtx) authorisedToSeeEvent(event *gomatrixserverlib.HeaderedEvent) b
 	if err != nil || !joinedToRoom {
 		return false
 	}
-	rc.authorisedRoomIDs[event.RoomID()] = true
+	rc.authorisedRoomIDs[event.RoomID()] = event.Version()
 	return true
 }
 
-// getLocalEventIfVisible returns the event for the event ID given, by trying to auto-join rooms if not authorised
-func (rc *reqCtx) getLocalEventIfVisible(eventID string) *gomatrixserverlib.HeaderedEvent {
+func (rc *reqCtx) getServersForEventID(eventID string) (string, gomatrixserverlib.RoomVersion, []gomatrixserverlib.ServerName) {
+	if len(rc.authorisedRoomIDs) != 1 {
+		util.GetLogger(rc.ctx).WithField("event_id", eventID).Error(
+			"getServersForEventID: thread exists over multiple rooms and reached unknown event, cannot determine room and hence which servers to query",
+		)
+		return "", "", nil
+	}
+	var roomID string
+	var roomVer gomatrixserverlib.RoomVersion
+	for r, v := range rc.authorisedRoomIDs {
+		roomID = r
+		roomVer = v
+	}
+	var queryRes fs.QueryJoinedHostServerNamesInRoomResponse
+	err := rc.fsAPI.QueryJoinedHostServerNamesInRoom(rc.ctx, &fs.QueryJoinedHostServerNamesInRoomRequest{
+		RoomID: roomID,
+	}, &queryRes)
+	if err != nil {
+		util.GetLogger(rc.ctx).WithError(err).Error("getServersForEventID: failed to QueryJoinedHostServerNamesInRoom")
+		return "", "", nil
+	}
+	// query up to 5 servers
+	serversToQuery := queryRes.ServerNames
+	if len(serversToQuery) > 5 {
+		serversToQuery = serversToQuery[:5]
+	}
+	return roomID, roomVer, serversToQuery
+}
+
+// remoteEvent queries for the event ID given.
+func (rc *reqCtx) remoteEvent(eventID string) *gomatrixserverlib.HeaderedEvent {
+	if rc.isFederatedRequest {
+		return nil // we don't query remote servers for remote requests
+	}
+	_, roomVer, serversToQuery := rc.getServersForEventID(eventID)
+	for _, s := range serversToQuery {
+		txn, err := rc.fsAPI.GetEvent(rc.ctx, s, eventID)
+		if err != nil {
+			util.GetLogger(rc.ctx).WithError(err).Warn("remoteEvent: failed to GetEvent")
+			continue
+		}
+		if len(txn.PDUs) != 1 {
+			continue
+		}
+		ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(txn.PDUs[0], roomVer)
+		if err != nil {
+			util.GetLogger(rc.ctx).WithError(err).Warn("remoteEvent: failed to NewEventFromUntrustedJSON")
+			continue
+		}
+		// TODO: check sigs on event
+		// TODO: check auth events on event
+		return ev.Headered(roomVer)
+	}
+	return nil
+}
+
+// nolint:unused
+func (rc *reqCtx) remoteEventRelationships(eventID string) *gomatrixserverlib.MSC2836EventRelationshipsResponse {
+	if rc.isFederatedRequest {
+		return nil // we don't query remote servers for remote requests
+	}
+	_, roomVer, serversToQuery := rc.getServersForEventID(eventID)
+	var res *gomatrixserverlib.MSC2836EventRelationshipsResponse
+	var err error
+	for _, srv := range serversToQuery {
+		res, err = rc.MSC2836EventRelationships(eventID, srv, roomVer)
+		if err != nil {
+			util.GetLogger(rc.ctx).WithError(err).WithField("server", srv).Error("remoteEventRelationships: failed to call MSC2836EventRelationships")
+		} else {
+			break
+		}
+	}
+	return res
+}
+
+// lookForEvent returns the event for the event ID given, by trying to auto-join rooms if not authorised and by querying remote servers
+// if the event ID is unknown.
+func (rc *reqCtx) lookForEvent(eventID string) *gomatrixserverlib.HeaderedEvent {
 	event := rc.getLocalEvent(eventID)
 	if event == nil {
-		return nil
+		// this event may have occurred before we joined the room, so delegate to another server to see if they know anything.
+		event = rc.remoteEvent(eventID)
+		if event == nil {
+			return nil
+		}
 	}
 	if rc.authorisedToSeeEvent(event) {
 		return event
