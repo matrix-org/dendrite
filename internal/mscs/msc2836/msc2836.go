@@ -119,13 +119,17 @@ func Enable(
 }
 
 type reqCtx struct {
-	ctx                context.Context
-	rsAPI              roomserver.RoomserverInternalAPI
-	db                 Database
-	req                *EventRelationshipRequest
-	fsAPI              fs.FederationSenderInternalAPI
-	userID             string
+	ctx               context.Context
+	rsAPI             roomserver.RoomserverInternalAPI
+	db                Database
+	req               *EventRelationshipRequest
+	userID            string
+	authorisedRoomIDs map[string]bool // events from these rooms can be returned
+
+	// federated request args
 	isFederatedRequest bool
+	serverName         gomatrixserverlib.ServerName
+	fsAPI              fs.FederationSenderInternalAPI
 }
 
 func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
@@ -170,13 +174,14 @@ func federatedEventRelationship(
 		}
 	}
 	rc := reqCtx{
-		ctx:                ctx,
-		req:                relation,
-		userID:             string(fedReq.Origin()),
-		rsAPI:              rsAPI,
+		ctx:   ctx,
+		req:   relation,
+		rsAPI: rsAPI,
+		db:    db,
+		// federation args
 		isFederatedRequest: true,
-		db:                 db,
 		fsAPI:              fsAPI,
+		serverName:         fedReq.Origin(),
 	}
 	res, resErr := rc.process()
 	if resErr != nil {
@@ -193,9 +198,8 @@ func (rc *reqCtx) process() (*EventRelationshipResponse, *util.JSONResponse) {
 	var res EventRelationshipResponse
 	var returnEvents []*gomatrixserverlib.HeaderedEvent
 	// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
-	// We should have the event being referenced so don't give any claimed room ID / servers
-	event := rc.getEventIfVisible(rc.req.EventID, "", nil)
-	if event == nil {
+	event := rc.getLocalEvent(rc.req.EventID)
+	if event == nil || !rc.authorisedToSeeEvent(event) {
 		return nil, &util.JSONResponse{
 			Code: 403,
 			JSON: jsonerror.Forbidden("Event does not exist or you are not authorised to see it"),
@@ -245,13 +249,12 @@ func (rc *reqCtx) process() (*EventRelationshipResponse, *util.JSONResponse) {
 
 // If include_parent: true and there is a valid m.relationship field in the event,
 // retrieve the referenced event. Apply history visibility check to that event and if it passes, add it to the response array.
-func (rc *reqCtx) includeParent(event *gomatrixserverlib.HeaderedEvent) (parent *gomatrixserverlib.HeaderedEvent) {
-	parentID, _, _ := parentChildEventIDs(event)
+func (rc *reqCtx) includeParent(childEvent *gomatrixserverlib.HeaderedEvent) (parent *gomatrixserverlib.HeaderedEvent) {
+	parentID, _, _ := parentChildEventIDs(childEvent)
 	if parentID == "" {
 		return nil
 	}
-	claimedRoomID, claimedServers := roomIDAndServers(event)
-	return rc.getEventIfVisible(parentID, claimedRoomID, claimedServers)
+	return rc.getLocalEventIfVisible(parentID)
 }
 
 // If include_children: true, lookup all events which have event_id as an m.relationship
@@ -266,8 +269,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	}
 	var childEvents []*gomatrixserverlib.HeaderedEvent
 	for _, child := range children {
-		// in order for us to even know about the children the server must be joined to those rooms, hence pass no claimed room ID or servers.
-		childEvent := rc.getEventIfVisible(child.EventID, "", nil)
+		childEvent := rc.getLocalEventIfVisible(child.EventID)
 		if childEvent != nil {
 			childEvents = append(childEvents, childEvent)
 		}
@@ -306,7 +308,7 @@ func walkThread(
 
 			// Process the event.
 			// TODO: Include edge information: room ID and servers
-			event := rc.getEventIfVisible(wi.EventID, "", nil)
+			event := rc.getLocalEventIfVisible(wi.EventID)
 			if event != nil {
 				result = append(result, event)
 			}
@@ -341,77 +343,101 @@ func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverli
 
 }
 
-// TODO:
-// getEventIfVisible returns the event if it is visible to the user. Does not perform any federated requests.
-// getEvent returns the event, retrieving it if necessary from a remote server.
-func (rc *reqCtx) getEventIfVisible(eventID string, claimedRoomID string, claimedServers []string) *gomatrixserverlib.HeaderedEvent {
-	event, joinedToRoom := getEventIfVisible(rc.ctx, rc.rsAPI, eventID, rc.userID)
-	if event != nil && joinedToRoom {
-		return event
+// TODO: getRemoteEventIfVisible: if event ID is unknown, blindly attempt to join (which room? Origin, via who?) then hit /event_relationships.
+
+// authorisedToSeeEvent authenticates that the user or server is allowed to see this event. Returns true if allowed to
+// see this request.
+func (rc *reqCtx) authorisedToSeeEvent(event *gomatrixserverlib.HeaderedEvent) bool {
+	authorised, ok := rc.authorisedRoomIDs[event.RoomID()]
+	if ok {
+		return authorised
 	}
-	// either we don't have the event or we aren't joined to the room, regardless we should try joining if auto join is enabled
-	if !rc.req.AutoJoin {
-		return nil
-	}
-	// if we're doing this on behalf of a random server don't auto-join rooms regardless of what the request says
 	if rc.isFederatedRequest {
+		// make sure the server is in this room
+		var res fs.QueryJoinedHostServerNamesInRoomResponse
+		err := rc.fsAPI.QueryJoinedHostServerNamesInRoom(rc.ctx, &fs.QueryJoinedHostServerNamesInRoomRequest{
+			RoomID: event.RoomID(),
+		}, &res)
+		if err != nil {
+			util.GetLogger(rc.ctx).WithError(err).Error("authenticateEvent: failed to QueryJoinedHostServerNamesInRoom")
+			return false
+		}
+		for _, srv := range res.ServerNames {
+			if srv == rc.serverName {
+				rc.authorisedRoomIDs[event.RoomID()] = true
+				return true
+			}
+		}
+		return false
+	}
+	// make sure the user is in this room
+	joinedToRoom, err := rc.allowedToSeeEvent(event.RoomID(), rc.userID)
+	if err != nil || !joinedToRoom {
+		return false
+	}
+	rc.authorisedRoomIDs[event.RoomID()] = true
+	return true
+}
+
+// getLocalEventIfVisible returns the event for the event ID given, by trying to auto-join rooms if not authorised
+func (rc *reqCtx) getLocalEventIfVisible(eventID string) *gomatrixserverlib.HeaderedEvent {
+	event := rc.getLocalEvent(eventID)
+	if event == nil {
 		return nil
 	}
-	roomID := claimedRoomID
-	var servers []gomatrixserverlib.ServerName
-	if event != nil {
-		roomID = event.RoomID()
-	}
-	for _, s := range claimedServers {
-		servers = append(servers, gomatrixserverlib.ServerName(s))
-	}
-	var joinRes roomserver.PerformJoinResponse
-	rc.rsAPI.PerformJoin(rc.ctx, &roomserver.PerformJoinRequest{
-		UserID:        rc.userID,
-		Content:       map[string]interface{}{},
-		RoomIDOrAlias: roomID,
-		ServerNames:   servers,
-	}, &joinRes)
-	if joinRes.Error != nil {
-		util.GetLogger(rc.ctx).WithError(joinRes.Error).WithField("room_id", roomID).Error("Failed to auto-join room")
-		return nil
-	}
-	if event != nil {
+	if rc.authorisedToSeeEvent(event) {
 		return event
 	}
-	// TODO: hit /event_relationships on the server we joined via
-	util.GetLogger(rc.ctx).Infof("joined room but need to fetch event TODO")
+	if !rc.isFederatedRequest && rc.req.AutoJoin {
+		// attempt to join the room then recheck auth, but only for local users
+		var joinRes roomserver.PerformJoinResponse
+		rc.rsAPI.PerformJoin(rc.ctx, &roomserver.PerformJoinRequest{
+			UserID:        rc.userID,
+			Content:       map[string]interface{}{},
+			RoomIDOrAlias: event.RoomID(),
+		}, &joinRes)
+		if joinRes.Error != nil {
+			util.GetLogger(rc.ctx).WithError(joinRes.Error).WithField("room_id", event.RoomID()).Error("Failed to auto-join room")
+			return nil
+		}
+		delete(rc.authorisedRoomIDs, event.RoomID())
+		if rc.authorisedToSeeEvent(event) {
+			return event
+		}
+	}
 	return nil
 }
 
-func getEventIfVisible(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, eventID, userID string) (*gomatrixserverlib.HeaderedEvent, bool) {
-	var queryEventsRes roomserver.QueryEventsByIDResponse
-	err := rsAPI.QueryEventsByID(ctx, &roomserver.QueryEventsByIDRequest{
-		EventIDs: []string{eventID},
-	}, &queryEventsRes)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("getEventIfVisible: failed to QueryEventsByID")
-		return nil, false
-	}
-	if len(queryEventsRes.Events) == 0 {
-		util.GetLogger(ctx).Infof("event does not exist")
-		return nil, false // event does not exist
-	}
-	event := queryEventsRes.Events[0]
-
+func (rc *reqCtx) allowedToSeeEvent(roomID, userID string) (bool, error) {
 	// Allow events if the member is in the room
 	// TODO: This does not honour history_visibility
 	// TODO: This does not honour m.room.create content
 	var queryMembershipRes roomserver.QueryMembershipForUserResponse
-	err = rsAPI.QueryMembershipForUser(ctx, &roomserver.QueryMembershipForUserRequest{
-		RoomID: event.RoomID(),
+	err := rc.rsAPI.QueryMembershipForUser(rc.ctx, &roomserver.QueryMembershipForUserRequest{
+		RoomID: roomID,
 		UserID: userID,
 	}, &queryMembershipRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("getEventIfVisible: failed to QueryMembershipForUser")
-		return nil, false
+		util.GetLogger(rc.ctx).WithError(err).Error("allowedToSeeEvent: failed to QueryMembershipForUser")
+		return false, err
 	}
-	return event, queryMembershipRes.IsInRoom
+	return queryMembershipRes.IsInRoom, nil
+}
+
+func (rc *reqCtx) getLocalEvent(eventID string) *gomatrixserverlib.HeaderedEvent {
+	var queryEventsRes roomserver.QueryEventsByIDResponse
+	err := rc.rsAPI.QueryEventsByID(rc.ctx, &roomserver.QueryEventsByIDRequest{
+		EventIDs: []string{eventID},
+	}, &queryEventsRes)
+	if err != nil {
+		util.GetLogger(rc.ctx).WithError(err).Error("getLocalEvent: failed to QueryEventsByID")
+		return nil
+	}
+	if len(queryEventsRes.Events) == 0 {
+		util.GetLogger(rc.ctx).Infof("getLocalEvent: event does not exist")
+		return nil // event does not exist
+	}
+	return queryEventsRes.Events[0]
 }
 
 type walkInfo struct {
