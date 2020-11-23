@@ -46,6 +46,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeSwitch "github.com/matrix-org/pinecone/packetswitch"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
