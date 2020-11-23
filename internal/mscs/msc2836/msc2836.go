@@ -36,9 +36,7 @@ import (
 )
 
 const (
-	constRelType     = "m.reference"
-	constRoomIDKey   = "relationship_room_id"
-	constRoomServers = "relationship_servers"
+	constRelType = "m.reference"
 )
 
 type EventRelationshipRequest struct {
@@ -114,7 +112,7 @@ func Enable(
 			if fedReq == nil {
 				return errResp
 			}
-			return federatedEventRelationship(req.Context(), fedReq, db, rsAPI)
+			return federatedEventRelationship(req.Context(), fedReq, db, rsAPI, fsAPI)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 	return nil
@@ -160,7 +158,9 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 	}
 }
 
-func federatedEventRelationship(ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI) util.JSONResponse {
+func federatedEventRelationship(
+	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
+) util.JSONResponse {
 	relation, err := NewEventRelationshipRequest(bytes.NewBuffer(fedReq.Content()))
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("failed to decode HTTP request as JSON")
@@ -176,6 +176,7 @@ func federatedEventRelationship(ctx context.Context, fedReq *gomatrixserverlib.F
 		rsAPI:              rsAPI,
 		isFederatedRequest: true,
 		db:                 db,
+		fsAPI:              fsAPI,
 	}
 	res, resErr := rc.process()
 	if resErr != nil {
@@ -320,10 +321,23 @@ func walkThread(
 	return result, limited
 }
 
-// walkEventFromServer performs an /event_relationships request to a remote server, injecting the resulting events
+// MSC2836EventRelationships performs an /event_relationships request to a remote server, injecting the resulting events
 // into the roomserver as KindOutlier, with auth chains.
-func (rc *reqCtx) walkEventFromServer(eventID string) {
-	//var fsAPI fs.FederationSenderInternalAPI
+func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*gomatrixserverlib.MSC2836EventRelationshipsResponse, error) {
+	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+		EventID:     eventID,
+		DepthFirst:  rc.req.DepthFirst,
+		Direction:   rc.req.Direction,
+		Limit:       rc.req.Limit,
+		MaxBreadth:  rc.req.MaxBreadth,
+		MaxDepth:    rc.req.MaxDepth,
+		RecentFirst: rc.req.RecentFirst,
+	}, ver)
+	if err != nil {
+		util.GetLogger(rc.ctx).WithError(err).Error("Failed to call MSC2836EventRelationships")
+		return nil, err
+	}
+	return &res, nil
 
 }
 
