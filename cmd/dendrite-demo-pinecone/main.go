@@ -89,7 +89,7 @@ func main() {
 	logger := log.New(os.Stdout, "", 0)
 
 	rL, rR := net.Pipe()
-	pSwitch := pineconeSwitch.NewSwitch(logger, sk, pk)
+	pSwitch := pineconeSwitch.NewSwitch(logger, sk, pk, false)
 	pRouter := pineconeRouter.NewRouter(logger, sk, pk, rL, "router", nil)
 	if _, err := pSwitch.Connect(rR); err != nil {
 		panic(err)
