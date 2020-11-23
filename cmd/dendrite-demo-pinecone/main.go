@@ -109,7 +109,7 @@ func main() {
 	}
 
 	pQUIC := pineconeSessions.NewQUIC(logger, pRouter)
-	//_ = pineconeMulticast.NewMulticast(logger, pSwitch)
+	_ = pineconeMulticast.NewMulticast(logger, pSwitch)
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
@@ -191,8 +191,8 @@ func main() {
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	pQUIC.Mux().Handle(httputil.PublicFederationPathPrefix, base.PublicFederationAPIMux)
-	pQUIC.Mux().Handle(httputil.PublicMediaPathPrefix, base.PublicMediaAPIMux)
+	pQUIC.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
+	pQUIC.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
