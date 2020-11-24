@@ -53,6 +53,7 @@ const (
 	RoomserverQuerySharedUsersPath             = "/roomserver/querySharedUsers"
 	RoomserverQueryKnownUsersPath              = "/roomserver/queryKnownUsers"
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
+	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -481,6 +482,16 @@ func (h *httpRoomserverInternalAPI) QueryKnownUsers(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryKnownUsersPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) QueryAuthChain(
+	ctx context.Context, req *api.QueryAuthChainRequest, res *api.QueryAuthChainResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryAuthChain")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryAuthChainPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 

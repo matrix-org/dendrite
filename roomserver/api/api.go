@@ -126,6 +126,14 @@ type RoomserverInternalAPI interface {
 		response *QueryStateAndAuthChainResponse,
 	) error
 
+	// QueryAuthChain returns the entire auth chain for the event IDs given.
+	// Omits without error any missing auth events.
+	QueryAuthChain(
+		ctx context.Context,
+		request *QueryAuthChainRequest,
+		response *QueryAuthChainResponse,
+	) error
+
 	// QueryCurrentState retrieves the requested state events. If state events are not found, they will be missing from
 	// the response.
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
