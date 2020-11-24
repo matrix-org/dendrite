@@ -198,6 +198,30 @@ func federatedEventRelationship(
 	if resErr != nil {
 		return *resErr
 	}
+	// add auth chain information
+	requiredAuthEventsSet := make(map[string]bool)
+	var requiredAuthEvents []string
+	for _, ev := range res.Events {
+		for _, a := range ev.AuthEventIDs() {
+			if requiredAuthEventsSet[a] {
+				continue
+			}
+			requiredAuthEvents = append(requiredAuthEvents, a)
+			requiredAuthEventsSet[a] = true
+		}
+	}
+	var queryRes roomserver.QueryAuthChainResponse
+	err = rsAPI.QueryAuthChain(ctx, &roomserver.QueryAuthChainRequest{
+		EventIDs: requiredAuthEvents,
+	}, &queryRes)
+	if err != nil {
+		// they may already have the auth events so don't fail this request
+		util.GetLogger(ctx).WithError(err).Error("Failed to QueryAuthChain")
+	}
+	res.AuthChain = make([]*gomatrixserverlib.Event, len(queryRes.AuthChain))
+	for i := range queryRes.AuthChain {
+		res.AuthChain[i] = queryRes.AuthChain[i].Unwrap()
+	}
 
 	return util.JSONResponse{
 		Code: 200,

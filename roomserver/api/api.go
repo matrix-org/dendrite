@@ -127,7 +127,8 @@ type RoomserverInternalAPI interface {
 	) error
 
 	// QueryAuthChain returns the entire auth chain for the event IDs given.
-	// Omits without error any missing auth events.
+	// The response includes the events in the request.
+	// Omits without error for any missing auth events. There will be no duplicates.
 	QueryAuthChain(
 		ctx context.Context,
 		request *QueryAuthChainRequest,
