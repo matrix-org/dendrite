@@ -110,7 +110,7 @@ func Enable(
 	})
 
 	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
-		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI)),
+		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI, fsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	base.PublicFederationAPIMux.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
@@ -141,7 +141,7 @@ type reqCtx struct {
 	fsAPI              fs.FederationSenderInternalAPI
 }
 
-func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
+func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		relation, err := NewEventRelationshipRequest(req.Body)
 		if err != nil {
@@ -156,6 +156,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 			req:                relation,
 			userID:             device.UserID,
 			rsAPI:              rsAPI,
+			fsAPI:              fsAPI,
 			isFederatedRequest: false,
 			db:                 db,
 			authorisedRoomIDs:  make(map[string]gomatrixserverlib.RoomVersion),

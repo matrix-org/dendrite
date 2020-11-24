@@ -63,6 +63,8 @@ func main() {
 	if *defaultsForCI {
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		cfg.FederationSender.DisableTLSValidation = true
+		cfg.MSCs.MSCs = []string{"msc2836"}
+		cfg.Logging[0].Level = "trace"
 	}
 
 	j, err := yaml.Marshal(cfg)
