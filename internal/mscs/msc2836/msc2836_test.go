@@ -411,8 +411,12 @@ func postRelationships(t *testing.T, expectCode int, accessToken string, req *ms
 	}
 	if res.StatusCode == 200 {
 		var result msc2836.EventRelationshipResponse
-		if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-			t.Fatalf("response 200 OK but failed to deserialise JSON : %s", err)
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("response 200 OK but failed to read response body: %s", err)
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("response 200 OK but failed to deserialise JSON : %s\nbody: %s", err, string(body))
 		}
 		return &result
 	}

@@ -79,6 +79,15 @@ type EventRelationshipResponse struct {
 	Limited   bool                            `json:"limited"`
 }
 
+func toClientResponse(res *gomatrixserverlib.MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
+	out := &EventRelationshipResponse{
+		Events:    gomatrixserverlib.ToClientEvents(res.Events, gomatrixserverlib.FormatAll),
+		Limited:   res.Limited,
+		NextBatch: res.NextBatch,
+	}
+	return out
+}
+
 // Enable this MSC
 // nolint:gocyclo
 func Enable(
@@ -158,7 +167,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 
 		return util.JSONResponse{
 			Code: 200,
-			JSON: res,
+			JSON: toClientResponse(res),
 		}
 	}
 }
@@ -196,8 +205,8 @@ func federatedEventRelationship(
 	}
 }
 
-func (rc *reqCtx) process() (*EventRelationshipResponse, *util.JSONResponse) {
-	var res EventRelationshipResponse
+func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsResponse, *util.JSONResponse) {
+	var res gomatrixserverlib.MSC2836EventRelationshipsResponse
 	var returnEvents []*gomatrixserverlib.HeaderedEvent
 	// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
 	event := rc.getLocalEvent(rc.req.EventID)
@@ -241,9 +250,9 @@ func (rc *reqCtx) process() (*EventRelationshipResponse, *util.JSONResponse) {
 		)
 		returnEvents = append(returnEvents, events...)
 	}
-	res.Events = make([]gomatrixserverlib.ClientEvent, len(returnEvents))
+	res.Events = make([]*gomatrixserverlib.Event, len(returnEvents))
 	for i, ev := range returnEvents {
-		res.Events[i] = gomatrixserverlib.HeaderedToClientEvent(ev, gomatrixserverlib.FormatAll)
+		res.Events[i] = ev.Unwrap()
 	}
 	res.Limited = remaining == 0 || walkLimited
 	return &res, nil
