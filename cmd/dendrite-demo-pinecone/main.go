@@ -32,7 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/embed"
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/signing"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
@@ -138,7 +138,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	federation := conn.CreateFederationClient(base, pQUIC)
 
-	serverKeyAPI := &signing.PineconeKeys{}
+	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)

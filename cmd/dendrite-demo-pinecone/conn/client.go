@@ -26,7 +26,7 @@ func CreateClient(
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
 			inner: &http.Transport{
-				MaxIdleConnsPerHost:   1,
+				MaxIdleConnsPerHost:   -1,
 				DisableKeepAlives:     true,
 				TLSHandshakeTimeout:   10 * time.Second,
 				ResponseHeaderTimeout: 10 * time.Second,
@@ -48,7 +48,7 @@ func CreateFederationClient(
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
 			inner: &http.Transport{
-				MaxIdleConnsPerHost:   1,
+				MaxIdleConnsPerHost:   -1,
 				DisableKeepAlives:     true,
 				TLSHandshakeTimeout:   10 * time.Second,
 				ResponseHeaderTimeout: 10 * time.Second,
