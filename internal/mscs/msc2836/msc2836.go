@@ -570,9 +570,12 @@ func (rc *reqCtx) getLocalEvent(eventID string) *gomatrixserverlib.HeaderedEvent
 
 func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836EventRelationshipsResponse) {
 	var stateEvents []*gomatrixserverlib.Event
+	var messageEvents []*gomatrixserverlib.Event
 	for _, ev := range res.Events {
 		if ev.StateKey() != nil {
 			stateEvents = append(stateEvents, ev)
+		} else {
+			messageEvents = append(messageEvents, ev)
 		}
 	}
 	respState := gomatrixserverlib.RespState{
@@ -587,7 +590,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836Event
 	// everything gets sent as an outlier because auth chain events may be disjoint from the DAG
 	// as may the threaded events.
 	var ires []roomserver.InputRoomEvent
-	for _, outlier := range eventsInOrder {
+	for _, outlier := range append(eventsInOrder, messageEvents...) {
 		ires = append(ires, roomserver.InputRoomEvent{
 			Kind:         roomserver.KindOutlier,
 			Event:        outlier.Headered(outlier.Version()),
