@@ -97,7 +97,7 @@ func (m *DendriteMonolith) Start() {
 	var sk ed25519.PrivateKey
 	var pk ed25519.PublicKey
 	yggfile := fmt.Sprintf("%s/dendrite-yggdrasil.conf", m.StorageDirectory)
-	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
+	if _, err := os.Stat(yggfile); err == nil {
 		yggconf, e := ioutil.ReadFile(yggfile)
 		if e != nil {
 			panic(err)
@@ -107,10 +107,12 @@ func (m *DendriteMonolith) Start() {
 			panic(err)
 		}
 		if mapconf["SigningPrivateKey"] != nil && mapconf["SigningPublicKey"] != nil {
-			if sk, err = hex.DecodeString(mapconf["SigningPrivateKey"].(string)); err != nil {
+			m.config.SigningPrivateKey = mapconf["SigningPrivateKey"].(string)
+			m.config.SigningPublicKey = mapconf["SigningPublicKey"].(string)
+			if sk, err = hex.DecodeString(m.config.SigningPrivateKey); err != nil {
 				panic(err)
 			}
-			if pk, err = hex.DecodeString(mapconf["SigningPublicKey"].(string)); err != nil {
+			if pk, err = hex.DecodeString(m.config.SigningPublicKey); err != nil {
 				panic(err)
 			}
 		} else {
@@ -157,7 +159,7 @@ func (m *DendriteMonolith) Start() {
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(m.config.SigningPublicKey)
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.Kafka.UseNaffka = true
