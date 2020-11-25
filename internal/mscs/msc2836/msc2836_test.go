@@ -349,6 +349,24 @@ func TestMSC2836(t *testing.T) {
 		}))
 		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID(), eventH.EventID()})
 	})
+	t.Run("can navigate up the graph with direction: up", func(t *testing.T) {
+		//   A4
+		//   |
+		//   B3
+		//  / \
+		// C   D2
+		//    /| \
+		//   E F1 G
+		//   |
+		//   H
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventF.EventID(),
+			"recent_first": false,
+			"depth_first":  true,
+			"direction":    "up",
+		}))
+		assertContains(t, body, []string{eventF.EventID(), eventD.EventID(), eventB.EventID(), eventA.EventID()})
+	})
 }
 
 // TODO: TestMSC2836TerminatesLoops (short and long)

@@ -25,6 +25,10 @@ type Database interface {
 	// provided `relType`. The returned slice is sorted by origin_server_ts according to whether
 	// `recentFirst` is true or false.
 	ChildrenForParent(ctx context.Context, eventID, relType string, recentFirst bool) ([]eventInfo, error)
+	// ParentForChild returns the parent event for the given child `eventID`. The eventInfo should be nil if
+	// there is no parent for this child event, with no error. The parent eventInfo can be missing the
+	// timestamp if the event is not known to the server.
+	ParentForChild(ctx context.Context, eventID, relType string) (*eventInfo, error)
 }
 
 type DB struct {
@@ -34,6 +38,7 @@ type DB struct {
 	insertNodeStmt                         *sql.Stmt
 	selectChildrenForParentOldestFirstStmt *sql.Stmt
 	selectChildrenForParentRecentFirstStmt *sql.Stmt
+	selectParentForChildStmt               *sql.Stmt
 }
 
 // NewDatabase loads the database for msc2836
@@ -93,6 +98,11 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	if d.selectChildrenForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenQuery + "DESC"); err != nil {
 		return nil, err
 	}
+	if d.selectParentForChildStmt, err = d.db.Prepare(`
+		SELECT parent_event_id, parent_room_id FROM msc2836_edges WHERE child_event_id = $1 AND rel_type = $2
+	`); err != nil {
+		return nil, err
+	}
 	return &d, err
 }
 
@@ -145,6 +155,11 @@ func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	if d.selectChildrenForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenQuery + "DESC"); err != nil {
 		return nil, err
 	}
+	if d.selectParentForChildStmt, err = d.db.Prepare(`
+		SELECT parent_event_id, parent_room_id FROM msc2836_edges WHERE child_event_id = $1 AND rel_type = $2
+	`); err != nil {
+		return nil, err
+	}
 	return &d, nil
 }
 
@@ -189,6 +204,17 @@ func (p *DB) ChildrenForParent(ctx context.Context, eventID, relType string, rec
 		children = append(children, evInfo)
 	}
 	return children, nil
+}
+
+func (p *DB) ParentForChild(ctx context.Context, eventID, relType string) (*eventInfo, error) {
+	var ei eventInfo
+	err := p.selectParentForChildStmt.QueryRowContext(ctx, eventID, relType).Scan(&ei.EventID, &ei.RoomID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &ei, nil
 }
 
 func parentChildEventIDs(ev *gomatrixserverlib.HeaderedEvent) (parent, child, relType string) {

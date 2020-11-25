@@ -322,10 +322,6 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 func walkThread(
 	ctx context.Context, db Database, rc *reqCtx, included map[string]bool, limit int,
 ) ([]*gomatrixserverlib.HeaderedEvent, bool) {
-	if rc.req.Direction != "down" {
-		util.GetLogger(ctx).Error("not implemented: direction=up")
-		return nil, false
-	}
 	var result []*gomatrixserverlib.HeaderedEvent
 	eventWalker := walker{
 		ctx: ctx,
@@ -620,9 +616,9 @@ type walker struct {
 
 // WalkFrom the event ID given
 func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
-	children, err := w.db.ChildrenForParent(w.ctx, eventID, constRelType, w.req.RecentFirst)
+	children, err := w.childrenForParent(eventID)
 	if err != nil {
-		util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() ChildrenForParent failed, cannot walk")
+		util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
 		return false, err
 	}
 	var next *walkInfo
@@ -634,9 +630,9 @@ func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 			return true, nil
 		}
 		// find the children's children
-		children, err = w.db.ChildrenForParent(w.ctx, next.EventID, constRelType, w.req.RecentFirst)
+		children, err = w.childrenForParent(next.EventID)
 		if err != nil {
-			util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() ChildrenForParent failed, cannot walk")
+			util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
 			return false, err
 		}
 		toWalk = w.addChildren(toWalk, children, next.Depth+1)
@@ -694,4 +690,21 @@ func (w *walker) nextChild(toWalk []walkInfo) (*walkInfo, []walkInfo) {
 	// toWalk is a queue so shift the child off
 	child, toWalk = toWalk[0], toWalk[1:]
 	return &child, toWalk
+}
+
+// childrenForParent returns the children events for this event ID, honouring the direction: up|down flags
+// meaning this can actually be returning the parent for the event instead of the children.
+func (w *walker) childrenForParent(eventID string) ([]eventInfo, error) {
+	if w.req.Direction == "down" {
+		return w.db.ChildrenForParent(w.ctx, eventID, constRelType, w.req.RecentFirst)
+	}
+	// find the event to pull out the parent
+	ei, err := w.db.ParentForChild(w.ctx, eventID, constRelType)
+	if err != nil {
+		return nil, err
+	}
+	if ei != nil {
+		return []eventInfo{*ei}, nil
+	}
+	return nil, nil
 }
