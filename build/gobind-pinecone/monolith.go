@@ -224,7 +224,7 @@ func (m *DendriteMonolith) Start() {
 		RoomserverAPI:          rsAPI,
 		UserAPI:                userAPI,
 		KeyAPI:                 keyAPI,
-		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pSwitch, pRouter, pQUIC, fsAPI, federation),
+		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(m.PineconeSwitch, m.PineconeRouter, m.PineconeQUIC, fsAPI, federation),
 	}
 	monolith.AddAllPublicRoutes(
 		base.PublicClientAPIMux,
