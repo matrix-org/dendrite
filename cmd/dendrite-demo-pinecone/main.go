@@ -56,9 +56,10 @@ import (
 )
 
 var (
-	instanceName = flag.String("name", "dendrite-p2p-pinecone", "the name of this P2P demo instance")
-	instancePort = flag.Int("port", 8008, "the port that the client API will listen on")
-	instancePeer = flag.String("peer", "", "the static Pinecone peer to connect to")
+	instanceName   = flag.String("name", "dendrite-p2p-pinecone", "the name of this P2P demo instance")
+	instancePort   = flag.Int("port", 8008, "the port that the client API will listen on")
+	instancePeer   = flag.String("peer", "", "the static Pinecone peer to connect to")
+	instanceListen = flag.String("listen", ":0", "the port Pinecone peers can connect to")
 )
 
 // nolint:gocyclo
@@ -109,6 +110,29 @@ func main() {
 			}
 		}(*instancePeer)
 	}
+
+	go func() {
+		listener, err := net.Listen("tcp", *instanceListen)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("Listening on", listener.Addr())
+
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				panic(err)
+			}
+
+			port, err := pSwitch.AuthenticatedConnect(conn, "")
+			if err != nil {
+				panic(err)
+			}
+
+			fmt.Println("Inbound connection", conn.RemoteAddr(), "is connected to port", port)
+		}
+	}()
 
 	pQUIC := pineconeSessions.NewQUIC(logger, pRouter)
 	_ = pineconeMulticast.NewMulticast(logger, pSwitch)
