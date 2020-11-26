@@ -32,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/embed"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -168,12 +169,13 @@ func main() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:       asAPI,
-		EDUInternalAPI:      eduInputAPI,
-		FederationSenderAPI: fsAPI,
-		RoomserverAPI:       rsAPI,
-		UserAPI:             userAPI,
-		KeyAPI:              keyAPI,
+		AppserviceAPI:          asAPI,
+		EDUInternalAPI:         eduInputAPI,
+		FederationSenderAPI:    fsAPI,
+		RoomserverAPI:          rsAPI,
+		UserAPI:                userAPI,
+		KeyAPI:                 keyAPI,
+		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pSwitch, pRouter, pQUIC, fsAPI, federation),
 	}
 	monolith.AddAllPublicRoutes(
 		base.PublicClientAPIMux,

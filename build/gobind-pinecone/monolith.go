@@ -18,6 +18,7 @@ import (
 	"github.com/hjson/hjson-go"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -223,7 +224,7 @@ func (m *DendriteMonolith) Start() {
 		RoomserverAPI:          rsAPI,
 		UserAPI:                userAPI,
 		KeyAPI:                 keyAPI,
-		ExtPublicRoomsProvider: nil,
+		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pSwitch, pRouter, pQUIC, fsAPI, federation),
 	}
 	monolith.AddAllPublicRoutes(
 		base.PublicClientAPIMux,

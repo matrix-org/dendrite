@@ -36,12 +36,12 @@ func (h mimeFixingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func Embed(rootMux *mux.Router, listenPort int, serverName string) {
-	url := fmt.Sprintf("http://localhost:%d", listenPort)
 	embeddedFS := _escFS(false)
 	embeddedServ := mimeFixingHandler{http.FileServer(embeddedFS)}
 
 	rootMux.NotFoundHandler = embeddedServ
-	rootMux.HandleFunc("/config.json", func(w http.ResponseWriter, _ *http.Request) {
+	rootMux.HandleFunc("/config.json", func(w http.ResponseWriter, r *http.Request) {
+		url := fmt.Sprintf("http://%s:%d", r.Header("Host"), listenPort)
 		configFile, err := embeddedFS.Open("/config.sample.json")
 		if err != nil {
 			w.WriteHeader(500)
