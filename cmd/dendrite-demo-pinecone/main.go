@@ -91,7 +91,7 @@ func main() {
 	rL, rR := net.Pipe()
 	pSwitch := pineconeSwitch.NewSwitch(logger, sk, pk, false)
 	pRouter := pineconeRouter.NewRouter(logger, sk, pk, rL, "router", nil)
-	if _, err := pSwitch.Connect(rR); err != nil {
+	if _, err := pSwitch.Connect(rR, nil, ""); err != nil {
 		panic(err)
 	}
 
@@ -103,7 +103,7 @@ func main() {
 				return
 			}
 
-			if _, err := pSwitch.Connect(parent); err != nil {
+			if _, err := pSwitch.Connect(parent, nil, "static"); err != nil {
 				logrus.WithError(err).Errorf("Failed to connect Pinecone static peer to switch")
 			}
 		}(*instancePeer)
