@@ -18,10 +18,13 @@ package msc2836
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -277,6 +280,8 @@ func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsRespons
 	}
 	res.Events = make([]*gomatrixserverlib.Event, len(returnEvents))
 	for i, ev := range returnEvents {
+		// for each event, extract the children_count | hash and add it as unsigned data.
+		rc.addChildMetadata(ev)
 		res.Events[i] = ev.Unwrap()
 	}
 	res.Limited = remaining == 0 || walkLimited
@@ -358,8 +363,7 @@ func walkThread(
 	return result, limited
 }
 
-// MSC2836EventRelationships performs an /event_relationships request to a remote server, injecting the resulting events
-// into the roomserver as KindOutlier, with auth chains.
+// MSC2836EventRelationships performs an /event_relationships request to a remote server
 func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*gomatrixserverlib.MSC2836EventRelationshipsResponse, error) {
 	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
 		EventID:     eventID,
@@ -568,6 +572,8 @@ func (rc *reqCtx) getLocalEvent(eventID string) *gomatrixserverlib.HeaderedEvent
 	return queryEventsRes.Events[0]
 }
 
+// injectResponseToRoomserver injects the events
+// into the roomserver as KindOutlier, with auth chains.
 func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836EventRelationshipsResponse) {
 	var stateEvents []*gomatrixserverlib.Event
 	var messageEvents []*gomatrixserverlib.Event
@@ -601,6 +607,38 @@ func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836Event
 	err = roomserver.SendInputRoomEvents(context.Background(), rc.rsAPI, ires)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
+	}
+}
+
+func (rc *reqCtx) addChildMetadata(ev *gomatrixserverlib.HeaderedEvent) {
+	children, err := rc.db.ChildrenForParent(rc.ctx, ev.EventID(), constRelType, false)
+	if err != nil {
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to get ChildrenForParent for adding child metadata")
+		return
+	}
+	if len(children) == 0 {
+		return
+	}
+	// sort it lexiographically
+	sort.Slice(children, func(i, j int) bool {
+		return children[i].EventID < children[j].EventID
+	})
+	// hash it
+	var eventIDs strings.Builder
+	for _, c := range children {
+		_, _ = eventIDs.WriteString(c.EventID)
+	}
+	hashValBytes := sha256.Sum256([]byte(eventIDs.String()))
+
+	err = ev.SetUnsignedField("children_hash", gomatrixserverlib.Base64Bytes(hashValBytes[:]))
+	if err != nil {
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children_hash")
+	}
+	err = ev.SetUnsignedField("children", map[string]int{
+		constRelType: len(children),
+	})
+	if err != nil {
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children count")
 	}
 }
 

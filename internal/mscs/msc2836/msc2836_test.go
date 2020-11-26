@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -367,6 +371,21 @@ func TestMSC2836(t *testing.T) {
 		}))
 		assertContains(t, body, []string{eventF.EventID(), eventD.EventID(), eventB.EventID(), eventA.EventID()})
 	})
+	t.Run("includes children and children_hash in unsigned", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": false,
+			"depth_first":  false,
+			"limit":        3,
+		}))
+		// event B has C,D as children
+		// event C has no children
+		// event D has 3 children (not included in response)
+		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID()})
+		assertUnsignedChildren(t, body.Events[0], "m.reference", 2, []string{eventC.EventID(), eventD.EventID()})
+		assertUnsignedChildren(t, body.Events[1], "", 0, nil)
+		assertUnsignedChildren(t, body.Events[2], "m.reference", 3, []string{eventE.EventID(), eventF.EventID(), eventG.EventID()})
+	})
 }
 
 // TODO: TestMSC2836TerminatesLoops (short and long)
@@ -454,6 +473,43 @@ func assertContains(t *testing.T, result *msc2836.EventRelationshipResponse, wan
 		if gotEventIDs[i] != wantEventIDs[i] {
 			t.Errorf("wrong item in position %d - got %s want %s", i, gotEventIDs[i], wantEventIDs[i])
 		}
+	}
+}
+
+func assertUnsignedChildren(t *testing.T, ev gomatrixserverlib.ClientEvent, relType string, wantCount int, childrenEventIDs []string) {
+	t.Helper()
+	unsigned := struct {
+		Children map[string]int `json:"children"`
+		Hash     string         `json:"children_hash"`
+	}{}
+	if err := json.Unmarshal(ev.Unsigned, &unsigned); err != nil {
+		if wantCount == 0 {
+			return // no children so possible there is no unsigned field at all
+		}
+		t.Fatalf("Failed to unmarshal unsigned field: %s", err)
+	}
+	// zero checks
+	if wantCount == 0 {
+		if len(unsigned.Children) != 0 || unsigned.Hash != "" {
+			t.Fatalf("want 0 children but got unsigned fields %+v", unsigned)
+		}
+		return
+	}
+	gotCount := unsigned.Children[relType]
+	if gotCount != wantCount {
+		t.Errorf("Got %d count, want %d count for rel_type %s", gotCount, wantCount, relType)
+	}
+	// work out the hash
+	sort.Strings(childrenEventIDs)
+	var b strings.Builder
+	for _, s := range childrenEventIDs {
+		b.WriteString(s)
+	}
+	t.Logf("hashing %s", b.String())
+	hashValBytes := sha256.Sum256([]byte(b.String()))
+	wantHash := base64.RawStdEncoding.EncodeToString(hashValBytes[:])
+	if wantHash != unsigned.Hash {
+		t.Errorf("Got unsigned hash %s want hash %s", unsigned.Hash, wantHash)
 	}
 }
 
