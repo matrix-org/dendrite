@@ -37,6 +37,7 @@ import (
 	pineconeSwitch "github.com/matrix-org/pinecone/packetswitch"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
+	pineconeTypes "github.com/matrix-org/pinecone/types"
 	yggdrasilConfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 )
 
@@ -153,7 +154,7 @@ func (m *DendriteMonolith) Start() {
 	rL, rR := net.Pipe()
 	m.PineconeSwitch = pineconeSwitch.NewSwitch(logger, sk, pk, false)
 	m.PineconeRouter = pineconeRouter.NewRouter(logger, sk, pk, rL, "router", nil)
-	if _, err := m.PineconeSwitch.Connect(rR, nil, ""); err != nil {
+	if _, err := m.PineconeSwitch.Connect(rR, pineconeTypes.PublicKey{}, ""); err != nil {
 		panic(err)
 	}
 
