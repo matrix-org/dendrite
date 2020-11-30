@@ -501,6 +501,7 @@ func (rc *reqCtx) remoteEventRelationships(eventID string) *gomatrixserverlib.MS
 // lookForEvent returns the event for the event ID given, by trying to auto-join rooms if not authorised and by querying remote servers
 // if the event ID is unknown. If `exploreThread` is true, remote requests will use /event_relationships instead of /event. This is
 // desirable when walking the thread, but is not desirable when satisfying include_parent|children flags.
+// nolint:gocyclo
 func (rc *reqCtx) lookForEvent(eventID string, exploreThread bool) *gomatrixserverlib.HeaderedEvent {
 	event := rc.getLocalEvent(eventID)
 	if event == nil {
@@ -641,6 +642,9 @@ func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836Event
 
 func (rc *reqCtx) addChildMetadata(ev *gomatrixserverlib.HeaderedEvent) {
 	count, hash := rc.getChildMetadata(ev.EventID())
+	if count == 0 {
+		return
+	}
 	err := ev.SetUnsignedField("children_hash", gomatrixserverlib.Base64Bytes(hash))
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children_hash")
