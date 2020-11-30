@@ -51,6 +51,7 @@ import (
 	pineconeSwitch "github.com/matrix-org/pinecone/packetswitch"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
+	pineconeTypes "github.com/matrix-org/pinecone/types"
 
 	"github.com/sirupsen/logrus"
 )
@@ -93,7 +94,7 @@ func main() {
 	rL, rR := net.Pipe()
 	pSwitch := pineconeSwitch.NewSwitch(logger, sk, pk, false)
 	pRouter := pineconeRouter.NewRouter(logger, sk, pk, rL, "router", nil)
-	if _, err := pSwitch.Connect(rR, nil, ""); err != nil {
+	if _, err := pSwitch.Connect(rR, pineconeTypes.PublicKey{}, ""); err != nil {
 		panic(err)
 	}
 
@@ -105,7 +106,7 @@ func main() {
 				return
 			}
 
-			if _, err := pSwitch.Connect(parent, nil, "static"); err != nil {
+			if _, err := pSwitch.Connect(parent, pineconeTypes.PublicKey{}, "static"); err != nil {
 				logrus.WithError(err).Errorf("Failed to connect Pinecone static peer to switch")
 			}
 		}(*instancePeer)
