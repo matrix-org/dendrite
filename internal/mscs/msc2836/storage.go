@@ -8,13 +8,13 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 type eventInfo struct {
 	EventID        string
 	OriginServerTS gomatrixserverlib.Timestamp
 	RoomID         string
-	Servers        []string
 }
 
 type Database interface {
@@ -29,6 +29,17 @@ type Database interface {
 	// there is no parent for this child event, with no error. The parent eventInfo can be missing the
 	// timestamp if the event is not known to the server.
 	ParentForChild(ctx context.Context, eventID, relType string) (*eventInfo, error)
+	// UpdateChildMetadata persists the children_count and children_hash from this event if and only if
+	// the count is greater than what was previously there. If the count is updated, the event will be
+	// updated to be unexplored.
+	UpdateChildMetadata(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error
+	// ChildMetadata returns the children_count and children_hash for the event ID in question.
+	// Also returns the `explored` flag, which is set to true when MarkChildrenExplored is called and is set
+	// back to `false` when a larger count is inserted via UpdateChildMetadata.
+	// Returns nil error if the event ID does not exist.
+	ChildMetadata(ctx context.Context, eventID string) (count int, hash []byte, explored bool, err error)
+	// MarkChildrenExplored sets the 'explored' flag on this event to `true`.
+	MarkChildrenExplored(ctx context.Context, eventID string) error
 }
 
 type DB struct {
@@ -249,4 +260,20 @@ func roomIDAndServers(ev *gomatrixserverlib.HeaderedEvent) (roomID string, serve
 		return
 	}
 	return body.RoomID, body.Servers
+}
+
+func extractChildMetadata(ev *gomatrixserverlib.HeaderedEvent) (count int, hash []byte) {
+	unsigned := struct {
+		Counts map[string]int                `json:"children"`
+		Hash   gomatrixserverlib.Base64Bytes `json:"children_hash"`
+	}{}
+	if err := json.Unmarshal(ev.Unsigned(), &unsigned); err != nil {
+		util.GetLogger(context.Background()).WithError(err).Error("failed to read unsigned field of event")
+		return
+	}
+	for _, c := range unsigned.Counts {
+		count += c
+	}
+	hash = unsigned.Hash
+	return
 }

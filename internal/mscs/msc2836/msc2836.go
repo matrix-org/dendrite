@@ -106,8 +106,16 @@ func Enable(
 		he := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
 		hookErr := db.StoreRelation(context.Background(), he)
 		if hookErr != nil {
-			util.GetLogger(context.Background()).WithError(hookErr).Error(
+			util.GetLogger(context.Background()).WithError(hookErr).WithField("event_id", he.EventID()).Error(
 				"failed to StoreRelation",
+			)
+		}
+		// we need to update child metadata here as well as after doing remote /event_relationships requests
+		// so we catch child metadata originating from /send transactions
+		hookErr = db.UpdateChildMetadata(context.Background(), he)
+		if hookErr != nil {
+			util.GetLogger(context.Background()).WithError(err).WithField("event_id", he.EventID()).Warn(
+				"failed to update child metadata for event",
 			)
 		}
 	})
@@ -516,7 +524,19 @@ func (rc *reqCtx) lookForEvent(eventID string, exploreThread bool) *gomatrixserv
 		if event == nil {
 			return nil
 		}
+	} else if exploreThread && rc.hasUnexploredChildren(eventID) {
+		// we have the local event but we may need to do a remote hit anyway if we are exploring the thread and have unknown children.
+		// If we don't do this then we risk never fetching the children.
+		queryRes := rc.remoteEventRelationships(eventID)
+		if queryRes != nil {
+			rc.injectResponseToRoomserver(queryRes)
+			err := rc.db.MarkChildrenExplored(context.Background(), eventID)
+			if err != nil {
+				util.GetLogger(rc.ctx).WithError(err).Warnf("failed to mark children of %s as explored", eventID)
+			}
+		}
 	}
+
 	if rc.authorisedToSeeEvent(event) {
 		return event
 	}
@@ -608,12 +628,35 @@ func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836Event
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
 	}
+	// update the child count / hash columns for these nodes. We need to do this here because not all events will make it
+	// through to the KindNewEventPersisted hook because the roomserver will ignore duplicates. Duplicates have meaning though
+	// as the `unsigned` field may differ (if the number of children changes).
+	for _, ev := range ires {
+		err = rc.db.UpdateChildMetadata(context.Background(), ev.Event)
+		if err != nil {
+			util.GetLogger(rc.ctx).WithError(err).WithField("event_id", ev.Event.EventID()).Warn("failed to update child metadata for event")
+		}
+	}
 }
 
 func (rc *reqCtx) addChildMetadata(ev *gomatrixserverlib.HeaderedEvent) {
-	children, err := rc.db.ChildrenForParent(rc.ctx, ev.EventID(), constRelType, false)
+	count, hash := rc.getChildMetadata(ev.EventID())
+	err := ev.SetUnsignedField("children_hash", gomatrixserverlib.Base64Bytes(hash))
 	if err != nil {
-		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to get ChildrenForParent for adding child metadata")
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children_hash")
+	}
+	err = ev.SetUnsignedField("children", map[string]int{
+		constRelType: count,
+	})
+	if err != nil {
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children count")
+	}
+}
+
+func (rc *reqCtx) getChildMetadata(eventID string) (count int, hash []byte) {
+	children, err := rc.db.ChildrenForParent(rc.ctx, eventID, constRelType, false)
+	if err != nil {
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to get ChildrenForParent for getting child metadata")
 		return
 	}
 	if len(children) == 0 {
@@ -630,16 +673,45 @@ func (rc *reqCtx) addChildMetadata(ev *gomatrixserverlib.HeaderedEvent) {
 	}
 	hashValBytes := sha256.Sum256([]byte(eventIDs.String()))
 
-	err = ev.SetUnsignedField("children_hash", gomatrixserverlib.Base64Bytes(hashValBytes[:]))
-	if err != nil {
-		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children_hash")
+	count = len(children)
+	hash = hashValBytes[:]
+	return
+}
+
+// hasUnexploredChildren returns true if this event has unexplored children.
+// "An event has unexplored children if the `unsigned` child count on the parent does not match
+// how many children the server believes the parent to have. In addition, if the counts match but
+// the hashes do not match, then the event is unexplored."
+func (rc *reqCtx) hasUnexploredChildren(eventID string) bool {
+	if rc.isFederatedRequest {
+		return false // we only explore children for clients, not servers.
 	}
-	err = ev.SetUnsignedField("children", map[string]int{
-		constRelType: len(children),
-	})
+	// extract largest child count from event
+	eventCount, eventHash, explored, err := rc.db.ChildMetadata(rc.ctx, eventID)
 	if err != nil {
-		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children count")
+		util.GetLogger(rc.ctx).WithError(err).WithField("event_id", eventID).Warn(
+			"failed to get ChildMetadata from db",
+		)
+		return false
 	}
+	// if there are no recorded children then we know we have >= children.
+	// if the event has already been explored (read: we hit /event_relationships successfully)
+	// then don't do it again. We'll only re-do this if we get an even bigger children count,
+	// see Database.UpdateChildMetadata
+	if eventCount == 0 || explored {
+		return false // short-circuit
+	}
+
+	// calculate child count for event
+	calcCount, calcHash := rc.getChildMetadata(eventID)
+
+	if eventCount < calcCount {
+		return false // we have more children
+	} else if eventCount > calcCount {
+		return true // the event has more children than we know about
+	}
+	// we have the same count, so a mismatched hash means some children are different
+	return !bytes.Equal(eventHash, calcHash)
 }
 
 type walkInfo struct {
