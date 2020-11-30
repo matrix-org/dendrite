@@ -106,7 +106,7 @@ func main() {
 				return
 			}
 
-			if _, err := pSwitch.Connect(parent, pineconeTypes.PublicKey{}, "static"); err != nil {
+			if _, err := pSwitch.AuthenticatedConnect(parent, "static"); err != nil {
 				logrus.WithError(err).Errorf("Failed to connect Pinecone static peer to switch")
 			}
 		}(*instancePeer)
