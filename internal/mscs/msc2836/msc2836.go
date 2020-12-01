@@ -381,6 +381,31 @@ func (rc *reqCtx) includeParent(childEvent *gomatrixserverlib.HeaderedEvent) (pa
 // Apply history visibility checks to all these events and add the ones which pass into the response array,
 // honouring the recent_first flag and the limit.
 func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recentFirst bool) ([]*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
+	if rc.hasUnexploredChildren(parentID) {
+		// we need to do a remote request to pull in the children as we are missing them locally.
+		_, roomVer, serversToQuery := rc.getServersForEventID(parentID)
+		var result *gomatrixserverlib.MSC2836EventRelationshipsResponse
+		for _, srv := range serversToQuery {
+			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+				EventID:     parentID,
+				Direction:   "down",
+				Limit:       100,
+				MaxBreadth:  -1,
+				MaxDepth:    1, // we just want the children from this parent
+				RecentFirst: true,
+			}, roomVer)
+			if err != nil {
+				util.GetLogger(rc.ctx).WithError(err).WithField("server", srv).Error("includeChildren: failed to call MSC2836EventRelationships")
+			} else {
+				result = &res
+				break
+			}
+		}
+		if result != nil {
+			rc.injectResponseToRoomserver(result)
+		}
+		// fallthrough to pull these new events from the DB
+	}
 	children, err := db.ChildrenForParent(rc.ctx, parentID, constRelType, recentFirst)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to get ChildrenForParent")
