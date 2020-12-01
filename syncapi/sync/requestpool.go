@@ -328,7 +328,7 @@ func (rp *RequestPool) appendAccountData(
 	// data keys were set between two message. This isn't a huge issue since the
 	// duplicate data doesn't represent a huge quantity of data, but an optimisation
 	// here would be making sure each data is sent only once to the client.
-	if req.since == nil {
+	if req.since == nil || (req.since.PDUPosition() == 0 && req.since.EDUPosition() == 0) {
 		// If this is the initial sync, we don't need to check if a data has
 		// already been sent. Instead, we send the whole batch.
 		dataReq := &userapi.QueryAccountDataRequest{
