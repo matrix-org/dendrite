@@ -374,7 +374,7 @@ func (rc *reqCtx) includeParent(childEvent *gomatrixserverlib.HeaderedEvent) (pa
 	if parentID == "" {
 		return nil
 	}
-	return rc.lookForEvent(parentID, false)
+	return rc.lookForEvent(parentID)
 }
 
 // If include_children: true, lookup all events which have event_id as an m.relationship
@@ -414,7 +414,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	}
 	var childEvents []*gomatrixserverlib.HeaderedEvent
 	for _, child := range children {
-		childEvent := rc.lookForEvent(child.EventID, false)
+		childEvent := rc.lookForEvent(child.EventID)
 		if childEvent != nil {
 			childEvents = append(childEvents, childEvent)
 		}
@@ -452,7 +452,7 @@ func walkThread(
 			// This will probably be easiest if the event relationships response is directly pumped into the database
 			// so the next walk will do the right thing. This requires those events to be authed and likely injected as
 			// outliers into the roomserver DB, which will de-dupe appropriately.
-			event := rc.lookForEvent(wi.EventID, true)
+			event := rc.lookForEvent(wi.EventID)
 			if event != nil {
 				result = append(result, event)
 			}
@@ -549,33 +549,6 @@ func (rc *reqCtx) getServersForEventID(eventID string) (string, gomatrixserverli
 	return roomID, roomVer, serversToQuery
 }
 
-// remoteEvent queries for the event ID given.
-func (rc *reqCtx) remoteEvent(eventID string) *gomatrixserverlib.HeaderedEvent {
-	if rc.isFederatedRequest {
-		return nil // we don't query remote servers for remote requests
-	}
-	_, roomVer, serversToQuery := rc.getServersForEventID(eventID)
-	for _, s := range serversToQuery {
-		txn, err := rc.fsAPI.GetEvent(rc.ctx, s, eventID)
-		if err != nil {
-			util.GetLogger(rc.ctx).WithError(err).Warn("remoteEvent: failed to GetEvent")
-			continue
-		}
-		if len(txn.PDUs) != 1 {
-			continue
-		}
-		ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(txn.PDUs[0], roomVer)
-		if err != nil {
-			util.GetLogger(rc.ctx).WithError(err).Warn("remoteEvent: failed to NewEventFromUntrustedJSON")
-			continue
-		}
-		// TODO: check sigs on event
-		// TODO: check auth events on event
-		return ev.Headered(roomVer)
-	}
-	return nil
-}
-
 func (rc *reqCtx) remoteEventRelationships(eventID string) *gomatrixserverlib.MSC2836EventRelationshipsResponse {
 	if rc.isFederatedRequest {
 		return nil // we don't query remote servers for remote requests
@@ -594,34 +567,23 @@ func (rc *reqCtx) remoteEventRelationships(eventID string) *gomatrixserverlib.MS
 	return res
 }
 
-// lookForEvent returns the event for the event ID given, by trying to auto-join rooms if not authorised and by querying remote servers
-// if the event ID is unknown. If `exploreThread` is true, remote requests will use /event_relationships instead of /event. This is
-// desirable when walking the thread, but is not desirable when satisfying include_parent|children flags.
+// lookForEvent returns the event for the event ID given, by trying to query remote servers
+// if the event ID is unknown via /event_relationships.
 // nolint:gocyclo
-func (rc *reqCtx) lookForEvent(eventID string, exploreThread bool) *gomatrixserverlib.HeaderedEvent {
+func (rc *reqCtx) lookForEvent(eventID string) *gomatrixserverlib.HeaderedEvent {
 	event := rc.getLocalEvent(eventID)
 	if event == nil {
-		if exploreThread {
-			queryRes := rc.remoteEventRelationships(eventID)
-			if queryRes != nil {
-				// inject all the events into the roomserver then return the event in question
-				rc.injectResponseToRoomserver(queryRes)
-				for _, ev := range queryRes.Events {
-					if ev.EventID() == eventID {
-						return ev.Headered(ev.Version())
-					}
+		queryRes := rc.remoteEventRelationships(eventID)
+		if queryRes != nil {
+			// inject all the events into the roomserver then return the event in question
+			rc.injectResponseToRoomserver(queryRes)
+			for _, ev := range queryRes.Events {
+				if ev.EventID() == eventID {
+					return ev.Headered(ev.Version())
 				}
 			}
-			// if we fail to query /event_relationships or we don't have the event queried in the response, fallthrough
-			// to do a /event call.
 		}
-		// this event may have occurred before we joined the room, so delegate to another server to see if they know anything.
-		// Only ask for this event though.
-		event = rc.remoteEvent(eventID)
-		if event == nil {
-			return nil
-		}
-	} else if exploreThread && rc.hasUnexploredChildren(eventID) {
+	} else if rc.hasUnexploredChildren(eventID) {
 		// we have the local event but we may need to do a remote hit anyway if we are exploring the thread and have unknown children.
 		// If we don't do this then we risk never fetching the children.
 		queryRes := rc.remoteEventRelationships(eventID)
@@ -683,7 +645,7 @@ func (rc *reqCtx) getLocalEvent(eventID string) *gomatrixserverlib.HeaderedEvent
 		return nil
 	}
 	if len(queryEventsRes.Events) == 0 {
-		util.GetLogger(rc.ctx).Infof("getLocalEvent: event does not exist")
+		util.GetLogger(rc.ctx).WithField("event_id", eventID).Infof("getLocalEvent: event does not exist")
 		return nil // event does not exist
 	}
 	return queryEventsRes.Events[0]

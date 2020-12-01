@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 type eventInfo struct {
@@ -240,20 +241,22 @@ func (p *DB) StoreRelation(ctx context.Context, ev *gomatrixserverlib.HeaderedEv
 		if err != nil {
 			return err
 		}
+		util.GetLogger(ctx).Infof("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
 		_, err = txn.Stmt(p.insertNodeStmt).ExecContext(ctx, ev.EventID(), ev.OriginServerTS(), ev.RoomID(), count, base64.RawStdEncoding.EncodeToString(hash), 0)
 		return err
 	})
 }
 
 func (p *DB) UpdateChildMetadata(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent) error {
+	eventCount, eventHash := extractChildMetadata(ev)
+	if eventCount == 0 {
+		return nil // nothing to update with
+	}
+
 	// extract current children count/hash, if they are less than the current event then update the columns and set to unexplored
 	count, hash, _, err := p.ChildMetadata(ctx, ev.EventID())
 	if err != nil {
 		return err
-	}
-	eventCount, eventHash := extractChildMetadata(ev)
-	if eventCount == 0 {
-		return nil // nothing to update with
 	}
 	if eventCount > count || (eventCount == count && !bytes.Equal(hash, eventHash)) {
 		_, err = p.updateChildMetadataStmt.ExecContext(ctx, eventCount, base64.RawStdEncoding.EncodeToString(eventHash), 0, ev.EventID())
@@ -266,6 +269,9 @@ func (p *DB) ChildMetadata(ctx context.Context, eventID string) (count int, hash
 	var b64hash string
 	var exploredInt int
 	if err = p.selectChildMetadataStmt.QueryRowContext(ctx, eventID).Scan(&count, &b64hash, &exploredInt); err != nil {
+		if err == sql.ErrNoRows {
+			err = nil
+		}
 		return
 	}
 	hash, err = base64.RawStdEncoding.DecodeString(b64hash)
