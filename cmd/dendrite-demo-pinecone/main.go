@@ -169,23 +169,23 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
-
 	rsComponent := roomserver.NewInternalAPI(
 		base, keyRing,
 	)
 	rsAPI := rsComponent
+	fsAPI := federationsender.NewInternalAPI(
+		base, federation, rsAPI, keyRing,
+	)
+
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
+	keyAPI.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,
 	)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
-	)
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 

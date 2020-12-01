@@ -191,22 +191,24 @@ func (m *DendriteMonolith) Start() {
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
 
 	rsAPI := roomserver.NewInternalAPI(
 		base, keyRing,
 	)
+
+	fsAPI := federationsender.NewInternalAPI(
+		base, federation, rsAPI, keyRing,
+	)
+
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
+	keyAPI.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,
 	)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
-	)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
