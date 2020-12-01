@@ -44,6 +44,7 @@ const (
 
 type EventRelationshipRequest struct {
 	EventID         string `json:"event_id"`
+	RoomID          string `json:"room_id"`
 	MaxDepth        int    `json:"max_depth"`
 	MaxBreadth      int    `json:"max_breadth"`
 	Limit           int    `json:"limit"`
@@ -144,7 +145,7 @@ type reqCtx struct {
 	db                Database
 	req               *EventRelationshipRequest
 	userID            string
-	authorisedRoomIDs map[string]gomatrixserverlib.RoomVersion // events from these rooms can be returned
+	authorisedRoomIDs map[string]gomatrixserverlib.RoomVersion // events from these rooms can be returned TODO remove
 
 	// federated request args
 	isFederatedRequest bool
@@ -246,6 +247,9 @@ func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsRespons
 	var returnEvents []*gomatrixserverlib.HeaderedEvent
 	// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
 	event := rc.getLocalEvent(rc.req.EventID)
+	if event == nil {
+		event = rc.fetchUnknownEvent(rc.req.EventID, rc.req.RoomID)
+	}
 	if event == nil || !rc.authorisedToSeeEvent(event) {
 		return nil, &util.JSONResponse{
 			Code: 403,
@@ -294,6 +298,73 @@ func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsRespons
 	}
 	res.Limited = remaining == 0 || walkLimited
 	return &res, nil
+}
+
+// fetchUnknownEvent retrieves an unknown event from the room specified. This server must
+// be joined to the room in question. This has the side effect of injecting surround threaded
+// events into the roomserver.
+func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *gomatrixserverlib.HeaderedEvent {
+	if rc.isFederatedRequest || roomID == "" {
+		// we don't do fed hits for fed requests, and we can't ask servers without a room ID!
+		return nil
+	}
+	logger := util.GetLogger(rc.ctx).WithField("room_id", roomID)
+	// if they supplied a room_id, check the room exists.
+	var queryVerRes roomserver.QueryRoomVersionForRoomResponse
+	err := rc.rsAPI.QueryRoomVersionForRoom(rc.ctx, &roomserver.QueryRoomVersionForRoomRequest{
+		RoomID: roomID,
+	}, &queryVerRes)
+	if err != nil {
+		logger.WithError(err).Warn("failed to query room version for room, does this room exist?")
+		return nil
+	}
+
+	// check the user is joined to that room
+	var queryMemRes roomserver.QueryMembershipForUserResponse
+	err = rc.rsAPI.QueryMembershipForUser(rc.ctx, &roomserver.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: rc.userID,
+	}, &queryMemRes)
+	if err != nil {
+		logger.WithError(err).Warn("failed to query membership for user in room")
+		return nil
+	}
+	if !queryMemRes.IsInRoom {
+		return nil
+	}
+
+	// ask one of the servers in the room for the event
+	var queryRes fs.QueryJoinedHostServerNamesInRoomResponse
+	err = rc.fsAPI.QueryJoinedHostServerNamesInRoom(rc.ctx, &fs.QueryJoinedHostServerNamesInRoomRequest{
+		RoomID: roomID,
+	}, &queryRes)
+	if err != nil {
+		logger.WithError(err).Error("failed to QueryJoinedHostServerNamesInRoom")
+		return nil
+	}
+	// query up to 5 servers
+	serversToQuery := queryRes.ServerNames
+	if len(serversToQuery) > 5 {
+		serversToQuery = serversToQuery[:5]
+	}
+
+	// fetch the event, along with some of the surrounding thread (if it's threaded) and the auth chain.
+	// Inject the response into the roomserver to remember the event across multiple calls and to set
+	// unexplored flags correctly.
+	for _, srv := range serversToQuery {
+		res, err := rc.MSC2836EventRelationships(eventID, srv, queryVerRes.RoomVersion)
+		if err != nil {
+			continue
+		}
+		rc.injectResponseToRoomserver(res)
+		for _, ev := range res.Events {
+			if ev.EventID() == eventID {
+				return ev.Headered(ev.Version())
+			}
+		}
+	}
+	logger.WithField("servers", serversToQuery).Warn("failed to query event relationships")
+	return nil
 }
 
 // If include_parent: true and there is a valid m.relationship field in the event,
