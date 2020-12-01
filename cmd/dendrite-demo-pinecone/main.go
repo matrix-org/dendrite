@@ -123,12 +123,14 @@ func main() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				panic(err)
+				logrus.WithError(err).Error("listener.Accept failed")
+				continue
 			}
 
 			port, err := pSwitch.AuthenticatedConnect(conn, "")
 			if err != nil {
-				panic(err)
+				logrus.WithError(err).Error("pSwitch.AuthenticatedConnect failed")
+				continue
 			}
 
 			fmt.Println("Inbound connection", conn.RemoteAddr(), "is connected to port", port)
