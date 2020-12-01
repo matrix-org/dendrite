@@ -47,9 +47,7 @@ func TestMSC2836(t *testing.T) {
 	alice := "@alice:localhost"
 	bob := "@bob:localhost"
 	charlie := "@charlie:localhost"
-	roomIDA := "!alice:localhost"
-	roomIDB := "!bob:localhost"
-	roomIDC := "!charlie:localhost"
+	roomID := "!alice:localhost"
 	// give access tokens to all three users
 	nopUserAPI := &testUserAPI{
 		accessTokens: make(map[string]userapi.Device),
@@ -70,7 +68,7 @@ func TestMSC2836(t *testing.T) {
 		UserID:      charlie,
 	}
 	eventA := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDA,
+		RoomID: roomID,
 		Sender: alice,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -78,7 +76,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventB := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDB,
+		RoomID: roomID,
 		Sender: bob,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -90,7 +88,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventC := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDB,
+		RoomID: roomID,
 		Sender: bob,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -102,7 +100,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventD := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDA,
+		RoomID: roomID,
 		Sender: alice,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -114,7 +112,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventE := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDB,
+		RoomID: roomID,
 		Sender: bob,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -126,7 +124,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventF := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDC,
+		RoomID: roomID,
 		Sender: charlie,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -138,7 +136,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventG := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDA,
+		RoomID: roomID,
 		Sender: alice,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -150,7 +148,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventH := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDB,
+		RoomID: roomID,
 		Sender: bob,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -164,9 +162,9 @@ func TestMSC2836(t *testing.T) {
 	// make everyone joined to each other's rooms
 	nopRsAPI := &testRoomserverAPI{
 		userToJoinedRooms: map[string][]string{
-			alice:   []string{roomIDA, roomIDB, roomIDC},
-			bob:     []string{roomIDA, roomIDB, roomIDC},
-			charlie: []string{roomIDA, roomIDB, roomIDC},
+			alice:   []string{roomID},
+			bob:     []string{roomID},
+			charlie: []string{roomID},
 		},
 		events: map[string]*gomatrixserverlib.HeaderedEvent{
 			eventA.EventID(): eventA,
@@ -201,21 +199,6 @@ func TestMSC2836(t *testing.T) {
 			"limit":          1,
 			"include_parent": true,
 		}))
-	})
-	t.Run("omits parent if not joined to the room of parent of event", func(t *testing.T) {
-		nopUserAPI.accessTokens["frank2"] = userapi.Device{
-			AccessToken: "frank2",
-			DisplayName: "Frank2 Not In Room",
-			UserID:      "@frank2:localhost",
-		}
-		// Event B is in roomB, Event A is in roomA, so make frank2 joined to roomB
-		nopRsAPI.userToJoinedRooms["@frank2:localhost"] = []string{roomIDB}
-		body := postRelationships(t, 200, "frank2", newReq(t, map[string]interface{}{
-			"event_id":       eventB.EventID(),
-			"limit":          1,
-			"include_parent": true,
-		}))
-		assertContains(t, body, []string{eventB.EventID()})
 	})
 	t.Run("returns the parent if include_parent is true", func(t *testing.T) {
 		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
