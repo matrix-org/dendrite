@@ -60,6 +60,10 @@ global:
   - matrix.org
   - vector.im
 
+  # Disables federation. Dendrite will not be able to make any outbound HTTP requests
+  # to other servers and the federation API will not be exposed.
+  disable_federation: false
+
   # Configuration for Kafka/Naffka.
   kafka:
     # List of Kafka broker addresses to connect to. This is not needed if using
