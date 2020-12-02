@@ -132,6 +132,7 @@ func main() {
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
 	cfg.MSCs.MSCs = []string{"msc2836"}
+	cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
