@@ -51,13 +51,6 @@ type databaseJoinedMember struct {
 	AvatarURL   string `json:"avatar_url"`
 }
 
-func (d databaseJoinedMember) toJoinedMember() joinedMember {
-	return joinedMember{
-		DisplayName: d.DisplayName,
-		AvatarURL:   d.AvatarURL,
-	}
-}
-
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
 	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
@@ -91,7 +84,7 @@ func GetMemberships(
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
 				return jsonerror.InternalServerError()
 			}
-			res.Joined[ev.Sender] = content.toJoinedMember()
+			res.Joined[ev.Sender] = joinedMember(content)
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
