@@ -18,9 +18,6 @@ var noOpHTTPTransport = &http.Transport{
 	DialTLS: func(_, _ string) (net.Conn, error) {
 		return nil, fmt.Errorf("federation prohibited by configuration")
 	},
-	DialTLSContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-		return nil, fmt.Errorf("federation prohibited by configuration")
-	},
 }
 
 func init() {
