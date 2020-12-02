@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/syncapi/types"

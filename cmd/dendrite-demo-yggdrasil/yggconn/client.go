@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

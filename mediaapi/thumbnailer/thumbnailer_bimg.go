@@ -21,9 +21,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/matrix-org/dendrite/setup/config"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/h2non/bimg.v1"
 )

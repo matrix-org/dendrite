@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"sort"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/pressly/goose"
 )
 

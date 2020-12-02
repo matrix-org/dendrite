@@ -28,10 +28,10 @@ import (
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/appservice/workers"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/internal/setup/kafka"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/kafka"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 )

@@ -15,9 +15,9 @@
 package personalities
 
 import (
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func RoomServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
