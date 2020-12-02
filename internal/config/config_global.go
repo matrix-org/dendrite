@@ -34,6 +34,10 @@ type Global struct {
 	// Defaults to 24 hours.
 	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
 
+	// Disables federation. Dendrite will not be able to make any outbound HTTP requests
+	// to other servers and the federation API will not be exposed.
+	DisableFederation bool `yaml:"disable_federation"`
+
 	// List of domains that the server will trust as identity servers to
 	// verify third-party identifiers.
 	// Defaults to an empty array.
