@@ -177,10 +177,10 @@ type PerformInboundPeekResponse struct {
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The current state and auth chain events.
 	// The lists will be in an arbitrary order.
-	StateEvents     []gomatrixserverlib.HeaderedEvent `json:"state_events"`
-	AuthChainEvents []gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
+	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
 	// The event at which this state was captured
-	LatestEvent gomatrixserverlib.HeaderedEvent `json:"latest_event"`
+	LatestEvent *gomatrixserverlib.HeaderedEvent `json:"latest_event"`
 }
 
 // PerformForgetRequest is a request to PerformForget
@@ -190,4 +190,3 @@ type PerformForgetRequest struct {
 }
 
 type PerformForgetResponse struct{}
-

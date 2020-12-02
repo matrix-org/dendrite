@@ -447,7 +447,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
-	var stateEvents []gomatrixserverlib.Event
+	var stateEvents []*gomatrixserverlib.Event
 	stateEvents, err = r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
 	if err != nil {
 		return err

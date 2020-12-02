@@ -56,7 +56,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
-	var stateEvents []gomatrixserverlib.Event
+	var stateEvents []*gomatrixserverlib.Event
 
 	var currentStateSnapshotNID types.StateSnapshotNID
 	latestEventRefs, currentStateSnapshotNID, _, err :=
@@ -68,7 +68,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	if err != nil {
 		return err
 	}
-	var sortedLatestEvents []gomatrixserverlib.Event
+	var sortedLatestEvents []*gomatrixserverlib.Event
 	for _, ev := range latestEvents {
 		sortedLatestEvents = append(sortedLatestEvents, ev.Event)
 	}

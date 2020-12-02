@@ -146,6 +146,14 @@ func (t *testRoomserverAPI) PerformLeave(
 	return nil
 }
 
+func (t *testRoomserverAPI) PerformInboundPeek(
+	ctx context.Context,
+	req *api.PerformInboundPeekRequest,
+	res *api.PerformInboundPeekResponse,
+) error {
+	return nil
+}
+
 // Query the latest events and state for a room from the room server.
 func (t *testRoomserverAPI) QueryLatestEventsAndState(
 	ctx context.Context,
