@@ -32,6 +32,7 @@ const (
 	PerformAccountCreationPath     = "/userapi/performAccountCreation"
 	PerformPasswordUpdatePath      = "/userapi/performPasswordUpdate"
 	PerformDeviceDeletionPath      = "/userapi/performDeviceDeletion"
+	PerformLastSeenUpdatePath      = "/userapi/performLastSeenUpdate"
 	PerformDeviceUpdatePath        = "/userapi/performDeviceUpdate"
 	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
 
@@ -117,6 +118,18 @@ func (h *httpUserInternalAPI) PerformDeviceDeletion(
 
 	apiURL := h.apiURL + PerformDeviceDeletionPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) PerformLastSeenUpdate(
+	ctx context.Context,
+	req *api.PerformLastSeenUpdateRequest,
+	res *api.PerformLastSeenUpdateResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformLastSeen")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformLastSeenUpdatePath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
 func (h *httpUserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.PerformDeviceUpdateRequest, res *api.PerformDeviceUpdateResponse) error {

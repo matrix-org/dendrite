@@ -16,6 +16,7 @@ package routing
 
 import (
 	"io/ioutil"
+	"net"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -32,7 +33,7 @@ type deviceJSON struct {
 	DeviceID    string `json:"device_id"`
 	DisplayName string `json:"display_name"`
 	LastSeenIP  string `json:"last_seen_ip"`
-	LastSeenTS  uint64 `json:"last_seen_ts"`
+	LastSeenTS  int64  `json:"last_seen_ts"`
 }
 
 type devicesJSON struct {
@@ -79,6 +80,8 @@ func GetDeviceByID(
 		JSON: deviceJSON{
 			DeviceID:    targetDevice.ID,
 			DisplayName: targetDevice.DisplayName,
+			LastSeenIP:  stripIPPort(targetDevice.LastSeenIP),
+			LastSeenTS:  targetDevice.LastSeenTS,
 		},
 	}
 }
@@ -102,6 +105,8 @@ func GetDevicesByLocalpart(
 		res.Devices = append(res.Devices, deviceJSON{
 			DeviceID:    dev.ID,
 			DisplayName: dev.DisplayName,
+			LastSeenIP:  stripIPPort(dev.LastSeenIP),
+			LastSeenTS:  dev.LastSeenTS,
 		})
 	}
 
@@ -229,4 +234,21 @@ func DeleteDevices(
 		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
+}
+
+// stripIPPort converts strings like "[::1]:12345" to "::1"
+func stripIPPort(addr string) string {
+	ip := net.ParseIP(addr)
+	if ip != nil {
+		return addr
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
+	ip = net.ParseIP(host)
+	if ip != nil {
+		return host
+	}
+	return ""
 }

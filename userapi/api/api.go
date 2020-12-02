@@ -29,6 +29,7 @@ type UserInternalAPI interface {
 	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
 	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
+	PerformLastSeenUpdate(ctx context.Context, req *PerformLastSeenUpdateRequest, res *PerformLastSeenUpdateResponse) error
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
@@ -181,6 +182,17 @@ type PerformPasswordUpdateRequest struct {
 type PerformPasswordUpdateResponse struct {
 	PasswordUpdated bool
 	Account         *Account
+}
+
+// PerformLastSeenUpdateRequest is the request for PerformLastSeenUpdate.
+type PerformLastSeenUpdateRequest struct {
+	UserID     string
+	DeviceID   string
+	RemoteAddr string
+}
+
+// PerformLastSeenUpdateResponse is the response for PerformLastSeenUpdate.
+type PerformLastSeenUpdateResponse struct {
 }
 
 // PerformDeviceCreationRequest is the request for PerformDeviceCreation

@@ -61,7 +61,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, rsAPI)
+	requestPool := sync.NewRequestPool(syncDB, cfg, notifier, userAPI, keyAPI, rsAPI)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
