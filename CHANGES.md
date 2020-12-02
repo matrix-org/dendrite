@@ -1,5 +1,17 @@
 # Changelog
 
+## Dendrite 0.3.2 (2020-12-02)
+
+### Features
+
+* Federation can now be disabled with the `global.disable_federation` configuration option
+
+### Fixes
+
+* The `"since"` parameter is now checked more thoroughly in the sync API, which led to a bug that could cause forgotten rooms to reappear (contributed by [kaniini](https://github.com/kaniini))
+* The polylith now proxies signing key requests through the federation sender correctly
+* The code for checking if remote servers are allowed to see events now no longer wastes CPU time retrieving irrelevant state events
+
 ## Dendrite 0.3.1 (2020-11-20)
 
 ### Features
