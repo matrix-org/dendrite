@@ -1,5 +1,49 @@
 # Changelog
 
+## Dendrite 0.3.1 (2020-11-20)
+
+### Features
+
+* Memory optimisation by reference passing, significantly reducing the number of allocations and duplication in memory
+* A hook API has been added for experimental MSCs, with an early implementation of MSC2836
+* The last seen timestamp and IP address are now updated automatically when calling `/sync`
+* The last seen timestamp and IP address are now reported in `/_matrix/client/r0/devices` (contributed by [alexkursell](https://github.com/alexkursell))
+* An optional configuration option `sync_api.real_ip_header` has been added for specifying which HTTP header contains the real client IP address (for if Dendrite is running behind a reverse HTTP proxy)
+* Partial implementation of `/_matrix/client/r0/admin/whois` (contributed by [DavidSpenler](https://github.com/DavidSpenler))
+
+### Fixes
+
+* A concurrency bug has been fixed in the federation API that could cause Dendrite to crash
+* The error when registering a username with invalid characters has been corrected (contributed by [bodqhrohro](https://github.com/bodqhrohro))
+
+## Dendrite 0.3.0 (2020-11-16)
+
+### Features
+
+* Read receipts (both inbound and outbound) are now supported (contributed by [S7evinK](https://github.com/S7evinK))
+* Forgetting rooms is now supported (contributed by [S7evinK](https://github.com/S7evinK))
+* The `-version` command line flag has been added (contributed by [S7evinK](https://github.com/S7evinK))
+
+### Fixes
+
+* User accounts that contain the `=` character can now be registered
+* Backfilling should now work properly on rooms with world-readable history visibility (contributed by [MayeulC](https://github.com/MayeulC))
+* The `gjson` dependency has been updated for correct JSON integer ranges
+* Some more client event fields have been marked as omit-when-empty (contributed by [S7evinK](https://github.com/S7evinK))
+* The `build.sh` script has been updated to work properly on all POSIX platforms (contributed by [felix](https://github.com/felix))
+
+## Dendrite 0.2.1 (2020-10-22)
+
+### Fixes
+
+* Forward extremities are now calculated using only references from other extremities, rather than including outliers, which should fix cases where state can become corrupted ([#1556](https://github.com/matrix-org/dendrite/pull/1556))
+* Old state events will no longer be processed by the sync API as new, which should fix some cases where clients incorrectly believe they have joined or left rooms ([#1548](https://github.com/matrix-org/dendrite/pull/1548))
+* More SQLite database locking issues have been resolved in the latest events updater ([#1554](https://github.com/matrix-org/dendrite/pull/1554))
+* Internal HTTP API calls are now made using H2C (HTTP/2) in polylith mode, mitigating some potential head-of-line blocking issues ([#1541](https://github.com/matrix-org/dendrite/pull/1541))
+* Roomserver output events no longer incorrectly flag state rewrites ([#1557](https://github.com/matrix-org/dendrite/pull/1557))
+* Notification levels are now parsed correctly in power level events ([gomatrixserverlib#228](https://github.com/matrix-org/gomatrixserverlib/pull/228), contributed by [Pestdoktor](https://github.com/Pestdoktor))
+* Invalid UTF-8 is now correctly rejected when making federation requests ([gomatrixserverlib#229](https://github.com/matrix-org/gomatrixserverlib/pull/229), contributed by [Pestdoktor](https://github.com/Pestdoktor))
+
 ## Dendrite 0.2.0 (2020-10-20)
 
 ### Important

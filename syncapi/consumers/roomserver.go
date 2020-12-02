@@ -118,7 +118,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 func (s *OutputRoomEventConsumer) onRedactEvent(
 	ctx context.Context, msg api.OutputRedactedEvent,
 ) error {
-	err := s.db.RedactEvent(ctx, msg.RedactedEventID, &msg.RedactedBecause)
+	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause)
 	if err != nil {
 		log.WithError(err).Error("RedactEvent error'd")
 		return err
@@ -156,7 +156,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	pduPos, err := s.db.WriteEvent(
 		ctx,
-		&ev,
+		ev,
 		addsStateEvents,
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
@@ -174,12 +174,12 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return nil
 	}
 
-	if pduPos, err = s.notifyJoinedPeeks(ctx, &ev, pduPos); err != nil {
+	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
-	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
 
 	return nil
 }
@@ -197,8 +197,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	// from confusing clients into thinking they've joined/left rooms.
 	pduPos, err := s.db.WriteEvent(
 		ctx,
-		&ev,
-		[]gomatrixserverlib.HeaderedEvent{},
+		ev,
+		[]*gomatrixserverlib.HeaderedEvent{},
 		[]string{},           // adds no state
 		[]string{},           // removes no state
 		nil,                  // no transaction
@@ -213,12 +213,12 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return nil
 	}
 
-	if pduPos, err = s.notifyJoinedPeeks(ctx, &ev, pduPos); err != nil {
+	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
-	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
 
 	return nil
 }
@@ -267,7 +267,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&msg.Event, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(msg.Event, "", nil, types.NewStreamToken(pduPos, 0, nil))
 	return nil
 }
 
@@ -309,7 +309,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	return nil
 }
 
-func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.HeaderedEvent) (gomatrixserverlib.HeaderedEvent, error) {
+func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {
 	if event.StateKey() == nil {
 		return event, nil
 	}

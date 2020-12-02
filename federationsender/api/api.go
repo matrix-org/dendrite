@@ -48,6 +48,7 @@ type FederationSenderInternalAPI interface {
 	// Query the server names of the joined hosts in a room.
 	// Unlike QueryJoinedHostsInRoom, this function returns a de-duplicated slice
 	// containing only the server names (without information for membership events).
+	// The response will include this server if they are joined to the room.
 	QueryJoinedHostServerNamesInRoom(
 		ctx context.Context,
 		request *QueryJoinedHostServerNamesInRoomRequest,
@@ -110,6 +111,7 @@ type PerformJoinRequest struct {
 }
 
 type PerformJoinResponse struct {
+	JoinedVia gomatrixserverlib.ServerName
 	LastError *gomatrix.HTTPError
 }
 
@@ -134,12 +136,12 @@ type PerformLeaveResponse struct {
 
 type PerformInviteRequest struct {
 	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
-	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
+	Event           *gomatrixserverlib.HeaderedEvent          `json:"event"`
 	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
 }
 
 type PerformInviteResponse struct {
-	Event gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 type PerformServersAliveRequest struct {

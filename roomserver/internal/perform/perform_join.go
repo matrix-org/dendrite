@@ -47,7 +47,7 @@ func (r *Joiner) PerformJoin(
 	req *api.PerformJoinRequest,
 	res *api.PerformJoinResponse,
 ) {
-	roomID, err := r.performJoin(ctx, req)
+	roomID, joinedVia, err := r.performJoin(ctx, req)
 	if err != nil {
 		perr, ok := err.(*api.PerformError)
 		if ok {
@@ -59,21 +59,22 @@ func (r *Joiner) PerformJoin(
 		}
 	}
 	res.RoomID = roomID
+	res.JoinedVia = joinedVia
 }
 
 func (r *Joiner) performJoin(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
-) (string, error) {
+) (string, gomatrixserverlib.ServerName, error) {
 	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
-		return "", &api.PerformError{
+		return "", "", &api.PerformError{
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("Supplied user ID %q in incorrect format", req.UserID),
 		}
 	}
 	if domain != r.Cfg.Matrix.ServerName {
-		return "", &api.PerformError{
+		return "", "", &api.PerformError{
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("User %q does not belong to this homeserver", req.UserID),
 		}
@@ -84,7 +85,7 @@ func (r *Joiner) performJoin(
 	if strings.HasPrefix(req.RoomIDOrAlias, "#") {
 		return r.performJoinRoomByAlias(ctx, req)
 	}
-	return "", &api.PerformError{
+	return "", "", &api.PerformError{
 		Code: api.PerformErrorBadRequest,
 		Msg:  fmt.Sprintf("Room ID or alias %q is invalid", req.RoomIDOrAlias),
 	}
@@ -93,11 +94,11 @@ func (r *Joiner) performJoin(
 func (r *Joiner) performJoinRoomByAlias(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
-) (string, error) {
+) (string, gomatrixserverlib.ServerName, error) {
 	// Get the domain part of the room alias.
 	_, domain, err := gomatrixserverlib.SplitID('#', req.RoomIDOrAlias)
 	if err != nil {
-		return "", fmt.Errorf("Alias %q is not in the correct format", req.RoomIDOrAlias)
+		return "", "", fmt.Errorf("Alias %q is not in the correct format", req.RoomIDOrAlias)
 	}
 	req.ServerNames = append(req.ServerNames, domain)
 
@@ -115,7 +116,7 @@ func (r *Joiner) performJoinRoomByAlias(
 		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
 			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
-			return "", fmt.Errorf("Looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
+			return "", "", fmt.Errorf("Looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
 		}
 		roomID = dirRes.RoomID
 		req.ServerNames = append(req.ServerNames, dirRes.ServerNames...)
@@ -123,13 +124,13 @@ func (r *Joiner) performJoinRoomByAlias(
 		// Otherwise, look up if we know this room alias locally.
 		roomID, err = r.DB.GetRoomIDForAlias(ctx, req.RoomIDOrAlias)
 		if err != nil {
-			return "", fmt.Errorf("Lookup room alias %q failed: %w", req.RoomIDOrAlias, err)
+			return "", "", fmt.Errorf("Lookup room alias %q failed: %w", req.RoomIDOrAlias, err)
 		}
 	}
 
 	// If the room ID is empty then we failed to look up the alias.
 	if roomID == "" {
-		return "", fmt.Errorf("Alias %q not found", req.RoomIDOrAlias)
+		return "", "", fmt.Errorf("Alias %q not found", req.RoomIDOrAlias)
 	}
 
 	// If we do, then pluck out the room ID and continue the join.
@@ -142,11 +143,11 @@ func (r *Joiner) performJoinRoomByAlias(
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
-) (string, error) {
+) (string, gomatrixserverlib.ServerName, error) {
 	// Get the domain part of the room ID.
 	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
 	if err != nil {
-		return "", &api.PerformError{
+		return "", "", &api.PerformError{
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("Room ID %q is invalid: %s", req.RoomIDOrAlias, err),
 		}
@@ -169,7 +170,7 @@ func (r *Joiner) performJoinRoomByID(
 		Redacts:  "",
 	}
 	if err = eb.SetUnsigned(struct{}{}); err != nil {
-		return "", fmt.Errorf("eb.SetUnsigned: %w", err)
+		return "", "", fmt.Errorf("eb.SetUnsigned: %w", err)
 	}
 
 	// It is possible for the request to include some "content" for the
@@ -180,7 +181,7 @@ func (r *Joiner) performJoinRoomByID(
 	}
 	req.Content["membership"] = gomatrixserverlib.Join
 	if err = eb.SetContent(req.Content); err != nil {
-		return "", fmt.Errorf("eb.SetContent: %w", err)
+		return "", "", fmt.Errorf("eb.SetContent: %w", err)
 	}
 
 	// Force a federated join if we aren't in the room and we've been
@@ -194,7 +195,7 @@ func (r *Joiner) performJoinRoomByID(
 	if err == nil && isInvitePending {
 		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
 		if ierr != nil {
-			return "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+			return "", "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 		}
 
 		// If we were invited by someone from another server then we can
@@ -206,8 +207,10 @@ func (r *Joiner) performJoinRoomByID(
 	}
 
 	// If we should do a forced federated join then do that.
+	var joinedVia gomatrixserverlib.ServerName
 	if forceFederatedJoin {
-		return req.RoomIDOrAlias, r.performFederatedJoinRoomByID(ctx, req)
+		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
+		return req.RoomIDOrAlias, joinedVia, err
 	}
 
 	// Try to construct an actual join event from the template.
@@ -249,7 +252,7 @@ func (r *Joiner) performJoinRoomByID(
 			inputRes := api.InputRoomEventsResponse{}
 			r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
 			if err = inputRes.Err(); err != nil {
-				return "", &api.PerformError{
+				return "", "", &api.PerformError{
 					Code: api.PerformErrorNotAllowed,
 					Msg:  fmt.Sprintf("InputRoomEvents auth failed: %s", err),
 				}
@@ -265,7 +268,7 @@ func (r *Joiner) performJoinRoomByID(
 			// Otherwise we'll try a federated join as normal, since it's quite
 			// possible that the room still exists on other servers.
 			if len(req.ServerNames) == 0 {
-				return "", &api.PerformError{
+				return "", "", &api.PerformError{
 					Code: api.PerformErrorNoRoom,
 					Msg:  fmt.Sprintf("Room ID %q does not exist", req.RoomIDOrAlias),
 				}
@@ -273,24 +276,25 @@ func (r *Joiner) performJoinRoomByID(
 		}
 
 		// Perform a federated room join.
-		return req.RoomIDOrAlias, r.performFederatedJoinRoomByID(ctx, req)
+		joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
+		return req.RoomIDOrAlias, joinedVia, err
 
 	default:
 		// Something else went wrong.
-		return "", fmt.Errorf("Error joining local room: %q", err)
+		return "", "", fmt.Errorf("Error joining local room: %q", err)
 	}
 
 	// By this point, if req.RoomIDOrAlias contained an alias, then
 	// it will have been overwritten with a room ID by performJoinRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return req.RoomIDOrAlias, nil
+	return req.RoomIDOrAlias, r.Cfg.Matrix.ServerName, nil
 }
 
 func (r *Joiner) performFederatedJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
-) error {
+) (gomatrixserverlib.ServerName, error) {
 	// Try joining by all of the supplied server names.
 	fedReq := fsAPI.PerformJoinRequest{
 		RoomID:      req.RoomIDOrAlias, // the room ID to try and join
@@ -301,13 +305,13 @@ func (r *Joiner) performFederatedJoinRoomByID(
 	fedRes := fsAPI.PerformJoinResponse{}
 	r.FSAPI.PerformJoin(ctx, &fedReq, &fedRes)
 	if fedRes.LastError != nil {
-		return &api.PerformError{
+		return "", &api.PerformError{
 			Code:       api.PerformErrRemote,
 			Msg:        fedRes.LastError.Message,
 			RemoteCode: fedRes.LastError.Code,
 		}
 	}
-	return nil
+	return fedRes.JoinedVia, nil
 }
 
 func buildEvent(

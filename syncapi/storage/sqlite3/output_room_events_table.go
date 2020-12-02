@@ -246,7 +246,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		stateNeeded[ev.RoomID()] = needSet
 
 		eventIDToEvent[ev.EventID()] = types.StreamEvent{
-			HeaderedEvent:   ev,
+			HeaderedEvent:   &ev,
 			StreamPosition:  streamPos,
 			ExcludeFromSync: excludeFromSync,
 		}
@@ -452,7 +452,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		}
 
 		result = append(result, types.StreamEvent{
-			HeaderedEvent:   ev,
+			HeaderedEvent:   &ev,
 			StreamPosition:  streamPos,
 			TransactionID:   transactionID,
 			ExcludeFromSync: excludeFromSync,

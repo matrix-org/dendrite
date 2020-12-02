@@ -88,7 +88,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 
-	events := []gomatrixserverlib.HeaderedEvent{output.NewRoomEvent.Event}
+	events := []*gomatrixserverlib.HeaderedEvent{output.NewRoomEvent.Event}
 	events = append(events, output.NewRoomEvent.AddStateEvents...)
 
 	// Send event to any relevant application services
@@ -102,14 +102,14 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 // application service.
 func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 	ctx context.Context,
-	events []gomatrixserverlib.HeaderedEvent,
+	events []*gomatrixserverlib.HeaderedEvent,
 ) error {
 	for _, ws := range s.workerStates {
 		for _, event := range events {
 			// Check if this event is interesting to this application service
 			if s.appserviceIsInterestedInEvent(ctx, event, ws.AppService) {
 				// Queue this event to be sent off to the application service
-				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, &event); err != nil {
+				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, event); err != nil {
 					log.WithError(err).Warn("failed to insert incoming event into appservices database")
 				} else {
 					// Tell our worker to send out new messages by updating remaining message
@@ -125,7 +125,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 
 // appserviceIsInterestedInEvent returns a boolean depending on whether a given
 // event falls within one of a given application service's namespaces.
-func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
 	// No reason to queue events if they'll never be sent to the application
 	// service
 	if appservice.URL == "" {

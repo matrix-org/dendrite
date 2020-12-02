@@ -50,7 +50,7 @@ func (r *Inputer) updateLatestEvents(
 	ctx context.Context,
 	roomInfo *types.RoomInfo,
 	stateAtEvent types.StateAtEvent,
-	event gomatrixserverlib.Event,
+	event *gomatrixserverlib.Event,
 	sendAsServer string,
 	transactionID *api.TransactionID,
 	rewritesState bool,
@@ -92,7 +92,7 @@ type latestEventsUpdater struct {
 	updater       *shared.LatestEventsUpdater
 	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent
-	event         gomatrixserverlib.Event
+	event         *gomatrixserverlib.Event
 	transactionID *api.TransactionID
 	rewritesState bool
 	// Which server to send this event as.
@@ -140,7 +140,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// Work out what the latest events are. This will include the new
 	// event if it is not already referenced.
 	extremitiesChanged, err := u.calculateLatest(
-		oldLatest, &u.event,
+		oldLatest, u.event,
 		types.StateAtEventAndReference{
 			EventReference: u.event.EventReference(),
 			StateAtEvent:   u.stateAtEvent,
@@ -373,7 +373,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 
 // extraEventsForIDs returns the full events for the event IDs given, but does not include the current event being
 // updated.
-func (u *latestEventsUpdater) extraEventsForIDs(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.HeaderedEvent, error) {
+func (u *latestEventsUpdater) extraEventsForIDs(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	var extraEventIDs []string
 	for _, e := range eventIDs {
 		if e == u.event.EventID() {
@@ -388,7 +388,7 @@ func (u *latestEventsUpdater) extraEventsForIDs(roomVersion gomatrixserverlib.Ro
 	if err != nil {
 		return nil, err
 	}
-	var h []gomatrixserverlib.HeaderedEvent
+	var h []*gomatrixserverlib.HeaderedEvent
 	for _, e := range extraEvents {
 		h = append(h, e.Headered(roomVersion))
 	}

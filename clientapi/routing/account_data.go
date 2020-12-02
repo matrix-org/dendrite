@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 
@@ -148,7 +149,8 @@ type fullyReadEvent struct {
 
 // SaveReadMarker implements POST /rooms/{roomId}/read_markers
 func SaveReadMarker(
-	req *http.Request, userAPI api.UserInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	req *http.Request,
+	userAPI api.UserInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI, eduAPI eduserverAPI.EDUServerInputAPI,
 	syncProducer *producers.SyncAPIProducer, device *api.Device, roomID string,
 ) util.JSONResponse {
 	// Verify that the user is a member of this room
@@ -192,8 +194,10 @@ func SaveReadMarker(
 		return jsonerror.InternalServerError()
 	}
 
-	// TODO handle the read receipt that may be included in the read marker
-	// See https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-rooms-roomid-read-markers
+	// Handle the read receipt that may be included in the read marker
+	if r.Read != "" {
+		return SetReceipt(req, eduAPI, device, roomID, "m.read", r.Read)
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,

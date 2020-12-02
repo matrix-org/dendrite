@@ -113,7 +113,7 @@ var (
 	// TODO: Remove old sessions. Need to do so on a session-specific timeout.
 	// sessions stores the completed flow stages for all sessions. Referenced using their sessionID.
 	sessions           = newSessionsDict()
-	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-./]+$`)
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
 )
 
 // registerRequest represents the submitted registration request.
@@ -209,7 +209,7 @@ func validateUsername(username string) *util.JSONResponse {
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./'"),
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
 		}
 	} else if username[0] == '_' { // Regex checks its not a zero length string
 		return &util.JSONResponse{
@@ -230,7 +230,7 @@ func validateApplicationServiceUsername(username string) *util.JSONResponse {
 	} else if !validUsernameRegex.MatchString(username) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./'"),
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
 		}
 	}
 	return nil

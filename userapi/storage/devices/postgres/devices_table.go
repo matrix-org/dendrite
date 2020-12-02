@@ -77,7 +77,7 @@ const selectDeviceByIDSQL = "" +
 	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name FROM device_devices WHERE localpart = $1 AND device_id != $2"
+	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2"
 
 const updateDeviceNameSQL = "" +
 	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
@@ -95,7 +95,7 @@ const selectDevicesByIDSQL = "" +
 	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id = ANY($1)"
 
 const updateDeviceLastSeen = "" +
-	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE device_id = $3"
+	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
 
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
@@ -281,8 +281,9 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 
 	for rows.Next() {
 		var dev api.Device
-		var id, displayname sql.NullString
-		err = rows.Scan(&id, &displayname)
+		var lastseents sql.NullInt64
+		var id, displayname, ip, useragent sql.NullString
+		err = rows.Scan(&id, &displayname, &lastseents, &ip, &useragent)
 		if err != nil {
 			return devices, err
 		}
@@ -292,6 +293,16 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 		if displayname.Valid {
 			dev.DisplayName = displayname.String
 		}
+		if lastseents.Valid {
+			dev.LastSeenTS = lastseents.Int64
+		}
+		if ip.Valid {
+			dev.LastSeenIP = ip.String
+		}
+		if useragent.Valid {
+			dev.UserAgent = useragent.String
+		}
+
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		devices = append(devices, dev)
 	}
@@ -299,9 +310,9 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	return devices, rows.Err()
 }
 
-func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, txn *sql.Tx, deviceID, ipAddr string) error {
+func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr string) error {
 	lastSeenTs := time.Now().UnixNano() / 1000000
 	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
-	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, deviceID)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, localpart, deviceID)
 	return err
 }

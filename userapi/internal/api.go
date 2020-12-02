@@ -172,6 +172,21 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 	return nil
 }
 
+func (a *UserInternalAPI) PerformLastSeenUpdate(
+	ctx context.Context,
+	req *api.PerformLastSeenUpdateRequest,
+	res *api.PerformLastSeenUpdateResponse,
+) error {
+	localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+	}
+	if err := a.DeviceDB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr); err != nil {
+		return fmt.Errorf("a.DeviceDB.UpdateDeviceLastSeen: %w", err)
+	}
+	return nil
+}
+
 func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.PerformDeviceUpdateRequest, res *api.PerformDeviceUpdateResponse) error {
 	localpart, _, err := gomatrixserverlib.SplitID('@', req.RequestingUserID)
 	if err != nil {

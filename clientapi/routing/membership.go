@@ -77,7 +77,7 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 	if err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
-		[]gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
+		[]*gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
 		cfg.Matrix.ServerName,
 		nil,
 	); err != nil {
@@ -214,7 +214,7 @@ func SendInvite(
 
 	err = roomserverAPI.SendInvite(
 		req.Context(), rsAPI,
-		*event,
+		event,
 		nil, // ask the roomserver to draw up invite room state for us
 		cfg.Matrix.ServerName,
 		nil,
@@ -406,4 +406,48 @@ func checkMemberInRoom(ctx context.Context, rsAPI api.RoomserverInternalAPI, use
 		}
 	}
 	return nil
+}
+
+func SendForget(
+	req *http.Request, device *userapi.Device,
+	roomID string, rsAPI roomserverAPI.RoomserverInternalAPI,
+) util.JSONResponse {
+	ctx := req.Context()
+	logger := util.GetLogger(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
+	var membershipRes api.QueryMembershipForUserResponse
+	membershipReq := api.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: device.UserID,
+	}
+	err := rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes)
+	if err != nil {
+		logger.WithError(err).Error("QueryMembershipForUser: could not query membership for user")
+		return jsonerror.InternalServerError()
+	}
+	if membershipRes.IsInRoom {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Forbidden("user is still a member of the room"),
+		}
+	}
+	if !membershipRes.HasBeenInRoom {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Forbidden("user did not belong to room"),
+		}
+	}
+
+	request := api.PerformForgetRequest{
+		RoomID: roomID,
+		UserID: device.UserID,
+	}
+	response := api.PerformForgetResponse{}
+	if err := rsAPI.PerformForget(ctx, &request, &response); err != nil {
+		logger.WithError(err).Error("PerformForget: unable to forget room")
+		return jsonerror.InternalServerError()
+	}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
 }

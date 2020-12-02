@@ -61,7 +61,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, rsAPI)
+	requestPool := sync.NewRequestPool(syncDB, cfg, notifier, userAPI, keyAPI, rsAPI)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
@@ -97,6 +97,13 @@ func AddPublicRoutes(
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
+	}
+
+	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
+		cfg, consumer, notifier, syncDB,
+	)
+	if err = receiptConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)

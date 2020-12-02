@@ -651,6 +651,16 @@ func Setup(
 		}),
 	).Methods(http.MethodGet)
 
+	r0mux.Handle("/admin/whois/{userID}",
+		httputil.MakeAuthAPI("admin_whois", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetAdminWhois(req, userAPI, device, vars["userID"])
+		}),
+	).Methods(http.MethodGet)
+
 	r0mux.Handle("/user_directory/search",
 		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {
@@ -705,7 +715,20 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveReadMarker(req, userAPI, rsAPI, syncProducer, device, vars["roomID"])
+			return SaveReadMarker(req, userAPI, rsAPI, eduAPI, syncProducer, device, vars["roomID"])
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	r0mux.Handle("/rooms/{roomID}/forget",
+		httputil.MakeAuthAPI("rooms_forget", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SendForget(req, device, vars["roomID"], rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -828,6 +851,19 @@ func Setup(
 	r0mux.Handle("/keys/claim",
 		httputil.MakeAuthAPI("keys_claim", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return ClaimKeys(req, keyAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomId}/receipt/{receiptType}/{eventId}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return SetReceipt(req, eduAPI, device, vars["roomId"], vars["receiptType"], vars["eventId"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 }

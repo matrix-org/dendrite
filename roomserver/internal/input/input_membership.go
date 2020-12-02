@@ -62,13 +62,13 @@ func (r *Inputer) updateMemberships(
 		if change.removedEventNID != 0 {
 			ev, _ := helpers.EventMap(events).Lookup(change.removedEventNID)
 			if ev != nil {
-				re = &ev.Event
+				re = ev.Event
 			}
 		}
 		if change.addedEventNID != 0 {
 			ev, _ := helpers.EventMap(events).Lookup(change.addedEventNID)
 			if ev != nil {
-				ae = &ev.Event
+				ae = ev.Event
 			}
 		}
 		if updates, err = r.updateMembership(updater, targetUserNID, re, ae, updates); err != nil {

@@ -14,6 +14,7 @@ package transactions
 
 import (
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/matrix-org/util"
@@ -44,8 +45,8 @@ func TestCache(t *testing.T) {
 	for i := 1; i <= 100; i++ {
 		fakeTxnCache.AddTransaction(
 			fakeAccessToken,
-			fakeTxnID+string(i),
-			&util.JSONResponse{Code: http.StatusOK, JSON: fakeType{ID: string(i)}},
+			fakeTxnID+strconv.Itoa(i),
+			&util.JSONResponse{Code: http.StatusOK, JSON: fakeType{ID: strconv.Itoa(i)}},
 		)
 	}
 

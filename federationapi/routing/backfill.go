@@ -93,9 +93,9 @@ func Backfill(
 	}
 
 	// Filter any event that's not from the requested room out.
-	evs := make([]gomatrixserverlib.Event, 0)
+	evs := make([]*gomatrixserverlib.Event, 0)
 
-	var ev gomatrixserverlib.HeaderedEvent
+	var ev *gomatrixserverlib.HeaderedEvent
 	for _, ev = range res.Events {
 		if ev.RoomID() == roomID {
 			evs = append(evs, ev.Event)

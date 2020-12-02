@@ -16,6 +16,13 @@ POST /register rejects registration of usernames with '£'
 POST /register rejects registration of usernames with 'é'
 POST /register rejects registration of usernames with '\n'
 POST /register rejects registration of usernames with '''
+POST /register allows registration of usernames with 'q'
+POST /register allows registration of usernames with '3'
+POST /register allows registration of usernames with '.'
+POST /register allows registration of usernames with '_'
+POST /register allows registration of usernames with '='
+POST /register allows registration of usernames with '-'
+POST /register allows registration of usernames with '/'
 GET /login yields a set of flows
 POST /login can log in as a user
 POST /login returns the same device_id as that in the request
@@ -483,6 +490,16 @@ POST rejects invalid utf-8 in JSON
 Users cannot kick users who have already left a room
 Event with an invalid signature in the send_join response should not cause room join to fail
 Inbound federation rejects typing notifications from wrong remote
+POST /rooms/:room_id/receipt can create receipts
+Receipts must be m.read
+Read receipts appear in initial v2 /sync
+New read receipts appear in incremental v2 /sync
+Outbound federation sends receipts
+Inbound federation rejects receipts from wrong remote
 Should not be able to take over the room by pretending there is no PL event
 Can get rooms/{roomId}/state for a departed room (SPEC-216)
 Users cannot set notifications powerlevel higher than their own
+Forgetting room does not show up in v2 /sync
+Can forget room you've been kicked from
+Can re-join room if re-invited
+/whois

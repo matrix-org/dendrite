@@ -37,7 +37,7 @@ var (
 	})
 )
 
-func MustCreateEvent(t *testing.T, roomID string, prevs []gomatrixserverlib.HeaderedEvent, b *gomatrixserverlib.EventBuilder) gomatrixserverlib.HeaderedEvent {
+func MustCreateEvent(t *testing.T, roomID string, prevs []*gomatrixserverlib.HeaderedEvent, b *gomatrixserverlib.EventBuilder) *gomatrixserverlib.HeaderedEvent {
 	b.RoomID = roomID
 	if prevs != nil {
 		prevIDs := make([]string, len(prevs))
@@ -70,8 +70,8 @@ func MustCreateDatabase(t *testing.T) storage.Database {
 }
 
 // Create a list of events which include a create event, join event and some messages.
-func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserverlib.HeaderedEvent, state []gomatrixserverlib.HeaderedEvent) {
-	var events []gomatrixserverlib.HeaderedEvent
+func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []*gomatrixserverlib.HeaderedEvent, state []*gomatrixserverlib.HeaderedEvent) {
+	var events []*gomatrixserverlib.HeaderedEvent
 	events = append(events, MustCreateEvent(t, roomID, nil, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(fmt.Sprintf(`{"room_version":"4","creator":"%s"}`, userA)),
 		Type:     "m.room.create",
@@ -80,7 +80,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 		Depth:    int64(len(events) + 1),
 	}))
 	state = append(state, events[len(events)-1])
-	events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+	events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &userA,
@@ -89,14 +89,14 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 	}))
 	state = append(state, events[len(events)-1])
 	for i := 0; i < 10; i++ {
-		events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+		events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 			Content: []byte(fmt.Sprintf(`{"body":"Message A %d"}`, i+1)),
 			Type:    "m.room.message",
 			Sender:  userA,
 			Depth:   int64(len(events) + 1),
 		}))
 	}
-	events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+	events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &userB,
@@ -105,7 +105,7 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 	}))
 	state = append(state, events[len(events)-1])
 	for i := 0; i < 10; i++ {
-		events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+		events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 			Content: []byte(fmt.Sprintf(`{"body":"Message B %d"}`, i+1)),
 			Type:    "m.room.message",
 			Sender:  userB,
@@ -116,16 +116,16 @@ func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []gomatrixserve
 	return events, state
 }
 
-func MustWriteEvents(t *testing.T, db storage.Database, events []gomatrixserverlib.HeaderedEvent) (positions []types.StreamPosition) {
+func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (positions []types.StreamPosition) {
 	for _, ev := range events {
-		var addStateEvents []gomatrixserverlib.HeaderedEvent
+		var addStateEvents []*gomatrixserverlib.HeaderedEvent
 		var addStateEventIDs []string
 		var removeStateEventIDs []string
 		if ev.StateKey() != nil {
 			addStateEvents = append(addStateEvents, ev)
 			addStateEventIDs = append(addStateEventIDs, ev.EventID())
 		}
-		pos, err := db.WriteEvent(ctx, &ev, addStateEvents, addStateEventIDs, removeStateEventIDs, nil, false)
+		pos, err := db.WriteEvent(ctx, ev, addStateEvents, addStateEventIDs, removeStateEventIDs, nil, false)
 		if err != nil {
 			t.Fatalf("WriteEvent failed: %s", err)
 		}
@@ -156,8 +156,8 @@ func TestSyncResponse(t *testing.T) {
 	testCases := []struct {
 		Name         string
 		DoSync       func() (*types.Response, error)
-		WantTimeline []gomatrixserverlib.HeaderedEvent
-		WantState    []gomatrixserverlib.HeaderedEvent
+		WantTimeline []*gomatrixserverlib.HeaderedEvent
+		WantState    []*gomatrixserverlib.HeaderedEvent
 	}{
 		// The purpose of this test is to make sure that incremental syncs are including up to the latest events.
 		// It's a basic sanity test that sync works. It creates a `since` token that is on the penultimate event.
@@ -339,7 +339,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 	t.Parallel()
 	db := MustCreateDatabase(t)
 
-	var events []gomatrixserverlib.HeaderedEvent
+	var events []*gomatrixserverlib.HeaderedEvent
 	events = append(events, MustCreateEvent(t, testRoomID, nil, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(fmt.Sprintf(`{"room_version":"4","creator":"%s"}`, testUserIDA)),
 		Type:     "m.room.create",
@@ -347,7 +347,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Sender:   testUserIDA,
 		Depth:    int64(len(events) + 1),
 	}))
-	events = append(events, MustCreateEvent(t, testRoomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+	events = append(events, MustCreateEvent(t, testRoomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &testUserIDA,
@@ -355,7 +355,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Depth:    int64(len(events) + 1),
 	}))
 	// fork the dag into three, same prev_events and depth
-	parent := []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}
+	parent := []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}
 	depth := int64(len(events) + 1)
 	for i := 0; i < 3; i++ {
 		events = append(events, MustCreateEvent(t, testRoomID, parent, &gomatrixserverlib.EventBuilder{
@@ -388,7 +388,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Name  string
 		From  types.TopologyToken
 		Limit int
-		Wants []gomatrixserverlib.HeaderedEvent
+		Wants []*gomatrixserverlib.HeaderedEvent
 	}{
 		{
 			Name:  "Pagination over the whole fork",
@@ -429,7 +429,7 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 	t.Parallel()
 	db := MustCreateDatabase(t)
 
-	makeEvents := func(roomID string) (events []gomatrixserverlib.HeaderedEvent) {
+	makeEvents := func(roomID string) (events []*gomatrixserverlib.HeaderedEvent) {
 		events = append(events, MustCreateEvent(t, roomID, nil, &gomatrixserverlib.EventBuilder{
 			Content:  []byte(fmt.Sprintf(`{"room_version":"4","creator":"%s"}`, testUserIDA)),
 			Type:     "m.room.create",
@@ -437,7 +437,7 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 			Sender:   testUserIDA,
 			Depth:    int64(len(events) + 1),
 		}))
-		events = append(events, MustCreateEvent(t, roomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+		events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 			Content:  []byte(`{"membership":"join"}`),
 			Type:     "m.room.member",
 			StateKey: &testUserIDA,
@@ -483,14 +483,14 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 
 	// "federation" join
 	userC := fmt.Sprintf("@radiance:%s", testOrigin)
-	joinEvent := MustCreateEvent(t, testRoomID, []gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
+	joinEvent := MustCreateEvent(t, testRoomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
 		Content:  []byte(`{"membership":"join"}`),
 		Type:     "m.room.member",
 		StateKey: &userC,
 		Sender:   userC,
 		Depth:    int64(len(events) + 1),
 	})
-	MustWriteEvents(t, db, []gomatrixserverlib.HeaderedEvent{joinEvent})
+	MustWriteEvents(t, db, []*gomatrixserverlib.HeaderedEvent{joinEvent})
 
 	// Sync will return this for the prev_batch
 	from := topologyTokenBefore(t, db, joinEvent.EventID())
@@ -627,7 +627,7 @@ func TestInviteBehaviour(t *testing.T) {
 		StateKey: &testUserIDA,
 		Sender:   "@inviteUser2:somewhere",
 	})
-	for _, ev := range []gomatrixserverlib.HeaderedEvent{inviteEvent1, inviteEvent2} {
+	for _, ev := range []*gomatrixserverlib.HeaderedEvent{inviteEvent1, inviteEvent2} {
 		_, err := db.AddInviteEvent(ctx, ev)
 		if err != nil {
 			t.Fatalf("Failed to AddInviteEvent: %s", err)
@@ -688,7 +688,7 @@ func assertInvitedToRooms(t *testing.T, res *types.Response, roomIDs []string) {
 	}
 }
 
-func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []gomatrixserverlib.HeaderedEvent) {
+func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []*gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
 	if len(gots) != len(wants) {
 		t.Fatalf("%s response returned %d events, want %d", msg, len(gots), len(wants))
@@ -738,8 +738,8 @@ func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *typ
 	return &tok
 }
 
-func reversed(in []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
-	out := make([]gomatrixserverlib.HeaderedEvent, len(in))
+func reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
+	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
 	for i := 0; i < len(in); i++ {
 		out[i] = in[len(in)-i-1]
 	}
