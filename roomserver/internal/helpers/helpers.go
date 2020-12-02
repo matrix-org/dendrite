@@ -232,19 +232,24 @@ func CheckServerAllowedToSeeEvent(
 		stateKeyNIDs = append(stateKeyNIDs, entry.EventStateKeyNID)
 	}
 
-	// Then request those state ky NIDs from the database.
+	// Then request those state key NIDs from the database.
 	stateKeys, err := db.EventStateKeys(ctx, stateKeyNIDs)
 	if err != nil {
 		return false, fmt.Errorf("db.EventStateKeys: %w", err)
 	}
 
-	// If the event state key doesn't match
+	// If the event state key doesn't match the given servername
+	// then we'll filter it out. This does preserve state keys that
+	// are "" since these will contain history visibility etc.
 	for nid, key := range stateKeys {
 		if key != "" && !strings.HasSuffix(key, ":"+string(serverName)) {
 			delete(stateKeys, nid)
 		}
 	}
 
+	// Now filter through all of the state events for the room.
+	// If the state key NID appears in the list of valid state
+	// keys then we'll add it to the list of filtered entries.
 	var filteredEntries []types.StateEntry
 	for _, entry := range stateEntries {
 		if _, ok := stateKeys[entry.EventStateKeyNID]; ok {
@@ -256,16 +261,9 @@ func CheckServerAllowedToSeeEvent(
 		return false, nil
 	}
 
-	// TODO: We probably want to make it so that we don't have to pull
-	// out all the state if possible.
 	stateAtEvent, err := LoadStateEvents(ctx, db, filteredEntries)
 	if err != nil {
 		return false, err
-	}
-
-	fmt.Println("Filtered entries:")
-	for _, entry := range stateAtEvent {
-		fmt.Println("*", entry.Type(), *entry.StateKey())
 	}
 
 	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
