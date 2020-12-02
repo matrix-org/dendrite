@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/mscs"
 	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -130,6 +131,7 @@ func main() {
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
+	cfg.MSCs.MSCs = []string{"msc2836"}
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -190,6 +192,9 @@ func main() {
 		base.Base.PublicKeyAPIMux,
 		base.Base.PublicMediaAPIMux,
 	)
+	if err := mscs.Enable(&base.Base, &monolith); err != nil {
+		logrus.WithError(err).Fatalf("Failed to enable MSCs")
+	}
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.Base.InternalAPIMux)
