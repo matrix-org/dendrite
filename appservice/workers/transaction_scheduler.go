@@ -185,14 +185,14 @@ func createTransaction(
 		}
 	}
 
-	var ev []*gomatrixserverlib.Event
-	for _, e := range events {
-		ev = append(ev, e.Event)
+	var ev []*gomatrixserverlib.HeaderedEvent
+	for i := range events {
+		ev = append(ev, &events[i])
 	}
 
 	// Create a transaction and store the events inside
 	transaction := gomatrixserverlib.ApplicationServiceTransaction{
-		Events: ev,
+		Events: gomatrixserverlib.HeaderedToClientEvents(ev, gomatrixserverlib.FormatAll),
 	}
 
 	transactionJSON, err = json.Marshal(transaction)
