@@ -484,8 +484,7 @@ func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	format, _ := event.RoomVersion.EventFormat()
-	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), format)
+	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), gomatrixserverlib.FormatSync)
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)
