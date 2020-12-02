@@ -28,7 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"

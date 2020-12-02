@@ -22,7 +22,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"

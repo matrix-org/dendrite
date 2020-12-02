@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/keyserver/api"
 )
 

@@ -16,7 +16,7 @@ package mediaapi
 
 import (
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/mediaapi/routing"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	userapi "github.com/matrix-org/dendrite/userapi/api"

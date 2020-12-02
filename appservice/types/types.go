@@ -15,7 +15,7 @@ package types
 import (
 	"sync"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 const (

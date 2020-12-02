@@ -18,7 +18,7 @@ var (
 	syncingUser = "@alice:localhost"
 	emptyToken  = types.NewStreamToken(0, 0, nil)
 	newestToken = types.NewStreamToken(0, 0, map[string]*types.LogPosition{
-		DeviceListLogName: &types.LogPosition{
+		DeviceListLogName: {
 			Offset:    sarama.OffsetNewest,
 			Partition: 0,
 		},

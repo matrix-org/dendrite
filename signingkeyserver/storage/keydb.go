@@ -21,7 +21,7 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/signingkeyserver/storage/postgres"
 	"github.com/matrix-org/dendrite/signingkeyserver/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"

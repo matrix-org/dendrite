@@ -16,8 +16,8 @@ package personalities
 
 import (
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup"
 )
 
 func FederationAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {

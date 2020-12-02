@@ -21,7 +21,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
