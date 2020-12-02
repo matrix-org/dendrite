@@ -16,8 +16,8 @@ package personalities
 
 import (
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func FederationSender(base *setup.BaseDendrite, cfg *config.Dendrite) {
