@@ -17,7 +17,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.3.5
 	github.com/libp2p/go-libp2p-record v0.1.3
 	github.com/libp2p/go-yamux v1.3.9 // indirect
-	github.com/lucas-clemente/quic-go v0.17.3
+	github.com/lucas-clemente/quic-go v0.19.1
 	github.com/matrix-org/dugong v0.0.0-20180820122854-51a565b5666b
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
@@ -40,7 +40,7 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20201006093556-760d9a7fd5ee
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
-	golang.org/x/net v0.0.0-20200528225125-3c3fba18258b
+	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	gopkg.in/h2non/bimg.v1 v1.1.4
 	gopkg.in/yaml.v2 v2.3.0
 )
