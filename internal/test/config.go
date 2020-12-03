@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"gopkg.in/yaml.v2"
 )

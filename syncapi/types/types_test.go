@@ -10,27 +10,27 @@ import (
 
 func TestNewSyncTokenWithLogs(t *testing.T) {
 	tests := map[string]*StreamingToken{
-		"s4_0": &StreamingToken{
+		"s4_0": {
 			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
 			logs:      make(map[string]*LogPosition),
 		},
-		"s4_0.dl-0-123": &StreamingToken{
+		"s4_0.dl-0-123": {
 			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
 			logs: map[string]*LogPosition{
-				"dl": &LogPosition{
+				"dl": {
 					Partition: 0,
 					Offset:    123,
 				},
 			},
 		},
-		"s4_0.ab-1-14419482332.dl-0-123": &StreamingToken{
+		"s4_0.ab-1-14419482332.dl-0-123": {
 			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
 			logs: map[string]*LogPosition{
-				"ab": &LogPosition{
+				"ab": {
 					Partition: 1,
 					Offset:    14419482332,
 				},
-				"dl": &LogPosition{
+				"dl": {
 					Partition: 0,
 					Offset:    123,
 				},

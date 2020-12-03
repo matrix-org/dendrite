@@ -19,8 +19,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/mscs/msc2836"
-	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
 	"github.com/matrix-org/util"
 )
 

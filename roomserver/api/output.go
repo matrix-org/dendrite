@@ -51,6 +51,8 @@ const (
 
 	// OutputTypeNewPeek indicates that the kafka event is an OutputNewPeek
 	OutputTypeNewPeek OutputType = "new_peek"
+	// OutputTypeRetirePeek indicates that the kafka event is an OutputRetirePeek
+	OutputTypeRetirePeek OutputType = "retire_peek"
 )
 
 // An OutputEvent is an entry in the roomserver output kafka log.
@@ -70,6 +72,8 @@ type OutputEvent struct {
 	RedactedEvent *OutputRedactedEvent `json:"redacted_event,omitempty"`
 	// The content of event with type OutputTypeNewPeek
 	NewPeek *OutputNewPeek `json:"new_peek,omitempty"`
+	// The content of event with type OutputTypeRetirePeek
+	RetirePeek *OutputRetirePeek `json:"retire_peek,omitempty"`
 }
 
 // Type of the OutputNewRoomEvent.
@@ -236,6 +240,13 @@ type OutputRedactedEvent struct {
 // An OutputNewPeek is written whenever a user starts peeking into a room
 // using a given device.
 type OutputNewPeek struct {
+	RoomID   string
+	UserID   string
+	DeviceID string
+}
+
+// An OutputRetirePeek is written whenever a user stops peeking into a room.
+type OutputRetirePeek struct {
 	RoomID   string
 	UserID   string
 	DeviceID string

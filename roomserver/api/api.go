@@ -42,6 +42,12 @@ type RoomserverInternalAPI interface {
 		res *PerformPeekResponse,
 	)
 
+	PerformUnpeek(
+		ctx context.Context,
+		req *PerformUnpeekRequest,
+		res *PerformUnpeekResponse,
+	)
+
 	PerformPublish(
 		ctx context.Context,
 		req *PerformPublishRequest,
