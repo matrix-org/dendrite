@@ -70,7 +70,7 @@ func InviteV1(
 ) util.JSONResponse {
 	roomVer := gomatrixserverlib.RoomVersionV1
 	body := request.Content()
-	event, err := gomatrixserverlib.NewEventFromTrustedJSON(body, false, roomVer)
+	event, err := gomatrixserverlib.NewEventFromUntrustedJSON(body, roomVer)
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{

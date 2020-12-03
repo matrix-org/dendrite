@@ -322,14 +322,18 @@ func (d *Database) Events(
 		if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
 			roomVersion, _ = d.Cache.GetRoomVersion(roomID)
 		}
+		eventID := ""
+		if id, ierr := d.EventsTable.SelectEventID(ctx, nil, eventNIDs[i]); ierr == nil {
+			eventID = id
+		}
 		if roomVersion == "" {
 			roomVersion, err = d.RoomsTable.SelectRoomVersionForRoomNID(ctx, roomNID)
 			if err != nil {
 				return nil, err
 			}
 		}
-		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSON(
-			eventJSON.EventJSON, false, roomVersion,
+		result.Event, err = gomatrixserverlib.NewEventFromStoredJSON(
+			eventID, eventJSON.EventJSON, false, roomVersion,
 		)
 		if err != nil {
 			return nil, err
@@ -810,7 +814,11 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			if len(data) == 0 {
 				return nil, fmt.Errorf("GetStateEvent: no json for event nid %d", e.EventNID)
 			}
-			ev, err := gomatrixserverlib.NewEventFromTrustedJSON(data[0].EventJSON, false, roomInfo.RoomVersion)
+			eventID := ""
+			if id, ierr := d.EventsTable.SelectEventID(ctx, nil, e.EventNID); ierr == nil {
+				eventID = id
+			}
+			ev, err := gomatrixserverlib.NewEventFromStoredJSON(eventID, data[0].EventJSON, false, roomInfo.RoomVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -929,7 +937,11 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	result := make([]tables.StrippedEvent, len(events))
 	for i := range events {
 		roomVer := eventNIDToVer[events[i].EventNID]
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSON(events[i].EventJSON, false, roomVer)
+		eventID := ""
+		if id, err := d.EventsTable.SelectEventID(ctx, nil, eventNIDs[i]); err == nil {
+			eventID = id
+		}
+		ev, err := gomatrixserverlib.NewEventFromStoredJSON(eventID, events[i].EventJSON, false, roomVer)
 		if err != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event NID %v : %w", events[i].EventNID, err)
 		}
