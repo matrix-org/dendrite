@@ -323,7 +323,7 @@ func (d *Database) Events(
 			roomVersion, _ = d.Cache.GetRoomVersion(roomID)
 		}
 		eventID := ""
-		if id, ierr := d.EventsTable.SelectEventID(ctx, nil, eventNIDs[i]); ierr == nil {
+		if id, ierr := d.EventsTable.SelectEventID(ctx, nil, eventJSON.EventNID); ierr == nil {
 			eventID = id
 		}
 		if roomVersion == "" {
@@ -938,7 +938,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	for i := range events {
 		roomVer := eventNIDToVer[events[i].EventNID]
 		eventID := ""
-		if id, err := d.EventsTable.SelectEventID(ctx, nil, eventNIDs[i]); err == nil {
+		if id, err := d.EventsTable.SelectEventID(ctx, nil, events[i].EventNID); err == nil {
 			eventID = id
 		}
 		ev, err := gomatrixserverlib.NewEventFromStoredJSON(eventID, events[i].EventJSON, false, roomVer)
