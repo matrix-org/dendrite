@@ -1,0 +1,47 @@
+name: "Docker Multiarch Build & Push"
+
+on:
+  push:
+    branches: [master]
+
+env:
+  DOCKER_HUB_USER: matrixdotorg
+
+jobs:
+  BuildAndPush:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up buildx
+        uses: crazy-max/ghaction-docker-buildx@v1
+        with:
+          buildx-version: latest
+
+      - name: Log in to registry
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u $(echo "$DOCKER_HUB_USER") --password-stdin
+
+      - name: Build and push
+        run: |
+          # Build temporary builder image first and then use it to build monolith and polylith images
+          for suffix in '' 'monolith' 'polylith'; do
+            # Name of the repo/image
+            IMAGE_NAME=$DOCKER_HUB_USER/dendrite$(if [ $suffix != "" ]; then echo "-$suffix"; fi)
+            
+            # Strip git ref prefix from version
+            VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+            
+            # Use `latest` insted of `master`
+            [ "$VERSION" == "master" ] && VERSION=latest
+            
+            # Ensure the whole tag is lowercase
+            IMAGE_NAME=$(echo $IMAGE_NAME | tr '[A-Z]' '[a-z]')
+
+            echo IMAGE_NAME=$IMAGE_NAME
+            echo VERSION=$VERSION
+
+            docker buildx build --push \
+               --file build/docker/Dockerfile$(if [ $suffix != "" ]; then echo ".$suffix"; fi) \
+               --tag $IMAGE_NAME:$VERSION \
+               --platform linux/amd64,linux/arm/v7,linux/arm64 .
+          done
