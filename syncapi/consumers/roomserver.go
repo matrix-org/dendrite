@@ -309,6 +309,26 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	return nil
 }
 
+func (s *OutputRoomEventConsumer) onRetirePeek(
+	ctx context.Context, msg api.OutputNewPeek,
+) error {
+	sp, err := s.db.DeletePeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
+	if err != nil {
+		// panic rather than continue with an inconsistent database
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+		}).Panicf("roomserver output log: write peek failure")
+		return nil
+	}
+	// tell the notifier about the new peek so it knows to wake up new devices
+	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID)
+
+	// we need to wake up the users who might need to now be peeking into this room,
+	// so we send in a dummy event to trigger a wakeup
+	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.NewStreamToken(sp, 0, nil))
+	return nil
+}
+
 func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {
 	if event.StateKey() == nil {
 		return event, nil
