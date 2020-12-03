@@ -105,6 +105,8 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
 	case api.OutputTypeNewPeek:
 		return s.onNewPeek(context.TODO(), *output.NewPeek)
+	case api.OutputTypeRetirePeek:
+		return s.onRetirePeek(context.TODO(), *output.RetirePeek)
 	case api.OutputTypeRedactedEvent:
 		return s.onRedactEvent(context.TODO(), *output.RedactedEvent)
 	default:
@@ -310,7 +312,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 }
 
 func (s *OutputRoomEventConsumer) onRetirePeek(
-	ctx context.Context, msg api.OutputNewPeek,
+	ctx context.Context, msg api.OutputRetirePeek,
 ) error {
 	sp, err := s.db.DeletePeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
