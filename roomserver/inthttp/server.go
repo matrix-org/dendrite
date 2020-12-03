@@ -82,6 +82,9 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			if err := r.PerformInboundPeek(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(RoomserverPerformPeekPath,
 		httputil.MakeInternalAPI("performUnpeek", func(req *http.Request) util.JSONResponse {
 			var request api.PerformUnpeekRequest
