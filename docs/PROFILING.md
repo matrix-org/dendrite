@@ -4,7 +4,7 @@ If you are running into problems with Dendrite using excessive resources (e.g. C
 
 Dendrite contains an embedded profiler called `pprof`, which is a part of the standard Go toolchain. 
 
-### Enable the profiler
+## Enable the profiler
 
 To enable the profiler, start Dendrite with the `PPROFLISTEN` environment variable. This variable specifies which address and port to listen on, e.g.
 
@@ -19,7 +19,9 @@ WARN[2020-12-03T13:32:33.669405000Z] [/Users/neilalexander/Desktop/dendrite/inte
 	 Starting pprof on localhost:65432
 ```
 
-### Profiling CPU usage
+All examples from this point forward assume `PPROFLISTEN=localhost:65432` but you may need to adjust as necessary for your setup.
+
+## Profiling CPU usage
 
 To examine where CPU time is going, you can call the `profile` endpoint:
 
@@ -45,7 +47,7 @@ curl -O http://localhost:65432/debug/pprof/profile?seconds=30
 
 This will block for the specified number of seconds, capturing information about what Dendrite is doing, and then produces a `profile` file, which you can send onward.
 
-### Profiling memory usage
+## Profiling memory usage
 
 To examine where memory usage is going, you can call the `heap` endpoint:
 
@@ -74,6 +76,6 @@ If you don't have the Go tools installed but just want to capture the profile to
 
 ```
 curl -O http://localhost:65432/debug/pprof/heap
-``
+```
 
 This will almost instantly produce a `heap` file, which you can send onward.
