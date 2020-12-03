@@ -77,3 +77,28 @@ func PeekRoomByIDOrAlias(
 		}{peekRes.RoomID},
 	}
 }
+
+func UnpeekRoomByID(
+	req *http.Request,
+	device *api.Device,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	accountDB accounts.Database,
+	roomID string,
+) util.JSONResponse {
+	unpeekReq := roomserverAPI.PerformUnpeekRequest{
+		RoomID:   roomID,
+		UserID:   device.UserID,
+		DeviceID: device.ID,
+	}
+	unpeekRes := roomserverAPI.PerformUnpeekResponse{}
+
+	rsAPI.PerformUnpeek(req.Context(), &unpeekReq, &unpeekRes)
+	if unpeekRes.Error != nil {
+		return unpeekRes.Error.JSONResponse()
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}

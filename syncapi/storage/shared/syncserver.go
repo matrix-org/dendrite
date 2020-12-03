@@ -178,6 +178,23 @@ func (d *Database) AddPeek(
 	return
 }
 
+// DeletePeeks tracks the fact that a user has stopped peeking from the specified
+// device. If the peeks was successfully deleted this returns the stream ID it was
+// stored at. Returns an error if there was a problem communicating with the database.
+func (d *Database) DeletePeek(
+	ctx context.Context, roomID, userID, deviceID string,
+) (sp types.StreamPosition, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		sp, err = d.Peeks.DeletePeek(ctx, txn, roomID, userID, deviceID)
+		return err
+	})
+	if err == sql.ErrNoRows {
+		sp = 0
+		err = nil
+	}
+	return
+}
+
 // DeletePeeks tracks the fact that a user has stopped peeking from all devices
 // If the peeks was successfully deleted this returns the stream ID it was stored at.
 // Returns an error if there was a problem communicating with the database.

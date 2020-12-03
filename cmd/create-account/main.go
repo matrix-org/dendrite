@@ -20,24 +20,27 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 const usage = `Usage: %s
 
-Generate a new Matrix account for testing purposes.
+Creates a new user account on the homeserver.
+
+Example:
+
+  ./create-account --config dendrite.yaml --username alice --password foobarbaz
 
 Arguments:
 
 `
 
 var (
-	database      = flag.String("database", "", "The location of the account database.")
-	username      = flag.String("username", "", "The user ID localpart to register e.g 'alice' in '@alice:localhost'.")
-	password      = flag.String("password", "", "Optional. The password to register with. If not specified, this account will be password-less.")
-	serverNameStr = flag.String("servername", "localhost", "The Matrix server domain which will form the domain part of the user ID.")
+	username = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
+	password = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
 )
 
 func main() {
@@ -45,36 +48,24 @@ func main() {
 		fmt.Fprintf(os.Stderr, usage, os.Args[0])
 		flag.PrintDefaults()
 	}
-
-	flag.Parse()
+	cfg := setup.ParseFlags(true)
 
 	if *username == "" {
 		flag.Usage()
-		fmt.Println("Missing --username")
 		os.Exit(1)
 	}
-
-	if *database == "" {
-		flag.Usage()
-		fmt.Println("Missing --database")
-		os.Exit(1)
-	}
-
-	serverName := gomatrixserverlib.ServerName(*serverNameStr)
 
 	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(*database),
-	}, serverName)
+		ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
+	}, cfg.Global.ServerName)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		logrus.Fatalln("Failed to connect to the database:", err.Error())
 	}
 
 	_, err = accountDB.CreateAccount(context.Background(), *username, *password, "")
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		logrus.Fatalln("Failed to create the account:", err.Error())
 	}
 
-	fmt.Println("Created account")
+	logrus.Infoln("Created account", *username)
 }

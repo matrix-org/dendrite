@@ -106,6 +106,9 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/peek/{roomIDOrAlias}",
 		httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -145,6 +148,17 @@ func Setup(
 			}
 			return LeaveRoomByID(
 				req, device, rsAPI, vars["roomID"],
+			)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomID}/unpeek",
+		httputil.MakeAuthAPI("unpeek", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return UnpeekRoomByID(
+				req, device, rsAPI, accountDB, vars["roomID"],
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)

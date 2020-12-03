@@ -105,6 +105,8 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
 	case api.OutputTypeNewPeek:
 		return s.onNewPeek(context.TODO(), *output.NewPeek)
+	case api.OutputTypeRetirePeek:
+		return s.onRetirePeek(context.TODO(), *output.RetirePeek)
 	case api.OutputTypeRedactedEvent:
 		return s.onRedactEvent(context.TODO(), *output.RedactedEvent)
 	default:
@@ -302,6 +304,26 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	}
 	// tell the notifier about the new peek so it knows to wake up new devices
 	s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID)
+
+	// we need to wake up the users who might need to now be peeking into this room,
+	// so we send in a dummy event to trigger a wakeup
+	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.NewStreamToken(sp, 0, nil))
+	return nil
+}
+
+func (s *OutputRoomEventConsumer) onRetirePeek(
+	ctx context.Context, msg api.OutputRetirePeek,
+) error {
+	sp, err := s.db.DeletePeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
+	if err != nil {
+		// panic rather than continue with an inconsistent database
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+		}).Panicf("roomserver output log: write peek failure")
+		return nil
+	}
+	// tell the notifier about the new peek so it knows to wake up new devices
+	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID)
 
 	// we need to wake up the users who might need to now be peeking into this room,
 	// so we send in a dummy event to trigger a wakeup

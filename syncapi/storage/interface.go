@@ -91,6 +91,9 @@ type Database interface {
 	// AddPeek adds a new peek to our DB for a given room by a given user's device.
 	// Returns an error if there was a problem communicating with the database.
 	AddPeek(ctx context.Context, RoomID, UserID, DeviceID string) (types.StreamPosition, error)
+	// DeletePeek removes an existing peek from the database for a given room by a user's device.
+	// Returns an error if there was a problem communicating with the database.
+	DeletePeek(ctx context.Context, roomID, userID, deviceID string) (sp types.StreamPosition, err error)
 	// DeletePeek deletes all peeks for a given room by a given user
 	// Returns an error if there was a problem communicating with the database.
 	DeletePeeks(ctx context.Context, RoomID, UserID string) (types.StreamPosition, error)
