@@ -66,6 +66,8 @@ type Dendrite struct {
 	SyncAPI          SyncAPI          `yaml:"sync_api"`
 	UserAPI          UserAPI          `yaml:"user_api"`
 
+	MSCs MSCs `yaml:"mscs"`
+
 	// The config for tracing the dendrite servers.
 	Tracing struct {
 		// Set to true to enable tracer hooks. If false, no tracing is set up.
@@ -306,6 +308,7 @@ func (c *Dendrite) Defaults() {
 	c.SyncAPI.Defaults()
 	c.UserAPI.Defaults()
 	c.AppServiceAPI.Defaults()
+	c.MSCs.Defaults()
 
 	c.Wiring()
 }
@@ -319,7 +322,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		&c.EDUServer, &c.FederationAPI, &c.FederationSender,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
 		&c.SigningKeyServer, &c.SyncAPI, &c.UserAPI,
-		&c.AppServiceAPI,
+		&c.AppServiceAPI, &c.MSCs,
 	} {
 		c.Verify(configErrs, isMonolith)
 	}
@@ -337,6 +340,7 @@ func (c *Dendrite) Wiring() {
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
+	c.MSCs.Matrix = &c.Global
 
 	c.ClientAPI.Derived = &c.Derived
 	c.AppServiceAPI.Derived = &c.Derived

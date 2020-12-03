@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // ParseFileURI returns the filepath in the given file: URI. Specifically, this will handle

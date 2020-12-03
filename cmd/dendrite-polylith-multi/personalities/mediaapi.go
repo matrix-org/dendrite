@@ -15,9 +15,9 @@
 package personalities
 
 import (
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/mediaapi"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func MediaAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {

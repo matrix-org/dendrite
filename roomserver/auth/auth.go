@@ -25,7 +25,7 @@ import (
 func IsServerAllowed(
 	serverName gomatrixserverlib.ServerName,
 	serverCurrentlyInRoom bool,
-	authEvents []gomatrixserverlib.Event,
+	authEvents []*gomatrixserverlib.Event,
 ) bool {
 	historyVisibility := HistoryVisibilityForRoom(authEvents)
 
@@ -52,7 +52,7 @@ func IsServerAllowed(
 	return false
 }
 
-func HistoryVisibilityForRoom(authEvents []gomatrixserverlib.Event) string {
+func HistoryVisibilityForRoom(authEvents []*gomatrixserverlib.Event) string {
 	// https://matrix.org/docs/spec/client_server/r0.6.0#id87
 	// By default if no history_visibility is set, or if the value is not understood, the visibility is assumed to be shared.
 	visibility := "shared"
@@ -78,7 +78,7 @@ func HistoryVisibilityForRoom(authEvents []gomatrixserverlib.Event) string {
 	return visibility
 }
 
-func IsAnyUserOnServerWithMembership(serverName gomatrixserverlib.ServerName, authEvents []gomatrixserverlib.Event, wantMembership string) bool {
+func IsAnyUserOnServerWithMembership(serverName gomatrixserverlib.ServerName, authEvents []*gomatrixserverlib.Event, wantMembership string) bool {
 	for _, ev := range authEvents {
 		membership, err := ev.Membership()
 		if err != nil || membership != wantMembership {

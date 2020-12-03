@@ -20,10 +20,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup/kafka"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/kafka"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -61,7 +61,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start notifier")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, notifier, userAPI, keyAPI, rsAPI)
+	requestPool := sync.NewRequestPool(syncDB, cfg, notifier, userAPI, keyAPI, rsAPI)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
@@ -97,6 +97,13 @@ func AddPublicRoutes(
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
+	}
+
+	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
+		cfg, consumer, notifier, syncDB,
+	)
+	if err = receiptConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)

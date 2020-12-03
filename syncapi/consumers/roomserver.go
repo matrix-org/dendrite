@@ -21,8 +21,8 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -105,6 +105,8 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		return s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
 	case api.OutputTypeNewPeek:
 		return s.onNewPeek(context.TODO(), *output.NewPeek)
+	case api.OutputTypeRetirePeek:
+		return s.onRetirePeek(context.TODO(), *output.RetirePeek)
 	case api.OutputTypeRedactedEvent:
 		return s.onRedactEvent(context.TODO(), *output.RedactedEvent)
 	default:
@@ -118,7 +120,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 func (s *OutputRoomEventConsumer) onRedactEvent(
 	ctx context.Context, msg api.OutputRedactedEvent,
 ) error {
-	err := s.db.RedactEvent(ctx, msg.RedactedEventID, &msg.RedactedBecause)
+	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause)
 	if err != nil {
 		log.WithError(err).Error("RedactEvent error'd")
 		return err
@@ -156,7 +158,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	pduPos, err := s.db.WriteEvent(
 		ctx,
-		&ev,
+		ev,
 		addsStateEvents,
 		msg.AddsStateEventIDs,
 		msg.RemovesStateEventIDs,
@@ -174,12 +176,12 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return nil
 	}
 
-	if pduPos, err = s.notifyJoinedPeeks(ctx, &ev, pduPos); err != nil {
+	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
-	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
 
 	return nil
 }
@@ -197,8 +199,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	// from confusing clients into thinking they've joined/left rooms.
 	pduPos, err := s.db.WriteEvent(
 		ctx,
-		&ev,
-		[]gomatrixserverlib.HeaderedEvent{},
+		ev,
+		[]*gomatrixserverlib.HeaderedEvent{},
 		[]string{},           // adds no state
 		[]string{},           // removes no state
 		nil,                  // no transaction
@@ -213,12 +215,12 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return nil
 	}
 
-	if pduPos, err = s.notifyJoinedPeeks(ctx, &ev, pduPos); err != nil {
+	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
-	s.notifier.OnNewEvent(&ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
 
 	return nil
 }
@@ -267,7 +269,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(&msg.Event, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(msg.Event, "", nil, types.NewStreamToken(pduPos, 0, nil))
 	return nil
 }
 
@@ -309,7 +311,27 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	return nil
 }
 
-func (s *OutputRoomEventConsumer) updateStateEvent(event gomatrixserverlib.HeaderedEvent) (gomatrixserverlib.HeaderedEvent, error) {
+func (s *OutputRoomEventConsumer) onRetirePeek(
+	ctx context.Context, msg api.OutputRetirePeek,
+) error {
+	sp, err := s.db.DeletePeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
+	if err != nil {
+		// panic rather than continue with an inconsistent database
+		log.WithFields(log.Fields{
+			log.ErrorKey: err,
+		}).Panicf("roomserver output log: write peek failure")
+		return nil
+	}
+	// tell the notifier about the new peek so it knows to wake up new devices
+	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID)
+
+	// we need to wake up the users who might need to now be peeking into this room,
+	// so we send in a dummy event to trigger a wakeup
+	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.NewStreamToken(sp, 0, nil))
+	return nil
+}
+
+func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {
 	if event.StateKey() == nil {
 		return event, nil
 	}

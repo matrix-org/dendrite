@@ -41,11 +41,11 @@ import (
 	eduinthttp "github.com/matrix-org/dendrite/eduserver/inthttp"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	fsinthttp "github.com/matrix-org/dendrite/federationsender/inthttp"
-	"github.com/matrix-org/dendrite/internal/config"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
+	"github.com/matrix-org/dendrite/setup/config"
 	skapi "github.com/matrix-org/dendrite/signingkeyserver/api"
 	skinthttp "github.com/matrix-org/dendrite/signingkeyserver/inthttp"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -249,6 +249,9 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 // CreateClient creates a new client (normally used for media fetch requests).
 // Should only be called once per component.
 func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
+	if b.Cfg.Global.DisableFederation {
+		return gomatrixserverlib.NewClientWithTransport(noOpHTTPTransport)
+	}
 	client := gomatrixserverlib.NewClient(
 		b.Cfg.FederationSender.DisableTLSValidation,
 	)
@@ -259,6 +262,12 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
+	if b.Cfg.Global.DisableFederation {
+		return gomatrixserverlib.NewFederationClientWithTransport(
+			b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
+			b.Cfg.FederationSender.DisableTLSValidation, noOpHTTPTransport,
+		)
+	}
 	client := gomatrixserverlib.NewFederationClientWithTimeout(
 		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
 		b.Cfg.FederationSender.DisableTLSValidation, time.Minute*5,
@@ -308,8 +317,10 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	}
 
 	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(b.PublicClientAPIMux)
-	externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
-	externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(b.PublicFederationAPIMux)
+	if !b.Cfg.Global.DisableFederation {
+		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
+		externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(b.PublicFederationAPIMux)
+	}
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 
 	if internalAddr != NoListener && internalAddr != externalAddr {

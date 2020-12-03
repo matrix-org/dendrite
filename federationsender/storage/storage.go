@@ -21,7 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewDatabase opens a new database

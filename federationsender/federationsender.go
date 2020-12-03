@@ -23,9 +23,9 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/internal/setup"
-	"github.com/matrix-org/dendrite/internal/setup/kafka"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/kafka"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -59,8 +59,8 @@ func NewInternalAPI(
 	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
 	queues := queue.NewOutgoingQueues(
-		federationSenderDB, cfg.Matrix.ServerName, federation,
-		rsAPI, stats,
+		federationSenderDB, cfg.Matrix.DisableFederation,
+		cfg.Matrix.ServerName, federation, rsAPI, stats,
 		&queue.SigningInfo{
 			KeyID:      cfg.Matrix.KeyID,
 			PrivateKey: cfg.Matrix.PrivateKey,

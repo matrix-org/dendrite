@@ -258,30 +258,28 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	})
 }
 
-func (d *Database) GetMembership(
-	ctx context.Context, roomNID types.RoomNID, requestSenderUserID string,
-) (membershipEventNID types.EventNID, stillInRoom bool, err error) {
+func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
 		return err
 	})
 	if err != nil {
-		return 0, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
+		return 0, false, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
 	}
 
-	senderMembershipEventNID, senderMembership, err :=
+	senderMembershipEventNID, senderMembership, isRoomforgotten, err :=
 		d.MembershipTable.SelectMembershipFromRoomAndTarget(
 			ctx, roomNID, requestSenderUserNID,
 		)
 	if err == sql.ErrNoRows {
 		// The user has never been a member of that room
-		return 0, false, nil
+		return 0, false, false, nil
 	} else if err != nil {
 		return
 	}
 
-	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, nil
+	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, isRoomforgotten, nil
 }
 
 func (d *Database) GetMembershipEventNIDsForRoom(
@@ -390,7 +388,7 @@ func (d *Database) GetLatestEventsForUpdate(
 
 // nolint:gocyclo
 func (d *Database) StoreEvent(
-	ctx context.Context, event gomatrixserverlib.Event,
+	ctx context.Context, event *gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID, isRejected bool,
 ) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
 	var (
@@ -613,7 +611,7 @@ func (d *Database) assignStateKeyNID(
 	return eventStateKeyNID, err
 }
 
-func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
+func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 	gomatrixserverlib.RoomVersion, error,
 ) {
 	var err error
@@ -653,7 +651,7 @@ func extractRoomVersionFromCreateEvent(event gomatrixserverlib.Event) (
 // Returns the redaction event and the event ID of the redacted event if this call resulted in a redaction.
 // nolint:gocyclo
 func (d *Database) handleRedactions(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event *gomatrixserverlib.Event,
 ) (*gomatrixserverlib.Event, string, error) {
 	var err error
 	isRedactionEvent := event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil
@@ -705,12 +703,12 @@ func (d *Database) handleRedactions(
 		err = fmt.Errorf("d.RedactionsTable.MarkRedactionValidated: %w", err)
 	}
 
-	return &redactionEvent.Event, redactedEvent.EventID(), err
+	return redactionEvent.Event, redactedEvent.EventID(), err
 }
 
 // loadRedactionPair returns both the redaction event and the redacted event, else nil.
 func (d *Database) loadRedactionPair(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event *gomatrixserverlib.Event,
 ) (*types.Event, *types.Event, bool, error) {
 	var redactionEvent, redactedEvent *types.Event
 	var info *tables.RedactionInfo
@@ -816,8 +814,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			if err != nil {
 				return nil, err
 			}
-			h := ev.Headered(roomInfo.RoomVersion)
-			return &h, nil
+			return ev.Headered(roomInfo.RoomVersion), nil
 		}
 	}
 
@@ -936,12 +933,11 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 		if err != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event NID %v : %w", events[i].EventNID, err)
 		}
-		hev := ev.Headered(roomVer)
 		result[i] = tables.StrippedEvent{
 			EventType:    ev.Type(),
 			RoomID:       ev.RoomID(),
 			StateKey:     *ev.StateKey(),
-			ContentValue: tables.ExtractContentValue(&hev),
+			ContentValue: tables.ExtractContentValue(ev.Headered(roomVer)),
 		}
 	}
 
@@ -990,6 +986,25 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 // GetKnownRooms returns a list of all rooms we know about.
 func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
 	return d.RoomsTable.SelectRoomIDs(ctx)
+}
+
+// ForgetRoom sets a users room to forgotten
+func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error {
+	roomNIDs, err := d.RoomsTable.BulkSelectRoomNIDs(ctx, []string{roomID})
+	if err != nil {
+		return err
+	}
+	if len(roomNIDs) > 1 {
+		return fmt.Errorf("expected one room, got %d", len(roomNIDs))
+	}
+	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
+	if err != nil {
+		return err
+	}
+
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.MembershipTable.UpdateForgetMembership(ctx, nil, roomNIDs[0], stateKeyNID, forget)
+	})
 }
 
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops

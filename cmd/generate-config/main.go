@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"gopkg.in/yaml.v2"
 )
 

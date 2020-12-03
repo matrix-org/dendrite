@@ -15,7 +15,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )

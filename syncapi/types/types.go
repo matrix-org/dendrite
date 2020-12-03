@@ -59,7 +59,7 @@ func (p *LogPosition) IsAfter(lp *LogPosition) bool {
 
 // StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
-	gomatrixserverlib.HeaderedEvent
+	*gomatrixserverlib.HeaderedEvent
 	StreamPosition  StreamPosition
 	TransactionID   *api.TransactionID
 	ExcludeFromSync bool
@@ -471,7 +471,7 @@ type InviteResponse struct {
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
-func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
+func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
 	res.InviteState.Events = []json.RawMessage{}
 
@@ -484,8 +484,7 @@ func NewInviteResponse(event gomatrixserverlib.HeaderedEvent) *InviteResponse {
 
 	// Then we'll see if we can create a partial of the invite event itself.
 	// This is needed for clients to work out *who* sent the invite.
-	format, _ := event.RoomVersion.EventFormat()
-	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), format)
+	inviteEvent := gomatrixserverlib.ToClientEvent(event.Unwrap(), gomatrixserverlib.FormatSync)
 	inviteEvent.Unsigned = nil
 	if ev, err := json.Marshal(inviteEvent); err == nil {
 		res.InviteState.Events = append(res.InviteState.Events, ev)

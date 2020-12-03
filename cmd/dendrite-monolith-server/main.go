@@ -22,11 +22,12 @@ import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/sirupsen/logrus"
@@ -147,6 +148,12 @@ func main() {
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
 	)
+
+	if len(base.Cfg.MSCs.MSCs) > 0 {
+		if err := mscs.Enable(base, &monolith); err != nil {
+			logrus.WithError(err).Fatalf("Failed to enable MSCs")
+		}
+	}
 
 	// Expose the matrix APIs directly rather than putting them under a /api path.
 	go func() {

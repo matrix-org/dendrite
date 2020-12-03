@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/ngrok/sqlmw"
 	"github.com/sirupsen/logrus"
 )

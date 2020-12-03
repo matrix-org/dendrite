@@ -17,7 +17,7 @@ package devices
 import (
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )

@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -93,9 +93,9 @@ func Backfill(
 	}
 
 	// Filter any event that's not from the requested room out.
-	evs := make([]gomatrixserverlib.Event, 0)
+	evs := make([]*gomatrixserverlib.Event, 0)
 
-	var ev gomatrixserverlib.HeaderedEvent
+	var ev *gomatrixserverlib.HeaderedEvent
 	for _, ev = range res.Events {
 		if ev.RoomID() == roomID {
 			evs = append(evs, ev.Event)

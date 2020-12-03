@@ -17,11 +17,11 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -112,22 +112,24 @@ func (m *DendriteMonolith) Start() {
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
 
 	rsAPI := roomserver.NewInternalAPI(
 		base, keyRing,
 	)
+
+	fsAPI := federationsender.NewInternalAPI(
+		base, federation, rsAPI, keyRing,
+	)
+
+	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
+	keyAPI.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,
 	)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
-	)
 
 	ygg.SetSessionFunc(func(address string) {
 		req := &api.PerformServersAliveRequest{

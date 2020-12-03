@@ -20,8 +20,8 @@ import (
 	"database/sql"
 	"encoding/base64"
 
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -207,8 +207,8 @@ func (d *Database) RemoveAllDevices(
 }
 
 // UpdateDeviceLastSeen updates a the last seen timestamp and the ip address
-func (d *Database) UpdateDeviceLastSeen(ctx context.Context, deviceID, ipAddr string) error {
+func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error {
 	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.devices.updateDeviceLastSeen(ctx, txn, deviceID, ipAddr)
+		return d.devices.updateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr)
 	})
 }

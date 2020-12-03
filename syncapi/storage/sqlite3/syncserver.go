@@ -22,8 +22,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 
@@ -95,6 +95,10 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err != nil {
 		return err
 	}
+	receipts, err := NewSqliteReceiptsTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Writer:              d.writer,
@@ -107,6 +111,7 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		Topology:            topology,
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
+		Receipts:            receipts,
 		EDUCache:            cache.New(),
 	}
 	return nil

@@ -85,6 +85,7 @@ Set up the database:
 
 ```sh
 sudo -u postgres psql -c "CREATE USER dendrite PASSWORD 'itsasecret'"
+sudo -u postgres psql -c "ALTER USER dendrite CREATEDB"
 for i in dendrite0 dendrite1 sytest_template; do sudo -u postgres psql -c "CREATE DATABASE $i OWNER dendrite;"; done
 mkdir -p "server-0"
 cat > "server-0/database.yaml" << EOF

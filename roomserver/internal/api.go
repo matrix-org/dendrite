@@ -6,13 +6,13 @@ import (
 	"github.com/Shopify/sarama"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/perform"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -23,9 +23,11 @@ type RoomserverInternalAPI struct {
 	*perform.Inviter
 	*perform.Joiner
 	*perform.Peeker
+	*perform.Unpeeker
 	*perform.Leaver
 	*perform.Publisher
 	*perform.Backfiller
+	*perform.Forgetter
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
 	Producer               sarama.SyncProducer
@@ -93,6 +95,13 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		FSAPI:      r.fsAPI,
 		Inputer:    r.Inputer,
 	}
+	r.Unpeeker = &perform.Unpeeker{
+		ServerName: r.Cfg.Matrix.ServerName,
+		Cfg:        r.Cfg,
+		DB:         r.DB,
+		FSAPI:      r.fsAPI,
+		Inputer:    r.Inputer,
+	}
 	r.Leaver = &perform.Leaver{
 		Cfg:     r.Cfg,
 		DB:      r.DB,
@@ -111,6 +120,9 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		// prefer these servers when backfilling (assuming they are in the room) rather
 		// than trying random servers
 		PreferServers: r.PerspectiveServerNames,
+	}
+	r.Forgetter = &perform.Forgetter{
+		DB: r.DB,
 	}
 }
 
@@ -142,4 +154,12 @@ func (r *RoomserverInternalAPI) PerformLeave(
 		return nil
 	}
 	return r.WriteOutputEvents(req.RoomID, outputEvents)
+}
+
+func (r *RoomserverInternalAPI) PerformForget(
+	ctx context.Context,
+	req *api.PerformForgetRequest,
+	resp *api.PerformForgetResponse,
+) error {
+	return r.Forgetter.PerformForget(ctx, req, resp)
 }

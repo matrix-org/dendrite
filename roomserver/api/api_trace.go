@@ -46,6 +46,15 @@ func (t *RoomserverInternalAPITrace) PerformPeek(
 	util.GetLogger(ctx).Infof("PerformPeek req=%+v res=%+v", js(req), js(res))
 }
 
+func (t *RoomserverInternalAPITrace) PerformUnpeek(
+	ctx context.Context,
+	req *PerformUnpeekRequest,
+	res *PerformUnpeekResponse,
+) {
+	t.Impl.PerformUnpeek(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformUnpeek req=%+v res=%+v", js(req), js(res))
+}
+
 func (t *RoomserverInternalAPITrace) PerformJoin(
 	ctx context.Context,
 	req *PerformJoinRequest,
@@ -191,6 +200,16 @@ func (t *RoomserverInternalAPITrace) PerformBackfill(
 ) error {
 	err := t.Impl.PerformBackfill(ctx, req, res)
 	util.GetLogger(ctx).WithError(err).Infof("PerformBackfill req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *RoomserverInternalAPITrace) PerformForget(
+	ctx context.Context,
+	req *PerformForgetRequest,
+	res *PerformForgetResponse,
+) error {
+	err := t.Impl.PerformForget(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformForget req=%+v res=%+v", js(req), js(res))
 	return err
 }
 

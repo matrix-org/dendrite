@@ -42,6 +42,12 @@ type RoomserverInternalAPI interface {
 		res *PerformPeekResponse,
 	)
 
+	PerformUnpeek(
+		ctx context.Context,
+		req *PerformUnpeekRequest,
+		res *PerformUnpeekResponse,
+	)
+
 	PerformPublish(
 		ctx context.Context,
 		req *PerformPublishRequest,
@@ -146,6 +152,9 @@ type RoomserverInternalAPI interface {
 		request *PerformBackfillRequest,
 		response *PerformBackfillResponse,
 	) error
+
+	// PerformForget forgets a rooms history for a specific user
+	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
 
 	// Asks for the default room version as preferred by the server.
 	QueryRoomVersionCapabilities(

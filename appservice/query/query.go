@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 )
