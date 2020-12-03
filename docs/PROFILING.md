@@ -31,6 +31,8 @@ http://localhost:65432/debug/pprof/profile?seconds=30
 
 The profile will run for the specified number of `seconds` and then will produce a result.
 
+### Examine a profile using the Go toolchain
+
 If you have Go installed and want to explore the profile, you can invoke `go tool pprof` to start the profile directly. The `-http=` parameter will instruct `go tool pprof` to start a web server providing a view of the captured profile:
 
 ```
@@ -38,6 +40,8 @@ go tool pprof -http=localhost:23456 http://localhost:65432/debug/pprof/profile?s
 ```
 
 You can then visit `http://localhost:23456` in your web browser to see a visual representation of the profile. Particularly usefully, in the "View" menu, you can select "Flame Graph" to see a proportional interactive graph of CPU usage.
+
+### Download a profile to send to someone else
 
 If you don't have the Go tools installed but just want to capture the profile to send to someone else, you can instead use `curl` to download the profiler results:
 
@@ -57,6 +61,8 @@ http://localhost:65432/debug/pprof/heap
 
 The profile will return almost instantly.
 
+### Examine a profile using the Go toolchain
+
 If you have Go installed and want to explore the profile, you can invoke `go tool pprof` to start the profile directly. The `-http=` parameter will instruct `go tool pprof` to start a web server providing a view of the captured profile:
 
 ```
@@ -71,6 +77,8 @@ You can then visit `http://localhost:23456` in your web browser to see a visual 
 * `alloc_objects`: Shows how many allocations have been made per function (although that memory may have since been deallocated)
 
 Also in the "View" menu, you can select "Flame Graph" to see a proportional interactive graph of the memory usage.
+
+### Download a profile to send to someone else
 
 If you don't have the Go tools installed but just want to capture the profile to send to someone else, you can instead use `curl` to download the profiler results:
 
