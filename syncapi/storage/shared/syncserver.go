@@ -745,6 +745,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	ctx context.Context, res *types.Response,
 	userID string, device userapi.Device,
 	numRecentEventsPerRoom int,
+	includeLeave bool,
 ) (
 	toPos types.StreamingToken,
 	joinedRoomIDs []string,
@@ -809,6 +810,19 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 			}
 			res.Rooms.Peek[peek.RoomID] = *jr
 		}
+	}
+
+	//Add left rooms
+	leftRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Leave)
+	for _, roomID := range leftRoomIDs {
+		var lr *types.LeaveResponse
+		lr, err = d.getLeaveResponseForCompleteSync(
+			ctx, txn, roomID, r, &stateFilter, numRecentEventsPerRoom, device,
+		)
+		if err != nil {
+			return
+		}
+		res.Rooms.Leave[roomID] = *lr
 	}
 
 	if err = d.addInvitesToResponse(ctx, txn, userID, r, res); err != nil {
@@ -896,12 +910,97 @@ func (d *Database) getJoinResponseForCompleteSync(
 	return jr, nil
 }
 
+func (d *Database) getLeaveResponseForCompleteSync(
+	ctx context.Context, txn *sql.Tx,
+	roomID string,
+	r types.Range,
+	stateFilter *gomatrixserverlib.StateFilter,
+	numRecentEventsPerRoom int, device userapi.Device,
+) (lr *types.LeaveResponse, err error) {
+	var stateEvents []*gomatrixserverlib.HeaderedEvent
+	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
+	if err != nil {
+		return
+	}
+	// TODO: When filters are added, we may need to call this multiple times to get enough events.
+	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
+	var recentStreamEvents []types.StreamEvent
+	var limited bool
+	recentStreamEvents, limited, err = d.OutputEvents.SelectRecentEvents(
+		ctx, txn, roomID, r, numRecentEventsPerRoom, true, true,
+	)
+	if err != nil {
+		return
+	}
+
+	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
+	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
+	// which is equiv to history_visibility: joined
+	joinEventIndex := -1
+	leaveEventIndex := -1
+	for i := len(recentStreamEvents) - 1; i >= 0; i-- {
+		ev := recentStreamEvents[i]
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(device.UserID) {
+			membership, _ := ev.Membership()
+			if leaveEventIndex == -1 && membership != "leave" {
+				continue
+			} else if membership == "leave"{
+				leaveEventIndex = i
+			} else if membership == "join" {
+				joinEventIndex = i
+				if i > 0 {
+					// the create event happens before the first join, so we should cut it at that point instead
+					if recentStreamEvents[i-1].Type() == gomatrixserverlib.MRoomCreate && recentStreamEvents[i-1].StateKeyEquals("") {
+						joinEventIndex = i - 1
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+	recentStreamEvents = recentStreamEvents[:leaveEventIndex+1]
+	if joinEventIndex != -1 {
+		// cut all events earlier than the join (but not the join itself)
+		recentStreamEvents = recentStreamEvents[joinEventIndex:]
+		limited = false // so clients know not to try to backpaginate
+	}
+
+	// Retrieve the backward topology position, i.e. the position of the
+	// oldest event in the room's topology.
+	var prevBatchStr string
+	if len(recentStreamEvents) > 0 {
+		var backwardTopologyPos, backwardStreamPos types.StreamPosition
+		backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
+		if err != nil {
+			return
+		}
+		prevBatch := types.NewTopologyToken(backwardTopologyPos, backwardStreamPos)
+		prevBatch.Decrement()
+		prevBatchStr = prevBatch.String()
+	}
+
+	// We don't include a device here as we don't need to send down
+	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
+	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
+	recentEvents := d.StreamEventsToEvents(&device, recentStreamEvents)
+	stateEvents = removeDuplicates(stateEvents, recentEvents)
+	lr = types.NewLeaveResponse()
+	lr.Timeline.PrevBatch = prevBatchStr
+	lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+	lr.Timeline.Limited = limited
+	lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
+	return lr, nil
+}
+
+
 func (d *Database) CompleteSync(
 	ctx context.Context, res *types.Response,
 	device userapi.Device, numRecentEventsPerRoom int,
+	includeLeave bool,
 ) (*types.Response, error) {
 	toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
-		ctx, res, device.UserID, device, numRecentEventsPerRoom,
+		ctx, res, device.UserID, device, numRecentEventsPerRoom, includeLeave,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("d.getResponseWithPDUsForCompleteSync: %w", err)
@@ -948,8 +1047,10 @@ func (d *Database) addInvitesToResponse(
 	}
 	for roomID := range retiredInvites {
 		if _, ok := res.Rooms.Join[roomID]; !ok {
+			/*
 			lr := types.NewLeaveResponse()
 			res.Rooms.Leave[roomID] = *lr
+			*/
 		}
 	}
 	return nil
