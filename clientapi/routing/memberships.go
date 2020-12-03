@@ -44,6 +44,13 @@ type joinedMember struct {
 	AvatarURL   string `json:"avatar_url"`
 }
 
+// The database stores 'displayname' without an underscore.
+// Deserialize into this and then change to the actual API response
+type databaseJoinedMember struct {
+	DisplayName string `json:"displayname"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
 	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
@@ -72,12 +79,12 @@ func GetMemberships(
 		var res getJoinedMembersResponse
 		res.Joined = make(map[string]joinedMember)
 		for _, ev := range queryRes.JoinEvents {
-			var content joinedMember
+			var content databaseJoinedMember
 			if err := json.Unmarshal(ev.Content, &content); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
 				return jsonerror.InternalServerError()
 			}
-			res.Joined[ev.Sender] = content
+			res.Joined[ev.Sender] = joinedMember(content)
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
