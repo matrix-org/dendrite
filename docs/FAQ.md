@@ -35,6 +35,14 @@ No, not yet. This is a planned feature.
 
 Possibly - Dendrite does have some application service support but it is not well tested. Please let us know by raising a GitHub issue if you try it and run into problems.
 
+## Is it possible to prevent communication with the outside world?
+
+Yes, you can do this by disabling federation - set `disable_federation` to `true` in the `global` section of the Dendrite configuration file. 
+
+## Should I use PostgreSQL or SQLite for my databases?
+
+Please use PostgreSQL wherever possible, especially if you are planning to run a homeserver that caters to more than a couple of users. 
+
 ## Dendrite is using a lot of CPU
 
 Generally speaking, you should expect to see some CPU spikes, particularly if you are joining or participating in large rooms. However, constant/sustained high CPU usage is not expected - if you are experiencing that, please join `#dendrite-dev:matrix.org` and let us know, or file a GitHub issue.
