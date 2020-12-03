@@ -137,6 +137,18 @@ func (n *Notifier) OnNewPeek(
 	// by calling OnNewEvent.
 }
 
+func (n *Notifier) OnRetirePeek(
+	roomID, userID, deviceID string,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
+	n.removePeekingDevice(roomID, userID, deviceID)
+
+	// we don't wake up devices here given the roomserver consumer will do this shortly afterwards
+	// by calling OnRetireEvent.
+}
+
 func (n *Notifier) OnNewSendToDevice(
 	userID string, deviceIDs []string,
 	posUpdate types.StreamingToken,

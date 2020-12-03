@@ -51,9 +51,10 @@ const (
 
 	// OutputTypeNewPeek indicates that the kafka event is an OutputNewPeek
 	OutputTypeNewPeek OutputType = "new_peek"
-
 	// OutputTypeNewInboundPeek indicates that the kafka event is an OutputNewInboundPeek
 	OutputTypeNewInboundPeek OutputType = "new_inbound_peek"
+	// OutputTypeRetirePeek indicates that the kafka event is an OutputRetirePeek
+	OutputTypeRetirePeek OutputType = "retire_peek"
 )
 
 // An OutputEvent is an entry in the roomserver output kafka log.
@@ -75,6 +76,8 @@ type OutputEvent struct {
 	NewPeek *OutputNewPeek `json:"new_peek,omitempty"`
 	// The content of event with type OutputTypeNewInboundPeek
 	NewInboundPeek *OutputNewInboundPeek `json:"new_inbound_peek,omitempty"`
+	// The content of event with type OutputTypeRetirePeek
+	RetirePeek *OutputRetirePeek `json:"retire_peek,omitempty"`
 }
 
 // Type of the OutputNewRoomEvent.
@@ -257,4 +260,11 @@ type OutputNewInboundPeek struct {
 	ServerName    gomatrixserverlib.ServerName
 	// how often we told the peeking server to renew the peek
 	RenewalInterval int64
+}
+
+// An OutputRetirePeek is written whenever a user stops peeking into a room.
+type OutputRetirePeek struct {
+	RoomID   string
+	UserID   string
+	DeviceID string
 }

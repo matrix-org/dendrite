@@ -6,13 +6,13 @@ import (
 	"github.com/Shopify/sarama"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/perform"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -24,6 +24,7 @@ type RoomserverInternalAPI struct {
 	*perform.Joiner
 	*perform.Peeker
 	*perform.InboundPeeker
+	*perform.Unpeeker
 	*perform.Leaver
 	*perform.Publisher
 	*perform.Backfiller
@@ -98,6 +99,13 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 	r.InboundPeeker = &perform.InboundPeeker{
 		DB:      r.DB,
 		Inputer: r.Inputer,
+  }
+	r.Unpeeker = &perform.Unpeeker{
+		ServerName: r.Cfg.Matrix.ServerName,
+		Cfg:        r.Cfg,
+		DB:         r.DB,
+		FSAPI:      r.fsAPI,
+		Inputer:    r.Inputer,
 	}
 	r.Leaver = &perform.Leaver{
 		Cfg:     r.Cfg,

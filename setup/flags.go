@@ -20,7 +20,7 @@ import (
 	"os"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 )
 

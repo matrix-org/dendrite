@@ -15,9 +15,9 @@
 package sqlite3
 
 import (
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {

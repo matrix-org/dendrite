@@ -21,10 +21,10 @@ import (
 	"strings"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -180,8 +180,7 @@ func (r *Peeker) performPeekRoomByID(
 	// XXX: we should probably factor out history_visibility checks into a common utility method somewhere
 	// which handles the default value etc.
 	var worldReadable = false
-	ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", "")
-	if ev != nil {
+	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", ""); ev != nil {
 		content := map[string]string{}
 		if err = json.Unmarshal(ev.Content(), &content); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
@@ -198,6 +197,15 @@ func (r *Peeker) performPeekRoomByID(
 			Msg:  "Room is not world-readable",
 		}
 	}
+
+	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.encryption", ""); ev != nil {
+		return "", &api.PerformError{
+			Code: api.PerformErrorNotAllowed,
+			Msg:  "Cannot peek into an encrypted room",
+		}
+	}
+
+	// TODO: handle federated peeks
 
 	err = r.Inputer.WriteOutputEvents(roomID, []api.OutputEvent{
 		{

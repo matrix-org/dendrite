@@ -131,6 +131,13 @@ func (t *testRoomserverAPI) PerformPeek(
 ) {
 }
 
+func (t *testRoomserverAPI) PerformUnpeek(
+	ctx context.Context,
+	req *api.PerformUnpeekRequest,
+	res *api.PerformUnpeekResponse,
+) {
+}
+
 func (t *testRoomserverAPI) PerformPublish(
 	ctx context.Context,
 	req *api.PerformPublishRequest,

@@ -123,6 +123,17 @@ type PerformPeekResponse struct {
 	Error *PerformError
 }
 
+type PerformUnpeekRequest struct {
+	RoomID   string `json:"room_id"`
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+}
+
+type PerformUnpeekResponse struct {
+	// If non-nil, the join request failed. Contains more information why it failed.
+	Error *PerformError
+}
+
 // PerformBackfillRequest is a request to PerformBackfill.
 type PerformBackfillRequest struct {
 	// The room to backfill
