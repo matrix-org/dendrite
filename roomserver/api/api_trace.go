@@ -324,6 +324,16 @@ func (t *RoomserverInternalAPITrace) QueryServerBannedFromRoom(ctx context.Conte
 	return err
 }
 
+func (t *RoomserverInternalAPITrace) QueryAuthChain(
+	ctx context.Context,
+	request *QueryAuthChainRequest,
+	response *QueryAuthChainResponse,
+) error {
+	err := t.Impl.QueryAuthChain(ctx, request, response)
+	util.GetLogger(ctx).WithError(err).Infof("QueryAuthChain req=%+v res=%+v", js(request), js(response))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {

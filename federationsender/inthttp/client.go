@@ -23,15 +23,16 @@ const (
 	FederationSenderPerformServersAlivePath           = "/federationsender/performServersAlive"
 	FederationSenderPerformBroadcastEDUPath           = "/federationsender/performBroadcastEDU"
 
-	FederationSenderGetUserDevicesPath   = "/federationsender/client/getUserDevices"
-	FederationSenderClaimKeysPath        = "/federationsender/client/claimKeys"
-	FederationSenderQueryKeysPath        = "/federationsender/client/queryKeys"
-	FederationSenderBackfillPath         = "/federationsender/client/backfill"
-	FederationSenderLookupStatePath      = "/federationsender/client/lookupState"
-	FederationSenderLookupStateIDsPath   = "/federationsender/client/lookupStateIDs"
-	FederationSenderGetEventPath         = "/federationsender/client/getEvent"
-	FederationSenderGetServerKeysPath    = "/federationsender/client/getServerKeys"
-	FederationSenderLookupServerKeysPath = "/federationsender/client/lookupServerKeys"
+	FederationSenderGetUserDevicesPath     = "/federationsender/client/getUserDevices"
+	FederationSenderClaimKeysPath          = "/federationsender/client/claimKeys"
+	FederationSenderQueryKeysPath          = "/federationsender/client/queryKeys"
+	FederationSenderBackfillPath           = "/federationsender/client/backfill"
+	FederationSenderLookupStatePath        = "/federationsender/client/lookupState"
+	FederationSenderLookupStateIDsPath     = "/federationsender/client/lookupStateIDs"
+	FederationSenderGetEventPath           = "/federationsender/client/getEvent"
+	FederationSenderGetServerKeysPath      = "/federationsender/client/getServerKeys"
+	FederationSenderLookupServerKeysPath   = "/federationsender/client/lookupServerKeys"
+	FederationSenderEventRelationshipsPath = "/federationsender/client/msc2836eventRelationships"
 )
 
 // NewFederationSenderClient creates a FederationSenderInternalAPI implemented by talking to a HTTP POST API.
@@ -415,4 +416,36 @@ func (h *httpFederationSenderInternalAPI) LookupServerKeys(
 		return []gomatrixserverlib.ServerKeys{}, response.Err
 	}
 	return response.ServerKeys, nil
+}
+
+type eventRelationships struct {
+	S       gomatrixserverlib.ServerName
+	Req     gomatrixserverlib.MSC2836EventRelationshipsRequest
+	RoomVer gomatrixserverlib.RoomVersion
+	Res     gomatrixserverlib.MSC2836EventRelationshipsResponse
+	Err     *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) MSC2836EventRelationships(
+	ctx context.Context, s gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest,
+	roomVersion gomatrixserverlib.RoomVersion,
+) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "MSC2836EventRelationships")
+	defer span.Finish()
+
+	request := eventRelationships{
+		S:       s,
+		Req:     r,
+		RoomVer: roomVersion,
+	}
+	var response eventRelationships
+	apiURL := h.federationSenderURL + FederationSenderEventRelationshipsPath
+	err = httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return res, err
+	}
+	if response.Err != nil {
+		return res, response.Err
+	}
+	return response.Res, nil
 }

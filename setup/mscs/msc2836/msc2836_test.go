@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,9 +47,7 @@ func TestMSC2836(t *testing.T) {
 	alice := "@alice:localhost"
 	bob := "@bob:localhost"
 	charlie := "@charlie:localhost"
-	roomIDA := "!alice:localhost"
-	roomIDB := "!bob:localhost"
-	roomIDC := "!charlie:localhost"
+	roomID := "!alice:localhost"
 	// give access tokens to all three users
 	nopUserAPI := &testUserAPI{
 		accessTokens: make(map[string]userapi.Device),
@@ -66,7 +68,7 @@ func TestMSC2836(t *testing.T) {
 		UserID:      charlie,
 	}
 	eventA := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDA,
+		RoomID: roomID,
 		Sender: alice,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -74,7 +76,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventB := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDB,
+		RoomID: roomID,
 		Sender: bob,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -86,7 +88,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventC := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDB,
+		RoomID: roomID,
 		Sender: bob,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -98,7 +100,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventD := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDA,
+		RoomID: roomID,
 		Sender: alice,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -110,7 +112,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventE := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDB,
+		RoomID: roomID,
 		Sender: bob,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -122,7 +124,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventF := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDC,
+		RoomID: roomID,
 		Sender: charlie,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -134,7 +136,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventG := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDA,
+		RoomID: roomID,
 		Sender: alice,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -146,7 +148,7 @@ func TestMSC2836(t *testing.T) {
 		},
 	})
 	eventH := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomIDB,
+		RoomID: roomID,
 		Sender: bob,
 		Type:   "m.room.message",
 		Content: map[string]interface{}{
@@ -160,9 +162,9 @@ func TestMSC2836(t *testing.T) {
 	// make everyone joined to each other's rooms
 	nopRsAPI := &testRoomserverAPI{
 		userToJoinedRooms: map[string][]string{
-			alice:   []string{roomIDA, roomIDB, roomIDC},
-			bob:     []string{roomIDA, roomIDB, roomIDC},
-			charlie: []string{roomIDA, roomIDB, roomIDC},
+			alice:   []string{roomID},
+			bob:     []string{roomID},
+			charlie: []string{roomID},
 		},
 		events: map[string]*gomatrixserverlib.HeaderedEvent{
 			eventA.EventID(): eventA,
@@ -197,21 +199,6 @@ func TestMSC2836(t *testing.T) {
 			"limit":          1,
 			"include_parent": true,
 		}))
-	})
-	t.Run("omits parent if not joined to the room of parent of event", func(t *testing.T) {
-		nopUserAPI.accessTokens["frank2"] = userapi.Device{
-			AccessToken: "frank2",
-			DisplayName: "Frank2 Not In Room",
-			UserID:      "@frank2:localhost",
-		}
-		// Event B is in roomB, Event A is in roomA, so make frank2 joined to roomB
-		nopRsAPI.userToJoinedRooms["@frank2:localhost"] = []string{roomIDB}
-		body := postRelationships(t, 200, "frank2", newReq(t, map[string]interface{}{
-			"event_id":       eventB.EventID(),
-			"limit":          1,
-			"include_parent": true,
-		}))
-		assertContains(t, body, []string{eventB.EventID()})
 	})
 	t.Run("returns the parent if include_parent is true", func(t *testing.T) {
 		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
@@ -349,6 +336,39 @@ func TestMSC2836(t *testing.T) {
 		}))
 		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID(), eventH.EventID()})
 	})
+	t.Run("can navigate up the graph with direction: up", func(t *testing.T) {
+		//   A4
+		//   |
+		//   B3
+		//  / \
+		// C   D2
+		//    /| \
+		//   E F1 G
+		//   |
+		//   H
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventF.EventID(),
+			"recent_first": false,
+			"depth_first":  true,
+			"direction":    "up",
+		}))
+		assertContains(t, body, []string{eventF.EventID(), eventD.EventID(), eventB.EventID(), eventA.EventID()})
+	})
+	t.Run("includes children and children_hash in unsigned", func(t *testing.T) {
+		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+			"event_id":     eventB.EventID(),
+			"recent_first": false,
+			"depth_first":  false,
+			"limit":        3,
+		}))
+		// event B has C,D as children
+		// event C has no children
+		// event D has 3 children (not included in response)
+		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID()})
+		assertUnsignedChildren(t, body.Events[0], "m.reference", 2, []string{eventC.EventID(), eventD.EventID()})
+		assertUnsignedChildren(t, body.Events[1], "", 0, nil)
+		assertUnsignedChildren(t, body.Events[2], "m.reference", 3, []string{eventE.EventID(), eventF.EventID(), eventG.EventID()})
+	})
 }
 
 // TODO: TestMSC2836TerminatesLoops (short and long)
@@ -411,8 +431,12 @@ func postRelationships(t *testing.T, expectCode int, accessToken string, req *ms
 	}
 	if res.StatusCode == 200 {
 		var result msc2836.EventRelationshipResponse
-		if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-			t.Fatalf("response 200 OK but failed to deserialise JSON : %s", err)
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("response 200 OK but failed to read response body: %s", err)
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("response 200 OK but failed to deserialise JSON : %s\nbody: %s", err, string(body))
 		}
 		return &result
 	}
@@ -432,6 +456,43 @@ func assertContains(t *testing.T, result *msc2836.EventRelationshipResponse, wan
 		if gotEventIDs[i] != wantEventIDs[i] {
 			t.Errorf("wrong item in position %d - got %s want %s", i, gotEventIDs[i], wantEventIDs[i])
 		}
+	}
+}
+
+func assertUnsignedChildren(t *testing.T, ev gomatrixserverlib.ClientEvent, relType string, wantCount int, childrenEventIDs []string) {
+	t.Helper()
+	unsigned := struct {
+		Children map[string]int `json:"children"`
+		Hash     string         `json:"children_hash"`
+	}{}
+	if err := json.Unmarshal(ev.Unsigned, &unsigned); err != nil {
+		if wantCount == 0 {
+			return // no children so possible there is no unsigned field at all
+		}
+		t.Fatalf("Failed to unmarshal unsigned field: %s", err)
+	}
+	// zero checks
+	if wantCount == 0 {
+		if len(unsigned.Children) != 0 || unsigned.Hash != "" {
+			t.Fatalf("want 0 children but got unsigned fields %+v", unsigned)
+		}
+		return
+	}
+	gotCount := unsigned.Children[relType]
+	if gotCount != wantCount {
+		t.Errorf("Got %d count, want %d count for rel_type %s", gotCount, wantCount, relType)
+	}
+	// work out the hash
+	sort.Strings(childrenEventIDs)
+	var b strings.Builder
+	for _, s := range childrenEventIDs {
+		b.WriteString(s)
+	}
+	t.Logf("hashing %s", b.String())
+	hashValBytes := sha256.Sum256([]byte(b.String()))
+	wantHash := base64.RawStdEncoding.EncodeToString(hashValBytes[:])
+	if wantHash != unsigned.Hash {
+		t.Errorf("Got unsigned hash %s want hash %s", unsigned.Hash, wantHash)
 	}
 }
 

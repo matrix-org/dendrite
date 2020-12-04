@@ -716,3 +716,16 @@ func (r *Queryer) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryS
 	res.Banned = r.ServerACLs.IsServerBannedFromRoom(req.ServerName, req.RoomID)
 	return nil
 }
+
+func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainRequest, res *api.QueryAuthChainResponse) error {
+	chain, err := getAuthChain(ctx, r.DB.EventsFromIDs, req.EventIDs)
+	if err != nil {
+		return err
+	}
+	hchain := make([]*gomatrixserverlib.HeaderedEvent, len(chain))
+	for i := range chain {
+		hchain[i] = chain[i].Headered(chain[i].Version())
+	}
+	res.AuthChain = hchain
+	return nil
+}

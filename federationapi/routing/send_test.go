@@ -9,7 +9,6 @@ import (
 	"time"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -85,18 +84,13 @@ func (o *testEDUProducer) InputReceiptEvent(
 }
 
 type testRoomserverAPI struct {
+	api.RoomserverInternalAPITrace
 	inputRoomEvents            []api.InputRoomEvent
 	queryMissingAuthPrevEvents func(*api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse
 	queryStateAfterEvents      func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse
 	queryEventsByID            func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse
 	queryLatestEventsAndState  func(*api.QueryLatestEventsAndStateRequest) api.QueryLatestEventsAndStateResponse
 }
-
-func (t *testRoomserverAPI) PerformForget(ctx context.Context, req *api.PerformForgetRequest, resp *api.PerformForgetResponse) error {
-	return nil
-}
-
-func (t *testRoomserverAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {}
 
 func (t *testRoomserverAPI) InputRoomEvents(
 	ctx context.Context,
@@ -107,50 +101,6 @@ func (t *testRoomserverAPI) InputRoomEvents(
 	for _, ire := range request.InputRoomEvents {
 		fmt.Println("InputRoomEvents: ", ire.Event.EventID())
 	}
-}
-
-func (t *testRoomserverAPI) PerformInvite(
-	ctx context.Context,
-	req *api.PerformInviteRequest,
-	res *api.PerformInviteResponse,
-) error {
-	return nil
-}
-
-func (t *testRoomserverAPI) PerformJoin(
-	ctx context.Context,
-	req *api.PerformJoinRequest,
-	res *api.PerformJoinResponse,
-) {
-}
-
-func (t *testRoomserverAPI) PerformPeek(
-	ctx context.Context,
-	req *api.PerformPeekRequest,
-	res *api.PerformPeekResponse,
-) {
-}
-
-func (t *testRoomserverAPI) PerformUnpeek(
-	ctx context.Context,
-	req *api.PerformUnpeekRequest,
-	res *api.PerformUnpeekResponse,
-) {
-}
-
-func (t *testRoomserverAPI) PerformPublish(
-	ctx context.Context,
-	req *api.PerformPublishRequest,
-	res *api.PerformPublishResponse,
-) {
-}
-
-func (t *testRoomserverAPI) PerformLeave(
-	ctx context.Context,
-	req *api.PerformLeaveRequest,
-	res *api.PerformLeaveResponse,
-) error {
-	return nil
 }
 
 // Query the latest events and state for a room from the room server.
