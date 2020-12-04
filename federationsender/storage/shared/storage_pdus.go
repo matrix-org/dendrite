@@ -87,7 +87,7 @@ func (d *Database) GetNextTransactionPDUs(
 
 		retrieve := make([]int64, 0, len(nids))
 		for _, nid := range nids {
-			if event, ok := d.Cache.GetFederationEvent(nid); ok {
+			if event, ok := d.Cache.GetFederationSenderQueuedPDU(nid); ok {
 				events = append(events, event)
 			} else {
 				retrieve = append(retrieve, nid)
@@ -105,7 +105,7 @@ func (d *Database) GetNextTransactionPDUs(
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
 			events = append(events, &event)
-			d.Cache.StoreFederationEvent(nid, &event)
+			d.Cache.StoreFederationSenderQueuedPDU(nid, &event)
 		}
 
 		return nil
@@ -138,7 +138,7 @@ func (d *Database) CleanPDUs(
 			}
 			if count == 0 {
 				deleteNIDs = append(deleteNIDs, nid)
-				d.Cache.EvictFederationEvent(nid)
+				d.Cache.EvictFederationSenderQueuedPDU(nid)
 			}
 		}
 

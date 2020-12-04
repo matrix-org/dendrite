@@ -29,7 +29,7 @@ import (
 
 type Database struct {
 	DB                          *sql.DB
-	Cache                       caching.FederationEventCache
+	Cache                       caching.FederationSenderCache
 	Writer                      sqlutil.Writer
 	FederationSenderQueuePDUs   tables.FederationSenderQueuePDUs
 	FederationSenderQueueEDUs   tables.FederationSenderQueueEDUs
