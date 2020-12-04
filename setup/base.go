@@ -106,7 +106,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}
 
-	cache, err := caching.NewInMemoryLRUCache(true)
+	cache, err := caching.NewInMemoryLRUCache(&cfg.Global)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}

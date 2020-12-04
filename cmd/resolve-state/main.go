@@ -42,7 +42,7 @@ func main() {
 
 	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
-	cache, err := caching.NewInMemoryLRUCache(true)
+	cache, err := caching.NewInMemoryLRUCache(&cfg.Global)
 	if err != nil {
 		panic(err)
 	}

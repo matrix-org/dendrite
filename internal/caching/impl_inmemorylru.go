@@ -4,16 +4,17 @@ import (
 	"fmt"
 
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
+func NewInMemoryLRUCache(cfg *config.Global) (*Caches, error) {
 	roomVersions, err := NewInMemoryLRUCachePartition(
 		RoomVersionCacheName,
 		RoomVersionCacheMutable,
 		RoomVersionCacheMaxEntries,
-		enablePrometheus,
+		cfg.Metrics.Enabled,
 	)
 	if err != nil {
 		return nil, err
@@ -22,7 +23,7 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		ServerKeyCacheName,
 		ServerKeyCacheMutable,
 		ServerKeyCacheMaxEntries,
-		enablePrometheus,
+		cfg.Metrics.Enabled,
 	)
 	if err != nil {
 		return nil, err
@@ -31,7 +32,7 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		RoomServerStateKeyNIDsCacheName,
 		RoomServerStateKeyNIDsCacheMutable,
 		RoomServerStateKeyNIDsCacheMaxEntries,
-		enablePrometheus,
+		cfg.Metrics.Enabled,
 	)
 	if err != nil {
 		return nil, err
@@ -40,7 +41,7 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		RoomServerEventTypeNIDsCacheName,
 		RoomServerEventTypeNIDsCacheMutable,
 		RoomServerEventTypeNIDsCacheMaxEntries,
-		enablePrometheus,
+		cfg.Metrics.Enabled,
 	)
 	if err != nil {
 		return nil, err
@@ -49,7 +50,7 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		RoomServerRoomNIDsCacheName,
 		RoomServerRoomNIDsCacheMutable,
 		RoomServerRoomNIDsCacheMaxEntries,
-		enablePrometheus,
+		cfg.Metrics.Enabled,
 	)
 	if err != nil {
 		return nil, err
@@ -58,16 +59,16 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		RoomServerRoomIDsCacheName,
 		RoomServerRoomIDsCacheMutable,
 		RoomServerRoomIDsCacheMaxEntries,
-		enablePrometheus,
+		cfg.Metrics.Enabled,
 	)
 	if err != nil {
 		return nil, err
 	}
 	federationEvents, err := NewInMemoryLRUCachePartition(
-		FederationEventCacheName,
-		FederationEventCacheMutable,
-		FederationEventCacheMaxEntries,
-		enablePrometheus,
+		FederationSenderCacheName,
+		FederationSenderCacheMutable,
+		cfg.Caches.FederationSenderEventCacheSize,
+		cfg.Metrics.Enabled,
 	)
 	if err != nil {
 		return nil, err
