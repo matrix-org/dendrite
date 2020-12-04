@@ -33,10 +33,10 @@ func (c Caches) GetFederationEvent(eventNID int64) (*gomatrixserverlib.HeaderedE
 
 func (c Caches) StoreFederationEvent(eventNID int64, event *gomatrixserverlib.HeaderedEvent) {
 	key := fmt.Sprintf("%d", eventNID)
-	c.ServerKeys.Set(key, event)
+	c.FederationEvents.Set(key, event)
 }
 
 func (c Caches) EvictFederationEvent(eventNID int64) {
 	key := fmt.Sprintf("%d", eventNID)
-	c.ServerKeys.Unset(key)
+	c.FederationEvents.Unset(key)
 }
