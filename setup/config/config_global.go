@@ -48,9 +48,6 @@ type Global struct {
 
 	// Metrics configuration
 	Metrics Metrics `yaml:"metrics"`
-
-	// Cache configuration
-	Caches Caches `yaml:"caches"`
 }
 
 func (c *Global) Defaults() {
@@ -142,15 +139,4 @@ func (c DatabaseOptions) MaxOpenConns() int {
 // ConnMaxLifetime returns maximum amount of time a connection may be reused
 func (c DatabaseOptions) ConnMaxLifetime() time.Duration {
 	return time.Duration(c.ConnMaxLifetimeSeconds) * time.Second
-}
-
-type Caches struct {
-	FederationSenderEventCacheSize int `yaml:"federationsender_cache_size"`
-}
-
-func (c *Caches) Defaults() {
-	c.FederationSenderEventCacheSize = 128
-}
-
-func (c *Caches) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }

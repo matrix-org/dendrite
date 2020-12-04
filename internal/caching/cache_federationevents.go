@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	FederationSenderCacheName    = "federation_event"
-	FederationSenderCacheMutable = true // to allow use of Unset only
+	FederationEventCacheName       = "federation_event"
+	FederationEventCacheMaxEntries = 256
+	FederationEventCacheMutable    = true // to allow use of Unset only
 )
 
 // FederationSenderCache contains the subset of functions needed for

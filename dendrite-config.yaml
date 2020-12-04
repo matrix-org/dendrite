@@ -103,11 +103,6 @@ global:
       username: metrics
       password: metrics
 
-  # Advanced options for tuning in-memory caches. Do not change these unless
-  # you know what you are doing.
-  # caches:
-  #   federationsender_cache_size: 128
-
 # Configuration for the Appservice API.
 app_service_api:
   internal_api:
