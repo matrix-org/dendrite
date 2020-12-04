@@ -171,7 +171,6 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 	// in the database.
 	ctx := context.Background()
 	if pduCapacity := maxPDUsInMemory - len(oq.pendingPDUs); pduCapacity > 0 {
-		logrus.Infof("Retrieving up to %d pending PDUs from the database for %q", pduCapacity, oq.destination)
 		if pdus, err := oq.db.GetPendingPDUs(ctx, oq.destination, pduCapacity); err == nil {
 			for receipt, pdu := range pdus {
 				oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{receipt, pdu})
@@ -181,7 +180,6 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 		}
 	}
 	if eduCapacity := maxPDUsInMemory - len(oq.pendingPDUs); eduCapacity > 0 {
-		logrus.Infof("Retrieving up to %d pending EDUs from the database for %q", eduCapacity, oq.destination)
 		if edus, err := oq.db.GetPendingEDUs(ctx, oq.destination, eduCapacity); err == nil {
 			for receipt, edu := range edus {
 				oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{receipt, edu})
