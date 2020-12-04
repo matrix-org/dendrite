@@ -62,7 +62,6 @@ func (c *Global) Defaults() {
 
 	c.Kafka.Defaults()
 	c.Metrics.Defaults()
-	c.Caches.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -71,7 +70,6 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 	c.Kafka.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
-	c.Caches.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -155,5 +153,4 @@ func (c *Caches) Defaults() {
 }
 
 func (c *Caches) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkPositive(configErrs, "global.caches.federationsender_cache_size", int64(c.FederationSenderEventCacheSize))
 }
