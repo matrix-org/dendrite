@@ -94,13 +94,20 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		}
 
 		if err := s.processMessage(*output.NewRoomEvent); err != nil {
-			// panic rather than continue with an inconsistent database
-			log.WithFields(log.Fields{
-				"event":      string(ev.JSON()),
-				"add":        output.NewRoomEvent.AddsStateEventIDs,
-				"del":        output.NewRoomEvent.RemovesStateEventIDs,
-				log.ErrorKey: err,
-			}).Panicf("roomserver output log: write room event failure")
+			switch err.(type) {
+			case *queue.ErrorFederationDisabled:
+				log.WithField("error", output.Type).Info(
+					err.Error(),
+				)
+			default:
+				// panic rather than continue with an inconsistent database
+				log.WithFields(log.Fields{
+					"event":      string(ev.JSON()),
+					"add":        output.NewRoomEvent.AddsStateEventIDs,
+					"del":        output.NewRoomEvent.RemovesStateEventIDs,
+					log.ErrorKey: err,
+				}).Panicf("roomserver output log: write room event failure")
+			}
 			return nil
 		}
 	default:
