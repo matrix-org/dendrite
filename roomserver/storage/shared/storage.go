@@ -309,6 +309,10 @@ func (d *Database) Events(
 	if err != nil {
 		return nil, err
 	}
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
+	if err != nil {
+		eventIDs = map[types.EventNID]string{}
+	}
 	results := make([]types.Event, len(eventJSONs))
 	for i, eventJSON := range eventJSONs {
 		var roomNID types.RoomNID
@@ -322,10 +326,6 @@ func (d *Database) Events(
 		if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
 			roomVersion, _ = d.Cache.GetRoomVersion(roomID)
 		}
-		eventID := ""
-		if id, ierr := d.EventsTable.SelectEventID(ctx, nil, eventJSON.EventNID); ierr == nil {
-			eventID = id
-		}
 		if roomVersion == "" {
 			roomVersion, err = d.RoomsTable.SelectRoomVersionForRoomNID(ctx, roomNID)
 			if err != nil {
@@ -333,7 +333,7 @@ func (d *Database) Events(
 			}
 		}
 		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
-			eventID, eventJSON.EventJSON, false, roomVersion,
+			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomVersion,
 		)
 		if err != nil {
 			return nil, err
@@ -783,6 +783,7 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 // GetStateEvent returns the current state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
+// nolint:gocyclo
 func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error) {
 	roomInfo, err := d.RoomInfo(ctx, roomID)
 	if err != nil {
@@ -804,6 +805,16 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
+	var eventNIDs []types.EventNID
+	for _, e := range entries {
+		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
+			eventNIDs = append(eventNIDs, e.EventNID)
+		}
+	}
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
+	if err != nil {
+		eventIDs = map[types.EventNID]string{}
+	}
 	// return the event requested
 	for _, e := range entries {
 		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
@@ -814,11 +825,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			if len(data) == 0 {
 				return nil, fmt.Errorf("GetStateEvent: no json for event nid %d", e.EventNID)
 			}
-			eventID := ""
-			if id, ierr := d.EventsTable.SelectEventID(ctx, nil, e.EventNID); ierr == nil {
-				eventID = id
-			}
-			ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventID, data[0].EventJSON, false, roomInfo.RoomVersion)
+			ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[e.EventNID], data[0].EventJSON, false, roomInfo.RoomVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -929,7 +936,10 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 			}
 		}
 	}
-
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
+	if err != nil {
+		eventIDs = map[types.EventNID]string{}
+	}
 	events, err := d.EventJSONTable.BulkSelectEventJSON(ctx, eventNIDs)
 	if err != nil {
 		return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event nids: %w", err)
@@ -937,11 +947,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	result := make([]tables.StrippedEvent, len(events))
 	for i := range events {
 		roomVer := eventNIDToVer[events[i].EventNID]
-		eventID := ""
-		if id, err := d.EventsTable.SelectEventID(ctx, nil, events[i].EventNID); err == nil {
-			eventID = id
-		}
-		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventID, events[i].EventJSON, false, roomVer)
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[events[i].EventNID], events[i].EventJSON, false, roomVer)
 		if err != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event NID %v : %w", events[i].EventNID, err)
 		}
