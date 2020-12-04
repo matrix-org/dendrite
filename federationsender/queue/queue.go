@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
+	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -100,6 +101,16 @@ type SigningInfo struct {
 	PrivateKey ed25519.PrivateKey
 }
 
+type queuedPDU struct {
+	receipt *shared.Receipt
+	pdu     *gomatrixserverlib.HeaderedEvent
+}
+
+type queuedEDU struct {
+	receipt *shared.Receipt
+	edu     *gomatrixserverlib.EDU
+}
+
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
@@ -112,8 +123,8 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			destination:      destination,
 			client:           oqs.client,
 			statistics:       oqs.statistics.ForServer(destination),
-			notifyPDUs:       make(chan bool, 1),
-			notifyEDUs:       make(chan bool, 1),
+			notifyPDUs:       make(chan *queuedPDU, 128),
+			notifyEDUs:       make(chan *queuedEDU, 128),
 			interruptBackoff: make(chan bool),
 			signing:          oqs.signing,
 		}
@@ -188,7 +199,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	for destination := range destmap {
-		oqs.getQueue(destination).sendEvent(nid)
+		oqs.getQueue(destination).sendEvent(ev, nid)
 	}
 
 	return nil
@@ -258,7 +269,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	for destination := range destmap {
-		oqs.getQueue(destination).sendEDU(nid)
+		oqs.getQueue(destination).sendEDU(e, nid)
 	}
 
 	return nil
