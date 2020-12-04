@@ -246,10 +246,10 @@ func (oq *destinationQueue) backgroundSend() {
 			// has exceeded a maximum allowable value. Clean up the in-memory
 			// buffers at this point. The PDU clean-up is already on a defer.
 			log.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
-			for i := pendingPDUs {
+			for i := range pendingPDUs {
 				pendingPDUs[i] = nil
 			}
-			for i := pendingEDUs {
+			for i := range pendingEDUs {
 				pendingEDUs[i] = nil
 			}
 			pendingPDUs = nil
@@ -277,10 +277,10 @@ func (oq *destinationQueue) backgroundSend() {
 			// If we successfully sent the transaction then clear out
 			// the pending events and EDUs, and wipe our transaction ID.
 			oq.statistics.Success()
-			for i := pendingPDUs {
+			for i := range pendingPDUs {
 				pendingPDUs[i] = nil
 			}
-			for i := pendingEDUs {
+			for i := range pendingEDUs {
 				pendingEDUs[i] = nil
 			}
 			pendingPDUs = pendingPDUs[:0]
