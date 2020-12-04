@@ -63,6 +63,15 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
+	federationEvents, err := NewInMemoryLRUCachePartition(
+		FederationEventCacheName,
+		FederationEventCacheMutable,
+		FederationEventCacheMaxEntries,
+		enablePrometheus,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &Caches{
 		RoomVersions:            roomVersions,
 		ServerKeys:              serverKeys,
@@ -70,6 +79,7 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		RoomServerEventTypeNIDs: roomServerEventTypeNIDs,
 		RoomServerRoomNIDs:      roomServerRoomNIDs,
 		RoomServerRoomIDs:       roomServerRoomIDs,
+		FederationEvents:        federationEvents,
 	}, nil
 }
 
