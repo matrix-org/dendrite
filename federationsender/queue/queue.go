@@ -84,8 +84,9 @@ func NewOutgoingQueues(
 				log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
 			}
 			for serverName := range serverNames {
-				if !queues.getQueue(serverName).statistics.Blacklisted() {
-					queues.getQueue(serverName).wakeQueueIfNeeded()
+				queue := queues.getQueue(serverName)
+				if !queue.statistics.Blacklisted() {
+					queue.wakeQueueIfNeeded()
 				}
 			}
 		})
@@ -123,12 +124,13 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			destination:      destination,
 			client:           oqs.client,
 			statistics:       oqs.statistics.ForServer(destination),
-			notifyPDUs:       make(chan *queuedPDU, 128),
-			notifyEDUs:       make(chan *queuedEDU, 128),
+			notifyPDUs:       make(chan *queuedPDU, 16),
+			notifyEDUs:       make(chan *queuedEDU, 16),
 			interruptBackoff: make(chan bool),
 			signing:          oqs.signing,
 		}
 		oqs.queues[destination] = oq
+		oq.getPendingFromDatabase()
 	}
 	return oq
 }
