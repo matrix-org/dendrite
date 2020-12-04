@@ -84,8 +84,7 @@ func NewOutgoingQueues(
 				log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
 			}
 			for serverName := range serverNames {
-				queue := queues.getQueue(serverName)
-				if !queue.statistics.Blacklisted() {
+				if queue := queues.getQueue(serverName); !queue.statistics.Blacklisted() {
 					queue.wakeQueueIfNeeded()
 				}
 			}
