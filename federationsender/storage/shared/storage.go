@@ -22,12 +22,14 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/storage/tables"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database struct {
 	DB                          *sql.DB
+	Cache                       caching.FederationSenderCache
 	Writer                      sqlutil.Writer
 	FederationSenderQueuePDUs   tables.FederationSenderQueuePDUs
 	FederationSenderQueueEDUs   tables.FederationSenderQueueEDUs

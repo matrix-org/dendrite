@@ -122,13 +122,23 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	return oq
 }
 
+type ErrorFederationDisabled struct {
+	Message string
+}
+
+func (e *ErrorFederationDisabled) Error() string {
+	return e.Message
+}
+
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
 	ev *gomatrixserverlib.HeaderedEvent, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if oqs.disabled {
-		return fmt.Errorf("federation is disabled")
+		return &ErrorFederationDisabled{
+			Message: "Federation disabled",
+		}
 	}
 	if origin != oqs.origin {
 		// TODO: Support virtual hosting; gh issue #577.
@@ -190,7 +200,9 @@ func (oqs *OutgoingQueues) SendEDU(
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if oqs.disabled {
-		return fmt.Errorf("federation is disabled")
+		return &ErrorFederationDisabled{
+			Message: "Federation disabled",
+		}
 	}
 	if origin != oqs.origin {
 		// TODO: Support virtual hosting; gh issue #577.

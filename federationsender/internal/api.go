@@ -229,3 +229,18 @@ func (a *FederationSenderInternalAPI) LookupServerKeys(
 	}
 	return ires.([]gomatrixserverlib.ServerKeys), nil
 }
+
+func (a *FederationSenderInternalAPI) MSC2836EventRelationships(
+	ctx context.Context, s gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest,
+	roomVersion gomatrixserverlib.RoomVersion,
+) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.MSC2836EventRelationships(ctx, s, r, roomVersion)
+	})
+	if err != nil {
+		return res, err
+	}
+	return ires.(gomatrixserverlib.MSC2836EventRelationshipsResponse), nil
+}

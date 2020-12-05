@@ -69,7 +69,16 @@ func (d *Database) GetNextTransactionEDUs(
 			nids: nids,
 		}
 
-		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, nids)
+		retrieve := make([]int64, 0, len(nids))
+		for _, nid := range nids {
+			if edu, ok := d.Cache.GetFederationSenderQueuedEDU(nid); ok {
+				edus = append(edus, edu)
+			} else {
+				retrieve = append(retrieve, nid)
+			}
+		}
+
+		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
 		if err != nil {
 			return fmt.Errorf("SelectQueueJSON: %w", err)
 		}
@@ -111,6 +120,7 @@ func (d *Database) CleanEDUs(
 			}
 			if count == 0 {
 				deleteNIDs = append(deleteNIDs, nid)
+				d.Cache.EvictFederationSenderQueuedEDU(nid)
 			}
 		}
 

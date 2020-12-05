@@ -64,3 +64,6 @@ A prev_batch token from incremental sync can be used in the v1 messages API
 
 # Blacklisted due to flakiness
 Forgotten room messages cannot be paginated
+
+# Blacklisted due to flakiness
+Can re-join room if re-invited
