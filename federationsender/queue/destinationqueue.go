@@ -279,11 +279,13 @@ func (oq *destinationQueue) backgroundSend() {
 		if eduCount > maxEDUsPerTransaction {
 			eduCount = maxEDUsPerTransaction
 		}
+		toSendPDUs := oq.pendingPDUs[:pduCount]
+		toSendEDUs := oq.pendingEDUs[:eduCount]
+		oq.pendingMutex.RUnlock()
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		// Try sending the next transaction and see what happens.
-		transaction, pc, ec, terr := oq.nextTransaction(oq.pendingPDUs[:pduCount], oq.pendingEDUs[:eduCount])
-		oq.pendingMutex.RUnlock()
+		transaction, pc, ec, terr := oq.nextTransaction(toSendPDUs, toSendEDUs)
 		if terr != nil {
 			// We failed to send the transaction. Mark it as a failure.
 			oq.statistics.Failure()
