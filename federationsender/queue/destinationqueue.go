@@ -125,19 +125,19 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		log.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
 		return
 	}
-	// If there's room in memory to hold the event then add it to the
-	// list.
-	oq.pendingMutex.Lock()
-	if len(oq.pendingEDUs) < maxEDUsInMemory {
-		oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
-			edu:     event,
-			receipt: receipt,
-		})
-	}
-	oq.pendingMutex.Unlock()
 	// Check if the destination is blacklisted. If it isn't then wake
 	// up the queue.
 	if !oq.statistics.Blacklisted() {
+		// If there's room in memory to hold the event then add it to the
+		// list.
+		oq.pendingMutex.Lock()
+		if len(oq.pendingEDUs) < maxEDUsInMemory {
+			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
+				edu:     event,
+				receipt: receipt,
+			})
+		}
+		oq.pendingMutex.Unlock()
 		// Wake up the queue if it's asleep.
 		oq.wakeQueueIfNeeded()
 		select {
