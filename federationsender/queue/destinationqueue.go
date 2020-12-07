@@ -84,19 +84,19 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		log.WithError(err).Errorf("failed to associate PDU %q with destination %q", event.EventID(), oq.destination)
 		return
 	}
-	// If there's room in memory to hold the event then add it to the
-	// list.
-	oq.pendingMutex.Lock()
-	if len(oq.pendingPDUs) < maxPDUsInMemory {
-		oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
-			pdu:     event,
-			receipt: receipt,
-		})
-	}
-	oq.pendingMutex.Unlock()
 	// Check if the destination is blacklisted. If it isn't then wake
 	// up the queue.
 	if !oq.statistics.Blacklisted() {
+		// If there's room in memory to hold the event then add it to the
+		// list.
+		oq.pendingMutex.Lock()
+		if len(oq.pendingPDUs) < maxPDUsInMemory {
+			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
+				pdu:     event,
+				receipt: receipt,
+			})
+		}
+		oq.pendingMutex.Unlock()
 		// Wake up the queue if it's asleep.
 		oq.wakeQueueIfNeeded()
 		select {
