@@ -95,6 +95,8 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 				pdu:     event,
 				receipt: receipt,
 			})
+		} else {
+			oq.overflowed.Store(true)
 		}
 		oq.pendingMutex.Unlock()
 		// Wake up the queue if it's asleep.
@@ -136,6 +138,8 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 				edu:     event,
 				receipt: receipt,
 			})
+		} else {
+			oq.overflowed.Store(true)
 		}
 		oq.pendingMutex.Unlock()
 		// Wake up the queue if it's asleep.
@@ -302,10 +306,10 @@ func (oq *destinationQueue) backgroundSend() {
 			// the pending events and EDUs, and wipe our transaction ID.
 			oq.statistics.Success()
 			oq.pendingMutex.Lock()
-			for i := range oq.pendingPDUs {
+			for i := range oq.pendingPDUs[:pc] {
 				oq.pendingPDUs[i] = nil
 			}
-			for i := range oq.pendingEDUs {
+			for i := range oq.pendingEDUs[:ec] {
 				oq.pendingEDUs[i] = nil
 			}
 			oq.pendingPDUs = oq.pendingPDUs[pc:]
