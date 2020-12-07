@@ -2,13 +2,13 @@
 
 In addition to standard Go code style (`gofmt`, `goimports`), we use `golangci-lint`
 to run a number of linters, the exact list can be found under linters in [.golangci.yml](.golangci.yml).
-[Installation](https://github.com/golangci/golangci-lint#install) and [Editor
-Integration](https://github.com/golangci/golangci-lint#editor-integration) for
+[Installation](https://github.com/golangci/golangci-lint#install-golangci-lint) and [Editor
+Integration](https://golangci-lint.run/usage/integrations/#editor-integration) for
 it can be found in the readme of golangci-lint.
 
 For rare cases where a linter is giving a spurious warning, it can be disabled
 for that line or statement using a [comment
-directive](https://github.com/golangci/golangci-lint#nolint), e.g.  `var
+directive](https://golangci-lint.run/usage/false-positives/#nolint), e.g.  `var
 bad_name int //nolint:golint,unused`. This should be used sparingly and only
 when its clear that the lint warning is spurious.
 
