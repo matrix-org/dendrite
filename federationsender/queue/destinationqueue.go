@@ -56,8 +56,8 @@ type destinationQueue struct {
 	overflowed         atomic.Bool                         // the queues exceed maxPDUsInMemory/maxEDUsInMemory, so we should consult the database for more
 	statistics         *statistics.ServerStatistics        // statistics about this remote server
 	transactionIDMutex sync.Mutex                          // protects transactionID
-	transactionID      gomatrixserverlib.TransactionID     // last transaction ID
-	notify             chan struct{}                       // interrupts idle wait for overflowed PDUs/EDUs from the database
+	transactionID      gomatrixserverlib.TransactionID     // last transaction ID if retrying, or "" if last txn was successful
+	notify             chan struct{}                       // interrupts idle wait pending PDUs/EDUs
 	pendingPDUs        []*queuedPDU                        // PDUs waiting to be sent
 	pendingEDUs        []*queuedEDU                        // EDUs waiting to be sent
 	pendingMutex       sync.RWMutex                        // protects pendingPDUs and pendingEDUs
@@ -269,6 +269,7 @@ func (oq *destinationQueue) backgroundSend() {
 			}
 		}
 
+		// Work out which PDUs/EDUs to include in the next transaction.
 		oq.pendingMutex.RLock()
 		pduCount := len(oq.pendingPDUs)
 		eduCount := len(oq.pendingEDUs)
