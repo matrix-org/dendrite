@@ -365,7 +365,7 @@ func (oq *destinationQueue) nextTransaction(
 	// Go through PDUs that we retrieved from the database, if any,
 	// and add them into the transaction.
 	for _, pdu := range pdus {
-		if pdu.pdu == nil {
+		if pdu == nil || pdu.pdu == nil {
 			continue
 		}
 		// Append the JSON of the event, since this is a json.RawMessage type in the
@@ -376,7 +376,7 @@ func (oq *destinationQueue) nextTransaction(
 
 	// Do the same for pending EDUS in the queue.
 	for _, edu := range edus {
-		if edu.edu == nil {
+		if edu == nil || edu.edu == nil {
 			continue
 		}
 		t.EDUs = append(t.EDUs, *edu.edu)
