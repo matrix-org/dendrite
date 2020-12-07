@@ -12,6 +12,10 @@ No, although a good portion of the Matrix specification has been implemented. Mo
 
 No, not at present. There will be in the future when Dendrite reaches version 1.0.
 
+### Should I run a monolith or a polylith deployment?
+
+Monolith deployments are always preferred where possible, and at this time, are far better tested than polylith deployments are. The only reason to consider a polylith deployment is if you wish to run different Dendrite components on separate physical machines.
+
 ### I've installed Dendrite but federation isn't working
 
 Check the [Federation Tester](https://federationtester.matrix.org). You need at least:
