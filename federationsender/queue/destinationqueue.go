@@ -234,7 +234,6 @@ func (oq *destinationQueue) backgroundSend() {
 			// The worker is idle so stop the goroutine. It'll get
 			// restarted automatically the next time we have an event to
 			// send.
-			log.Tracef("Queue %q has been idle for %s, going to sleep", oq.destination, queueIdleTimeout)
 			return
 		}
 
