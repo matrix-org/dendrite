@@ -46,6 +46,10 @@ type Receipt struct {
 	nid int64
 }
 
+func (r *Receipt) String() string {
+	return fmt.Sprintf("%d", r.nid)
+}
+
 // UpdateRoom updates the joined hosts for a room and returns what the joined
 // hosts were before the update, or nil if this was a duplicate message.
 // This is called when we receive a message from kafka, so we pass in
