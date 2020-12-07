@@ -411,13 +411,13 @@ func (oq *destinationQueue) nextTransaction(
 		if pduReceipts != nil {
 			//logrus.Infof("Cleaning PDUs %q", pduReceipt.String())
 			if err = oq.db.CleanPDUs(context.Background(), oq.destination, pduReceipts); err != nil {
-				log.WithError(err).Errorf("failed to clean PDUs for server %q", t.Destination)
+				log.WithError(err).Errorf("Failed to clean PDUs for server %q", t.Destination)
 			}
 		}
 		if eduReceipts != nil {
 			//logrus.Infof("Cleaning EDUs %q", eduReceipt.String())
 			if err = oq.db.CleanEDUs(context.Background(), oq.destination, eduReceipts); err != nil {
-				log.WithError(err).Errorf("failed to clean EDUs for server %q", t.Destination)
+				log.WithError(err).Errorf("Failed to clean EDUs for server %q", t.Destination)
 			}
 		}
 		return true, len(t.PDUs), len(t.EDUs), nil
@@ -429,7 +429,7 @@ func (oq *destinationQueue) nextTransaction(
 		log.WithFields(log.Fields{
 			"destination": oq.destination,
 			log.ErrorKey:  err,
-		}).Info("problem sending transaction")
+		}).Infof("Failed to send transaction %q", t.TransactionID)
 		return false, 0, 0, err
 	}
 }
