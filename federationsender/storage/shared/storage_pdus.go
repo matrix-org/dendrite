@@ -53,48 +53,42 @@ func (d *Database) GetPendingPDUs(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 	limit int,
-) (
-	events map[*Receipt]*gomatrixserverlib.HeaderedEvent,
-	err error,
-) {
+) (map[*Receipt]*gomatrixserverlib.HeaderedEvent, error) {
 	// Strictly speaking this doesn't need to be using the writer
 	// since we are only performing selects, but since we don't have
 	// a guarantee of transactional isolation, it's actually useful
 	// to know in SQLite mode that nothing else is trying to modify
 	// the database.
-	events = make(map[*Receipt]*gomatrixserverlib.HeaderedEvent)
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nids, err := d.FederationSenderQueuePDUs.SelectQueuePDUs(ctx, txn, serverName, limit)
-		if err != nil {
-			return fmt.Errorf("SelectQueuePDUs: %w", err)
-		}
+	events := make(map[*Receipt]*gomatrixserverlib.HeaderedEvent)
+	nids, err := d.FederationSenderQueuePDUs.SelectQueuePDUs(ctx, nil, serverName, limit)
+	if err != nil {
+		return nil, fmt.Errorf("SelectQueuePDUs: %w", err)
+	}
 
-		retrieve := make([]int64, 0, len(nids))
-		for _, nid := range nids {
-			if event, ok := d.Cache.GetFederationSenderQueuedPDU(nid); ok {
-				events[&Receipt{nid}] = event
-			} else {
-				retrieve = append(retrieve, nid)
-			}
+	retrieve := make([]int64, 0, len(nids))
+	for _, nid := range nids {
+		if event, ok := d.Cache.GetFederationSenderQueuedPDU(nid); ok {
+			events[&Receipt{nid}] = event
+		} else {
+			retrieve = append(retrieve, nid)
 		}
+	}
 
-		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
-		if err != nil {
-			return fmt.Errorf("SelectQueueJSON: %w", err)
+	blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, nil, retrieve)
+	if err != nil {
+		return nil, fmt.Errorf("SelectQueueJSON: %w", err)
+	}
+
+	for nid, blob := range blobs {
+		var event gomatrixserverlib.HeaderedEvent
+		if err := json.Unmarshal(blob, &event); err != nil {
+			return nil, fmt.Errorf("json.Unmarshal: %w", err)
 		}
+		events[&Receipt{nid}] = &event
+		d.Cache.StoreFederationSenderQueuedPDU(nid, &event)
+	}
 
-		for nid, blob := range blobs {
-			var event gomatrixserverlib.HeaderedEvent
-			if err := json.Unmarshal(blob, &event); err != nil {
-				return fmt.Errorf("json.Unmarshal: %w", err)
-			}
-			events[&Receipt{nid}] = &event
-			d.Cache.StoreFederationSenderQueuedPDU(nid, &event)
-		}
-
-		return nil
-	})
-	return
+	return events, nil
 }
 
 // CleanTransactionPDUs cleans up all associated events for a

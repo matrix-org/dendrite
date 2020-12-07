@@ -69,6 +69,10 @@ type destinationQueue struct {
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
 func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, receipt *shared.Receipt) {
+	if event == nil {
+		log.Errorf("attempt to send nil PDU with destination %q", oq.destination)
+		return
+	}
 	// Create a transaction ID. We'll either do this if we don't have
 	// one made up yet, or if we've exceeded the number of maximum
 	// events allowed in a single tranaction. We'll reset the counter
@@ -116,6 +120,10 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
 func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *shared.Receipt) {
+	if event == nil {
+		log.Errorf("attempt to send nil EDU with destination %q", oq.destination)
+		return
+	}
 	// Create a database entry that associates the given PDU NID with
 	// this destination queue. We'll then be able to retrieve the PDU
 	// later.
@@ -370,6 +378,9 @@ func (oq *destinationQueue) nextTransaction(
 	// Go through PDUs that we retrieved from the database, if any,
 	// and add them into the transaction.
 	for _, pdu := range pdus {
+		if pdu.pdu == nil {
+			continue
+		}
 		// Append the JSON of the event, since this is a json.RawMessage type in the
 		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, pdu.pdu.JSON())
@@ -378,6 +389,9 @@ func (oq *destinationQueue) nextTransaction(
 
 	// Do the same for pending EDUS in the queue.
 	for _, edu := range edus {
+		if edu.edu == nil {
+			continue
+		}
 		t.EDUs = append(t.EDUs, *edu.edu)
 		eduReceipts = append(pduReceipts, edu.receipt)
 	}

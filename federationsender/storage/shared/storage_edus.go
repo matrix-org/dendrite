@@ -52,42 +52,36 @@ func (d *Database) GetPendingEDUs(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 	limit int,
-) (
-	edus map[*Receipt]*gomatrixserverlib.EDU,
-	err error,
-) {
-	edus = make(map[*Receipt]*gomatrixserverlib.EDU)
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nids, err := d.FederationSenderQueueEDUs.SelectQueueEDUs(ctx, txn, serverName, limit)
-		if err != nil {
-			return fmt.Errorf("SelectQueueEDUs: %w", err)
-		}
+) (map[*Receipt]*gomatrixserverlib.EDU, error) {
+	edus := make(map[*Receipt]*gomatrixserverlib.EDU)
+	nids, err := d.FederationSenderQueueEDUs.SelectQueueEDUs(ctx, nil, serverName, limit)
+	if err != nil {
+		return nil, fmt.Errorf("SelectQueueEDUs: %w", err)
+	}
 
-		retrieve := make([]int64, 0, len(nids))
-		for _, nid := range nids {
-			if edu, ok := d.Cache.GetFederationSenderQueuedEDU(nid); ok {
-				edus[&Receipt{nid}] = edu
-			} else {
-				retrieve = append(retrieve, nid)
-			}
+	retrieve := make([]int64, 0, len(nids))
+	for _, nid := range nids {
+		if edu, ok := d.Cache.GetFederationSenderQueuedEDU(nid); ok {
+			edus[&Receipt{nid}] = edu
+		} else {
+			retrieve = append(retrieve, nid)
 		}
+	}
 
-		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
-		if err != nil {
-			return fmt.Errorf("SelectQueueJSON: %w", err)
+	blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, nil, retrieve)
+	if err != nil {
+		return nil, fmt.Errorf("SelectQueueJSON: %w", err)
+	}
+
+	for nid, blob := range blobs {
+		var event gomatrixserverlib.EDU
+		if err := json.Unmarshal(blob, &event); err != nil {
+			return nil, fmt.Errorf("json.Unmarshal: %w", err)
 		}
+		edus[&Receipt{nid}] = &event
+	}
 
-		for nid, blob := range blobs {
-			var event gomatrixserverlib.EDU
-			if err := json.Unmarshal(blob, &event); err != nil {
-				return fmt.Errorf("json.Unmarshal: %w", err)
-			}
-			edus[&Receipt{nid}] = &event
-		}
-
-		return nil
-	})
-	return
+	return edus, nil
 }
 
 // CleanEDUs cleans up all specified EDUs. This is done when a
