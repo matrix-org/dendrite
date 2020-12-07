@@ -123,9 +123,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			destination:      destination,
 			client:           oqs.client,
 			statistics:       oqs.statistics.ForServer(destination),
-			notifyPDUs:       make(chan *queuedPDU, 16),
-			notifyEDUs:       make(chan *queuedEDU, 16),
-			notifyOverflow:   make(chan struct{}, 1),
+			notify:           make(chan struct{}, 1),
 			interruptBackoff: make(chan bool),
 			signing:          oqs.signing,
 		}
