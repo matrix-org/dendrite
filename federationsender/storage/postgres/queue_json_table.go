@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -76,9 +77,9 @@ func NewPostgresQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
 
 func (s *queueJSONStatements) InsertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
-) (int64, error) {
+) (types.ContentNID, error) {
 	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
-	var lastid int64
+	var lastid types.ContentNID
 	if err := stmt.QueryRowContext(ctx, json).Scan(&lastid); err != nil {
 		return 0, err
 	}
@@ -86,25 +87,33 @@ func (s *queueJSONStatements) InsertQueueJSON(
 }
 
 func (s *queueJSONStatements) DeleteQueueJSON(
-	ctx context.Context, txn *sql.Tx, nids []int64,
+	ctx context.Context, txn *sql.Tx, jsonNIDs []types.ContentNID,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
+	nids := make([]int64, 0, len(jsonNIDs))
+	for _, n := range jsonNIDs {
+		nids = append(nids, int64(n))
+	}
 	_, err := stmt.ExecContext(ctx, pq.Int64Array(nids))
 	return err
 }
 
 func (s *queueJSONStatements) SelectQueueJSON(
-	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
-) (map[int64][]byte, error) {
-	blobs := map[int64][]byte{}
+	ctx context.Context, txn *sql.Tx, jsonNIDs []types.ContentNID,
+) (map[types.ContentNID][]byte, error) {
+	blobs := map[types.ContentNID][]byte{}
 	stmt := sqlutil.TxStmt(txn, s.selectJSONStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Int64Array(jsonNIDs))
+	nids := make([]int64, 0, len(jsonNIDs))
+	for _, n := range jsonNIDs {
+		nids = append(nids, int64(n))
+	}
+	rows, err := stmt.QueryContext(ctx, pq.Int64Array(nids))
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJSON: rows.close() failed")
 	for rows.Next() {
-		var nid int64
+		var nid types.ContentNID
 		var blob []byte
 		if err = rows.Scan(&nid, &blob); err != nil {
 			return nil, err

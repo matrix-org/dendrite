@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -102,7 +103,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 	txn *sql.Tx,
 	eduType string,
 	serverName gomatrixserverlib.ServerName,
-	nid int64,
+	nid types.ContentNID,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
 	_, err := stmt.ExecContext(
@@ -117,7 +118,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 func (s *queueEDUsStatements) DeleteQueueEDUs(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
-	jsonNIDs []int64,
+	jsonNIDs []types.ContentNID,
 ) error {
 	deleteSQL := strings.Replace(deleteQueueEDUsSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
 	deleteStmt, err := txn.Prepare(deleteSQL)
@@ -140,16 +141,16 @@ func (s *queueEDUsStatements) SelectQueueEDUs(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
 	limit int,
-) ([]int64, error) {
+) ([]types.ContentNID, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUStmt)
 	rows, err := stmt.QueryContext(ctx, serverName, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
-	var result []int64
+	var result []types.ContentNID
 	for rows.Next() {
-		var nid int64
+		var nid types.ContentNID
 		if err = rows.Scan(&nid); err != nil {
 			return nil, err
 		}
@@ -159,9 +160,9 @@ func (s *queueEDUsStatements) SelectQueueEDUs(
 }
 
 func (s *queueEDUsStatements) SelectQueueEDUReferenceJSONCount(
-	ctx context.Context, txn *sql.Tx, jsonNID int64,
-) (int64, error) {
-	var count int64
+	ctx context.Context, txn *sql.Tx, jsonNID types.ContentNID,
+) (types.ContentNID, error) {
+	var count types.ContentNID
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUReferenceJSONCountStmt)
 	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
 	if err == sql.ErrNoRows {
@@ -172,8 +173,8 @@ func (s *queueEDUsStatements) SelectQueueEDUReferenceJSONCount(
 
 func (s *queueEDUsStatements) SelectQueueEDUCount(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
-) (int64, error) {
-	var count int64
+) (types.ContentNID, error) {
+	var count types.ContentNID
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUCountStmt)
 	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
 	if err == sql.ErrNoRows {

@@ -24,7 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/federationsender/storage/shared"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -102,13 +102,13 @@ type SigningInfo struct {
 }
 
 type queuedPDU struct {
-	receipt *shared.Receipt
-	pdu     *gomatrixserverlib.HeaderedEvent
+	nid types.ContentNID
+	pdu *gomatrixserverlib.HeaderedEvent
 }
 
 type queuedEDU struct {
-	receipt *shared.Receipt
-	edu     *gomatrixserverlib.EDU
+	nid types.ContentNID
+	edu *gomatrixserverlib.EDU
 }
 
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {

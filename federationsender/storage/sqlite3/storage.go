@@ -21,7 +21,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
-	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -35,7 +34,7 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationSenderCache) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
@@ -68,7 +67,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	}
 	d.Database = shared.Database{
 		DB:                          d.db,
-		Cache:                       cache,
 		Writer:                      d.writer,
 		FederationSenderJoinedHosts: joinedHosts,
 		FederationSenderQueuePDUs:   queuePDUs,

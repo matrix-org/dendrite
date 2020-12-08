@@ -21,17 +21,16 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
-	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewDatabase opens a new database
-func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationSenderCache) (Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, cache)
+		return sqlite3.NewDatabase(dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(dbProperties, cache)
+		return postgres.NewDatabase(dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

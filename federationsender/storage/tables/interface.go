@@ -23,27 +23,27 @@ import (
 )
 
 type FederationSenderQueuePDUs interface {
-	InsertQueuePDU(ctx context.Context, txn *sql.Tx, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, nid int64) error
-	DeleteQueuePDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, jsonNIDs []int64) error
-	SelectQueuePDUReferenceJSONCount(ctx context.Context, txn *sql.Tx, jsonNID int64) (int64, error)
-	SelectQueuePDUCount(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (int64, error)
-	SelectQueuePDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, limit int) ([]int64, error)
+	InsertQueuePDU(ctx context.Context, txn *sql.Tx, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, nid types.ContentNID) error
+	DeleteQueuePDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, jsonNIDs []types.ContentNID) error
+	SelectQueuePDUReferenceJSONCount(ctx context.Context, txn *sql.Tx, jsonNID types.ContentNID) (types.ContentNID, error)
+	SelectQueuePDUCount(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (types.ContentNID, error)
+	SelectQueuePDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, limit int) ([]types.ContentNID, error)
 	SelectQueuePDUServerNames(ctx context.Context, txn *sql.Tx) ([]gomatrixserverlib.ServerName, error)
 }
 
 type FederationSenderQueueEDUs interface {
-	InsertQueueEDU(ctx context.Context, txn *sql.Tx, eduType string, serverName gomatrixserverlib.ServerName, nid int64) error
-	DeleteQueueEDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, jsonNIDs []int64) error
-	SelectQueueEDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, limit int) ([]int64, error)
-	SelectQueueEDUReferenceJSONCount(ctx context.Context, txn *sql.Tx, jsonNID int64) (int64, error)
-	SelectQueueEDUCount(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (int64, error)
+	InsertQueueEDU(ctx context.Context, txn *sql.Tx, eduType string, serverName gomatrixserverlib.ServerName, nid types.ContentNID) error
+	DeleteQueueEDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, jsonNIDs []types.ContentNID) error
+	SelectQueueEDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, limit int) ([]types.ContentNID, error)
+	SelectQueueEDUReferenceJSONCount(ctx context.Context, txn *sql.Tx, jsonNID types.ContentNID) (types.ContentNID, error)
+	SelectQueueEDUCount(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (types.ContentNID, error)
 	SelectQueueEDUServerNames(ctx context.Context, txn *sql.Tx) ([]gomatrixserverlib.ServerName, error)
 }
 
 type FederationSenderQueueJSON interface {
-	InsertQueueJSON(ctx context.Context, txn *sql.Tx, json string) (int64, error)
-	DeleteQueueJSON(ctx context.Context, txn *sql.Tx, nids []int64) error
-	SelectQueueJSON(ctx context.Context, txn *sql.Tx, jsonNIDs []int64) (map[int64][]byte, error)
+	InsertQueueJSON(ctx context.Context, txn *sql.Tx, json string) (types.ContentNID, error)
+	DeleteQueueJSON(ctx context.Context, txn *sql.Tx, nids []types.ContentNID) error
+	SelectQueueJSON(ctx context.Context, txn *sql.Tx, jsonNIDs []types.ContentNID) (map[types.ContentNID][]byte, error)
 }
 
 type FederationSenderJoinedHosts interface {

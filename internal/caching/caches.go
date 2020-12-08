@@ -10,7 +10,6 @@ type Caches struct {
 	RoomServerEventTypeNIDs Cache // RoomServerNIDsCache
 	RoomServerRoomNIDs      Cache // RoomServerNIDsCache
 	RoomServerRoomIDs       Cache // RoomServerNIDsCache
-	FederationEvents        Cache // FederationEventsCache
 }
 
 // Cache is the interface that an implementation must satisfy.

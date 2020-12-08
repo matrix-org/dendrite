@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -71,21 +72,21 @@ func NewSQLiteQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
 
 func (s *queueJSONStatements) InsertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
-) (lastid int64, err error) {
+) (types.ContentNID, error) {
 	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
 	res, err := stmt.ExecContext(ctx, json)
 	if err != nil {
 		return 0, fmt.Errorf("stmt.QueryContext: %w", err)
 	}
-	lastid, err = res.LastInsertId()
+	lastid, err := res.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf("res.LastInsertId: %w", err)
 	}
-	return
+	return types.ContentNID(lastid), nil
 }
 
 func (s *queueJSONStatements) DeleteQueueJSON(
-	ctx context.Context, txn *sql.Tx, nids []int64,
+	ctx context.Context, txn *sql.Tx, nids []types.ContentNID,
 ) error {
 	deleteSQL := strings.Replace(deleteJSONSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
 	deleteStmt, err := txn.Prepare(deleteSQL)
@@ -104,8 +105,8 @@ func (s *queueJSONStatements) DeleteQueueJSON(
 }
 
 func (s *queueJSONStatements) SelectQueueJSON(
-	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
-) (map[int64][]byte, error) {
+	ctx context.Context, txn *sql.Tx, jsonNIDs []types.ContentNID,
+) (map[types.ContentNID][]byte, error) {
 	selectSQL := strings.Replace(selectJSONSQL, "($1)", sqlutil.QueryVariadic(len(jsonNIDs)), 1)
 	selectStmt, err := txn.Prepare(selectSQL)
 	if err != nil {
@@ -117,7 +118,7 @@ func (s *queueJSONStatements) SelectQueueJSON(
 		iNIDs[k] = v
 	}
 
-	blobs := map[int64][]byte{}
+	blobs := map[types.ContentNID][]byte{}
 	stmt := sqlutil.TxStmt(txn, selectStmt)
 	rows, err := stmt.QueryContext(ctx, iNIDs...)
 	if err != nil {
@@ -125,7 +126,7 @@ func (s *queueJSONStatements) SelectQueueJSON(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJSON: rows.close() failed")
 	for rows.Next() {
-		var nid int64
+		var nid types.ContentNID
 		var blob []byte
 		if err = rows.Scan(&nid, &blob); err != nil {
 			return nil, fmt.Errorf("s.selectQueueJSON rows.Scan: %w", err)

@@ -21,14 +21,12 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/storage/tables"
 	"github.com/matrix-org/dendrite/federationsender/types"
-	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database struct {
 	DB                          *sql.DB
-	Cache                       caching.FederationSenderCache
 	Writer                      sqlutil.Writer
 	FederationSenderQueuePDUs   tables.FederationSenderQueuePDUs
 	FederationSenderQueueEDUs   tables.FederationSenderQueueEDUs
@@ -36,18 +34,6 @@ type Database struct {
 	FederationSenderJoinedHosts tables.FederationSenderJoinedHosts
 	FederationSenderRooms       tables.FederationSenderRooms
 	FederationSenderBlacklist   tables.FederationSenderBlacklist
-}
-
-// An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
-// We don't actually export the NIDs but we need the caller to be able
-// to pass them back so that we can clean up if the transaction sends
-// successfully.
-type Receipt struct {
-	nid int64
-}
-
-func (r *Receipt) String() string {
-	return fmt.Sprintf("%d", r.nid)
 }
 
 // UpdateRoom updates the joined hosts for a room and returns what the joined
@@ -129,19 +115,17 @@ func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string)
 // metadata entries.
 func (d *Database) StoreJSON(
 	ctx context.Context, js string,
-) (*Receipt, error) {
-	var nid int64
+) (types.ContentNID, error) {
+	var nid types.ContentNID
 	var err error
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		nid, err = d.FederationSenderQueueJSON.InsertQueueJSON(ctx, txn, js)
 		return err
 	})
 	if err != nil {
-		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)
+		return 0, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
-	return &Receipt{
-		nid: nid,
-	}, nil
+	return nid, nil
 }
 
 func (d *Database) PurgeRoomState(

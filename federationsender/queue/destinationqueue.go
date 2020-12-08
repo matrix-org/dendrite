@@ -23,7 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/federationsender/storage/shared"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -67,7 +67,7 @@ type destinationQueue struct {
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, receipt *shared.Receipt) {
+func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, nid types.ContentNID) {
 	if event == nil {
 		log.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return
@@ -79,7 +79,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		context.TODO(),
 		"",             // TODO: remove this, as we don't need to persist the transaction ID
 		oq.destination, // the destination server name
-		receipt,        // NIDs from federationsender_queue_json table
+		nid,            // NIDs from federationsender_queue_json table
 	); err != nil {
 		log.WithError(err).Errorf("failed to associate PDU %q with destination %q", event.EventID(), oq.destination)
 		return
@@ -92,8 +92,8 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		oq.pendingMutex.Lock()
 		if len(oq.pendingPDUs) < maxPDUsInMemory {
 			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
-				pdu:     event,
-				receipt: receipt,
+				pdu: event,
+				nid: nid,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -111,7 +111,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 // sendEDU adds the EDU event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *shared.Receipt) {
+func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, nid types.ContentNID) {
 	if event == nil {
 		log.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
@@ -122,7 +122,7 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 	if err := oq.db.AssociateEDUWithDestination(
 		context.TODO(),
 		oq.destination, // the destination server name
-		receipt,        // NIDs from federationsender_queue_json table
+		nid,            // NIDs from federationsender_queue_json table
 	); err != nil {
 		log.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
 		return
@@ -135,8 +135,8 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		oq.pendingMutex.Lock()
 		if len(oq.pendingEDUs) < maxEDUsInMemory {
 			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
-				edu:     event,
-				receipt: receipt,
+				edu: event,
+				nid: nid,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -183,20 +183,20 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 	// have cached. We will index them based on the receipt,
 	// which ultimately just contains the index of the PDU/EDU
 	// in the database.
-	gotPDUs := map[string]struct{}{}
-	gotEDUs := map[string]struct{}{}
+	gotPDUs := map[types.ContentNID]struct{}{}
+	gotEDUs := map[types.ContentNID]struct{}{}
 	for _, pdu := range oq.pendingPDUs {
-		gotPDUs[pdu.receipt.String()] = struct{}{}
+		gotPDUs[pdu.nid] = struct{}{}
 	}
 	for _, edu := range oq.pendingEDUs {
-		gotEDUs[edu.receipt.String()] = struct{}{}
+		gotEDUs[edu.nid] = struct{}{}
 	}
 
 	if pduCapacity := maxPDUsInMemory - len(oq.pendingPDUs); pduCapacity > 0 {
 		// We have room in memory for some PDUs - let's request no more than that.
 		if pdus, err := oq.db.GetPendingPDUs(ctx, oq.destination, pduCapacity); err == nil {
 			for receipt, pdu := range pdus {
-				if _, ok := gotPDUs[receipt.String()]; ok {
+				if _, ok := gotPDUs[receipt]; ok {
 					continue
 				}
 				oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{receipt, pdu})
@@ -210,7 +210,7 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 		// We have room in memory for some EDUs - let's request no more than that.
 		if edus, err := oq.db.GetPendingEDUs(ctx, oq.destination, eduCapacity); err == nil {
 			for receipt, edu := range edus {
-				if _, ok := gotEDUs[receipt.String()]; ok {
+				if _, ok := gotEDUs[receipt]; ok {
 					continue
 				}
 				oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{receipt, edu})
@@ -375,8 +375,8 @@ func (oq *destinationQueue) nextTransaction(
 		return false, 0, 0, nil
 	}
 
-	var pduReceipts []*shared.Receipt
-	var eduReceipts []*shared.Receipt
+	var pduReceipts []types.ContentNID
+	var eduReceipts []types.ContentNID
 
 	// Go through PDUs that we retrieved from the database, if any,
 	// and add them into the transaction.
@@ -387,7 +387,7 @@ func (oq *destinationQueue) nextTransaction(
 		// Append the JSON of the event, since this is a json.RawMessage type in the
 		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, pdu.pdu.JSON())
-		pduReceipts = append(pduReceipts, pdu.receipt)
+		pduReceipts = append(pduReceipts, pdu.nid)
 	}
 
 	// Do the same for pending EDUS in the queue.
@@ -396,7 +396,7 @@ func (oq *destinationQueue) nextTransaction(
 			continue
 		}
 		t.EDUs = append(t.EDUs, *edu.edu)
-		eduReceipts = append(eduReceipts, edu.receipt)
+		eduReceipts = append(eduReceipts, edu.nid)
 	}
 
 	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))

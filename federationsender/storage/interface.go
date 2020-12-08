@@ -17,7 +17,6 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -34,19 +33,19 @@ type Database interface {
 	GetJoinedHostsForRooms(ctx context.Context, roomIDs []string) ([]gomatrixserverlib.ServerName, error)
 	PurgeRoomState(ctx context.Context, roomID string) error
 
-	StoreJSON(ctx context.Context, js string) (*shared.Receipt, error)
+	StoreJSON(ctx context.Context, js string) (types.ContentNID, error)
 
-	GetPendingPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (pdus map[*shared.Receipt]*gomatrixserverlib.HeaderedEvent, err error)
-	GetPendingEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (edus map[*shared.Receipt]*gomatrixserverlib.EDU, err error)
+	GetPendingPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (pdus map[types.ContentNID]*gomatrixserverlib.HeaderedEvent, err error)
+	GetPendingEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (edus map[types.ContentNID]*gomatrixserverlib.EDU, err error)
 
-	AssociatePDUWithDestination(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error
-	AssociateEDUWithDestination(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error
+	AssociatePDUWithDestination(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, nid types.ContentNID) error
+	AssociateEDUWithDestination(ctx context.Context, serverName gomatrixserverlib.ServerName, nid types.ContentNID) error
 
-	CleanPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error
-	CleanEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error
+	CleanPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, nids []types.ContentNID) error
+	CleanEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, nids []types.ContentNID) error
 
-	GetPendingPDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error)
-	GetPendingEDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error)
+	GetPendingPDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (types.ContentNID, error)
+	GetPendingEDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (types.ContentNID, error)
 
 	GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)

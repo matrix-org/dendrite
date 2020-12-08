@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -105,7 +106,7 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName gomatrixserverlib.ServerName,
-	nid int64,
+	nid types.ContentNID,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertQueuePDUStmt)
 	_, err := stmt.ExecContext(
@@ -120,17 +121,21 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 func (s *queuePDUsStatements) DeleteQueuePDUs(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
-	jsonNIDs []int64,
+	jsonNIDs []types.ContentNID,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteQueuePDUsStmt)
-	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(jsonNIDs))
+	nids := make([]int64, 0, len(jsonNIDs))
+	for _, n := range jsonNIDs {
+		nids = append(nids, int64(n))
+	}
+	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(nids))
 	return err
 }
 
 func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
-	ctx context.Context, txn *sql.Tx, jsonNID int64,
-) (int64, error) {
-	var count int64
+	ctx context.Context, txn *sql.Tx, jsonNID types.ContentNID,
+) (types.ContentNID, error) {
+	var count types.ContentNID
 	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUReferenceJSONCountStmt)
 	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
 	if err == sql.ErrNoRows {
@@ -144,8 +149,8 @@ func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
 
 func (s *queuePDUsStatements) SelectQueuePDUCount(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
-) (int64, error) {
-	var count int64
+) (types.ContentNID, error) {
+	var count types.ContentNID
 	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsCountStmt)
 	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
 	if err == sql.ErrNoRows {
@@ -161,16 +166,16 @@ func (s *queuePDUsStatements) SelectQueuePDUs(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
 	limit int,
-) ([]int64, error) {
+) ([]types.ContentNID, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsStmt)
 	rows, err := stmt.QueryContext(ctx, serverName, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
-	var result []int64
+	var result []types.ContentNID
 	for rows.Next() {
-		var nid int64
+		var nid types.ContentNID
 		if err = rows.Scan(&nid); err != nil {
 			return nil, err
 		}

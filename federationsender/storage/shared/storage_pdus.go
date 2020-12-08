@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -31,7 +32,7 @@ func (d *Database) AssociatePDUWithDestination(
 	ctx context.Context,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName gomatrixserverlib.ServerName,
-	receipt *Receipt,
+	nid types.ContentNID,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if err := d.FederationSenderQueuePDUs.InsertQueuePDU(
@@ -39,7 +40,7 @@ func (d *Database) AssociatePDUWithDestination(
 			txn,           // SQL transaction
 			transactionID, // transaction ID
 			serverName,    // destination server name
-			receipt.nid,   // NID from the federationsender_queue_json table
+			nid,           // NID from the federationsender_queue_json table
 		); err != nil {
 			return fmt.Errorf("InsertQueuePDU: %w", err)
 		}
@@ -54,7 +55,7 @@ func (d *Database) GetPendingPDUs(
 	serverName gomatrixserverlib.ServerName,
 	limit int,
 ) (
-	events map[*Receipt]*gomatrixserverlib.HeaderedEvent,
+	events map[types.ContentNID]*gomatrixserverlib.HeaderedEvent,
 	err error,
 ) {
 	// Strictly speaking this doesn't need to be using the writer
@@ -62,23 +63,14 @@ func (d *Database) GetPendingPDUs(
 	// a guarantee of transactional isolation, it's actually useful
 	// to know in SQLite mode that nothing else is trying to modify
 	// the database.
-	events = make(map[*Receipt]*gomatrixserverlib.HeaderedEvent)
+	events = make(map[types.ContentNID]*gomatrixserverlib.HeaderedEvent)
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		nids, err := d.FederationSenderQueuePDUs.SelectQueuePDUs(ctx, txn, serverName, limit)
 		if err != nil {
 			return fmt.Errorf("SelectQueuePDUs: %w", err)
 		}
 
-		retrieve := make([]int64, 0, len(nids))
-		for _, nid := range nids {
-			if event, ok := d.Cache.GetFederationSenderQueuedPDU(nid); ok {
-				events[&Receipt{nid}] = event
-			} else {
-				retrieve = append(retrieve, nid)
-			}
-		}
-
-		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
+		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, nids)
 		if err != nil {
 			return fmt.Errorf("SelectQueueJSON: %w", err)
 		}
@@ -88,8 +80,7 @@ func (d *Database) GetPendingPDUs(
 			if err := json.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
-			events[&Receipt{nid}] = &event
-			d.Cache.StoreFederationSenderQueuedPDU(nid, &event)
+			events[nid] = &event
 		}
 
 		return nil
@@ -103,15 +94,10 @@ func (d *Database) GetPendingPDUs(
 func (d *Database) CleanPDUs(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
-	receipts []*Receipt,
+	nids []types.ContentNID,
 ) error {
-	if len(receipts) == 0 {
-		return errors.New("expected receipt")
-	}
-
-	nids := make([]int64, len(receipts))
-	for i := range receipts {
-		nids[i] = receipts[i].nid
+	if len(nids) == 0 {
+		return errors.New("expected one or more ContentNIDs")
 	}
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -119,7 +105,7 @@ func (d *Database) CleanPDUs(
 			return err
 		}
 
-		var deleteNIDs []int64
+		var deleteNIDs []types.ContentNID
 		for _, nid := range nids {
 			count, err := d.FederationSenderQueuePDUs.SelectQueuePDUReferenceJSONCount(ctx, txn, nid)
 			if err != nil {
@@ -127,7 +113,6 @@ func (d *Database) CleanPDUs(
 			}
 			if count == 0 {
 				deleteNIDs = append(deleteNIDs, nid)
-				d.Cache.EvictFederationSenderQueuedPDU(nid)
 			}
 		}
 
@@ -146,7 +131,7 @@ func (d *Database) CleanPDUs(
 func (d *Database) GetPendingPDUCount(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
-) (int64, error) {
+) (types.ContentNID, error) {
 	return d.FederationSenderQueuePDUs.SelectQueuePDUCount(ctx, nil, serverName)
 }
 
