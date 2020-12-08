@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
+	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -100,6 +101,16 @@ type SigningInfo struct {
 	PrivateKey ed25519.PrivateKey
 }
 
+type queuedPDU struct {
+	receipt *shared.Receipt
+	pdu     *gomatrixserverlib.HeaderedEvent
+}
+
+type queuedEDU struct {
+	receipt *shared.Receipt
+	edu     *gomatrixserverlib.EDU
+}
+
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
@@ -116,7 +127,6 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			interruptBackoff: make(chan bool),
 			signing:          oqs.signing,
 		}
-		oq.pendingTransactions.statistics = oq.statistics
 		oqs.queues[destination] = oq
 	}
 	return oq
