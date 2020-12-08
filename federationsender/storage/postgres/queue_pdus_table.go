@@ -45,10 +45,16 @@ const insertQueuePDUSQL = "" +
 const deleteQueuePDUSQL = "" +
 	"DELETE FROM federationsender_queue_pdus WHERE server_name = $1 AND json_nid = ANY($2)"
 
-const selectQueuePDUsSQL = "" +
-	"SELECT json_nid FROM federationsender_queue_pdus" +
+const selectQueuePDUNextTransactionIDSQL = "" +
+	"SELECT transaction_id FROM federationsender_queue_pdus" +
 	" WHERE server_name = $1" +
-	" LIMIT $2"
+	" ORDER BY transaction_id ASC" +
+	" LIMIT 1"
+
+const selectQueuePDUsByTransactionSQL = "" +
+	"SELECT json_nid FROM federationsender_queue_pdus" +
+	" WHERE server_name = $1 AND transaction_id = $2" +
+	" LIMIT $3"
 
 const selectQueuePDUReferenceJSONCountSQL = "" +
 	"SELECT COUNT(*) FROM federationsender_queue_pdus" +
@@ -65,7 +71,8 @@ type queuePDUsStatements struct {
 	db                                   *sql.DB
 	insertQueuePDUStmt                   *sql.Stmt
 	deleteQueuePDUsStmt                  *sql.Stmt
-	selectQueuePDUsStmt                  *sql.Stmt
+	selectQueuePDUNextTransactionIDStmt  *sql.Stmt
+	selectQueuePDUsByTransactionStmt     *sql.Stmt
 	selectQueuePDUReferenceJSONCountStmt *sql.Stmt
 	selectQueuePDUsCountStmt             *sql.Stmt
 	selectQueuePDUServerNamesStmt        *sql.Stmt
@@ -85,7 +92,10 @@ func NewPostgresQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
 	if s.deleteQueuePDUsStmt, err = s.db.Prepare(deleteQueuePDUSQL); err != nil {
 		return
 	}
-	if s.selectQueuePDUsStmt, err = s.db.Prepare(selectQueuePDUsSQL); err != nil {
+	if s.selectQueuePDUNextTransactionIDStmt, err = s.db.Prepare(selectQueuePDUNextTransactionIDSQL); err != nil {
+		return
+	}
+	if s.selectQueuePDUsByTransactionStmt, err = s.db.Prepare(selectQueuePDUsByTransactionSQL); err != nil {
 		return
 	}
 	if s.selectQueuePDUReferenceJSONCountStmt, err = s.db.Prepare(selectQueuePDUReferenceJSONCountSQL); err != nil {
@@ -127,6 +137,18 @@ func (s *queuePDUsStatements) DeleteQueuePDUs(
 	return err
 }
 
+func (s *queuePDUsStatements) SelectQueuePDUNextTransactionID(
+	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+) (gomatrixserverlib.TransactionID, error) {
+	var transactionID gomatrixserverlib.TransactionID
+	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUNextTransactionIDStmt)
+	err := stmt.QueryRowContext(ctx, serverName).Scan(&transactionID)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return transactionID, err
+}
+
 func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
 	ctx context.Context, txn *sql.Tx, jsonNID int64,
 ) (int64, error) {
@@ -160,10 +182,11 @@ func (s *queuePDUsStatements) SelectQueuePDUCount(
 func (s *queuePDUsStatements) SelectQueuePDUs(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
+	transactionID gomatrixserverlib.TransactionID,
 	limit int,
 ) ([]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsStmt)
-	rows, err := stmt.QueryContext(ctx, serverName, limit)
+	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsByTransactionStmt)
+	rows, err := stmt.QueryContext(ctx, serverName, transactionID, limit)
 	if err != nil {
 		return nil, err
 	}

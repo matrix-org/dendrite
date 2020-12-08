@@ -17,6 +17,7 @@ package shared
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/tables"
@@ -43,11 +44,16 @@ type Database struct {
 // to pass them back so that we can clean up if the transaction sends
 // successfully.
 type Receipt struct {
-	nid int64
+	nids []int64
 }
 
-func (r *Receipt) String() string {
-	return fmt.Sprintf("%d", r.nid)
+func (e *Receipt) Empty() bool {
+	return len(e.nids) == 0
+}
+
+func (e *Receipt) String() string {
+	j, _ := json.Marshal(e.nids)
+	return string(j)
 }
 
 // UpdateRoom updates the joined hosts for a room and returns what the joined
@@ -140,7 +146,7 @@ func (d *Database) StoreJSON(
 		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
 	return &Receipt{
-		nid: nid,
+		nids: []int64{nid},
 	}, nil
 }
 

@@ -33,11 +33,7 @@ import (
 )
 
 const (
-	maxPDUsPerTransaction = 50
-	maxEDUsPerTransaction = 50
-	maxPDUsInMemory       = 128
-	maxEDUsInMemory       = 128
-	queueIdleTimeout      = time.Second * 30
+	queueIdleTimeout = time.Second * 30
 )
 
 // destinationQueue is a queue of events for a single destination.
@@ -45,23 +41,24 @@ const (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
-	db                 storage.Database
-	signing            *SigningInfo
-	rsAPI              api.RoomserverInternalAPI
-	client             *gomatrixserverlib.FederationClient // federation client
-	origin             gomatrixserverlib.ServerName        // origin of requests
-	destination        gomatrixserverlib.ServerName        // destination of requests
-	running            atomic.Bool                         // is the queue worker running?
-	backingOff         atomic.Bool                         // true if we're backing off
-	overflowed         atomic.Bool                         // the queues exceed maxPDUsInMemory/maxEDUsInMemory, so we should consult the database for more
-	statistics         *statistics.ServerStatistics        // statistics about this remote server
-	transactionIDMutex sync.Mutex                          // protects transactionID
-	transactionID      gomatrixserverlib.TransactionID     // last transaction ID if retrying, or "" if last txn was successful
-	notify             chan struct{}                       // interrupts idle wait pending PDUs/EDUs
-	pendingPDUs        []*queuedPDU                        // PDUs waiting to be sent
-	pendingEDUs        []*queuedEDU                        // EDUs waiting to be sent
-	pendingMutex       sync.RWMutex                        // protects pendingPDUs and pendingEDUs
-	interruptBackoff   chan bool                           // interrupts backoff
+	db                  storage.Database
+	signing             *SigningInfo
+	rsAPI               api.RoomserverInternalAPI
+	client              *gomatrixserverlib.FederationClient // federation client
+	origin              gomatrixserverlib.ServerName        // origin of requests
+	destination         gomatrixserverlib.ServerName        // destination of requests
+	running             atomic.Bool                         // is the queue worker running?
+	backingOff          atomic.Bool                         // true if we're backing off
+	overflowed          atomic.Bool                         // the queues exceed maxPDUsInMemory/maxEDUsInMemory, so we should consult the database for more
+	transactionID       gomatrixserverlib.TransactionID     // the ID to commit to the database with
+	transactionIDMutex  sync.RWMutex                        // protects transactionID
+	transactionPDUCount atomic.Int32                        // how many PDUs in database transaction?
+	transactionEDUCount atomic.Int32                        // how many EDUs in database transaction?
+	statistics          *statistics.ServerStatistics        // statistics about this remote server
+	notify              chan struct{}                       // interrupts idle wait pending PDUs/EDUs
+	pendingTransactions queuedTransactions                  // transactions waiting to be sent
+	pendingMutex        sync.RWMutex                        // protects pendingTransactions
+	interruptBackoff    chan bool                           // interrupts backoff
 }
 
 // Send event adds the event to the pending queue for the destination.
@@ -72,39 +69,55 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		log.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return
 	}
+
+	// Try to queue the PDU up in memory. If there was enough free
+	// space then we'll get a transaction ID back.
+	oq.pendingMutex.Lock()
+	transactionID := oq.pendingTransactions.queuePDUs(receipt, event)
+	oq.pendingMutex.Unlock()
+
+	// Check if we got a transaction ID back.
+	if transactionID == "" {
+		// If we hit this point then we weren't able to fit the event
+		// into the memory cache, therefore we need to generate a new
+		// transaction ID to commit to the database. If we don't have
+		// a transaction ID for the database, or we've exceeded the
+		// number of PDUs we can fit in the last one, generate a new
+		// one.
+		oq.transactionIDMutex.Lock()
+		if oq.transactionID == "" || oq.transactionPDUCount.Load() > maxPDUsPerTransaction {
+			now := gomatrixserverlib.AsTimestamp(time.Now())
+			oq.transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.statistics.SuccessCount()))
+			oq.transactionPDUCount.Store(0)
+			oq.transactionEDUCount.Store(0)
+			transactionID = oq.transactionID
+		}
+		oq.transactionIDMutex.Unlock()
+		oq.overflowed.Store(true)
+	}
+
 	// Create a database entry that associates the given PDU NID with
 	// this destination queue. We'll then be able to retrieve the PDU
 	// later.
 	if err := oq.db.AssociatePDUWithDestination(
 		context.TODO(),
-		"",             // TODO: remove this, as we don't need to persist the transaction ID
+		transactionID,  // the transaction ID
 		oq.destination, // the destination server name
 		receipt,        // NIDs from federationsender_queue_json table
 	); err != nil {
 		log.WithError(err).Errorf("failed to associate PDU %q with destination %q", event.EventID(), oq.destination)
 		return
 	}
-	// Check if the destination is blacklisted. If it isn't then wake
-	// up the queue.
-	if !oq.statistics.Blacklisted() {
-		// If there's room in memory to hold the event then add it to the
-		// list.
-		oq.pendingMutex.Lock()
-		if len(oq.pendingPDUs) < maxPDUsInMemory {
-			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
-				pdu:     event,
-				receipt: receipt,
-			})
-		} else {
-			oq.overflowed.Store(true)
-		}
-		oq.pendingMutex.Unlock()
-		// Wake up the queue if it's asleep.
-		oq.wakeQueueIfNeeded()
-		select {
-		case oq.notify <- struct{}{}:
-		default:
-		}
+
+	// We've successfully added a PDU to the transaction so increase
+	// the counter.
+	oq.transactionPDUCount.Add(1)
+
+	// Wake up the queue.
+	oq.wakeQueueIfNeeded()
+	select {
+	case oq.notify <- struct{}{}:
+	default:
 	}
 }
 
@@ -116,38 +129,57 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		log.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
 	}
-	// Create a database entry that associates the given PDU NID with
-	// this destination queue. We'll then be able to retrieve the PDU
+
+	// Try to queue the PDU up in memory. If there was enough free
+	// space then we'll get a transaction ID back.
+	oq.pendingMutex.Lock()
+	transactionID := oq.pendingTransactions.queueEDUs(receipt, event)
+	oq.pendingMutex.Unlock()
+
+	// Check if we got a transaction ID back.
+	if transactionID == "" {
+		// If we hit this point then we weren't able to fit the event
+		// into the memory cache, therefore we need to generate a new
+		// transaction ID to commit to the database. If we don't have
+		// a transaction ID for the database, or we've exceeded the
+		// number of PDUs we can fit in the last one, generate a new
+		// one.
+		/*
+			oq.transactionIDMutex.Lock()
+			if oq.transactionID == "" || oq.transactionPDUCount.Load() > maxPDUsPerTransaction {
+				now := gomatrixserverlib.AsTimestamp(time.Now())
+				oq.transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, oq.statistics.SuccessCount()))
+				oq.transactionPDUCount.Store(0)
+				oq.transactionEDUCount.Store(0)
+				transactionID = oq.transactionID
+			}
+			oq.transactionIDMutex.Unlock()
+		*/
+		oq.overflowed.Store(true)
+	}
+
+	// Create a database entry that associates the given EDU NID with
+	// this destination queue. We'll then be able to retrieve the EDU
 	// later.
 	if err := oq.db.AssociateEDUWithDestination(
 		context.TODO(),
+		//transactionID,  // the transaction ID
 		oq.destination, // the destination server name
 		receipt,        // NIDs from federationsender_queue_json table
 	); err != nil {
 		log.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
 		return
 	}
-	// Check if the destination is blacklisted. If it isn't then wake
-	// up the queue.
-	if !oq.statistics.Blacklisted() {
-		// If there's room in memory to hold the event then add it to the
-		// list.
-		oq.pendingMutex.Lock()
-		if len(oq.pendingEDUs) < maxEDUsInMemory {
-			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
-				edu:     event,
-				receipt: receipt,
-			})
-		} else {
-			oq.overflowed.Store(true)
-		}
-		oq.pendingMutex.Unlock()
-		// Wake up the queue if it's asleep.
-		oq.wakeQueueIfNeeded()
-		select {
-		case oq.notify <- struct{}{}:
-		default:
-		}
+
+	// We've successfully added a PDU to the transaction so increase
+	// the counter.
+	oq.transactionEDUCount.Add(1)
+
+	// Wake up the queue.
+	oq.wakeQueueIfNeeded()
+	select {
+	case oq.notify <- struct{}{}:
+	default:
 	}
 }
 
@@ -167,66 +199,33 @@ func (oq *destinationQueue) wakeQueueIfNeeded() {
 	}
 }
 
-// getPendingFromDatabase will look at the database and see if
-// there are any persisted events that haven't been sent to this
+// getNextTransactionFromDatabase will look at the database and see
+// if there are any persisted events that haven't been sent to this
 // destination yet. If so, they will be queued up.
 // nolint:gocyclo
-func (oq *destinationQueue) getPendingFromDatabase() {
+func (oq *destinationQueue) getNextTransactionFromDatabase() {
 	// Check to see if there's anything to do for this server
 	// in the database.
-	retrieved := false
 	ctx := context.Background()
 	oq.pendingMutex.Lock()
 	defer oq.pendingMutex.Unlock()
 
-	// Take a note of all of the PDUs and EDUs that we already
-	// have cached. We will index them based on the receipt,
-	// which ultimately just contains the index of the PDU/EDU
-	// in the database.
-	gotPDUs := map[string]struct{}{}
-	gotEDUs := map[string]struct{}{}
-	for _, pdu := range oq.pendingPDUs {
-		gotPDUs[pdu.receipt.String()] = struct{}{}
-	}
-	for _, edu := range oq.pendingEDUs {
-		gotEDUs[edu.receipt.String()] = struct{}{}
+	transactionID, pdus, pduReceipt, err := oq.db.GetNextTransactionPDUs(ctx, oq.destination, maxPDUsPerTransaction)
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to get pending PDUs for %q", oq.destination)
 	}
 
-	if pduCapacity := maxPDUsInMemory - len(oq.pendingPDUs); pduCapacity > 0 {
-		// We have room in memory for some PDUs - let's request no more than that.
-		if pdus, err := oq.db.GetPendingPDUs(ctx, oq.destination, pduCapacity); err == nil {
-			for receipt, pdu := range pdus {
-				if _, ok := gotPDUs[receipt.String()]; ok {
-					continue
-				}
-				oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{receipt, pdu})
-				retrieved = true
-			}
-		} else {
-			logrus.WithError(err).Errorf("Failed to get pending PDUs for %q", oq.destination)
-		}
+	edus, eduReceipt, err := oq.db.GetNextTransactionEDUs(ctx, oq.destination, maxEDUsPerTransaction)
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to get pending EDUs for %q", oq.destination)
 	}
-	if eduCapacity := maxEDUsInMemory - len(oq.pendingEDUs); eduCapacity > 0 {
-		// We have room in memory for some EDUs - let's request no more than that.
-		if edus, err := oq.db.GetPendingEDUs(ctx, oq.destination, eduCapacity); err == nil {
-			for receipt, edu := range edus {
-				if _, ok := gotEDUs[receipt.String()]; ok {
-					continue
-				}
-				oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{receipt, edu})
-				retrieved = true
-			}
-		} else {
-			logrus.WithError(err).Errorf("Failed to get pending EDUs for %q", oq.destination)
-		}
-	}
-	// If we've retrieved all of the events from the database with room to spare
-	// in memory then we'll no longer consider this queue to be overflowed.
-	if len(oq.pendingPDUs) < maxPDUsInMemory && len(oq.pendingEDUs) < maxEDUsInMemory {
-		oq.overflowed.Store(false)
-	}
+
+	oq.pendingTransactions.createNew(transactionID)
+	oq.pendingTransactions.queuePDUs(pduReceipt, pdus...)
+	oq.pendingTransactions.queueEDUs(eduReceipt, edus...)
+
 	// If we've retrieved some events then notify the destination queue goroutine.
-	if retrieved {
+	if len(pdus) > 0 || len(edus) > 0 {
 		select {
 		case oq.notify <- struct{}{}:
 		default:
@@ -252,7 +251,7 @@ func (oq *destinationQueue) backgroundSend() {
 		// If we are overflowing memory and have sent things out to the
 		// database then we can look up what those things are.
 		if oq.overflowed.Load() {
-			oq.getPendingFromDatabase()
+			oq.getNextTransactionFromDatabase()
 		}
 
 		// If we have nothing to do then wait either for incoming events, or
@@ -279,14 +278,10 @@ func (oq *destinationQueue) backgroundSend() {
 			// buffers at this point. The PDU clean-up is already on a defer.
 			log.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
 			oq.pendingMutex.Lock()
-			for i := range oq.pendingPDUs {
-				oq.pendingPDUs[i] = nil
+			for i := range oq.pendingTransactions.queue {
+				oq.pendingTransactions.queue[i] = nil
 			}
-			for i := range oq.pendingEDUs {
-				oq.pendingEDUs[i] = nil
-			}
-			oq.pendingPDUs = nil
-			oq.pendingEDUs = nil
+			oq.pendingTransactions.queue = nil
 			oq.pendingMutex.Lock()
 			return
 		}
@@ -303,21 +298,15 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// Work out which PDUs/EDUs to include in the next transaction.
 		oq.pendingMutex.RLock()
-		pduCount := len(oq.pendingPDUs)
-		eduCount := len(oq.pendingEDUs)
-		if pduCount > maxPDUsPerTransaction {
-			pduCount = maxPDUsPerTransaction
+		if len(oq.pendingTransactions.queue) == 0 {
+			continue
 		}
-		if eduCount > maxEDUsPerTransaction {
-			eduCount = maxEDUsPerTransaction
-		}
-		toSendPDUs := oq.pendingPDUs[:pduCount]
-		toSendEDUs := oq.pendingEDUs[:eduCount]
+		next := oq.pendingTransactions.queue[0]
 		oq.pendingMutex.RUnlock()
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		// Try sending the next transaction and see what happens.
-		transaction, pc, ec, terr := oq.nextTransaction(toSendPDUs, toSendEDUs)
+		transaction, _, _, terr := oq.nextTransaction(next)
 		if terr != nil {
 			// We failed to send the transaction. Mark it as a failure.
 			oq.statistics.Failure()
@@ -327,14 +316,13 @@ func (oq *destinationQueue) backgroundSend() {
 			// the pending events and EDUs, and wipe our transaction ID.
 			oq.statistics.Success()
 			oq.pendingMutex.Lock()
-			for i := range oq.pendingPDUs[:pc] {
-				oq.pendingPDUs[i] = nil
+			for i := range next.pdus {
+				next.pdus[i] = nil
 			}
-			for i := range oq.pendingEDUs[:ec] {
-				oq.pendingEDUs[i] = nil
+			for i := range next.edus {
+				next.edus[i] = nil
 			}
-			oq.pendingPDUs = oq.pendingPDUs[pc:]
-			oq.pendingEDUs = oq.pendingEDUs[ec:]
+			oq.pendingTransactions.queue = oq.pendingTransactions.queue[1:]
 			oq.pendingMutex.Unlock()
 		}
 	}
@@ -344,10 +332,7 @@ func (oq *destinationQueue) backgroundSend() {
 // queue and sends it. Returns true if a transaction was sent or
 // false otherwise.
 // nolint:gocyclo
-func (oq *destinationQueue) nextTransaction(
-	pdus []*queuedPDU,
-	edus []*queuedEDU,
-) (bool, int, int, error) {
+func (oq *destinationQueue) nextTransaction(transaction *queuedTransaction) (bool, int, int, error) {
 	// If there's no projected transaction ID then generate one. If
 	// the transaction succeeds then we'll set it back to "" so that
 	// we generate a new one next time. If it fails, we'll preserve
@@ -371,32 +356,27 @@ func (oq *destinationQueue) nextTransaction(
 
 	// If we didn't get anything from the database and there are no
 	// pending EDUs then there's nothing to do - stop here.
-	if len(pdus) == 0 && len(edus) == 0 {
+	if len(transaction.pdus) == 0 && len(transaction.edus) == 0 {
 		return false, 0, 0, nil
 	}
 
-	var pduReceipts []*shared.Receipt
-	var eduReceipts []*shared.Receipt
-
 	// Go through PDUs that we retrieved from the database, if any,
 	// and add them into the transaction.
-	for _, pdu := range pdus {
-		if pdu == nil || pdu.pdu == nil {
+	for _, pdu := range transaction.pdus {
+		if pdu == nil {
 			continue
 		}
 		// Append the JSON of the event, since this is a json.RawMessage type in the
 		// gomatrixserverlib.Transaction struct
-		t.PDUs = append(t.PDUs, pdu.pdu.JSON())
-		pduReceipts = append(pduReceipts, pdu.receipt)
+		t.PDUs = append(t.PDUs, pdu.JSON())
 	}
 
 	// Do the same for pending EDUS in the queue.
-	for _, edu := range edus {
-		if edu == nil || edu.edu == nil {
+	for _, edu := range transaction.edus {
+		if edu == nil {
 			continue
 		}
-		t.EDUs = append(t.EDUs, *edu.edu)
-		eduReceipts = append(eduReceipts, edu.receipt)
+		t.EDUs = append(t.EDUs, *edu)
 	}
 
 	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
@@ -411,15 +391,15 @@ func (oq *destinationQueue) nextTransaction(
 	switch err.(type) {
 	case nil:
 		// Clean up the transaction in the database.
-		if pduReceipts != nil {
+		for _, receipt := range transaction.pduReceipts {
 			//logrus.Infof("Cleaning PDUs %q", pduReceipt.String())
-			if err = oq.db.CleanPDUs(context.Background(), oq.destination, pduReceipts); err != nil {
+			if err = oq.db.CleanPDUs(context.Background(), oq.destination, receipt); err != nil {
 				log.WithError(err).Errorf("Failed to clean PDUs for server %q", t.Destination)
 			}
 		}
-		if eduReceipts != nil {
+		for _, receipt := range transaction.eduReceipts {
 			//logrus.Infof("Cleaning EDUs %q", eduReceipt.String())
-			if err = oq.db.CleanEDUs(context.Background(), oq.destination, eduReceipts); err != nil {
+			if err = oq.db.CleanEDUs(context.Background(), oq.destination, receipt); err != nil {
 				log.WithError(err).Errorf("Failed to clean EDUs for server %q", t.Destination)
 			}
 		}
