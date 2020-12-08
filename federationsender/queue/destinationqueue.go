@@ -287,7 +287,7 @@ func (oq *destinationQueue) backgroundSend() {
 			}
 			oq.pendingPDUs = nil
 			oq.pendingEDUs = nil
-			oq.pendingMutex.Lock()
+			oq.pendingMutex.Unlock()
 			return
 		}
 		if until != nil && until.After(time.Now()) {
