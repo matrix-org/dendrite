@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -514,25 +515,28 @@ func (d *Database) addPDUDeltaToResponse(
 		deltas, joinedRoomIDs, err = d.getStateDeltas(
 			ctx, &device, txn, r, device.UserID, &stateFilter,
 		)
+		if err != nil {
+			return nil, fmt.Errorf("d.getStateDeltas: %w", err)
+		}
 	} else {
 		deltas, joinedRoomIDs, err = d.getStateDeltasForFullStateSync(
 			ctx, &device, txn, r, device.UserID, &stateFilter,
 		)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, fmt.Errorf("d.getStateDeltasForFullStateSync: %w", err)
+		}
 	}
 
 	for _, delta := range deltas {
 		err = d.addRoomDeltaToResponse(ctx, &device, txn, r, delta, numRecentEventsPerRoom, res)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("d.addRoomDeltaToResponse: %w", err)
 		}
 	}
 
 	// TODO: This should be done in getStateDeltas
 	if err = d.addInvitesToResponse(ctx, txn, device.UserID, r, res); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("d.addInvitesToResponse: %w", err)
 	}
 
 	succeeded = true
@@ -1126,7 +1130,8 @@ func (d *Database) fetchMissingStateEvents(
 		return nil, err
 	}
 	if len(stateEvents) != len(missing) {
-		return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
+		logrus.WithContext(ctx).Warnf("Failed to map all event IDs to events (got %d, wanted %d)", len(stateEvents), len(missing))
+		//return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
 	}
 	events = append(events, stateEvents...)
 	return events, nil
