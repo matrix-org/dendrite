@@ -1,5 +1,20 @@
 # Changelog
 
+## Dendrite 0.3.3 (2020-12-09)
+
+### Features
+
+* Federation sender should now use considerably less CPU cycles and RAM when sending events into large rooms
+* The roomserver now uses considerably less CPU cycles by not calculating event IDs so often
+* Experimental support for [MSC2836](https://github.com/matrix-org/matrix-doc/pull/2836) (threading) has been merged
+* Dendrite will no longer hold federation HTTP connections open unnecessarily, which should help to reduce ambient CPU/RAM usage and hold fewer long-term file descriptors
+
+### Fixes
+
+* A bug in the latest event updater has been fixed, which should prevent the roomserver from losing forward extremities in some rare cases
+* A panic has been fixed when federation is disabled (contributed by [kraem](https://github.com/kraem))
+* The response format of the `/joined_members` endpoint has been fixed (contributed by [alexkursell](https://github.com/alexkursell))
+
 ## Dendrite 0.3.2 (2020-12-02)
 
 ### Features
