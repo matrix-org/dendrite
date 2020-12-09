@@ -285,15 +285,15 @@ func (u *latestEventsUpdater) calculateLatest(
 	// then do nothing - it's not a candidate to be a new extremity if
 	// it has been referenced.
 	if _, ok := existingPrevs[newEvent.EventID()]; ok {
+		u.latest = oldLatest
 		return false, nil
 	}
 
 	// If the "new" event is already a forward extremity then stop, as
 	// nothing changes.
-	for _, event := range events {
-		if event.EventID() == newEvent.EventID() {
-			return false, nil
-		}
+	if _, ok := existingRefs[newEvent.EventID()]; ok {
+		u.latest = oldLatest
+		return false, nil
 	}
 
 	// Include our new event in the extremities.
