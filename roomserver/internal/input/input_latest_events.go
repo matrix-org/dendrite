@@ -290,10 +290,8 @@ func (u *latestEventsUpdater) calculateLatest(
 
 	// If the "new" event is already a forward extremity then stop, as
 	// nothing changes.
-	for _, event := range events {
-		if event.EventID() == newEvent.EventID() {
-			return false, nil
-		}
+	if _, ok := existingRefs[newEvent.EventID()]; ok {
+		return false, nil
 	}
 
 	// Include our new event in the extremities.
@@ -303,14 +301,6 @@ func (u *latestEventsUpdater) calculateLatest(
 	// If our new event references them then they are no longer good
 	// candidates.
 	for _, prevEventID := range newEvent.PrevEventIDs() {
-		delete(existingRefs, prevEventID)
-	}
-
-	// Ensure that we don't add any candidate forward extremities from
-	// the old set that are, themselves, referenced by the old set of
-	// forward extremities. This shouldn't happen but guards against
-	// the possibility anyway.
-	for prevEventID := range existingPrevs {
 		delete(existingRefs, prevEventID)
 	}
 
