@@ -306,6 +306,14 @@ func (u *latestEventsUpdater) calculateLatest(
 		delete(existingRefs, prevEventID)
 	}
 
+	// Ensure that we don't add any candidate forward extremities from
+	// the old set that are, themselves, referenced by the old set of
+	// forward extremities. This shouldn't happen but guards against
+	// the possibility anyway.
+	for prevEventID := range existingPrevs {
+		delete(existingRefs, prevEventID)
+	}
+
 	// Then re-add any old extremities that are still valid after all.
 	for _, old := range existingRefs {
 		newLatest = append(newLatest, *old)
