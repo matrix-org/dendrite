@@ -253,26 +253,19 @@ func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
 		return
 	}
 	parts := strings.Split(tok[1:], "_")
-	if len(parts) < 3 {
-		err = fmt.Errorf("topology token must have 3 positions")
-		return
-	}
-	depth, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return
-	}
-	pduPos, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return
-	}
-	receiptPos, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return
+	var positions [3]StreamPosition
+	for i, p := range parts {
+		if i > len(positions) {
+			break
+		}
+		if pos, perr := strconv.Atoi(p); perr == nil {
+			positions[i] = StreamPosition(pos)
+		}
 	}
 	token = TopologyToken{
-		Depth:           StreamPosition(depth),
-		PDUPosition:     StreamPosition(pduPos),
-		ReceiptPosition: StreamPosition(receiptPos),
+		Depth:           positions[0],
+		PDUPosition:     positions[1],
+		ReceiptPosition: positions[2],
 	}
 	return
 }
@@ -301,31 +294,20 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	}
 	categories := strings.Split(tok[1:], ".")
 	parts := strings.Split(categories[0], "_")
-	if len(parts) < 4 {
-		err = fmt.Errorf("stream token must have 4 positions")
-		return
-	}
-	pduPos, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return
-	}
-	typingPos, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return
-	}
-	receiptPos, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return
-	}
-	sendToDevicePos, err := strconv.Atoi(parts[3])
-	if err != nil {
-		return
+	var positions [4]StreamPosition
+	for i, p := range parts {
+		if i > len(positions) {
+			break
+		}
+		if pos, perr := strconv.Atoi(p); perr == nil {
+			positions[i] = StreamPosition(pos)
+		}
 	}
 	token = StreamingToken{
-		PDUPosition:          StreamPosition(pduPos),
-		TypingPosition:       StreamPosition(typingPos),
-		ReceiptPosition:      StreamPosition(receiptPos),
-		SendToDevicePosition: StreamPosition(sendToDevicePos),
+		PDUPosition:          positions[0],
+		TypingPosition:       positions[1],
+		ReceiptPosition:      positions[2],
+		SendToDevicePosition: positions[3],
 		logs:                 make(map[string]*LogPosition),
 	}
 	// dl-0-1234
