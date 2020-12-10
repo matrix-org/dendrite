@@ -32,11 +32,11 @@ var (
 	randomMessageEvent  gomatrixserverlib.HeaderedEvent
 	aliceInviteBobEvent gomatrixserverlib.HeaderedEvent
 	bobLeaveEvent       gomatrixserverlib.HeaderedEvent
-	syncPositionVeryOld = types.NewStreamToken(5, 0, 0, 0, nil)
-	syncPositionBefore  = types.NewStreamToken(11, 0, 0, 0, nil)
-	syncPositionAfter   = types.NewStreamToken(12, 0, 0, 0, nil)
+	syncPositionVeryOld = types.StreamingToken{PDUPosition: 5}
+	syncPositionBefore  = types.StreamingToken{PDUPosition: 11}
+	syncPositionAfter   = types.StreamingToken{PDUPosition: 12}
 	//syncPositionNewEDU  = types.NewStreamToken(syncPositionAfter.PDUPosition, 1, 0, 0, nil)
-	syncPositionAfter2 = types.NewStreamToken(13, 0, 0, 0, nil)
+	syncPositionAfter2 = types.StreamingToken{PDUPosition: 13}
 )
 
 var (

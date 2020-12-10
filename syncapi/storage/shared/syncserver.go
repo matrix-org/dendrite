@@ -440,9 +440,9 @@ func (d *Database) MaxTopologicalPosition(
 ) (types.TopologyToken, error) {
 	depth, streamPos, err := d.Topology.SelectMaxPositionInTopology(ctx, nil, roomID)
 	if err != nil {
-		return types.NewTopologyToken(0, 0), err
+		return types.TopologyToken{}, err
 	}
-	return types.NewTopologyToken(depth, streamPos), nil
+	return types.TopologyToken{Depth: depth, PDUPosition: streamPos}, nil
 }
 
 func (d *Database) EventPositionInTopology(
@@ -450,9 +450,9 @@ func (d *Database) EventPositionInTopology(
 ) (types.TopologyToken, error) {
 	depth, stream, err := d.Topology.SelectPositionInTopology(ctx, nil, eventID)
 	if err != nil {
-		return types.NewTopologyToken(0, 0), err
+		return types.TopologyToken{}, err
 	}
-	return types.NewTopologyToken(depth, stream), nil
+	return types.TopologyToken{Depth: depth, PDUPosition: stream}, nil
 }
 
 func (d *Database) syncPositionTx(
@@ -484,13 +484,10 @@ func (d *Database) syncPositionTx(
 		maxEventID = maxPeekID
 	}
 	// TODO: complete these positions
-	sp = types.NewStreamToken(
-		types.StreamPosition(maxEventID),
-		types.StreamPosition(d.EDUCache.GetLatestSyncPosition()),
-		0,
-		0,
-		nil,
-	)
+	sp = types.StreamingToken{
+		PDUPosition:    types.StreamPosition(maxEventID),
+		TypingPosition: types.StreamPosition(d.EDUCache.GetLatestSyncPosition()),
+	}
 	return
 }
 
@@ -889,7 +886,10 @@ func (d *Database) getJoinResponseForCompleteSync(
 		if err != nil {
 			return
 		}
-		prevBatch := types.NewTopologyToken(backwardTopologyPos, backwardStreamPos)
+		prevBatch := types.TopologyToken{
+			Depth:       backwardTopologyPos,
+			PDUPosition: backwardStreamPos,
+		}
 		prevBatch.Decrement()
 		prevBatchStr = prevBatch.String()
 	}
@@ -922,7 +922,7 @@ func (d *Database) CompleteSync(
 
 	// Use a zero value SyncPosition for fromPos so all EDU states are added.
 	err = d.addEDUDeltaToResponse(
-		types.NewStreamToken(0, 0, 0, 0, nil), toPos, joinedRoomIDs, res,
+		types.StreamingToken{}, toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("d.addEDUDeltaToResponse: %w", err)
@@ -972,7 +972,7 @@ func (d *Database) getBackwardTopologyPos(
 	ctx context.Context, txn *sql.Tx,
 	events []types.StreamEvent,
 ) (types.TopologyToken, error) {
-	zeroToken := types.NewTopologyToken(0, 0)
+	zeroToken := types.TopologyToken{}
 	if len(events) == 0 {
 		return zeroToken, nil
 	}
@@ -980,7 +980,7 @@ func (d *Database) getBackwardTopologyPos(
 	if err != nil {
 		return zeroToken, err
 	}
-	tok := types.NewTopologyToken(pos, spos)
+	tok := types.TopologyToken{Depth: pos, PDUPosition: spos}
 	tok.Decrement()
 	return tok, nil
 }

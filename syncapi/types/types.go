@@ -206,7 +206,9 @@ type TopologyToken struct {
 }
 
 func (t *TopologyToken) StreamToken() StreamingToken {
-	return NewStreamToken(t.PDUPosition, 0, 0, 0, nil)
+	return StreamingToken{
+		PDUPosition: t.PDUPosition,
+	}
 }
 
 func (t TopologyToken) String() string {
@@ -233,17 +235,6 @@ func (t *TopologyToken) Decrement() {
 	}
 	t.Depth = depth
 	t.PDUPosition = pduPos
-}
-
-// NewTopologyToken creates a new sync token for /messages
-func NewTopologyToken(depth, pduPos StreamPosition) TopologyToken {
-	if depth < 0 {
-		depth = 1
-	}
-	return TopologyToken{
-		Depth:       depth,
-		PDUPosition: pduPos,
-	}
 }
 
 func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
@@ -273,23 +264,6 @@ func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
 		PDUPosition: positions[1],
 	}
 	return
-}
-
-// NewStreamToken creates a new sync token for /sync
-func NewStreamToken(
-	pduPos, typingPos, receiptPos, sendToDevicePos StreamPosition,
-	logs map[string]*LogPosition,
-) StreamingToken {
-	if logs == nil {
-		logs = make(map[string]*LogPosition)
-	}
-	return StreamingToken{
-		PDUPosition:          pduPos,
-		TypingPosition:       typingPos,
-		ReceiptPosition:      receiptPos,
-		SendToDevicePosition: sendToDevicePos,
-		logs:                 logs,
-	}
 }
 
 func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
