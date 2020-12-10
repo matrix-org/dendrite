@@ -74,7 +74,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	}
 	d.Database = shared.Database{
 		DB:                            d.db,
-    Cache:                         cache,
+		Cache:                         cache,
 		Writer:                        d.writer,
 		FederationSenderJoinedHosts:   joinedHosts,
 		FederationSenderQueuePDUs:     queuePDUs,

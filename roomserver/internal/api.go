@@ -99,7 +99,7 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 	r.InboundPeeker = &perform.InboundPeeker{
 		DB:      r.DB,
 		Inputer: r.Inputer,
-  }
+	}
 	r.Unpeeker = &perform.Unpeeker{
 		ServerName: r.Cfg.Matrix.ServerName,
 		Cfg:        r.Cfg,

@@ -27,13 +27,13 @@ const (
 	// Perform operations
 	RoomserverPerformInvitePath      = "/roomserver/performInvite"
 	RoomserverPerformPeekPath        = "/roomserver/performPeek"
-  RoomserverPerformUnpeekPath      = "/roomserver/performUnpeek"
+	RoomserverPerformUnpeekPath      = "/roomserver/performUnpeek"
 	RoomserverPerformJoinPath        = "/roomserver/performJoin"
 	RoomserverPerformLeavePath       = "/roomserver/performLeave"
 	RoomserverPerformBackfillPath    = "/roomserver/performBackfill"
 	RoomserverPerformPublishPath     = "/roomserver/performPublish"
 	RoomserverPerformInboundPeekPath = "/roomserver/performInboundPeek"
-  RoomserverPerformForgetPath   = "/roomserver/performForget"
+	RoomserverPerformForgetPath      = "/roomserver/performForget"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
