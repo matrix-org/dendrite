@@ -275,6 +275,14 @@ type QueryPublishedRoomsResponse struct {
 	RoomIDs []string
 }
 
+type QueryAuthChainRequest struct {
+	EventIDs []string
+}
+
+type QueryAuthChainResponse struct {
+	AuthChain []*gomatrixserverlib.HeaderedEvent
+}
+
 type QuerySharedUsersRequest struct {
 	UserID         string
 	ExcludeRoomIDs []string

@@ -16,15 +16,18 @@
 package mscs
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
+	"github.com/matrix-org/util"
 )
 
 // Enable MSCs - returns an error on unknown MSCs
 func Enable(base *setup.BaseDendrite, monolith *setup.Monolith) error {
 	for _, msc := range base.Cfg.MSCs.MSCs {
+		util.GetLogger(context.Background()).WithField("msc", msc).Info("Enabling MSC")
 		if err := EnableMSC(base, monolith, msc); err != nil {
 			return err
 		}

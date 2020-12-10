@@ -56,20 +56,20 @@ const insertEventSQL = "" +
 	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = $13"
 
 const selectEventsSQL = "" +
-	"SELECT id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
 
 const selectRecentEventsSQL = "" +
-	"SELECT id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC LIMIT $4"
 
 const selectRecentEventsForSyncSQL = "" +
-	"SELECT id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
 	" ORDER BY id DESC LIMIT $4"
 
 const selectEarlyEventsSQL = "" +
-	"SELECT id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id ASC LIMIT $4"
 
@@ -428,6 +428,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 	var result []types.StreamEvent
 	for rows.Next() {
 		var (
+			eventID         string
 			streamPos       types.StreamPosition
 			eventBytes      []byte
 			excludeFromSync bool
@@ -435,12 +436,12 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			txnID           *string
 			transactionID   *api.TransactionID
 		)
-		if err := rows.Scan(&streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID); err != nil {
+		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID); err != nil {
 			return nil, err
 		}
 		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
-		if err := json.Unmarshal(eventBytes, &ev); err != nil {
+		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
 			return nil, err
 		}
 

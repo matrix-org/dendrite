@@ -501,6 +501,5 @@ Can get rooms/{roomId}/state for a departed room (SPEC-216)
 Users cannot set notifications powerlevel higher than their own
 Forgetting room does not show up in v2 /sync
 Can forget room you've been kicked from
-Can re-join room if re-invited
 /whois
 /joined_members return joined members

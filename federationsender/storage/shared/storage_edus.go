@@ -33,16 +33,14 @@ func (d *Database) AssociateEDUWithDestination(
 	receipt *Receipt,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		for _, nid := range receipt.nids {
-			if err := d.FederationSenderQueueEDUs.InsertQueueEDU(
-				ctx,        // context
-				txn,        // SQL transaction
-				"",         // TODO: EDU type for coalescing
-				serverName, // destination server name
-				nid,        // NID from the federationsender_queue_json table
-			); err != nil {
-				return fmt.Errorf("InsertQueueEDU: %w", err)
-			}
+		if err := d.FederationSenderQueueEDUs.InsertQueueEDU(
+			ctx,         // context
+			txn,         // SQL transaction
+			"",          // TODO: EDU type for coalescing
+			serverName,  // destination server name
+			receipt.nid, // NID from the federationsender_queue_json table
+		); err != nil {
+			return fmt.Errorf("InsertQueueEDU: %w", err)
 		}
 		return nil
 	})
@@ -50,36 +48,41 @@ func (d *Database) AssociateEDUWithDestination(
 
 // GetNextTransactionEDUs retrieves events from the database for
 // the next pending transaction, up to the limit specified.
-func (d *Database) GetNextTransactionEDUs(
+func (d *Database) GetPendingEDUs(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 	limit int,
 ) (
-	edus []*gomatrixserverlib.EDU,
-	receipt *Receipt,
+	edus map[*Receipt]*gomatrixserverlib.EDU,
 	err error,
 ) {
+	edus = make(map[*Receipt]*gomatrixserverlib.EDU)
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		nids, err := d.FederationSenderQueueEDUs.SelectQueueEDUs(ctx, txn, serverName, limit)
 		if err != nil {
 			return fmt.Errorf("SelectQueueEDUs: %w", err)
 		}
 
-		receipt = &Receipt{
-			nids: nids,
+		retrieve := make([]int64, 0, len(nids))
+		for _, nid := range nids {
+			if edu, ok := d.Cache.GetFederationSenderQueuedEDU(nid); ok {
+				edus[&Receipt{nid}] = edu
+			} else {
+				retrieve = append(retrieve, nid)
+			}
 		}
 
-		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, nids)
+		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
 		if err != nil {
 			return fmt.Errorf("SelectQueueJSON: %w", err)
 		}
 
-		for _, blob := range blobs {
+		for nid, blob := range blobs {
 			var event gomatrixserverlib.EDU
 			if err := json.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
-			edus = append(edus, &event)
+			edus[&Receipt{nid}] = &event
 		}
 
 		return nil
@@ -92,25 +95,31 @@ func (d *Database) GetNextTransactionEDUs(
 func (d *Database) CleanEDUs(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
-	receipt *Receipt,
+	receipts []*Receipt,
 ) error {
-	if receipt == nil {
+	if len(receipts) == 0 {
 		return errors.New("expected receipt")
 	}
 
+	nids := make([]int64, len(receipts))
+	for i := range receipts {
+		nids[i] = receipts[i].nid
+	}
+
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationSenderQueueEDUs.DeleteQueueEDUs(ctx, txn, serverName, receipt.nids); err != nil {
+		if err := d.FederationSenderQueueEDUs.DeleteQueueEDUs(ctx, txn, serverName, nids); err != nil {
 			return err
 		}
 
 		var deleteNIDs []int64
-		for _, nid := range receipt.nids {
+		for _, nid := range nids {
 			count, err := d.FederationSenderQueueEDUs.SelectQueueEDUReferenceJSONCount(ctx, txn, nid)
 			if err != nil {
 				return fmt.Errorf("SelectQueueEDUReferenceJSONCount: %w", err)
 			}
 			if count == 0 {
 				deleteNIDs = append(deleteNIDs, nid)
+				d.Cache.EvictFederationSenderQueuedEDU(nid)
 			}
 		}
 

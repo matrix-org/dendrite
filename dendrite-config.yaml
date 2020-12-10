@@ -89,7 +89,7 @@ global:
     # Naffka database options. Not required when using Kafka.
     naffka_database:
       connection_string: file:naffka.db
-      max_open_conns: 100
+      max_open_conns: 10
       max_idle_conns: 2
       conn_max_lifetime: -1
 
@@ -110,7 +110,7 @@ app_service_api:
     connect: http://localhost:7777
   database:
     connection_string: file:appservice.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -185,7 +185,7 @@ federation_sender:
     connect: http://localhost:7775
   database:
     connection_string: file:federationsender.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -211,7 +211,7 @@ key_server:
     connect: http://localhost:7779
   database:
     connection_string: file:keyserver.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -224,7 +224,7 @@ media_api:
     listen: http://[::]:8074
   database:
     connection_string: file:mediaapi.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -260,7 +260,7 @@ room_server:
     connect: http://localhost:7770
   database:
     connection_string: file:roomserver.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -271,7 +271,7 @@ signing_key_server:
     connect: http://localhost:7780
   database:
     connection_string: file:signingkeyserver.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -300,7 +300,7 @@ sync_api:
     listen: http://[::]:8073
   database:
     connection_string: file:syncapi.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -316,12 +316,12 @@ user_api:
     connect: http://localhost:7781
   account_database:
     connection_string: file:userapi_accounts.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
   device_database:
     connection_string: file:userapi_devices.db
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 

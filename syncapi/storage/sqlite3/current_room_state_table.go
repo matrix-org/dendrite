@@ -64,7 +64,7 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectCurrentStateSQL = "" +
-	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
+	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
 	" AND ( $2 IS NULL OR     sender IN ($2)  )" +
 	" AND ( $3 IS NULL OR NOT(sender IN ($3)) )" +
 	" AND ( $4 IS NULL OR     type   IN ($4)  )" +
@@ -80,10 +80,10 @@ const selectStateEventSQL = "" +
 
 const selectEventsWithEventIDsSQL = "" +
 	// TODO: The session_id and transaction_id blanks are here because otherwise
-	// the rowsToStreamEvents expects there to be exactly five columns. We need to
+	// the rowsToStreamEvents expects there to be exactly six columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 type currentRoomStateStatements struct {
@@ -289,13 +289,14 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	result := []*gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
+		var eventID string
 		var eventBytes []byte
-		if err := rows.Scan(&eventBytes); err != nil {
+		if err := rows.Scan(&eventID, &eventBytes); err != nil {
 			return nil, err
 		}
 		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
-		if err := json.Unmarshal(eventBytes, &ev); err != nil {
+		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
 			return nil, err
 		}
 		result = append(result, &ev)
