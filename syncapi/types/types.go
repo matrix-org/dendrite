@@ -128,7 +128,7 @@ func (t *StreamingToken) Log(name string) *LogPosition {
 	return l
 }
 
-func (t *StreamingToken) String() string {
+func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
 		"s%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
@@ -201,17 +201,16 @@ func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) 
 }
 
 type TopologyToken struct {
-	Depth           StreamPosition
-	PDUPosition     StreamPosition
-	ReceiptPosition StreamPosition
+	Depth       StreamPosition
+	PDUPosition StreamPosition
 }
 
 func (t *TopologyToken) StreamToken() StreamingToken {
-	return NewStreamToken(t.PDUPosition, 0, t.ReceiptPosition, 0, nil)
+	return NewStreamToken(t.PDUPosition, 0, 0, 0, nil)
 }
 
-func (t *TopologyToken) String() string {
-	return fmt.Sprintf("t%d_%d_%d", t.Depth, t.PDUPosition, t.ReceiptPosition)
+func (t TopologyToken) String() string {
+	return fmt.Sprintf("t%d_%d", t.Depth, t.PDUPosition)
 }
 
 // Decrement the topology token to one event earlier.
@@ -248,24 +247,31 @@ func NewTopologyToken(depth, pduPos StreamPosition) TopologyToken {
 }
 
 func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
+	if len(tok) < 1 {
+		err = fmt.Errorf("empty topology token")
+		return
+	}
 	if tok[0] != SyncTokenTypeTopology[0] {
 		err = fmt.Errorf("topology token must start with 't'")
 		return
 	}
 	parts := strings.Split(tok[1:], "_")
-	var positions [3]StreamPosition
+	var positions [2]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
+		}
+		if len(p) == 0 {
+			err = fmt.Errorf("empty position %d not allowed", i)
+			return
 		}
 		if pos, perr := strconv.Atoi(p); perr == nil {
 			positions[i] = StreamPosition(pos)
 		}
 	}
 	token = TopologyToken{
-		Depth:           positions[0],
-		PDUPosition:     positions[1],
-		ReceiptPosition: positions[2],
+		Depth:       positions[0],
+		PDUPosition: positions[1],
 	}
 	return
 }
@@ -288,6 +294,10 @@ func NewStreamToken(
 }
 
 func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
+	if len(tok) < 1 {
+		err = fmt.Errorf("empty stream token")
+		return
+	}
 	if tok[0] != SyncTokenTypeStream[0] {
 		err = fmt.Errorf("stream token must start with 's'")
 		return
@@ -298,6 +308,10 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	for i, p := range parts {
 		if i > len(positions) {
 			break
+		}
+		if len(p) == 0 {
+			err = fmt.Errorf("empty position %d not allowed", i)
+			return
 		}
 		if pos, perr := strconv.Atoi(p); perr == nil {
 			positions[i] = StreamPosition(pos)
