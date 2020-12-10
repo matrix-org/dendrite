@@ -292,6 +292,16 @@ func (r *FederationSenderInternalAPI) PerformOutboundPeek(
 	}
 	request.ServerNames = uniqueList
 
+	// See if there's an existing outbound peek for this room ID with
+	// one of the specified servers.
+	if peeks, err := r.db.GetOutboundPeeks(ctx, request.RoomID); err == nil {
+		for _, peek := range peeks {
+			if _, ok := seenSet[peek.ServerName]; ok {
+				return nil
+			}
+		}
+	}
+
 	// Try each server that we were provided until we land on one that
 	// successfully completes the peek
 	var lastErr error
