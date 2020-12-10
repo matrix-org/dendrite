@@ -720,7 +720,7 @@ func (r *Queryer) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryS
 }
 
 func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainRequest, res *api.QueryAuthChainResponse) error {
-	chain, err := getAuthChain(ctx, r.DB.EventsFromIDs, req.EventIDs)
+	chain, err := GetAuthChain(ctx, r.DB.EventsFromIDs, req.EventIDs)
 	if err != nil {
 		return err
 	}
