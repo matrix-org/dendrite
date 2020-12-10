@@ -261,13 +261,12 @@ func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
 		if i > len(positions) {
 			break
 		}
-		if len(p) == 0 {
-			err = fmt.Errorf("empty position %d not allowed", i)
+		var pos int
+		pos, err = strconv.Atoi(p)
+		if err != nil {
 			return
 		}
-		if pos, perr := strconv.Atoi(p); perr == nil {
-			positions[i] = StreamPosition(pos)
-		}
+		positions[i] = StreamPosition(pos)
 	}
 	token = TopologyToken{
 		Depth:       positions[0],
@@ -309,13 +308,12 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		if i > len(positions) {
 			break
 		}
-		if len(p) == 0 {
-			err = fmt.Errorf("empty position %d not allowed", i)
+		var pos int
+		pos, err = strconv.Atoi(p)
+		if err != nil {
 			return
 		}
-		if pos, perr := strconv.Atoi(p); perr == nil {
-			positions[i] = StreamPosition(pos)
-		}
+		positions[i] = StreamPosition(pos)
 	}
 	token = StreamingToken{
 		PDUPosition:          positions[0],
