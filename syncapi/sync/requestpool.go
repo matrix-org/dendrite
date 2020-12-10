@@ -254,7 +254,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	}
 
 	// TODO: handle ignored users
-	if req.since.PDUPosition() == 0 && req.since.EDUPosition() == 0 {
+	if req.since.IsEmpty() {
 		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
 		if err != nil {
 			return res, fmt.Errorf("rp.db.CompleteSync: %w", err)
@@ -267,7 +267,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	}
 
 	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
-	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition(), &accountDataFilter)
+	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
 	if err != nil {
 		return res, fmt.Errorf("rp.appendAccountData: %w", err)
 	}
@@ -299,7 +299,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		// Get the next_batch from the sync response and increase the
 		// EDU counter.
 		if pos, perr := types.NewStreamTokenFromString(res.NextBatch); perr == nil {
-			pos.Positions[1]++
+			pos.SendToDevicePosition++
 			res.NextBatch = pos.String()
 		}
 	}
@@ -328,7 +328,7 @@ func (rp *RequestPool) appendAccountData(
 	// data keys were set between two message. This isn't a huge issue since the
 	// duplicate data doesn't represent a huge quantity of data, but an optimisation
 	// here would be making sure each data is sent only once to the client.
-	if req.since == nil || (req.since.PDUPosition() == 0 && req.since.EDUPosition() == 0) {
+	if req.since.IsEmpty() {
 		// If this is the initial sync, we don't need to check if a data has
 		// already been sent. Instead, we send the whole batch.
 		dataReq := &userapi.QueryAccountDataRequest{
@@ -363,7 +363,7 @@ func (rp *RequestPool) appendAccountData(
 	}
 
 	r := types.Range{
-		From: req.since.PDUPosition(),
+		From: req.since.PDUPosition,
 		To:   currentPos,
 	}
 	// If both positions are the same, it means that the data was saved after the

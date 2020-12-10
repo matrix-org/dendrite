@@ -78,8 +78,8 @@ func (d *Database) GetEventsInStreamingRange(
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
 	r := types.Range{
-		From:      from.PDUPosition(),
-		To:        to.PDUPosition(),
+		From:      from.PDUPosition,
+		To:        to.PDUPosition,
 		Backwards: backwardOrdering,
 	}
 	if backwardOrdering {
@@ -391,16 +391,16 @@ func (d *Database) GetEventsInTopologicalRange(
 	var minDepth, maxDepth, maxStreamPosForMaxDepth types.StreamPosition
 	if backwardOrdering {
 		// Backward ordering means the 'from' token has a higher depth than the 'to' token
-		minDepth = to.Depth()
-		maxDepth = from.Depth()
+		minDepth = to.Depth
+		maxDepth = from.Depth
 		// for cases where we have say 5 events with the same depth, the TopologyToken needs to
 		// know which of the 5 the client has seen. This is done by using the PDU position.
 		// Events with the same maxDepth but less than this PDU position will be returned.
-		maxStreamPosForMaxDepth = from.PDUPosition()
+		maxStreamPosForMaxDepth = from.PDUPosition
 	} else {
 		// Forward ordering means the 'from' token has a lower depth than the 'to' token.
-		minDepth = from.Depth()
-		maxDepth = to.Depth()
+		minDepth = from.Depth
+		maxDepth = to.Depth
 	}
 
 	// Select the event IDs from the defined range.
@@ -483,7 +483,14 @@ func (d *Database) syncPositionTx(
 	if maxPeekID > maxEventID {
 		maxEventID = maxPeekID
 	}
-	sp = types.NewStreamToken(types.StreamPosition(maxEventID), types.StreamPosition(d.EDUCache.GetLatestSyncPosition()), nil)
+	// TODO: complete these positions
+	sp = types.NewStreamToken(
+		types.StreamPosition(maxEventID),
+		types.StreamPosition(d.EDUCache.GetLatestSyncPosition()),
+		0,
+		0,
+		nil,
+	)
 	return
 }
 
@@ -555,7 +562,7 @@ func (d *Database) addTypingDeltaToResponse(
 	for _, roomID := range joinedRoomIDs {
 		var jr types.JoinResponse
 		if typingUsers, updated := d.EDUCache.GetTypingUsersIfUpdatedAfter(
-			roomID, int64(since.EDUPosition()),
+			roomID, int64(since.TypingPosition),
 		); updated {
 			ev := gomatrixserverlib.ClientEvent{
 				Type: gomatrixserverlib.MTyping,
@@ -584,7 +591,7 @@ func (d *Database) addReceiptDeltaToResponse(
 	joinedRoomIDs []string,
 	res *types.Response,
 ) error {
-	receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), joinedRoomIDs, since.EDUPosition())
+	receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), joinedRoomIDs, since.ReceiptPosition)
 	if err != nil {
 		return fmt.Errorf("unable to select receipts for rooms: %w", err)
 	}
@@ -639,7 +646,7 @@ func (d *Database) addEDUDeltaToResponse(
 	joinedRoomIDs []string,
 	res *types.Response,
 ) error {
-	if fromPos.EDUPosition() != toPos.EDUPosition() {
+	if fromPos.TypingPosition != toPos.TypingPosition {
 		// add typing deltas
 		if err := d.addTypingDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
 			return fmt.Errorf("unable to apply typing delta to response: %w", err)
@@ -647,8 +654,8 @@ func (d *Database) addEDUDeltaToResponse(
 	}
 
 	// Check on initial sync and if EDUPositions differ
-	if (fromPos.EDUPosition() == 0 && toPos.EDUPosition() == 0) ||
-		fromPos.EDUPosition() != toPos.EDUPosition() {
+	if (fromPos.ReceiptPosition == 0 && toPos.ReceiptPosition == 0) ||
+		fromPos.ReceiptPosition != toPos.ReceiptPosition {
 		if err := d.addReceiptDeltaToResponse(fromPos, joinedRoomIDs, res); err != nil {
 			return fmt.Errorf("unable to apply receipts to response: %w", err)
 		}
@@ -687,10 +694,10 @@ func (d *Database) IncrementalSync(
 
 	var joinedRoomIDs []string
 	var err error
-	if fromPos.PDUPosition() != toPos.PDUPosition() || wantFullState {
+	if fromPos.PDUPosition != toPos.PDUPosition || wantFullState {
 		r := types.Range{
-			From: fromPos.PDUPosition(),
-			To:   toPos.PDUPosition(),
+			From: fromPos.PDUPosition,
+			To:   toPos.PDUPosition,
 		}
 		joinedRoomIDs, err = d.addPDUDeltaToResponse(
 			ctx, device, r, numRecentEventsPerRoom, wantFullState, res,
@@ -772,7 +779,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	}
 	r := types.Range{
 		From: 0,
-		To:   toPos.PDUPosition(),
+		To:   toPos.PDUPosition,
 	}
 
 	res.NextBatch = toPos.String()
@@ -915,7 +922,7 @@ func (d *Database) CompleteSync(
 
 	// Use a zero value SyncPosition for fromPos so all EDU states are added.
 	err = d.addEDUDeltaToResponse(
-		types.NewStreamToken(0, 0, nil), toPos, joinedRoomIDs, res,
+		types.NewStreamToken(0, 0, 0, 0, nil), toPos, joinedRoomIDs, res,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("d.addEDUDeltaToResponse: %w", err)

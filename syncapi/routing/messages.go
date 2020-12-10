@@ -447,11 +447,11 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 				// The condition in the SQL query is a strict "greater than" so
 				// we need to check against to-1.
 				streamPos := types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition)
-				isSetLargeEnough = (r.to.PDUPosition()-1 == streamPos)
+				isSetLargeEnough = (r.to.PDUPosition-1 == streamPos)
 			}
 		} else {
 			streamPos := types.StreamPosition(streamEvents[0].StreamPosition)
-			isSetLargeEnough = (r.from.PDUPosition()-1 == streamPos)
+			isSetLargeEnough = (r.from.PDUPosition-1 == streamPos)
 		}
 	}
 
