@@ -381,7 +381,7 @@ func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (st
 	if r.backwardOrdering && events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
 		// We've hit the beginning of the room so there's really nowhere else
 		// to go. This seems to fix Riot iOS from looping on /messages endlessly.
-		end = types.NewTopologyToken(0, 0)
+		end = types.TopologyToken{}
 	} else {
 		end, err = r.db.EventPositionInTopology(
 			r.ctx, events[len(events)-1].EventID(),
@@ -447,11 +447,11 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 				// The condition in the SQL query is a strict "greater than" so
 				// we need to check against to-1.
 				streamPos := types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition)
-				isSetLargeEnough = (r.to.PDUPosition()-1 == streamPos)
+				isSetLargeEnough = (r.to.PDUPosition-1 == streamPos)
 			}
 		} else {
 			streamPos := types.StreamPosition(streamEvents[0].StreamPosition)
-			isSetLargeEnough = (r.from.PDUPosition()-1 == streamPos)
+			isSetLargeEnough = (r.from.PDUPosition-1 == streamPos)
 		}
 	}
 
@@ -565,7 +565,7 @@ func setToDefault(
 	if backwardOrdering {
 		// go 1 earlier than the first event so we correctly fetch the earliest event
 		// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
-		to = types.NewTopologyToken(0, 0)
+		to = types.TopologyToken{}
 	} else {
 		to, err = db.MaxTopologicalPosition(ctx, roomID)
 	}

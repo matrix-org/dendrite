@@ -16,13 +16,15 @@ import (
 
 var (
 	syncingUser = "@alice:localhost"
-	emptyToken  = types.NewStreamToken(0, 0, nil)
-	newestToken = types.NewStreamToken(0, 0, map[string]*types.LogPosition{
-		DeviceListLogName: {
-			Offset:    sarama.OffsetNewest,
-			Partition: 0,
+	emptyToken  = types.StreamingToken{}
+	newestToken = types.StreamingToken{
+		Logs: map[string]*types.LogPosition{
+			DeviceListLogName: {
+				Offset:    sarama.OffsetNewest,
+				Partition: 0,
+			},
 		},
-	})
+	}
 )
 
 type mockKeyAPI struct{}

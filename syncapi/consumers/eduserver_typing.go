@@ -66,7 +66,9 @@ func (s *OutputTypingEventConsumer) Start() error {
 	s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
 		s.notifier.OnNewEvent(
 			nil, roomID, nil,
-			types.NewStreamToken(0, types.StreamPosition(latestSyncPosition), nil),
+			types.StreamingToken{
+				TypingPosition: types.StreamPosition(latestSyncPosition),
+			},
 		)
 	})
 
@@ -95,6 +97,6 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		typingPos = s.db.RemoveTypingUser(typingEvent.UserID, typingEvent.RoomID)
 	}
 
-	s.notifier.OnNewEvent(nil, output.Event.RoomID, nil, types.NewStreamToken(0, typingPos, nil))
+	s.notifier.OnNewEvent(nil, output.Event.RoomID, nil, types.StreamingToken{TypingPosition: typingPos})
 	return nil
 }

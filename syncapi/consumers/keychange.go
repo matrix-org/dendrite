@@ -114,12 +114,14 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 		return err
 	}
 	// TODO: f.e queryRes.UserIDsToCount : notify users by waking up streams
-	posUpdate := types.NewStreamToken(0, 0, map[string]*types.LogPosition{
-		syncinternal.DeviceListLogName: {
-			Offset:    msg.Offset,
-			Partition: msg.Partition,
+	posUpdate := types.StreamingToken{
+		Logs: map[string]*types.LogPosition{
+			syncinternal.DeviceListLogName: {
+				Offset:    msg.Offset,
+				Partition: msg.Partition,
+			},
 		},
-	})
+	}
 	for userID := range queryRes.UserIDsToCount {
 		s.notifier.OnNewKeyChange(posUpdate, userID, output.UserID)
 	}

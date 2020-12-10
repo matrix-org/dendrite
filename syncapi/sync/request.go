@@ -65,8 +65,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		since = &tok
 	}
 	if since == nil {
-		tok := types.NewStreamToken(0, 0, nil)
-		since = &tok
+		since = &types.StreamingToken{}
 	}
 	timelineLimit := DefaultTimelineLimit
 	// TODO: read from stored filters too

@@ -503,3 +503,4 @@ Forgetting room does not show up in v2 /sync
 Can forget room you've been kicked from
 /whois
 /joined_members return joined members
+A next_batch token can be used in the v1 messages API

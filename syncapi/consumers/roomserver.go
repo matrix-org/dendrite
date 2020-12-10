@@ -181,7 +181,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
-	s.notifier.OnNewEvent(ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(ev, "", nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -220,7 +220,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return err
 	}
 
-	s.notifier.OnNewEvent(ev, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(ev, "", nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -269,7 +269,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(msg.Event, "", nil, types.NewStreamToken(pduPos, 0, nil))
+	s.notifier.OnNewEvent(msg.Event, "", nil, types.StreamingToken{PDUPosition: pduPos})
 	return nil
 }
 
@@ -287,7 +287,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	}
 	// Notify any active sync requests that the invite has been retired.
 	// Invites share the same stream counter as PDUs
-	s.notifier.OnNewEvent(nil, "", []string{msg.TargetUserID}, types.NewStreamToken(sp, 0, nil))
+	s.notifier.OnNewEvent(nil, "", []string{msg.TargetUserID}, types.StreamingToken{PDUPosition: sp})
 	return nil
 }
 
@@ -307,7 +307,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 
 	// we need to wake up the users who might need to now be peeking into this room,
 	// so we send in a dummy event to trigger a wakeup
-	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.NewStreamToken(sp, 0, nil))
+	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
 	return nil
 }
 
@@ -327,7 +327,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 
 	// we need to wake up the users who might need to now be peeking into this room,
 	// so we send in a dummy event to trigger a wakeup
-	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.NewStreamToken(sp, 0, nil))
+	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
 	return nil
 }
 

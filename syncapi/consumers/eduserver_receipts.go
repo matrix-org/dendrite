@@ -88,7 +88,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 		return err
 	}
 	// update stream position
-	s.notifier.OnNewReceipt(types.NewStreamToken(0, streamPos, nil))
+	s.notifier.OnNewReceipt(types.StreamingToken{ReceiptPosition: streamPos})
 
 	return nil
 }

@@ -16,7 +16,6 @@ package types
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -107,59 +106,70 @@ const (
 )
 
 type StreamingToken struct {
-	syncToken
-	logs map[string]*LogPosition
+	PDUPosition          StreamPosition
+	TypingPosition       StreamPosition
+	ReceiptPosition      StreamPosition
+	SendToDevicePosition StreamPosition
+	Logs                 map[string]*LogPosition
 }
 
 func (t *StreamingToken) SetLog(name string, lp *LogPosition) {
-	if t.logs == nil {
-		t.logs = make(map[string]*LogPosition)
+	if t.Logs == nil {
+		t.Logs = make(map[string]*LogPosition)
 	}
-	t.logs[name] = lp
+	t.Logs[name] = lp
 }
 
 func (t *StreamingToken) Log(name string) *LogPosition {
-	l, ok := t.logs[name]
+	l, ok := t.Logs[name]
 	if !ok {
 		return nil
 	}
 	return l
 }
 
-func (t *StreamingToken) PDUPosition() StreamPosition {
-	return t.Positions[0]
-}
-func (t *StreamingToken) EDUPosition() StreamPosition {
-	return t.Positions[1]
-}
-func (t *StreamingToken) String() string {
+func (t StreamingToken) String() string {
+	posStr := fmt.Sprintf(
+		"s%d_%d_%d_%d",
+		t.PDUPosition, t.TypingPosition,
+		t.ReceiptPosition, t.SendToDevicePosition,
+	)
 	var logStrings []string
-	for name, lp := range t.logs {
+	for name, lp := range t.Logs {
 		logStr := fmt.Sprintf("%s-%d-%d", name, lp.Partition, lp.Offset)
 		logStrings = append(logStrings, logStr)
 	}
 	sort.Strings(logStrings)
-	// E.g s11_22_33.dl0-134.ab1-441
-	return strings.Join(append([]string{t.syncToken.String()}, logStrings...), ".")
+	// E.g s11_22_33_44.dl0-134.ab1-441
+	return strings.Join(append([]string{posStr}, logStrings...), ".")
 }
 
 // IsAfter returns true if ANY position in this token is greater than `other`.
 func (t *StreamingToken) IsAfter(other StreamingToken) bool {
-	for i := range other.Positions {
-		if t.Positions[i] > other.Positions[i] {
-			return true
-		}
+	switch {
+	case t.PDUPosition > other.PDUPosition:
+		return true
+	case t.TypingPosition > other.TypingPosition:
+		return true
+	case t.ReceiptPosition > other.ReceiptPosition:
+		return true
+	case t.SendToDevicePosition > other.SendToDevicePosition:
+		return true
 	}
-	for name := range t.logs {
+	for name := range t.Logs {
 		otherLog := other.Log(name)
 		if otherLog == nil {
 			continue
 		}
-		if t.logs[name].IsAfter(otherLog) {
+		if t.Logs[name].IsAfter(otherLog) {
 			return true
 		}
 	}
 	return false
+}
+
+func (t *StreamingToken) IsEmpty() bool {
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition == 0
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -167,48 +177,48 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 // and its value will replace the corresponding value in the StreamingToken on which WithUpdates is called.
 // If the other token has a log, they will replace any existing log on this token.
 func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) {
-	ret.Type = t.Type
-	ret.Positions = make([]StreamPosition, len(t.Positions))
-	for i := range t.Positions {
-		ret.Positions[i] = t.Positions[i]
-		if other.Positions[i] == 0 {
-			continue
-		}
-		ret.Positions[i] = other.Positions[i]
+	ret = *t
+	switch {
+	case other.PDUPosition > 0:
+		ret.PDUPosition = other.PDUPosition
+	case other.TypingPosition > 0:
+		ret.TypingPosition = other.TypingPosition
+	case other.ReceiptPosition > 0:
+		ret.ReceiptPosition = other.ReceiptPosition
+	case other.SendToDevicePosition > 0:
+		ret.SendToDevicePosition = other.SendToDevicePosition
 	}
-	ret.logs = make(map[string]*LogPosition)
-	for name := range t.logs {
+	ret.Logs = make(map[string]*LogPosition)
+	for name := range t.Logs {
 		otherLog := other.Log(name)
 		if otherLog == nil {
 			continue
 		}
 		copy := *otherLog
-		ret.logs[name] = &copy
+		ret.Logs[name] = &copy
 	}
 	return ret
 }
 
 type TopologyToken struct {
-	syncToken
+	Depth       StreamPosition
+	PDUPosition StreamPosition
 }
 
-func (t *TopologyToken) Depth() StreamPosition {
-	return t.Positions[0]
-}
-func (t *TopologyToken) PDUPosition() StreamPosition {
-	return t.Positions[1]
-}
 func (t *TopologyToken) StreamToken() StreamingToken {
-	return NewStreamToken(t.PDUPosition(), 0, nil)
+	return StreamingToken{
+		PDUPosition: t.PDUPosition,
+	}
 }
-func (t *TopologyToken) String() string {
-	return t.syncToken.String()
+
+func (t TopologyToken) String() string {
+	return fmt.Sprintf("t%d_%d", t.Depth, t.PDUPosition)
 }
 
 // Decrement the topology token to one event earlier.
 func (t *TopologyToken) Decrement() {
-	depth := t.Positions[0]
-	pduPos := t.Positions[1]
+	depth := t.Depth
+	pduPos := t.PDUPosition
 	if depth-1 <= 0 {
 		// nothing can be lower than this
 		depth = 1
@@ -223,151 +233,93 @@ func (t *TopologyToken) Decrement() {
 	if depth < 1 {
 		depth = 1
 	}
-	t.Positions = []StreamPosition{
-		depth, pduPos,
-	}
+	t.Depth = depth
+	t.PDUPosition = pduPos
 }
 
-// NewSyncTokenFromString takes a string of the form "xyyyy..." where "x"
-// represents the type of a pagination token and "yyyy..." the token itself, and
-// parses it in order to create a new instance of SyncToken. Returns an
-// error if the token couldn't be parsed into an int64, or if the token type
-// isn't a known type (returns ErrInvalidSyncTokenType in the latter
-// case).
-func newSyncTokenFromString(s string) (token *syncToken, categories []string, err error) {
-	if len(s) == 0 {
-		return nil, nil, ErrInvalidSyncTokenLen
+func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
+	if len(tok) < 1 {
+		err = fmt.Errorf("empty topology token")
+		return
 	}
-
-	token = new(syncToken)
-	var positions []string
-
-	switch t := SyncTokenType(s[:1]); t {
-	case SyncTokenTypeStream, SyncTokenTypeTopology:
-		token.Type = t
-		categories = strings.Split(s[1:], ".")
-		positions = strings.Split(categories[0], "_")
-	default:
-		return nil, nil, ErrInvalidSyncTokenType
+	if tok[0] != SyncTokenTypeTopology[0] {
+		err = fmt.Errorf("topology token must start with 't'")
+		return
 	}
-
-	for _, pos := range positions {
-		if posInt, err := strconv.ParseInt(pos, 10, 64); err != nil {
-			return nil, nil, err
-		} else if posInt < 0 {
-			return nil, nil, errors.New("negative position not allowed")
-		} else {
-			token.Positions = append(token.Positions, StreamPosition(posInt))
+	parts := strings.Split(tok[1:], "_")
+	var positions [2]StreamPosition
+	for i, p := range parts {
+		if i > len(positions) {
+			break
 		}
+		var pos int
+		pos, err = strconv.Atoi(p)
+		if err != nil {
+			return
+		}
+		positions[i] = StreamPosition(pos)
+	}
+	token = TopologyToken{
+		Depth:       positions[0],
+		PDUPosition: positions[1],
 	}
 	return
 }
 
-// NewTopologyToken creates a new sync token for /messages
-func NewTopologyToken(depth, streamPos StreamPosition) TopologyToken {
-	if depth < 0 {
-		depth = 1
-	}
-	return TopologyToken{
-		syncToken: syncToken{
-			Type:      SyncTokenTypeTopology,
-			Positions: []StreamPosition{depth, streamPos},
-		},
-	}
-}
-func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
-	t, _, err := newSyncTokenFromString(tok)
-	if err != nil {
-		return
-	}
-	if t.Type != SyncTokenTypeTopology {
-		err = fmt.Errorf("token %s is not a topology token", tok)
-		return
-	}
-	if len(t.Positions) < 2 {
-		err = fmt.Errorf("token %s wrong number of values, got %d want at least 2", tok, len(t.Positions))
-		return
-	}
-	return TopologyToken{
-		syncToken: *t,
-	}, nil
-}
-
-// NewStreamToken creates a new sync token for /sync
-func NewStreamToken(pduPos, eduPos StreamPosition, logs map[string]*LogPosition) StreamingToken {
-	if logs == nil {
-		logs = make(map[string]*LogPosition)
-	}
-	return StreamingToken{
-		syncToken: syncToken{
-			Type:      SyncTokenTypeStream,
-			Positions: []StreamPosition{pduPos, eduPos},
-		},
-		logs: logs,
-	}
-}
 func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
-	t, categories, err := newSyncTokenFromString(tok)
-	if err != nil {
+	if len(tok) < 1 {
+		err = fmt.Errorf("empty stream token")
 		return
 	}
-	if t.Type != SyncTokenTypeStream {
-		err = fmt.Errorf("token %s is not a streaming token", tok)
+	if tok[0] != SyncTokenTypeStream[0] {
+		err = fmt.Errorf("stream token must start with 's'")
 		return
 	}
-	if len(t.Positions) < 2 {
-		err = fmt.Errorf("token %s wrong number of values, got %d want at least 2", tok, len(t.Positions))
-		return
+	categories := strings.Split(tok[1:], ".")
+	parts := strings.Split(categories[0], "_")
+	var positions [4]StreamPosition
+	for i, p := range parts {
+		if i > len(positions) {
+			break
+		}
+		var pos int
+		pos, err = strconv.Atoi(p)
+		if err != nil {
+			return
+		}
+		positions[i] = StreamPosition(pos)
 	}
-	logs := make(map[string]*LogPosition)
-	if len(categories) > 1 {
-		// dl-0-1234
-		// $log_name-$partition-$offset
-		for _, logStr := range categories[1:] {
-			segments := strings.Split(logStr, "-")
-			if len(segments) != 3 {
-				err = fmt.Errorf("token %s - invalid log: %s", tok, logStr)
-				return
-			}
-			var partition int64
-			partition, err = strconv.ParseInt(segments[1], 10, 32)
-			if err != nil {
-				return
-			}
-			var offset int64
-			offset, err = strconv.ParseInt(segments[2], 10, 64)
-			if err != nil {
-				return
-			}
-			logs[segments[0]] = &LogPosition{
-				Partition: int32(partition),
-				Offset:    offset,
-			}
+	token = StreamingToken{
+		PDUPosition:          positions[0],
+		TypingPosition:       positions[1],
+		ReceiptPosition:      positions[2],
+		SendToDevicePosition: positions[3],
+		Logs:                 make(map[string]*LogPosition),
+	}
+	// dl-0-1234
+	// $log_name-$partition-$offset
+	for _, logStr := range categories[1:] {
+		segments := strings.Split(logStr, "-")
+		if len(segments) != 3 {
+			err = fmt.Errorf("token %s - invalid log: %s", tok, logStr)
+			return
+		}
+		var partition int64
+		partition, err = strconv.ParseInt(segments[1], 10, 32)
+		if err != nil {
+			return
+		}
+		var offset int64
+		offset, err = strconv.ParseInt(segments[2], 10, 64)
+		if err != nil {
+			return
+		}
+		token.Logs[segments[0]] = &LogPosition{
+			Partition: int32(partition),
+			Offset:    offset,
 		}
 	}
-	return StreamingToken{
-		syncToken: *t,
-		logs:      logs,
-	}, nil
-}
-
-// syncToken represents a syncapi token, used for interactions with
-// /sync or /messages, for example.
-type syncToken struct {
-	Type SyncTokenType
-	// A list of stream positions, their meanings vary depending on the token type.
-	Positions []StreamPosition
-}
-
-// String translates a SyncToken to a string of the "xyyyy..." (see
-// NewSyncToken to know what it represents).
-func (p *syncToken) String() string {
-	posStr := make([]string, len(p.Positions))
-	for i := range p.Positions {
-		posStr[i] = strconv.FormatInt(int64(p.Positions[i]), 10)
-	}
-
-	return fmt.Sprintf("%s%s", p.Type, strings.Join(posStr, "_"))
+	return token, nil
 }
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
