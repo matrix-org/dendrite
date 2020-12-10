@@ -12,11 +12,11 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 	tests := map[string]*StreamingToken{
 		"s4_0_0_0": {
 			PDUPosition: 4,
-			logs:        make(map[string]*LogPosition),
+			Logs:        make(map[string]*LogPosition),
 		},
 		"s4_0_0_0.dl-0-123": {
 			PDUPosition: 4,
-			logs: map[string]*LogPosition{
+			Logs: map[string]*LogPosition{
 				"dl": {
 					Partition: 0,
 					Offset:    123,
@@ -25,7 +25,7 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 		},
 		"s4_0_0_0.ab-1-14419482332.dl-0-123": {
 			PDUPosition: 4,
-			logs: map[string]*LogPosition{
+			Logs: map[string]*LogPosition{
 				"ab": {
 					Partition: 1,
 					Offset:    14419482332,
