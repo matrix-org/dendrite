@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS syncapi_stream_id (
 );
 INSERT INTO syncapi_stream_id (stream_name, stream_id) VALUES ("global", 0)
   ON CONFLICT DO NOTHING;
+INSERT INTO syncapi_stream_id (stream_name, stream_id) VALUES ("receipt", 0)
+  ON CONFLICT DO NOTHING;
 `
 
 const increaseStreamIDStmt = "" +

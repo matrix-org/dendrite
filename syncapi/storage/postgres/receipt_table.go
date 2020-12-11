@@ -59,10 +59,14 @@ const selectRoomReceipts = "" +
 	" FROM syncapi_receipts" +
 	" WHERE room_id = ANY($1) AND id > $2"
 
+const selectMaxReceiptIDSQL = "" +
+	"SELECT MAX(id) FROM syncapi_receipts"
+
 type receiptStatements struct {
 	db                 *sql.DB
 	upsertReceipt      *sql.Stmt
 	selectRoomReceipts *sql.Stmt
+	selectMaxReceiptID *sql.Stmt
 }
 
 func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
@@ -77,6 +81,9 @@ func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 		return nil, fmt.Errorf("unable to prepare upsertReceipt statement: %w", err)
 	}
 	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
+		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
+	}
+	if r.selectMaxReceiptID, err = db.Prepare(selectMaxReceiptIDSQL); err != nil {
 		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
 	}
 	return r, nil
@@ -104,4 +111,16 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs
 		res = append(res, r)
 	}
 	return res, rows.Err()
+}
+
+func (s *receiptStatements) SelectMaxReceiptID(
+	ctx context.Context, txn *sql.Tx,
+) (id int64, err error) {
+	var nullableID sql.NullInt64
+	stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
+	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	if nullableID.Valid {
+		id = nullableID.Int64
+	}
+	return
 }
