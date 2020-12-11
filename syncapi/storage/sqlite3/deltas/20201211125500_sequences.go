@@ -36,6 +36,7 @@ func UpFixSequences(tx *sql.Tx) error {
 		-- will be wrong, and we'll get primary key violations if we try to
 		-- reuse existing stream IDs from a different sequence.
 		DELETE FROM syncapi_receipts;
+		UPDATE syncapi_stream_id SET stream_id=1 WHERE stream_name="receipt";
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
