@@ -55,11 +55,15 @@ const selectRoomReceipts = "" +
 	" FROM syncapi_receipts" +
 	" WHERE id > $1 and room_id in ($2)"
 
+const selectMaxReceiptIDSQL = "" +
+	"SELECT MAX(id) FROM syncapi_receipts"
+
 type receiptStatements struct {
 	db                 *sql.DB
 	streamIDStatements *streamIDStatements
 	upsertReceipt      *sql.Stmt
 	selectRoomReceipts *sql.Stmt
+	selectMaxReceiptID *sql.Stmt
 }
 
 func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Receipts, error) {
@@ -77,12 +81,15 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Re
 	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
 		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
 	}
+	if r.selectMaxReceiptID, err = db.Prepare(selectMaxReceiptIDSQL); err != nil {
+		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
+	}
 	return r, nil
 }
 
 // UpsertReceipt creates new user receipts
 func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error) {
-	pos, err = r.streamIDStatements.nextStreamID(ctx, txn)
+	pos, err = r.streamIDStatements.nextReceiptID(ctx, txn)
 	if err != nil {
 		return
 	}
@@ -115,4 +122,16 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs
 		res = append(res, r)
 	}
 	return res, rows.Err()
+}
+
+func (s *receiptStatements) SelectMaxReceiptID(
+	ctx context.Context, txn *sql.Tx,
+) (id int64, err error) {
+	var nullableID sql.NullInt64
+	stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
+	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	if nullableID.Valid {
+		id = nullableID.Int64
+	}
+	return
 }

@@ -30,11 +30,12 @@ import (
 )
 
 const receiptsSchema = `
-CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
+CREATE SEQUENCE IF NOT EXISTS syncapi_receipt_id;
+
 -- Stores data about receipts
 CREATE TABLE IF NOT EXISTS syncapi_receipts (
 	-- The ID
-	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
+	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_receipt_id'),
 	room_id TEXT NOT NULL,
 	receipt_type TEXT NOT NULL,
 	user_id TEXT NOT NULL,
@@ -50,7 +51,7 @@ const upsertReceipt = "" +
 	" (room_id, receipt_type, user_id, event_id, receipt_ts)" +
 	" VALUES ($1, $2, $3, $4, $5)" +
 	" ON CONFLICT (room_id, receipt_type, user_id)" +
-	" DO UPDATE SET id = nextval('syncapi_stream_id'), event_id = $4, receipt_ts = $5" +
+	" DO UPDATE SET id = nextval('syncapi_receipt_id'), event_id = $4, receipt_ts = $5" +
 	" RETURNING id"
 
 const selectRoomReceipts = "" +
@@ -58,10 +59,14 @@ const selectRoomReceipts = "" +
 	" FROM syncapi_receipts" +
 	" WHERE room_id = ANY($1) AND id > $2"
 
+const selectMaxReceiptIDSQL = "" +
+	"SELECT MAX(id) FROM syncapi_receipts"
+
 type receiptStatements struct {
 	db                 *sql.DB
 	upsertReceipt      *sql.Stmt
 	selectRoomReceipts *sql.Stmt
+	selectMaxReceiptID *sql.Stmt
 }
 
 func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
@@ -76,6 +81,9 @@ func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 		return nil, fmt.Errorf("unable to prepare upsertReceipt statement: %w", err)
 	}
 	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
+		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
+	}
+	if r.selectMaxReceiptID, err = db.Prepare(selectMaxReceiptIDSQL); err != nil {
 		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
 	}
 	return r, nil
@@ -103,4 +111,16 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs
 		res = append(res, r)
 	}
 	return res, rows.Err()
+}
+
+func (s *receiptStatements) SelectMaxReceiptID(
+	ctx context.Context, txn *sql.Tx,
+) (id int64, err error) {
+	var nullableID sql.NullInt64
+	stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
+	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	if nullableID.Valid {
+		id = nullableID.Int64
+	}
+	return
 }

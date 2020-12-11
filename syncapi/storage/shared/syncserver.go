@@ -483,10 +483,15 @@ func (d *Database) syncPositionTx(
 	if maxPeekID > maxEventID {
 		maxEventID = maxPeekID
 	}
+	maxReceiptID, err := d.Receipts.SelectMaxReceiptID(ctx, txn)
+	if err != nil {
+		return sp, err
+	}
 	// TODO: complete these positions
 	sp = types.StreamingToken{
-		PDUPosition:    types.StreamPosition(maxEventID),
-		TypingPosition: types.StreamPosition(d.EDUCache.GetLatestSyncPosition()),
+		PDUPosition:     types.StreamPosition(maxEventID),
+		TypingPosition:  types.StreamPosition(d.EDUCache.GetLatestSyncPosition()),
+		ReceiptPosition: types.StreamPosition(maxReceiptID),
 	}
 	return
 }
