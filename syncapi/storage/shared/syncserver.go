@@ -880,14 +880,14 @@ func (d *Database) getJoinResponseForCompleteSync(
 
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
-	var prevBatch types.TopologyToken
+	var prevBatch *types.TopologyToken
 	if len(recentStreamEvents) > 0 {
 		var backwardTopologyPos, backwardStreamPos types.StreamPosition
 		backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 		if err != nil {
 			return
 		}
-		prevBatch = types.TopologyToken{
+		prevBatch = &types.TopologyToken{
 			Depth:       backwardTopologyPos,
 			PDUPosition: backwardStreamPos,
 		}
@@ -1028,7 +1028,7 @@ func (d *Database) addRoomDeltaToResponse(
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
 
-		jr.Timeline.PrevBatch = prevBatch
+		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -1036,7 +1036,7 @@ func (d *Database) addRoomDeltaToResponse(
 	case gomatrixserverlib.Peek:
 		jr := types.NewJoinResponse()
 
-		jr.Timeline.PrevBatch = prevBatch
+		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -1047,7 +1047,7 @@ func (d *Database) addRoomDeltaToResponse(
 		// TODO: recentEvents may contain events that this user is not allowed to see because they are
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
-		lr.Timeline.PrevBatch = prevBatch
+		lr.Timeline.PrevBatch = &prevBatch
 		lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)

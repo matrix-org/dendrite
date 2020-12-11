@@ -114,7 +114,7 @@ type StreamingToken struct {
 }
 
 // This will be used as a fallback by json.Marshal.
-func (t *StreamingToken) MarshalText() ([]byte, error) {
+func (t StreamingToken) MarshalText() ([]byte, error) {
 	return []byte(t.String()), nil
 }
 
@@ -222,7 +222,7 @@ type TopologyToken struct {
 }
 
 // This will be used as a fallback by json.Marshal.
-func (t *TopologyToken) MarshalText() ([]byte, error) {
+func (t TopologyToken) MarshalText() ([]byte, error) {
 	return []byte(t.String()), nil
 }
 
@@ -422,7 +422,7 @@ type JoinResponse struct {
 	Timeline struct {
 		Events    []gomatrixserverlib.ClientEvent `json:"events"`
 		Limited   bool                            `json:"limited"`
-		PrevBatch TopologyToken                   `json:"prev_batch"`
+		PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
 	} `json:"timeline"`
 	Ephemeral struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
@@ -480,7 +480,7 @@ type LeaveResponse struct {
 	Timeline struct {
 		Events    []gomatrixserverlib.ClientEvent `json:"events"`
 		Limited   bool                            `json:"limited"`
-		PrevBatch TopologyToken                   `json:"prev_batch"`
+		PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
 	} `json:"timeline"`
 }
 
