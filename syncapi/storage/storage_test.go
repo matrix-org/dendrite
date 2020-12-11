@@ -228,7 +228,7 @@ func TestSyncResponse(t *testing.T) {
 				ReceiptPosition:      latest.ReceiptPosition,
 				SendToDevicePosition: latest.SendToDevicePosition,
 			}
-			if res.NextBatch != next.String() {
+			if res.NextBatch.String() != next.String() {
 				st.Errorf("NextBatch got %s want %s", res.NextBatch, next.String())
 			}
 			roomRes, ok := res.Rooms.Join[testRoomID]
@@ -266,7 +266,7 @@ func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
 	// returns the last event "Message 10"
 	assertEventsEqual(t, "IncrementalSync Timeline", false, roomRes.Timeline.Events, reversed(events[len(events)-1:]))
 
-	prev := roomRes.Timeline.PrevBatch
+	prev := roomRes.Timeline.PrevBatch.String()
 	if prev == "" {
 		t.Fatalf("IncrementalSync expected prev_batch token")
 	}
@@ -666,12 +666,8 @@ func TestInviteBehaviour(t *testing.T) {
 	assertInvitedToRooms(t, res, []string{inviteRoom2})
 
 	// a sync after we have received both invites should result in a leave for the retired room
-	beforeRetireTok, err := types.NewStreamTokenFromString(beforeRetireRes.NextBatch)
-	if err != nil {
-		t.Fatalf("NewStreamTokenFromString cannot parse next batch '%s' : %s", beforeRetireRes.NextBatch, err)
-	}
 	res = types.NewResponse()
-	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, beforeRetireTok, latest, 0, false)
+	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, beforeRetireRes.NextBatch, latest, 0, false)
 	if err != nil {
 		t.Fatalf("IncrementalSync failed: %s", err)
 	}

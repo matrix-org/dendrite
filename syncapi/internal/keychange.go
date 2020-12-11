@@ -134,7 +134,7 @@ func DeviceListCatchup(
 		Partition: queryRes.Partition,
 		Offset:    queryRes.Offset,
 	})
-	res.NextBatch = to.String()
+	res.NextBatch = res.NextBatch.WithUpdates(to)
 
 	return hasNew, nil
 }

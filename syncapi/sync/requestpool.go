@@ -295,13 +295,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		for _, event := range events {
 			res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
 		}
-
-		// Get the next_batch from the sync response and increase the
-		// EDU counter.
-		if pos, perr := types.NewStreamTokenFromString(res.NextBatch); perr == nil {
-			pos.SendToDevicePosition++
-			res.NextBatch = pos.String()
-		}
+		res.NextBatch.SendToDevicePosition++
 	}
 
 	return res, err

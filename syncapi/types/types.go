@@ -113,6 +113,17 @@ type StreamingToken struct {
 	Logs                 map[string]*LogPosition
 }
 
+// This will be used as a fallback by json.Marshal.
+func (t *StreamingToken) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// This will be used as a fallback by json.Unmarshal.
+func (t *StreamingToken) UnmarshalText(text []byte) (err error) {
+	*t, err = NewStreamTokenFromString(string(text))
+	return err
+}
+
 func (t *StreamingToken) SetLog(name string, lp *LogPosition) {
 	if t.Logs == nil {
 		t.Logs = make(map[string]*LogPosition)
@@ -203,6 +214,17 @@ func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) 
 type TopologyToken struct {
 	Depth       StreamPosition
 	PDUPosition StreamPosition
+}
+
+// This will be used as a fallback by json.Marshal.
+func (t *TopologyToken) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// This will be used as a fallback by json.Unmarshal.
+func (t *TopologyToken) UnmarshalText(text []byte) (err error) {
+	*t, err = NewTopologyTokenFromString(string(text))
+	return err
 }
 
 func (t *TopologyToken) StreamToken() StreamingToken {
@@ -331,7 +353,7 @@ type PrevEventRef struct {
 
 // Response represents a /sync API response. See https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-client-r0-sync
 type Response struct {
-	NextBatch   string `json:"next_batch"`
+	NextBatch   StreamingToken `json:"next_batch"`
 	AccountData struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"account_data,omitempty"`
@@ -395,7 +417,7 @@ type JoinResponse struct {
 	Timeline struct {
 		Events    []gomatrixserverlib.ClientEvent `json:"events"`
 		Limited   bool                            `json:"limited"`
-		PrevBatch string                          `json:"prev_batch"`
+		PrevBatch TopologyToken                   `json:"prev_batch"`
 	} `json:"timeline"`
 	Ephemeral struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
@@ -453,7 +475,7 @@ type LeaveResponse struct {
 	Timeline struct {
 		Events    []gomatrixserverlib.ClientEvent `json:"events"`
 		Limited   bool                            `json:"limited"`
-		PrevBatch string                          `json:"prev_batch"`
+		PrevBatch TopologyToken                   `json:"prev_batch"`
 	} `json:"timeline"`
 }
 

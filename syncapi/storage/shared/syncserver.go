@@ -686,8 +686,7 @@ func (d *Database) IncrementalSync(
 	numRecentEventsPerRoom int,
 	wantFullState bool,
 ) (*types.Response, error) {
-	nextBatchPos := fromPos.WithUpdates(toPos)
-	res.NextBatch = nextBatchPos.String()
+	res.NextBatch = res.NextBatch.WithUpdates(toPos)
 
 	var joinedRoomIDs []string
 	var err error
@@ -779,7 +778,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		To:   toPos.PDUPosition,
 	}
 
-	res.NextBatch = toPos.String()
+	res.NextBatch = res.NextBatch.WithUpdates(toPos)
 
 	// Extract room state and recent events for all rooms the user is joined to.
 	joinedRoomIDs, err = d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
@@ -879,19 +878,18 @@ func (d *Database) getJoinResponseForCompleteSync(
 
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
-	var prevBatchStr string
+	var prevBatch types.TopologyToken
 	if len(recentStreamEvents) > 0 {
 		var backwardTopologyPos, backwardStreamPos types.StreamPosition
 		backwardTopologyPos, backwardStreamPos, err = d.Topology.SelectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 		if err != nil {
 			return
 		}
-		prevBatch := types.TopologyToken{
+		prevBatch = types.TopologyToken{
 			Depth:       backwardTopologyPos,
 			PDUPosition: backwardStreamPos,
 		}
 		prevBatch.Decrement()
-		prevBatchStr = prevBatch.String()
 	}
 
 	// We don't include a device here as we don't need to send down
@@ -900,7 +898,7 @@ func (d *Database) getJoinResponseForCompleteSync(
 	recentEvents := d.StreamEventsToEvents(&device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
 	jr = types.NewJoinResponse()
-	jr.Timeline.PrevBatch = prevBatchStr
+	jr.Timeline.PrevBatch = prevBatch
 	jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 	jr.Timeline.Limited = limited
 	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
@@ -1028,7 +1026,7 @@ func (d *Database) addRoomDeltaToResponse(
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
 
-		jr.Timeline.PrevBatch = prevBatch.String()
+		jr.Timeline.PrevBatch = prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -1036,7 +1034,7 @@ func (d *Database) addRoomDeltaToResponse(
 	case gomatrixserverlib.Peek:
 		jr := types.NewJoinResponse()
 
-		jr.Timeline.PrevBatch = prevBatch.String()
+		jr.Timeline.PrevBatch = prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
@@ -1047,7 +1045,7 @@ func (d *Database) addRoomDeltaToResponse(
 		// TODO: recentEvents may contain events that this user is not allowed to see because they are
 		//       no longer in the room.
 		lr := types.NewLeaveResponse()
-		lr.Timeline.PrevBatch = prevBatch.String()
+		lr.Timeline.PrevBatch = prevBatch
 		lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
 		lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
