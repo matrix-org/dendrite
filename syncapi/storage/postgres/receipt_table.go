@@ -30,11 +30,12 @@ import (
 )
 
 const receiptsSchema = `
-CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
+CREATE SEQUENCE IF NOT EXISTS syncapi_receipt_id;
+
 -- Stores data about receipts
 CREATE TABLE IF NOT EXISTS syncapi_receipts (
 	-- The ID
-	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
+	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_receipt_id'),
 	room_id TEXT NOT NULL,
 	receipt_type TEXT NOT NULL,
 	user_id TEXT NOT NULL,
@@ -50,7 +51,7 @@ const upsertReceipt = "" +
 	" (room_id, receipt_type, user_id, event_id, receipt_ts)" +
 	" VALUES ($1, $2, $3, $4, $5)" +
 	" ON CONFLICT (room_id, receipt_type, user_id)" +
-	" DO UPDATE SET id = nextval('syncapi_stream_id'), event_id = $4, receipt_ts = $5" +
+	" DO UPDATE SET id = nextval('syncapi_receipt_id'), event_id = $4, receipt_ts = $5" +
 	" RETURNING id"
 
 const selectRoomReceipts = "" +

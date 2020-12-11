@@ -82,7 +82,7 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Re
 
 // UpsertReceipt creates new user receipts
 func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error) {
-	pos, err = r.streamIDStatements.nextStreamID(ctx, txn)
+	pos, err = r.streamIDStatements.nextReceiptID(ctx, txn)
 	if err != nil {
 		return
 	}

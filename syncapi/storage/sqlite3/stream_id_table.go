@@ -56,3 +56,13 @@ func (s *streamIDStatements) nextStreamID(ctx context.Context, txn *sql.Tx) (pos
 	err = selectStmt.QueryRowContext(ctx, "global").Scan(&pos)
 	return
 }
+
+func (s *streamIDStatements) nextReceiptID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
+	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
+	selectStmt := sqlutil.TxStmt(txn, s.selectStreamIDStmt)
+	if _, err = increaseStmt.ExecContext(ctx, "receipt"); err != nil {
+		return
+	}
+	err = selectStmt.QueryRowContext(ctx, "receipt").Scan(&pos)
+	return
+}
