@@ -15,6 +15,9 @@
 package deltas
 
 import (
+	"database/sql"
+	"fmt"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/pressly/goose"
 )
@@ -25,4 +28,30 @@ func LoadFromGoose() {
 
 func LoadFixSequences(m *sqlutil.Migrations) {
 	m.AddMigration(UpFixSequences, DownFixSequences)
+}
+
+func UpFixSequences(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		-- We need to delete all of the existing receipts because the indexes
+		-- will be wrong, and we'll get primary key violations if we try to
+		-- reuse existing stream IDs from a different sequence.
+		DELETE FROM syncapi_receipts;
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
+	return nil
+}
+
+func DownFixSequences(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		-- We need to delete all of the existing receipts because the indexes
+		-- will be wrong, and we'll get primary key violations if we try to
+		-- reuse existing stream IDs from a different sequence.
+		DELETE FROM syncapi_receipts;
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to execute downgrade: %w", err)
+	}
+	return nil
 }

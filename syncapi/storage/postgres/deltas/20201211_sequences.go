@@ -17,7 +17,18 @@ package deltas
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/pressly/goose"
 )
+
+func LoadFromGoose() {
+	goose.AddMigration(UpFixSequences, DownFixSequences)
+}
+
+func LoadFixSequences(m *sqlutil.Migrations) {
+	m.AddMigration(UpFixSequences, DownFixSequences)
+}
 
 func UpFixSequences(tx *sql.Tx) error {
 	_, err := tx.Exec(`
