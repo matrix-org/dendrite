@@ -427,7 +427,7 @@ func (rp *RequestPool) appendAccountData(
 // or timeout=0, or full_state=true, in any of the cases the request should
 // return immediately.
 func (rp *RequestPool) shouldReturnImmediately(syncReq *syncRequest) bool {
-	if syncReq.since == nil || syncReq.timeout == 0 || syncReq.wantFullState {
+	if syncReq.since.IsEmpty() || syncReq.timeout == 0 || syncReq.wantFullState {
 		return true
 	}
 	waiting, werr := rp.db.SendToDeviceUpdatesWaiting(context.TODO(), syncReq.device.UserID, syncReq.device.ID)

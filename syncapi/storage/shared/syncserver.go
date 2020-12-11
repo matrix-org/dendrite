@@ -575,6 +575,7 @@ func (d *Database) addTypingDeltaToResponse(
 				jr = *types.NewJoinResponse()
 			}
 			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
+			res.NextBatch.TypingPosition++
 			res.Rooms.Join[roomID] = jr
 		}
 	}
@@ -630,6 +631,7 @@ func (d *Database) addReceiptDeltaToResponse(
 		}
 
 		jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
+		res.NextBatch.ReceiptPosition++
 		res.Rooms.Join[roomID] = jr
 	}
 
@@ -686,7 +688,7 @@ func (d *Database) IncrementalSync(
 	numRecentEventsPerRoom int,
 	wantFullState bool,
 ) (*types.Response, error) {
-	res.NextBatch = res.NextBatch.WithUpdates(toPos)
+	res.NextBatch = fromPos.WithUpdates(toPos)
 
 	var joinedRoomIDs []string
 	var err error
@@ -778,7 +780,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		To:   toPos.PDUPosition,
 	}
 
-	res.NextBatch = res.NextBatch.WithUpdates(toPos)
+	res.NextBatch.ApplyUpdates(toPos)
 
 	// Extract room state and recent events for all rooms the user is joined to.
 	joinedRoomIDs, err = d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)

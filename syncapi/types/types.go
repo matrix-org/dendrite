@@ -187,28 +187,33 @@ func (t *StreamingToken) IsEmpty() bool {
 // If the latter StreamingToken contains a field that is not 0, it is considered an update,
 // and its value will replace the corresponding value in the StreamingToken on which WithUpdates is called.
 // If the other token has a log, they will replace any existing log on this token.
-func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) {
-	ret = *t
+func (t *StreamingToken) WithUpdates(other StreamingToken) StreamingToken {
+	ret := *t
+	ret.ApplyUpdates(other)
+	return ret
+}
+
+// ApplyUpdates applies any changes from the supplied StreamingToken. If the supplied
+// streaming token contains any positions that are not 0, they are considered updates
+// and will overwrite the value in the token.
+func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	switch {
 	case other.PDUPosition > 0:
-		ret.PDUPosition = other.PDUPosition
+		t.PDUPosition = other.PDUPosition
 	case other.TypingPosition > 0:
-		ret.TypingPosition = other.TypingPosition
+		t.TypingPosition = other.TypingPosition
 	case other.ReceiptPosition > 0:
-		ret.ReceiptPosition = other.ReceiptPosition
+		t.ReceiptPosition = other.ReceiptPosition
 	case other.SendToDevicePosition > 0:
-		ret.SendToDevicePosition = other.SendToDevicePosition
+		t.SendToDevicePosition = other.SendToDevicePosition
 	}
-	ret.Logs = make(map[string]*LogPosition)
-	for name := range t.Logs {
-		otherLog := other.Log(name)
-		if otherLog == nil {
-			continue
-		}
-		copy := *otherLog
-		ret.Logs[name] = &copy
+	if t.Logs == nil {
+		t.Logs = make(map[string]*LogPosition)
 	}
-	return ret
+	for name, pos := range other.Logs {
+		copy := *pos
+		t.Logs[name] = &copy
+	}
 }
 
 type TopologyToken struct {
