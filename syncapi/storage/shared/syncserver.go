@@ -629,6 +629,7 @@ func (d *Database) addReceiptDeltaToResponse(
 			}
 			read.User[receipt.UserID] = eduAPI.ReceiptTS{TS: receipt.Timestamp}
 			content[receipt.EventID] = read
+			res.NextBatch.ReceiptPosition++
 		}
 		ev.Content, err = json.Marshal(content)
 		if err != nil {
@@ -636,7 +637,6 @@ func (d *Database) addReceiptDeltaToResponse(
 		}
 
 		jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
-		res.NextBatch.ReceiptPosition++
 		res.Rooms.Join[roomID] = jr
 	}
 
