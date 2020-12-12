@@ -99,7 +99,7 @@ Assuming that PostgreSQL 9.6 (or later) is installed:
 * Create the component databases:
 
   ```bash
-  for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_account userapi_device naffka; do
+  for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_accounts userapi_devices naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
@@ -140,8 +140,8 @@ Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Th
 * The `server_name` entry to reflect the hostname of your Dendrite server
 * The `database` lines with an updated connection string based on your
   desired setup, e.g. replacing `database` with the name of the database:
-  * For Postgres: `postgres://dendrite:password@localhost/database`, e.g. `postgres://dendrite:password@localhost/dendrite_userapi_account.db`
-  * For SQLite on disk: `file:component.db` or `file:///path/to/component.db`, e.g. `file:userapi_account.db`
+  * For Postgres: `postgres://dendrite:password@localhost/database`, e.g. `postgres://dendrite:password@localhost/dendrite_userapi_accounts.db`
+  * For SQLite on disk: `file:component.db` or `file:///path/to/component.db`, e.g. `file:userapi_accounts.db`
   * Postgres and SQLite can be mixed and matched on different components as desired.
 * The `use_naffka` option if using Naffka in a monolith deployment
 
