@@ -580,9 +580,9 @@ func (d *Database) addTypingDeltaToResponse(
 				jr = *types.NewJoinResponse()
 			}
 			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
-			res.NextBatch.TypingPosition++
 			res.Rooms.Join[roomID] = jr
 		}
+		res.NextBatch.TypingPosition = types.StreamPosition(d.EDUCache.GetLatestSyncPosition())
 	}
 	return nil
 }
