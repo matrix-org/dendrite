@@ -162,13 +162,29 @@ func (n *Notifier) OnNewSendToDevice(
 }
 
 // OnNewReceipt updates the current position
-func (n *Notifier) OnNewReceipt(
+func (n *Notifier) OnNewTyping(
+	roomID string,
 	posUpdate types.StreamingToken,
 ) {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 	latestPos := n.currPos.WithUpdates(posUpdate)
 	n.currPos = latestPos
+
+	n.wakeupUsers(n.joinedUsers(roomID), nil, latestPos)
+}
+
+// OnNewReceipt updates the current position
+func (n *Notifier) OnNewReceipt(
+	roomID string,
+	posUpdate types.StreamingToken,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+	latestPos := n.currPos.WithUpdates(posUpdate)
+	n.currPos = latestPos
+
+	n.wakeupUsers(n.joinedUsers(roomID), nil, latestPos)
 }
 
 func (n *Notifier) OnNewKeyChange(
