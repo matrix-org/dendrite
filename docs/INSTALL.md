@@ -80,12 +80,6 @@ brew services start kafka
 
 ## Configuration
 
-### SQLite database setup
-
-Dendrite can use the built-in SQLite database engine for small setups.
-The SQLite databases do not need to be pre-built - Dendrite will
-create them automatically at startup.
-
 ### PostgreSQL database setup
 
 Assuming that PostgreSQL 9.6 (or later) is installed:
@@ -96,7 +90,23 @@ Assuming that PostgreSQL 9.6 (or later) is installed:
   sudo -u postgres createuser -P dendrite
   ```
 
-* Create the component databases:
+At this point you have a choice on whether to run all of the Dendrite
+components from a single database, or for each component to have its
+own database. For most deployments, running from a single database will
+be sufficient, although you may wish to separate them if you plan to
+split out the databases across multiple machines in the future.
+
+On macOS, omit `sudo -u postgres` from the below commands.
+
+* If you want to run all Dendrite components from a single database:
+
+  ```bash
+    sudo -u postgres createdb -O dendrite dendrite
+  ```
+
+  ... in which case your connection string will look like `postgres://user:pass@database/dendrite`.
+
+* If you want to run each Dendrite component with its own database:
 
   ```bash
   for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_account userapi_device naffka; do
@@ -104,14 +114,22 @@ Assuming that PostgreSQL 9.6 (or later) is installed:
   done
   ```
 
-(On macOS, omit `sudo -u postgres` from the above commands.)
+  ... in which case your connection string will look like `postgres://user:pass@database/dendrite_componentname`.
+
+### SQLite database setup
+
+**WARNING:** SQLite is suitable for small experimental deployments only and should not be used in production - use PostgreSQL instead for any user-facing federating installation!
+
+Dendrite can use the built-in SQLite database engine for small setups.
+The SQLite databases do not need to be pre-built - Dendrite will
+create them automatically at startup.
 
 ### Server key generation
 
 Each Dendrite installation requires:
 
-- A unique Matrix signing private key
-- A valid and trusted TLS certificate and private key
+* A unique Matrix signing private key
+* A valid and trusted TLS certificate and private key
 
 To generate a Matrix signing private key:
 
@@ -119,7 +137,7 @@ To generate a Matrix signing private key:
 ./bin/generate-keys --private-key matrix_key.pem
 ```
 
-**Warning:** Make sure take a safe backup of this key! You will likely need it if you want to reinstall Dendrite, or
+**WARNING:** Make sure take a safe backup of this key! You will likely need it if you want to reinstall Dendrite, or
 any other Matrix homeserver, on the same domain name in the future. If you lose this key, you may have trouble joining
 federated rooms.
 
@@ -129,8 +147,8 @@ For testing, you can generate a self-signed certificate and key, although this w
 ./bin/generate-keys --tls-cert server.crt --tls-key server.key
 ```
 
-If you have server keys from an older Synapse instance, 
-[convert them](serverkeyformat.md#converting-synapse-keys) to Dendrite's PEM 
+If you have server keys from an older Synapse instance,
+[convert them](serverkeyformat.md#converting-synapse-keys) to Dendrite's PEM
 format and configure them as `old_private_keys` in your config.
 
 ### Configuration file
@@ -140,7 +158,9 @@ Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Th
 * The `server_name` entry to reflect the hostname of your Dendrite server
 * The `database` lines with an updated connection string based on your
   desired setup, e.g. replacing `database` with the name of the database:
-  * For Postgres: `postgres://dendrite:password@localhost/database`, e.g. `postgres://dendrite:password@localhost/dendrite_userapi_account`
+  * For Postgres: `postgres://dendrite:password@localhost/database`, e.g.
+    * `postgres://dendrite:password@localhost/dendrite_userapi_account` to connect to PostgreSQL with SSL/TLS
+    * `postgres://dendrite:password@localhost/dendrite_userapi_account?sslmode=disable` to connect to PostgreSQL without SSL/TLS
   * For SQLite on disk: `file:component.db` or `file:///path/to/component.db`, e.g. `file:userapi_account.db`
   * Postgres and SQLite can be mixed and matched on different components as desired.
 * The `use_naffka` option if using Naffka in a monolith deployment
@@ -295,4 +315,3 @@ amongst other things.
 ```bash
 ./bin/dendrite-polylith-multi --config=dendrite.yaml userapi
 ```
-
