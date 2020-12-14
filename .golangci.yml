@@ -185,6 +185,7 @@ linters:
     - gocyclo
     - goimports # Does everything gofmt does
     - gosimple
+    - govet
     - ineffassign
     - megacheck
     - misspell # Check code comments, whereas misspell in CI checks *.md files
