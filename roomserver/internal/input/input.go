@@ -116,7 +116,7 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 
 // InputRoomEvents implements api.RoomserverInternalAPI
 func (r *Inputer) InputRoomEvents(
-	ctx context.Context,
+	_ context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) {
@@ -148,7 +148,7 @@ func (r *Inputer) InputRoomEvents(
 		// the wait group, so that the worker can notify us when this specific
 		// task has been finished.
 		tasks[i] = &inputTask{
-			ctx:   ctx,
+			ctx:   context.Background(),
 			event: &request.InputRoomEvents[i],
 			wg:    wg,
 		}
