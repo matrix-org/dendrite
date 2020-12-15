@@ -96,7 +96,7 @@ const selectMaxEventDepthSQL = "" +
 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
 
 const selectRoomNIDsForEventNIDsSQL = "" +
-	"SELECT room_nid FROM roomserver_events WHERE event_nid IN ($1)"
+	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid IN ($1)"
 
 type eventStatements struct {
 	db                                     *sql.DB
