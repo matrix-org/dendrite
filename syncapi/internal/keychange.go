@@ -79,7 +79,7 @@ func DeviceListCatchup(
 	}
 	var toOffset int64
 	toOffset = sarama.OffsetNewest
-	if toLog := to.DeviceListPosition; toLog.Offset > 0 {
+	if toLog := to.DeviceListPosition; toLog.Partition == partition && toLog.Offset > 0 {
 		toOffset = toLog.Offset
 	}
 	var queryRes api.QueryKeyChangesResponse
