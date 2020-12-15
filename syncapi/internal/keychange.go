@@ -73,15 +73,13 @@ func DeviceListCatchup(
 	offset = sarama.OffsetOldest
 	// Extract partition/offset from sync token
 	// TODO: In a world where keyserver is sharded there will be multiple partitions and hence multiple QueryKeyChanges to make.
-	logOffset := from.Log(DeviceListLogName)
-	if logOffset != nil {
-		partition = logOffset.Partition
-		offset = logOffset.Offset
+	if !from.DeviceListPosition.IsEmpty() {
+		partition = from.DeviceListPosition.Partition
+		offset = from.DeviceListPosition.Offset
 	}
 	var toOffset int64
 	toOffset = sarama.OffsetNewest
-	toLog := to.Log(DeviceListLogName)
-	if toLog != nil && toLog.Offset > 0 {
+	if toLog := to.DeviceListPosition; toLog.Partition == partition && toLog.Offset > 0 {
 		toOffset = toLog.Offset
 	}
 	var queryRes api.QueryKeyChangesResponse
@@ -130,10 +128,10 @@ func DeviceListCatchup(
 		}
 	}
 	// set the new token
-	to.SetLog(DeviceListLogName, &types.LogPosition{
+	to.DeviceListPosition = types.LogPosition{
 		Partition: queryRes.Partition,
 		Offset:    queryRes.Offset,
-	})
+	}
 	res.NextBatch = to.String()
 
 	return hasNew, nil
