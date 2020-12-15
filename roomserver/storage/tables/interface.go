@@ -10,8 +10,9 @@ import (
 )
 
 type EventJSONPair struct {
-	EventNID  types.EventNID
-	EventJSON []byte
+	EventNID    types.EventNID
+	RoomVersion gomatrixserverlib.RoomVersion
+	EventJSON   []byte
 }
 
 type EventJSON interface {
@@ -58,7 +59,7 @@ type Events interface {
 	// If an event ID is not in the database then it is omitted from the map.
 	BulkSelectEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error)
 	SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error)
-	SelectRoomNIDForEventNID(ctx context.Context, eventNID types.EventNID) (roomNID types.RoomNID, err error)
+	SelectRoomNIDsForEventNIDs(ctx context.Context, eventNIDs []types.EventNID) (roomNIDs map[types.EventNID]types.RoomNID, err error)
 }
 
 type Rooms interface {

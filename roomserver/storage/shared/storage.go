@@ -313,16 +313,18 @@ func (d *Database) Events(
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}
+	var roomNIDs map[types.EventNID]types.RoomNID
+	roomNIDs, err = d.EventsTable.SelectRoomNIDsForEventNIDs(ctx, eventNIDs)
+	if err != nil {
+		return nil, err
+	}
 	results := make([]types.Event, len(eventJSONs))
 	for i, eventJSON := range eventJSONs {
 		var roomNID types.RoomNID
 		var roomVersion gomatrixserverlib.RoomVersion
 		result := &results[i]
 		result.EventNID = eventJSON.EventNID
-		roomNID, err = d.EventsTable.SelectRoomNIDForEventNID(ctx, eventJSON.EventNID)
-		if err != nil {
-			return nil, err
-		}
+		roomNID = roomNIDs[result.EventNID]
 		if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
 			roomVersion, _ = d.Cache.GetRoomVersion(roomID)
 		}
