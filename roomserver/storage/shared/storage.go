@@ -318,22 +318,24 @@ func (d *Database) Events(
 	if err != nil {
 		return nil, err
 	}
+	uniqueRoomNIDs := make(map[types.RoomNID]struct{})
+	for _, n := range roomNIDs {
+		uniqueRoomNIDs[n] = struct{}{}
+	}
+	roomNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
+	for n := range uniqueRoomNIDs {
+		roomNIDList = append(roomNIDList, n)
+	}
+	roomVersions, err := d.RoomsTable.SelectRoomVersionsForRoomNIDs(ctx, roomNIDList)
+	if err != nil {
+		return nil, err
+	}
 	results := make([]types.Event, len(eventJSONs))
 	for i, eventJSON := range eventJSONs {
-		var roomNID types.RoomNID
-		var roomVersion gomatrixserverlib.RoomVersion
 		result := &results[i]
 		result.EventNID = eventJSON.EventNID
-		roomNID = roomNIDs[result.EventNID]
-		if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
-			roomVersion, _ = d.Cache.GetRoomVersion(roomID)
-		}
-		if roomVersion == "" {
-			roomVersion, err = d.RoomsTable.SelectRoomVersionForRoomNID(ctx, roomNID)
-			if err != nil {
-				return nil, err
-			}
-		}
+		roomNID := roomNIDs[result.EventNID]
+		roomVersion := roomVersions[roomNID]
 		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
 			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomVersion,
 		)
