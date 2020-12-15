@@ -496,6 +496,7 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomNIDsForEventNIDsStmt: rows.close() failed")
 	result := make(map[types.EventNID]types.RoomNID)
 	for rows.Next() {
 		var eventNID types.EventNID
