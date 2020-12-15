@@ -12,28 +12,12 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 	tests := map[string]*StreamingToken{
 		"s4_0_0_0": {
 			PDUPosition: 4,
-			Logs:        make(map[string]*LogPosition),
 		},
 		"s4_0_0_0.dl-0-123": {
 			PDUPosition: 4,
-			Logs: map[string]*LogPosition{
-				"dl": {
-					Partition: 0,
-					Offset:    123,
-				},
-			},
-		},
-		"s4_0_0_0.ab-1-14419482332.dl-0-123": {
-			PDUPosition: 4,
-			Logs: map[string]*LogPosition{
-				"ab": {
-					Partition: 1,
-					Offset:    14419482332,
-				},
-				"dl": {
-					Partition: 0,
-					Offset:    123,
-				},
+			DeviceListPosition: LogPosition{
+				Partition: 0,
+				Offset:    123,
 			},
 		},
 	}
@@ -58,10 +42,10 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 
 func TestSyncTokens(t *testing.T) {
 	shouldPass := map[string]string{
-		"s4_0_0_0": StreamingToken{4, 0, 0, 0, nil}.String(),
-		"s3_1_0_0": StreamingToken{3, 1, 0, 0, nil}.String(),
-		"s3_1_2_3": StreamingToken{3, 1, 2, 3, nil}.String(),
-		"t3_1":     TopologyToken{3, 1}.String(),
+		"s4_0_0_0":        StreamingToken{4, 0, 0, 0, LogPosition{}}.String(),
+		"s3_1_0_0.dl-1-2": StreamingToken{3, 1, 0, 0, LogPosition{1, 2}}.String(),
+		"s3_1_2_3":        StreamingToken{3, 1, 2, 3, LogPosition{}}.String(),
+		"t3_1":            TopologyToken{3, 1}.String(),
 	}
 
 	for a, b := range shouldPass {

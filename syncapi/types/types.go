@@ -17,7 +17,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -43,6 +42,10 @@ type StreamPosition int64
 type LogPosition struct {
 	Partition int32
 	Offset    int64
+}
+
+func (p *LogPosition) IsEmpty() bool {
+	return p.Offset == 0
 }
 
 // IsAfter returns true if this position is after `lp`.
@@ -110,22 +113,7 @@ type StreamingToken struct {
 	TypingPosition       StreamPosition
 	ReceiptPosition      StreamPosition
 	SendToDevicePosition StreamPosition
-	Logs                 map[string]*LogPosition
-}
-
-func (t *StreamingToken) SetLog(name string, lp *LogPosition) {
-	if t.Logs == nil {
-		t.Logs = make(map[string]*LogPosition)
-	}
-	t.Logs[name] = lp
-}
-
-func (t *StreamingToken) Log(name string) *LogPosition {
-	l, ok := t.Logs[name]
-	if !ok {
-		return nil
-	}
-	return l
+	DeviceListPosition   LogPosition
 }
 
 func (t StreamingToken) String() string {
@@ -134,14 +122,10 @@ func (t StreamingToken) String() string {
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
 	)
-	var logStrings []string
-	for name, lp := range t.Logs {
-		logStr := fmt.Sprintf("%s-%d-%d", name, lp.Partition, lp.Offset)
-		logStrings = append(logStrings, logStr)
+	if dl := t.DeviceListPosition; !dl.IsEmpty() {
+		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
 	}
-	sort.Strings(logStrings)
-	// E.g s11_22_33_44.dl0-134.ab1-441
-	return strings.Join(append([]string{posStr}, logStrings...), ".")
+	return posStr
 }
 
 // IsAfter returns true if ANY position in this token is greater than `other`.
@@ -155,21 +139,14 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.SendToDevicePosition > other.SendToDevicePosition:
 		return true
-	}
-	for name := range t.Logs {
-		otherLog := other.Log(name)
-		if otherLog == nil {
-			continue
-		}
-		if t.Logs[name].IsAfter(otherLog) {
-			return true
-		}
+	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
+		return true
 	}
 	return false
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition == 0
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition == 0 && t.DeviceListPosition.IsEmpty()
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -187,15 +164,8 @@ func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) 
 		ret.ReceiptPosition = other.ReceiptPosition
 	case other.SendToDevicePosition > 0:
 		ret.SendToDevicePosition = other.SendToDevicePosition
-	}
-	ret.Logs = make(map[string]*LogPosition)
-	for name := range t.Logs {
-		otherLog := other.Log(name)
-		if otherLog == nil {
-			continue
-		}
-		copy := *otherLog
-		ret.Logs[name] = &copy
+	case other.DeviceListPosition.Offset > 0:
+		ret.DeviceListPosition = other.DeviceListPosition
 	}
 	return ret
 }
@@ -294,29 +264,30 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		TypingPosition:       positions[1],
 		ReceiptPosition:      positions[2],
 		SendToDevicePosition: positions[3],
-		Logs:                 make(map[string]*LogPosition),
 	}
 	// dl-0-1234
 	// $log_name-$partition-$offset
 	for _, logStr := range categories[1:] {
 		segments := strings.Split(logStr, "-")
 		if len(segments) != 3 {
-			err = fmt.Errorf("token %s - invalid log: %s", tok, logStr)
+			err = fmt.Errorf("invalid log position %q", logStr)
 			return
 		}
-		var partition int64
-		partition, err = strconv.ParseInt(segments[1], 10, 32)
-		if err != nil {
+		switch segments[0] {
+		case "dl":
+			// Device list syncing
+			var partition, offset int
+			if partition, err = strconv.Atoi(segments[1]); err != nil {
+				return
+			}
+			if offset, err = strconv.Atoi(segments[2]); err != nil {
+				return
+			}
+			token.DeviceListPosition.Partition = int32(partition)
+			token.DeviceListPosition.Offset = int64(offset)
+		default:
+			err = fmt.Errorf("unrecognised token type %q", segments[0])
 			return
-		}
-		var offset int64
-		offset, err = strconv.ParseInt(segments[2], 10, 64)
-		if err != nil {
-			return
-		}
-		token.Logs[segments[0]] = &LogPosition{
-			Partition: int32(partition),
-			Offset:    offset,
 		}
 	}
 	return token, nil

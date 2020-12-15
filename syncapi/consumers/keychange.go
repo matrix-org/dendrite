@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	syncinternal "github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	syncapi "github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -115,11 +114,9 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}
 	// TODO: f.e queryRes.UserIDsToCount : notify users by waking up streams
 	posUpdate := types.StreamingToken{
-		Logs: map[string]*types.LogPosition{
-			syncinternal.DeviceListLogName: {
-				Offset:    msg.Offset,
-				Partition: msg.Partition,
-			},
+		DeviceListPosition: types.LogPosition{
+			Offset:    msg.Offset,
+			Partition: msg.Partition,
 		},
 	}
 	for userID := range queryRes.UserIDsToCount {
