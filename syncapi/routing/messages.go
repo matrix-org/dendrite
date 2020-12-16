@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -65,6 +66,7 @@ func OnIncomingMessagesRequest(
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
+	srp *sync.RequestPool,
 ) util.JSONResponse {
 	var err error
 
@@ -84,9 +86,17 @@ func OnIncomingMessagesRequest(
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
 	var fromStream *types.StreamingToken
-	from, err := types.NewTopologyTokenFromString(req.URL.Query().Get("from"))
+	fromQuery := req.URL.Query().Get("from")
+	if fromQuery == "" {
+		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
+		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
+		currPos := srp.Notifier.CurrentPosition()
+		fromQuery = currPos.String()
+	}
+
+	from, err := types.NewTopologyTokenFromString(fromQuery)
 	if err != nil {
-		fs, err2 := types.NewStreamTokenFromString(req.URL.Query().Get("from"))
+		fs, err2 := types.NewStreamTokenFromString(fromQuery)
 		fromStream = &fs
 		if err2 != nil {
 			return util.JSONResponse{
