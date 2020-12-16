@@ -2,6 +2,7 @@ package caching
 
 import (
 	"fmt"
+	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,19 +46,19 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
-	roomServerRoomNIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerRoomNIDsCacheName,
-		RoomServerRoomNIDsCacheMutable,
-		RoomServerRoomNIDsCacheMaxEntries,
+	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
+		RoomServerRoomIDsCacheName,
+		RoomServerRoomIDsCacheMutable,
+		RoomServerRoomIDsCacheMaxEntries,
 		enablePrometheus,
 	)
 	if err != nil {
 		return nil, err
 	}
-	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerRoomIDsCacheName,
-		RoomServerRoomIDsCacheMutable,
-		RoomServerRoomIDsCacheMaxEntries,
+	roomInfos, err := NewInMemoryLRUCachePartition(
+		RoomInfoCacheName,
+		RoomInfoCacheMutable,
+		RoomInfoCacheMaxEntries,
 		enablePrometheus,
 	)
 	if err != nil {
@@ -77,8 +78,8 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		ServerKeys:              serverKeys,
 		RoomServerStateKeyNIDs:  roomServerStateKeyNIDs,
 		RoomServerEventTypeNIDs: roomServerEventTypeNIDs,
-		RoomServerRoomNIDs:      roomServerRoomNIDs,
 		RoomServerRoomIDs:       roomServerRoomIDs,
+		RoomInfos:               roomInfos,
 		FederationEvents:        federationEvents,
 	}, nil
 }
@@ -87,6 +88,7 @@ type InMemoryLRUCachePartition struct {
 	name       string
 	mutable    bool
 	maxEntries int
+	mutex      sync.RWMutex
 	lru        *lru.Cache
 }
 
@@ -114,6 +116,8 @@ func NewInMemoryLRUCachePartition(name string, mutable bool, maxEntries int, ena
 }
 
 func (c *InMemoryLRUCachePartition) Set(key string, value interface{}) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	if !c.mutable {
 		if peek, ok := c.lru.Peek(key); ok && peek != value {
 			panic(fmt.Sprintf("invalid use of immutable cache tries to mutate existing value of %q", key))
@@ -123,6 +127,8 @@ func (c *InMemoryLRUCachePartition) Set(key string, value interface{}) {
 }
 
 func (c *InMemoryLRUCachePartition) Unset(key string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	if !c.mutable {
 		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %q", key))
 	}
@@ -130,5 +136,7 @@ func (c *InMemoryLRUCachePartition) Unset(key string) {
 }
 
 func (c *InMemoryLRUCachePartition) Get(key string) (value interface{}, ok bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 	return c.lru.Get(key)
 }
