@@ -10,6 +10,7 @@ type Caches struct {
 	RoomServerEventTypeNIDs Cache // RoomServerNIDsCache
 	RoomServerRoomNIDs      Cache // RoomServerNIDsCache
 	RoomServerRoomIDs       Cache // RoomServerNIDsCache
+	RoomInfos               Cache // RoomInfoCache
 	FederationEvents        Cache // FederationEventsCache
 }
 

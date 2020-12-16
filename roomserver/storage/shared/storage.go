@@ -124,7 +124,15 @@ func (d *Database) StateEntriesForTuples(
 }
 
 func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
-	return d.RoomsTable.SelectRoomInfo(ctx, roomID)
+	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
+		return &roomInfo, nil
+	}
+	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, roomID)
+	if err == nil && roomInfo != nil {
+		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
+		d.Cache.StoreRoomInfo(roomID, *roomInfo)
+	}
+	return roomInfo, err
 }
 
 func (d *Database) AddState(
@@ -322,13 +330,23 @@ func (d *Database) Events(
 	for _, n := range roomNIDs {
 		uniqueRoomNIDs[n] = struct{}{}
 	}
-	roomNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
+	roomVersions := make(map[types.RoomNID]gomatrixserverlib.RoomVersion)
+	fetchNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
 	for n := range uniqueRoomNIDs {
-		roomNIDList = append(roomNIDList, n)
+		if roomID, ok := d.Cache.GetRoomServerRoomID(n); ok {
+			if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
+				roomVersions[n] = roomInfo.RoomVersion
+				continue
+			}
+		}
+		fetchNIDList = append(fetchNIDList, n)
 	}
-	roomVersions, err := d.RoomsTable.SelectRoomVersionsForRoomNIDs(ctx, roomNIDList)
+	dbRoomVersions, err := d.RoomsTable.SelectRoomVersionsForRoomNIDs(ctx, fetchNIDList)
 	if err != nil {
 		return nil, err
+	}
+	for n, v := range dbRoomVersions {
+		roomVersions[n] = v
 	}
 	results := make([]types.Event, len(eventJSONs))
 	for i, eventJSON := range eventJSONs {
@@ -556,8 +574,8 @@ func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
-	if roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID); ok {
-		return roomNID, nil
+	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
+		return roomInfo.RoomNID, nil
 	}
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
@@ -568,9 +586,6 @@ func (d *Database) assignRoomNID(
 			// We raced with another insert so run the select again.
 			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 		}
-	}
-	if err == nil {
-		d.Cache.StoreRoomServerRoomNID(roomID, roomNID)
 	}
 	return roomNID, err
 }
