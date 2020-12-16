@@ -50,9 +50,10 @@ type messagesReq struct {
 }
 
 type messagesResp struct {
-	Start string                          `json:"start"`
-	End   string                          `json:"end"`
-	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+	Start       string                          `json:"start"`
+	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: so clients can hit /messages then immediately /sync with a latest sync token
+	End         string                          `json:"end"`
+	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
 }
 
 const defaultMessagesLimit = 10
@@ -87,7 +88,8 @@ func OnIncomingMessagesRequest(
 	// Pagination tokens.
 	var fromStream *types.StreamingToken
 	fromQuery := req.URL.Query().Get("from")
-	if fromQuery == "" {
+	emptyFromSupplied := fromQuery == ""
+	if emptyFromSupplied {
 		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
 		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
 		currPos := srp.Notifier.CurrentPosition()
@@ -195,14 +197,19 @@ func OnIncomingMessagesRequest(
 		"return_end":   end.String(),
 	}).Info("Responding")
 
+	res := messagesResp{
+		Chunk: clientEvents,
+		Start: start.String(),
+		End:   end.String(),
+	}
+	if emptyFromSupplied {
+		res.StartStream = fromStream.String()
+	}
+
 	// Respond with the events.
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: messagesResp{
-			Chunk: clientEvents,
-			Start: start.String(),
-			End:   end.String(),
-		},
+		JSON: res,
 	}
 }
 
