@@ -120,8 +120,8 @@ const bulkSelectEventNIDSQL = "" +
 const selectMaxEventDepthSQL = "" +
 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid = ANY($1)"
 
-const selectRoomNIDForEventNIDSQL = "" +
-	"SELECT room_nid FROM roomserver_events WHERE event_nid = $1"
+const selectRoomNIDsForEventNIDsSQL = "" +
+	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid = ANY($1)"
 
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
@@ -137,7 +137,7 @@ type eventStatements struct {
 	bulkSelectEventIDStmt                  *sql.Stmt
 	bulkSelectEventNIDStmt                 *sql.Stmt
 	selectMaxEventDepthStmt                *sql.Stmt
-	selectRoomNIDForEventNIDStmt           *sql.Stmt
+	selectRoomNIDsForEventNIDsStmt         *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -161,7 +161,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
-		{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
+		{&s.selectRoomNIDsForEventNIDsStmt, selectRoomNIDsForEventNIDsSQL},
 	}.Prepare(db)
 }
 
@@ -432,11 +432,24 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 	return result, nil
 }
 
-func (s *eventStatements) SelectRoomNIDForEventNID(
-	ctx context.Context, eventNID types.EventNID,
-) (roomNID types.RoomNID, err error) {
-	err = s.selectRoomNIDForEventNIDStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&roomNID)
-	return
+func (s *eventStatements) SelectRoomNIDsForEventNIDs(
+	ctx context.Context, eventNIDs []types.EventNID,
+) (map[types.EventNID]types.RoomNID, error) {
+	rows, err := s.selectRoomNIDsForEventNIDsStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomNIDsForEventNIDsStmt: rows.close() failed")
+	result := make(map[types.EventNID]types.RoomNID)
+	for rows.Next() {
+		var eventNID types.EventNID
+		var roomNID types.RoomNID
+		if err = rows.Scan(&eventNID, &roomNID); err != nil {
+			return nil, err
+		}
+		result[eventNID] = roomNID
+	}
+	return result, nil
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
