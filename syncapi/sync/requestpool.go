@@ -35,6 +35,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -99,6 +100,30 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 	rp.lastseen.Store(device.UserID+device.ID, time.Now())
 }
 
+func init() {
+	prometheus.MustRegister(
+		activeSyncRequests, waitingSyncRequests,
+	)
+}
+
+var activeSyncRequests = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "syncapi",
+		Name:      "active_sync_requests",
+		Help:      "The number of sync requests that are active right now",
+	},
+)
+
+var waitingSyncRequests = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "syncapi",
+		Name:      "waiting_sync_requests",
+		Help:      "The number of sync requests that are waiting to be woken by a notifier",
+	},
+)
+
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
@@ -122,6 +147,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		"limit":     syncReq.limit,
 	})
 
+	activeSyncRequests.Inc()
+	defer activeSyncRequests.Dec()
+
 	rp.updateLastSeen(req, device)
 
 	currPos := rp.notifier.CurrentPosition()
@@ -138,6 +166,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			JSON: syncData,
 		}
 	}
+
+	waitingSyncRequests.Inc()
+	defer waitingSyncRequests.Dec()
 
 	// Otherwise, we wait for the notifier to tell us if something *may* have
 	// happened. We loop in case it turns out that nothing did happen.
