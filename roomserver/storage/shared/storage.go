@@ -330,13 +330,23 @@ func (d *Database) Events(
 	for _, n := range roomNIDs {
 		uniqueRoomNIDs[n] = struct{}{}
 	}
-	roomNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
+	roomVersions := make(map[types.RoomNID]gomatrixserverlib.RoomVersion)
+	fetchNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
 	for n := range uniqueRoomNIDs {
-		roomNIDList = append(roomNIDList, n)
+		if roomID, ok := d.Cache.GetRoomServerRoomID(n); ok {
+			if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
+				roomVersions[n] = roomInfo.RoomVersion
+				continue
+			}
+		}
+		fetchNIDList = append(fetchNIDList, n)
 	}
-	roomVersions, err := d.RoomsTable.SelectRoomVersionsForRoomNIDs(ctx, roomNIDList)
+	dbRoomVersions, err := d.RoomsTable.SelectRoomVersionsForRoomNIDs(ctx, fetchNIDList)
 	if err != nil {
 		return nil, err
+	}
+	for n, v := range dbRoomVersions {
+		roomVersions[n] = v
 	}
 	results := make([]types.Event, len(eventJSONs))
 	for i, eventJSON := range eventJSONs {
