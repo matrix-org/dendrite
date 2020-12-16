@@ -52,6 +52,12 @@ func SendEvent(
 	rsAPI api.RoomserverInternalAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
+	prevEvent := req.URL.Query().Get("prev_event")
+
+	util.GetLogger(req.Context()).WithFields(logrus.Fields{
+		"prevEvent": prevEvent,
+	}).Info("prevEvent")
+
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
 	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
