@@ -128,7 +128,7 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 		return &roomInfo, nil
 	}
 	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, roomID)
-	if err == nil {
+	if err == nil && roomInfo != nil {
 		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
 		d.Cache.StoreRoomInfo(roomID, *roomInfo)
 	}
