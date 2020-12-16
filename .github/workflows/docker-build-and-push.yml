@@ -3,8 +3,8 @@
 name: "Docker Multiarch Build & Push"
 
 on:
-  push:
-    branches: [master]
+  release:
+    types: [published]
 
 env:
   DOCKER_HUB_USER: matrixdotorg
@@ -16,6 +16,9 @@ jobs:
       - 
         name: Checkout
         uses: actions/checkout@v2
+      - 
+        name: Get release tag
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -29,7 +32,7 @@ jobs:
           username: ${{ env.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
       -
-        name: Build temporary image
+        name: Build temporary (builder) image
         id: docker_build_temporary
         uses: docker/build-push-action@v2
         with:
@@ -47,7 +50,7 @@ jobs:
           file: ./build/docker/Dockerfile.monolith
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
-          tags: ${{ env.DOCKER_HUB_USER }}/dendrite-monolith:latest
+          tags: ${{ env.DOCKER_HUB_USER }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
       -
         name: Build polylith image
         id: docker_build_polylith
@@ -57,9 +60,9 @@ jobs:
           file: ./build/docker/Dockerfile.polylith
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
-          tags: ${{ env.DOCKER_HUB_USER }}/dendrite-polylith:latest
+          tags: ${{ env.DOCKER_HUB_USER }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
       -
         name: Image digest
         run: |
-          echo Monolith image digest - ${{ steps.docker_build_monolith.outputs.digest }}
-          echo Polylith image digest - ${{ steps.docker_build_polylith.outputs.digest }}
+          echo Monolith ( ${{ env.RELEASE_VERSION }} ) image digest - ${{ steps.docker_build_monolith.outputs.digest }}
+          echo Polylith ( ${{ env.RELEASE_VERSION }} ) image digest - ${{ steps.docker_build_polylith.outputs.digest }}
