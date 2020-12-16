@@ -44,7 +44,7 @@ type RequestPool struct {
 	db       storage.Database
 	cfg      *config.SyncAPI
 	userAPI  userapi.UserInternalAPI
-	notifier *Notifier
+	Notifier *Notifier
 	keyAPI   keyapi.KeyInternalAPI
 	rsAPI    roomserverAPI.RoomserverInternalAPI
 	lastseen sync.Map
@@ -152,7 +152,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	rp.updateLastSeen(req, device)
 
-	currPos := rp.notifier.CurrentPosition()
+	currPos := rp.Notifier.CurrentPosition()
 
 	if rp.shouldReturnImmediately(syncReq) {
 		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
@@ -176,7 +176,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	timer := time.NewTimer(syncReq.timeout) // case of timeout=0 is handled above
 	defer timer.Stop()
 
-	userStreamListener := rp.notifier.GetListener(*syncReq)
+	userStreamListener := rp.Notifier.GetListener(*syncReq)
 	defer userStreamListener.Close()
 
 	// We need the loop in case userStreamListener wakes up even if there isn't
