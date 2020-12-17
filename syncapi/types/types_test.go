@@ -10,10 +10,10 @@ import (
 
 func TestNewSyncTokenWithLogs(t *testing.T) {
 	tests := map[string]*StreamingToken{
-		"s4_0_0_0": {
+		"s4_0_0_0_0": {
 			PDUPosition: 4,
 		},
-		"s4_0_0_0.dl-0-123": {
+		"s4_0_0_0_0.dl-0-123": {
 			PDUPosition: 4,
 			DeviceListPosition: LogPosition{
 				Partition: 0,
