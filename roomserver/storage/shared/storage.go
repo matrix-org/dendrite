@@ -124,7 +124,15 @@ func (d *Database) StateEntriesForTuples(
 }
 
 func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
-	return d.RoomsTable.SelectRoomInfo(ctx, roomID)
+	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
+		return &roomInfo, nil
+	}
+	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, roomID)
+	if err == nil && roomInfo != nil {
+		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
+		d.Cache.StoreRoomInfo(roomID, *roomInfo)
+	}
+	return roomInfo, err
 }
 
 func (d *Database) AddState(
@@ -313,25 +321,39 @@ func (d *Database) Events(
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}
-	results := make([]types.Event, len(eventJSONs))
-	for i, eventJSON := range eventJSONs {
-		var roomNID types.RoomNID
-		var roomVersion gomatrixserverlib.RoomVersion
-		result := &results[i]
-		result.EventNID = eventJSON.EventNID
-		roomNID, err = d.EventsTable.SelectRoomNIDForEventNID(ctx, eventJSON.EventNID)
-		if err != nil {
-			return nil, err
-		}
-		if roomID, ok := d.Cache.GetRoomServerRoomID(roomNID); ok {
-			roomVersion, _ = d.Cache.GetRoomVersion(roomID)
-		}
-		if roomVersion == "" {
-			roomVersion, err = d.RoomsTable.SelectRoomVersionForRoomNID(ctx, roomNID)
-			if err != nil {
-				return nil, err
+	var roomNIDs map[types.EventNID]types.RoomNID
+	roomNIDs, err = d.EventsTable.SelectRoomNIDsForEventNIDs(ctx, eventNIDs)
+	if err != nil {
+		return nil, err
+	}
+	uniqueRoomNIDs := make(map[types.RoomNID]struct{})
+	for _, n := range roomNIDs {
+		uniqueRoomNIDs[n] = struct{}{}
+	}
+	roomVersions := make(map[types.RoomNID]gomatrixserverlib.RoomVersion)
+	fetchNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
+	for n := range uniqueRoomNIDs {
+		if roomID, ok := d.Cache.GetRoomServerRoomID(n); ok {
+			if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
+				roomVersions[n] = roomInfo.RoomVersion
+				continue
 			}
 		}
+		fetchNIDList = append(fetchNIDList, n)
+	}
+	dbRoomVersions, err := d.RoomsTable.SelectRoomVersionsForRoomNIDs(ctx, fetchNIDList)
+	if err != nil {
+		return nil, err
+	}
+	for n, v := range dbRoomVersions {
+		roomVersions[n] = v
+	}
+	results := make([]types.Event, len(eventJSONs))
+	for i, eventJSON := range eventJSONs {
+		result := &results[i]
+		result.EventNID = eventJSON.EventNID
+		roomNID := roomNIDs[result.EventNID]
+		roomVersion := roomVersions[roomNID]
 		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
 			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomVersion,
 		)
@@ -552,8 +574,8 @@ func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
-	if roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID); ok {
-		return roomNID, nil
+	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
+		return roomInfo.RoomNID, nil
 	}
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
@@ -564,9 +586,6 @@ func (d *Database) assignRoomNID(
 			// We raced with another insert so run the select again.
 			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 		}
-	}
-	if err == nil {
-		d.Cache.StoreRoomServerRoomNID(roomID, roomNID)
 	}
 	return roomNID, err
 }

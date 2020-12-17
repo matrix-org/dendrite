@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -49,9 +50,10 @@ type messagesReq struct {
 }
 
 type messagesResp struct {
-	Start string                          `json:"start"`
-	End   string                          `json:"end"`
-	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+	Start       string                          `json:"start"`
+	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: so clients can hit /messages then immediately /sync with a latest sync token
+	End         string                          `json:"end"`
+	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
 }
 
 const defaultMessagesLimit = 10
@@ -65,6 +67,7 @@ func OnIncomingMessagesRequest(
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
+	srp *sync.RequestPool,
 ) util.JSONResponse {
 	var err error
 
@@ -84,9 +87,18 @@ func OnIncomingMessagesRequest(
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
 	var fromStream *types.StreamingToken
-	from, err := types.NewTopologyTokenFromString(req.URL.Query().Get("from"))
+	fromQuery := req.URL.Query().Get("from")
+	emptyFromSupplied := fromQuery == ""
+	if emptyFromSupplied {
+		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
+		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
+		currPos := srp.Notifier.CurrentPosition()
+		fromQuery = currPos.String()
+	}
+
+	from, err := types.NewTopologyTokenFromString(fromQuery)
 	if err != nil {
-		fs, err2 := types.NewStreamTokenFromString(req.URL.Query().Get("from"))
+		fs, err2 := types.NewStreamTokenFromString(fromQuery)
 		fromStream = &fs
 		if err2 != nil {
 			return util.JSONResponse{
@@ -185,14 +197,19 @@ func OnIncomingMessagesRequest(
 		"return_end":   end.String(),
 	}).Info("Responding")
 
+	res := messagesResp{
+		Chunk: clientEvents,
+		Start: start.String(),
+		End:   end.String(),
+	}
+	if emptyFromSupplied {
+		res.StartStream = fromStream.String()
+	}
+
 	// Respond with the events.
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: messagesResp{
-			Chunk: clientEvents,
-			Start: start.String(),
-			End:   end.String(),
-		},
+		JSON: res,
 	}
 }
 

@@ -45,19 +45,19 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
-	roomServerRoomNIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerRoomNIDsCacheName,
-		RoomServerRoomNIDsCacheMutable,
-		RoomServerRoomNIDsCacheMaxEntries,
+	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
+		RoomServerRoomIDsCacheName,
+		RoomServerRoomIDsCacheMutable,
+		RoomServerRoomIDsCacheMaxEntries,
 		enablePrometheus,
 	)
 	if err != nil {
 		return nil, err
 	}
-	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerRoomIDsCacheName,
-		RoomServerRoomIDsCacheMutable,
-		RoomServerRoomIDsCacheMaxEntries,
+	roomInfos, err := NewInMemoryLRUCachePartition(
+		RoomInfoCacheName,
+		RoomInfoCacheMutable,
+		RoomInfoCacheMaxEntries,
 		enablePrometheus,
 	)
 	if err != nil {
@@ -77,8 +77,8 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		ServerKeys:              serverKeys,
 		RoomServerStateKeyNIDs:  roomServerStateKeyNIDs,
 		RoomServerEventTypeNIDs: roomServerEventTypeNIDs,
-		RoomServerRoomNIDs:      roomServerRoomNIDs,
 		RoomServerRoomIDs:       roomServerRoomIDs,
+		RoomInfos:               roomInfos,
 		FederationEvents:        federationEvents,
 	}, nil
 }
