@@ -113,6 +113,7 @@ type StreamingToken struct {
 	TypingPosition       StreamPosition
 	ReceiptPosition      StreamPosition
 	SendToDevicePosition StreamPosition
+	InvitePosition       StreamPosition
 	DeviceListPosition   LogPosition
 }
 
@@ -129,9 +130,10 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
+		t.InvitePosition,
 	)
 	if dl := t.DeviceListPosition; !dl.IsEmpty() {
 		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
@@ -150,6 +152,8 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.SendToDevicePosition > other.SendToDevicePosition:
 		return true
+	case t.InvitePosition > other.InvitePosition:
+		return true
 	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
 		return true
 	}
@@ -157,7 +161,7 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition == 0 && t.DeviceListPosition.IsEmpty()
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition == 0 && t.DeviceListPosition.IsEmpty()
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -174,16 +178,22 @@ func (t *StreamingToken) WithUpdates(other StreamingToken) StreamingToken {
 // streaming token contains any positions that are not 0, they are considered updates
 // and will overwrite the value in the token.
 func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
-	switch {
-	case other.PDUPosition > 0:
+	if other.PDUPosition > 0 {
 		t.PDUPosition = other.PDUPosition
-	case other.TypingPosition > 0:
+	}
+	if other.TypingPosition > 0 {
 		t.TypingPosition = other.TypingPosition
-	case other.ReceiptPosition > 0:
+	}
+	if other.ReceiptPosition > 0 {
 		t.ReceiptPosition = other.ReceiptPosition
-	case other.SendToDevicePosition > 0:
+	}
+	if other.SendToDevicePosition > 0 {
 		t.SendToDevicePosition = other.SendToDevicePosition
-	case other.DeviceListPosition.Offset > 0:
+	}
+	if other.InvitePosition > 0 {
+		t.InvitePosition = other.InvitePosition
+	}
+	if other.DeviceListPosition.Offset > 0 {
 		t.DeviceListPosition = other.DeviceListPosition
 	}
 }
@@ -276,7 +286,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	}
 	categories := strings.Split(tok[1:], ".")
 	parts := strings.Split(categories[0], "_")
-	var positions [4]StreamPosition
+	var positions [5]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -293,6 +303,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		TypingPosition:       positions[1],
 		ReceiptPosition:      positions[2],
 		SendToDevicePosition: positions[3],
+		InvitePosition:       positions[4],
 	}
 	// dl-0-1234
 	// $log_name-$partition-$offset

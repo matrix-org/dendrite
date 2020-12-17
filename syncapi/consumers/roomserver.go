@@ -259,6 +259,12 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) error {
+	if msg.Event.StateKey() == nil {
+		log.WithFields(log.Fields{
+			"event": string(msg.Event.JSON()),
+		}).Panicf("roomserver output log: invite has no state key")
+		return nil
+	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -269,7 +275,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(msg.Event, "", nil, types.StreamingToken{PDUPosition: pduPos})
+	s.notifier.OnNewInvite(types.StreamingToken{PDUPosition: pduPos}, *msg.Event.StateKey())
 	return nil
 }
 

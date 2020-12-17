@@ -193,6 +193,16 @@ func (n *Notifier) OnNewKeyChange(
 	n.wakeupUsers([]string{wakeUserID}, nil, n.currPos)
 }
 
+func (n *Notifier) OnNewInvite(
+	posUpdate types.StreamingToken, wakeUserID string,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
+	n.currPos.ApplyUpdates(posUpdate)
+	n.wakeupUsers([]string{wakeUserID}, nil, n.currPos)
+}
+
 // GetListener returns a UserStreamListener that can be used to wait for
 // updates for a user. Must be closed.
 // notify for anything before sincePos

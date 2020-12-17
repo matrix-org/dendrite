@@ -492,6 +492,7 @@ func (d *Database) syncPositionTx(
 		PDUPosition:     types.StreamPosition(maxEventID),
 		TypingPosition:  types.StreamPosition(d.EDUCache.GetLatestSyncPosition()),
 		ReceiptPosition: types.StreamPosition(maxReceiptID),
+		InvitePosition:  types.StreamPosition(maxInviteID),
 	}
 	return
 }
@@ -502,6 +503,7 @@ func (d *Database) addPDUDeltaToResponse(
 	ctx context.Context,
 	device userapi.Device,
 	r types.Range,
+	ir types.Range,
 	numRecentEventsPerRoom int,
 	wantFullState bool,
 	res *types.Response,
@@ -544,7 +546,7 @@ func (d *Database) addPDUDeltaToResponse(
 	}
 
 	// TODO: This should be done in getStateDeltas
-	if err = d.addInvitesToResponse(ctx, txn, device.UserID, r, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, device.UserID, ir, res); err != nil {
 		return nil, fmt.Errorf("d.addInvitesToResponse: %w", err)
 	}
 
@@ -702,8 +704,12 @@ func (d *Database) IncrementalSync(
 			From: fromPos.PDUPosition,
 			To:   toPos.PDUPosition,
 		}
+		ir := types.Range{
+			From: fromPos.InvitePosition,
+			To:   toPos.InvitePosition,
+		}
 		joinedRoomIDs, err = d.addPDUDeltaToResponse(
-			ctx, device, r, numRecentEventsPerRoom, wantFullState, res,
+			ctx, device, r, ir, numRecentEventsPerRoom, wantFullState, res,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("d.addPDUDeltaToResponse: %w", err)
@@ -784,6 +790,10 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		From: 0,
 		To:   toPos.PDUPosition,
 	}
+	ir := types.Range{
+		From: 0,
+		To:   toPos.InvitePosition,
+	}
 
 	res.NextBatch.ApplyUpdates(toPos)
 
@@ -825,7 +835,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		}
 	}
 
-	if err = d.addInvitesToResponse(ctx, txn, userID, r, res); err != nil {
+	if err = d.addInvitesToResponse(ctx, txn, userID, ir, res); err != nil {
 		return
 	}
 
