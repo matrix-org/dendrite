@@ -488,22 +488,6 @@ func Register(
 		return *resErr
 	}
 
-	accessToken, _ := auth.ExtractAccessToken(req)
-
-	// Make sure normal user isn't registering under an exclusive application
-	// service namespace. Skip this check if no app services are registered.
-	// If an access token is provided, ignore this check this is an appservice
-	// request and we will validate in validateApplicationService
-	if r.Auth.Type != authtypes.LoginTypeApplicationService &&
-		len(cfg.Derived.ApplicationServices) != 0 &&
-		accessToken == "" &&
-		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
-		}
-	}
-
 	logger := util.GetLogger(req.Context())
 	logger.WithFields(log.Fields{
 		"username":   r.Username,
@@ -586,9 +570,31 @@ func handleRegistrationFlow(
 	// TODO: Handle mapping registrationRequest parameters into session parameters
 
 	// TODO: email / msisdn auth types.
+	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
+
+	// Appservices are special and are not affected by disabled
+	// registration or user exclusivity.
+	if r.Auth.Type == authtypes.LoginTypeApplicationService ||
+		(r.Auth.Type == "" && accessTokenErr == nil) {
+		return handleApplicationServiceRegistration(
+			accessToken, accessTokenErr, req, r, cfg, userAPI,
+		)
+	}
 
 	if cfg.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
 		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
+	}
+
+	// Make sure normal user isn't registering under an exclusive application
+	// service namespace. Skip this check if no app services are registered.
+	// If an access token is provided, ignore this check this is an appservice
+	// request and we will validate in validateApplicationService
+	if len(cfg.Derived.ApplicationServices) != 0 &&
+		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
+		}
 	}
 
 	switch r.Auth.Type {
@@ -615,31 +621,6 @@ func handleRegistrationFlow(
 
 		// Add SharedSecret to the list of completed registration stages
 		AddCompletedSessionStage(sessionID, authtypes.LoginTypeSharedSecret)
-
-	case "":
-		// Extract the access token from the request, if there's one to extract
-		// (which we can know by checking whether the error is nil or not).
-		accessToken, err := auth.ExtractAccessToken(req)
-
-		// A missing auth type can mean either the registration is performed by
-		// an AS or the request is made as the first step of a registration
-		// using the User-Interactive Authentication API. This can be determined
-		// by whether the request contains an access token.
-		if err == nil {
-			return handleApplicationServiceRegistration(
-				accessToken, err, req, r, cfg, userAPI,
-			)
-		}
-
-	case authtypes.LoginTypeApplicationService:
-		// Extract the access token from the request.
-		accessToken, err := auth.ExtractAccessToken(req)
-		// Let the AS registration handler handle the process from here. We
-		// don't need a condition on that call since the registration is clearly
-		// stated as being AS-related.
-		return handleApplicationServiceRegistration(
-			accessToken, err, req, r, cfg, userAPI,
-		)
 
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
