@@ -488,7 +488,6 @@ func Register(
 		return *resErr
 	}
 
-	// Extract access token here
 	accessToken, _ := auth.ExtractAccessToken(req)
 
 	// Make sure normal user isn't registering under an exclusive application
