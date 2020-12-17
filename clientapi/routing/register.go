@@ -488,10 +488,16 @@ func Register(
 		return *resErr
 	}
 
+	// Extract access token here
+	accessToken, _ := auth.ExtractAccessToken(req)
+
 	// Make sure normal user isn't registering under an exclusive application
 	// service namespace. Skip this check if no app services are registered.
+	// If an access token is provided, ignore this check this is an appservice
+	// request and we will validate in validateApplicationService
 	if r.Auth.Type != authtypes.LoginTypeApplicationService &&
 		len(cfg.Derived.ApplicationServices) != 0 &&
+		accessToken == "" &&
 		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
