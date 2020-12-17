@@ -141,18 +141,14 @@ New users appear in /keys/changes
 Local delete device changes appear in v2 /sync
 Local new device changes appear in v2 /sync
 Local update device changes appear in v2 /sync
-Users receive device_list updates for their own devices
 Get left notifs for other users in sync and /keys/changes when user leaves
 Local device key changes get to remote servers
 Local device key changes get to remote servers with correct prev_id
 Server correctly handles incoming m.device_list_update
-Device deletion propagates over federation
 If remote user leaves room, changes device and rejoins we see update in sync
 If remote user leaves room, changes device and rejoins we see update in /keys/changes
 If remote user leaves room we no longer receive device updates
 If a device list update goes missing, the server resyncs on the next one
-Get left notifs in sync and /keys/changes when other user leaves
-Can query remote device keys using POST after notification
 Server correctly resyncs when client query keys and there is no remote cache
 Server correctly resyncs when server leaves and rejoins a room
 Device list doesn't change if remote server is down
