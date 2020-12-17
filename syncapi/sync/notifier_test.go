@@ -335,7 +335,7 @@ func waitForEvents(n *Notifier, req syncRequest) (types.StreamingToken, error) {
 		return types.StreamingToken{}, fmt.Errorf(
 			"waitForEvents timed out waiting for %s (pos=%v)", req.device.UserID, req.since,
 		)
-	case <-listener.GetNotifyChannel(*req.since):
+	case <-listener.GetNotifyChannel(req.since):
 		p := listener.GetSyncPosition()
 		return p, nil
 	}
@@ -365,7 +365,7 @@ func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) syn
 			ID:     deviceID,
 		},
 		timeout:       1 * time.Minute,
-		since:         &since,
+		since:         since,
 		wantFullState: false,
 		limit:         DefaultTimelineLimit,
 		log:           util.GetLogger(context.TODO()),

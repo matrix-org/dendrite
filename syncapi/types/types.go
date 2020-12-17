@@ -116,6 +116,17 @@ type StreamingToken struct {
 	DeviceListPosition   LogPosition
 }
 
+// This will be used as a fallback by json.Marshal.
+func (s StreamingToken) MarshalText() ([]byte, error) {
+	return []byte(s.String()), nil
+}
+
+// This will be used as a fallback by json.Unmarshal.
+func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
+	*s, err = NewStreamTokenFromString(string(text))
+	return err
+}
+
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
 		"s%d_%d_%d_%d",
