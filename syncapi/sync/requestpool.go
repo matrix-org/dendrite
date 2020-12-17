@@ -325,7 +325,6 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		// Add the updates into the sync response.
 		for _, event := range events {
 			res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
-			res.NextBatch.SendToDevicePosition++
 		}
 	}
 
