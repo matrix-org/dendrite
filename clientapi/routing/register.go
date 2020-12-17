@@ -627,6 +627,10 @@ func handleRegistrationFlow(
 		// Add Dummy to the list of completed registration stages
 		AddCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
 
+	case "":
+		// An empty auth type means that we want to fetch the available
+		// flows. It can also mean that we want to register as an appservice
+		// but that is handed above.
 	default:
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
