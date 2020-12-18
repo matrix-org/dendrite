@@ -22,6 +22,9 @@ import (
 	"strconv"
 	"sync"
 
+	// Import the sqlite3 package
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -29,7 +32,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
-	// Import the sqlite3 database driver.
 )
 
 // Database represents an account database
