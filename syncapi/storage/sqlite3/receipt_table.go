@@ -51,7 +51,7 @@ const upsertReceipt = "" +
 	" DO UPDATE SET id = $7, event_id = $8, receipt_ts = $9"
 
 const selectRoomReceipts = "" +
-	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
+	"SELECT id, room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
 	" WHERE id > $1 and room_id in ($2)"
 
@@ -99,9 +99,9 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 }
 
 // SelectRoomReceiptsAfter select all receipts for a given room after a specific timestamp
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]api.OutputReceiptEvent, error) {
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []api.OutputReceiptEvent, error) {
 	selectSQL := strings.Replace(selectRoomReceipts, "($2)", sqlutil.QueryVariadicOffset(len(roomIDs), 1), 1)
-
+	lastPos := types.StreamPosition(0)
 	params := make([]interface{}, len(roomIDs)+1)
 	params[0] = streamPos
 	for k, v := range roomIDs {
@@ -109,19 +109,23 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs
 	}
 	rows, err := r.db.QueryContext(ctx, selectSQL, params...)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query room receipts: %w", err)
+		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomReceiptsAfter: rows.close() failed")
 	var res []api.OutputReceiptEvent
 	for rows.Next() {
 		r := api.OutputReceiptEvent{}
-		err = rows.Scan(&r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
+		var id types.StreamPosition
+		err = rows.Scan(&id, &r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
 		if err != nil {
-			return res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
+			return 0, res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
 		}
 		res = append(res, r)
+		if id > lastPos {
+			lastPos = id
+		}
 	}
-	return res, rows.Err()
+	return lastPos, res, rows.Err()
 }
 
 func (s *receiptStatements) SelectMaxReceiptID(

@@ -259,6 +259,12 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) error {
+	if msg.Event.StateKey() == nil {
+		log.WithFields(log.Fields{
+			"event": string(msg.Event.JSON()),
+		}).Panicf("roomserver output log: invite has no state key")
+		return nil
+	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -269,14 +275,14 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewEvent(msg.Event, "", nil, types.StreamingToken{PDUPosition: pduPos})
+	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
 	return nil
 }
 
 func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	ctx context.Context, msg api.OutputRetireInviteEvent,
 ) error {
-	sp, err := s.db.RetireInviteEvent(ctx, msg.EventID)
+	pduPos, err := s.db.RetireInviteEvent(ctx, msg.EventID)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
@@ -287,7 +293,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	}
 	// Notify any active sync requests that the invite has been retired.
 	// Invites share the same stream counter as PDUs
-	s.notifier.OnNewEvent(nil, "", []string{msg.TargetUserID}, types.StreamingToken{PDUPosition: sp})
+	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
 	return nil
 }
 

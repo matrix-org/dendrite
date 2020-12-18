@@ -113,14 +113,27 @@ type StreamingToken struct {
 	TypingPosition       StreamPosition
 	ReceiptPosition      StreamPosition
 	SendToDevicePosition StreamPosition
+	InvitePosition       StreamPosition
 	DeviceListPosition   LogPosition
+}
+
+// This will be used as a fallback by json.Marshal.
+func (s StreamingToken) MarshalText() ([]byte, error) {
+	return []byte(s.String()), nil
+}
+
+// This will be used as a fallback by json.Unmarshal.
+func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
+	*s, err = NewStreamTokenFromString(string(text))
+	return err
 }
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
+		t.InvitePosition,
 	)
 	if dl := t.DeviceListPosition; !dl.IsEmpty() {
 		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
@@ -139,6 +152,8 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.SendToDevicePosition > other.SendToDevicePosition:
 		return true
+	case t.InvitePosition > other.InvitePosition:
+		return true
 	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
 		return true
 	}
@@ -146,33 +161,57 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition == 0 && t.DeviceListPosition.IsEmpty()
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition == 0 && t.DeviceListPosition.IsEmpty()
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
 // If the latter StreamingToken contains a field that is not 0, it is considered an update,
 // and its value will replace the corresponding value in the StreamingToken on which WithUpdates is called.
 // If the other token has a log, they will replace any existing log on this token.
-func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) {
-	ret = *t
-	switch {
-	case other.PDUPosition > 0:
-		ret.PDUPosition = other.PDUPosition
-	case other.TypingPosition > 0:
-		ret.TypingPosition = other.TypingPosition
-	case other.ReceiptPosition > 0:
-		ret.ReceiptPosition = other.ReceiptPosition
-	case other.SendToDevicePosition > 0:
-		ret.SendToDevicePosition = other.SendToDevicePosition
-	case other.DeviceListPosition.Offset > 0:
-		ret.DeviceListPosition = other.DeviceListPosition
-	}
+func (t *StreamingToken) WithUpdates(other StreamingToken) StreamingToken {
+	ret := *t
+	ret.ApplyUpdates(other)
 	return ret
+}
+
+// ApplyUpdates applies any changes from the supplied StreamingToken. If the supplied
+// streaming token contains any positions that are not 0, they are considered updates
+// and will overwrite the value in the token.
+func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
+	if other.PDUPosition > 0 {
+		t.PDUPosition = other.PDUPosition
+	}
+	if other.TypingPosition > 0 {
+		t.TypingPosition = other.TypingPosition
+	}
+	if other.ReceiptPosition > 0 {
+		t.ReceiptPosition = other.ReceiptPosition
+	}
+	if other.SendToDevicePosition > 0 {
+		t.SendToDevicePosition = other.SendToDevicePosition
+	}
+	if other.InvitePosition > 0 {
+		t.InvitePosition = other.InvitePosition
+	}
+	if other.DeviceListPosition.Offset > 0 {
+		t.DeviceListPosition = other.DeviceListPosition
+	}
 }
 
 type TopologyToken struct {
 	Depth       StreamPosition
 	PDUPosition StreamPosition
+}
+
+// This will be used as a fallback by json.Marshal.
+func (t TopologyToken) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// This will be used as a fallback by json.Unmarshal.
+func (t *TopologyToken) UnmarshalText(text []byte) (err error) {
+	*t, err = NewTopologyTokenFromString(string(text))
+	return err
 }
 
 func (t *TopologyToken) StreamToken() StreamingToken {
@@ -247,7 +286,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	}
 	categories := strings.Split(tok[1:], ".")
 	parts := strings.Split(categories[0], "_")
-	var positions [4]StreamPosition
+	var positions [5]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -264,6 +303,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		TypingPosition:       positions[1],
 		ReceiptPosition:      positions[2],
 		SendToDevicePosition: positions[3],
+		InvitePosition:       positions[4],
 	}
 	// dl-0-1234
 	// $log_name-$partition-$offset
@@ -302,7 +342,7 @@ type PrevEventRef struct {
 
 // Response represents a /sync API response. See https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-client-r0-sync
 type Response struct {
-	NextBatch   string `json:"next_batch"`
+	NextBatch   StreamingToken `json:"next_batch"`
 	AccountData struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"account_data,omitempty"`
@@ -366,7 +406,7 @@ type JoinResponse struct {
 	Timeline struct {
 		Events    []gomatrixserverlib.ClientEvent `json:"events"`
 		Limited   bool                            `json:"limited"`
-		PrevBatch string                          `json:"prev_batch"`
+		PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
 	} `json:"timeline"`
 	Ephemeral struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
@@ -424,7 +464,7 @@ type LeaveResponse struct {
 	Timeline struct {
 		Events    []gomatrixserverlib.ClientEvent `json:"events"`
 		Limited   bool                            `json:"limited"`
-		PrevBatch string                          `json:"prev_batch"`
+		PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
 	} `json:"timeline"`
 }
 
