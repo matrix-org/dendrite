@@ -46,7 +46,7 @@ type syncRequest struct {
 	device        userapi.Device
 	limit         int
 	timeout       time.Duration
-	since         *types.StreamingToken // nil means that no since token was supplied
+	since         types.StreamingToken // nil means that no since token was supplied
 	wantFullState bool
 	log           *log.Entry
 }
@@ -55,17 +55,13 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
-	var since *types.StreamingToken
-	sinceStr := req.URL.Query().Get("since")
+	since, sinceStr := types.StreamingToken{}, req.URL.Query().Get("since")
 	if sinceStr != "" {
-		tok, err := types.NewStreamTokenFromString(sinceStr)
+		var err error
+		since, err = types.NewStreamTokenFromString(sinceStr)
 		if err != nil {
 			return nil, err
 		}
-		since = &tok
-	}
-	if since == nil {
-		since = &types.StreamingToken{}
 	}
 	timelineLimit := DefaultTimelineLimit
 	// TODO: read from stored filters too
