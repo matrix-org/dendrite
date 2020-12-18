@@ -27,7 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -177,7 +176,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
@@ -216,7 +215,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		logrus.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
