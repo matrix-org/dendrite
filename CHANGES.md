@@ -1,5 +1,26 @@
 # Changelog
 
+## Dendrite 0.3.4 (2020-12-18)
+
+### Features
+
+* The stream tokens for `/sync` have been refactored, giving PDUs, typing notifications, read receipts, invites and send-to-device messages their own respective stream positions, greatly improving the correctness of sync
+* A new roominfo cache has been added, which results in less database hits in the roomserver
+* Prometheus metrics have been added for sync requests, destination queues and client API event send perceived latency
+
+### Fixes
+
+* Event IDs are no longer recalculated so often in `/sync`, which reduces CPU usage
+* Sync requests are now woken up correctly for our own device list updates
+* The device list stream position is no longer lost, so unnecessary device updates no longer appear in every other sync
+* A crash on concurrent map read/writes has been fixed in the stream token code
+* The roomserver input API no longer starts more worker goroutines than needed
+* The roomserver no longer uses the request context for queued tasks which could lead to send requests failing to be processed
+* A new index has been added to the sync API current state table, which improves lookup performance significantly
+* The client API `/joined_rooms` endpoint no longer incorrectly returns `null` if there are 0 rooms joined
+* The roomserver will now query appservices when looking up a local room alias that isn't known
+* The check on registration for appservice-exclusive namespaces has been fixed
+
 ## Dendrite 0.3.3 (2020-12-09)
 
 ### Features
