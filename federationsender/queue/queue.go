@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
@@ -44,6 +45,37 @@ type OutgoingQueues struct {
 	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
+
+func init() {
+	prometheus.MustRegister(
+		destinationQueueTotal, destinationQueueRunning,
+		destinationQueueBackingOff,
+	)
+}
+
+var destinationQueueTotal = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "federationsender",
+		Name:      "destination_queues_total",
+	},
+)
+
+var destinationQueueRunning = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "federationsender",
+		Name:      "destination_queues_running",
+	},
+)
+
+var destinationQueueBackingOff = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "federationsender",
+		Name:      "destination_queues_backing_off",
+	},
+)
 
 // NewOutgoingQueues makes a new OutgoingQueues
 func NewOutgoingQueues(
@@ -116,6 +148,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	defer oqs.queuesMutex.Unlock()
 	oq := oqs.queues[destination]
 	if oq == nil {
+		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
 			db:               oqs.db,
 			rsAPI:            oqs.rsAPI,

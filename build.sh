@@ -19,4 +19,4 @@ fi
 
 go install -trimpath -ldflags "$FLAGS" -v $PWD/`dirname $0`/cmd/...
 
-GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o main.wasm ./cmd/dendritejs
+GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o bin/main.wasm ./cmd/dendritejs

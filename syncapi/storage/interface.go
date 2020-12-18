@@ -130,9 +130,9 @@ type Database interface {
 	//      can be deleted altogether by CleanSendToDeviceUpdates
 	// The token supplied should be the current requested sync token, e.g. from the "since"
 	// parameter.
-	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, token types.StreamingToken) (events []types.SendToDeviceEvent, changes []types.SendToDeviceNID, deletions []types.SendToDeviceNID, err error)
+	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, token types.StreamingToken) (pos types.StreamPosition, events []types.SendToDeviceEvent, changes []types.SendToDeviceNID, deletions []types.SendToDeviceNID, err error)
 	// StoreNewSendForDeviceMessage stores a new send-to-device event for a user's device.
-	StoreNewSendForDeviceMessage(ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
+	StoreNewSendForDeviceMessage(ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
 	// CleanSendToDeviceUpdates will update or remove any send-to-device updates based on the
 	// result to a previous call to SendDeviceUpdatesForSync. This is separate as it allows
 	// SendToDeviceUpdatesForSync to be called multiple times if needed (e.g. before and after
