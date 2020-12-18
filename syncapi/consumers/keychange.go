@@ -112,7 +112,8 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 		log.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
 		return err
 	}
-	// TODO: f.e queryRes.UserIDsToCount : notify users by waking up streams
+	// make sure we get our own key updates too!
+	queryRes.UserIDsToCount[output.UserID] = 1
 	posUpdate := types.StreamingToken{
 		DeviceListPosition: types.LogPosition{
 			Offset:    msg.Offset,
