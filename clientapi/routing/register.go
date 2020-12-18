@@ -589,12 +589,6 @@ func handleRegistrationFlow(
 
 	// TODO: email / msisdn auth types.
 	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
-	if accessTokenErr != nil {
-		return util.JSONResponse{
-			Code: http.StatusUnauthorized,
-			JSON: jsonerror.MissingToken(accessTokenErr.Error()),
-		}
-	}
 
 	// Appservices are special and are not affected by disabled
 	// registration or user exclusivity.
