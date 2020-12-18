@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 )
 
@@ -11,6 +12,7 @@ type RoomserverInternalAPI interface {
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
 	SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI)
+	SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI)
 
 	InputRoomEvents(
 		ctx context.Context,

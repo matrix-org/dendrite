@@ -126,6 +126,7 @@ func main() {
 		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
 	}
+	rsAPI.SetAppserviceAPI(asAPI)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

@@ -161,6 +161,7 @@ func main() {
 		&base.Base, cache.New(), userAPI,
 	)
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
+	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationsender.NewInternalAPI(
 		&base.Base, federation, rsAPI, keyRing,
 	)
