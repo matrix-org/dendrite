@@ -103,7 +103,7 @@ const updateEventJSONSQL = "" +
 	"UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
 
 const selectCountStateChangesInRangeSQL = "" +
-	"SELECT COUNT(*), MIN(id), MAX(id) FROM syncapi_output_room_events" +
+	"SELECT COUNT(id), COALESCE(MIN(id), 0) AS min, COALESCE(MAX(id), 0) AS max FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (cardinality (add_state_ids) > 0 OR cardinality (remove_state_ids) > 0)"
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).

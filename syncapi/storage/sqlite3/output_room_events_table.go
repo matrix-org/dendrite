@@ -92,7 +92,7 @@ const updateEventJSONSQL = "" +
 */
 
 const selectCountStateChangesInRangeSQL = "" +
-	"SELECT COUNT(*), coalesce(MIN(id), 0) AS min, coalesce(MAX(id), 0) AS max FROM syncapi_output_room_events" +
+	"SELECT COUNT(*), MIN(id), MAX(id) AS max FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND ((add_state_ids IS NULL OR add_state_ids = '') OR (remove_state_ids IS NULL OR remove_state_ids = ''))"
 
 const selectStateInRangeSQL = "" +
