@@ -539,7 +539,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 
 	// At this point there should be no messages. We haven't sent anything
 	// yet.
-	events, updates, deletions, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{})
+	_, events, updates, deletions, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,7 +552,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	}
 
 	// Try sending a message.
-	streamPos, err := db.StoreNewSendForDeviceMessage(ctx, types.StreamPosition(0), "alice", "one", gomatrixserverlib.SendToDeviceEvent{
+	streamPos, err := db.StoreNewSendForDeviceMessage(ctx, "alice", "one", gomatrixserverlib.SendToDeviceEvent{
 		Sender:  "bob",
 		Type:    "m.type",
 		Content: json.RawMessage("{}"),
@@ -564,7 +564,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	// At this point we should get exactly one message. We're sending the sync position
 	// that we were given from the update and the send-to-device update will be updated
 	// in the database to reflect that this was the sync position we sent the message at.
-	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos})
+	_, events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -579,7 +579,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	// At this point we should still have one message because we haven't progressed the
 	// sync position yet. This is equivalent to the client failing to /sync and retrying
 	// with the same position.
-	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos})
+	_, events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -593,7 +593,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 
 	// At this point we should now have no updates, because we've progressed the sync
 	// position. Therefore the update from before will not be sent again.
-	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos + 1})
+	_, events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos + 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -607,7 +607,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 
 	// At this point we should still have no updates, because no new updates have been
 	// sent.
-	events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos + 2})
+	_, events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos + 2})
 	if err != nil {
 		t.Fatal(err)
 	}

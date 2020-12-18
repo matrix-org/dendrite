@@ -100,8 +100,14 @@ func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 
 func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, content string,
-) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
+) (pos types.StreamPosition, err error) {
+	var result sql.Result
+	result, err = sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).ExecContext(ctx, userID, deviceID, content)
+	if p, err := result.LastInsertId(); err != nil {
+		return 0, err
+	} else {
+		pos = types.StreamPosition(p)
+	}
 	return
 }
 
@@ -117,7 +123,7 @@ func (s *sendToDeviceStatements) CountSendToDeviceMessages(
 
 func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, userID, deviceID string,
-) (events []types.SendToDeviceEvent, err error) {
+) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error) {
 	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID)
 	if err != nil {
 		return
@@ -145,9 +151,12 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			}
 		}
 		events = append(events, event)
+		if types.StreamPosition(id) > lastPos {
+			lastPos = types.StreamPosition(id)
+		}
 	}
 
-	return events, rows.Err()
+	return lastPos, events, rows.Err()
 }
 
 func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(

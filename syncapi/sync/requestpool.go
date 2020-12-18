@@ -278,7 +278,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	res := types.NewResponse()
 
 	// See if we have any new tasks to do for the send-to-device messaging.
-	events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, req.since)
+	lastPos, events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, req.since)
 	if err != nil {
 		return nil, fmt.Errorf("rp.db.SendToDeviceUpdatesForSync: %w", err)
 	}
@@ -324,10 +324,10 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		// Add the updates into the sync response.
 		for _, event := range events {
 			res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
-			res.NextBatch.SendToDevicePosition++
 		}
 	}
 
+	res.NextBatch.SendToDevicePosition = lastPos
 	return res, err
 }
 
