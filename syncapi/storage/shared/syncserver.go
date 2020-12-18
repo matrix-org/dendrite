@@ -515,6 +515,7 @@ func (d *Database) addPDUDeltaToResponse(
 	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 
 	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
+	stateFilter.Limit = numRecentEventsPerRoom
 
 	// Work out which rooms to return in the response. This is done by getting not only the currently
 	// joined rooms, but also which rooms have membership transitions for this user between the 2 PDU stream positions.
