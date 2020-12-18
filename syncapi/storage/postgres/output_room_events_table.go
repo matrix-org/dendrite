@@ -106,7 +106,7 @@ const updateEventJSONSQL = "" +
 const selectStateInRangeSQL = "" +
 	"SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
-	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
+	" WHERE (id > $1 AND id <= $2) AND (cardinality (add_state_ids) > 0 OR cardinality (remove_state_ids) > 0)" +
 	" AND ( $3::text[] IS NULL OR     sender  = ANY($3)  )" +
 	" AND ( $4::text[] IS NULL OR NOT(sender  = ANY($4)) )" +
 	" AND ( $5::text[] IS NULL OR     type LIKE ANY($5)  )" +
