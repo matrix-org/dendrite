@@ -328,7 +328,18 @@ func UserIDIsWithinApplicationServiceNamespace(
 	userID string,
 	appservice *config.ApplicationService,
 ) bool {
+
+	var local, _, err = gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		// Not a valid userID
+		return false
+	}
+
 	if appservice != nil {
+		if appservice.SenderLocalpart == local {
+			return true
+		}
+
 		// Loop through given application service's namespaces and see if any match
 		for _, namespace := range appservice.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
@@ -341,6 +352,9 @@ func UserIDIsWithinApplicationServiceNamespace(
 
 	// Loop through all known application service's namespaces and see if any match
 	for _, knownAppService := range cfg.Derived.ApplicationServices {
+		if knownAppService.SenderLocalpart == local {
+			return true
+		}
 		for _, namespace := range knownAppService.NamespaceMap["users"] {
 			// AS namespaces are checked for validity in config
 			if namespace.RegexpObject.MatchString(userID) {
