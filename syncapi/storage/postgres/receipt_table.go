@@ -55,7 +55,7 @@ const upsertReceipt = "" +
 	" RETURNING id"
 
 const selectRoomReceipts = "" +
-	"SELECT room_id, receipt_type, user_id, event_id, receipt_ts" +
+	"SELECT id, room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
 	" WHERE room_id = ANY($1) AND id > $2"
 
@@ -95,22 +95,27 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 	return
 }
 
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]api.OutputReceiptEvent, error) {
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []api.OutputReceiptEvent, error) {
+	lastPos := types.StreamPosition(0)
 	rows, err := r.selectRoomReceipts.QueryContext(ctx, pq.Array(roomIDs), streamPos)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query room receipts: %w", err)
+		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomReceiptsAfter: rows.close() failed")
 	var res []api.OutputReceiptEvent
 	for rows.Next() {
 		r := api.OutputReceiptEvent{}
-		err = rows.Scan(&r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
+		var id types.StreamPosition
+		err = rows.Scan(&id, &r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
 		if err != nil {
-			return res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
+			return 0, res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
 		}
 		res = append(res, r)
+		if id > lastPos {
+			lastPos = id
+		}
 	}
-	return res, rows.Err()
+	return lastPos, res, rows.Err()
 }
 
 func (s *receiptStatements) SelectMaxReceiptID(

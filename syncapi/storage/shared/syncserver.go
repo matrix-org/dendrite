@@ -578,8 +578,8 @@ func (d *Database) addTypingDeltaToResponse(
 			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
 			res.Rooms.Join[roomID] = jr
 		}
-		res.NextBatch.TypingPosition = types.StreamPosition(d.EDUCache.GetLatestSyncPosition())
 	}
+	res.NextBatch.TypingPosition = types.StreamPosition(d.EDUCache.GetLatestSyncPosition())
 	return nil
 }
 
@@ -590,7 +590,7 @@ func (d *Database) addReceiptDeltaToResponse(
 	joinedRoomIDs []string,
 	res *types.Response,
 ) error {
-	receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), joinedRoomIDs, since.ReceiptPosition)
+	lastPos, receipts, err := d.Receipts.SelectRoomReceiptsAfter(context.TODO(), joinedRoomIDs, since.ReceiptPosition)
 	if err != nil {
 		return fmt.Errorf("unable to select receipts for rooms: %w", err)
 	}
@@ -625,7 +625,6 @@ func (d *Database) addReceiptDeltaToResponse(
 			}
 			read.User[receipt.UserID] = eduAPI.ReceiptTS{TS: receipt.Timestamp}
 			content[receipt.EventID] = read
-			res.NextBatch.ReceiptPosition++
 		}
 		ev.Content, err = json.Marshal(content)
 		if err != nil {
@@ -636,6 +635,7 @@ func (d *Database) addReceiptDeltaToResponse(
 		res.Rooms.Join[roomID] = jr
 	}
 
+	res.NextBatch.ReceiptPosition = lastPos
 	return nil
 }
 
@@ -1527,5 +1527,6 @@ func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId
 }
 
 func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error) {
-	return d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
+	_, receipts, err := d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
+	return receipts, err
 }
