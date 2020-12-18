@@ -102,6 +102,10 @@ const selectMaxEventIDSQL = "" +
 const updateEventJSONSQL = "" +
 	"UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
 
+const selectCountStateChangesInRangeSQL = "" +
+	"SELECT COUNT(*), MIN(id), MAX(id) FROM syncapi_output_room_events" +
+	" WHERE (id > $1 AND id <= $2) AND (cardinality (add_state_ids) > 0 OR cardinality (remove_state_ids) > 0)"
+
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 const selectStateInRangeSQL = "" +
 	"SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
@@ -119,15 +123,16 @@ const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
 
 type outputRoomEventsStatements struct {
-	insertEventStmt               *sql.Stmt
-	selectEventsStmt              *sql.Stmt
-	selectMaxEventIDStmt          *sql.Stmt
-	selectRecentEventsStmt        *sql.Stmt
-	selectRecentEventsForSyncStmt *sql.Stmt
-	selectEarlyEventsStmt         *sql.Stmt
-	selectStateInRangeStmt        *sql.Stmt
-	updateEventJSONStmt           *sql.Stmt
-	deleteEventsForRoomStmt       *sql.Stmt
+	insertEventStmt                    *sql.Stmt
+	selectEventsStmt                   *sql.Stmt
+	selectMaxEventIDStmt               *sql.Stmt
+	selectRecentEventsStmt             *sql.Stmt
+	selectRecentEventsForSyncStmt      *sql.Stmt
+	selectEarlyEventsStmt              *sql.Stmt
+	selectStateInRangeStmt             *sql.Stmt
+	updateEventJSONStmt                *sql.Stmt
+	deleteEventsForRoomStmt            *sql.Stmt
+	selectCountStateChangesInRangeStmt *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -161,6 +166,9 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		return nil, err
 	}
 	if s.deleteEventsForRoomStmt, err = db.Prepare(deleteEventsForRoomSQL); err != nil {
+		return nil, err
+	}
+	if s.selectCountStateChangesInRangeStmt, err = db.Prepare(selectCountStateChangesInRangeSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -445,4 +453,18 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		})
 	}
 	return result, rows.Err()
+}
+
+// SelectCountStateChangesInRange returns how many state changes there were
+// and which positions they happened between.
+func (s *outputRoomEventsStatements) SelectCountStateChangesInRange(
+	ctx context.Context, txn *sql.Tx, r types.Range,
+) (int, types.Range, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectCountStateChangesInRangeStmt)
+	var count int
+	var from, to types.StreamPosition
+	if err := stmt.QueryRowContext(ctx, r.From, r.To).Scan(&count, &from, &to); err != nil {
+		return 0, types.Range{}, err
+	}
+	return count, types.Range{From: from, To: to}, nil
 }

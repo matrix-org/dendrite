@@ -1182,8 +1182,17 @@ func (d *Database) getStateDeltas(
 	// - Get all CURRENTLY joined rooms, and add them to 'joined' block.
 	var deltas []stateDelta
 
+	// work out if any state changed, and if so, within which ranges
+	count, nr, err := d.OutputEvents.SelectCountStateChangesInRange(ctx, txn, r)
+	if err != nil {
+		return nil, nil, err
+	}
+	if count == 0 {
+		return nil, nil, nil
+	}
+
 	// get all the state events ever (i.e. for all available rooms) between these two positions
-	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter)
+	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, nr, stateFilter)
 	if err != nil {
 		return nil, nil, err
 	}
