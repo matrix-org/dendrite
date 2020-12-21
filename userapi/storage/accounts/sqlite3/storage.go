@@ -22,9 +22,6 @@ import (
 	"strconv"
 	"sync"
 
-	// Import the sqlite3 package
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
