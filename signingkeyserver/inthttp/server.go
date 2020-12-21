@@ -1,7 +1,6 @@
 package inthttp
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -9,7 +8,11 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/util"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func AddRoutes(s api.SigningKeyServerAPI, internalAPIMux *mux.Router, cache caching.ServerKeyCache) {
 	internalAPIMux.Handle(ServerKeyQueryPublicKeyPath,

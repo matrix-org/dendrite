@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
 	"github.com/tidwall/gjson"
 )
 

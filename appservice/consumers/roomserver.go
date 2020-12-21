@@ -16,7 +16,6 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
@@ -26,8 +25,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/Shopify/sarama"
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {

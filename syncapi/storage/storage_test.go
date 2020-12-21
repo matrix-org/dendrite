@@ -3,7 +3,6 @@ package storage_test
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -555,7 +554,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	streamPos, err := db.StoreNewSendForDeviceMessage(ctx, "alice", "one", gomatrixserverlib.SendToDeviceEvent{
 		Sender:  "bob",
 		Type:    "m.type",
-		Content: json.RawMessage("{}"),
+		Content: []byte("{}"),
 	})
 	if err != nil {
 		t.Fatal(err)

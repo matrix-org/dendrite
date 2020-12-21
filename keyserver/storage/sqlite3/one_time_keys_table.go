@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -93,7 +92,7 @@ func NewSqliteOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
 	return s, nil
 }
 
-func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
+func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string][]byte, error) {
 	rows, err := s.selectKeysStmt.QueryContext(ctx, userID, deviceID)
 	if err != nil {
 		return nil, err
@@ -105,7 +104,7 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 		wantSet[ka] = true
 	}
 
-	result := make(map[string]json.RawMessage)
+	result := make(map[string][]byte)
 	for rows.Next() {
 		var keyID string
 		var algorithm string
@@ -115,7 +114,7 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 		}
 		keyIDWithAlgo := algorithm + ":" + keyID
 		if wantSet[keyIDWithAlgo] {
-			result[keyIDWithAlgo] = json.RawMessage(keyJSONStr)
+			result[keyIDWithAlgo] = []byte(keyJSONStr)
 		}
 	}
 	return result, rows.Err()
@@ -180,7 +179,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 
 func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, algorithm string,
-) (map[string]json.RawMessage, error) {
+) (map[string][]byte, error) {
 	var keyID string
 	var keyJSON string
 	err := sqlutil.TxStmtContext(ctx, txn, s.selectKeyByAlgorithmStmt).QueryRowContext(ctx, userID, deviceID, algorithm).Scan(&keyID, &keyJSON)
@@ -197,7 +196,7 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 	if keyJSON == "" {
 		return nil, nil
 	}
-	return map[string]json.RawMessage{
-		algorithm + ":" + keyID: json.RawMessage(keyJSON),
+	return map[string][]byte{
+		algorithm + ":" + keyID: []byte(keyJSON),
 	}, err
 }

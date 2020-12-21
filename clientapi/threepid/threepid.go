@@ -16,7 +16,6 @@ package threepid
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -25,7 +24,11 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/setup/config"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // EmailAssociationRequest represents the request defined at https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-register-email-requesttoken
 type EmailAssociationRequest struct {

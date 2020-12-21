@@ -16,7 +16,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -42,10 +41,10 @@ type UserInternalAPI interface {
 
 // InputAccountDataRequest is the request for InputAccountData
 type InputAccountDataRequest struct {
-	UserID      string          // required: the user to set account data for
-	RoomID      string          // optional: the room to associate the account data with
-	DataType    string          // required: the data type of the data
-	AccountData json.RawMessage // required: the message content
+	UserID      string // required: the user to set account data for
+	RoomID      string // optional: the room to associate the account data with
+	DataType    string // required: the data type of the data
+	AccountData []byte // required: the message content
 }
 
 // InputAccountDataResponse is the response for InputAccountData
@@ -111,8 +110,8 @@ type QueryAccountDataRequest struct {
 
 // QueryAccountDataResponse is the response for QueryAccountData
 type QueryAccountDataResponse struct {
-	GlobalAccountData map[string]json.RawMessage            // type -> data
-	RoomAccountData   map[string]map[string]json.RawMessage // room -> type -> data
+	GlobalAccountData map[string][]byte            // type -> data
+	RoomAccountData   map[string]map[string][]byte // room -> type -> data
 }
 
 // QueryDevicesRequest is the request for QueryDevices

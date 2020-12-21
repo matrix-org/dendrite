@@ -16,16 +16,19 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // Type represents an auth type
 // https://matrix.org/docs/spec/client_server/r0.6.1#authentication-types

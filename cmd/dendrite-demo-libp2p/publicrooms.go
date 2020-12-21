@@ -16,7 +16,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -24,12 +23,15 @@ import (
 
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 
+	jsoniter "github.com/json-iterator/go"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 const MaintenanceInterval = time.Second * 10
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type discoveredRoom struct {
 	time time.Time

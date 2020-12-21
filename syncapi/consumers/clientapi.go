@@ -16,17 +16,20 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
+
+	"github.com/Shopify/sarama"
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {

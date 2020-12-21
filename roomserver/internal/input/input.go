@@ -17,19 +17,22 @@ package input
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/Shopify/sarama"
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type Inputer struct {
 	DB                   storage.Database

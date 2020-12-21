@@ -1,14 +1,16 @@
 package inthttp
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/util"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // AddRoutes adds the AppServiceQueryAPI handlers to the http.ServeMux.
 func AddRoutes(a api.AppServiceQueryAPI, internalAPIMux *mux.Router) {

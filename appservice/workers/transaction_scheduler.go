@@ -17,7 +17,6 @@ package workers
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -28,6 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,6 +37,8 @@ var (
 	transactionBatchSize = 50
 	// Timeout for sending a single transaction to an application service.
 	transactionTimeout = time.Second * 60
+
+	json = jsoniter.ConfigCompatibleWithStandardLibrary
 )
 
 // SetupTransactionWorkers spawns a separate goroutine for each application

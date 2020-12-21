@@ -15,9 +15,12 @@
 package jsonerror
 
 import (
-	"encoding/json"
 	"testing"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func TestLimitExceeded(t *testing.T) {
 	e := LimitExceeded("too fast", 5000)

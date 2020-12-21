@@ -15,13 +15,14 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
 )
 
@@ -33,6 +34,8 @@ var (
 	// ErrInvalidSyncTokenLen is returned when the pagination token is an
 	// invalid length
 	ErrInvalidSyncTokenLen = fmt.Errorf("Sync token has an invalid length")
+
+	json = jsoniter.ConfigCompatibleWithStandardLibrary
 )
 
 // StreamPosition represents the offset in the sync stream a client is at.
@@ -335,9 +338,9 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 
 // PrevEventRef represents a reference to a previous event in a state event upgrade
 type PrevEventRef struct {
-	PrevContent   json.RawMessage `json:"prev_content"`
-	ReplacesState string          `json:"replaces_state"`
-	PrevSender    string          `json:"prev_sender"`
+	PrevContent   []byte `json:"prev_content"`
+	ReplacesState string `json:"replaces_state"`
+	PrevSender    string `json:"prev_sender"`
 }
 
 // Response represents a /sync API response. See https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-client-r0-sync
@@ -429,14 +432,14 @@ func NewJoinResponse() *JoinResponse {
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
 type InviteResponse struct {
 	InviteState struct {
-		Events []json.RawMessage `json:"events"`
+		Events [][]byte `json:"events"`
 	} `json:"invite_state"`
 }
 
 // NewInviteResponse creates an empty response with initialised arrays.
 func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 	res := InviteResponse{}
-	res.InviteState.Events = []json.RawMessage{}
+	res.InviteState.Events = [][]byte{}
 
 	// First see if there's invite_room_state in the unsigned key of the invite.
 	// If there is then unmarshal it into the response. This will contain the

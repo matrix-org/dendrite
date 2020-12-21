@@ -16,7 +16,6 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"sync"

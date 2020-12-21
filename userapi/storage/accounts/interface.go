@@ -16,7 +16,6 @@ package accounts
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -36,13 +35,13 @@ type Database interface {
 	// account already exists, it will return nil, ErrUserExists.
 	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*api.Account, error)
 	CreateGuestAccount(ctx context.Context) (*api.Account, error)
-	SaveAccountData(ctx context.Context, localpart, roomID, dataType string, content json.RawMessage) error
-	GetAccountData(ctx context.Context, localpart string) (global map[string]json.RawMessage, rooms map[string]map[string]json.RawMessage, err error)
+	SaveAccountData(ctx context.Context, localpart, roomID, dataType string, content []byte) error
+	GetAccountData(ctx context.Context, localpart string) (global map[string][]byte, rooms map[string]map[string][]byte, err error)
 	// GetAccountDataByType returns account data matching a given
 	// localpart, room ID and type.
 	// If no account data could be found, returns nil
 	// Returns an error if there was an issue with the retrieval
-	GetAccountDataByType(ctx context.Context, localpart, roomID, dataType string) (data json.RawMessage, err error)
+	GetAccountDataByType(ctx context.Context, localpart, roomID, dataType string) (data []byte, err error)
 	GetNewNumericLocalpart(ctx context.Context) (int64, error)
 	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
 	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)

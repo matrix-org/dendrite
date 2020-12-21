@@ -16,11 +16,13 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/matrix-org/gomatrixserverlib"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // SendTyping sends a typing event to EDU server
 func SendTyping(

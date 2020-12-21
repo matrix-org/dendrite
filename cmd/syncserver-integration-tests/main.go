@@ -15,7 +15,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -28,6 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 var (
@@ -51,6 +52,8 @@ var (
 	testDatabaseName = test.Defaulting(os.Getenv("DATABASE_NAME"), "syncserver_test")
 	// The postgres connection config for connecting to the test database.
 	testDatabase = test.Defaulting(os.Getenv("DATABASE"), fmt.Sprintf("dbname=%s sslmode=disable binary_parameters=yes", testDatabaseName))
+
+	json = jsoniter.ConfigCompatibleWithStandardLibrary
 )
 
 const inputTopic = "syncserverInput"

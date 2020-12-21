@@ -17,7 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -28,7 +27,12 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/gorilla/mux"
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // Setup registers HTTP handlers with the given ServeMux.
 // The provided publicAPIMux MUST have `UseEncodedPath()` enabled or else routes will incorrectly

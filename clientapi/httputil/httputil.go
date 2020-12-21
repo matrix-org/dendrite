@@ -15,14 +15,17 @@
 package httputil
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"unicode/utf8"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // UnmarshalJSONRequest into the given interface pointer. Returns an error JSON response if
 // there was a problem unmarshalling. Calling this function consumes the request body.

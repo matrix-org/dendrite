@@ -18,6 +18,8 @@ package postgres
 import (
 	"database/sql"
 
+	jsoniter "github.com/json-iterator/go"
+
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -26,6 +28,8 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.

@@ -22,8 +22,12 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // Notifier will wake up sleeping requests when there is some new data.
 // It does not tell requests what that data is, only the sync position which

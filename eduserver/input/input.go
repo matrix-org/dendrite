@@ -18,16 +18,18 @@ package input
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/Shopify/sarama"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // EDUServerInputAPI implements api.EDUServerInputAPI
 type EDUServerInputAPI struct {

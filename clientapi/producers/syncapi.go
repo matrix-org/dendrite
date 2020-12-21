@@ -15,12 +15,14 @@
 package producers
 
 import (
-	"encoding/json"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/internal/eventutil"
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // SyncAPIProducer produces events for the sync API server to consume
 type SyncAPIProducer struct {

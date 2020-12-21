@@ -16,10 +16,8 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -27,6 +25,8 @@ import (
 	syncapi "github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/Shopify/sarama"
 	log "github.com/sirupsen/logrus"
 )
 

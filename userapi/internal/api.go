@@ -17,7 +17,6 @@ package internal
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -313,17 +312,17 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 		return fmt.Errorf("cannot query account data of remote users: got %s want %s", domain, a.ServerName)
 	}
 	if req.DataType != "" {
-		var data json.RawMessage
+		var data []byte
 		data, err = a.AccountDB.GetAccountDataByType(ctx, local, req.RoomID, req.DataType)
 		if err != nil {
 			return err
 		}
-		res.RoomAccountData = make(map[string]map[string]json.RawMessage)
-		res.GlobalAccountData = make(map[string]json.RawMessage)
+		res.RoomAccountData = make(map[string]map[string][]byte)
+		res.GlobalAccountData = make(map[string][]byte)
 		if data != nil {
 			if req.RoomID != "" {
 				if _, ok := res.RoomAccountData[req.RoomID]; !ok {
-					res.RoomAccountData[req.RoomID] = make(map[string]json.RawMessage)
+					res.RoomAccountData[req.RoomID] = make(map[string][]byte)
 				}
 				res.RoomAccountData[req.RoomID][req.DataType] = data
 			} else {

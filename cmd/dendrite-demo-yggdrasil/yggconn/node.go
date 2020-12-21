@@ -19,7 +19,6 @@ import (
 	"crypto/ed25519"
 	"crypto/tls"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -39,7 +38,10 @@ import (
 	"github.com/yggdrasil-network/yggdrasil-go/src/yggdrasil"
 
 	gologme "github.com/gologme/log"
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type Node struct {
 	core         *yggdrasil.Core

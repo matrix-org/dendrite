@@ -18,7 +18,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"

@@ -16,10 +16,9 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
+	stdjson "encoding/json"
 	"fmt"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
@@ -27,8 +26,13 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/Shopify/sarama"
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // OutputEDUConsumer consumes events that originate in EDU server.
 type OutputEDUConsumer struct {
@@ -131,7 +135,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *sarama.ConsumerMessage) err
 		Sender:    ote.Sender,
 		Type:      ote.Type,
 		MessageID: util.RandomString(32),
-		Messages: map[string]map[string]json.RawMessage{
+		Messages: map[string]map[string]stdjson.RawMessage{
 			ote.UserID: {
 				ote.DeviceID: ote.Content,
 			},

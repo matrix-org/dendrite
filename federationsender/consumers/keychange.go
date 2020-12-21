@@ -16,7 +16,6 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/Shopify/sarama"

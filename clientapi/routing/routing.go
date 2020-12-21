@@ -15,11 +15,9 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -37,7 +35,12 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/gorilla/mux"
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -480,7 +483,7 @@ func Setup(
 	r0mux.Handle("/pushrules/",
 		httputil.MakeExternalAPI("push_rules", func(req *http.Request) util.JSONResponse {
 			// TODO: Implement push rules API
-			res := json.RawMessage(`{
+			res := []byte(`{
 					"global": {
 						"content": [],
 						"override": [],

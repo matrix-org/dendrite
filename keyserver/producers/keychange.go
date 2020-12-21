@@ -16,13 +16,15 @@ package producers
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/Shopify/sarama"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // KeyChange produces key change events for the sync API and federation sender to consume
 type KeyChange struct {

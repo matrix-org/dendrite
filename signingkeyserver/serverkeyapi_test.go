@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -18,7 +17,11 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type server struct {
 	name      gomatrixserverlib.ServerName        // server name

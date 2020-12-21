@@ -17,7 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -26,7 +25,12 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/gorilla/mux"
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // Setup configures the given mux with sync-server listeners
 //

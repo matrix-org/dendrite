@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"

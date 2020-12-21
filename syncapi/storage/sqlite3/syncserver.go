@@ -18,6 +18,8 @@ package sqlite3
 import (
 	"database/sql"
 
+	jsoniter "github.com/json-iterator/go"
+
 	// Import the sqlite3 package
 	_ "github.com/mattn/go-sqlite3"
 
@@ -27,6 +29,8 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.

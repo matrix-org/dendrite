@@ -18,11 +18,12 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -64,6 +65,8 @@ const (
 	// checking again the default value.
 	invalidTxnID = -2
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type eventsStatements struct {
 	db                                     *sql.DB

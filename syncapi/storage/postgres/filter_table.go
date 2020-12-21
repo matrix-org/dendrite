@@ -17,7 +17,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"

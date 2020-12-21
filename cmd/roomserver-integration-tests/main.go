@@ -18,15 +18,12 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"encoding/json"
-
-	"net/http"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/test"
@@ -34,6 +31,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 var (
@@ -55,6 +54,8 @@ var (
 	testDatabaseName = defaulting(os.Getenv("DATABASE_NAME"), "roomserver_test")
 	// The postgres connection config for connecting to the test database.
 	testDatabase = defaulting(os.Getenv("DATABASE"), fmt.Sprintf("dbname=%s binary_parameters=yes", testDatabaseName))
+
+	json = jsoniter.ConfigCompatibleWithStandardLibrary
 )
 
 var exe = test.KafkaExecutor{

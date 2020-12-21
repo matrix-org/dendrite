@@ -16,7 +16,6 @@ package perform
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -27,8 +26,12 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type Peeker struct {
 	ServerName gomatrixserverlib.ServerName

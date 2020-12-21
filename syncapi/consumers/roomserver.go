@@ -16,10 +16,8 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"

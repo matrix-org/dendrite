@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -184,9 +183,9 @@ func NotaryKeys(
 	}
 
 	var response struct {
-		ServerKeys []json.RawMessage `json:"server_keys"`
+		ServerKeys [][]byte `json:"server_keys"`
 	}
-	response.ServerKeys = []json.RawMessage{}
+	response.ServerKeys = [][]byte{}
 
 	for serverName := range req.ServerKeys {
 		var keys *gomatrixserverlib.ServerKeys

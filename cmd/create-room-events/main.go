@@ -18,7 +18,6 @@ package main
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -27,6 +26,8 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -48,6 +49,8 @@ var (
 	messageCount     = flag.Int("message-count", 10, "The number of m.room.messsage events to generate")
 	format           = flag.String("Format", "InputRoomEvent", "The output format to use for the messages: InputRoomEvent or Event")
 	ver              = flag.String("version", string(gomatrixserverlib.RoomVersionV1), "Room version to generate events as")
+
+	json = jsoniter.ConfigCompatibleWithStandardLibrary
 )
 
 // By default we use a private key of 0.

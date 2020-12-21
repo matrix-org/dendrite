@@ -1,14 +1,17 @@
 package inthttp
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/util"
+
+	"github.com/gorilla/mux"
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // AddRoutes adds the FederationSenderInternalAPI handlers to the http.ServeMux.
 // nolint:gocyclo

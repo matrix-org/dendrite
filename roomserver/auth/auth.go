@@ -13,10 +13,12 @@
 package auth
 
 import (
-	"encoding/json"
-
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // TODO: This logic should live in gomatrixserverlib
 

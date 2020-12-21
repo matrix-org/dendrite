@@ -17,7 +17,6 @@ package queue
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -27,10 +26,14 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers

@@ -16,7 +16,6 @@ package acls
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"regexp"
@@ -24,8 +23,12 @@ import (
 	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type ServerACLDatabase interface {
 	// GetKnownRooms returns a list of all rooms we know about.

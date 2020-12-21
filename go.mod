@@ -7,6 +7,7 @@ require (
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/json-iterator/go v1.1.10
 	github.com/lib/pq v1.8.0
 	github.com/libp2p/go-libp2p v0.11.0
 	github.com/libp2p/go-libp2p-circuit v0.3.1
@@ -33,6 +34,7 @@ require (
 	github.com/pressly/goose v2.7.0-rc5+incompatible
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.7.0
+	github.com/stretchr/testify v1.6.1
 	github.com/tidwall/gjson v1.6.3
 	github.com/tidwall/match v1.0.2 // indirect
 	github.com/tidwall/sjson v1.1.2

@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -102,7 +102,7 @@ func Backfill(
 		}
 	}
 
-	eventJSONs := []json.RawMessage{}
+	eventJSONs := []stdjson.RawMessage{}
 	for _, e := range gomatrixserverlib.ReverseTopologicalOrdering(
 		evs,
 		gomatrixserverlib.TopologicalOrderByPrevEvents,

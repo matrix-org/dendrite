@@ -6,7 +6,6 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
@@ -30,6 +30,7 @@ var (
 	client = &http.Client{
 		Timeout: 10 * time.Second,
 	}
+	json = jsoniter.ConfigCompatibleWithStandardLibrary
 )
 
 // Basic sanity check of MSC2836 logic. Injects a thread that looks like:
@@ -162,9 +163,9 @@ func TestMSC2836(t *testing.T) {
 	// make everyone joined to each other's rooms
 	nopRsAPI := &testRoomserverAPI{
 		userToJoinedRooms: map[string][]string{
-			alice:   []string{roomID},
-			bob:     []string{roomID},
-			charlie: []string{roomID},
+			alice:   {roomID},
+			bob:     {roomID},
+			charlie: {roomID},
 		},
 		events: map[string]*gomatrixserverlib.HeaderedEvent{
 			eventA.EventID(): eventA,

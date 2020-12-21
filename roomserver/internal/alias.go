@@ -16,7 +16,6 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -25,7 +24,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // RoomserverInternalAPIDatabase has the storage APIs needed to implement the alias API.
 type RoomserverInternalAPIDatabase interface {
@@ -200,7 +203,7 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	if err != nil {
 		return err
 	}
-	err = builder.SetContent(json.RawMessage(rawContent))
+	err = builder.SetContent([]byte(rawContent))
 	if err != nil {
 		return err
 	}

@@ -16,7 +16,7 @@ package routing
 
 import (
 	"context"
-	"encoding/json"
+	stdjson "encoding/json"
 	"net/http"
 	"time"
 
@@ -45,7 +45,7 @@ func GetEvent(
 	return util.JSONResponse{Code: http.StatusOK, JSON: gomatrixserverlib.Transaction{
 		Origin:         origin,
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
-		PDUs: []json.RawMessage{
+		PDUs: []stdjson.RawMessage{
 			event.JSON(),
 		},
 	}}

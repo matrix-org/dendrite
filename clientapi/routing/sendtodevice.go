@@ -13,7 +13,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -39,7 +38,7 @@ func SendToDevice(
 	}
 
 	var httpReq struct {
-		Messages map[string]map[string]json.RawMessage `json:"messages"`
+		Messages map[string]map[string][]byte `json:"messages"`
 	}
 	resErr := httputil.UnmarshalJSONRequest(req, &httpReq)
 	if resErr != nil {

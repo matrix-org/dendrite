@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -14,8 +13,12 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // PerformLeaveRequest implements api.FederationSenderInternalAPI
 func (r *FederationSenderInternalAPI) PerformDirectoryLookup(

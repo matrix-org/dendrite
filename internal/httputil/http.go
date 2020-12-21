@@ -17,15 +17,17 @@ package httputil
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
+	jsoniter "github.com/json-iterator/go"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // PostJSON performs a POST request with JSON on an internal HTTP API
 func PostJSON(

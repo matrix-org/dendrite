@@ -16,7 +16,6 @@ package sync
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"

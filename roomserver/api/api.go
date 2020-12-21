@@ -5,7 +5,11 @@ import (
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {

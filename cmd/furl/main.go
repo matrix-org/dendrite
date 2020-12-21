@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -14,11 +13,15 @@ import (
 	"os"
 
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 var requestFrom = flag.String("from", "", "the server name that the request should originate from")
 var requestKey = flag.String("key", "matrix_key.pem", "the private key to use when signing the request")
 var requestPost = flag.Bool("post", false, "send a POST request instead of GET (pipe input into stdin or type followed by Ctrl-D)")
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // nolint:gocyclo
 func main() {

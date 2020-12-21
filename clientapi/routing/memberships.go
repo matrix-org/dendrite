@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"

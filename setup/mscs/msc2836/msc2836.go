@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
@@ -41,6 +41,8 @@ import (
 const (
 	constRelType = "m.reference"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type EventRelationshipRequest struct {
 	EventID         string `json:"event_id"`

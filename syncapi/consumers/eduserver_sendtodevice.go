@@ -16,9 +16,7 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -27,6 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/Shopify/sarama"
 	log "github.com/sirupsen/logrus"
 )
 

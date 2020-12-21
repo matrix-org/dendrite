@@ -16,7 +16,7 @@ package queue
 
 import (
 	"context"
-	"encoding/json"
+	stdjson "encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
@@ -367,7 +368,7 @@ func (oq *destinationQueue) nextTransaction(
 
 	// Create the transaction.
 	t := gomatrixserverlib.Transaction{
-		PDUs: []json.RawMessage{},
+		PDUs: []stdjson.RawMessage{},
 		EDUs: []gomatrixserverlib.EDU{},
 	}
 	t.Origin = oq.origin
@@ -390,7 +391,7 @@ func (oq *destinationQueue) nextTransaction(
 		if pdu == nil || pdu.pdu == nil {
 			continue
 		}
-		// Append the JSON of the event, since this is a json.RawMessage type in the
+		// Append the JSON of the event, since this is a []byte type in the
 		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, pdu.pdu.JSON())
 		pduReceipts = append(pduReceipts, pdu.receipt)

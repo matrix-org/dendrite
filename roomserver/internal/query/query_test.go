@@ -16,13 +16,16 @@ package query
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // used to implement RoomserverInternalAPIEventDB to test getAuthChain
 type getEventDB struct {

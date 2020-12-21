@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -14,6 +13,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
 )
 
@@ -25,6 +26,8 @@ import (
 // in their database on receipt of a redaction. Also note that we still modify the event JSON to set the field
 // unsigned.redacted_because - we just don't clear out the content fields yet.
 const redactionsArePermanent = true
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type Database struct {
 	DB                         *sql.DB

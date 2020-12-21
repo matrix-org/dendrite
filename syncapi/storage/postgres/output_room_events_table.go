@@ -18,7 +18,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"sort"
 
 	"github.com/matrix-org/dendrite/internal"

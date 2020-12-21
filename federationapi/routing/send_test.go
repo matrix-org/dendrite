@@ -2,7 +2,7 @@ package routing
 
 import (
 	"context"
-	"encoding/json"
+	stdjson "encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -21,7 +21,7 @@ const (
 
 var (
 	testRoomVersion = gomatrixserverlib.RoomVersionV1
-	testData        = []json.RawMessage{
+	testData        = [][]byte{
 		[]byte(`{"auth_events":[],"content":{"creator":"@userid:kaer.morhen"},"depth":0,"event_id":"$0ok8ynDp7kjc95e3:kaer.morhen","hashes":{"sha256":"17kPoH+h0Dk4Omn7Sus0qMb6+oGcf+CZFEgDhv7UKWs"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[],"prev_state":[],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"jP4a04f5/F10Pw95FPpdCyKAO44JOwUQ/MZOOeA/RTU1Dn+AHPMzGSaZnuGjRr/xQuADt+I3ctb5ZQfLKNzHDw"}},"state_key":"","type":"m.room.create"}`),
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}]],"content":{"membership":"join"},"depth":1,"event_id":"$LEwEu0kxrtu5fOiS:kaer.morhen","hashes":{"sha256":"B7M88PhXf3vd1LaFtjQutFu4x/w7fHD28XKZ4sAsJTo"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}]],"prev_state":[],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"p2vqmuJn7ZBRImctSaKbXCAxCcBlIjPH9JHte1ouIUGy84gpu4eLipOvSBCLL26hXfC0Zrm4WUto6Hr+ohdrCg"}},"state_key":"@userid:kaer.morhen","type":"m.room.member"}`),
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}],["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"content":{"join_rule":"public"},"depth":2,"event_id":"$SMHlqUrNhhBBRLeN:kaer.morhen","hashes":{"sha256":"vIuJQvmMjrGxshAkj1SXe0C4RqvMbv4ZADDw9pFCWqQ"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"prev_state":[],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"hBMsb3Qppo3RaqqAl4JyTgaiWEbW5hlckATky6PrHun+F3YM203TzG7w9clwuQU5F5pZoB1a6nw+to0hN90FAw"}},"state_key":"","type":"m.room.join_rules"}`),
@@ -362,7 +362,7 @@ func (c *txnFedClient) LookupMissingEvents(ctx context.Context, s gomatrixserver
 	return c.getMissingEvents(missing)
 }
 
-func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
+func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederationClient, pdus []stdjson.RawMessage) *txnReq {
 	t := &txnReq{
 		rsAPI:      rsAPI,
 		eduAPI:     &testEDUProducer{},
@@ -445,7 +445,7 @@ func TestBasicTransaction(t *testing.T) {
 			}
 		},
 	}
-	pdus := []json.RawMessage{
+	pdus := []stdjson.RawMessage{
 		testData[len(testData)-1], // a message event
 	}
 	txn := mustCreateTransaction(rsAPI, &txnFedClient{}, pdus)
@@ -465,7 +465,7 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 			}
 		},
 	}
-	pdus := []json.RawMessage{
+	pdus := []stdjson.RawMessage{
 		testData[len(testData)-1], // a message event
 	}
 	txn := mustCreateTransaction(rsAPI, &txnFedClient{}, pdus)
@@ -550,7 +550,7 @@ func TestTransactionFetchMissingPrevEvents(t *testing.T) {
 		},
 	}
 
-	pdus := []json.RawMessage{
+	pdus := []stdjson.RawMessage{
 		inputEvent.JSON(),
 	}
 	txn := mustCreateTransaction(rsAPI, cli, pdus)
@@ -713,7 +713,7 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 		// /event for event B returns it
 		getEvent: map[string]gomatrixserverlib.Transaction{
 			eventB.EventID(): {
-				PDUs: []json.RawMessage{
+				PDUs: []stdjson.RawMessage{
 					eventB.JSON(),
 				},
 			},
@@ -735,7 +735,7 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 		},
 	}
 
-	pdus := []json.RawMessage{
+	pdus := []stdjson.RawMessage{
 		eventD.JSON(),
 	}
 	txn := mustCreateTransaction(rsAPI, cli, pdus)

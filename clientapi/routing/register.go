@@ -19,7 +19,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
