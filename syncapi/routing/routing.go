@@ -42,6 +42,7 @@ func Setup(
 	r0mux := csMux.PathPrefix("/r0").Subrouter()
 
 	// TODO: Add AS support for all handlers below.
+	// asdf
 	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
 	})).Methods(http.MethodGet, http.MethodOptions)

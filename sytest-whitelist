@@ -123,6 +123,7 @@ We should see our own leave event when rejecting an invite, even if history_visi
 Newly left rooms appear in the leave section of gapped sync
 Previously left rooms don't appear in the leave section of sync
 Left rooms appear in the leave section of full state sync
+Archived rooms only contain history from before the user left
 Newly banned rooms appear in the leave section of incremental sync
 Newly banned rooms appear in the leave section of incremental sync
 local user can join room with version 1

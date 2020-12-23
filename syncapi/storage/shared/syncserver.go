@@ -762,6 +762,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 	ctx context.Context, res *types.Response,
 	userID string, device userapi.Device,
 	numRecentEventsPerRoom int,
+	includeLeave bool,
 ) (
 	toPos types.StreamingToken,
 	joinedRoomIDs []string,
@@ -811,6 +812,9 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		if err != nil {
 			return
 		}
+
+		// TODO: Add "leave" rooms.
+
 		res.Rooms.Join[roomID] = *jr
 	}
 

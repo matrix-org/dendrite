@@ -30,11 +30,13 @@ import (
 )
 
 const defaultSyncTimeout = time.Duration(0)
+const defaultIncludeLeave = false
 const DefaultTimelineLimit = 20
 
 type filter struct {
 	Room struct {
-		Timeline struct {
+		IncludeLeave *bool `json:"include_leave"`
+		Timeline     struct {
 			Limit *int `json:"limit"`
 		} `json:"timeline"`
 	} `json:"room"`
@@ -45,6 +47,7 @@ type syncRequest struct {
 	ctx           context.Context
 	device        userapi.Device
 	limit         int
+	includeLeave  bool
 	timeout       time.Duration
 	since         types.StreamingToken // nil means that no since token was supplied
 	wantFullState bool
@@ -64,6 +67,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		}
 	}
 	timelineLimit := DefaultTimelineLimit
+	includeLeave := defaultIncludeLeave
 	// TODO: read from stored filters too
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {
@@ -73,6 +77,9 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			err := json.Unmarshal([]byte(filterQuery), &f)
 			if err == nil && f.Room.Timeline.Limit != nil {
 				timelineLimit = *f.Room.Timeline.Limit
+			}
+			if err == nil && f.Room.IncludeLeave != nil {
+				includeLeave = *f.Room.IncludeLeave
 			}
 		} else {
 			// attempt to load the filter ID
@@ -84,6 +91,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery)
 			if err == nil {
 				timelineLimit = f.Room.Timeline.Limit
+				includeLeave = f.Room.IncludeLeave
 			}
 		}
 	}
@@ -95,6 +103,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		since:         since,
 		wantFullState: wantFullState,
 		limit:         timelineLimit,
+		includeLeave:  includeLeave,
 		log:           util.GetLogger(req.Context()),
 	}, nil
 }

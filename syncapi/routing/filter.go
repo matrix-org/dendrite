@@ -65,6 +65,7 @@ type filterResponse struct {
 	FilterID string `json:"filter_id"`
 }
 
+// TODO: asdf
 //PutFilter implements POST /_matrix/client/r0/user/{userId}/filter
 func PutFilter(
 	req *http.Request, device *api.Device, syncDB storage.Database, userID string,

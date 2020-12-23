@@ -140,11 +140,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	}
 
 	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
-		"user_id":   device.UserID,
-		"device_id": device.ID,
-		"since":     syncReq.since,
-		"timeout":   syncReq.timeout,
-		"limit":     syncReq.limit,
+		"user_id":       device.UserID,
+		"device_id":     device.ID,
+		"since":         syncReq.since,
+		"timeout":       syncReq.timeout,
+		"limit":         syncReq.limit,
+		"include_leave": syncReq.includeLeave,
 	})
 
 	activeSyncRequests.Inc()
@@ -285,7 +286,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 
 	// TODO: handle ignored users
 	if req.since.IsEmpty() {
-		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
+		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit, req.includeLeave)
 		if err != nil {
 			return res, fmt.Errorf("rp.db.CompleteSync: %w", err)
 		}
