@@ -64,10 +64,10 @@ type Database interface {
 	// from when the device sent the event via an API that included a transaction
 	// ID. A response object must be provided for IncrementaSync to populate - it
 	// will not create one.
-	IncrementalSync(ctx context.Context, res *types.Response, device userapi.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
+	IncrementalSync(ctx context.Context, res *types.Response, device userapi.Device, fromPos, toPos types.StreamingToken, filter *gomatrixserverlib.Filter, wantFullState bool) (*types.Response, error)
 	// CompleteSync returns a complete /sync API response for the given user. A response object
 	// must be provided for CompleteSync to populate - it will not create one.
-	CompleteSync(ctx context.Context, res *types.Response, device userapi.Device, numRecentEventsPerRoom int) (*types.Response, error)
+	CompleteSync(ctx context.Context, res *types.Response, device userapi.Device, filter *gomatrixserverlib.Filter) (*types.Response, error)
 	// GetAccountDataInRange returns all account data for a given user inserted or
 	// updated between two given positions
 	// Returns a map following the format data[roomID] = []dataTypes

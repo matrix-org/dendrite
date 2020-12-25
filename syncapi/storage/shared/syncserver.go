@@ -685,7 +685,7 @@ func (d *Database) IncrementalSync(
 	ctx context.Context, res *types.Response,
 	device userapi.Device,
 	fromPos, toPos types.StreamingToken,
-	numRecentEventsPerRoom int,
+	filter *gomatrixserverlib.Filter,
 	wantFullState bool,
 ) (*types.Response, error) {
 	res.NextBatch = fromPos.WithUpdates(toPos)
@@ -697,6 +697,9 @@ func (d *Database) IncrementalSync(
 			From: fromPos.PDUPosition,
 			To:   toPos.PDUPosition,
 		}
+
+		numRecentEventsPerRoom := filter.Room.Timeline.Limit
+
 		joinedRoomIDs, err = d.addPDUDeltaToResponse(
 			ctx, device, r, numRecentEventsPerRoom, wantFullState, res,
 		)
@@ -761,8 +764,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 func (d *Database) getResponseWithPDUsForCompleteSync(
 	ctx context.Context, res *types.Response,
 	userID string, device userapi.Device,
-	numRecentEventsPerRoom int,
-	includeLeave bool,
+	filter *gomatrixserverlib.Filter,
 ) (
 	toPos types.StreamingToken,
 	joinedRoomIDs []string,
@@ -801,13 +803,11 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		return
 	}
 
-	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
-
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
 		var jr *types.JoinResponse
 		jr, err = d.getJoinResponseForCompleteSync(
-			ctx, txn, roomID, r, &stateFilter, numRecentEventsPerRoom, device,
+			ctx, txn, roomID, r, filter, device,
 		)
 		if err != nil {
 			return
@@ -827,7 +827,7 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = d.getJoinResponseForCompleteSync(
-				ctx, txn, peek.RoomID, r, &stateFilter, numRecentEventsPerRoom, device,
+				ctx, txn, peek.RoomID, r, filter, device,
 			)
 			if err != nil {
 				return
@@ -848,14 +848,17 @@ func (d *Database) getJoinResponseForCompleteSync(
 	ctx context.Context, txn *sql.Tx,
 	roomID string,
 	r types.Range,
-	stateFilter *gomatrixserverlib.StateFilter,
-	numRecentEventsPerRoom int, device userapi.Device,
+	filter *gomatrixserverlib.Filter,
+	device userapi.Device,
 ) (jr *types.JoinResponse, err error) {
 	var stateEvents []*gomatrixserverlib.HeaderedEvent
-	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
+	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, &filter.Room.State)
 	if err != nil {
 		return
 	}
+
+	numRecentEventsPerRoom := filter.Room.Timeline.Limit
+
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 	var recentStreamEvents []types.StreamEvent
@@ -924,11 +927,13 @@ func (d *Database) getJoinResponseForCompleteSync(
 }
 
 func (d *Database) CompleteSync(
-	ctx context.Context, res *types.Response,
-	device userapi.Device, numRecentEventsPerRoom int,
+	ctx context.Context,
+	res *types.Response,
+	device userapi.Device,
+	filter *gomatrixserverlib.Filter,
 ) (*types.Response, error) {
 	toPos, joinedRoomIDs, err := d.getResponseWithPDUsForCompleteSync(
-		ctx, res, device.UserID, device, numRecentEventsPerRoom,
+		ctx, res, device.UserID, device, filter,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("d.getResponseWithPDUsForCompleteSync: %w", err)

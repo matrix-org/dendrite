@@ -140,12 +140,11 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	}
 
 	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
-		"user_id":       device.UserID,
-		"device_id":     device.ID,
-		"since":         syncReq.since,
-		"timeout":       syncReq.timeout,
-		"limit":         syncReq.limit,
-		"include_leave": syncReq.includeLeave,
+		"user_id":   device.UserID,
+		"device_id": device.ID,
+		"since":     syncReq.since,
+		"timeout":   syncReq.timeout,
+		"filter":    syncReq.filter,
 	})
 
 	activeSyncRequests.Inc()
@@ -248,9 +247,12 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 			JSON: jsonerror.InvalidArgumentValue("bad 'to' value"),
 		}
 	}
+
 	// work out room joins/leaves
+	var f gomatrixserverlib.Filter
+	f.Room.Timeline.Limit = 10
 	res, err := rp.db.IncrementalSync(
-		req.Context(), types.NewResponse(), *device, fromToken, toToken, 10, false,
+		req.Context(), types.NewResponse(), *device, fromToken, toToken, &f, false,
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("Failed to IncrementalSync")
@@ -286,12 +288,12 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 
 	// TODO: handle ignored users
 	if req.since.IsEmpty() {
-		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit, req.includeLeave)
+		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.filter)
 		if err != nil {
 			return res, fmt.Errorf("rp.db.CompleteSync: %w", err)
 		}
 	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, req.since, latestPos, req.limit, req.wantFullState)
+		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, req.since, latestPos, req.filter, req.wantFullState)
 		if err != nil {
 			return res, fmt.Errorf("rp.db.IncrementalSync: %w", err)
 		}

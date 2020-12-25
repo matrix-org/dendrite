@@ -33,21 +33,11 @@ const defaultSyncTimeout = time.Duration(0)
 const defaultIncludeLeave = false
 const DefaultTimelineLimit = 20
 
-type filter struct {
-	Room struct {
-		IncludeLeave *bool `json:"include_leave"`
-		Timeline     struct {
-			Limit *int `json:"limit"`
-		} `json:"timeline"`
-	} `json:"room"`
-}
-
 // syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
 type syncRequest struct {
 	ctx           context.Context
 	device        userapi.Device
-	limit         int
-	includeLeave  bool
+	filter        *gomatrixserverlib.Filter
 	timeout       time.Duration
 	since         types.StreamingToken // nil means that no since token was supplied
 	wantFullState bool
@@ -66,21 +56,14 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			return nil, err
 		}
 	}
-	timelineLimit := DefaultTimelineLimit
-	includeLeave := defaultIncludeLeave
+
+	var f *gomatrixserverlib.Filter
 	// TODO: read from stored filters too
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {
 		if filterQuery[0] == '{' {
 			// attempt to parse the timeline limit at least
-			var f filter
-			err := json.Unmarshal([]byte(filterQuery), &f)
-			if err == nil && f.Room.Timeline.Limit != nil {
-				timelineLimit = *f.Room.Timeline.Limit
-			}
-			if err == nil && f.Room.IncludeLeave != nil {
-				includeLeave = *f.Room.IncludeLeave
-			}
+			json.Unmarshal([]byte(filterQuery), &f)
 		} else {
 			// attempt to load the filter ID
 			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -88,10 +71,10 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, err
 			}
-			f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery)
-			if err == nil {
-				timelineLimit = f.Room.Timeline.Limit
-				includeLeave = f.Room.IncludeLeave
+			f, err = syncDB.GetFilter(req.Context(), localpart, filterQuery)
+			if err != nil {
+				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
+				return nil, err
 			}
 		}
 	}
@@ -102,8 +85,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		timeout:       timeout,
 		since:         since,
 		wantFullState: wantFullState,
-		limit:         timelineLimit,
-		includeLeave:  includeLeave,
+		filter:        f,
 		log:           util.GetLogger(req.Context()),
 	}, nil
 }
