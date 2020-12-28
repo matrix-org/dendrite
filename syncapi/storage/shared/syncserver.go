@@ -698,7 +698,10 @@ func (d *Database) IncrementalSync(
 			To:   toPos.PDUPosition,
 		}
 
-		numRecentEventsPerRoom := filter.Room.Timeline.Limit
+		numRecentEventsPerRoom := gomatrixserverlib.DefaultRoomEventFilter().Limit
+		if filter != nil {
+			numRecentEventsPerRoom = filter.Room.Timeline.Limit
+		}
 
 		joinedRoomIDs, err = d.addPDUDeltaToResponse(
 			ctx, device, r, numRecentEventsPerRoom, wantFullState, res,
@@ -813,9 +816,25 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 			return
 		}
 
-		// TODO: Add "leave" rooms.
-
 		res.Rooms.Join[roomID] = *jr
+	}
+
+	// Extract room state and recent events for all rooms the user has left
+	leaveRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Leave)
+	if err != nil {
+		return
+	}
+	// Build up a /sync response. Add leave rooms.
+	for _, roomID := range leaveRoomIDs {
+		var lr *types.LeaveResponse
+		lr, err = d.getLeaveResponseForCompleteSync(
+			ctx, txn, roomID, r, filter, device,
+		)
+		if err != nil {
+			return
+		}
+
+		res.Rooms.Leave[roomID] = *lr
 	}
 
 	// Add peeked rooms.
@@ -924,6 +943,33 @@ func (d *Database) getJoinResponseForCompleteSync(
 	jr.Timeline.Limited = limited
 	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 	return jr, nil
+}
+
+func (d *Database) getLeaveResponseForCompleteSync(
+	ctx context.Context, txn *sql.Tx,
+	roomID string,
+	r types.Range,
+	filter *gomatrixserverlib.Filter,
+	device userapi.Device,
+) (lr *types.LeaveResponse, err error) {
+	jr, err := d.getJoinResponseForCompleteSync(
+		ctx,
+		txn,
+		roomID,
+		r,
+		filter,
+		device,
+	)
+	if err != nil {
+		return
+	}
+
+	lr = types.NewLeaveResponse()
+	lr.Timeline.PrevBatch = jr.Timeline.PrevBatch
+	lr.Timeline.Events = jr.Timeline.Events
+	lr.Timeline.Limited = jr.Timeline.Limited
+	lr.State.Events = jr.State.Events
+	return lr, nil
 }
 
 func (d *Database) CompleteSync(

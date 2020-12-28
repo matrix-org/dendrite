@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -105,7 +104,7 @@ func PutFilter(
 	limitRes := gjson.GetBytes(body, "room.timeline.limit")
 	if !limitRes.Exists() {
 		util.GetLogger(req.Context()).Infof("missing timeline limit, using default")
-		filter.Room.Timeline.Limit = sync.DefaultTimelineLimit
+		filter.Room.Timeline.Limit = gomatrixserverlib.DefaultRoomEventFilter().Limit
 	}
 
 	// Validate generates a user-friendly error
