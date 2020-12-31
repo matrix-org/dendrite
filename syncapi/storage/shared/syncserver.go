@@ -991,7 +991,7 @@ func (d *Database) getLeaveResponseForCompleteSync(
 				}
 				break
 			} else if membership == gomatrixserverlib.Leave {
-				leaveEventIndex = i - 1
+				leaveEventIndex = i
 			}
 
 			if joinEventIndex != -1 && leaveEventIndex != -1 {
@@ -999,11 +999,12 @@ func (d *Database) getLeaveResponseForCompleteSync(
 			}
 		}
 	}
+
 	// We can assume that if the person joined, they also left and will only show the events between (inclusive)
 	if joinEventIndex != -1 && leaveEventIndex != -1 {
-		// cut all events earlier than the join (but not the join itself)
-		// and cut all events after the person left
-		recentStreamEvents = recentStreamEvents[joinEventIndex:leaveEventIndex]
+		// cut all events earlier the join (exclude the join itself too)
+		// and cut all events after the person left (exclude the leave itself too)
+		recentStreamEvents = recentStreamEvents[joinEventIndex+1 : leaveEventIndex]
 		limited = false // so clients know not to try to backpaginate
 	}
 
