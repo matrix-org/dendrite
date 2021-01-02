@@ -389,9 +389,10 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 
 	if localpart != "" { // AS is masquerading as another user
 		// Verify that the user is registered
-		_, err := a.AccountDB.GetAccountByLocalpart(ctx, localpart)
-		// Verify that the account belongs to the appservice user namespaces
-		if err == nil && appService.IsInterestedInUserID(appServiceUserID) {
+		account, err := a.AccountDB.GetAccountByLocalpart(ctx, localpart)
+		// Verify that the account exists and either appServiceID matches or
+		// it belongs to the appservice user namespaces
+		if err == nil && (account.AppServiceID == appService.ID || appService.IsInterestedInUserID(appServiceUserID)) {
 			// Set the userID of dummy device
 			dev.UserID = appServiceUserID
 			return &dev, nil
