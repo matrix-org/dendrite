@@ -253,6 +253,18 @@ media_api:
     height: 480
     method: scale
 
+# Configuration for experimental MSC's
+mscs:
+  # A list of enabled MSC's
+  # Currently valid values are:
+  # - msc2836         (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
+  mscs: []
+  database:
+    connection_string: file:mscs.db
+    max_open_conns: 10
+    max_idle_conns: 2
+    conn_max_lifetime: -1
+
 # Configuration for the Room Server.
 room_server:
   internal_api:
