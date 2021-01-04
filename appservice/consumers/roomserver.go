@@ -159,5 +159,33 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		}).WithError(err).Errorf("Unable to get aliases for room")
 	}
 
+	// Check if any of the members in the room match the appservice
+	// TODO: appserviceIsInterestedInEvent should be wrapped in a cache
+	// as this part can involve a lot of DB lookups
+	membershipReq := api.QueryMembershipsForRoomRequest{
+		JoinedOnly: true,
+		RoomID:     event.RoomID(),
+	}
+	var membershipRes api.QueryMembershipsForRoomResponse
+
+	// XXX: This should be membership at the time of the event, not current membership. I'm not sure
+	// how to extract this though, help?!
+	// TODO: We also don't need to get all the members. Could we query the DB directly with a set of
+	// regex to limit the cost involved?
+	log.WithFields(log.Fields{
+		"room_id":          event.RoomID(),
+		"membership_count": len(membershipRes.JoinEvents),
+	}).Infof("Got membership")
+	if err := s.rsAPI.QueryMembershipsForRoom(ctx, &membershipReq, &membershipRes); err == nil {
+		for _, ev := range membershipRes.JoinEvents {
+			if appservice.IsInterestedInUserID(*ev.StateKey) {
+				return true
+			}
+		}
+	} else {
+		log.WithFields(log.Fields{
+			"room_id": event.RoomID(),
+		}).WithError(err).Errorf("Unable to get membership for room")
+	}
 	return false
 }
