@@ -125,6 +125,8 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 
 // appserviceIsInterestedInEvent returns a boolean depending on whether a given
 // event falls within one of a given application service's namespaces.
+//
+// TODO: This should be cached, see https://github.com/matrix-org/dendrite/issues/1682
 func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
 	// No reason to queue events if they'll never be sent to the application
 	// service
@@ -160,26 +162,21 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	}
 
 	// Check if any of the members in the room match the appservice
-	// TODO: appserviceIsInterestedInEvent should be wrapped in a cache
-	// as this part can involve a lot of DB lookups
-	membershipReq := api.QueryMembershipsForRoomRequest{
-		JoinedOnly: true,
-		RoomID:     event.RoomID(),
+	membershipReq := api.QueryStateAfterEventsRequest{
+		PrevEventIDs: []string{event.EventID()},
+		RoomID:       event.RoomID(),
 	}
-	var membershipRes api.QueryMembershipsForRoomResponse
+	var membershipRes api.QueryStateAfterEventsResponse
 
-	// XXX: This should be membership at the time of the event, not current membership. I'm not sure
-	// how to extract this though, help?!
-	// TODO: We also don't need to get all the members. Could we query the DB directly with a set of
-	// regex to limit the cost involved?
-	log.WithFields(log.Fields{
-		"room_id":          event.RoomID(),
-		"membership_count": len(membershipRes.JoinEvents),
-	}).Infof("Got membership")
-	if err := s.rsAPI.QueryMembershipsForRoom(ctx, &membershipReq, &membershipRes); err == nil {
-		for _, ev := range membershipRes.JoinEvents {
-			if appservice.IsInterestedInUserID(*ev.StateKey) {
-				return true
+	// XXX: This could potentially race if the state for the event is not known yet
+	// e.g. the event came over federation but we do not have the full state persisted.
+	if err := s.rsAPI.QueryStateAfterEvents(ctx, &membershipReq, &membershipRes); err == nil {
+		for _, ev := range membershipRes.StateEvents {
+			if ev.Type() == gomatrixserverlib.MRoomMember {
+				var membership, _ = ev.Membership()
+				if membership == gomatrixserverlib.Join && appservice.IsInterestedInUserID(*ev.StateKey()) {
+					return true
+				}
 			}
 		}
 	} else {
