@@ -3,7 +3,7 @@ services:
   # PostgreSQL is needed for both polylith and monolith modes.
   postgres:
     hostname: postgres
-    image: postgres:9.6
+    image: postgres:11
     restart: always
     volumes:
       - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
