@@ -25,7 +25,6 @@ import (
 
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 
-// nolint:gocyclo
 func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)

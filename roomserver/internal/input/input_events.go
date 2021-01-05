@@ -37,7 +37,6 @@ import (
 // difficulty is in ensuring that we correctly annotate events with the correct
 // state deltas when sending to kafka streams
 // TODO: Break up function - we should probably do transaction ID checks before calling this.
-// nolint:gocyclo
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
 	input *api.InputRoomEvent,

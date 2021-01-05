@@ -100,9 +100,6 @@ linters-settings:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
     #local-prefixes: github.com/org/project
-  gocyclo:
-    # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 13
   maligned:
     # print struct with more effective memory layout or not, false by default
     suggest-new: true
@@ -182,7 +179,6 @@ linters:
     - deadcode
     - errcheck
     - goconst
-    - gocyclo
     - goimports # Does everything gofmt does
     - gosimple
     - govet
@@ -203,6 +199,7 @@ linters:
     - gochecknoglobals
     - gochecknoinits
     - gocritic
+    - gocyclo
     - gofmt
     - golint
     - gosec # Should turn back on soon

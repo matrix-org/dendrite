@@ -277,7 +277,6 @@ func (t *txnReq) haveEventIDs() map[string]bool {
 	return result
 }
 
-// nolint:gocyclo
 func (t *txnReq) processEDUs(ctx context.Context) {
 	for _, e := range t.EDUs {
 		switch e.Type {
@@ -537,7 +536,6 @@ func checkAllowedByState(e *gomatrixserverlib.Event, stateEvents []*gomatrixserv
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
-// nolint:gocyclo
 func (t *txnReq) processEventWithMissingState(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) error {
 	// Do this with a fresh context, so that we keep working even if the
 	// original request times out. With any luck, by the time the remote
@@ -838,7 +836,6 @@ retryAllowedState:
 // begin from. Returns an error only if we should terminate the transaction which initiated /get_missing_events
 // This function recursively calls txnReq.processEvent with the missing events, which will be processed before this function returns.
 // This means that we may recursively call this function, as we spider back up prev_events.
-// nolint:gocyclo
 func (t *txnReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (newEvents []*gomatrixserverlib.Event, err error) {
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
 	needed := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{e})
@@ -950,7 +947,6 @@ func (t *txnReq) lookupMissingStateViaState(ctx context.Context, roomID, eventID
 	return &state, nil
 }
 
-// nolint:gocyclo
 func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
 	*gomatrixserverlib.RespState, error) {
 	util.GetLogger(ctx).Infof("lookupMissingStateViaStateIDs %s", eventID)

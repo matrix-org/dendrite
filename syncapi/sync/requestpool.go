@@ -273,7 +273,6 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 }
 
-// nolint:gocyclo
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (*types.Response, error) {
 	res := types.NewResponse()
 
@@ -342,7 +341,6 @@ func (rp *RequestPool) appendDeviceLists(
 	return data, nil
 }
 
-// nolint:gocyclo
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
 	accountDataFilter *gomatrixserverlib.EventFilter,

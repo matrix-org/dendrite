@@ -49,7 +49,6 @@ func (r *Queryer) QueryLatestEventsAndState(
 }
 
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
-// nolint:gocyclo
 func (r *Queryer) QueryStateAfterEvents(
 	ctx context.Context,
 	request *api.QueryStateAfterEventsRequest,
@@ -372,7 +371,6 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 }
 
 // QueryMissingEvents implements api.RoomserverInternalAPI
-// nolint:gocyclo
 func (r *Queryer) QueryMissingEvents(
 	ctx context.Context,
 	request *api.QueryMissingEventsRequest,
