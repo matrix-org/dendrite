@@ -121,5 +121,6 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Receipts:            receipts,
 		EDUCache:            cache.New(),
 	}
+	d.Database.ConfigureProviders()
 	return nil
 }

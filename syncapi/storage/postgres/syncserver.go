@@ -108,5 +108,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		Receipts:            receipts,
 		EDUCache:            cache.New(),
 	}
+	d.Database.ConfigureProviders()
 	return &d, nil
 }

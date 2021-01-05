@@ -50,6 +50,35 @@ type Database struct {
 	Filter              tables.Filter
 	Receipts            tables.Receipts
 	EDUCache            *cache.EDUCache
+
+	PDUStreamProvider    types.StreamProvider
+	PDUTopologyProvider  types.TopologyProvider
+	TypingStreamProvider types.StreamProvider
+}
+
+// ConfigureProviders creates instances of the various
+// stream and topology providers provided by the storage
+// packages.
+func (d *Database) ConfigureProviders() {
+	d.PDUStreamProvider = &PDUStreamProvider{DB: d}
+	d.TypingStreamProvider = &TypingStreamProvider{DB: d}
+
+	d.PDUStreamProvider.StreamSetup()
+	d.TypingStreamProvider.StreamSetup()
+
+	d.PDUTopologyProvider = &PDUTopologyProvider{DB: d}
+}
+
+func (d *Database) PDUStream() types.StreamProvider {
+	return d.PDUStreamProvider
+}
+
+func (d *Database) PDUTopology() types.TopologyProvider {
+	return d.PDUTopologyProvider
+}
+
+func (d *Database) TypingStream() types.StreamProvider {
+	return d.TypingStreamProvider
 }
 
 // Events lookups a list of event by their event ID.
@@ -325,6 +354,7 @@ func (d *Database) WriteEvent(
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
 		}
 		pduPosition = pos
+		d.PDUStreamProvider.StreamAdvance(pduPosition)
 
 		if err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return fmt.Errorf("d.Topology.InsertEventInTopology: %w", err)

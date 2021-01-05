@@ -41,13 +41,15 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db       storage.Database
-	cfg      *config.SyncAPI
-	userAPI  userapi.UserInternalAPI
-	Notifier *Notifier
-	keyAPI   keyapi.KeyInternalAPI
-	rsAPI    roomserverAPI.RoomserverInternalAPI
-	lastseen sync.Map
+	db           storage.Database
+	cfg          *config.SyncAPI
+	userAPI      userapi.UserInternalAPI
+	Notifier     *Notifier
+	keyAPI       keyapi.KeyInternalAPI
+	rsAPI        roomserverAPI.RoomserverInternalAPI
+	lastseen     sync.Map
+	pduStream    types.StreamProvider
+	typingStream types.StreamProvider
 }
 
 // NewRequestPool makes a new RequestPool
@@ -56,7 +58,17 @@ func NewRequestPool(
 	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *RequestPool {
-	rp := &RequestPool{db, cfg, userAPI, n, keyAPI, rsAPI, sync.Map{}}
+	rp := &RequestPool{
+		db:           db,
+		cfg:          cfg,
+		userAPI:      userAPI,
+		Notifier:     n,
+		keyAPI:       keyAPI,
+		rsAPI:        rsAPI,
+		lastseen:     sync.Map{},
+		pduStream:    db.PDUStream(),
+		typingStream: db.TypingStream(),
+	}
 	go rp.cleanLastSeen()
 	return rp
 }
@@ -147,80 +159,57 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		"limit":     syncReq.limit,
 	})
 
+	_ = logger
+
 	activeSyncRequests.Inc()
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
 
-	currPos := rp.Notifier.CurrentPosition()
-
-	if rp.shouldReturnImmediately(syncReq) {
-		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
-		if err != nil {
-			logger.WithError(err).Error("rp.currentSyncForUser failed")
-			return jsonerror.InternalServerError()
-		}
-		logger.WithField("next", syncData.NextBatch).Info("Responding immediately")
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: syncData,
-		}
+	syncData = types.NewResponse()
+	filter := gomatrixserverlib.DefaultEventFilter()
+	syncData.NextBatch = types.StreamingToken{
+		PDUPosition:    rp.pduStream.StreamLatestPosition(syncReq.ctx),
+		TypingPosition: rp.typingStream.StreamLatestPosition(syncReq.ctx),
 	}
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
 
-	// Otherwise, we wait for the notifier to tell us if something *may* have
-	// happened. We loop in case it turns out that nothing did happen.
+	if !rp.shouldReturnImmediately(syncReq) {
+		timer := time.NewTimer(syncReq.timeout) // case of timeout=0 is handled above
+		defer timer.Stop()
 
-	timer := time.NewTimer(syncReq.timeout) // case of timeout=0 is handled above
-	defer timer.Stop()
-
-	userStreamListener := rp.Notifier.GetListener(*syncReq)
-	defer userStreamListener.Close()
-
-	// We need the loop in case userStreamListener wakes up even if there isn't
-	// anything to send down. In this case, we'll jump out of the select but
-	// don't want to send anything back until we get some actual content to
-	// respond with, so we skip the return an go back to waiting for content to
-	// be sent down or the request timing out.
-	var hasTimedOut bool
-	sincePos := syncReq.since
-	for {
 		select {
-		// Wait for notifier to wake us up
-		case <-userStreamListener.GetNotifyChannel(sincePos):
-			currPos = userStreamListener.GetSyncPosition()
-		// Or for timeout to expire
-		case <-timer.C:
-			// We just need to ensure we get out of the select after reaching the
-			// timeout, but there's nothing specific we want to do in this case
-			// apart from that, so we do nothing except stating we're timing out
-			// and need to respond.
-			hasTimedOut = true
-		// Or for the request to be cancelled
-		case <-req.Context().Done():
-			logger.WithError(err).Error("request cancelled")
-			return jsonerror.InternalServerError()
-		}
-
-		// Note that we don't time out during calculation of sync
-		// response. This ensures that we don't waste the hard work
-		// of calculating the sync only to get timed out before we
-		// can respond
-		syncData, err = rp.currentSyncForUser(*syncReq, currPos)
-		if err != nil {
-			logger.WithError(err).Error("rp.currentSyncForUser failed")
-			return jsonerror.InternalServerError()
-		}
-
-		if !syncData.IsEmpty() || hasTimedOut {
-			logger.WithField("next", syncData.NextBatch).WithField("timed_out", hasTimedOut).Info("Responding")
+		case <-syncReq.ctx.Done():
+			// Caller gave up
+			logger.Println("Context expired")
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: syncData,
 			}
+
+		case <-timer.C:
+			// Timeout reached
+			logger.Println("Timed out")
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: syncData,
+			}
+
+		case <-rp.pduStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
+			logger.Println("PDU stream awake")
+		case <-rp.typingStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
+			logger.Println("Typing stream awake")
 		}
+	}
+
+	syncData.NextBatch.PDUPosition = rp.pduStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, syncData.NextBatch, filter)
+	syncData.NextBatch.TypingPosition = rp.typingStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, syncData.NextBatch, filter)
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: syncData,
 	}
 }
 
@@ -274,6 +263,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 }
 
 // nolint:gocyclo
+/*
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (*types.Response, error) {
 	res := types.NewResponse()
 
@@ -330,6 +320,7 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 	res.NextBatch.SendToDevicePosition = lastPos
 	return res, err
 }
+*/
 
 func (rp *RequestPool) appendDeviceLists(
 	data *types.Response, userID string, since, to types.StreamingToken,
