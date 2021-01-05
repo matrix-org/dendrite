@@ -88,11 +88,13 @@ func (r *RoomserverInternalAPI) GetRoomIDForAlias(
 ) error {
 	// Look up the room ID in the database
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
-	if err != nil {
-		return err
+	if err == nil && roomID != "" {
+		response.RoomID = roomID
+		return nil
 	}
 
-	if r.asAPI != nil { // appservice component is wired in
+	// Check appservice on err
+	if r.asAPI != nil && request.ShouldHitAppservice { // appservice component is wired in
 		if roomID == "" {
 			// No room found locally, try our application services by making a call to
 			// the appservice component
@@ -107,12 +109,13 @@ func (r *RoomserverInternalAPI) GetRoomIDForAlias(
 				if err != nil {
 					return err
 				}
+				response.RoomID = roomID
+				return nil
 			}
 		}
 	}
 
-	response.RoomID = roomID
-	return nil
+	return err
 }
 
 // GetAliasesForRoomID implements alias.RoomserverInternalAPI

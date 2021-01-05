@@ -53,7 +53,7 @@ func RoomAliasToID(
 	var resp gomatrixserverlib.RespDirectory
 
 	if domain == cfg.Matrix.ServerName {
-		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
+		queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias, ShouldHitAppservice: true}
 		var queryRes roomserverAPI.GetRoomIDForAliasResponse
 		if err = rsAPI.GetRoomIDForAlias(httpReq.Context(), &queryReq, &queryRes); err != nil {
 			util.GetLogger(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
