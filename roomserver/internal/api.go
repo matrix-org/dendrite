@@ -88,6 +88,7 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		Cfg:        r.Cfg,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
+		RSAPI:      r,
 		Inputer:    r.Inputer,
 	}
 	r.Peeker = &perform.Peeker{
