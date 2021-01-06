@@ -55,19 +55,22 @@ type Database struct {
 	PDUTopologyProvider   types.TopologyProvider
 	TypingStreamProvider  types.StreamProvider
 	ReceiptStreamProvider types.StreamProvider
+	InviteStreamProvider  types.StreamProvider
 }
 
 // ConfigureProviders creates instances of the various
 // stream and topology providers provided by the storage
 // packages.
 func (d *Database) ConfigureProviders() {
-	d.PDUStreamProvider = &PDUStreamProvider{DB: d}
-	d.TypingStreamProvider = &TypingStreamProvider{DB: d}
-	d.ReceiptStreamProvider = &ReceiptStreamProvider{DB: d}
+	d.PDUStreamProvider = &PDUStreamProvider{StreamProvider{DB: d}}
+	d.TypingStreamProvider = &TypingStreamProvider{StreamProvider{DB: d}}
+	d.ReceiptStreamProvider = &ReceiptStreamProvider{StreamProvider{DB: d}}
+	d.InviteStreamProvider = &InviteStreamProvider{StreamProvider{DB: d}}
 
 	d.PDUStreamProvider.StreamSetup()
 	d.TypingStreamProvider.StreamSetup()
 	d.ReceiptStreamProvider.StreamSetup()
+	d.InviteStreamProvider.StreamSetup()
 
 	d.PDUTopologyProvider = &PDUTopologyProvider{DB: d}
 }
@@ -86,6 +89,10 @@ func (d *Database) TypingStream() types.StreamProvider {
 
 func (d *Database) ReceiptStream() types.StreamProvider {
 	return d.ReceiptStreamProvider
+}
+
+func (d *Database) InviteStream() types.StreamProvider {
+	return d.InviteStreamProvider
 }
 
 // Events lookups a list of event by their event ID.

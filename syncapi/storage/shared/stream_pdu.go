@@ -2,22 +2,17 @@ package shared
 
 import (
 	"context"
-	"sync"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type PDUStreamProvider struct {
-	DB          *Database
-	latest      types.StreamPosition
-	latestMutex sync.RWMutex
-	update      *sync.Cond
+	StreamProvider
 }
 
 func (p *PDUStreamProvider) StreamSetup() {
-	locker := &sync.Mutex{}
-	p.update = sync.NewCond(locker)
+	p.StreamProvider.StreamSetup()
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
@@ -29,15 +24,14 @@ func (p *PDUStreamProvider) StreamSetup() {
 	p.latest = types.StreamPosition(id)
 }
 
-func (p *PDUStreamProvider) StreamAdvance(
-	latest types.StreamPosition,
-) {
-	p.latestMutex.Lock()
-	defer p.latestMutex.Unlock()
+func (p *PDUStreamProvider) StreamLatestPosition(
+	ctx context.Context,
+) types.StreamingToken {
+	p.latestMutex.RLock()
+	defer p.latestMutex.RUnlock()
 
-	if latest > p.latest {
-		p.latest = latest
-		p.update.Broadcast()
+	return types.StreamingToken{
+		PDUPosition: p.latest,
 	}
 }
 
@@ -178,15 +172,4 @@ func (p *PDUStreamProvider) StreamNotifyAfter(
 	}(p)
 
 	return ch
-}
-
-func (p *PDUStreamProvider) StreamLatestPosition(
-	ctx context.Context,
-) types.StreamingToken {
-	p.latestMutex.RLock()
-	defer p.latestMutex.RUnlock()
-
-	return types.StreamingToken{
-		PDUPosition: p.latest,
-	}
 }

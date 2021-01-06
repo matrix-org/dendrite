@@ -2,68 +2,47 @@ package shared
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type TypingStreamProvider struct {
+type InviteStreamProvider struct {
 	StreamProvider
 }
 
-func (p *TypingStreamProvider) StreamSetup() {
+func (p *InviteStreamProvider) StreamSetup() {
 	p.StreamProvider.StreamSetup()
+
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	p.latest = 0
 }
 
-func (p *TypingStreamProvider) StreamLatestPosition(
+func (p *InviteStreamProvider) StreamLatestPosition(
 	ctx context.Context,
 ) types.StreamingToken {
 	p.latestMutex.RLock()
 	defer p.latestMutex.RUnlock()
 
 	return types.StreamingToken{
-		TypingPosition: p.latest,
+		InvitePosition: p.latest,
 	}
 }
 
-func (p *TypingStreamProvider) StreamRange(
+// nolint:gocyclo
+func (p *InviteStreamProvider) StreamRange(
 	ctx context.Context,
 	req *types.StreamRangeRequest,
 	from, to types.StreamingToken,
-) types.StreamingToken {
-	var err error
-	for roomID := range req.Rooms {
-		// This may have already been set by a previous stream, so
-		// reuse it if it exists.
-		jr := req.Response.Rooms.Join[roomID]
-
-		if users, updated := p.DB.EDUCache.GetTypingUsersIfUpdatedAfter(
-			roomID, int64(from.TypingPosition),
-		); updated {
-			ev := gomatrixserverlib.ClientEvent{
-				Type: gomatrixserverlib.MTyping,
-			}
-			ev.Content, err = json.Marshal(map[string]interface{}{
-				"user_ids": users,
-			})
-			if err != nil {
-				return types.StreamingToken{
-					TypingPosition: from.TypingPosition,
-				}
-			}
-
-			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
-			req.Response.Rooms.Join[roomID] = jr
-		}
-	}
+) (newPos types.StreamingToken) {
 
 	return types.StreamingToken{
-		TypingPosition: types.StreamPosition(p.DB.EDUCache.GetLatestSyncPosition()),
+		InvitePosition: 0,
 	}
 }
 
-func (p *TypingStreamProvider) StreamNotifyAfter(
+func (p *InviteStreamProvider) StreamNotifyAfter(
 	ctx context.Context,
 	from types.StreamingToken,
 ) chan struct{} {
@@ -72,7 +51,7 @@ func (p *TypingStreamProvider) StreamNotifyAfter(
 	check := func() bool {
 		p.latestMutex.RLock()
 		defer p.latestMutex.RUnlock()
-		if p.latest > from.TypingPosition {
+		if p.latest > from.InvitePosition {
 			close(ch)
 			return true
 		}
@@ -89,7 +68,7 @@ func (p *TypingStreamProvider) StreamNotifyAfter(
 	// sync.Cond will fire every time the latest position
 	// updates, so we can check and see if we've advanced
 	// past it.
-	go func(p *TypingStreamProvider) {
+	go func(p *InviteStreamProvider) {
 		p.update.L.Lock()
 		defer p.update.L.Unlock()
 

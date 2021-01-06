@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"encoding/json"
-	"sync"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -11,15 +10,11 @@ import (
 )
 
 type ReceiptStreamProvider struct {
-	DB          *Database
-	latest      types.StreamPosition
-	latestMutex sync.RWMutex
-	update      *sync.Cond
+	StreamProvider
 }
 
 func (p *ReceiptStreamProvider) StreamSetup() {
-	locker := &sync.Mutex{}
-	p.update = sync.NewCond(locker)
+	p.StreamProvider.StreamSetup()
 
 	latest, err := p.DB.Receipts.SelectMaxReceiptID(context.Background(), nil)
 	if err != nil {
@@ -29,15 +24,14 @@ func (p *ReceiptStreamProvider) StreamSetup() {
 	p.latest = types.StreamPosition(latest)
 }
 
-func (p *ReceiptStreamProvider) StreamAdvance(
-	latest types.StreamPosition,
-) {
-	p.latestMutex.Lock()
-	defer p.latestMutex.Unlock()
+func (p *ReceiptStreamProvider) StreamLatestPosition(
+	ctx context.Context,
+) types.StreamingToken {
+	p.latestMutex.RLock()
+	defer p.latestMutex.RUnlock()
 
-	if latest > p.latest {
-		p.latest = latest
-		p.update.Broadcast()
+	return types.StreamingToken{
+		ReceiptPosition: p.latest,
 	}
 }
 
@@ -150,15 +144,4 @@ func (p *ReceiptStreamProvider) StreamNotifyAfter(
 	}(p)
 
 	return ch
-}
-
-func (p *ReceiptStreamProvider) StreamLatestPosition(
-	ctx context.Context,
-) types.StreamingToken {
-	p.latestMutex.RLock()
-	defer p.latestMutex.RUnlock()
-
-	return types.StreamingToken{
-		ReceiptPosition: p.latest,
-	}
 }

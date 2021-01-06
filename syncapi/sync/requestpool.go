@@ -71,7 +71,7 @@ func NewRequestPool(
 		typingStream:       db.TypingStream(),
 		receiptStream:      db.ReceiptStream(),
 		sendToDeviceStream: nil, // TODO
-		inviteStream:       nil, // TODO
+		inviteStream:       db.InviteStream(),
 		deviceListStream:   nil, // TODO
 	}
 	go rp.cleanLastSeen()
@@ -190,15 +190,19 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			return util.JSONResponse{Code: http.StatusOK, JSON: syncData}
 
 		case <-rp.pduStream.StreamNotifyAfter(waitctx, syncReq.Since):
+			logger.Println("Responding to sync after PDU")
 		case <-rp.typingStream.StreamNotifyAfter(waitctx, syncReq.Since):
+			logger.Println("Responding to sync after typing event")
 		case <-rp.receiptStream.StreamNotifyAfter(waitctx, syncReq.Since):
+			logger.Println("Responding to sync after read receipt")
+		case <-rp.inviteStream.StreamNotifyAfter(waitctx, syncReq.Since):
+			logger.Println("Responding to sync after invite")
+
 			// case <-rp.sendToDeviceStream.StreamNotifyAfter(waitctx, syncReq.Since):
-			// case <-rp.inviteStream.StreamNotifyAfter(waitctx, syncReq.Since):
 			// case <-rp.deviceListStream.StreamNotifyAfter(waitctx, syncReq.Since):
 		}
 
 		waitcancel()
-		logger.Println("Responding to sync after notify")
 	} else {
 		logger.Println("Responding to sync immediately")
 	}
@@ -208,15 +212,15 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	latest.ApplyUpdates(rp.typingStream.StreamLatestPosition(syncReq.Context))
 	latest.ApplyUpdates(rp.receiptStream.StreamLatestPosition(syncReq.Context))
 	// latest.ApplyUpdates(rp.sendToDeviceStream.StreamLatestPosition(syncReq.Context))
-	// latest.ApplyUpdates(rp.inviteStream.StreamLatestPosition(syncReq.Context))
+	latest.ApplyUpdates(rp.inviteStream.StreamLatestPosition(syncReq.Context))
 	// latest.ApplyUpdates(rp.deviceListStream.StreamLatestPosition(syncReq.Context))
 
 	syncReq.Response.NextBatch.ApplyUpdates(rp.pduStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
 	syncReq.Response.NextBatch.ApplyUpdates(rp.typingStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
 	syncReq.Response.NextBatch.ApplyUpdates(rp.receiptStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
 	// syncReq.Response.NextBatch.ApplyUpdates(rp.sendToDeviceStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
-	// syncReq.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
-	// syncReq.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
+	syncReq.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
+	// syncReq.Response.NextBatch.ApplyUpdates(rp.deviceListStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
