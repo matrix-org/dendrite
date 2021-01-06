@@ -51,9 +51,10 @@ type Database struct {
 	Receipts            tables.Receipts
 	EDUCache            *cache.EDUCache
 
-	PDUStreamProvider    types.StreamProvider
-	PDUTopologyProvider  types.TopologyProvider
-	TypingStreamProvider types.StreamProvider
+	PDUStreamProvider     types.StreamProvider
+	PDUTopologyProvider   types.TopologyProvider
+	TypingStreamProvider  types.StreamProvider
+	ReceiptStreamProvider types.StreamProvider
 }
 
 // ConfigureProviders creates instances of the various
@@ -62,9 +63,11 @@ type Database struct {
 func (d *Database) ConfigureProviders() {
 	d.PDUStreamProvider = &PDUStreamProvider{DB: d}
 	d.TypingStreamProvider = &TypingStreamProvider{DB: d}
+	d.ReceiptStreamProvider = &ReceiptStreamProvider{DB: d}
 
 	d.PDUStreamProvider.StreamSetup()
 	d.TypingStreamProvider.StreamSetup()
+	d.ReceiptStreamProvider.StreamSetup()
 
 	d.PDUTopologyProvider = &PDUTopologyProvider{DB: d}
 }
@@ -79,6 +82,10 @@ func (d *Database) PDUTopology() types.TopologyProvider {
 
 func (d *Database) TypingStream() types.StreamProvider {
 	return d.TypingStreamProvider
+}
+
+func (d *Database) ReceiptStream() types.StreamProvider {
+	return d.ReceiptStreamProvider
 }
 
 // Events lookups a list of event by their event ID.

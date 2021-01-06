@@ -18,8 +18,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/syncapi/types"
-
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -87,8 +85,8 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 	if err != nil {
 		return err
 	}
-	// update stream position
-	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
+
+	s.db.TypingStream().StreamAdvance(streamPos)
 
 	return nil
 }

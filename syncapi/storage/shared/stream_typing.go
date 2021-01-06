@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -28,8 +27,10 @@ func (p *TypingStreamProvider) StreamAdvance(
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	p.latest = latest
-	p.update.Broadcast()
+	if latest > p.latest {
+		p.latest = latest
+		p.update.Broadcast()
+	}
 }
 
 func (p *TypingStreamProvider) StreamRange(
@@ -56,12 +57,8 @@ func (p *TypingStreamProvider) StreamRange(
 				return types.StreamingToken{}
 			}
 
-			fmt.Println("Typing", roomID, "users", users)
-
 			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
 			req.Response.Rooms.Join[roomID] = jr
-		} else {
-			fmt.Println("Typing", roomID, "not updated")
 		}
 	}
 

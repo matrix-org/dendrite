@@ -35,8 +35,10 @@ func (p *PDUStreamProvider) StreamAdvance(
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	p.latest = latest
-	p.update.Broadcast()
+	if latest > p.latest {
+		p.latest = latest
+		p.update.Broadcast()
+	}
 }
 
 func (p *PDUStreamProvider) StreamRange(
@@ -50,7 +52,7 @@ func (p *PDUStreamProvider) StreamRange(
 		Backwards: from.IsAfter(to),
 	}
 	newPos = types.StreamingToken{
-		PDUPosition: from.PDUPosition,
+		PDUPosition: to.PDUPosition,
 	}
 
 	var err error
@@ -72,7 +74,7 @@ func (p *PDUStreamProvider) StreamRange(
 	}
 
 	for _, roomID := range joinedRooms {
-		req.Rooms[roomID] = "join"
+		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
 
 	for _, stateDelta := range stateDeltas {
@@ -110,7 +112,13 @@ func (p *PDUStreamProvider) StreamRange(
 			gomatrixserverlib.FormatSync,
 		)
 
-		// TODO: fill in prev_batch
+		if len(events) > 0 {
+			prevBatch, err := p.DB.getBackwardTopologyPos(ctx, nil, events)
+			if err != nil {
+				return
+			}
+			room.Timeline.PrevBatch = &prevBatch
+		}
 
 		req.Response.Rooms.Join[roomID] = room
 	}

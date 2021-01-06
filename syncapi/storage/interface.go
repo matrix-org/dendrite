@@ -34,6 +34,7 @@ type Database interface {
 	PDUStream() types.StreamProvider
 	PDUTopology() types.TopologyProvider
 	TypingStream() types.StreamProvider
+	ReceiptStream() types.StreamProvider
 
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)

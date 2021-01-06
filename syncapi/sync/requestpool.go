@@ -70,7 +70,7 @@ func NewRequestPool(
 		lastseen:           sync.Map{},
 		pduStream:          db.PDUStream(),
 		typingStream:       db.TypingStream(),
-		receiptStream:      nil, // TODO
+		receiptStream:      db.ReceiptStream(),
 		sendToDeviceStream: nil, // TODO
 		inviteStream:       nil, // TODO
 		deviceListStream:   nil, // TODO
@@ -188,7 +188,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 		case <-rp.pduStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
 		case <-rp.typingStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
-			// case <-rp.receiptStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
+		case <-rp.receiptStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
 			// case <-rp.sendToDeviceStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
 			// case <-rp.inviteStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
 			// case <-rp.deviceListStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
@@ -198,7 +198,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	var latest types.StreamingToken
 	latest.ApplyUpdates(rp.pduStream.StreamLatestPosition(syncReq.ctx))
 	latest.ApplyUpdates(rp.typingStream.StreamLatestPosition(syncReq.ctx))
-	// latest.ApplyUpdates(rp.receiptStream.StreamLatestPosition(syncReq.ctx))
+	latest.ApplyUpdates(rp.receiptStream.StreamLatestPosition(syncReq.ctx))
 	// latest.ApplyUpdates(rp.sendToDeviceStream.StreamLatestPosition(syncReq.ctx))
 	// latest.ApplyUpdates(rp.inviteStream.StreamLatestPosition(syncReq.ctx))
 	// latest.ApplyUpdates(rp.deviceListStream.StreamLatestPosition(syncReq.ctx))
@@ -212,7 +212,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	sr.Response.NextBatch.ApplyUpdates(rp.pduStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
 	sr.Response.NextBatch.ApplyUpdates(rp.typingStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
-	// sr.Response.NextBatch.ApplyUpdates(rp.receiptStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
+	sr.Response.NextBatch.ApplyUpdates(rp.receiptStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
 	// sr.Response.NextBatch.ApplyUpdates(rp.sendToDeviceStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
 	// sr.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
 	// sr.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
