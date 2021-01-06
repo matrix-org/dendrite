@@ -144,8 +144,6 @@ var waitingSyncRequests = prometheus.NewGauge(
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
-	var syncData *types.Response
-
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
@@ -174,11 +172,11 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		select {
 		case <-waitctx.Done(): // Caller gave up
 			waitcancel()
-			return util.JSONResponse{Code: http.StatusOK, JSON: syncData}
+			return util.JSONResponse{Code: http.StatusOK, JSON: syncReq.Response}
 
 		case <-timer.C: // Timeout reached
 			waitcancel()
-			return util.JSONResponse{Code: http.StatusOK, JSON: syncData}
+			return util.JSONResponse{Code: http.StatusOK, JSON: syncReq.Response}
 
 		case <-rp.pduStream.NotifyAfter(waitctx, syncReq.Since.PDUPosition):
 		case <-rp.typingStream.NotifyAfter(waitctx, syncReq.Since.TypingPosition):
