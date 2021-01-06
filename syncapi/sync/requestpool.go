@@ -50,6 +50,7 @@ type RequestPool struct {
 	receiptStream      types.StreamProvider
 	sendToDeviceStream types.StreamProvider
 	inviteStream       types.StreamProvider
+	accountDataStream  types.StreamProvider
 	deviceListStream   types.StreamLogProvider
 }
 
@@ -71,6 +72,7 @@ func NewRequestPool(
 		receiptStream:      db.ReceiptStream(),
 		sendToDeviceStream: db.SendToDeviceStream(),
 		inviteStream:       db.InviteStream(),
+		accountDataStream:  db.AccountDataStream(),
 		deviceListStream:   db.DeviceListStream(),
 	}
 	go rp.cleanLastSeen()
@@ -189,6 +191,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		case <-rp.receiptStream.NotifyAfter(waitctx, syncReq.Since.ReceiptPosition):
 		case <-rp.inviteStream.NotifyAfter(waitctx, syncReq.Since.InvitePosition):
 		case <-rp.sendToDeviceStream.NotifyAfter(waitctx, syncReq.Since.SendToDevicePosition):
+		case <-rp.accountDataStream.NotifyAfter(waitctx, syncReq.Since.AccountDataPosition):
 		case <-rp.deviceListStream.NotifyAfter(waitctx, syncReq.Since.DeviceListPosition):
 		}
 
@@ -214,6 +217,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				syncReq.Context, syncReq,
 			),
 			SendToDevicePosition: rp.sendToDeviceStream.CompleteSync(
+				syncReq.Context, syncReq,
+			),
+			AccountDataPosition: rp.accountDataStream.CompleteSync(
 				syncReq.Context, syncReq,
 			),
 			DeviceListPosition: rp.deviceListStream.CompleteSync(
@@ -242,6 +248,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			SendToDevicePosition: rp.sendToDeviceStream.IncrementalSync(
 				syncReq.Context, syncReq, syncReq.Since.SendToDevicePosition,
 				rp.sendToDeviceStream.LatestPosition(syncReq.Context),
+			),
+			AccountDataPosition: rp.accountDataStream.IncrementalSync(
+				syncReq.Context, syncReq, syncReq.Since.AccountDataPosition,
+				rp.accountDataStream.LatestPosition(syncReq.Context),
 			),
 			DeviceListPosition: rp.deviceListStream.IncrementalSync(
 				syncReq.Context, syncReq, syncReq.Since.DeviceListPosition,

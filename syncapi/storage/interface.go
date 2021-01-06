@@ -37,6 +37,7 @@ type Database interface {
 	ReceiptStream() types.StreamProvider
 	InviteStream() types.StreamProvider
 	SendToDeviceStream() types.StreamProvider
+	AccountDataStream() types.StreamProvider
 	DeviceListStream() types.StreamLogProvider
 
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.

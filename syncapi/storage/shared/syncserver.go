@@ -57,6 +57,7 @@ type Database struct {
 	ReceiptStreamProvider      types.StreamProvider
 	InviteStreamProvider       types.StreamProvider
 	SendToDeviceStreamProvider types.StreamProvider
+	AccountDataStreamProvider  types.StreamProvider
 	DeviceListStreamProvider   types.StreamLogProvider
 }
 
@@ -69,6 +70,7 @@ func (d *Database) ConfigureProviders() {
 	d.ReceiptStreamProvider = &ReceiptStreamProvider{StreamProvider{DB: d}}
 	d.InviteStreamProvider = &InviteStreamProvider{StreamProvider{DB: d}}
 	d.SendToDeviceStreamProvider = &SendToDeviceStreamProvider{StreamProvider{DB: d}}
+	d.AccountDataStreamProvider = &AccountDataStreamProvider{StreamProvider{DB: d}}
 	d.DeviceListStreamProvider = &DeviceListStreamProvider{StreamLogProvider{DB: d}}
 
 	d.PDUStreamProvider.Setup()
@@ -76,6 +78,7 @@ func (d *Database) ConfigureProviders() {
 	d.ReceiptStreamProvider.Setup()
 	d.InviteStreamProvider.Setup()
 	d.SendToDeviceStreamProvider.Setup()
+	d.AccountDataStreamProvider.Setup()
 	d.DeviceListStreamProvider.Setup()
 
 	d.PDUTopologyProvider = &PDUTopologyProvider{DB: d}
@@ -103,6 +106,10 @@ func (d *Database) InviteStream() types.StreamProvider {
 
 func (d *Database) SendToDeviceStream() types.StreamProvider {
 	return d.SendToDeviceStreamProvider
+}
+
+func (d *Database) AccountDataStream() types.StreamProvider {
+	return d.AccountDataStreamProvider
 }
 
 func (d *Database) DeviceListStream() types.StreamLogProvider {
