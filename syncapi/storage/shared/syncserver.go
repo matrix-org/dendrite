@@ -64,13 +64,16 @@ type Database struct {
 // ConfigureProviders creates instances of the various
 // stream and topology providers provided by the storage
 // packages.
-func (d *Database) ConfigureProviders() {
+func (d *Database) ConfigureProviders(userAPI userapi.UserInternalAPI) {
 	d.PDUStreamProvider = &PDUStreamProvider{StreamProvider{DB: d}}
 	d.TypingStreamProvider = &TypingStreamProvider{StreamProvider{DB: d}}
 	d.ReceiptStreamProvider = &ReceiptStreamProvider{StreamProvider{DB: d}}
 	d.InviteStreamProvider = &InviteStreamProvider{StreamProvider{DB: d}}
 	d.SendToDeviceStreamProvider = &SendToDeviceStreamProvider{StreamProvider{DB: d}}
-	d.AccountDataStreamProvider = &AccountDataStreamProvider{StreamProvider{DB: d}}
+	d.AccountDataStreamProvider = &AccountDataStreamProvider{
+		StreamProvider: StreamProvider{DB: d},
+		userAPI:        userAPI,
+	}
 	d.DeviceListStreamProvider = &DeviceListStreamProvider{StreamLogProvider{DB: d}}
 
 	d.PDUStreamProvider.Setup()

@@ -22,15 +22,16 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // NewSyncServerDatasource opens a database connection.
-func NewSyncServerDatasource(dbProperties *config.DatabaseOptions) (Database, error) {
+func NewSyncServerDatasource(dbProperties *config.DatabaseOptions, userAPI userapi.UserInternalAPI) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties)
+		return sqlite3.NewDatabase(dbProperties, userAPI)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(dbProperties)
+		return postgres.NewDatabase(dbProperties, userAPI)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

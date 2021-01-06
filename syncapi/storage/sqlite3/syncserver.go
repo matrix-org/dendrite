@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -40,7 +41,7 @@ type SyncServerDatasource struct {
 
 // NewDatabase creates a new sync server database
 // nolint: gocyclo
-func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, userAPI userapi.UserInternalAPI) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
@@ -50,6 +51,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if err = d.prepare(dbProperties); err != nil {
 		return nil, err
 	}
+	d.ConfigureProviders(userAPI)
 	return &d, nil
 }
 
@@ -121,6 +123,5 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Receipts:            receipts,
 		EDUCache:            cache.New(),
 	}
-	d.Database.ConfigureProviders()
 	return nil
 }

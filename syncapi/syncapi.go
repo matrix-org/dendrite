@@ -43,7 +43,7 @@ func AddPublicRoutes(
 ) {
 	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
-	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
+	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database, userAPI)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
