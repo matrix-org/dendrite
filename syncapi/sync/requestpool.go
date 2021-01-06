@@ -168,15 +168,21 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		// Use a subcontext so that we don't keep the StreamNotifyAfter
 		// goroutines alive any longer than they really need to be.
 		waitctx, waitcancel := context.WithCancel(syncReq.Context)
+		giveup := func() util.JSONResponse {
+			waitcancel()
+			syncReq.Response.NextBatch = syncReq.Since
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: syncReq.Response,
+			}
+		}
 
 		select {
 		case <-waitctx.Done(): // Caller gave up
-			waitcancel()
-			return util.JSONResponse{Code: http.StatusOK, JSON: syncReq.Response}
+			return giveup()
 
 		case <-timer.C: // Timeout reached
-			waitcancel()
-			return util.JSONResponse{Code: http.StatusOK, JSON: syncReq.Response}
+			return giveup()
 
 		case <-rp.pduStream.NotifyAfter(waitctx, syncReq.Since.PDUPosition):
 		case <-rp.typingStream.NotifyAfter(waitctx, syncReq.Since.TypingPosition):
