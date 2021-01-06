@@ -7,6 +7,13 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+type StreamRangeRequest struct {
+	Device   *userapi.Device
+	Response *Response
+	Filter   gomatrixserverlib.EventFilter
+	Rooms    map[string]string
+}
+
 type StreamProvider interface {
 	StreamSetup()
 
@@ -17,7 +24,7 @@ type StreamProvider interface {
 	// StreamRange will update the response to include all updates between
 	// the from and to sync positions. It will always return immediately,
 	// making no changes if the range contains no updates.
-	StreamRange(ctx context.Context, res *Response, device *userapi.Device, from, to StreamingToken, filter gomatrixserverlib.EventFilter) StreamingToken
+	StreamRange(ctx context.Context, req *StreamRangeRequest, from, to StreamingToken) StreamingToken
 
 	// StreamNotifyAfter returns a channel which will be closed once the
 	// stream advances past the "from" position.

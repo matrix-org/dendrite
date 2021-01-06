@@ -92,6 +92,7 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		typingPos = s.db.RemoveTypingUser(typingEvent.UserID, typingEvent.RoomID)
 	}
 
-	s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
+	s.db.TypingStream().StreamAdvance(typingPos)
+
 	return nil
 }

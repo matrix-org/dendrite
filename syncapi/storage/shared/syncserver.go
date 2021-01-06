@@ -355,8 +355,6 @@ func (d *Database) WriteEvent(
 		}
 		pduPosition = pos
 
-		d.PDUStreamProvider.StreamAdvance(pos)
-
 		if err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return fmt.Errorf("d.Topology.InsertEventInTopology: %w", err)
 		}

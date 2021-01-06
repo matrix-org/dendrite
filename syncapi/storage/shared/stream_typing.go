@@ -2,10 +2,11 @@ package shared
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -33,12 +34,40 @@ func (p *TypingStreamProvider) StreamAdvance(
 
 func (p *TypingStreamProvider) StreamRange(
 	ctx context.Context,
-	res *types.Response,
-	device *userapi.Device,
+	req *types.StreamRangeRequest,
 	from, to types.StreamingToken,
-	filter gomatrixserverlib.EventFilter,
 ) types.StreamingToken {
-	return types.StreamingToken{}
+	var err error
+	for roomID := range req.Rooms {
+		// This may have already been set by a previous stream, so
+		// reuse it if it exists.
+		jr := req.Response.Rooms.Join[roomID]
+
+		if users, updated := p.DB.EDUCache.GetTypingUsersIfUpdatedAfter(
+			roomID, int64(from.TypingPosition),
+		); updated {
+			ev := gomatrixserverlib.ClientEvent{
+				Type: gomatrixserverlib.MTyping,
+			}
+			ev.Content, err = json.Marshal(map[string]interface{}{
+				"user_ids": users,
+			})
+			if err != nil {
+				return types.StreamingToken{}
+			}
+
+			fmt.Println("Typing", roomID, "users", users)
+
+			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
+			req.Response.Rooms.Join[roomID] = jr
+		} else {
+			fmt.Println("Typing", roomID, "not updated")
+		}
+	}
+
+	return types.StreamingToken{
+		TypingPosition: types.StreamPosition(p.DB.EDUCache.GetLatestSyncPosition()),
+	}
 }
 
 func (p *TypingStreamProvider) StreamNotifyAfter(

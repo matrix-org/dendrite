@@ -180,7 +180,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
-	s.notifier.OnNewEvent(ev, "", nil, types.StreamingToken{PDUPosition: pduPos})
+	s.db.PDUStream().StreamAdvance(pduPos)
 
 	return nil
 }
@@ -219,7 +219,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return err
 	}
 
-	s.notifier.OnNewEvent(ev, "", nil, types.StreamingToken{PDUPosition: pduPos})
+	s.db.PDUStream().StreamAdvance(pduPos)
 
 	return nil
 }

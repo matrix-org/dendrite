@@ -172,9 +172,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	rp.updateLastSeen(req, device)
 
-	syncData = types.NewResponse()
-	filter := gomatrixserverlib.DefaultEventFilter()
-
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
 
@@ -206,16 +203,23 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	// latest.ApplyUpdates(rp.inviteStream.StreamLatestPosition(syncReq.ctx))
 	// latest.ApplyUpdates(rp.deviceListStream.StreamLatestPosition(syncReq.ctx))
 
-	syncData.NextBatch.ApplyUpdates(rp.pduStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
-	syncData.NextBatch.ApplyUpdates(rp.typingStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
-	// syncData.NextBatch.ApplyUpdates(rp.receiptStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
-	// syncData.NextBatch.ApplyUpdates(rp.sendToDeviceStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
-	// syncData.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
-	// syncData.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
+	sr := &types.StreamRangeRequest{
+		Device:   device,                                 //
+		Response: types.NewResponse(),                    // Populated by all streams
+		Filter:   gomatrixserverlib.DefaultEventFilter(), //
+		Rooms:    make(map[string]string),                // Populated by the PDU stream
+	}
+
+	sr.Response.NextBatch.ApplyUpdates(rp.pduStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
+	sr.Response.NextBatch.ApplyUpdates(rp.typingStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
+	// sr.Response.NextBatch.ApplyUpdates(rp.receiptStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
+	// sr.Response.NextBatch.ApplyUpdates(rp.sendToDeviceStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
+	// sr.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
+	// sr.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: syncData,
+		JSON: sr.Response,
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -42,10 +41,8 @@ func (p *PDUStreamProvider) StreamAdvance(
 
 func (p *PDUStreamProvider) StreamRange(
 	ctx context.Context,
-	res *types.Response,
-	device *userapi.Device,
+	req *types.StreamRangeRequest,
 	from, to types.StreamingToken,
-	filter gomatrixserverlib.EventFilter,
 ) (newPos types.StreamingToken) {
 	r := types.Range{
 		From:      from.PDUPosition,
@@ -59,18 +56,23 @@ func (p *PDUStreamProvider) StreamRange(
 	var err error
 	var events []types.StreamEvent
 	var stateDeltas []stateDelta
+	var joinedRooms []string
 
 	// TODO: use filter provided in request
 	stateFilter := gomatrixserverlib.DefaultStateFilter()
 
 	if from.IsEmpty() {
-		if stateDeltas, _, err = p.DB.getStateDeltas(ctx, device, nil, r, device.UserID, &stateFilter); err != nil {
+		if stateDeltas, joinedRooms, err = p.DB.getStateDeltas(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
 			return
 		}
 	} else {
-		if stateDeltas, _, err = p.DB.getStateDeltasForFullStateSync(ctx, device, nil, r, device.UserID, &stateFilter); err != nil {
+		if stateDeltas, joinedRooms, err = p.DB.getStateDeltasForFullStateSync(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
 			return
 		}
+	}
+
+	for _, roomID := range joinedRooms {
+		req.Rooms[roomID] = "join"
 	}
 
 	for _, stateDelta := range stateDeltas {
@@ -79,12 +81,12 @@ func (p *PDUStreamProvider) StreamRange(
 
 		if r.Backwards {
 			// When using backward ordering, we want the most recent events first.
-			if events, _, err = p.DB.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, filter.Limit, false, false); err != nil {
+			if events, _, err = p.DB.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, req.Filter.Limit, false, false); err != nil {
 				return
 			}
 		} else {
 			// When using forward ordering, we want the least recent events first.
-			if events, err = p.DB.OutputEvents.SelectEarlyEvents(ctx, nil, roomID, r, filter.Limit); err != nil {
+			if events, err = p.DB.OutputEvents.SelectEarlyEvents(ctx, nil, roomID, r, req.Filter.Limit); err != nil {
 				return
 			}
 		}
@@ -110,7 +112,7 @@ func (p *PDUStreamProvider) StreamRange(
 
 		// TODO: fill in prev_batch
 
-		res.Rooms.Join[roomID] = room
+		req.Response.Rooms.Join[roomID] = room
 	}
 
 	return newPos
