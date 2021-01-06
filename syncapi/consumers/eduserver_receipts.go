@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -31,7 +30,6 @@ import (
 type OutputReceiptEventConsumer struct {
 	receiptConsumer *internal.ContinualConsumer
 	db              storage.Database
-	notifier        *sync.Notifier
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
@@ -39,7 +37,6 @@ type OutputReceiptEventConsumer struct {
 func NewOutputReceiptEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
 ) *OutputReceiptEventConsumer {
 
@@ -53,7 +50,6 @@ func NewOutputReceiptEventConsumer(
 	s := &OutputReceiptEventConsumer{
 		receiptConsumer: &consumer,
 		db:              store,
-		notifier:        n,
 	}
 
 	consumer.ProcessMessage = s.onMessage

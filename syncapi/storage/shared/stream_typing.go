@@ -54,7 +54,9 @@ func (p *TypingStreamProvider) StreamRange(
 				"user_ids": users,
 			})
 			if err != nil {
-				return types.StreamingToken{}
+				return types.StreamingToken{
+					TypingPosition: from.TypingPosition,
+				}
 			}
 
 			jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)

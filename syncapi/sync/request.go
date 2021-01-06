@@ -15,7 +15,6 @@
 package sync
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -26,7 +25,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	log "github.com/sirupsen/logrus"
 )
 
 const defaultSyncTimeout = time.Duration(0)
@@ -40,18 +38,7 @@ type filter struct {
 	} `json:"room"`
 }
 
-// syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
-type syncRequest struct {
-	ctx           context.Context
-	device        userapi.Device
-	limit         int
-	timeout       time.Duration
-	since         types.StreamingToken // nil means that no since token was supplied
-	wantFullState bool
-	log           *log.Entry
-}
-
-func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*syncRequest, error) {
+func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*types.StreamRangeRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
@@ -88,14 +75,17 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		}
 	}
 	// TODO: Additional query params: set_presence, filter
-	return &syncRequest{
-		ctx:           req.Context(),
-		device:        device,
-		timeout:       timeout,
-		since:         since,
-		wantFullState: wantFullState,
-		limit:         timelineLimit,
-		log:           util.GetLogger(req.Context()),
+
+	return &types.StreamRangeRequest{
+		Context:       req.Context(),                          //
+		Device:        &device,                                //
+		Response:      types.NewResponse(),                    // Populated by all streams
+		Filter:        gomatrixserverlib.DefaultEventFilter(), //
+		Since:         since,                                  //
+		Timeout:       timeout,                                //
+		Limit:         timelineLimit,                          //
+		Rooms:         make(map[string]string),                // Populated by the PDU stream
+		WantFullState: wantFullState,                          //
 	}, nil
 }
 

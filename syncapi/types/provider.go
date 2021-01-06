@@ -2,16 +2,25 @@ package types
 
 import (
 	"context"
+	"time"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type StreamRangeRequest struct {
-	Device   *userapi.Device
-	Response *Response
-	Filter   gomatrixserverlib.EventFilter
-	Rooms    map[string]string
+	Context       context.Context
+	Device        *userapi.Device
+	Response      *Response
+	Filter        gomatrixserverlib.EventFilter
+	Since         StreamingToken
+	Limit         int
+	Timeout       time.Duration
+	WantFullState bool
+
+	// Below this line are items updated by the
+	// stream providers. Not thread-safe.
+	Rooms map[string]string
 }
 
 type StreamProvider interface {

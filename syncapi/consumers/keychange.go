@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	syncapi "github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -39,7 +38,6 @@ type OutputKeyChangeEventConsumer struct {
 	keyAPI              api.KeyInternalAPI
 	partitionToOffset   map[int32]int64
 	partitionToOffsetMu sync.Mutex
-	notifier            *syncapi.Notifier
 }
 
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
@@ -48,7 +46,6 @@ func NewOutputKeyChangeEventConsumer(
 	serverName gomatrixserverlib.ServerName,
 	topic string,
 	kafkaConsumer sarama.Consumer,
-	n *syncapi.Notifier,
 	keyAPI api.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	store storage.Database,
@@ -69,7 +66,6 @@ func NewOutputKeyChangeEventConsumer(
 		rsAPI:               rsAPI,
 		partitionToOffset:   make(map[int32]int64),
 		partitionToOffsetMu: sync.Mutex{},
-		notifier:            n,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -120,8 +116,11 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 			Partition: msg.Partition,
 		},
 	}
-	for userID := range queryRes.UserIDsToCount {
-		s.notifier.OnNewKeyChange(posUpdate, userID, output.UserID)
-	}
+
+	_ = posUpdate
+
+	//for userID := range queryRes.UserIDsToCount {
+	//	s.notifier.OnNewKeyChange(posUpdate, userID, output.UserID)
+	//}
 	return nil
 }

@@ -23,8 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -35,7 +33,6 @@ type OutputSendToDeviceEventConsumer struct {
 	sendToDeviceConsumer *internal.ContinualConsumer
 	db                   storage.Database
 	serverName           gomatrixserverlib.ServerName // our server name
-	notifier             *sync.Notifier
 }
 
 // NewOutputSendToDeviceEventConsumer creates a new OutputSendToDeviceEventConsumer.
@@ -43,7 +40,6 @@ type OutputSendToDeviceEventConsumer struct {
 func NewOutputSendToDeviceEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
 ) *OutputSendToDeviceEventConsumer {
 
@@ -58,7 +54,6 @@ func NewOutputSendToDeviceEventConsumer(
 		sendToDeviceConsumer: &consumer,
 		db:                   store,
 		serverName:           cfg.Matrix.ServerName,
-		notifier:             n,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -102,11 +97,13 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		return err
 	}
 
-	s.notifier.OnNewSendToDevice(
-		output.UserID,
-		[]string{output.DeviceID},
-		types.StreamingToken{SendToDevicePosition: streamPos},
-	)
+	//s.notifier.OnNewSendToDevice(
+	//	output.UserID,
+	//	[]string{output.DeviceID},
+	//	types.StreamingToken{SendToDevicePosition: streamPos},
+	//)
+
+	_ = streamPos
 
 	return nil
 }

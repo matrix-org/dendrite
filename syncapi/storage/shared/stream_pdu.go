@@ -41,6 +41,7 @@ func (p *PDUStreamProvider) StreamAdvance(
 	}
 }
 
+// nolint:gocyclo
 func (p *PDUStreamProvider) StreamRange(
 	ctx context.Context,
 	req *types.StreamRangeRequest,
@@ -63,12 +64,12 @@ func (p *PDUStreamProvider) StreamRange(
 	// TODO: use filter provided in request
 	stateFilter := gomatrixserverlib.DefaultStateFilter()
 
-	if from.IsEmpty() {
-		if stateDeltas, joinedRooms, err = p.DB.getStateDeltas(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
+	if req.WantFullState {
+		if stateDeltas, joinedRooms, err = p.DB.getStateDeltasForFullStateSync(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
 			return
 		}
 	} else {
-		if stateDeltas, joinedRooms, err = p.DB.getStateDeltasForFullStateSync(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, joinedRooms, err = p.DB.getStateDeltas(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
 			return
 		}
 	}
@@ -93,7 +94,7 @@ func (p *PDUStreamProvider) StreamRange(
 			}
 		}
 
-		for _, event := range events {
+		for _, event := range p.DB.StreamEventsToEvents(req.Device, events) {
 			room.Timeline.Events = append(
 				room.Timeline.Events,
 				gomatrixserverlib.ToClientEvent(
@@ -101,7 +102,9 @@ func (p *PDUStreamProvider) StreamRange(
 					gomatrixserverlib.FormatSync,
 				),
 			)
+		}
 
+		for _, event := range events {
 			if event.StreamPosition > newPos.PDUPosition {
 				newPos.PDUPosition = event.StreamPosition
 			}

@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -36,14 +35,12 @@ type OutputRoomEventConsumer struct {
 	rsAPI      api.RoomserverInternalAPI
 	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
-	notifier   *sync.Notifier
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
@@ -58,7 +55,6 @@ func NewOutputRoomEventConsumer(
 		cfg:        cfg,
 		rsConsumer: &consumer,
 		db:         store,
-		notifier:   n,
 		rsAPI:      rsAPI,
 	}
 	consumer.ProcessMessage = s.onMessage
@@ -274,7 +270,9 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
-	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
+
+	_ = pduPos
+	//s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
 	return nil
 }
 
@@ -292,7 +290,9 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	}
 	// Notify any active sync requests that the invite has been retired.
 	// Invites share the same stream counter as PDUs
-	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+
+	_ = pduPos
+	//s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
 	return nil
 }
 
@@ -308,11 +308,11 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 		return nil
 	}
 	// tell the notifier about the new peek so it knows to wake up new devices
-	s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID)
-
+	//s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID)
+	_ = sp
 	// we need to wake up the users who might need to now be peeking into this room,
 	// so we send in a dummy event to trigger a wakeup
-	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
+	//s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
 	return nil
 }
 
@@ -328,11 +328,11 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 		return nil
 	}
 	// tell the notifier about the new peek so it knows to wake up new devices
-	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID)
-
+	//s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID)
+	_ = sp
 	// we need to wake up the users who might need to now be peeking into this room,
 	// so we send in a dummy event to trigger a wakeup
-	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
+	//s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
 	return nil
 }
 

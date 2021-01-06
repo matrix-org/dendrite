@@ -33,7 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -57,7 +56,7 @@ type RequestPool struct {
 
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
-	db storage.Database, cfg *config.SyncAPI, n *Notifier,
+	db storage.Database, cfg *config.SyncAPI,
 	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *RequestPool {
@@ -160,12 +159,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
 		"user_id":   device.UserID,
 		"device_id": device.ID,
-		"since":     syncReq.since,
-		"timeout":   syncReq.timeout,
-		"limit":     syncReq.limit,
+		"since":     syncReq.Since,
+		"timeout":   syncReq.Timeout,
+		"limit":     syncReq.Limit,
 	})
-
-	_ = logger
 
 	activeSyncRequests.Inc()
 	defer activeSyncRequests.Dec()
@@ -176,50 +173,54 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer waitingSyncRequests.Dec()
 
 	if !rp.shouldReturnImmediately(syncReq) {
-		timer := time.NewTimer(syncReq.timeout) // case of timeout=0 is handled above
+		timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
 		defer timer.Stop()
 
+		// Use a subcontext so that we don't keep the StreamNotifyAfter
+		// goroutines alive any longer than they really need to be.
+		waitctx, waitcancel := context.WithCancel(syncReq.Context)
+
 		select {
-		case <-syncReq.ctx.Done(): // Caller gave up
+		case <-waitctx.Done(): // Caller gave up
+			waitcancel()
 			return util.JSONResponse{Code: http.StatusOK, JSON: syncData}
 
 		case <-timer.C: // Timeout reached
+			waitcancel()
 			return util.JSONResponse{Code: http.StatusOK, JSON: syncData}
 
-		case <-rp.pduStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
-		case <-rp.typingStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
-		case <-rp.receiptStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
-			// case <-rp.sendToDeviceStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
-			// case <-rp.inviteStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
-			// case <-rp.deviceListStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
+		case <-rp.pduStream.StreamNotifyAfter(waitctx, syncReq.Since):
+		case <-rp.typingStream.StreamNotifyAfter(waitctx, syncReq.Since):
+		case <-rp.receiptStream.StreamNotifyAfter(waitctx, syncReq.Since):
+			// case <-rp.sendToDeviceStream.StreamNotifyAfter(waitctx, syncReq.Since):
+			// case <-rp.inviteStream.StreamNotifyAfter(waitctx, syncReq.Since):
+			// case <-rp.deviceListStream.StreamNotifyAfter(waitctx, syncReq.Since):
 		}
+
+		waitcancel()
+		logger.Println("Responding to sync after notify")
+	} else {
+		logger.Println("Responding to sync immediately")
 	}
 
 	var latest types.StreamingToken
-	latest.ApplyUpdates(rp.pduStream.StreamLatestPosition(syncReq.ctx))
-	latest.ApplyUpdates(rp.typingStream.StreamLatestPosition(syncReq.ctx))
-	latest.ApplyUpdates(rp.receiptStream.StreamLatestPosition(syncReq.ctx))
-	// latest.ApplyUpdates(rp.sendToDeviceStream.StreamLatestPosition(syncReq.ctx))
-	// latest.ApplyUpdates(rp.inviteStream.StreamLatestPosition(syncReq.ctx))
-	// latest.ApplyUpdates(rp.deviceListStream.StreamLatestPosition(syncReq.ctx))
+	latest.ApplyUpdates(rp.pduStream.StreamLatestPosition(syncReq.Context))
+	latest.ApplyUpdates(rp.typingStream.StreamLatestPosition(syncReq.Context))
+	latest.ApplyUpdates(rp.receiptStream.StreamLatestPosition(syncReq.Context))
+	// latest.ApplyUpdates(rp.sendToDeviceStream.StreamLatestPosition(syncReq.Context))
+	// latest.ApplyUpdates(rp.inviteStream.StreamLatestPosition(syncReq.Context))
+	// latest.ApplyUpdates(rp.deviceListStream.StreamLatestPosition(syncReq.Context))
 
-	sr := &types.StreamRangeRequest{
-		Device:   device,                                 //
-		Response: types.NewResponse(),                    // Populated by all streams
-		Filter:   gomatrixserverlib.DefaultEventFilter(), //
-		Rooms:    make(map[string]string),                // Populated by the PDU stream
-	}
-
-	sr.Response.NextBatch.ApplyUpdates(rp.pduStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
-	sr.Response.NextBatch.ApplyUpdates(rp.typingStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
-	sr.Response.NextBatch.ApplyUpdates(rp.receiptStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
-	// sr.Response.NextBatch.ApplyUpdates(rp.sendToDeviceStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
-	// sr.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
-	// sr.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, sr, syncReq.since, latest))
+	syncReq.Response.NextBatch.ApplyUpdates(rp.pduStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
+	syncReq.Response.NextBatch.ApplyUpdates(rp.typingStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
+	syncReq.Response.NextBatch.ApplyUpdates(rp.receiptStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
+	// syncReq.Response.NextBatch.ApplyUpdates(rp.sendToDeviceStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
+	// syncReq.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
+	// syncReq.Response.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.Context, syncReq, syncReq.Since, latest))
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: sr.Response,
+		JSON: syncReq.Response,
 	}
 }
 
@@ -458,10 +459,10 @@ func (rp *RequestPool) appendAccountData(
 // shouldReturnImmediately returns whether the /sync request is an initial sync,
 // or timeout=0, or full_state=true, in any of the cases the request should
 // return immediately.
-func (rp *RequestPool) shouldReturnImmediately(syncReq *syncRequest) bool {
-	if syncReq.since.IsEmpty() || syncReq.timeout == 0 || syncReq.wantFullState {
+func (rp *RequestPool) shouldReturnImmediately(syncReq *types.StreamRangeRequest) bool {
+	if syncReq.Since.IsEmpty() || syncReq.Timeout == 0 || syncReq.WantFullState {
 		return true
 	}
-	waiting, werr := rp.db.SendToDeviceUpdatesWaiting(context.TODO(), syncReq.device.UserID, syncReq.device.ID)
+	waiting, werr := rp.db.SendToDeviceUpdatesWaiting(context.TODO(), syncReq.Device.UserID, syncReq.Device.ID)
 	return werr == nil && waiting
 }

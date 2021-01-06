@@ -53,9 +53,13 @@ func (p *ReceiptStreamProvider) StreamRange(
 		}
 	}
 
-	lastPos, receipts, err := p.DB.Receipts.SelectRoomReceiptsAfter(context.TODO(), joinedRooms, from.ReceiptPosition)
+	lastPos, receipts, err := p.DB.Receipts.SelectRoomReceiptsAfter(ctx, joinedRooms, from.ReceiptPosition)
 	if err != nil {
-		return types.StreamingToken{} //fmt.Errorf("unable to select receipts for rooms: %w", err)
+		return to //fmt.Errorf("unable to select receipts for rooms: %w", err)
+	}
+
+	if len(receipts) == 0 || lastPos == 0 {
+		return to
 	}
 
 	// Group receipts by room, so we can create one ClientEvent for every room
@@ -85,21 +89,15 @@ func (p *ReceiptStreamProvider) StreamRange(
 		}
 		ev.Content, err = json.Marshal(content)
 		if err != nil {
-			return types.StreamingToken{} // err
+			return to // err
 		}
 
 		jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)
 		req.Response.Rooms.Join[roomID] = jr
 	}
 
-	if lastPos > 0 {
-		return types.StreamingToken{
-			ReceiptPosition: lastPos,
-		}
-	} else {
-		return types.StreamingToken{
-			ReceiptPosition: to.ReceiptPosition,
-		}
+	return types.StreamingToken{
+		ReceiptPosition: lastPos,
 	}
 }
 

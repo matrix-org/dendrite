@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -31,7 +30,6 @@ import (
 type OutputTypingEventConsumer struct {
 	typingConsumer *internal.ContinualConsumer
 	db             storage.Database
-	notifier       *sync.Notifier
 }
 
 // NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
@@ -39,7 +37,6 @@ type OutputTypingEventConsumer struct {
 func NewOutputTypingEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
 ) *OutputTypingEventConsumer {
 
@@ -53,7 +50,6 @@ func NewOutputTypingEventConsumer(
 	s := &OutputTypingEventConsumer{
 		typingConsumer: &consumer,
 		db:             store,
-		notifier:       n,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -63,9 +59,11 @@ func NewOutputTypingEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
-	s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
-		s.notifier.OnNewTyping(roomID, types.StreamingToken{TypingPosition: types.StreamPosition(latestSyncPosition)})
-	})
+	/*
+		s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
+			s.notifier.OnNewTyping(roomID, types.StreamingToken{TypingPosition: types.StreamPosition(latestSyncPosition)})
+		})
+	*/
 
 	return s.typingConsumer.Start()
 }

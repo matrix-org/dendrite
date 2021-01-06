@@ -15,8 +15,6 @@
 package syncapi
 
 import (
-	"context"
-
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
@@ -50,57 +48,46 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
-	pos, err := syncDB.SyncPosition(context.Background())
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to get sync position")
-	}
-
-	notifier := sync.NewNotifier(pos)
-	err = notifier.Load(context.Background(), syncDB)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to start notifier")
-	}
-
-	requestPool := sync.NewRequestPool(syncDB, cfg, notifier, userAPI, keyAPI, rsAPI)
+	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
-		consumer, notifier, keyAPI, rsAPI, syncDB,
+		consumer, keyAPI, rsAPI, syncDB,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start key change consumer")
 	}
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg, consumer, notifier, syncDB, rsAPI,
+		cfg, consumer, syncDB, rsAPI,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		cfg, consumer, notifier, syncDB,
+		cfg, consumer, syncDB,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		cfg, consumer, notifier, syncDB,
+		cfg, consumer, syncDB,
 	)
 	if err = typingConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		cfg, consumer, notifier, syncDB,
+		cfg, consumer, syncDB,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		cfg, consumer, notifier, syncDB,
+		cfg, consumer, syncDB,
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
