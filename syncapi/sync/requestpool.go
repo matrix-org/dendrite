@@ -35,7 +35,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
@@ -156,14 +155,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		}
 	}
 
-	logger := util.GetLogger(req.Context()).WithFields(log.Fields{
-		"user_id":   device.UserID,
-		"device_id": device.ID,
-		"since":     syncReq.Since,
-		"timeout":   syncReq.Timeout,
-		"limit":     syncReq.Limit,
-	})
-
 	activeSyncRequests.Inc()
 	defer activeSyncRequests.Dec()
 
@@ -197,10 +188,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		case <-rp.deviceListStream.NotifyAfter(waitctx, syncReq.Since.DeviceListPosition):
 		}
 
-		logger.Println("Responding to sync after wakeup")
+		syncReq.Log.Println("Responding to sync after wakeup")
 		waitcancel()
 	} else {
-		logger.Println("Responding to sync immediately")
+		syncReq.Log.Println("Responding to sync immediately")
 	}
 
 	if syncReq.Since.IsEmpty() {

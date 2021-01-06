@@ -6,10 +6,12 @@ import (
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 type SyncRequest struct {
 	Context       context.Context
+	Log           *logrus.Entry
 	Device        *userapi.Device
 	Response      *Response
 	Filter        gomatrixserverlib.EventFilter
@@ -18,8 +20,7 @@ type SyncRequest struct {
 	Timeout       time.Duration
 	WantFullState bool
 
-	// Below this line are items updated by the
-	// stream providers. Not thread-safe.
+	// Updated by the PDU stream.
 	Rooms map[string]string
 }
 

@@ -79,6 +79,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			return to
 		}
 		req.Response.Rooms.Join[roomID] = *jr
+		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
 
 	// Add peeked rooms.

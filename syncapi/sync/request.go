@@ -25,6 +25,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 const defaultSyncTimeout = time.Duration(0)
@@ -74,10 +75,20 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			}
 		}
 	}
+
 	// TODO: Additional query params: set_presence, filter
+
+	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
+		"user_id":   device.UserID,
+		"device_id": device.ID,
+		"since":     since,
+		"timeout":   timeout,
+		"limit":     timelineLimit,
+	})
 
 	return &types.SyncRequest{
 		Context:       req.Context(),                          //
+		Log:           logger,                                 //
 		Device:        &device,                                //
 		Response:      types.NewResponse(),                    // Populated by all streams
 		Filter:        gomatrixserverlib.DefaultEventFilter(), //
