@@ -203,22 +203,56 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		logger.Println("Responding to sync immediately")
 	}
 
-	latest := types.StreamingToken{
-		PDUPosition:          rp.pduStream.LatestPosition(syncReq.Context),
-		TypingPosition:       rp.typingStream.LatestPosition(syncReq.Context),
-		ReceiptPosition:      rp.receiptStream.LatestPosition(syncReq.Context),
-		InvitePosition:       rp.inviteStream.LatestPosition(syncReq.Context),
-		SendToDevicePosition: rp.sendToDeviceStream.LatestPosition(syncReq.Context),
-		DeviceListPosition:   rp.db.DeviceListStream().LatestPosition(syncReq.Context),
-	}
-
-	syncReq.Response.NextBatch = types.StreamingToken{
-		PDUPosition:          rp.pduStream.Range(syncReq.Context, syncReq, syncReq.Since.PDUPosition, latest.PDUPosition),
-		TypingPosition:       rp.typingStream.Range(syncReq.Context, syncReq, syncReq.Since.TypingPosition, latest.TypingPosition),
-		ReceiptPosition:      rp.receiptStream.Range(syncReq.Context, syncReq, syncReq.Since.ReceiptPosition, latest.ReceiptPosition),
-		InvitePosition:       rp.inviteStream.Range(syncReq.Context, syncReq, syncReq.Since.InvitePosition, latest.InvitePosition),
-		SendToDevicePosition: rp.sendToDeviceStream.Range(syncReq.Context, syncReq, syncReq.Since.SendToDevicePosition, latest.SendToDevicePosition),
-		DeviceListPosition:   rp.deviceListStream.Range(syncReq.Context, syncReq, syncReq.Since.DeviceListPosition, latest.DeviceListPosition),
+	if syncReq.Since.IsEmpty() {
+		// Complete sync
+		syncReq.Response.NextBatch = types.StreamingToken{
+			PDUPosition: rp.pduStream.CompleteSync(
+				syncReq.Context, syncReq,
+			),
+			TypingPosition: rp.typingStream.CompleteSync(
+				syncReq.Context, syncReq,
+			),
+			ReceiptPosition: rp.receiptStream.CompleteSync(
+				syncReq.Context, syncReq,
+			),
+			InvitePosition: rp.inviteStream.CompleteSync(
+				syncReq.Context, syncReq,
+			),
+			SendToDevicePosition: rp.sendToDeviceStream.CompleteSync(
+				syncReq.Context, syncReq,
+			),
+			DeviceListPosition: rp.deviceListStream.CompleteSync(
+				syncReq.Context, syncReq,
+			),
+		}
+	} else {
+		// Incremental sync
+		syncReq.Response.NextBatch = types.StreamingToken{
+			PDUPosition: rp.pduStream.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.PDUPosition, rp.pduStream.LatestPosition(syncReq.Context),
+			),
+			TypingPosition: rp.typingStream.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.TypingPosition, rp.typingStream.LatestPosition(syncReq.Context),
+			),
+			ReceiptPosition: rp.receiptStream.IncrementalSync(
+				syncReq.Context, syncReq, syncReq.Since.ReceiptPosition,
+				rp.receiptStream.LatestPosition(syncReq.Context),
+			),
+			InvitePosition: rp.inviteStream.IncrementalSync(
+				syncReq.Context, syncReq, syncReq.Since.InvitePosition,
+				rp.inviteStream.LatestPosition(syncReq.Context),
+			),
+			SendToDevicePosition: rp.sendToDeviceStream.IncrementalSync(
+				syncReq.Context, syncReq, syncReq.Since.SendToDevicePosition,
+				rp.sendToDeviceStream.LatestPosition(syncReq.Context),
+			),
+			DeviceListPosition: rp.deviceListStream.IncrementalSync(
+				syncReq.Context, syncReq, syncReq.Since.DeviceListPosition,
+				rp.db.DeviceListStream().LatestPosition(syncReq.Context),
+			),
+		}
 	}
 
 	return util.JSONResponse{
@@ -251,14 +285,16 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 		}
 	}
 	// work out room joins/leaves
-	res, err := rp.db.IncrementalSync(
-		req.Context(), types.NewResponse(), *device, fromToken, toToken, 10, false,
-	)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("Failed to IncrementalSync")
-		return jsonerror.InternalServerError()
-	}
-
+	/*
+		res, err := rp.db.IncrementalSync(
+			req.Context(), types.NewResponse(), *device, fromToken, toToken, 10, false,
+		)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("Failed to IncrementalSync")
+			return jsonerror.InternalServerError()
+		}
+	*/
+	res := types.NewResponse()
 	res, err = rp.appendDeviceLists(res, device.UserID, fromToken, toToken)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("Failed to appendDeviceLists info")
@@ -280,12 +316,6 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 /*
 func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (*types.Response, error) {
 	res := types.NewResponse()
-
-	// See if we have any new tasks to do for the send-to-device messaging.
-	lastPos, events, updates, deletions, err := rp.db.SendToDeviceUpdatesForSync(req.ctx, req.device.UserID, req.device.ID, req.since)
-	if err != nil {
-		return nil, fmt.Errorf("rp.db.SendToDeviceUpdatesForSync: %w", err)
-	}
 
 	// TODO: handle ignored users
 	if req.since.IsEmpty() {
@@ -314,24 +344,6 @@ func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.Strea
 		return res, fmt.Errorf("internal.DeviceOTKCounts: %w", err)
 	}
 
-	// Before we return the sync response, make sure that we take action on
-	// any send-to-device database updates or deletions that we need to do.
-	// Then add the updates into the sync response.
-	if len(updates) > 0 || len(deletions) > 0 {
-		// Handle the updates and deletions in the database.
-		err = rp.db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, req.since)
-		if err != nil {
-			return res, fmt.Errorf("rp.db.CleanSendToDeviceUpdates: %w", err)
-		}
-	}
-	if len(events) > 0 {
-		// Add the updates into the sync response.
-		for _, event := range events {
-			res.ToDevice.Events = append(res.ToDevice.Events, event.SendToDeviceEvent)
-		}
-	}
-
-	res.NextBatch.SendToDevicePosition = lastPos
 	return res, err
 }
 */

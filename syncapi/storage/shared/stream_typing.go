@@ -12,7 +12,14 @@ type TypingStreamProvider struct {
 	StreamProvider
 }
 
-func (p *TypingStreamProvider) Range(
+func (p *TypingStreamProvider) CompleteSync(
+	ctx context.Context,
+	req *types.SyncRequest,
+) types.StreamPosition {
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+}
+
+func (p *TypingStreamProvider) IncrementalSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
@@ -23,8 +30,6 @@ func (p *TypingStreamProvider) Range(
 			continue
 		}
 
-		// This may have already been set by a previous stream, so
-		// reuse it if it exists.
 		jr := req.Response.Rooms.Join[roomID]
 
 		if users, updated := p.DB.EDUCache.GetTypingUsersIfUpdatedAfter(

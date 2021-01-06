@@ -24,7 +24,14 @@ func (p *ReceiptStreamProvider) Setup() {
 	p.latest = types.StreamPosition(latest)
 }
 
-func (p *ReceiptStreamProvider) Range(
+func (p *ReceiptStreamProvider) CompleteSync(
+	ctx context.Context,
+	req *types.SyncRequest,
+) types.StreamPosition {
+	return p.LatestPosition(ctx)
+}
+
+func (p *ReceiptStreamProvider) IncrementalSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,

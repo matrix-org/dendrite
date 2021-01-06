@@ -65,18 +65,6 @@ type Database interface {
 	// Returns an empty slice if no state events could be found for this room.
 	// Returns an error if there was an issue with the retrieval.
 	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error)
-	// SyncPosition returns the latest positions for syncing.
-	SyncPosition(ctx context.Context) (types.StreamingToken, error)
-	// IncrementalSync returns all the data needed in order to create an incremental
-	// sync response for the given user. Events returned will include any client
-	// transaction IDs associated with the given device. These transaction IDs come
-	// from when the device sent the event via an API that included a transaction
-	// ID. A response object must be provided for IncrementaSync to populate - it
-	// will not create one.
-	IncrementalSync(ctx context.Context, res *types.Response, device userapi.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
-	// CompleteSync returns a complete /sync API response for the given user. A response object
-	// must be provided for CompleteSync to populate - it will not create one.
-	CompleteSync(ctx context.Context, res *types.Response, device userapi.Device, numRecentEventsPerRoom int) (*types.Response, error)
 	// GetAccountDataInRange returns all account data for a given user inserted or
 	// updated between two given positions
 	// Returns a map following the format data[roomID] = []dataTypes

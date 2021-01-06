@@ -24,11 +24,18 @@ func (p *InviteStreamProvider) Setup() {
 	p.latest = types.StreamPosition(latest)
 }
 
-func (p *InviteStreamProvider) Range(
+func (p *InviteStreamProvider) CompleteSync(
+	ctx context.Context,
+	req *types.SyncRequest,
+) types.StreamPosition {
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+}
+
+func (p *InviteStreamProvider) IncrementalSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
-) (newPos types.StreamPosition) {
+) types.StreamPosition {
 	r := types.Range{
 		From: from,
 		To:   to,
@@ -38,7 +45,7 @@ func (p *InviteStreamProvider) Range(
 		ctx, nil, req.Device.UserID, r,
 	)
 	if err != nil {
-		return // fmt.Errorf("d.Invites.SelectInviteEventsInRange: %w", err)
+		return to // fmt.Errorf("d.Invites.SelectInviteEventsInRange: %w", err)
 	}
 
 	for roomID, inviteEvent := range invites {
