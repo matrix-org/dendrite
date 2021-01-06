@@ -821,22 +821,25 @@ func (d *Database) getResponseWithPDUsForCompleteSync(
 		res.Rooms.Join[roomID] = *jr
 	}
 
-	// Extract room state and recent events for all rooms the user has left
-	leaveRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Leave)
-	if err != nil {
-		return
-	}
-	// Build up a /sync response. Add leave rooms.
-	for _, roomID := range leaveRoomIDs {
-		var lr *types.LeaveResponse
-		lr, err = d.getLeaveResponseForCompleteSync(
-			ctx, txn, roomID, r, filter, device,
-		)
+	if filter.Room.IncludeLeave {
+		var leaveRoomIDs []string
+		// Extract room state and recent events for all rooms the user has left
+		leaveRoomIDs, err = d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Leave)
 		if err != nil {
 			return
 		}
+		// Build up a /sync response. Add leave rooms.
+		for _, roomID := range leaveRoomIDs {
+			var lr *types.LeaveResponse
+			lr, err = d.getLeaveResponseForCompleteSync(
+				ctx, txn, roomID, r, filter, device,
+			)
+			if err != nil {
+				return
+			}
 
-		res.Rooms.Leave[roomID] = *lr
+			res.Rooms.Leave[roomID] = *lr
+		}
 	}
 
 	// Add peeked rooms.
@@ -909,7 +912,7 @@ func (d *Database) filterStreamEventsAccordingToHistoryVisibility(
 	}
 	// Default to spanning the rest of the array
 	sliceEnd := len(recentStreamEvents)
-	// If there is a leaveEvent, then cut all events after the person left (exclude the leave itself too)
+	// If there is a leaveEvent, then cut all events after the person left (exclude the leave event too)
 	if leaveEventIndex != -1 {
 		sliceEnd = leaveEventIndex
 	}
@@ -1225,10 +1228,11 @@ func (d *Database) addRoomDeltaToResponse(
 	// 	"recentStreamEvents": fmt.Sprintf("%+v", events),
 	// }).Info("isync addRoomDeltaToResponse before")
 
-	recentStreamEvents, limited, err = d.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, device, limited)
-	if err != nil {
-		return err
-	}
+	// // asdf
+	// recentStreamEvents, limited, err = d.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, device, limited)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// events = make([]somematrixevent, len(recentStreamEvents))
 	// for i, v := range recentStreamEvents {
