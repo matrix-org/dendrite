@@ -41,15 +41,18 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db           storage.Database
-	cfg          *config.SyncAPI
-	userAPI      userapi.UserInternalAPI
-	Notifier     *Notifier
-	keyAPI       keyapi.KeyInternalAPI
-	rsAPI        roomserverAPI.RoomserverInternalAPI
-	lastseen     sync.Map
-	pduStream    types.StreamProvider
-	typingStream types.StreamProvider
+	db                 storage.Database
+	cfg                *config.SyncAPI
+	userAPI            userapi.UserInternalAPI
+	keyAPI             keyapi.KeyInternalAPI
+	rsAPI              roomserverAPI.RoomserverInternalAPI
+	lastseen           sync.Map
+	pduStream          types.StreamProvider
+	typingStream       types.StreamProvider
+	receiptStream      types.StreamProvider
+	sendToDeviceStream types.StreamProvider
+	inviteStream       types.StreamProvider
+	deviceListStream   types.StreamProvider
 }
 
 // NewRequestPool makes a new RequestPool
@@ -59,15 +62,18 @@ func NewRequestPool(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) *RequestPool {
 	rp := &RequestPool{
-		db:           db,
-		cfg:          cfg,
-		userAPI:      userAPI,
-		Notifier:     n,
-		keyAPI:       keyAPI,
-		rsAPI:        rsAPI,
-		lastseen:     sync.Map{},
-		pduStream:    db.PDUStream(),
-		typingStream: db.TypingStream(),
+		db:                 db,
+		cfg:                cfg,
+		userAPI:            userAPI,
+		keyAPI:             keyAPI,
+		rsAPI:              rsAPI,
+		lastseen:           sync.Map{},
+		pduStream:          db.PDUStream(),
+		typingStream:       db.TypingStream(),
+		receiptStream:      nil, // TODO
+		sendToDeviceStream: nil, // TODO
+		inviteStream:       nil, // TODO
+		deviceListStream:   nil, // TODO
 	}
 	go rp.cleanLastSeen()
 	return rp
@@ -168,10 +174,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	syncData = types.NewResponse()
 	filter := gomatrixserverlib.DefaultEventFilter()
-	syncData.NextBatch = types.StreamingToken{
-		PDUPosition:    rp.pduStream.StreamLatestPosition(syncReq.ctx),
-		TypingPosition: rp.typingStream.StreamLatestPosition(syncReq.ctx),
-	}
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
@@ -181,31 +183,35 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		defer timer.Stop()
 
 		select {
-		case <-syncReq.ctx.Done():
-			// Caller gave up
-			logger.Println("Context expired")
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: syncData,
-			}
+		case <-syncReq.ctx.Done(): // Caller gave up
+			return util.JSONResponse{Code: http.StatusOK, JSON: syncData}
 
-		case <-timer.C:
-			// Timeout reached
-			logger.Println("Timed out")
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: syncData,
-			}
+		case <-timer.C: // Timeout reached
+			return util.JSONResponse{Code: http.StatusOK, JSON: syncData}
 
 		case <-rp.pduStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
-			logger.Println("PDU stream awake")
 		case <-rp.typingStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
-			logger.Println("Typing stream awake")
+			// case <-rp.receiptStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
+			// case <-rp.sendToDeviceStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
+			// case <-rp.inviteStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
+			// case <-rp.deviceListStream.StreamNotifyAfter(syncReq.ctx, syncReq.since):
 		}
 	}
 
-	syncData.NextBatch.PDUPosition = rp.pduStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, syncData.NextBatch, filter)
-	syncData.NextBatch.TypingPosition = rp.typingStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, syncData.NextBatch, filter)
+	var latest types.StreamingToken
+	latest.ApplyUpdates(rp.pduStream.StreamLatestPosition(syncReq.ctx))
+	latest.ApplyUpdates(rp.typingStream.StreamLatestPosition(syncReq.ctx))
+	// latest.ApplyUpdates(rp.receiptStream.StreamLatestPosition(syncReq.ctx))
+	// latest.ApplyUpdates(rp.sendToDeviceStream.StreamLatestPosition(syncReq.ctx))
+	// latest.ApplyUpdates(rp.inviteStream.StreamLatestPosition(syncReq.ctx))
+	// latest.ApplyUpdates(rp.deviceListStream.StreamLatestPosition(syncReq.ctx))
+
+	syncData.NextBatch.ApplyUpdates(rp.pduStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
+	syncData.NextBatch.ApplyUpdates(rp.typingStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
+	// syncData.NextBatch.ApplyUpdates(rp.receiptStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
+	// syncData.NextBatch.ApplyUpdates(rp.sendToDeviceStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
+	// syncData.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
+	// syncData.NextBatch.ApplyUpdates(rp.inviteStream.StreamRange(syncReq.ctx, syncData, device, syncReq.since, latest, filter))
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -333,7 +339,7 @@ func (rp *RequestPool) appendDeviceLists(
 	return data, nil
 }
 
-// nolint:gocyclo
+/*
 func (rp *RequestPool) appendAccountData(
 	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
 	accountDataFilter *gomatrixserverlib.EventFilter,
@@ -443,6 +449,7 @@ func (rp *RequestPool) appendAccountData(
 
 	return data, nil
 }
+*/
 
 // shouldReturnImmediately returns whether the /sync request is an initial sync,
 // or timeout=0, or full_state=true, in any of the cases the request should

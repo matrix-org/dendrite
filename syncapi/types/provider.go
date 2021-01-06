@@ -9,19 +9,22 @@ import (
 
 type StreamProvider interface {
 	StreamSetup()
+
+	// StreamAdvance will update the latest position of the stream based on
+	// an update and will wake callers waiting on StreamNotifyAfter.
 	StreamAdvance(latest StreamPosition)
 
-	// Range will update the response to include all updates between
+	// StreamRange will update the response to include all updates between
 	// the from and to sync positions. It will always return immediately,
 	// making no changes if the range contains no updates.
-	StreamRange(ctx context.Context, res *Response, device *userapi.Device, from, to StreamingToken, filter gomatrixserverlib.EventFilter) StreamPosition
+	StreamRange(ctx context.Context, res *Response, device *userapi.Device, from, to StreamingToken, filter gomatrixserverlib.EventFilter) StreamingToken
 
-	// NotifyAfter returns a channel which will be closed once the
+	// StreamNotifyAfter returns a channel which will be closed once the
 	// stream advances past the "from" position.
 	StreamNotifyAfter(ctx context.Context, from StreamingToken) chan struct{}
 
-	// LatestPosition returns the latest stream position for this stream.
-	StreamLatestPosition(ctx context.Context) StreamPosition
+	// StreamLatestPosition returns the latest stream position for this stream.
+	StreamLatestPosition(ctx context.Context) StreamingToken
 }
 
 type TopologyProvider interface {
@@ -33,5 +36,5 @@ type TopologyProvider interface {
 
 	// LatestPosition returns the latest stream position for this stream
 	// for the given room.
-	TopologyLatestPosition(ctx context.Context, roomID string) StreamPosition
+	TopologyLatestPosition(ctx context.Context, roomID string) TopologyToken
 }

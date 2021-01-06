@@ -46,13 +46,15 @@ func (p *PDUStreamProvider) StreamRange(
 	device *userapi.Device,
 	from, to types.StreamingToken,
 	filter gomatrixserverlib.EventFilter,
-) (newPos types.StreamPosition) {
+) (newPos types.StreamingToken) {
 	r := types.Range{
 		From:      from.PDUPosition,
 		To:        to.PDUPosition,
 		Backwards: from.IsAfter(to),
 	}
-	newPos = from.PDUPosition
+	newPos = types.StreamingToken{
+		PDUPosition: from.PDUPosition,
+	}
 
 	var err error
 	var events []types.StreamEvent
@@ -96,8 +98,8 @@ func (p *PDUStreamProvider) StreamRange(
 				),
 			)
 
-			if event.StreamPosition > newPos {
-				newPos = event.StreamPosition
+			if event.StreamPosition > newPos.PDUPosition {
+				newPos.PDUPosition = event.StreamPosition
 			}
 		}
 
@@ -123,7 +125,7 @@ func (p *PDUStreamProvider) StreamNotifyAfter(
 	check := func() bool {
 		p.latestMutex.RLock()
 		defer p.latestMutex.RUnlock()
-		if from.PDUPosition > p.latest {
+		if p.latest > from.PDUPosition {
 			close(ch)
 			return true
 		}
@@ -167,9 +169,11 @@ func (p *PDUStreamProvider) StreamNotifyAfter(
 
 func (p *PDUStreamProvider) StreamLatestPosition(
 	ctx context.Context,
-) types.StreamPosition {
+) types.StreamingToken {
 	p.latestMutex.RLock()
 	defer p.latestMutex.RUnlock()
 
-	return p.latest
+	return types.StreamingToken{
+		PDUPosition: p.latest,
+	}
 }

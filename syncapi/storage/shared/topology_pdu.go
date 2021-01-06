@@ -22,10 +22,10 @@ func (p *PDUTopologyProvider) TopologyRange(ctx context.Context, res *types.Resp
 	_ = events
 }
 
-func (p *PDUTopologyProvider) TopologyLatestPosition(ctx context.Context, roomID string) types.StreamPosition {
+func (p *PDUTopologyProvider) TopologyLatestPosition(ctx context.Context, roomID string) types.TopologyToken {
 	token, err := p.DB.MaxTopologicalPosition(ctx, roomID)
 	if err != nil {
-		return 0
+		return types.TopologyToken{}
 	}
-	return token.PDUPosition
+	return token
 }

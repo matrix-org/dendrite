@@ -37,8 +37,8 @@ func (p *TypingStreamProvider) StreamRange(
 	device *userapi.Device,
 	from, to types.StreamingToken,
 	filter gomatrixserverlib.EventFilter,
-) types.StreamPosition {
-	return 0
+) types.StreamingToken {
+	return types.StreamingToken{}
 }
 
 func (p *TypingStreamProvider) StreamNotifyAfter(
@@ -50,7 +50,7 @@ func (p *TypingStreamProvider) StreamNotifyAfter(
 	check := func() bool {
 		p.latestMutex.RLock()
 		defer p.latestMutex.RUnlock()
-		if from.TypingPosition > p.latest {
+		if p.latest > from.TypingPosition {
 			close(ch)
 			return true
 		}
@@ -94,9 +94,11 @@ func (p *TypingStreamProvider) StreamNotifyAfter(
 
 func (p *TypingStreamProvider) StreamLatestPosition(
 	ctx context.Context,
-) types.StreamPosition {
+) types.StreamingToken {
 	p.latestMutex.RLock()
 	defer p.latestMutex.RUnlock()
 
-	return p.latest
+	return types.StreamingToken{
+		TypingPosition: p.latest,
+	}
 }
