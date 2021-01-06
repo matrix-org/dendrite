@@ -75,6 +75,7 @@ func (p *StreamProvider) NotifyAfter(
 			case <-ctx.Done():
 				// The context has expired, so there's no point
 				// in continuing to wait for the update.
+				close(ch)
 				return
 			default:
 				// The latest position has been advanced. Let's
