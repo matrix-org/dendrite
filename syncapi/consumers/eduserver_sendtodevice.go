@@ -97,13 +97,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		return err
 	}
 
-	//s.notifier.OnNewSendToDevice(
-	//	output.UserID,
-	//	[]string{output.DeviceID},
-	//	types.StreamingToken{SendToDevicePosition: streamPos},
-	//)
-
-	_ = streamPos
+	s.db.SendToDeviceStream().Advance(streamPos)
 
 	return nil
 }

@@ -110,14 +110,12 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}
 	// make sure we get our own key updates too!
 	queryRes.UserIDsToCount[output.UserID] = 1
-	posUpdate := types.StreamingToken{
-		DeviceListPosition: types.LogPosition{
-			Offset:    msg.Offset,
-			Partition: msg.Partition,
-		},
+	posUpdate := types.LogPosition{
+		Offset:    msg.Offset,
+		Partition: msg.Partition,
 	}
 
-	_ = posUpdate
+	s.db.DeviceListStream().Advance(posUpdate)
 
 	//for userID := range queryRes.UserIDsToCount {
 	//	s.notifier.OnNewKeyChange(posUpdate, userID, output.UserID)

@@ -271,8 +271,8 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		return nil
 	}
 
-	_ = pduPos
-	//s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
+	s.db.InviteStream().Advance(pduPos)
+
 	return nil
 }
 
@@ -291,8 +291,8 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	// Notify any active sync requests that the invite has been retired.
 	// Invites share the same stream counter as PDUs
 
-	_ = pduPos
-	//s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+	s.db.InviteStream().Advance(pduPos)
+
 	return nil
 }
 
