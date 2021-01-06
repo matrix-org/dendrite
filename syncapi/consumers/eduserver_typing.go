@@ -59,11 +59,9 @@ func NewOutputTypingEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
-	/*
-		s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
-			s.notifier.OnNewTyping(roomID, types.StreamingToken{TypingPosition: types.StreamPosition(latestSyncPosition)})
-		})
-	*/
+	s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
+		s.db.TypingStream().Advance(types.StreamPosition(latestSyncPosition))
+	})
 
 	return s.typingConsumer.Start()
 }
@@ -90,7 +88,7 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		typingPos = s.db.RemoveTypingUser(typingEvent.UserID, typingEvent.RoomID)
 	}
 
-	s.db.TypingStream().StreamAdvance(typingPos)
+	s.db.TypingStream().Advance(typingPos)
 
 	return nil
 }

@@ -38,7 +38,7 @@ type filter struct {
 	} `json:"room"`
 }
 
-func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*types.StreamRangeRequest, error) {
+func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*types.SyncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
@@ -76,7 +76,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	}
 	// TODO: Additional query params: set_presence, filter
 
-	return &types.StreamRangeRequest{
+	return &types.SyncRequest{
 		Context:       req.Context(),                          //
 		Device:        &device,                                //
 		Response:      types.NewResponse(),                    // Populated by all streams

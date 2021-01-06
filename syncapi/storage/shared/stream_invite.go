@@ -10,85 +10,48 @@ type InviteStreamProvider struct {
 	StreamProvider
 }
 
-func (p *InviteStreamProvider) StreamSetup() {
-	p.StreamProvider.StreamSetup()
+func (p *InviteStreamProvider) Setup() {
+	p.StreamProvider.Setup()
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	p.latest = 0
-}
-
-func (p *InviteStreamProvider) StreamLatestPosition(
-	ctx context.Context,
-) types.StreamingToken {
-	p.latestMutex.RLock()
-	defer p.latestMutex.RUnlock()
-
-	return types.StreamingToken{
-		InvitePosition: p.latest,
+	latest, err := p.DB.Invites.SelectMaxInviteID(context.Background(), nil)
+	if err != nil {
+		return
 	}
+
+	p.latest = types.StreamPosition(latest)
 }
 
-// nolint:gocyclo
-func (p *InviteStreamProvider) StreamRange(
+func (p *InviteStreamProvider) Range(
 	ctx context.Context,
-	req *types.StreamRangeRequest,
-	from, to types.StreamingToken,
-) (newPos types.StreamingToken) {
-
-	return types.StreamingToken{
-		InvitePosition: 0,
+	req *types.SyncRequest,
+	from, to types.StreamPosition,
+) (newPos types.StreamPosition) {
+	r := types.Range{
+		From: from,
+		To:   to,
 	}
-}
 
-func (p *InviteStreamProvider) StreamNotifyAfter(
-	ctx context.Context,
-	from types.StreamingToken,
-) chan struct{} {
-	ch := make(chan struct{})
+	invites, retiredInvites, err := p.DB.Invites.SelectInviteEventsInRange(
+		ctx, nil, req.Device.UserID, r,
+	)
+	if err != nil {
+		return // fmt.Errorf("d.Invites.SelectInviteEventsInRange: %w", err)
+	}
 
-	check := func() bool {
-		p.latestMutex.RLock()
-		defer p.latestMutex.RUnlock()
-		if p.latest > from.InvitePosition {
-			close(ch)
-			return true
+	for roomID, inviteEvent := range invites {
+		ir := types.NewInviteResponse(inviteEvent)
+		req.Response.Rooms.Invite[roomID] = *ir
+	}
+
+	for roomID := range retiredInvites {
+		if _, ok := req.Response.Rooms.Join[roomID]; !ok {
+			lr := types.NewLeaveResponse()
+			req.Response.Rooms.Leave[roomID] = *lr
 		}
-		return false
 	}
 
-	// If we've already advanced past the specified position
-	// then return straight away.
-	if check() {
-		return ch
-	}
-
-	// If we haven't, then we'll subscribe to updates. The
-	// sync.Cond will fire every time the latest position
-	// updates, so we can check and see if we've advanced
-	// past it.
-	go func(p *InviteStreamProvider) {
-		p.update.L.Lock()
-		defer p.update.L.Unlock()
-
-		for {
-			select {
-			case <-ctx.Done():
-				// The context has expired, so there's no point
-				// in continuing to wait for the update.
-				return
-			default:
-				// The latest position has been advanced. Let's
-				// see if it's advanced to the position we care
-				// about. If it has then we'll return.
-				p.update.Wait()
-				if check() {
-					return
-				}
-			}
-		}
-	}(p)
-
-	return ch
+	return to
 }

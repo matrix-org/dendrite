@@ -82,7 +82,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 		return err
 	}
 
-	s.db.TypingStream().StreamAdvance(streamPos)
+	s.db.TypingStream().Advance(streamPos)
 
 	return nil
 }

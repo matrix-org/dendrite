@@ -11,8 +11,8 @@ type PDUStreamProvider struct {
 	StreamProvider
 }
 
-func (p *PDUStreamProvider) StreamSetup() {
-	p.StreamProvider.StreamSetup()
+func (p *PDUStreamProvider) Setup() {
+	p.StreamProvider.Setup()
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
@@ -24,31 +24,18 @@ func (p *PDUStreamProvider) StreamSetup() {
 	p.latest = types.StreamPosition(id)
 }
 
-func (p *PDUStreamProvider) StreamLatestPosition(
-	ctx context.Context,
-) types.StreamingToken {
-	p.latestMutex.RLock()
-	defer p.latestMutex.RUnlock()
-
-	return types.StreamingToken{
-		PDUPosition: p.latest,
-	}
-}
-
 // nolint:gocyclo
-func (p *PDUStreamProvider) StreamRange(
+func (p *PDUStreamProvider) Range(
 	ctx context.Context,
-	req *types.StreamRangeRequest,
-	from, to types.StreamingToken,
-) (newPos types.StreamingToken) {
+	req *types.SyncRequest,
+	from, to types.StreamPosition,
+) (newPos types.StreamPosition) {
 	r := types.Range{
-		From:      from.PDUPosition,
-		To:        to.PDUPosition,
-		Backwards: from.IsAfter(to),
+		From:      from,
+		To:        to,
+		Backwards: from > to,
 	}
-	newPos = types.StreamingToken{
-		PDUPosition: to.PDUPosition,
-	}
+	newPos = to
 
 	var err error
 	var events []types.StreamEvent
@@ -99,8 +86,8 @@ func (p *PDUStreamProvider) StreamRange(
 		}
 
 		for _, event := range events {
-			if event.StreamPosition > newPos.PDUPosition {
-				newPos.PDUPosition = event.StreamPosition
+			if event.StreamPosition > newPos {
+				newPos = event.StreamPosition
 			}
 		}
 
@@ -121,55 +108,4 @@ func (p *PDUStreamProvider) StreamRange(
 	}
 
 	return newPos
-}
-
-func (p *PDUStreamProvider) StreamNotifyAfter(
-	ctx context.Context,
-	from types.StreamingToken,
-) chan struct{} {
-	ch := make(chan struct{})
-
-	check := func() bool {
-		p.latestMutex.RLock()
-		defer p.latestMutex.RUnlock()
-		if p.latest > from.PDUPosition {
-			close(ch)
-			return true
-		}
-		return false
-	}
-
-	// If we've already advanced past the specified position
-	// then return straight away.
-	if check() {
-		return ch
-	}
-
-	// If we haven't, then we'll subscribe to updates. The
-	// sync.Cond will fire every time the latest position
-	// updates, so we can check and see if we've advanced
-	// past it.
-	go func(p *PDUStreamProvider) {
-		p.update.L.Lock()
-		defer p.update.L.Unlock()
-
-		for {
-			select {
-			case <-ctx.Done():
-				// The context has expired, so there's no point
-				// in continuing to wait for the update.
-				return
-			default:
-				// The latest position has been advanced. Let's
-				// see if it's advanced to the position we care
-				// about. If it has then we'll return.
-				p.update.Wait()
-				if check() {
-					return
-				}
-			}
-		}
-	}(p)
-
-	return ch
 }

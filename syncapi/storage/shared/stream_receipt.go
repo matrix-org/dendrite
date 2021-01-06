@@ -13,8 +13,8 @@ type ReceiptStreamProvider struct {
 	StreamProvider
 }
 
-func (p *ReceiptStreamProvider) StreamSetup() {
-	p.StreamProvider.StreamSetup()
+func (p *ReceiptStreamProvider) Setup() {
+	p.StreamProvider.Setup()
 
 	latest, err := p.DB.Receipts.SelectMaxReceiptID(context.Background(), nil)
 	if err != nil {
@@ -24,22 +24,11 @@ func (p *ReceiptStreamProvider) StreamSetup() {
 	p.latest = types.StreamPosition(latest)
 }
 
-func (p *ReceiptStreamProvider) StreamLatestPosition(
+func (p *ReceiptStreamProvider) Range(
 	ctx context.Context,
-) types.StreamingToken {
-	p.latestMutex.RLock()
-	defer p.latestMutex.RUnlock()
-
-	return types.StreamingToken{
-		ReceiptPosition: p.latest,
-	}
-}
-
-func (p *ReceiptStreamProvider) StreamRange(
-	ctx context.Context,
-	req *types.StreamRangeRequest,
-	from, to types.StreamingToken,
-) types.StreamingToken {
+	req *types.SyncRequest,
+	from, to types.StreamPosition,
+) types.StreamPosition {
 	var joinedRooms []string
 	for roomID, membership := range req.Rooms {
 		if membership == gomatrixserverlib.Join {
@@ -47,7 +36,7 @@ func (p *ReceiptStreamProvider) StreamRange(
 		}
 	}
 
-	lastPos, receipts, err := p.DB.Receipts.SelectRoomReceiptsAfter(ctx, joinedRooms, from.ReceiptPosition)
+	lastPos, receipts, err := p.DB.Receipts.SelectRoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
 		return to //fmt.Errorf("unable to select receipts for rooms: %w", err)
 	}
@@ -90,58 +79,5 @@ func (p *ReceiptStreamProvider) StreamRange(
 		req.Response.Rooms.Join[roomID] = jr
 	}
 
-	return types.StreamingToken{
-		ReceiptPosition: lastPos,
-	}
-}
-
-func (p *ReceiptStreamProvider) StreamNotifyAfter(
-	ctx context.Context,
-	from types.StreamingToken,
-) chan struct{} {
-	ch := make(chan struct{})
-
-	check := func() bool {
-		p.latestMutex.RLock()
-		defer p.latestMutex.RUnlock()
-		if p.latest > from.ReceiptPosition {
-			close(ch)
-			return true
-		}
-		return false
-	}
-
-	// If we've already advanced past the specified position
-	// then return straight away.
-	if check() {
-		return ch
-	}
-
-	// If we haven't, then we'll subscribe to updates. The
-	// sync.Cond will fire every time the latest position
-	// updates, so we can check and see if we've advanced
-	// past it.
-	go func(p *ReceiptStreamProvider) {
-		p.update.L.Lock()
-		defer p.update.L.Unlock()
-
-		for {
-			select {
-			case <-ctx.Done():
-				// The context has expired, so there's no point
-				// in continuing to wait for the update.
-				return
-			default:
-				// The latest position has been advanced. Let's
-				// see if it's advanced to the position we care
-				// about. If it has then we'll return.
-				p.update.Wait()
-				if check() {
-					return
-				}
-			}
-		}
-	}(p)
-
-	return ch
+	return lastPos
 }

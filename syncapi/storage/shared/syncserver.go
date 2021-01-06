@@ -51,11 +51,13 @@ type Database struct {
 	Receipts            tables.Receipts
 	EDUCache            *cache.EDUCache
 
-	PDUStreamProvider     types.StreamProvider
-	PDUTopologyProvider   types.TopologyProvider
-	TypingStreamProvider  types.StreamProvider
-	ReceiptStreamProvider types.StreamProvider
-	InviteStreamProvider  types.StreamProvider
+	PDUStreamProvider          types.StreamProvider
+	PDUTopologyProvider        types.TopologyProvider
+	TypingStreamProvider       types.StreamProvider
+	ReceiptStreamProvider      types.StreamProvider
+	InviteStreamProvider       types.StreamProvider
+	SendToDeviceStreamProvider types.StreamProvider
+	DeviceListStreamProvider   types.StreamLogProvider
 }
 
 // ConfigureProviders creates instances of the various
@@ -66,11 +68,15 @@ func (d *Database) ConfigureProviders() {
 	d.TypingStreamProvider = &TypingStreamProvider{StreamProvider{DB: d}}
 	d.ReceiptStreamProvider = &ReceiptStreamProvider{StreamProvider{DB: d}}
 	d.InviteStreamProvider = &InviteStreamProvider{StreamProvider{DB: d}}
+	d.SendToDeviceStreamProvider = &SendToDeviceStreamProvider{StreamProvider{DB: d}}
+	d.DeviceListStreamProvider = &DeviceListStreamProvider{StreamLogProvider{DB: d}}
 
-	d.PDUStreamProvider.StreamSetup()
-	d.TypingStreamProvider.StreamSetup()
-	d.ReceiptStreamProvider.StreamSetup()
-	d.InviteStreamProvider.StreamSetup()
+	d.PDUStreamProvider.Setup()
+	d.TypingStreamProvider.Setup()
+	d.ReceiptStreamProvider.Setup()
+	d.InviteStreamProvider.Setup()
+	d.SendToDeviceStreamProvider.Setup()
+	d.DeviceListStreamProvider.Setup()
 
 	d.PDUTopologyProvider = &PDUTopologyProvider{DB: d}
 }
@@ -93,6 +99,14 @@ func (d *Database) ReceiptStream() types.StreamProvider {
 
 func (d *Database) InviteStream() types.StreamProvider {
 	return d.InviteStreamProvider
+}
+
+func (d *Database) SendToDeviceStream() types.StreamProvider {
+	return d.SendToDeviceStreamProvider
+}
+
+func (d *Database) DeviceListStream() types.StreamLogProvider {
+	return d.DeviceListStreamProvider
 }
 
 // Events lookups a list of event by their event ID.

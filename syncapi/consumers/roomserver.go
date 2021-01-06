@@ -176,7 +176,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
-	s.db.PDUStream().StreamAdvance(pduPos)
+	s.db.PDUStream().Advance(pduPos)
 
 	return nil
 }
@@ -215,7 +215,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return err
 	}
 
-	s.db.PDUStream().StreamAdvance(pduPos)
+	s.db.PDUStream().Advance(pduPos)
 
 	return nil
 }

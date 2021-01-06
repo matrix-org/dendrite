@@ -8,7 +8,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type StreamRangeRequest struct {
+type SyncRequest struct {
 	Context       context.Context
 	Device        *userapi.Device
 	Response      *Response
@@ -24,23 +24,31 @@ type StreamRangeRequest struct {
 }
 
 type StreamProvider interface {
-	StreamSetup()
+	Setup()
 
-	// StreamAdvance will update the latest position of the stream based on
+	// Advance will update the latest position of the stream based on
 	// an update and will wake callers waiting on StreamNotifyAfter.
-	StreamAdvance(latest StreamPosition)
+	Advance(latest StreamPosition)
 
-	// StreamRange will update the response to include all updates between
+	// Range will update the response to include all updates between
 	// the from and to sync positions. It will always return immediately,
 	// making no changes if the range contains no updates.
-	StreamRange(ctx context.Context, req *StreamRangeRequest, from, to StreamingToken) StreamingToken
+	Range(ctx context.Context, req *SyncRequest, from, to StreamPosition) StreamPosition
 
-	// StreamNotifyAfter returns a channel which will be closed once the
+	// NotifyAfter returns a channel which will be closed once the
 	// stream advances past the "from" position.
-	StreamNotifyAfter(ctx context.Context, from StreamingToken) chan struct{}
+	NotifyAfter(ctx context.Context, from StreamPosition) chan struct{}
 
-	// StreamLatestPosition returns the latest stream position for this stream.
-	StreamLatestPosition(ctx context.Context) StreamingToken
+	// LatestPosition returns the latest stream position for this stream.
+	LatestPosition(ctx context.Context) StreamPosition
+}
+
+type StreamLogProvider interface {
+	Setup()
+	Advance(latest LogPosition)
+	Range(ctx context.Context, req *SyncRequest, from, to LogPosition) LogPosition
+	NotifyAfter(ctx context.Context, from LogPosition) chan struct{}
+	LatestPosition(ctx context.Context) LogPosition
 }
 
 type TopologyProvider interface {
