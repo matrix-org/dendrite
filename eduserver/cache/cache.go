@@ -161,11 +161,10 @@ func (t *EDUCache) RemoveUser(userID, roomID string) int64 {
 		return t.latestSyncPosition
 	}
 
-	t.latestSyncPosition++
-
 	timer.Stop()
 	delete(roomData.userSet, userID)
 
+	t.latestSyncPosition++
 	t.data[roomID].syncPosition = t.latestSyncPosition
 
 	return t.latestSyncPosition

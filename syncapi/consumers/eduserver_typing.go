@@ -16,7 +16,6 @@ package consumers
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
@@ -98,9 +97,7 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		)
 	}
 
-	fmt.Println("Advancing typing position to", typingPos)
 	s.streams.TypingStreamProvider.Advance(typingPos)
-	fmt.Println("Advanced typing position to", typingPos)
 
 	return nil
 }
