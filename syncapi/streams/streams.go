@@ -1,0 +1,50 @@
+package streams
+
+import (
+	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+)
+
+type Streams struct {
+	PDUStreamProvider          types.StreamProvider
+	PDUTopologyProvider        types.TopologyProvider
+	TypingStreamProvider       types.StreamProvider
+	ReceiptStreamProvider      types.StreamProvider
+	InviteStreamProvider       types.StreamProvider
+	SendToDeviceStreamProvider types.StreamProvider
+	AccountDataStreamProvider  types.StreamProvider
+	DeviceListStreamProvider   types.StreamLogProvider
+}
+
+func NewSyncStreamProviders(
+	d storage.Database, userAPI userapi.UserInternalAPI,
+	eduCache *cache.EDUCache,
+) *Streams {
+	streams := &Streams{
+		PDUStreamProvider: &PDUStreamProvider{StreamProvider{DB: d}},
+		TypingStreamProvider: &TypingStreamProvider{
+			StreamProvider: StreamProvider{DB: d},
+			EDUCache:       eduCache,
+		},
+		ReceiptStreamProvider:      &ReceiptStreamProvider{StreamProvider{DB: d}},
+		InviteStreamProvider:       &InviteStreamProvider{StreamProvider{DB: d}},
+		SendToDeviceStreamProvider: &SendToDeviceStreamProvider{StreamProvider{DB: d}},
+		AccountDataStreamProvider: &AccountDataStreamProvider{
+			StreamProvider: StreamProvider{DB: d},
+			userAPI:        userAPI,
+		},
+		DeviceListStreamProvider: &DeviceListStreamProvider{StreamLogProvider{DB: d}},
+	}
+
+	streams.PDUStreamProvider.Setup()
+	streams.TypingStreamProvider.Setup()
+	streams.ReceiptStreamProvider.Setup()
+	streams.InviteStreamProvider.Setup()
+	streams.SendToDeviceStreamProvider.Setup()
+	streams.AccountDataStreamProvider.Setup()
+	streams.DeviceListStreamProvider.Setup()
+
+	return streams
+}

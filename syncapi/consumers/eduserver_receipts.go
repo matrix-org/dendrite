@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,6 +31,7 @@ import (
 type OutputReceiptEventConsumer struct {
 	receiptConsumer *internal.ContinualConsumer
 	db              storage.Database
+	streams         *streams.Streams
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
@@ -38,6 +40,7 @@ func NewOutputReceiptEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
+	streams *streams.Streams,
 ) *OutputReceiptEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -50,6 +53,7 @@ func NewOutputReceiptEventConsumer(
 	s := &OutputReceiptEventConsumer{
 		receiptConsumer: &consumer,
 		db:              store,
+		streams:         streams,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -82,7 +86,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 		return err
 	}
 
-	s.db.TypingStream().Advance(streamPos)
+	s.streams.TypingStreamProvider.Advance(streamPos)
 
 	return nil
 }

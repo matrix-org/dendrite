@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -35,6 +36,7 @@ type OutputRoomEventConsumer struct {
 	rsAPI      api.RoomserverInternalAPI
 	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
+	streams    *streams.Streams
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -42,6 +44,7 @@ func NewOutputRoomEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
+	streams *streams.Streams,
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
 
@@ -55,6 +58,7 @@ func NewOutputRoomEventConsumer(
 		cfg:        cfg,
 		rsConsumer: &consumer,
 		db:         store,
+		streams:    streams,
 		rsAPI:      rsAPI,
 	}
 	consumer.ProcessMessage = s.onMessage
@@ -176,7 +180,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
-	s.db.PDUStream().Advance(pduPos)
+	s.streams.PDUStreamProvider.Advance(pduPos)
 
 	return nil
 }
@@ -215,7 +219,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return err
 	}
 
-	s.db.PDUStream().Advance(pduPos)
+	s.streams.PDUStreamProvider.Advance(pduPos)
 
 	return nil
 }
@@ -271,7 +275,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		return nil
 	}
 
-	s.db.InviteStream().Advance(pduPos)
+	s.streams.InviteStreamProvider.Advance(pduPos)
 
 	return nil
 }
@@ -291,7 +295,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	// Notify any active sync requests that the invite has been retired.
 	// Invites share the same stream counter as PDUs
 
-	s.db.InviteStream().Advance(pduPos)
+	s.streams.InviteStreamProvider.Advance(pduPos)
 
 	return nil
 }

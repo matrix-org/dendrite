@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -28,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 )
 
@@ -43,51 +45,54 @@ func AddPublicRoutes(
 ) {
 	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
-	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database, userAPI)
+	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI)
+	eduCache := cache.New()
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, eduCache)
+
+	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
-		consumer, keyAPI, rsAPI, syncDB,
+		consumer, keyAPI, rsAPI, syncDB, streams,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start key change consumer")
 	}
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg, consumer, syncDB, rsAPI,
+		cfg, consumer, syncDB, streams, rsAPI,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		cfg, consumer, syncDB,
+		cfg, consumer, syncDB, streams,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		cfg, consumer, syncDB,
+		cfg, consumer, syncDB, eduCache, streams,
 	)
 	if err = typingConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		cfg, consumer, syncDB,
+		cfg, consumer, syncDB, streams,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		cfg, consumer, syncDB,
+		cfg, consumer, syncDB, streams,
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")

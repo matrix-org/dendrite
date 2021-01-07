@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -33,6 +34,7 @@ import (
 type OutputKeyChangeEventConsumer struct {
 	keyChangeConsumer   *internal.ContinualConsumer
 	db                  storage.Database
+	streams             *streams.Streams
 	serverName          gomatrixserverlib.ServerName // our server name
 	rsAPI               roomserverAPI.RoomserverInternalAPI
 	keyAPI              api.KeyInternalAPI
@@ -49,6 +51,7 @@ func NewOutputKeyChangeEventConsumer(
 	keyAPI api.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	store storage.Database,
+	streams *streams.Streams,
 ) *OutputKeyChangeEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -66,6 +69,7 @@ func NewOutputKeyChangeEventConsumer(
 		rsAPI:               rsAPI,
 		partitionToOffset:   make(map[int32]int64),
 		partitionToOffsetMu: sync.Mutex{},
+		streams:             streams,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -115,7 +119,7 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 		Partition: msg.Partition,
 	}
 
-	s.db.DeviceListStream().Advance(posUpdate)
+	s.streams.DeviceListStreamProvider.Advance(posUpdate)
 
 	//for userID := range queryRes.UserIDsToCount {
 	//	s.notifier.OnNewKeyChange(posUpdate, userID, output.UserID)

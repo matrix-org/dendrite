@@ -1,4 +1,4 @@
-package shared
+package streams
 
 import (
 	"context"
@@ -16,12 +16,11 @@ func (p *InviteStreamProvider) Setup() {
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	latest, err := p.DB.Invites.SelectMaxInviteID(context.Background(), nil)
+	id, err := p.DB.MaxStreamTokenForInvites(context.Background())
 	if err != nil {
 		return
 	}
-
-	p.latest = types.StreamPosition(latest)
+	p.latest = id
 }
 
 func (p *InviteStreamProvider) CompleteSync(
@@ -41,7 +40,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		To:   to,
 	}
 
-	invites, retiredInvites, err := p.DB.Invites.SelectInviteEventsInRange(
+	invites, retiredInvites, err := p.DB.InviteEventsInRange(
 		ctx, nil, req.Device.UserID, r,
 	)
 	if err != nil {

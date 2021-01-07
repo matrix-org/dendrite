@@ -1,4 +1,4 @@
-package shared
+package streams
 
 import (
 	"context"
@@ -14,27 +14,17 @@ type PDUStreamProvider struct {
 	StreamProvider
 }
 
-var txReadOnlySnapshot = sql.TxOptions{
-	// Set the isolation level so that we see a snapshot of the database.
-	// In PostgreSQL repeatable read transactions will see a snapshot taken
-	// at the first query, and since the transaction is read-only it can't
-	// run into any serialisation errors.
-	// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
-	Isolation: sql.LevelRepeatableRead,
-	ReadOnly:  true,
-}
-
 func (p *PDUStreamProvider) Setup() {
 	p.StreamProvider.Setup()
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := p.DB.OutputEvents.SelectMaxEventID(context.Background(), nil)
+	id, err := p.DB.MaxStreamTokenForPDUs(context.Background())
 	if err != nil {
 		return
 	}
-	p.latest = types.StreamPosition(id)
+	p.latest = id
 }
 
 func (p *PDUStreamProvider) CompleteSync(
@@ -47,7 +37,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	// a consistent view of the database throughout. This does have the unfortunate side-effect that all
 	// the matrixy logic resides in this function, but it's better to not hide the fact that this is
 	// being done in a transaction.
-	txn, err := p.DB.DB.BeginTx(ctx, &txReadOnlySnapshot)
+	txn, err := p.DB.ReadOnlySnapshot(ctx)
 	if err != nil {
 		return to
 	}
@@ -61,8 +51,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	// Extract room state and recent events for all rooms the user is joined to.
-	var joinedRoomIDs []string
-	joinedRoomIDs, err = p.DB.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, req.Device.UserID, gomatrixserverlib.Join)
+	joinedRoomIDs, err := p.DB.RoomIDsWithMembership(ctx, txn, req.Device.UserID, gomatrixserverlib.Join)
 	if err != nil {
 		return to
 	}
@@ -83,7 +72,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	// Add peeked rooms.
-	peeks, err := p.DB.Peeks.SelectPeeksInRange(ctx, txn, req.Device.UserID, req.Device.ID, r)
+	peeks, err := p.DB.PeeksInRange(ctx, txn, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
 		return to
 	}
@@ -101,7 +90,6 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	succeeded = true
-
 	return p.LatestPosition(ctx)
 }
 
@@ -120,18 +108,18 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	var err error
 	//var events []types.StreamEvent
-	var stateDeltas []stateDelta
+	var stateDeltas []types.StateDelta
 	var joinedRooms []string
 
 	// TODO: use filter provided in request
 	stateFilter := gomatrixserverlib.DefaultStateFilter()
 
 	if req.WantFullState {
-		if stateDeltas, joinedRooms, err = p.DB.getStateDeltasForFullStateSync(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
 			return
 		}
 	} else {
-		if stateDeltas, joinedRooms, err = p.DB.getStateDeltas(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
 			return
 		}
 	}
@@ -155,56 +143,56 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	device *userapi.Device,
 	txn *sql.Tx,
 	r types.Range,
-	delta stateDelta,
+	delta types.StateDelta,
 	numRecentEventsPerRoom int,
 	res *types.Response,
 ) error {
-	if delta.membershipPos > 0 && delta.membership == gomatrixserverlib.Leave {
+	if delta.MembershipPos > 0 && delta.Membership == gomatrixserverlib.Leave {
 		// make sure we don't leak recent events after the leave event.
 		// TODO: History visibility makes this somewhat complex to handle correctly. For example:
 		// TODO: This doesn't work for join -> leave in a single /sync request (see events prior to join).
 		// TODO: This will fail on join -> leave -> sensitive msg -> join -> leave
 		//       in a single /sync request
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
-		r.To = delta.membershipPos
+		r.To = delta.MembershipPos
 	}
-	recentStreamEvents, limited, err := p.DB.OutputEvents.SelectRecentEvents(
-		ctx, txn, delta.roomID, r,
+	recentStreamEvents, limited, err := p.DB.RecentEvents(
+		ctx, txn, delta.RoomID, r,
 		numRecentEventsPerRoom, true, true,
 	)
 	if err != nil {
 		return err
 	}
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
-	delta.stateEvents = removeDuplicates(delta.stateEvents, recentEvents) // roll back
-	prevBatch, err := p.DB.getBackwardTopologyPos(ctx, txn, recentStreamEvents)
+	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
+	prevBatch, err := p.DB.GetBackwardTopologyPos(ctx, txn, recentStreamEvents)
 	if err != nil {
 		return err
 	}
 
 	// XXX: should we ever get this far if we have no recent events or state in this room?
 	// in practice we do for peeks, but possibly not joins?
-	if len(recentEvents) == 0 && len(delta.stateEvents) == 0 {
+	if len(recentEvents) == 0 && len(delta.StateEvents) == 0 {
 		return nil
 	}
 
-	switch delta.membership {
+	switch delta.Membership {
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
 
 		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
-		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Join[delta.roomID] = *jr
+		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
+		res.Rooms.Join[delta.RoomID] = *jr
 	case gomatrixserverlib.Peek:
 		jr := types.NewJoinResponse()
 
 		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
-		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Peek[delta.roomID] = *jr
+		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
+		res.Rooms.Peek[delta.RoomID] = *jr
 	case gomatrixserverlib.Leave:
 		fallthrough // transitions to leave are the same as ban
 	case gomatrixserverlib.Ban:
@@ -214,8 +202,8 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		lr.Timeline.PrevBatch = &prevBatch
 		lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		lr.Timeline.Limited = false // TODO: if len(events) >= numRecents + 1 and then set limited:true
-		lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.stateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Leave[delta.roomID] = *lr
+		lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
+		res.Rooms.Leave[delta.RoomID] = *lr
 	}
 
 	return nil
@@ -229,7 +217,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	numRecentEventsPerRoom int, device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
 	var stateEvents []*gomatrixserverlib.HeaderedEvent
-	stateEvents, err = p.DB.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
+	stateEvents, err = p.DB.CurrentState(ctx, txn, roomID, stateFilter)
 	if err != nil {
 		return
 	}
@@ -237,7 +225,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 	var recentStreamEvents []types.StreamEvent
 	var limited bool
-	recentStreamEvents, limited, err = p.DB.OutputEvents.SelectRecentEvents(
+	recentStreamEvents, limited, err = p.DB.RecentEvents(
 		ctx, txn, roomID, r, numRecentEventsPerRoom, true, true,
 	)
 	if err != nil {
@@ -276,7 +264,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	var prevBatch *types.TopologyToken
 	if len(recentStreamEvents) > 0 {
 		var backwardTopologyPos, backwardStreamPos types.StreamPosition
-		backwardTopologyPos, backwardStreamPos, err = p.DB.Topology.SelectPositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
+		backwardTopologyPos, backwardStreamPos, err = p.DB.PositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
 		if err != nil {
 			return
 		}

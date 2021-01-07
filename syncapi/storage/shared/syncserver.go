@@ -19,12 +19,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -49,74 +47,70 @@ type Database struct {
 	SendToDevice        tables.SendToDevice
 	Filter              tables.Filter
 	Receipts            tables.Receipts
-	EDUCache            *cache.EDUCache
-
-	PDUStreamProvider          types.StreamProvider
-	PDUTopologyProvider        types.TopologyProvider
-	TypingStreamProvider       types.StreamProvider
-	ReceiptStreamProvider      types.StreamProvider
-	InviteStreamProvider       types.StreamProvider
-	SendToDeviceStreamProvider types.StreamProvider
-	AccountDataStreamProvider  types.StreamProvider
-	DeviceListStreamProvider   types.StreamLogProvider
 }
 
-// ConfigureProviders creates instances of the various
-// stream and topology providers provided by the storage
-// packages.
-func (d *Database) ConfigureProviders(userAPI userapi.UserInternalAPI) {
-	d.PDUStreamProvider = &PDUStreamProvider{StreamProvider{DB: d}}
-	d.TypingStreamProvider = &TypingStreamProvider{StreamProvider{DB: d}}
-	d.ReceiptStreamProvider = &ReceiptStreamProvider{StreamProvider{DB: d}}
-	d.InviteStreamProvider = &InviteStreamProvider{StreamProvider{DB: d}}
-	d.SendToDeviceStreamProvider = &SendToDeviceStreamProvider{StreamProvider{DB: d}}
-	d.AccountDataStreamProvider = &AccountDataStreamProvider{
-		StreamProvider: StreamProvider{DB: d},
-		userAPI:        userAPI,
+func (d *Database) ReadOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
+	return d.DB.BeginTx(ctx, &sql.TxOptions{
+		// Set the isolation level so that we see a snapshot of the database.
+		// In PostgreSQL repeatable read transactions will see a snapshot taken
+		// at the first query, and since the transaction is read-only it can't
+		// run into any serialisation errors.
+		// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
+		Isolation: sql.LevelRepeatableRead,
+		ReadOnly:  true,
+	})
+}
+
+func (d *Database) MaxStreamTokenForPDUs(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.OutputEvents.SelectMaxEventID(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("d.OutputEvents.SelectMaxEventID: %w", err)
 	}
-	d.DeviceListStreamProvider = &DeviceListStreamProvider{StreamLogProvider{DB: d}}
-
-	d.PDUStreamProvider.Setup()
-	d.TypingStreamProvider.Setup()
-	d.ReceiptStreamProvider.Setup()
-	d.InviteStreamProvider.Setup()
-	d.SendToDeviceStreamProvider.Setup()
-	d.AccountDataStreamProvider.Setup()
-	d.DeviceListStreamProvider.Setup()
-
-	d.PDUTopologyProvider = &PDUTopologyProvider{DB: d}
+	return types.StreamPosition(id), nil
 }
 
-func (d *Database) PDUStream() types.StreamProvider {
-	return d.PDUStreamProvider
+func (d *Database) MaxStreamTokenForReceipts(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.Receipts.SelectMaxReceiptID(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("d.Receipts.SelectMaxReceiptID: %w", err)
+	}
+	return types.StreamPosition(id), nil
 }
 
-func (d *Database) PDUTopology() types.TopologyProvider {
-	return d.PDUTopologyProvider
+func (d *Database) MaxStreamTokenForInvites(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.Invites.SelectMaxInviteID(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("d.Invites.SelectMaxInviteID: %w", err)
+	}
+	return types.StreamPosition(id), nil
 }
 
-func (d *Database) TypingStream() types.StreamProvider {
-	return d.TypingStreamProvider
+func (d *Database) CurrentState(ctx context.Context, txn *sql.Tx, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	return d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilterPart)
 }
 
-func (d *Database) ReceiptStream() types.StreamProvider {
-	return d.ReceiptStreamProvider
+func (d *Database) RoomIDsWithMembership(ctx context.Context, txn *sql.Tx, userID string, membership string) ([]string, error) {
+	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, membership)
 }
 
-func (d *Database) InviteStream() types.StreamProvider {
-	return d.InviteStreamProvider
+func (d *Database) RecentEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
+	return d.OutputEvents.SelectRecentEvents(ctx, txn, roomID, r, limit, chronologicalOrder, onlySyncEvents)
 }
 
-func (d *Database) SendToDeviceStream() types.StreamProvider {
-	return d.SendToDeviceStreamProvider
+func (d *Database) PositionInTopology(ctx context.Context, txn *sql.Tx, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error) {
+	return d.Topology.SelectPositionInTopology(ctx, txn, eventID)
 }
 
-func (d *Database) AccountDataStream() types.StreamProvider {
-	return d.AccountDataStreamProvider
+func (d *Database) InviteEventsInRange(ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error) {
+	return d.Invites.SelectInviteEventsInRange(ctx, txn, targetUserID, r)
 }
 
-func (d *Database) DeviceListStream() types.StreamLogProvider {
-	return d.DeviceListStreamProvider
+func (d *Database) PeeksInRange(ctx context.Context, txn *sql.Tx, userID, deviceID string, r types.Range) (peeks []types.Peek, err error) {
+	return d.Peeks.SelectPeeksInRange(ctx, txn, userID, deviceID, r)
+}
+
+func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []eduAPI.OutputReceiptEvent, error) {
+	return d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
 }
 
 // Events lookups a list of event by their event ID.
@@ -166,6 +160,7 @@ func (d *Database) GetEventsInStreamingRange(
 	return events, err
 }
 
+/*
 func (d *Database) AddTypingUser(
 	userID, roomID string, expireTime *time.Time,
 ) types.StreamPosition {
@@ -178,13 +173,16 @@ func (d *Database) RemoveTypingUser(
 	return types.StreamPosition(d.EDUCache.RemoveUser(userID, roomID))
 }
 
-func (d *Database) AddSendToDevice() types.StreamPosition {
-	return types.StreamPosition(d.EDUCache.AddSendToDeviceMessage())
-}
-
 func (d *Database) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
 	d.EDUCache.SetTimeoutCallback(fn)
 }
+*/
+
+/*
+func (d *Database) AddSendToDevice() types.StreamPosition {
+	return types.StreamPosition(d.EDUCache.AddSendToDeviceMessage())
+}
+*/
 
 func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
@@ -552,7 +550,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 
 // Retrieve the backward topology position, i.e. the position of the
 // oldest event in the room's topology.
-func (d *Database) getBackwardTopologyPos(
+func (d *Database) GetBackwardTopologyPos(
 	ctx context.Context, txn *sql.Tx,
 	events []types.StreamEvent,
 ) (types.TopologyToken, error) {
@@ -576,7 +574,7 @@ func (d *Database) addRoomDeltaToResponse(
 	device *userapi.Device,
 	txn *sql.Tx,
 	r types.Range,
-	delta stateDelta,
+	delta types.StateDelta,
 	numRecentEventsPerRoom int,
 	res *types.Response,
 ) error {
@@ -740,11 +738,11 @@ func (d *Database) fetchMissingStateEvents(
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
 // nolint:gocyclo
-func (d *Database) getStateDeltas(
+func (d *Database) GetStateDeltas(
 	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
-) ([]stateDelta, []string, error) {
+) ([]types.StateDelta, []string, error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
 	// - For each room which has membership list changes:
@@ -753,7 +751,7 @@ func (d *Database) getStateDeltas(
 	//     * Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
 	//     * Check if the user is CURRENTLY (TODO) left/banned. If so, add room to 'archived' block.
 	// - Get all CURRENTLY joined rooms, and add them to 'joined' block.
-	var deltas []stateDelta
+	var deltas []types.StateDelta
 
 	// get all the state events ever (i.e. for all available rooms) between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter)
@@ -784,10 +782,10 @@ func (d *Database) getStateDeltas(
 			state[peek.RoomID] = s
 		}
 		if !peek.Deleted {
-			deltas = append(deltas, stateDelta{
-				membership:  gomatrixserverlib.Peek,
-				stateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
-				roomID:      peek.RoomID,
+			deltas = append(deltas, types.StateDelta{
+				Membership:  gomatrixserverlib.Peek,
+				StateEvents: d.StreamEventsToEvents(device, state[peek.RoomID]),
+				RoomID:      peek.RoomID,
 			})
 		}
 	}
@@ -812,11 +810,11 @@ func (d *Database) getStateDeltas(
 					continue // we'll add this room in when we do joined rooms
 				}
 
-				deltas = append(deltas, stateDelta{
-					membership:    membership,
-					membershipPos: ev.StreamPosition,
-					stateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
-					roomID:        roomID,
+				deltas = append(deltas, types.StateDelta{
+					Membership:    membership,
+					MembershipPos: ev.StreamPosition,
+					StateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
+					RoomID:        roomID,
 				})
 				break
 			}
@@ -829,10 +827,10 @@ func (d *Database) getStateDeltas(
 		return nil, nil, err
 	}
 	for _, joinedRoomID := range joinedRoomIDs {
-		deltas = append(deltas, stateDelta{
-			membership:  gomatrixserverlib.Join,
-			stateEvents: d.StreamEventsToEvents(device, state[joinedRoomID]),
-			roomID:      joinedRoomID,
+		deltas = append(deltas, types.StateDelta{
+			Membership:  gomatrixserverlib.Join,
+			StateEvents: d.StreamEventsToEvents(device, state[joinedRoomID]),
+			RoomID:      joinedRoomID,
 		})
 	}
 
@@ -844,13 +842,13 @@ func (d *Database) getStateDeltas(
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
 // nolint:gocyclo
-func (d *Database) getStateDeltasForFullStateSync(
+func (d *Database) GetStateDeltasForFullStateSync(
 	ctx context.Context, device *userapi.Device, txn *sql.Tx,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
-) ([]stateDelta, []string, error) {
+) ([]types.StateDelta, []string, error) {
 	// Use a reasonable initial capacity
-	deltas := make(map[string]stateDelta)
+	deltas := make(map[string]types.StateDelta)
 
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
 	if err != nil {
@@ -864,10 +862,10 @@ func (d *Database) getStateDeltasForFullStateSync(
 			if stateErr != nil {
 				return nil, nil, stateErr
 			}
-			deltas[peek.RoomID] = stateDelta{
-				membership:  gomatrixserverlib.Peek,
-				stateEvents: d.StreamEventsToEvents(device, s),
-				roomID:      peek.RoomID,
+			deltas[peek.RoomID] = types.StateDelta{
+				Membership:  gomatrixserverlib.Peek,
+				StateEvents: d.StreamEventsToEvents(device, s),
+				RoomID:      peek.RoomID,
 			}
 		}
 	}
@@ -886,11 +884,11 @@ func (d *Database) getStateDeltasForFullStateSync(
 		for _, ev := range stateStreamEvents {
 			if membership := getMembershipFromEvent(ev.Event, userID); membership != "" {
 				if membership != gomatrixserverlib.Join { // We've already added full state for all joined rooms above.
-					deltas[roomID] = stateDelta{
-						membership:    membership,
-						membershipPos: ev.StreamPosition,
-						stateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
-						roomID:        roomID,
+					deltas[roomID] = types.StateDelta{
+						Membership:    membership,
+						MembershipPos: ev.StreamPosition,
+						StateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
+						RoomID:        roomID,
 					}
 				}
 
@@ -910,15 +908,15 @@ func (d *Database) getStateDeltasForFullStateSync(
 		if stateErr != nil {
 			return nil, nil, stateErr
 		}
-		deltas[joinedRoomID] = stateDelta{
-			membership:  gomatrixserverlib.Join,
-			stateEvents: d.StreamEventsToEvents(device, s),
-			roomID:      joinedRoomID,
+		deltas[joinedRoomID] = types.StateDelta{
+			Membership:  gomatrixserverlib.Join,
+			StateEvents: d.StreamEventsToEvents(device, s),
+			RoomID:      joinedRoomID,
 		}
 	}
 
 	// Create a response array.
-	result := make([]stateDelta, len(deltas))
+	result := make([]types.StateDelta, len(deltas))
 	i := 0
 	for _, delta := range deltas {
 		result[i] = delta
@@ -1055,15 +1053,6 @@ func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) string {
 		return ""
 	}
 	return membership
-}
-
-type stateDelta struct {
-	roomID      string
-	stateEvents []*gomatrixserverlib.HeaderedEvent
-	membership  string
-	// The PDU stream position of the latest membership event for this user, if applicable.
-	// Can be 0 if there is no membership event in this delta.
-	membershipPos types.StreamPosition
 }
 
 // StoreReceipt stores user receipts

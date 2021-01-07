@@ -35,6 +35,15 @@ var (
 	ErrInvalidSyncTokenLen = fmt.Errorf("Sync token has an invalid length")
 )
 
+type StateDelta struct {
+	RoomID      string
+	StateEvents []*gomatrixserverlib.HeaderedEvent
+	Membership  string
+	// The PDU stream position of the latest membership event for this user, if applicable.
+	// Can be 0 if there is no membership event in this delta.
+	MembershipPos StreamPosition
+}
+
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
 

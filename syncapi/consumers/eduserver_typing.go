@@ -19,9 +19,11 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -29,7 +31,8 @@ import (
 // OutputTypingEventConsumer consumes events that originated in the EDU server.
 type OutputTypingEventConsumer struct {
 	typingConsumer *internal.ContinualConsumer
-	db             storage.Database
+	eduCache       *cache.EDUCache
+	streams        *streams.Streams
 }
 
 // NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
@@ -38,6 +41,8 @@ func NewOutputTypingEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
+	eduCache *cache.EDUCache,
+	streams *streams.Streams,
 ) *OutputTypingEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -49,7 +54,8 @@ func NewOutputTypingEventConsumer(
 
 	s := &OutputTypingEventConsumer{
 		typingConsumer: &consumer,
-		db:             store,
+		eduCache:       eduCache,
+		streams:        streams,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -59,10 +65,11 @@ func NewOutputTypingEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
-	s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
-		s.db.TypingStream().Advance(types.StreamPosition(latestSyncPosition))
-	})
-
+	/*
+		s.eduCache.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
+			s.eduCache.TypingStream().Advance(types.StreamPosition(latestSyncPosition))
+		})
+	*/
 	return s.typingConsumer.Start()
 }
 
@@ -83,12 +90,16 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 	var typingPos types.StreamPosition
 	typingEvent := output.Event
 	if typingEvent.Typing {
-		typingPos = s.db.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime)
+		typingPos = types.StreamPosition(
+			s.eduCache.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime),
+		)
 	} else {
-		typingPos = s.db.RemoveTypingUser(typingEvent.UserID, typingEvent.RoomID)
+		typingPos = types.StreamPosition(
+			s.eduCache.RemoveUser(typingEvent.UserID, typingEvent.RoomID),
+		)
 	}
 
-	s.db.TypingStream().Advance(typingPos)
+	s.streams.TypingStreamProvider.Advance(typingPos)
 
 	return nil
 }

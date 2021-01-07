@@ -1,15 +1,17 @@
-package shared
+package streams
 
 import (
 	"context"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type TypingStreamProvider struct {
 	StreamProvider
+	EDUCache *cache.EDUCache
 }
 
 func (p *TypingStreamProvider) CompleteSync(
@@ -35,7 +37,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 
 		jr := req.Response.Rooms.Join[roomID]
 
-		if users, updated := p.DB.EDUCache.GetTypingUsersIfUpdatedAfter(
+		if users, updated := p.EDUCache.GetTypingUsersIfUpdatedAfter(
 			roomID, int64(from),
 		); updated {
 			ev := gomatrixserverlib.ClientEvent{

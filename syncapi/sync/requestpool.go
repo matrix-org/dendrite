@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
@@ -39,19 +40,13 @@ import (
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db                 storage.Database
-	cfg                *config.SyncAPI
-	userAPI            userapi.UserInternalAPI
-	keyAPI             keyapi.KeyInternalAPI
-	rsAPI              roomserverAPI.RoomserverInternalAPI
-	lastseen           sync.Map
-	pduStream          types.StreamProvider
-	typingStream       types.StreamProvider
-	receiptStream      types.StreamProvider
-	sendToDeviceStream types.StreamProvider
-	inviteStream       types.StreamProvider
-	accountDataStream  types.StreamProvider
-	deviceListStream   types.StreamLogProvider
+	db       storage.Database
+	cfg      *config.SyncAPI
+	userAPI  userapi.UserInternalAPI
+	keyAPI   keyapi.KeyInternalAPI
+	rsAPI    roomserverAPI.RoomserverInternalAPI
+	lastseen sync.Map
+	streams  *streams.Streams
 }
 
 // NewRequestPool makes a new RequestPool
@@ -59,21 +54,16 @@ func NewRequestPool(
 	db storage.Database, cfg *config.SyncAPI,
 	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
+	streams *streams.Streams,
 ) *RequestPool {
 	rp := &RequestPool{
-		db:                 db,
-		cfg:                cfg,
-		userAPI:            userAPI,
-		keyAPI:             keyAPI,
-		rsAPI:              rsAPI,
-		lastseen:           sync.Map{},
-		pduStream:          db.PDUStream(),
-		typingStream:       db.TypingStream(),
-		receiptStream:      db.ReceiptStream(),
-		sendToDeviceStream: db.SendToDeviceStream(),
-		inviteStream:       db.InviteStream(),
-		accountDataStream:  db.AccountDataStream(),
-		deviceListStream:   db.DeviceListStream(),
+		db:       db,
+		cfg:      cfg,
+		userAPI:  userAPI,
+		keyAPI:   keyAPI,
+		rsAPI:    rsAPI,
+		lastseen: sync.Map{},
+		streams:  streams,
 	}
 	go rp.cleanLastSeen()
 	return rp
@@ -186,13 +176,13 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		case <-timer.C: // Timeout reached
 			return giveup()
 
-		case <-rp.pduStream.NotifyAfter(waitctx, syncReq.Since.PDUPosition):
-		case <-rp.typingStream.NotifyAfter(waitctx, syncReq.Since.TypingPosition):
-		case <-rp.receiptStream.NotifyAfter(waitctx, syncReq.Since.ReceiptPosition):
-		case <-rp.inviteStream.NotifyAfter(waitctx, syncReq.Since.InvitePosition):
-		case <-rp.sendToDeviceStream.NotifyAfter(waitctx, syncReq.Since.SendToDevicePosition):
-		case <-rp.accountDataStream.NotifyAfter(waitctx, syncReq.Since.AccountDataPosition):
-		case <-rp.deviceListStream.NotifyAfter(waitctx, syncReq.Since.DeviceListPosition):
+		case <-rp.streams.PDUStreamProvider.NotifyAfter(waitctx, syncReq.Since.PDUPosition):
+		case <-rp.streams.TypingStreamProvider.NotifyAfter(waitctx, syncReq.Since.TypingPosition):
+		case <-rp.streams.ReceiptStreamProvider.NotifyAfter(waitctx, syncReq.Since.ReceiptPosition):
+		case <-rp.streams.InviteStreamProvider.NotifyAfter(waitctx, syncReq.Since.InvitePosition):
+		case <-rp.streams.SendToDeviceStreamProvider.NotifyAfter(waitctx, syncReq.Since.SendToDevicePosition):
+		case <-rp.streams.AccountDataStreamProvider.NotifyAfter(waitctx, syncReq.Since.AccountDataPosition):
+		case <-rp.streams.DeviceListStreamProvider.NotifyAfter(waitctx, syncReq.Since.DeviceListPosition):
 		}
 
 		syncReq.Log.Println("Responding to sync after wakeup")
@@ -204,58 +194,65 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	if syncReq.Since.IsEmpty() {
 		// Complete sync
 		syncReq.Response.NextBatch = types.StreamingToken{
-			PDUPosition: rp.pduStream.CompleteSync(
+			PDUPosition: rp.streams.PDUStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
-			TypingPosition: rp.typingStream.CompleteSync(
+			TypingPosition: rp.streams.TypingStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
-			ReceiptPosition: rp.receiptStream.CompleteSync(
+			ReceiptPosition: rp.streams.ReceiptStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
-			InvitePosition: rp.inviteStream.CompleteSync(
+			InvitePosition: rp.streams.InviteStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
-			SendToDevicePosition: rp.sendToDeviceStream.CompleteSync(
+			SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
-			AccountDataPosition: rp.accountDataStream.CompleteSync(
+			AccountDataPosition: rp.streams.AccountDataStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
-			DeviceListPosition: rp.deviceListStream.CompleteSync(
+			DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
 		}
 	} else {
 		// Incremental sync
 		syncReq.Response.NextBatch = types.StreamingToken{
-			PDUPosition: rp.pduStream.IncrementalSync(
+			PDUPosition: rp.streams.PDUStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.PDUPosition, rp.pduStream.LatestPosition(syncReq.Context),
+				syncReq.Since.PDUPosition,                                    // from
+				rp.streams.PDUStreamProvider.LatestPosition(syncReq.Context), // to
 			),
-			TypingPosition: rp.typingStream.IncrementalSync(
+			TypingPosition: rp.streams.TypingStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.TypingPosition, rp.typingStream.LatestPosition(syncReq.Context),
+				syncReq.Since.TypingPosition,                                    // from
+				rp.streams.TypingStreamProvider.LatestPosition(syncReq.Context), // to
 			),
-			ReceiptPosition: rp.receiptStream.IncrementalSync(
-				syncReq.Context, syncReq, syncReq.Since.ReceiptPosition,
-				rp.receiptStream.LatestPosition(syncReq.Context),
+			ReceiptPosition: rp.streams.ReceiptStreamProvider.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.ReceiptPosition,                                    // from
+				rp.streams.ReceiptStreamProvider.LatestPosition(syncReq.Context), // to
 			),
-			InvitePosition: rp.inviteStream.IncrementalSync(
-				syncReq.Context, syncReq, syncReq.Since.InvitePosition,
-				rp.inviteStream.LatestPosition(syncReq.Context),
+			InvitePosition: rp.streams.InviteStreamProvider.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.InvitePosition,                                    // from
+				rp.streams.InviteStreamProvider.LatestPosition(syncReq.Context), // to
 			),
-			SendToDevicePosition: rp.sendToDeviceStream.IncrementalSync(
-				syncReq.Context, syncReq, syncReq.Since.SendToDevicePosition,
-				rp.sendToDeviceStream.LatestPosition(syncReq.Context),
+			SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.SendToDevicePosition,                                    // from
+				rp.streams.SendToDeviceStreamProvider.LatestPosition(syncReq.Context), // to
 			),
-			AccountDataPosition: rp.accountDataStream.IncrementalSync(
-				syncReq.Context, syncReq, syncReq.Since.AccountDataPosition,
-				rp.accountDataStream.LatestPosition(syncReq.Context),
+			AccountDataPosition: rp.streams.AccountDataStreamProvider.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.AccountDataPosition,                                    // from
+				rp.streams.AccountDataStreamProvider.LatestPosition(syncReq.Context), // to
 			),
-			DeviceListPosition: rp.deviceListStream.IncrementalSync(
-				syncReq.Context, syncReq, syncReq.Since.DeviceListPosition,
-				rp.db.DeviceListStream().LatestPosition(syncReq.Context),
+			DeviceListPosition: rp.streams.DeviceListStreamProvider.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.DeviceListPosition,                                    // from
+				rp.streams.DeviceListStreamProvider.LatestPosition(syncReq.Context), // to
 			),
 		}
 	}

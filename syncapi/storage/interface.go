@@ -16,11 +16,10 @@ package storage
 
 import (
 	"context"
-	"time"
+	"database/sql"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -31,14 +30,25 @@ import (
 type Database interface {
 	internal.PartitionStorer
 
-	PDUStream() types.StreamProvider
-	PDUTopology() types.TopologyProvider
-	TypingStream() types.StreamProvider
-	ReceiptStream() types.StreamProvider
-	InviteStream() types.StreamProvider
-	SendToDeviceStream() types.StreamProvider
-	AccountDataStream() types.StreamProvider
-	DeviceListStream() types.StreamLogProvider
+	ReadOnlySnapshot(ctx context.Context) (*sql.Tx, error)
+
+	MaxStreamTokenForPDUs(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamTokenForReceipts(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamTokenForInvites(ctx context.Context) (types.StreamPosition, error)
+
+	CurrentState(ctx context.Context, txn *sql.Tx, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
+	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, txn *sql.Tx, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
+	GetStateDeltas(ctx context.Context, device *userapi.Device, txn *sql.Tx, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
+	RoomIDsWithMembership(ctx context.Context, txn *sql.Tx, userID string, membership string) ([]string, error)
+
+	RecentEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
+
+	GetBackwardTopologyPos(ctx context.Context, txn *sql.Tx, events []types.StreamEvent) (types.TopologyToken, error)
+	PositionInTopology(ctx context.Context, txn *sql.Tx, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error)
+
+	InviteEventsInRange(ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error)
+	PeeksInRange(ctx context.Context, txn *sql.Tx, userID, deviceID string, r types.Range) (peeks []types.Peek, err error)
+	RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []eduAPI.OutputReceiptEvent, error)
 
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
@@ -95,15 +105,6 @@ type Database interface {
 	// DeletePeek deletes all peeks for a given room by a given user
 	// Returns an error if there was a problem communicating with the database.
 	DeletePeeks(ctx context.Context, RoomID, UserID string) (types.StreamPosition, error)
-	// SetTypingTimeoutCallback sets a callback function that is called right after
-	// a user is removed from the typing user list due to timeout.
-	SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn)
-	// AddTypingUser adds a typing user to the typing cache.
-	// Returns the newly calculated sync position for typing notifications.
-	AddTypingUser(userID, roomID string, expireTime *time.Time) types.StreamPosition
-	// RemoveTypingUser removes a typing user from the typing cache.
-	// Returns the newly calculated sync position for typing notifications.
-	RemoveTypingUser(userID, roomID string) types.StreamPosition
 	// GetEventsInStreamingRange retrieves all of the events on a given ordering using the given extremities and limit.
 	GetEventsInStreamingRange(ctx context.Context, from, to *types.StreamingToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
 	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit.
@@ -118,8 +119,6 @@ type Database interface {
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.
 	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*gomatrixserverlib.HeaderedEvent
-	// AddSendToDevice increases the EDU position in the cache and returns the stream position.
-	AddSendToDevice() types.StreamPosition
 	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns three lists:
 	// - "events": a list of send-to-device events that should be included in the sync
 	// - "changes": a list of send-to-device events that should be updated in the database by

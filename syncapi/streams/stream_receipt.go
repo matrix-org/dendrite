@@ -1,4 +1,4 @@
-package shared
+package streams
 
 import (
 	"context"
@@ -16,12 +16,11 @@ type ReceiptStreamProvider struct {
 func (p *ReceiptStreamProvider) Setup() {
 	p.StreamProvider.Setup()
 
-	latest, err := p.DB.Receipts.SelectMaxReceiptID(context.Background(), nil)
+	id, err := p.DB.MaxStreamTokenForReceipts(context.Background())
 	if err != nil {
 		return
 	}
-
-	p.latest = types.StreamPosition(latest)
+	p.latest = id
 }
 
 func (p *ReceiptStreamProvider) CompleteSync(
@@ -43,7 +42,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 	}
 
-	lastPos, receipts, err := p.DB.Receipts.SelectRoomReceiptsAfter(ctx, joinedRooms, from)
+	lastPos, receipts, err := p.DB.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
 		return to //fmt.Errorf("unable to select receipts for rooms: %w", err)
 	}

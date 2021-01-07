@@ -1,55 +1,56 @@
-package shared
+package streams
 
 import (
 	"context"
 	"sync"
 
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
-type StreamLogProvider struct {
-	DB          *Database
-	latest      types.LogPosition
+type StreamProvider struct {
+	DB          storage.Database
+	latest      types.StreamPosition
 	latestMutex sync.RWMutex
 	update      *sync.Cond
 }
 
-func (p *StreamLogProvider) Setup() {
+func (p *StreamProvider) Setup() {
 	locker := &sync.Mutex{}
 	p.update = sync.NewCond(locker)
 }
 
-func (p *StreamLogProvider) Advance(
-	latest types.LogPosition,
+func (p *StreamProvider) Advance(
+	latest types.StreamPosition,
 ) {
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	if latest.IsAfter(&p.latest) {
+	if latest > p.latest {
 		p.latest = latest
 		p.update.Broadcast()
 	}
 }
 
-func (p *StreamLogProvider) LatestPosition(
+func (p *StreamProvider) LatestPosition(
 	ctx context.Context,
-) types.LogPosition {
+) types.StreamPosition {
 	p.latestMutex.RLock()
 	defer p.latestMutex.RUnlock()
 
 	return p.latest
 }
 
-func (p *StreamLogProvider) NotifyAfter(
+func (p *StreamProvider) NotifyAfter(
 	ctx context.Context,
-	from types.LogPosition,
+	from types.StreamPosition,
 ) chan struct{} {
 	ch := make(chan struct{})
 
 	check := func() bool {
 		p.latestMutex.RLock()
 		defer p.latestMutex.RUnlock()
-		if p.latest.IsAfter(&from) {
+		if p.latest > from {
 			close(ch)
 			return true
 		}
@@ -66,7 +67,7 @@ func (p *StreamLogProvider) NotifyAfter(
 	// sync.Cond will fire every time the latest position
 	// updates, so we can check and see if we've advanced
 	// past it.
-	go func(p *StreamLogProvider) {
+	go func(p *StreamProvider) {
 		p.update.L.Lock()
 		defer p.update.L.Unlock()
 
