@@ -18,7 +18,7 @@ func (p *ReceiptStreamProvider) Setup() {
 
 	id, err := p.DB.MaxStreamTokenForReceipts(context.Background())
 	if err != nil {
-		return
+		panic(err)
 	}
 	p.latest = id
 }
@@ -44,7 +44,8 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 
 	lastPos, receipts, err := p.DB.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
-		return to //fmt.Errorf("unable to select receipts for rooms: %w", err)
+		req.Log.WithError(err).Error("p.DB.RoomReceiptsAfter failed")
+		return to
 	}
 
 	if len(receipts) == 0 || lastPos == 0 {
@@ -78,7 +79,8 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 		ev.Content, err = json.Marshal(content)
 		if err != nil {
-			return to // err
+			req.Log.WithError(err).Error("json.Marshal failed")
+			return to
 		}
 
 		jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)

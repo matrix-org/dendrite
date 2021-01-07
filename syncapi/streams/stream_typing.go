@@ -47,6 +47,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 				"user_ids": users,
 			})
 			if err != nil {
+				req.Log.WithError(err).Error("json.Marshal failed")
 				return to
 			}
 

@@ -25,7 +25,8 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 	// See if we have any new tasks to do for the send-to-device messaging.
 	lastPos, events, updates, deletions, err := p.DB.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, req.Since)
 	if err != nil {
-		return to // nil, fmt.Errorf("rp.db.SendToDeviceUpdatesForSync: %w", err)
+		req.Log.WithError(err).Error("p.DB.SendToDeviceUpdatesForSync failed")
+		return to
 	}
 
 	// Before we return the sync response, make sure that we take action on
@@ -35,7 +36,8 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 		// Handle the updates and deletions in the database.
 		err = p.DB.CleanSendToDeviceUpdates(context.Background(), updates, deletions, req.Since)
 		if err != nil {
-			return to // res, fmt.Errorf("rp.db.CleanSendToDeviceUpdates: %w", err)
+			req.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
+			return to
 		}
 	}
 	if len(events) > 0 {

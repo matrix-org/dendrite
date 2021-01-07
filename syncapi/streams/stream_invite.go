@@ -18,7 +18,7 @@ func (p *InviteStreamProvider) Setup() {
 
 	id, err := p.DB.MaxStreamTokenForInvites(context.Background())
 	if err != nil {
-		return
+		panic(err)
 	}
 	p.latest = id
 }
@@ -41,10 +41,11 @@ func (p *InviteStreamProvider) IncrementalSync(
 	}
 
 	invites, retiredInvites, err := p.DB.InviteEventsInRange(
-		ctx, nil, req.Device.UserID, r,
+		ctx, req.Device.UserID, r,
 	)
 	if err != nil {
-		return to // fmt.Errorf("d.Invites.SelectInviteEventsInRange: %w", err)
+		req.Log.WithError(err).Error("p.DB.InviteEventsInRange failed")
+		return to
 	}
 
 	for roomID, inviteEvent := range invites {

@@ -26,7 +26,8 @@ func (p *AccountDataStreamProvider) CompleteSync(
 	}
 	dataRes := &userapi.QueryAccountDataResponse{}
 	if err := p.userAPI.QueryAccountData(ctx, dataReq, dataRes); err != nil {
-		return p.LatestPosition(ctx) // nil, err
+		req.Log.WithError(err).Error("p.userAPI.QueryAccountData failed")
+		return p.LatestPosition(ctx)
 	}
 	for datatype, databody := range dataRes.GlobalAccountData {
 		req.Response.AccountData.Events = append(
@@ -68,7 +69,8 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		ctx, req.Device.UserID, r, &accountDataFilter,
 	)
 	if err != nil {
-		return to // nil, fmt.Errorf("rp.db.GetAccountDataInRange: %w", err)
+		req.Log.WithError(err).Error("p.DB.GetAccountDataInRange failed")
+		return to
 	}
 
 	if len(dataTypes) == 0 {
@@ -88,6 +90,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 			dataRes := userapi.QueryAccountDataResponse{}
 			err = p.userAPI.QueryAccountData(ctx, &dataReq, &dataRes)
 			if err != nil {
+				req.Log.WithError(err).Error("p.userAPI.QueryAccountData failed")
 				continue
 			}
 			if roomID == "" {

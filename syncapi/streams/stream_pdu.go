@@ -2,9 +2,7 @@ package streams
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -22,7 +20,7 @@ func (p *PDUStreamProvider) Setup() {
 
 	id, err := p.DB.MaxStreamTokenForPDUs(context.Background())
 	if err != nil {
-		return
+		panic(err)
 	}
 	p.latest = id
 }
@@ -33,17 +31,6 @@ func (p *PDUStreamProvider) CompleteSync(
 ) types.StreamPosition {
 	to := p.LatestPosition(ctx)
 
-	// This needs to be all done in a transaction as we need to do multiple SELECTs, and we need to have
-	// a consistent view of the database throughout. This does have the unfortunate side-effect that all
-	// the matrixy logic resides in this function, but it's better to not hide the fact that this is
-	// being done in a transaction.
-	txn, err := p.DB.ReadOnlySnapshot(ctx)
-	if err != nil {
-		return to
-	}
-	succeeded := false
-	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
-
 	// Get the current sync position which we will base the sync response on.
 	r := types.Range{
 		From: 0,
@@ -51,8 +38,9 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	// Extract room state and recent events for all rooms the user is joined to.
-	joinedRoomIDs, err := p.DB.RoomIDsWithMembership(ctx, txn, req.Device.UserID, gomatrixserverlib.Join)
+	joinedRoomIDs, err := p.DB.RoomIDsWithMembership(ctx, req.Device.UserID, gomatrixserverlib.Join)
 	if err != nil {
+		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
 		return to
 	}
 
@@ -62,9 +50,10 @@ func (p *PDUStreamProvider) CompleteSync(
 	for _, roomID := range joinedRoomIDs {
 		var jr *types.JoinResponse
 		jr, err = p.getJoinResponseForCompleteSync(
-			ctx, txn, roomID, r, &stateFilter, 20, req.Device,
+			ctx, roomID, r, &stateFilter, 20, req.Device,
 		)
 		if err != nil {
+			req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
 			return to
 		}
 		req.Response.Rooms.Join[roomID] = *jr
@@ -72,24 +61,25 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	// Add peeked rooms.
-	peeks, err := p.DB.PeeksInRange(ctx, txn, req.Device.UserID, req.Device.ID, r)
+	peeks, err := p.DB.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
+		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
 		return to
 	}
 	for _, peek := range peeks {
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, txn, peek.RoomID, r, &stateFilter, 20, req.Device,
+				ctx, peek.RoomID, r, &stateFilter, 20, req.Device,
 			)
 			if err != nil {
+				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
 				return to
 			}
 			req.Response.Rooms.Peek[peek.RoomID] = *jr
 		}
 	}
 
-	succeeded = true
 	return p.LatestPosition(ctx)
 }
 
@@ -115,11 +105,11 @@ func (p *PDUStreamProvider) IncrementalSync(
 	stateFilter := gomatrixserverlib.DefaultStateFilter()
 
 	if req.WantFullState {
-		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			return
 		}
 	} else {
-		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, nil, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			return
 		}
 	}
@@ -129,7 +119,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	}
 
 	for _, delta := range stateDeltas {
-		err = p.addRoomDeltaToResponse(ctx, req.Device, nil, r, delta, 20, req.Response)
+		err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, 20, req.Response)
 		if err != nil {
 			return newPos // nil, fmt.Errorf("d.addRoomDeltaToResponse: %w", err)
 		}
@@ -141,7 +131,6 @@ func (p *PDUStreamProvider) IncrementalSync(
 func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	ctx context.Context,
 	device *userapi.Device,
-	txn *sql.Tx,
 	r types.Range,
 	delta types.StateDelta,
 	numRecentEventsPerRoom int,
@@ -157,7 +146,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		r.To = delta.MembershipPos
 	}
 	recentStreamEvents, limited, err := p.DB.RecentEvents(
-		ctx, txn, delta.RoomID, r,
+		ctx, delta.RoomID, r,
 		numRecentEventsPerRoom, true, true,
 	)
 	if err != nil {
@@ -165,7 +154,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
-	prevBatch, err := p.DB.GetBackwardTopologyPos(ctx, txn, recentStreamEvents)
+	prevBatch, err := p.DB.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
 		return err
 	}
@@ -210,14 +199,14 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 }
 
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	roomID string,
 	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 	numRecentEventsPerRoom int, device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
 	var stateEvents []*gomatrixserverlib.HeaderedEvent
-	stateEvents, err = p.DB.CurrentState(ctx, txn, roomID, stateFilter)
+	stateEvents, err = p.DB.CurrentState(ctx, roomID, stateFilter)
 	if err != nil {
 		return
 	}
@@ -226,7 +215,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	var recentStreamEvents []types.StreamEvent
 	var limited bool
 	recentStreamEvents, limited, err = p.DB.RecentEvents(
-		ctx, txn, roomID, r, numRecentEventsPerRoom, true, true,
+		ctx, roomID, r, numRecentEventsPerRoom, true, true,
 	)
 	if err != nil {
 		return
@@ -264,7 +253,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	var prevBatch *types.TopologyToken
 	if len(recentStreamEvents) > 0 {
 		var backwardTopologyPos, backwardStreamPos types.StreamPosition
-		backwardTopologyPos, backwardStreamPos, err = p.DB.PositionInTopology(ctx, txn, recentStreamEvents[0].EventID())
+		backwardTopologyPos, backwardStreamPos, err = p.DB.PositionInTopology(ctx, recentStreamEvents[0].EventID())
 		if err != nil {
 			return
 		}
