@@ -292,9 +292,9 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		}).Panicf("roomserver output log: remove invite failure")
 		return nil
 	}
+
 	// Notify any active sync requests that the invite has been retired.
 	// Invites share the same stream counter as PDUs
-
 	s.streams.InviteStreamProvider.Advance(pduPos)
 
 	return nil
@@ -311,12 +311,12 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 		}).Panicf("roomserver output log: write peek failure")
 		return nil
 	}
+
 	// tell the notifier about the new peek so it knows to wake up new devices
-	//s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID)
-	_ = sp
-	// we need to wake up the users who might need to now be peeking into this room,
-	// so we send in a dummy event to trigger a wakeup
-	//s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
+	// TODO: This only works because the peeks table is reusing the same
+	// index as PDUs, but we should fix this
+	s.streams.PDUStreamProvider.Advance(sp)
+
 	return nil
 }
 
@@ -331,12 +331,12 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 		}).Panicf("roomserver output log: write peek failure")
 		return nil
 	}
+
 	// tell the notifier about the new peek so it knows to wake up new devices
-	//s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID)
-	_ = sp
-	// we need to wake up the users who might need to now be peeking into this room,
-	// so we send in a dummy event to trigger a wakeup
-	//s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
+	// TODO: This only works because the peeks table is reusing the same
+	// index as PDUs, but we should fix this
+	s.streams.PDUStreamProvider.Advance(sp)
+
 	return nil
 }
 

@@ -121,8 +121,5 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 
 	s.streams.DeviceListStreamProvider.Advance(posUpdate)
 
-	//for userID := range queryRes.UserIDsToCount {
-	//	s.notifier.OnNewKeyChange(posUpdate, userID, output.UserID)
-	//}
 	return nil
 }
