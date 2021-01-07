@@ -176,13 +176,13 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		case <-timer.C: // Timeout reached
 			return giveup()
 
-		case <-rp.streams.PDUStreamProvider.NotifyAfter(waitctx, syncReq.Since.PDUPosition):
-		case <-rp.streams.TypingStreamProvider.NotifyAfter(waitctx, syncReq.Since.TypingPosition):
-		case <-rp.streams.ReceiptStreamProvider.NotifyAfter(waitctx, syncReq.Since.ReceiptPosition):
-		case <-rp.streams.InviteStreamProvider.NotifyAfter(waitctx, syncReq.Since.InvitePosition):
-		case <-rp.streams.SendToDeviceStreamProvider.NotifyAfter(waitctx, syncReq.Since.SendToDevicePosition):
-		case <-rp.streams.AccountDataStreamProvider.NotifyAfter(waitctx, syncReq.Since.AccountDataPosition):
-		case <-rp.streams.DeviceListStreamProvider.NotifyAfter(waitctx, syncReq.Since.DeviceListPosition):
+		case <-rp.streams.PDUStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.PDUPosition):
+		case <-rp.streams.TypingStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.TypingPosition):
+		case <-rp.streams.ReceiptStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.ReceiptPosition):
+		case <-rp.streams.InviteStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.InvitePosition):
+		case <-rp.streams.SendToDeviceStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.SendToDevicePosition):
+		case <-rp.streams.AccountDataStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.AccountDataPosition):
+		case <-rp.streams.DeviceListStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.DeviceListPosition):
 		}
 
 		syncReq.Log.Println("Responding to sync after wakeup")

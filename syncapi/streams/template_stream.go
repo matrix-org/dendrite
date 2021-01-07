@@ -6,18 +6,25 @@ import (
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type StreamProvider struct {
-	DB          storage.Database
-	latest      types.StreamPosition
-	latestMutex sync.RWMutex
-	update      *sync.Cond
+	DB                 storage.Database
+	latest             types.StreamPosition
+	latestMutex        sync.RWMutex
+	subscriptions      map[string]*streamSubscription // userid+deviceid
+	subscriptionsMutex sync.Mutex
+}
+
+type streamSubscription struct {
+	ctx  context.Context
+	from types.StreamPosition
+	ch   chan struct{}
 }
 
 func (p *StreamProvider) Setup() {
-	locker := &sync.Mutex{}
-	p.update = sync.NewCond(locker)
+	p.subscriptions = make(map[string]*streamSubscription)
 }
 
 func (p *StreamProvider) Advance(
@@ -28,7 +35,22 @@ func (p *StreamProvider) Advance(
 
 	if latest > p.latest {
 		p.latest = latest
-		p.update.Broadcast()
+
+		p.subscriptionsMutex.Lock()
+		for id, s := range p.subscriptions {
+			select {
+			case <-s.ctx.Done():
+				close(s.ch)
+				delete(p.subscriptions, id)
+				continue
+			default:
+				if latest > s.from {
+					close(s.ch)
+					delete(p.subscriptions, id)
+				}
+			}
+		}
+		p.subscriptionsMutex.Unlock()
 	}
 }
 
@@ -43,6 +65,7 @@ func (p *StreamProvider) LatestPosition(
 
 func (p *StreamProvider) NotifyAfter(
 	ctx context.Context,
+	device *userapi.Device,
 	from types.StreamPosition,
 ) chan struct{} {
 	ch := make(chan struct{})
@@ -63,32 +86,13 @@ func (p *StreamProvider) NotifyAfter(
 		return ch
 	}
 
-	// If we haven't, then we'll subscribe to updates. The
-	// sync.Cond will fire every time the latest position
-	// updates, so we can check and see if we've advanced
-	// past it.
-	go func(p *StreamProvider) {
-		p.update.L.Lock()
-		defer p.update.L.Unlock()
-
-		for {
-			select {
-			case <-ctx.Done():
-				// The context has expired, so there's no point
-				// in continuing to wait for the update.
-				close(ch)
-				return
-			default:
-				// The latest position has been advanced. Let's
-				// see if it's advanced to the position we care
-				// about. If it has then we'll return.
-				p.update.Wait()
-				if check() {
-					return
-				}
-			}
-		}
-	}(p)
+	id := device.UserID + device.ID
+	p.subscriptionsMutex.Lock()
+	if s, ok := p.subscriptions[id]; ok {
+		close(s.ch)
+	}
+	p.subscriptions[id] = &streamSubscription{ctx, from, ch}
+	p.subscriptionsMutex.Unlock()
 
 	return ch
 }
