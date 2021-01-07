@@ -28,7 +28,7 @@ func (p *ReceiptStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.LatestPosition(ctx)
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *ReceiptStreamProvider) IncrementalSync(

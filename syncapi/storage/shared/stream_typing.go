@@ -19,7 +19,7 @@ func (p *TypingStreamProvider) CompleteSync(
 	// It isn't beneficial to send previous typing notifications
 	// after a complete sync, so just return the latest position
 	// and otherwise do nothing.
-	return p.LatestPosition(ctx)
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *TypingStreamProvider) IncrementalSync(
