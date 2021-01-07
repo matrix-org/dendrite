@@ -91,9 +91,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		}).Panicf("could not save account data")
 	}
 
-	_ = pduPos
-
-	//s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.StreamingToken{PDUPosition: pduPos})
+	s.streams.AccountDataStreamProvider.Advance(pduPos)
 
 	return nil
 }
