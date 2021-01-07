@@ -18,7 +18,6 @@ package sync
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -185,10 +184,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		case <-rp.streams.DeviceListStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.DeviceListPosition):
 		}
 
-		syncReq.Log.Println("Responding to sync after wakeup")
+		syncReq.Log.Debugln("Responding to sync after wakeup")
 		waitcancel()
 	} else {
-		syncReq.Log.Println("Responding to sync immediately")
+		syncReq.Log.Debugln("Responding to sync immediately")
 	}
 
 	if syncReq.Since.IsEmpty() {
@@ -279,20 +278,18 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 			JSON: jsonerror.InvalidArgumentValue("bad 'to' value"),
 		}
 	}
-	// work out room joins/leaves
-	/*
-		res, err := rp.db.IncrementalSync(
-			req.Context(), types.NewResponse(), *device, fromToken, toToken, 10, false,
-		)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("Failed to IncrementalSync")
-			return jsonerror.InternalServerError()
-		}
-	*/
-	res := types.NewResponse()
-	res, err = rp.appendDeviceLists(res, device.UserID, fromToken, toToken)
+	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("Failed to appendDeviceLists info")
+		util.GetLogger(req.Context()).WithError(err).Error("newSyncRequest failed")
+		return jsonerror.InternalServerError()
+	}
+	rp.streams.PDUStreamProvider.IncrementalSync(req.Context(), syncReq, fromToken.PDUPosition, toToken.PDUPosition)
+	_, _, err = internal.DeviceListCatchup(
+		req.Context(), rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
+		syncReq.Response, fromToken.DeviceListPosition, toToken.DeviceListPosition,
+	)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
 		return jsonerror.InternalServerError()
 	}
 	return util.JSONResponse{
@@ -301,170 +298,11 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 			Changed []string `json:"changed"`
 			Left    []string `json:"left"`
 		}{
-			Changed: res.DeviceLists.Changed,
-			Left:    res.DeviceLists.Left,
+			Changed: syncReq.Response.DeviceLists.Changed,
+			Left:    syncReq.Response.DeviceLists.Left,
 		},
 	}
 }
-
-// nolint:gocyclo
-/*
-func (rp *RequestPool) currentSyncForUser(req syncRequest, latestPos types.StreamingToken) (*types.Response, error) {
-	res := types.NewResponse()
-
-	// TODO: handle ignored users
-	if req.since.IsEmpty() {
-		res, err = rp.db.CompleteSync(req.ctx, res, req.device, req.limit)
-		if err != nil {
-			return res, fmt.Errorf("rp.db.CompleteSync: %w", err)
-		}
-	} else {
-		res, err = rp.db.IncrementalSync(req.ctx, res, req.device, req.since, latestPos, req.limit, req.wantFullState)
-		if err != nil {
-			return res, fmt.Errorf("rp.db.IncrementalSync: %w", err)
-		}
-	}
-
-	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
-	res, err = rp.appendAccountData(res, req.device.UserID, req, latestPos.PDUPosition, &accountDataFilter)
-	if err != nil {
-		return res, fmt.Errorf("rp.appendAccountData: %w", err)
-	}
-	res, err = rp.appendDeviceLists(res, req.device.UserID, req.since, latestPos)
-	if err != nil {
-		return res, fmt.Errorf("rp.appendDeviceLists: %w", err)
-	}
-	err = internal.DeviceOTKCounts(req.ctx, rp.keyAPI, req.device.UserID, req.device.ID, res)
-	if err != nil {
-		return res, fmt.Errorf("internal.DeviceOTKCounts: %w", err)
-	}
-
-	return res, err
-}
-*/
-
-func (rp *RequestPool) appendDeviceLists(
-	data *types.Response, userID string, since, to types.StreamingToken,
-) (*types.Response, error) {
-	_, err := internal.DeviceListCatchup(context.Background(), rp.keyAPI, rp.rsAPI, userID, data, since, to)
-	if err != nil {
-		return nil, fmt.Errorf("internal.DeviceListCatchup: %w", err)
-	}
-
-	return data, nil
-}
-
-/*
-func (rp *RequestPool) appendAccountData(
-	data *types.Response, userID string, req syncRequest, currentPos types.StreamPosition,
-	accountDataFilter *gomatrixserverlib.EventFilter,
-) (*types.Response, error) {
-	// TODO: Account data doesn't have a sync position of its own, meaning that
-	// account data might be sent multiple time to the client if multiple account
-	// data keys were set between two message. This isn't a huge issue since the
-	// duplicate data doesn't represent a huge quantity of data, but an optimisation
-	// here would be making sure each data is sent only once to the client.
-	if req.since.IsEmpty() {
-		// If this is the initial sync, we don't need to check if a data has
-		// already been sent. Instead, we send the whole batch.
-		dataReq := &userapi.QueryAccountDataRequest{
-			UserID: userID,
-		}
-		dataRes := &userapi.QueryAccountDataResponse{}
-		if err := rp.userAPI.QueryAccountData(req.ctx, dataReq, dataRes); err != nil {
-			return nil, err
-		}
-		for datatype, databody := range dataRes.GlobalAccountData {
-			data.AccountData.Events = append(
-				data.AccountData.Events,
-				gomatrixserverlib.ClientEvent{
-					Type:    datatype,
-					Content: gomatrixserverlib.RawJSON(databody),
-				},
-			)
-		}
-		for r, j := range data.Rooms.Join {
-			for datatype, databody := range dataRes.RoomAccountData[r] {
-				j.AccountData.Events = append(
-					j.AccountData.Events,
-					gomatrixserverlib.ClientEvent{
-						Type:    datatype,
-						Content: gomatrixserverlib.RawJSON(databody),
-					},
-				)
-				data.Rooms.Join[r] = j
-			}
-		}
-		return data, nil
-	}
-
-	r := types.Range{
-		From: req.since.PDUPosition,
-		To:   currentPos,
-	}
-	// If both positions are the same, it means that the data was saved after the
-	// latest room event. In that case, we need to decrement the old position as
-	// results are exclusive of Low.
-	if r.Low() == r.High() {
-		r.From--
-	}
-
-	// Sync is not initial, get all account data since the latest sync
-	dataTypes, err := rp.db.GetAccountDataInRange(
-		req.ctx, userID, r, accountDataFilter,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("rp.db.GetAccountDataInRange: %w", err)
-	}
-
-	if len(dataTypes) == 0 {
-		// TODO: this fixes the sytest but is it the right thing to do?
-		dataTypes[""] = []string{"m.push_rules"}
-	}
-
-	// Iterate over the rooms
-	for roomID, dataTypes := range dataTypes {
-		// Request the missing data from the database
-		for _, dataType := range dataTypes {
-			dataReq := userapi.QueryAccountDataRequest{
-				UserID:   userID,
-				RoomID:   roomID,
-				DataType: dataType,
-			}
-			dataRes := userapi.QueryAccountDataResponse{}
-			err = rp.userAPI.QueryAccountData(req.ctx, &dataReq, &dataRes)
-			if err != nil {
-				continue
-			}
-			if roomID == "" {
-				if globalData, ok := dataRes.GlobalAccountData[dataType]; ok {
-					data.AccountData.Events = append(
-						data.AccountData.Events,
-						gomatrixserverlib.ClientEvent{
-							Type:    dataType,
-							Content: gomatrixserverlib.RawJSON(globalData),
-						},
-					)
-				}
-			} else {
-				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
-					joinData := data.Rooms.Join[roomID]
-					joinData.AccountData.Events = append(
-						joinData.AccountData.Events,
-						gomatrixserverlib.ClientEvent{
-							Type:    dataType,
-							Content: gomatrixserverlib.RawJSON(roomData),
-						},
-					)
-					data.Rooms.Join[roomID] = joinData
-				}
-			}
-		}
-	}
-
-	return data, nil
-}
-*/
 
 // shouldReturnImmediately returns whether the /sync request is an initial sync,
 // or timeout=0, or full_state=true, in any of the cases the request should

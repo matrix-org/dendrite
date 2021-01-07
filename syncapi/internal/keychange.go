@@ -49,8 +49,8 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, 
 // nolint:gocyclo
 func DeviceListCatchup(
 	ctx context.Context, keyAPI keyapi.KeyInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
-	userID string, res *types.Response, from, to types.StreamingToken,
-) (hasNew bool, err error) {
+	userID string, res *types.Response, from, to types.LogPosition,
+) (newPos types.LogPosition, hasNew bool, err error) {
 
 	// Track users who we didn't track before but now do by virtue of sharing a room with them, or not.
 	newlyJoinedRooms := joinedRooms(res, userID)
@@ -58,7 +58,7 @@ func DeviceListCatchup(
 	if len(newlyJoinedRooms) > 0 || len(newlyLeftRooms) > 0 {
 		changed, left, err := TrackChangedUsers(ctx, rsAPI, userID, newlyJoinedRooms, newlyLeftRooms)
 		if err != nil {
-			return false, err
+			return to, false, err
 		}
 		res.DeviceLists.Changed = changed
 		res.DeviceLists.Left = left
@@ -73,13 +73,13 @@ func DeviceListCatchup(
 	offset = sarama.OffsetOldest
 	// Extract partition/offset from sync token
 	// TODO: In a world where keyserver is sharded there will be multiple partitions and hence multiple QueryKeyChanges to make.
-	if !from.DeviceListPosition.IsEmpty() {
-		partition = from.DeviceListPosition.Partition
-		offset = from.DeviceListPosition.Offset
+	if !from.IsEmpty() {
+		partition = from.Partition
+		offset = from.Offset
 	}
 	var toOffset int64
 	toOffset = sarama.OffsetNewest
-	if toLog := to.DeviceListPosition; toLog.Partition == partition && toLog.Offset > 0 {
+	if toLog := to; toLog.Partition == partition && toLog.Offset > 0 {
 		toOffset = toLog.Offset
 	}
 	var queryRes api.QueryKeyChangesResponse
@@ -91,7 +91,7 @@ func DeviceListCatchup(
 	if queryRes.Error != nil {
 		// don't fail the catchup because we may have got useful information by tracking membership
 		util.GetLogger(ctx).WithError(queryRes.Error).Error("QueryKeyChanges failed")
-		return hasNew, nil
+		return to, hasNew, nil
 	}
 	// QueryKeyChanges gets ALL users who have changed keys, we want the ones who share rooms with the user.
 	var sharedUsersMap map[string]int
@@ -128,13 +128,12 @@ func DeviceListCatchup(
 		}
 	}
 	// set the new token
-	to.DeviceListPosition = types.LogPosition{
+	to = types.LogPosition{
 		Partition: queryRes.Partition,
 		Offset:    queryRes.Offset,
 	}
-	res.NextBatch.ApplyUpdates(to)
 
-	return hasNew, nil
+	return to, hasNew, nil
 }
 
 // TrackChangedUsers calculates the values of device_lists.changed|left in the /sync response.

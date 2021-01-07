@@ -2,6 +2,8 @@ package streams
 
 import (
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -19,6 +21,7 @@ type Streams struct {
 
 func NewSyncStreamProviders(
 	d storage.Database, userAPI userapi.UserInternalAPI,
+	rsAPI rsapi.RoomserverInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	eduCache *cache.EDUCache,
 ) *Streams {
 	streams := &Streams{
@@ -44,6 +47,8 @@ func NewSyncStreamProviders(
 		},
 		DeviceListStreamProvider: &DeviceListStreamProvider{
 			PartitionedStreamProvider: PartitionedStreamProvider{DB: d},
+			rsAPI:                     rsAPI,
+			keyAPI:                    keyAPI,
 		},
 	}
 

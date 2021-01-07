@@ -51,7 +51,7 @@ func AddPublicRoutes(
 	}
 
 	eduCache := cache.New()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, eduCache)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache)
 
 	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams)
 
