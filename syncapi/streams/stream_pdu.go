@@ -97,7 +97,6 @@ func (p *PDUStreamProvider) IncrementalSync(
 	newPos = to
 
 	var err error
-	//var events []types.StreamEvent
 	var stateDeltas []types.StateDelta
 	var joinedRooms []string
 
@@ -106,10 +105,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	if req.WantFullState {
 		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
 			return
 		}
 	} else {
 		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
 			return
 		}
 	}
@@ -119,9 +120,9 @@ func (p *PDUStreamProvider) IncrementalSync(
 	}
 
 	for _, delta := range stateDeltas {
-		err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, 20, req.Response)
-		if err != nil {
-			return newPos // nil, fmt.Errorf("d.addRoomDeltaToResponse: %w", err)
+		if err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, req.Limit, req.Response); err != nil {
+			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
+			return newPos
 		}
 	}
 
