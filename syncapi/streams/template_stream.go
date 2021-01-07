@@ -31,26 +31,25 @@ func (p *StreamProvider) Advance(
 	latest types.StreamPosition,
 ) {
 	p.latestMutex.Lock()
-	defer p.latestMutex.Unlock()
-
 	if latest > p.latest {
 		p.latest = latest
+	}
+	p.latestMutex.Unlock()
 
-		p.subscriptionsMutex.Lock()
-		for id, s := range p.subscriptions {
-			select {
-			case <-s.ctx.Done():
+	p.subscriptionsMutex.Lock()
+	defer p.subscriptionsMutex.Unlock()
+
+	for id, s := range p.subscriptions {
+		select {
+		case <-s.ctx.Done():
+			close(s.ch)
+			delete(p.subscriptions, id)
+		default:
+			if latest > s.from {
 				close(s.ch)
 				delete(p.subscriptions, id)
-				continue
-			default:
-				if latest > s.from {
-					close(s.ch)
-					delete(p.subscriptions, id)
-				}
 			}
 		}
-		p.subscriptionsMutex.Unlock()
 	}
 }
 

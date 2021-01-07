@@ -221,38 +221,31 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		syncReq.Response.NextBatch = types.StreamingToken{
 			PDUPosition: rp.streams.PDUStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.PDUPosition,                                    // from
-				rp.streams.PDUStreamProvider.LatestPosition(syncReq.Context), // to
+				syncReq.Since.PDUPosition, rp.streams.PDUStreamProvider.LatestPosition(syncReq.Context),
 			),
 			TypingPosition: rp.streams.TypingStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.TypingPosition,                                    // from
-				rp.streams.TypingStreamProvider.LatestPosition(syncReq.Context), // to
+				syncReq.Since.TypingPosition, rp.streams.TypingStreamProvider.LatestPosition(syncReq.Context),
 			),
 			ReceiptPosition: rp.streams.ReceiptStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.ReceiptPosition,                                    // from
-				rp.streams.ReceiptStreamProvider.LatestPosition(syncReq.Context), // to
+				syncReq.Since.ReceiptPosition, rp.streams.ReceiptStreamProvider.LatestPosition(syncReq.Context),
 			),
 			InvitePosition: rp.streams.InviteStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.InvitePosition,                                    // from
-				rp.streams.InviteStreamProvider.LatestPosition(syncReq.Context), // to
+				syncReq.Since.InvitePosition, rp.streams.InviteStreamProvider.LatestPosition(syncReq.Context),
 			),
 			SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.SendToDevicePosition,                                    // from
-				rp.streams.SendToDeviceStreamProvider.LatestPosition(syncReq.Context), // to
+				syncReq.Since.SendToDevicePosition, rp.streams.SendToDeviceStreamProvider.LatestPosition(syncReq.Context),
 			),
 			AccountDataPosition: rp.streams.AccountDataStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.AccountDataPosition,                                    // from
-				rp.streams.AccountDataStreamProvider.LatestPosition(syncReq.Context), // to
+				syncReq.Since.AccountDataPosition, rp.streams.AccountDataStreamProvider.LatestPosition(syncReq.Context),
 			),
 			DeviceListPosition: rp.streams.DeviceListStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.DeviceListPosition,                                    // from
-				rp.streams.DeviceListStreamProvider.LatestPosition(syncReq.Context), // to
+				syncReq.Since.DeviceListPosition, rp.streams.DeviceListStreamProvider.LatestPosition(syncReq.Context),
 			),
 		}
 	}

@@ -16,6 +16,7 @@ package consumers
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
@@ -65,11 +66,9 @@ func NewOutputTypingEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
-	/*
-		s.eduCache.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
-			s.eduCache.TypingStream().Advance(types.StreamPosition(latestSyncPosition))
-		})
-	*/
+	s.eduCache.SetTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
+		s.streams.TypingStreamProvider.Advance(types.StreamPosition(latestSyncPosition))
+	})
 	return s.typingConsumer.Start()
 }
 
@@ -99,7 +98,9 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		)
 	}
 
+	fmt.Println("Advancing typing position to", typingPos)
 	s.streams.TypingStreamProvider.Advance(typingPos)
+	fmt.Println("Advanced typing position to", typingPos)
 
 	return nil
 }

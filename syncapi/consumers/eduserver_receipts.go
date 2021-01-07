@@ -86,7 +86,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 		return err
 	}
 
-	s.streams.TypingStreamProvider.Advance(streamPos)
+	s.streams.ReceiptStreamProvider.Advance(streamPos)
 
 	return nil
 }
