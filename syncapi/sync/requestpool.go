@@ -176,15 +176,21 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			return giveup()
 
 		case <-rp.streams.PDUStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.PDUPosition):
+			syncReq.Log.Debugln("Responding to sync after PDU")
 		case <-rp.streams.TypingStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.TypingPosition):
+			syncReq.Log.Debugln("Responding to sync after typing notification")
 		case <-rp.streams.ReceiptStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.ReceiptPosition):
+			syncReq.Log.Debugln("Responding to sync after read receipt")
 		case <-rp.streams.InviteStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.InvitePosition):
+			syncReq.Log.Debugln("Responding to sync after invite")
 		case <-rp.streams.SendToDeviceStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.SendToDevicePosition):
+			syncReq.Log.Debugln("Responding to sync after send-to-device message")
 		case <-rp.streams.AccountDataStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.AccountDataPosition):
+			syncReq.Log.Debugln("Responding to sync after account data")
 		case <-rp.streams.DeviceListStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.DeviceListPosition):
+			syncReq.Log.Debugln("Responding to sync after device list update")
 		}
 
-		syncReq.Log.Debugln("Responding to sync after wakeup")
 		waitcancel()
 	} else {
 		syncReq.Log.Debugln("Responding to sync immediately")
@@ -311,6 +317,5 @@ func (rp *RequestPool) shouldReturnImmediately(syncReq *types.SyncRequest) bool 
 	if syncReq.Since.IsEmpty() || syncReq.Timeout == 0 || syncReq.WantFullState {
 		return true
 	}
-	waiting, werr := rp.db.SendToDeviceUpdatesWaiting(context.TODO(), syncReq.Device.UserID, syncReq.Device.ID)
-	return werr == nil && waiting
+	return false
 }

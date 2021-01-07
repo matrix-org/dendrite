@@ -30,10 +30,14 @@ func (p *PDUStreamProvider) CompleteSync(
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	to := p.LatestPosition(ctx)
+	from := to - 20
+	if from < 0 {
+		from = 0
+	}
 
 	// Get the current sync position which we will base the sync response on.
 	r := types.Range{
-		From: 0,
+		From: from,
 		To:   to,
 	}
 
@@ -50,7 +54,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	for _, roomID := range joinedRoomIDs {
 		var jr *types.JoinResponse
 		jr, err = p.getJoinResponseForCompleteSync(
-			ctx, roomID, r, &stateFilter, 20, req.Device,
+			ctx, roomID, r, &stateFilter, req.Limit, req.Device,
 		)
 		if err != nil {
 			req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -70,7 +74,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, peek.RoomID, r, &stateFilter, 20, req.Device,
+				ctx, peek.RoomID, r, &stateFilter, req.Limit, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -80,7 +84,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		}
 	}
 
-	return p.LatestPosition(ctx)
+	return to
 }
 
 // nolint:gocyclo

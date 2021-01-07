@@ -76,6 +76,8 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		}
 	}
 
+	filter := gomatrixserverlib.DefaultEventFilter()
+	filter.Limit = timelineLimit
 	// TODO: Additional query params: set_presence, filter
 
 	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
@@ -87,16 +89,16 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	})
 
 	return &types.SyncRequest{
-		Context:       req.Context(),                          //
-		Log:           logger,                                 //
-		Device:        &device,                                //
-		Response:      types.NewResponse(),                    // Populated by all streams
-		Filter:        gomatrixserverlib.DefaultEventFilter(), //
-		Since:         since,                                  //
-		Timeout:       timeout,                                //
-		Limit:         timelineLimit,                          //
-		Rooms:         make(map[string]string),                // Populated by the PDU stream
-		WantFullState: wantFullState,                          //
+		Context:       req.Context(),           //
+		Log:           logger,                  //
+		Device:        &device,                 //
+		Response:      types.NewResponse(),     // Populated by all streams
+		Filter:        filter,                  //
+		Since:         since,                   //
+		Timeout:       timeout,                 //
+		Limit:         timelineLimit,           //
+		Rooms:         make(map[string]string), // Populated by the PDU stream
+		WantFullState: wantFullState,           //
 	}, nil
 }
 
