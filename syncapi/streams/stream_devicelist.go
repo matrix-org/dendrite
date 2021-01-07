@@ -7,7 +7,7 @@ import (
 )
 
 type DeviceListStreamProvider struct {
-	StreamLogProvider
+	PartitionedStreamProvider
 }
 
 func (p *DeviceListStreamProvider) CompleteSync(

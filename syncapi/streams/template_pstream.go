@@ -8,19 +8,19 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
-type StreamLogProvider struct {
+type PartitionedStreamProvider struct {
 	DB          storage.Database
 	latest      types.LogPosition
 	latestMutex sync.RWMutex
 	update      *sync.Cond
 }
 
-func (p *StreamLogProvider) Setup() {
+func (p *PartitionedStreamProvider) Setup() {
 	locker := &sync.Mutex{}
 	p.update = sync.NewCond(locker)
 }
 
-func (p *StreamLogProvider) Advance(
+func (p *PartitionedStreamProvider) Advance(
 	latest types.LogPosition,
 ) {
 	p.latestMutex.Lock()
@@ -32,7 +32,7 @@ func (p *StreamLogProvider) Advance(
 	}
 }
 
-func (p *StreamLogProvider) LatestPosition(
+func (p *PartitionedStreamProvider) LatestPosition(
 	ctx context.Context,
 ) types.LogPosition {
 	p.latestMutex.RLock()
@@ -41,7 +41,7 @@ func (p *StreamLogProvider) LatestPosition(
 	return p.latest
 }
 
-func (p *StreamLogProvider) NotifyAfter(
+func (p *PartitionedStreamProvider) NotifyAfter(
 	ctx context.Context,
 	from types.LogPosition,
 ) chan struct{} {
@@ -67,7 +67,7 @@ func (p *StreamLogProvider) NotifyAfter(
 	// sync.Cond will fire every time the latest position
 	// updates, so we can check and see if we've advanced
 	// past it.
-	go func(p *StreamLogProvider) {
+	go func(p *PartitionedStreamProvider) {
 		p.update.L.Lock()
 		defer p.update.L.Unlock()
 

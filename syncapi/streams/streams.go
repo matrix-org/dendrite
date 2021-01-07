@@ -9,13 +9,12 @@ import (
 
 type Streams struct {
 	PDUStreamProvider          types.StreamProvider
-	PDUTopologyProvider        types.TopologyProvider
 	TypingStreamProvider       types.StreamProvider
 	ReceiptStreamProvider      types.StreamProvider
 	InviteStreamProvider       types.StreamProvider
 	SendToDeviceStreamProvider types.StreamProvider
 	AccountDataStreamProvider  types.StreamProvider
-	DeviceListStreamProvider   types.StreamLogProvider
+	DeviceListStreamProvider   types.PartitionedStreamProvider
 }
 
 func NewSyncStreamProviders(
@@ -23,19 +22,29 @@ func NewSyncStreamProviders(
 	eduCache *cache.EDUCache,
 ) *Streams {
 	streams := &Streams{
-		PDUStreamProvider: &PDUStreamProvider{StreamProvider{DB: d}},
+		PDUStreamProvider: &PDUStreamProvider{
+			StreamProvider: StreamProvider{DB: d},
+		},
 		TypingStreamProvider: &TypingStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
 			EDUCache:       eduCache,
 		},
-		ReceiptStreamProvider:      &ReceiptStreamProvider{StreamProvider{DB: d}},
-		InviteStreamProvider:       &InviteStreamProvider{StreamProvider{DB: d}},
-		SendToDeviceStreamProvider: &SendToDeviceStreamProvider{StreamProvider{DB: d}},
+		ReceiptStreamProvider: &ReceiptStreamProvider{
+			StreamProvider: StreamProvider{DB: d},
+		},
+		InviteStreamProvider: &InviteStreamProvider{
+			StreamProvider: StreamProvider{DB: d},
+		},
+		SendToDeviceStreamProvider: &SendToDeviceStreamProvider{
+			StreamProvider: StreamProvider{DB: d},
+		},
 		AccountDataStreamProvider: &AccountDataStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
 			userAPI:        userAPI,
 		},
-		DeviceListStreamProvider: &DeviceListStreamProvider{StreamLogProvider{DB: d}},
+		DeviceListStreamProvider: &DeviceListStreamProvider{
+			PartitionedStreamProvider: PartitionedStreamProvider{DB: d},
+		},
 	}
 
 	streams.PDUStreamProvider.Setup()
