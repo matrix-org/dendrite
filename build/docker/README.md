@@ -34,6 +34,10 @@ runtime config should come from. The mounted folder must contain:
 - `server.crt` certificate file
 - `server.key` private key file for the above certificate
 
+as well as 
+
+- `build_db.sh` in a parallel `postgres` parallel to the `config` folder, providing database generation.
+
 To generate keys:
 
 ```
