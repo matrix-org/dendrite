@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sync
+package notifier
 
 import (
 	"context"
@@ -326,16 +326,16 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 }
 
-func waitForEvents(n *Notifier, req syncRequest) (types.StreamingToken, error) {
+func waitForEvents(n *Notifier, req types.SyncRequest) (types.StreamingToken, error) {
 	listener := n.GetListener(req)
 	defer listener.Close()
 
 	select {
 	case <-time.After(5 * time.Second):
 		return types.StreamingToken{}, fmt.Errorf(
-			"waitForEvents timed out waiting for %s (pos=%v)", req.device.UserID, req.since,
+			"waitForEvents timed out waiting for %s (pos=%v)", req.Device.UserID, req.Since,
 		)
-	case <-listener.GetNotifyChannel(req.since):
+	case <-listener.GetNotifyChannel(req.Since):
 		p := listener.GetSyncPosition()
 		return p, nil
 	}
@@ -358,17 +358,17 @@ func lockedFetchUserStream(n *Notifier, userID, deviceID string) *UserDeviceStre
 	return n.fetchUserDeviceStream(userID, deviceID, true)
 }
 
-func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) syncRequest {
-	return syncRequest{
-		device: userapi.Device{
+func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) types.SyncRequest {
+	return types.SyncRequest{
+		Device: &userapi.Device{
 			UserID: userID,
 			ID:     deviceID,
 		},
-		timeout:       1 * time.Minute,
-		since:         since,
-		wantFullState: false,
-		limit:         DefaultTimelineLimit,
-		log:           util.GetLogger(context.TODO()),
-		ctx:           context.TODO(),
+		Timeout:       1 * time.Minute,
+		Since:         since,
+		WantFullState: false,
+		Limit:         20,
+		Log:           util.GetLogger(context.TODO()),
+		Context:       context.TODO(),
 	}
 }

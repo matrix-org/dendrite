@@ -16,12 +16,10 @@ import (
 
 var (
 	syncingUser = "@alice:localhost"
-	emptyToken  = types.StreamingToken{}
-	newestToken = types.StreamingToken{
-		DeviceListPosition: types.LogPosition{
-			Offset:    sarama.OffsetNewest,
-			Partition: 0,
-		},
+	emptyToken  = types.LogPosition{}
+	newestToken = types.LogPosition{
+		Offset:    sarama.OffsetNewest,
+		Partition: 0,
 	}
 )
 
@@ -180,7 +178,7 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 			"!another:room": {syncingUser},
 		},
 	}
-	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -203,7 +201,7 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 			"!another:room": {syncingUser},
 		},
 	}
-	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -226,7 +224,7 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 			"!another:room": {syncingUser, existingUser},
 		},
 	}
-	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -248,7 +246,7 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 			"!another:room": {syncingUser, existingUser},
 		},
 	}
-	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -307,7 +305,7 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 			roomID: {syncingUser, existingUser},
 		},
 	}
-	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -335,7 +333,7 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 			"!another:room": {syncingUser},
 		},
 	}
-	hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken)
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -420,7 +418,7 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 			"!another:room": {syncingUser},
 		},
 	}
-	hasNew, err := DeviceListCatchup(
+	_, hasNew, err := DeviceListCatchup(
 		context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, newestToken,
 	)
 	if err != nil {

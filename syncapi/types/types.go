@@ -35,6 +35,15 @@ var (
 	ErrInvalidSyncTokenLen = fmt.Errorf("Sync token has an invalid length")
 )
 
+type StateDelta struct {
+	RoomID      string
+	StateEvents []*gomatrixserverlib.HeaderedEvent
+	Membership  string
+	// The PDU stream position of the latest membership event for this user, if applicable.
+	// Can be 0 if there is no membership event in this delta.
+	MembershipPos StreamPosition
+}
+
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
 
@@ -114,6 +123,7 @@ type StreamingToken struct {
 	ReceiptPosition      StreamPosition
 	SendToDevicePosition StreamPosition
 	InvitePosition       StreamPosition
+	AccountDataPosition  StreamPosition
 	DeviceListPosition   LogPosition
 }
 
@@ -130,10 +140,10 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
-		t.InvitePosition,
+		t.InvitePosition, t.AccountDataPosition,
 	)
 	if dl := t.DeviceListPosition; !dl.IsEmpty() {
 		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
@@ -154,6 +164,8 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.InvitePosition > other.InvitePosition:
 		return true
+	case t.AccountDataPosition > other.AccountDataPosition:
+		return true
 	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
 		return true
 	}
@@ -161,7 +173,7 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition == 0 && t.DeviceListPosition.IsEmpty()
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition == 0 && t.DeviceListPosition.IsEmpty()
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -192,6 +204,9 @@ func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	}
 	if other.InvitePosition > 0 {
 		t.InvitePosition = other.InvitePosition
+	}
+	if other.AccountDataPosition > 0 {
+		t.AccountDataPosition = other.AccountDataPosition
 	}
 	if other.DeviceListPosition.Offset > 0 {
 		t.DeviceListPosition = other.DeviceListPosition
@@ -286,7 +301,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	}
 	categories := strings.Split(tok[1:], ".")
 	parts := strings.Split(categories[0], "_")
-	var positions [5]StreamPosition
+	var positions [6]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -304,6 +319,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		ReceiptPosition:      positions[2],
 		SendToDevicePosition: positions[3],
 		InvitePosition:       positions[4],
+		AccountDataPosition:  positions[5],
 	}
 	// dl-0-1234
 	// $log_name-$partition-$offset
