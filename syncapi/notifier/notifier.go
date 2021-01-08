@@ -124,6 +124,15 @@ func (n *Notifier) OnNewEvent(
 	}
 }
 
+func (n *Notifier) OnNewAccountData(
+	userID string, posUpdate types.StreamingToken,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
+	n.wakeupUsers([]string{userID}, nil, posUpdate)
+}
+
 func (n *Notifier) OnNewPeek(
 	roomID, userID, deviceID string,
 ) {

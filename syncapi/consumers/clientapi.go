@@ -97,7 +97,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 	}
 
 	s.streams.AccountDataStreamProvider.Advance(pduPos)
-	s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.StreamingToken{AccountDataPosition: pduPos})
+	s.notifier.OnNewAccountData(string(msg.Key), types.StreamingToken{AccountDataPosition: pduPos})
 
 	return nil
 }
