@@ -511,3 +511,4 @@ Can pass a JSON filter as a query parameter
 Local room members can get room messages
 Remote room members can get room messages
 Guest users can send messages to guest_access rooms if joined
+Can read configuration endpoint

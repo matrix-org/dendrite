@@ -74,6 +74,12 @@ func Setup(
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/config",
+		httputil.MakeAuthAPI("config", userAPI, func(req *http.Request, dev *userapi.Device) util.JSONResponse {
+			return Config(req, cfg)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
 
 func makeDownloadAPI(
