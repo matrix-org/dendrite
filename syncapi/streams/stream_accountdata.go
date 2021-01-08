@@ -19,7 +19,7 @@ func (p *AccountDataStreamProvider) Setup() {
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := p.DB.MaxStreamTokenForAccountData(context.Background())
+	id, err := p.DB.MaxStreamPositionForAccountData(context.Background())
 	if err != nil {
 		panic(err)
 	}

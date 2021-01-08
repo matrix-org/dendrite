@@ -16,7 +16,7 @@ type ReceiptStreamProvider struct {
 func (p *ReceiptStreamProvider) Setup() {
 	p.StreamProvider.Setup()
 
-	id, err := p.DB.MaxStreamTokenForReceipts(context.Background())
+	id, err := p.DB.MaxStreamPositionForReceipts(context.Background())
 	if err != nil {
 		panic(err)
 	}

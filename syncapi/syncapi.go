@@ -57,14 +57,14 @@ func AddPublicRoutes(
 	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache)
 	notifier := notifier.NewNotifier(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
-		logrus.WithError(err).Panicf("failed to load notifier")
+		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
 	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
-		consumer, keyAPI, rsAPI, syncDB, notifier, streams,
+		consumer, keyAPI, rsAPI, syncDB, notifier, streams.DeviceListStreamProvider,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start key change consumer")
@@ -78,28 +78,28 @@ func AddPublicRoutes(
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		cfg, consumer, syncDB, notifier, streams,
+		cfg, consumer, syncDB, notifier, streams.AccountDataStreamProvider,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		cfg, consumer, syncDB, eduCache, notifier, streams,
+		cfg, consumer, syncDB, eduCache, notifier, streams.TypingStreamProvider,
 	)
 	if err = typingConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		cfg, consumer, syncDB, notifier, streams,
+		cfg, consumer, syncDB, notifier, streams.SendToDeviceStreamProvider,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		cfg, consumer, syncDB, notifier, streams,
+		cfg, consumer, syncDB, notifier, streams.ReceiptStreamProvider,
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")

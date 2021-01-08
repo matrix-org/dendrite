@@ -301,7 +301,6 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	}
 
 	// Notify any active sync requests that the invite has been retired.
-	// Invites share the same stream counter as PDUs
 	s.streams.InviteStreamProvider.Advance(pduPos)
 	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
 
@@ -324,7 +323,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	// TODO: This only works because the peeks table is reusing the same
 	// index as PDUs, but we should fix this
 	s.streams.PDUStreamProvider.Advance(sp)
-	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
+	s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
 
 	return nil
 }
@@ -345,7 +344,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 	// TODO: This only works because the peeks table is reusing the same
 	// index as PDUs, but we should fix this
 	s.streams.PDUStreamProvider.Advance(sp)
-	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
+	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
 
 	return nil
 }

@@ -16,7 +16,7 @@ func (p *InviteStreamProvider) Setup() {
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := p.DB.MaxStreamTokenForInvites(context.Background())
+	id, err := p.DB.MaxStreamPositionForInvites(context.Background())
 	if err != nil {
 		panic(err)
 	}

@@ -136,10 +136,12 @@ func (n *Notifier) OnNewAccountData(
 
 func (n *Notifier) OnNewPeek(
 	roomID, userID, deviceID string,
+	posUpdate types.StreamingToken,
 ) {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
+	n.currPos.ApplyUpdates(posUpdate)
 	n.addPeekingDevice(roomID, userID, deviceID)
 
 	// we don't wake up devices here given the roomserver consumer will do this shortly afterwards
@@ -148,10 +150,12 @@ func (n *Notifier) OnNewPeek(
 
 func (n *Notifier) OnRetirePeek(
 	roomID, userID, deviceID string,
+	posUpdate types.StreamingToken,
 ) {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
+	n.currPos.ApplyUpdates(posUpdate)
 	n.removePeekingDevice(roomID, userID, deviceID)
 
 	// we don't wake up devices here given the roomserver consumer will do this shortly afterwards

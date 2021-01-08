@@ -18,7 +18,7 @@ func (p *PDUStreamProvider) Setup() {
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := p.DB.MaxStreamTokenForPDUs(context.Background())
+	id, err := p.DB.MaxStreamPositionForPDUs(context.Background())
 	if err != nil {
 		panic(err)
 	}
@@ -33,6 +33,8 @@ func (p *PDUStreamProvider) CompleteSync(
 	to := p.LatestPosition(ctx)
 
 	// Get the current sync position which we will base the sync response on.
+	// For complete syncs, we want to start at the most recent events and work
+	// backwards, so that we show the most recent events in the room.
 	r := types.Range{
 		From:      to,
 		To:        0,

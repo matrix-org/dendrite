@@ -61,7 +61,7 @@ func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
 	})
 }
 
-func (d *Database) MaxStreamTokenForPDUs(ctx context.Context) (types.StreamPosition, error) {
+func (d *Database) MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.OutputEvents.SelectMaxEventID(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("d.OutputEvents.SelectMaxEventID: %w", err)
@@ -69,7 +69,7 @@ func (d *Database) MaxStreamTokenForPDUs(ctx context.Context) (types.StreamPosit
 	return types.StreamPosition(id), nil
 }
 
-func (d *Database) MaxStreamTokenForReceipts(ctx context.Context) (types.StreamPosition, error) {
+func (d *Database) MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.Receipts.SelectMaxReceiptID(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("d.Receipts.SelectMaxReceiptID: %w", err)
@@ -77,7 +77,7 @@ func (d *Database) MaxStreamTokenForReceipts(ctx context.Context) (types.StreamP
 	return types.StreamPosition(id), nil
 }
 
-func (d *Database) MaxStreamTokenForInvites(ctx context.Context) (types.StreamPosition, error) {
+func (d *Database) MaxStreamPositionForInvites(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.Invites.SelectMaxInviteID(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("d.Invites.SelectMaxInviteID: %w", err)
@@ -85,7 +85,7 @@ func (d *Database) MaxStreamTokenForInvites(ctx context.Context) (types.StreamPo
 	return types.StreamPosition(id), nil
 }
 
-func (d *Database) MaxStreamTokenForAccountData(ctx context.Context) (types.StreamPosition, error) {
+func (d *Database) MaxStreamPositionForAccountData(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.AccountData.SelectMaxAccountDataID(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("d.Invites.SelectMaxAccountDataID: %w", err)

@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -33,7 +32,7 @@ import (
 type OutputTypingEventConsumer struct {
 	typingConsumer *internal.ContinualConsumer
 	eduCache       *cache.EDUCache
-	streams        *streams.Streams
+	stream         types.StreamProvider
 	notifier       *notifier.Notifier
 }
 
@@ -45,7 +44,7 @@ func NewOutputTypingEventConsumer(
 	store storage.Database,
 	eduCache *cache.EDUCache,
 	notifier *notifier.Notifier,
-	streams *streams.Streams,
+	stream types.StreamProvider,
 ) *OutputTypingEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -59,7 +58,7 @@ func NewOutputTypingEventConsumer(
 		typingConsumer: &consumer,
 		eduCache:       eduCache,
 		notifier:       notifier,
-		streams:        streams,
+		stream:         stream,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -102,7 +101,7 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		)
 	}
 
-	s.streams.TypingStreamProvider.Advance(typingPos)
+	s.stream.Advance(typingPos)
 	s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
 
 	return nil
