@@ -32,6 +32,7 @@ type Database interface {
 	MaxStreamTokenForPDUs(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamTokenForReceipts(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamTokenForInvites(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamTokenForAccountData(ctx context.Context) (types.StreamPosition, error)
 
 	CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
 	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)

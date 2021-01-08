@@ -85,6 +85,14 @@ func (d *Database) MaxStreamTokenForInvites(ctx context.Context) (types.StreamPo
 	return types.StreamPosition(id), nil
 }
 
+func (d *Database) MaxStreamTokenForAccountData(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.AccountData.SelectMaxAccountDataID(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("d.Invites.SelectMaxAccountDataID: %w", err)
+	}
+	return types.StreamPosition(id), nil
+}
+
 func (d *Database) CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilterPart)
 }

@@ -13,6 +13,19 @@ type AccountDataStreamProvider struct {
 	userAPI userapi.UserInternalAPI
 }
 
+func (p *AccountDataStreamProvider) Setup() {
+	p.StreamProvider.Setup()
+
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	id, err := p.DB.MaxStreamTokenForAccountData(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	p.latest = id
+}
+
 func (p *AccountDataStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
