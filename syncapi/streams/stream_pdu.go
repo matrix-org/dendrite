@@ -29,16 +29,14 @@ func (p *PDUStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.StreamPosition {
+	from := types.StreamPosition(0)
 	to := p.LatestPosition(ctx)
-	from := to - 20
-	if from < 0 {
-		from = 0
-	}
 
 	// Get the current sync position which we will base the sync response on.
 	r := types.Range{
-		From: from,
-		To:   to,
+		From:      to,
+		To:        0,
+		Backwards: true,
 	}
 
 	// Extract room state and recent events for all rooms the user is joined to.
