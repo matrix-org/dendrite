@@ -282,7 +282,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	}
 
 	s.streams.InviteStreamProvider.Advance(pduPos)
-	s.notifier.OnNewInvite(types.StreamingToken{PDUPosition: pduPos}, *msg.Event.StateKey())
+	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
 
 	return nil
 }
