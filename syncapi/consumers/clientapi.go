@@ -85,7 +85,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		"room_id": output.RoomID,
 	}).Info("received data from client API server")
 
-	pduPos, err := s.db.UpsertAccountData(
+	streamPos, err := s.db.UpsertAccountData(
 		context.TODO(), string(msg.Key), output.RoomID, output.Type,
 	)
 	if err != nil {
@@ -96,8 +96,8 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		}).Panicf("could not save account data")
 	}
 
-	s.streams.AccountDataStreamProvider.Advance(pduPos)
-	s.notifier.OnNewAccountData(string(msg.Key), types.StreamingToken{AccountDataPosition: pduPos})
+	s.streams.AccountDataStreamProvider.Advance(streamPos)
+	s.notifier.OnNewAccountData(string(msg.Key), types.StreamingToken{AccountDataPosition: streamPos})
 
 	return nil
 }
