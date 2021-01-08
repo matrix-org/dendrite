@@ -130,6 +130,7 @@ func (n *Notifier) OnNewAccountData(
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
+	n.currPos.ApplyUpdates(posUpdate)
 	n.wakeupUsers([]string{userID}, nil, posUpdate)
 }
 
