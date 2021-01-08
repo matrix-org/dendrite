@@ -92,7 +92,7 @@ func OnIncomingMessagesRequest(
 	if emptyFromSupplied {
 		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
 		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
-		currPos := types.TopologyToken{} // .Notifier.CurrentPosition()
+		currPos := srp.Notifier.CurrentPosition()
 		fromQuery = currPos.String()
 	}
 

@@ -26,7 +26,7 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 	lastPos, events, updates, deletions, err := p.DB.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, req.Since)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.SendToDeviceUpdatesForSync failed")
-		return to
+		return from
 	}
 
 	// Before we return the sync response, make sure that we take action on
@@ -37,7 +37,7 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 		err = p.DB.CleanSendToDeviceUpdates(context.Background(), updates, deletions, req.Since)
 		if err != nil {
 			req.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
-			return to
+			return from
 		}
 	}
 	if len(events) > 0 {

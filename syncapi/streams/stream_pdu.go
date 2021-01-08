@@ -45,7 +45,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	joinedRoomIDs, err := p.DB.RoomIDsWithMembership(ctx, req.Device.UserID, gomatrixserverlib.Join)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
-		return to
+		return from
 	}
 
 	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
@@ -58,7 +58,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		)
 		if err != nil {
 			req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
-			return to
+			return from
 		}
 		req.Response.Rooms.Join[roomID] = *jr
 		req.Rooms[roomID] = gomatrixserverlib.Join
@@ -68,7 +68,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	peeks, err := p.DB.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
-		return to
+		return from
 	}
 	for _, peek := range peeks {
 		if !peek.Deleted {
@@ -78,7 +78,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
-				return to
+				return from
 			}
 			req.Response.Rooms.Peek[peek.RoomID] = *jr
 		}

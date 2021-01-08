@@ -131,7 +131,6 @@ func (n *Notifier) OnNewPeek(
 	defer n.streamLock.Unlock()
 
 	n.addPeekingDevice(roomID, userID, deviceID)
-	//n.streams.PDUStreamProvider.Advance(posUpdate.PDUPosition)
 
 	// we don't wake up devices here given the roomserver consumer will do this shortly afterwards
 	// by calling OnNewEvent.
@@ -144,7 +143,6 @@ func (n *Notifier) OnRetirePeek(
 	defer n.streamLock.Unlock()
 
 	n.removePeekingDevice(roomID, userID, deviceID)
-	//n.streams.PDUStreamProvider.Advance(posUpdate.PDUPosition)
 
 	// we don't wake up devices here given the roomserver consumer will do this shortly afterwards
 	// by calling OnRetireEvent.

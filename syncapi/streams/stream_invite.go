@@ -45,7 +45,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 	)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.InviteEventsInRange failed")
-		return to
+		return from
 	}
 
 	for roomID, inviteEvent := range invites {

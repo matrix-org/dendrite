@@ -45,7 +45,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 	lastPos, receipts, err := p.DB.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.RoomReceiptsAfter failed")
-		return to
+		return from
 	}
 
 	if len(receipts) == 0 || lastPos == 0 {
@@ -80,7 +80,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		ev.Content, err = json.Marshal(content)
 		if err != nil {
 			req.Log.WithError(err).Error("json.Marshal failed")
-			return to
+			return from
 		}
 
 		jr.Ephemeral.Events = append(jr.Ephemeral.Events, ev)

@@ -30,11 +30,13 @@ func (p *DeviceListStreamProvider) IncrementalSync(
 	var err error
 	to, _, err = internal.DeviceListCatchup(context.Background(), p.keyAPI, p.rsAPI, req.Device.UserID, req.Response, from, to)
 	if err != nil {
-		return to // nil, fmt.Errorf("internal.DeviceListCatchup: %w", err)
+		req.Log.WithError(err).Error("internal.DeviceListCatchup failed")
+		return from
 	}
 	err = internal.DeviceOTKCounts(req.Context, p.keyAPI, req.Device.UserID, req.Device.ID, req.Response)
 	if err != nil {
-		return to // res, fmt.Errorf("internal.DeviceOTKCounts: %w", err)
+		req.Log.WithError(err).Error("internal.DeviceListCatchup failed")
+		return from
 	}
 
 	return to

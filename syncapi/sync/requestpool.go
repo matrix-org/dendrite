@@ -46,7 +46,7 @@ type RequestPool struct {
 	rsAPI    roomserverAPI.RoomserverInternalAPI
 	lastseen sync.Map
 	streams  *streams.Streams
-	notifier *notifier.Notifier
+	Notifier *notifier.Notifier
 }
 
 // NewRequestPool makes a new RequestPool
@@ -64,7 +64,7 @@ func NewRequestPool(
 		rsAPI:    rsAPI,
 		lastseen: sync.Map{},
 		streams:  streams,
-		notifier: notifier,
+		Notifier: notifier,
 	}
 	go rp.cleanLastSeen()
 	return rp
@@ -154,13 +154,13 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
 
-	currentPos := rp.notifier.CurrentPosition()
+	currentPos := rp.Notifier.CurrentPosition()
 
 	if !rp.shouldReturnImmediately(syncReq) {
 		timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
 		defer timer.Stop()
 
-		userStreamListener := rp.notifier.GetListener(*syncReq)
+		userStreamListener := rp.Notifier.GetListener(*syncReq)
 		defer userStreamListener.Close()
 
 		giveup := func() util.JSONResponse {
