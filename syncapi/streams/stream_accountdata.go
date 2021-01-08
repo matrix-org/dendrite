@@ -13,10 +13,6 @@ type AccountDataStreamProvider struct {
 	userAPI userapi.UserInternalAPI
 }
 
-func (p *AccountDataStreamProvider) Setup() {
-	p.StreamProvider.Setup()
-}
-
 func (p *AccountDataStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,

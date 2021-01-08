@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -37,6 +38,7 @@ type OutputRoomEventConsumer struct {
 	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
 	streams    *streams.Streams
+	notifier   *notifier.Notifier
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -44,6 +46,7 @@ func NewOutputRoomEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
+	notifier *notifier.Notifier,
 	streams *streams.Streams,
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
@@ -58,6 +61,7 @@ func NewOutputRoomEventConsumer(
 		cfg:        cfg,
 		rsConsumer: &consumer,
 		db:         store,
+		notifier:   notifier,
 		streams:    streams,
 		rsAPI:      rsAPI,
 	}
@@ -181,6 +185,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	s.streams.PDUStreamProvider.Advance(pduPos)
+	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -220,6 +225,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	}
 
 	s.streams.PDUStreamProvider.Advance(pduPos)
+	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -276,6 +282,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	}
 
 	s.streams.InviteStreamProvider.Advance(pduPos)
+	s.notifier.OnNewInvite(types.StreamingToken{PDUPosition: pduPos}, *msg.Event.StateKey())
 
 	return nil
 }
@@ -296,6 +303,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	// Notify any active sync requests that the invite has been retired.
 	// Invites share the same stream counter as PDUs
 	s.streams.InviteStreamProvider.Advance(pduPos)
+	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
 
 	return nil
 }
@@ -316,6 +324,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	// TODO: This only works because the peeks table is reusing the same
 	// index as PDUs, but we should fix this
 	s.streams.PDUStreamProvider.Advance(sp)
+	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
 
 	return nil
 }
@@ -336,6 +345,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 	// TODO: This only works because the peeks table is reusing the same
 	// index as PDUs, but we should fix this
 	s.streams.PDUStreamProvider.Advance(sp)
+	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
 
 	return nil
 }

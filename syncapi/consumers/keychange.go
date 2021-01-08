@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -34,6 +35,7 @@ import (
 type OutputKeyChangeEventConsumer struct {
 	keyChangeConsumer   *internal.ContinualConsumer
 	db                  storage.Database
+	notifier            *notifier.Notifier
 	streams             *streams.Streams
 	serverName          gomatrixserverlib.ServerName // our server name
 	rsAPI               roomserverAPI.RoomserverInternalAPI
@@ -51,6 +53,7 @@ func NewOutputKeyChangeEventConsumer(
 	keyAPI api.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	store storage.Database,
+	notifier *notifier.Notifier,
 	streams *streams.Streams,
 ) *OutputKeyChangeEventConsumer {
 
@@ -69,6 +72,7 @@ func NewOutputKeyChangeEventConsumer(
 		rsAPI:               rsAPI,
 		partitionToOffset:   make(map[int32]int64),
 		partitionToOffsetMu: sync.Mutex{},
+		notifier:            notifier,
 		streams:             streams,
 	}
 
@@ -120,6 +124,9 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}
 
 	s.streams.DeviceListStreamProvider.Advance(posUpdate)
+	for userID := range queryRes.UserIDsToCount {
+		s.notifier.OnNewKeyChange(types.StreamingToken{DeviceListPosition: posUpdate}, userID, output.UserID)
+	}
 
 	return nil
 }

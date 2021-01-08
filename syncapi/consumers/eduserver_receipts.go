@@ -22,8 +22,10 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,6 +34,7 @@ type OutputReceiptEventConsumer struct {
 	receiptConsumer *internal.ContinualConsumer
 	db              storage.Database
 	streams         *streams.Streams
+	notifier        *notifier.Notifier
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
@@ -40,6 +43,7 @@ func NewOutputReceiptEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
+	notifier *notifier.Notifier,
 	streams *streams.Streams,
 ) *OutputReceiptEventConsumer {
 
@@ -53,6 +57,7 @@ func NewOutputReceiptEventConsumer(
 	s := &OutputReceiptEventConsumer{
 		receiptConsumer: &consumer,
 		db:              store,
+		notifier:        notifier,
 		streams:         streams,
 	}
 
@@ -87,6 +92,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 	}
 
 	s.streams.ReceiptStreamProvider.Advance(streamPos)
+	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
 
 	return nil
 }

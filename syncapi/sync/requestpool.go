@@ -17,7 +17,6 @@
 package sync
 
 import (
-	"context"
 	"net"
 	"net/http"
 	"strings"
@@ -29,6 +28,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -46,6 +46,7 @@ type RequestPool struct {
 	rsAPI    roomserverAPI.RoomserverInternalAPI
 	lastseen sync.Map
 	streams  *streams.Streams
+	notifier *notifier.Notifier
 }
 
 // NewRequestPool makes a new RequestPool
@@ -53,7 +54,7 @@ func NewRequestPool(
 	db storage.Database, cfg *config.SyncAPI,
 	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	streams *streams.Streams,
+	streams *streams.Streams, notifier *notifier.Notifier,
 ) *RequestPool {
 	rp := &RequestPool{
 		db:       db,
@@ -63,6 +64,7 @@ func NewRequestPool(
 		rsAPI:    rsAPI,
 		lastseen: sync.Map{},
 		streams:  streams,
+		notifier: notifier,
 	}
 	go rp.cleanLastSeen()
 	return rp
@@ -152,15 +154,16 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
 
+	currentPos := rp.notifier.CurrentPosition()
+
 	if !rp.shouldReturnImmediately(syncReq) {
 		timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
 		defer timer.Stop()
 
-		// Use a subcontext so that we don't keep the StreamNotifyAfter
-		// goroutines alive any longer than they really need to be.
-		waitctx, waitcancel := context.WithCancel(syncReq.Context)
+		userStreamListener := rp.notifier.GetListener(*syncReq)
+		defer userStreamListener.Close()
+
 		giveup := func() util.JSONResponse {
-			waitcancel()
 			syncReq.Response.NextBatch = syncReq.Since
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -169,29 +172,16 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		}
 
 		select {
-		case <-waitctx.Done(): // Caller gave up
+		case <-syncReq.Context.Done(): // Caller gave up
 			return giveup()
 
 		case <-timer.C: // Timeout reached
 			return giveup()
 
-		case <-rp.streams.PDUStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.PDUPosition):
-			syncReq.Log.Debugln("Responding to sync after PDU")
-		case <-rp.streams.TypingStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.TypingPosition):
-			syncReq.Log.Debugln("Responding to sync after typing notification")
-		case <-rp.streams.ReceiptStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.ReceiptPosition):
-			syncReq.Log.Debugln("Responding to sync after read receipt")
-		case <-rp.streams.InviteStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.InvitePosition):
-			syncReq.Log.Debugln("Responding to sync after invite")
-		case <-rp.streams.SendToDeviceStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.SendToDevicePosition):
-			syncReq.Log.Debugln("Responding to sync after send-to-device message")
-		case <-rp.streams.AccountDataStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.AccountDataPosition):
-			syncReq.Log.Debugln("Responding to sync after account data")
-		case <-rp.streams.DeviceListStreamProvider.NotifyAfter(waitctx, device, syncReq.Since.DeviceListPosition):
-			syncReq.Log.Debugln("Responding to sync after device list update")
+		case <-userStreamListener.GetNotifyChannel(syncReq.Since):
+			syncReq.Log.Debugln("Responding to sync after wake-up")
+			currentPos = userStreamListener.GetSyncPosition()
 		}
-
-		waitcancel()
 	} else {
 		syncReq.Log.Debugln("Responding to sync immediately")
 	}
@@ -226,31 +216,31 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		syncReq.Response.NextBatch = types.StreamingToken{
 			PDUPosition: rp.streams.PDUStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.PDUPosition, rp.streams.PDUStreamProvider.LatestPosition(syncReq.Context),
+				syncReq.Since.PDUPosition, currentPos.PDUPosition,
 			),
 			TypingPosition: rp.streams.TypingStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.TypingPosition, rp.streams.TypingStreamProvider.LatestPosition(syncReq.Context),
+				syncReq.Since.TypingPosition, currentPos.TypingPosition,
 			),
 			ReceiptPosition: rp.streams.ReceiptStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.ReceiptPosition, rp.streams.ReceiptStreamProvider.LatestPosition(syncReq.Context),
+				syncReq.Since.ReceiptPosition, currentPos.ReceiptPosition,
 			),
 			InvitePosition: rp.streams.InviteStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.InvitePosition, rp.streams.InviteStreamProvider.LatestPosition(syncReq.Context),
+				syncReq.Since.InvitePosition, currentPos.InvitePosition,
 			),
 			SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.SendToDevicePosition, rp.streams.SendToDeviceStreamProvider.LatestPosition(syncReq.Context),
+				syncReq.Since.SendToDevicePosition, currentPos.SendToDevicePosition,
 			),
 			AccountDataPosition: rp.streams.AccountDataStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.AccountDataPosition, rp.streams.AccountDataStreamProvider.LatestPosition(syncReq.Context),
+				syncReq.Since.AccountDataPosition, currentPos.AccountDataPosition,
 			),
 			DeviceListPosition: rp.streams.DeviceListStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
-				syncReq.Since.DeviceListPosition, rp.streams.DeviceListStreamProvider.LatestPosition(syncReq.Context),
+				syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
 			),
 		}
 	}

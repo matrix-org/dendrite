@@ -22,8 +22,10 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,6 +34,7 @@ type OutputClientDataConsumer struct {
 	clientAPIConsumer *internal.ContinualConsumer
 	db                storage.Database
 	streams           *streams.Streams
+	notifier          *notifier.Notifier
 }
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
@@ -39,6 +42,7 @@ func NewOutputClientDataConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
+	notifier *notifier.Notifier,
 	streams *streams.Streams,
 ) *OutputClientDataConsumer {
 
@@ -51,6 +55,7 @@ func NewOutputClientDataConsumer(
 	s := &OutputClientDataConsumer{
 		clientAPIConsumer: &consumer,
 		db:                store,
+		notifier:          notifier,
 		streams:           streams,
 	}
 	consumer.ProcessMessage = s.onMessage
@@ -92,6 +97,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 	}
 
 	s.streams.AccountDataStreamProvider.Advance(pduPos)
+	s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.StreamingToken{AccountDataPosition: pduPos})
 
 	return nil
 }
