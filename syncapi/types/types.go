@@ -190,25 +190,25 @@ func (t *StreamingToken) WithUpdates(other StreamingToken) StreamingToken {
 // streaming token contains any positions that are not 0, they are considered updates
 // and will overwrite the value in the token.
 func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
-	if other.PDUPosition > 0 {
+	if other.PDUPosition > t.PDUPosition {
 		t.PDUPosition = other.PDUPosition
 	}
-	if other.TypingPosition > 0 {
+	if other.TypingPosition > t.TypingPosition {
 		t.TypingPosition = other.TypingPosition
 	}
-	if other.ReceiptPosition > 0 {
+	if other.ReceiptPosition > t.ReceiptPosition {
 		t.ReceiptPosition = other.ReceiptPosition
 	}
-	if other.SendToDevicePosition > 0 {
+	if other.SendToDevicePosition > t.SendToDevicePosition {
 		t.SendToDevicePosition = other.SendToDevicePosition
 	}
-	if other.InvitePosition > 0 {
+	if other.InvitePosition > t.InvitePosition {
 		t.InvitePosition = other.InvitePosition
 	}
-	if other.AccountDataPosition > 0 {
+	if other.AccountDataPosition > t.AccountDataPosition {
 		t.AccountDataPosition = other.AccountDataPosition
 	}
-	if other.DeviceListPosition.Offset > 0 {
+	if other.DeviceListPosition.IsAfter(&t.DeviceListPosition) {
 		t.DeviceListPosition = other.DeviceListPosition
 	}
 }
