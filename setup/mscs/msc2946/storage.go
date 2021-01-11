@@ -30,10 +30,6 @@ var (
 		ConstSpaceChildEventType:  1,
 		ConstSpaceParentEventType: 2,
 	}
-	relTypesEnum = map[int]string{
-		1: ConstSpaceChildEventType,
-		2: ConstSpaceParentEventType,
-	}
 )
 
 type Database interface {

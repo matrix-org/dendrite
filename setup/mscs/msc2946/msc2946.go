@@ -117,10 +117,7 @@ func spacesHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*ht
 			rsAPI:              rsAPI,
 			inMemoryBatchCache: inMemoryBatchCache,
 		}
-		res, resErr := w.walk()
-		if resErr != nil {
-			return *resErr
-		}
+		res := w.walk()
 		return util.JSONResponse{
 			Code: 200,
 			JSON: res,
@@ -162,7 +159,8 @@ func (w *walker) markSent(id string) {
 	w.inMemoryBatchCache[w.caller.UserID+"|"+w.caller.ID] = m
 }
 
-func (w *walker) walk() (*SpacesResponse, *util.JSONResponse) {
+// nolint:gocyclo
+func (w *walker) walk() *SpacesResponse {
 	var res SpacesResponse
 	// Begin walking the graph starting with the room ID in the request in a queue of unvisited rooms
 	unvisited := []string{w.rootRoomID}
@@ -255,7 +253,7 @@ func (w *walker) walk() (*SpacesResponse, *util.JSONResponse) {
 			unvisited = append(unvisited, roomID)
 		}
 	}
-	return &res, nil
+	return &res
 }
 
 func (w *walker) stateEvent(roomID, evType, stateKey string) *gomatrixserverlib.HeaderedEvent {
@@ -340,19 +338,6 @@ func (w *walker) references(roomID string) (eventLookup, error) {
 // state event lookup across multiple rooms keyed on event type
 // NOT THREAD SAFE
 type eventLookup map[string][]*gomatrixserverlib.HeaderedEvent
-
-func (el eventLookup) get(roomID, evType, stateKey string) *gomatrixserverlib.HeaderedEvent {
-	evs := el[evType]
-	if len(evs) == 0 {
-		return nil
-	}
-	for _, ev := range evs {
-		if ev.RoomID() == roomID && ev.StateKeyEquals(stateKey) {
-			return ev
-		}
-	}
-	return nil
-}
 
 func (el eventLookup) set(ev *gomatrixserverlib.HeaderedEvent) {
 	evs := el[ev.Type()]

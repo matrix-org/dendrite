@@ -18,15 +18,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"sort"
-	"strings"
 	"testing"
 	"time"
 
@@ -36,7 +32,6 @@ import (
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2946"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -279,7 +274,7 @@ func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2946.SpacesReques
 func runServer(t *testing.T, router *mux.Router) func() {
 	t.Helper()
 	externalServ := &http.Server{
-		Addr:         string(":8009"),
+		Addr:         string(":8010"),
 		WriteTimeout: 60 * time.Second,
 		Handler:      router,
 	}
@@ -302,7 +297,7 @@ func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *m
 		t.Fatalf("failed to marshal request: %s", err)
 	}
 	httpReq, err := http.NewRequest(
-		"POST", "http://localhost:8009/_matrix/client/unstable/rooms/"+url.PathEscape(roomID)+"/spaces",
+		"POST", "http://localhost:8010/_matrix/client/unstable/rooms/"+url.PathEscape(roomID)+"/spaces",
 		bytes.NewBuffer(data),
 	)
 	httpReq.Header.Set("Authorization", "Bearer "+accessToken)
@@ -330,59 +325,6 @@ func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *m
 		return &result
 	}
 	return nil
-}
-
-func assertContains(t *testing.T, result *msc2836.EventRelationshipResponse, wantEventIDs []string) {
-	t.Helper()
-	gotEventIDs := make([]string, len(result.Events))
-	for i, ev := range result.Events {
-		gotEventIDs[i] = ev.EventID
-	}
-	if len(gotEventIDs) != len(wantEventIDs) {
-		t.Fatalf("length mismatch: got %v want %v", gotEventIDs, wantEventIDs)
-	}
-	for i := range gotEventIDs {
-		if gotEventIDs[i] != wantEventIDs[i] {
-			t.Errorf("wrong item in position %d - got %s want %s", i, gotEventIDs[i], wantEventIDs[i])
-		}
-	}
-}
-
-func assertUnsignedChildren(t *testing.T, ev gomatrixserverlib.ClientEvent, relType string, wantCount int, childrenEventIDs []string) {
-	t.Helper()
-	unsigned := struct {
-		Children map[string]int `json:"children"`
-		Hash     string         `json:"children_hash"`
-	}{}
-	if err := json.Unmarshal(ev.Unsigned, &unsigned); err != nil {
-		if wantCount == 0 {
-			return // no children so possible there is no unsigned field at all
-		}
-		t.Fatalf("Failed to unmarshal unsigned field: %s", err)
-	}
-	// zero checks
-	if wantCount == 0 {
-		if len(unsigned.Children) != 0 || unsigned.Hash != "" {
-			t.Fatalf("want 0 children but got unsigned fields %+v", unsigned)
-		}
-		return
-	}
-	gotCount := unsigned.Children[relType]
-	if gotCount != wantCount {
-		t.Errorf("Got %d count, want %d count for rel_type %s", gotCount, wantCount, relType)
-	}
-	// work out the hash
-	sort.Strings(childrenEventIDs)
-	var b strings.Builder
-	for _, s := range childrenEventIDs {
-		b.WriteString(s)
-	}
-	t.Logf("hashing %s", b.String())
-	hashValBytes := sha256.Sum256([]byte(b.String()))
-	wantHash := base64.RawStdEncoding.EncodeToString(hashValBytes[:])
-	if wantHash != unsigned.Hash {
-		t.Errorf("Got unsigned hash %s want hash %s", unsigned.Hash, wantHash)
-	}
 }
 
 type testUserAPI struct {
