@@ -60,10 +60,10 @@ var (
 //                      |  <-- this link is just a parent, not a child
 //                      R5
 //
-// TODO: Alice is not joined to R4, but R4 is "world_readable".
+// Alice is not joined to R4, but R4 is "world_readable".
 func TestMSC2946(t *testing.T) {
 	alice := "@alice:localhost"
-	// give access tokens to all three users
+	// give access token to alice
 	nopUserAPI := &testUserAPI{
 		accessTokens: make(map[string]userapi.Device),
 	}
@@ -157,6 +157,31 @@ func TestMSC2946(t *testing.T) {
 			"present": true,
 		},
 	})
+	// history visibility for R4
+	r4HisVis := mustCreateEvent(t, fledglingEvent{
+		RoomID:   room4,
+		Sender:   "@someone:localhost",
+		Type:     gomatrixserverlib.MRoomHistoryVisibility,
+		StateKey: &empty,
+		Content: map[string]interface{}{
+			"history_visibility": "world_readable",
+		},
+	})
+	var joinEvents []*gomatrixserverlib.HeaderedEvent
+	for _, roomID := range allRooms {
+		if roomID == room4 {
+			continue // not joined to that room
+		}
+		joinEvents = append(joinEvents, mustCreateEvent(t, fledglingEvent{
+			RoomID:   roomID,
+			Sender:   alice,
+			StateKey: &alice,
+			Type:     gomatrixserverlib.MRoomMember,
+			Content: map[string]interface{}{
+				"membership": "join",
+			},
+		}))
+	}
 	roomNameTuple := gomatrixserverlib.StateKeyTuple{
 		EventType: "m.room.name",
 		StateKey:  "",
@@ -166,9 +191,7 @@ func TestMSC2946(t *testing.T) {
 		StateKey:  "",
 	}
 	nopRsAPI := &testRoomserverAPI{
-		userToJoinedRooms: map[string][]string{
-			alice: allRooms,
-		},
+		joinEvents: joinEvents,
 		events: map[string]*gomatrixserverlib.HeaderedEvent{
 			rootToR1.EventID(): rootToR1,
 			rootToR2.EventID(): rootToR2,
@@ -177,6 +200,7 @@ func TestMSC2946(t *testing.T) {
 			s1ToR4.EventID():   s1ToR4,
 			s1ToS2.EventID():   s1ToS2,
 			s2ToR5.EventID():   s2ToR5,
+			r4HisVis.EventID(): r4HisVis,
 		},
 		pubRoomState: map[string]map[gomatrixserverlib.StateKeyTuple]string{
 			rootSpace: {
@@ -208,11 +232,13 @@ func TestMSC2946(t *testing.T) {
 			},
 		},
 	}
-	router := injectEvents(t, nopUserAPI, nopRsAPI, []*gomatrixserverlib.HeaderedEvent{
+	allEvents := []*gomatrixserverlib.HeaderedEvent{
 		rootToR1, rootToR2, rootToS1,
 		s1ToR3, s1ToR4, s1ToS2,
-		s2ToR5,
-	})
+		s2ToR5, r4HisVis,
+	}
+	allEvents = append(allEvents, joinEvents...)
+	router := injectEvents(t, nopUserAPI, nopRsAPI, allEvents)
 	cancel := runServer(t, router)
 	defer cancel()
 
@@ -416,9 +442,9 @@ type testRoomserverAPI struct {
 	// use a trace API as it implements method stubs so we don't need to have them here.
 	// We'll override the functions we care about.
 	roomserver.RoomserverInternalAPITrace
-	userToJoinedRooms map[string][]string
-	events            map[string]*gomatrixserverlib.HeaderedEvent
-	pubRoomState      map[string]map[gomatrixserverlib.StateKeyTuple]string
+	joinEvents   []*gomatrixserverlib.HeaderedEvent
+	events       map[string]*gomatrixserverlib.HeaderedEvent
+	pubRoomState map[string]map[gomatrixserverlib.StateKeyTuple]string
 }
 
 func (r *testRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *roomserver.QueryBulkStateContentRequest, res *roomserver.QueryBulkStateContentResponse) error {
@@ -434,12 +460,12 @@ func (r *testRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *room
 
 func (r *testRoomserverAPI) QueryCurrentState(ctx context.Context, req *roomserver.QueryCurrentStateRequest, res *roomserver.QueryCurrentStateResponse) error {
 	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
-	for _, he := range r.events {
+	checkEvent := func(he *gomatrixserverlib.HeaderedEvent) {
 		if he.RoomID() != req.RoomID {
-			continue
+			return
 		}
 		if he.StateKey() == nil {
-			continue
+			return
 		}
 		tuple := gomatrixserverlib.StateKeyTuple{
 			EventType: he.Type(),
@@ -451,18 +477,11 @@ func (r *testRoomserverAPI) QueryCurrentState(ctx context.Context, req *roomserv
 			}
 		}
 	}
-	return nil
-}
-
-func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roomserver.QueryMembershipForUserRequest, res *roomserver.QueryMembershipForUserResponse) error {
-	rooms := r.userToJoinedRooms[req.UserID]
-	for _, roomID := range rooms {
-		if roomID == req.RoomID {
-			res.IsInRoom = true
-			res.HasBeenInRoom = true
-			res.Membership = "join"
-			break
-		}
+	for _, he := range r.joinEvents {
+		checkEvent(he)
+	}
+	for _, he := range r.events {
+		checkEvent(he)
 	}
 	return nil
 }

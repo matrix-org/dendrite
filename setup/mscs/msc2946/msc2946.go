@@ -288,16 +288,40 @@ func (w *walker) publicRoomsChunk(roomID string) *gomatrixserverlib.PublicRoom {
 
 // authorised returns true iff the user is joined this room or the room is world_readable
 func (w *walker) authorised(roomID string) bool {
-	var queryRes roomserver.QueryMembershipForUserResponse
-	err := w.rsAPI.QueryMembershipForUser(w.ctx, &roomserver.QueryMembershipForUserRequest{
+	hisVisTuple := gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomHistoryVisibility,
+		StateKey:  "",
+	}
+	roomMemberTuple := gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomMember,
+		StateKey:  w.caller.UserID,
+	}
+	var queryRes roomserver.QueryCurrentStateResponse
+	err := w.rsAPI.QueryCurrentState(w.ctx, &roomserver.QueryCurrentStateRequest{
 		RoomID: roomID,
-		UserID: w.caller.UserID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{
+			hisVisTuple, roomMemberTuple,
+		},
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(w.ctx).WithError(err).Error("failed to QueryMembershipForUser")
+		util.GetLogger(w.ctx).WithError(err).Error("failed to QueryCurrentState")
 		return false
 	}
-	return queryRes.IsInRoom
+	memberEv := queryRes.StateEvents[roomMemberTuple]
+	hisVisEv := queryRes.StateEvents[hisVisTuple]
+	if memberEv != nil {
+		membership, _ := memberEv.Membership()
+		if membership == gomatrixserverlib.Join {
+			return true
+		}
+	}
+	if hisVisEv != nil {
+		hisVis, _ := hisVisEv.HistoryVisibility()
+		if hisVis == "world_readable" {
+			return true
+		}
+	}
+	return false
 }
 
 // references returns all references pointing to or from this room.
