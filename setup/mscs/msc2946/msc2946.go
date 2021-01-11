@@ -171,7 +171,7 @@ func (w *walker) walk() (*SpacesResponse, *util.JSONResponse) {
 		roomID := unvisited[0]
 		unvisited = unvisited[1:]
 		// If this room has already been processed, skip. NB: do not remember this between calls
-		if processed[roomID] {
+		if processed[roomID] || roomID == "" {
 			continue
 		}
 		// Mark this room as processed.
@@ -219,6 +219,7 @@ func (w *walker) walk() (*SpacesResponse, *util.JSONResponse) {
 						ev, gomatrixserverlib.FormatAll,
 					))
 					uniqueRooms[ev.RoomID()] = true
+					uniqueRooms[SpaceTarget(ev)] = true
 					w.markSent(ev.EventID())
 				}
 			}
@@ -227,10 +228,10 @@ func (w *walker) walk() (*SpacesResponse, *util.JSONResponse) {
 			// are exceeded, stop adding events. If the event has already been added, do not add it again.
 			numAdded := 0
 			for _, ev := range refs.events() {
-				if len(res.Events) >= w.req.Limit {
+				if w.req.Limit > 0 && len(res.Events) >= w.req.Limit {
 					break
 				}
-				if numAdded >= w.req.MaxRoomsPerSpace {
+				if w.req.MaxRoomsPerSpace > 0 && numAdded >= w.req.MaxRoomsPerSpace {
 					break
 				}
 				if w.alreadySent(ev.EventID()) {
@@ -240,6 +241,7 @@ func (w *walker) walk() (*SpacesResponse, *util.JSONResponse) {
 					ev, gomatrixserverlib.FormatAll,
 				))
 				uniqueRooms[ev.RoomID()] = true
+				uniqueRooms[SpaceTarget(ev)] = true
 				w.markSent(ev.EventID())
 				// we don't distinguish between child state events and parent state events for the purposes of
 				// max_rooms_per_space, maybe we should?
@@ -331,9 +333,9 @@ func (el eventLookup) get(roomID, evType, stateKey string) *gomatrixserverlib.He
 func (el eventLookup) set(ev *gomatrixserverlib.HeaderedEvent) {
 	evs := el[ev.Type()]
 	if evs == nil {
-		evs = make([]*gomatrixserverlib.HeaderedEvent, 1)
+		evs = make([]*gomatrixserverlib.HeaderedEvent, 0)
 	}
-	evs[0] = ev
+	evs = append(evs, ev)
 	el[ev.Type()] = evs
 }
 

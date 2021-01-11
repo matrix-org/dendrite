@@ -57,8 +57,10 @@ var (
 //             |_________
 //             |    |   |
 //             R3   R4  S2
-//                      |
+//                      |  <-- this link is just a parent, not a child
 //                      R5
+//
+// TODO: Alice is not joined to R4, but R4 is "world_readable".
 func TestMSC2946(t *testing.T) {
 	alice := "@alice:localhost"
 	// give access tokens to all three users
@@ -77,6 +79,7 @@ func TestMSC2946(t *testing.T) {
 	room2 := "!room2:localhost"
 	room3 := "!room3:localhost"
 	room4 := "!room4:localhost"
+	empty := ""
 	room5 := "!room5:localhost"
 	allRooms := []string{
 		rootSpace, subSpaceS1, subSpaceS2,
@@ -142,16 +145,26 @@ func TestMSC2946(t *testing.T) {
 			"present": true,
 		},
 	})
+	// This is a parent link only
 	s2ToR5 := mustCreateEvent(t, fledglingEvent{
-		RoomID:   subSpaceS2,
+		RoomID:   room5,
 		Sender:   alice,
-		Type:     msc2946.ConstSpaceChildEventType,
-		StateKey: &room5,
+		Type:     msc2946.ConstSpaceParentEventType,
+		StateKey: &empty,
 		Content: map[string]interface{}{
+			"room_id": subSpaceS2,
 			"via":     []string{"localhost"},
 			"present": true,
 		},
 	})
+	roomNameTuple := gomatrixserverlib.StateKeyTuple{
+		EventType: "m.room.name",
+		StateKey:  "",
+	}
+	hisVisTuple := gomatrixserverlib.StateKeyTuple{
+		EventType: "m.room.history_visibility",
+		StateKey:  "",
+	}
 	nopRsAPI := &testRoomserverAPI{
 		userToJoinedRooms: map[string][]string{
 			alice: allRooms,
@@ -164,6 +177,35 @@ func TestMSC2946(t *testing.T) {
 			s1ToR4.EventID():   s1ToR4,
 			s1ToS2.EventID():   s1ToS2,
 			s2ToR5.EventID():   s2ToR5,
+		},
+		pubRoomState: map[string]map[gomatrixserverlib.StateKeyTuple]string{
+			rootSpace: {
+				roomNameTuple: "Root",
+				hisVisTuple:   "shared",
+			},
+			subSpaceS1: {
+				roomNameTuple: "Sub-Space 1",
+				hisVisTuple:   "joined",
+			},
+			subSpaceS2: {
+				roomNameTuple: "Sub-Space 2",
+				hisVisTuple:   "shared",
+			},
+			room1: {
+				hisVisTuple: "joined",
+			},
+			room2: {
+				hisVisTuple: "joined",
+			},
+			room3: {
+				hisVisTuple: "joined",
+			},
+			room4: {
+				hisVisTuple: "world_readable",
+			},
+			room5: {
+				hisVisTuple: "joined",
+			},
 		},
 	}
 	router := injectEvents(t, nopUserAPI, nopRsAPI, []*gomatrixserverlib.HeaderedEvent{
@@ -182,6 +224,16 @@ func TestMSC2946(t *testing.T) {
 		if len(res.Rooms) > 0 {
 			t.Errorf("got %d rooms, want 0", len(res.Rooms))
 		}
+	})
+	t.Run("returns the entire graph", func(t *testing.T) {
+		res := postSpaces(t, 200, "alice", rootSpace, newReq(t, map[string]interface{}{}))
+		if len(res.Events) != 7 {
+			t.Errorf("got %d events, want 7", len(res.Events))
+		}
+		if len(res.Rooms) != len(allRooms) {
+			t.Errorf("got %d rooms, want %d", len(res.Rooms), len(allRooms))
+		}
+
 	})
 }
 
@@ -245,6 +297,7 @@ func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *m
 		if err != nil {
 			t.Fatalf("response 200 OK but failed to read response body: %s", err)
 		}
+		t.Logf("Body: %s", string(body))
 		if err := json.Unmarshal(body, &result); err != nil {
 			t.Fatalf("response 200 OK but failed to deserialise JSON : %s\nbody: %s", err, string(body))
 		}
@@ -365,13 +418,37 @@ type testRoomserverAPI struct {
 	roomserver.RoomserverInternalAPITrace
 	userToJoinedRooms map[string][]string
 	events            map[string]*gomatrixserverlib.HeaderedEvent
+	pubRoomState      map[string]map[gomatrixserverlib.StateKeyTuple]string
 }
 
-func (r *testRoomserverAPI) QueryEventsByID(ctx context.Context, req *roomserver.QueryEventsByIDRequest, res *roomserver.QueryEventsByIDResponse) error {
-	for _, eventID := range req.EventIDs {
-		ev := r.events[eventID]
-		if ev != nil {
-			res.Events = append(res.Events, ev)
+func (r *testRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *roomserver.QueryBulkStateContentRequest, res *roomserver.QueryBulkStateContentResponse) error {
+	res.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
+	for _, roomID := range req.RoomIDs {
+		pubRoomData, ok := r.pubRoomState[roomID]
+		if ok {
+			res.Rooms[roomID] = pubRoomData
+		}
+	}
+	return nil
+}
+
+func (r *testRoomserverAPI) QueryCurrentState(ctx context.Context, req *roomserver.QueryCurrentStateRequest, res *roomserver.QueryCurrentStateResponse) error {
+	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
+	for _, he := range r.events {
+		if he.RoomID() != req.RoomID {
+			continue
+		}
+		if he.StateKey() == nil {
+			continue
+		}
+		tuple := gomatrixserverlib.StateKeyTuple{
+			EventType: he.Type(),
+			StateKey:  *he.StateKey(),
+		}
+		for _, t := range req.StateTuples {
+			if t == tuple {
+				res.StateEvents[t] = he
+			}
 		}
 	}
 	return nil
