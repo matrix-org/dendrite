@@ -24,7 +24,8 @@ import (
 )
 
 type Database interface {
-	StoreRelation(ctx context.Context, he *gomatrixserverlib.HeaderedEvent) error
+	StoreReference(ctx context.Context, he *gomatrixserverlib.HeaderedEvent) error
+	References(ctx context.Context, roomID string) ([]*gomatrixserverlib.HeaderedEvent, error)
 }
 
 type DB struct {
@@ -38,6 +39,10 @@ func NewDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	return &DB{}, nil
 }
 
-func (d *DB) StoreRelation(ctx context.Context, he *gomatrixserverlib.HeaderedEvent) error {
+func (d *DB) StoreReference(ctx context.Context, he *gomatrixserverlib.HeaderedEvent) error {
 	return nil
+}
+
+func (d *DB) References(ctx context.Context, roomID string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	return nil, nil
 }

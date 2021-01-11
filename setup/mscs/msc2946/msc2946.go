@@ -34,7 +34,9 @@ import (
 )
 
 const (
-	createEventContentKey = "org.matrix.msc1772.type"
+	ConstCreateEventContentKey = "org.matrix.msc1772.type"
+	ConstSpaceChildEventType   = "org.matrix.msc1772.space.child"
+	ConstSpaceParentEventType  = "org.matrix.msc1772.room.parent"
 )
 
 // SpacesRequest is the request body to POST /_matrix/client/r0/rooms/{roomID}/spaces
@@ -77,10 +79,10 @@ func Enable(
 	hooks.Enable()
 	hooks.Attach(hooks.KindNewEventPersisted, func(headeredEvent interface{}) {
 		he := headeredEvent.(*gomatrixserverlib.HeaderedEvent)
-		hookErr := db.StoreRelation(context.Background(), he)
+		hookErr := db.StoreReference(context.Background(), he)
 		if hookErr != nil {
 			util.GetLogger(context.Background()).WithError(hookErr).WithField("event_id", he.EventID()).Error(
-				"failed to StoreRelation",
+				"failed to StoreReference",
 			)
 		}
 	})
@@ -195,7 +197,7 @@ func (w *walker) walk() (*SpacesResponse, *util.JSONResponse) {
 			roomType := ""
 			create := w.stateEvent(roomID, "m.room.create", "")
 			if create != nil {
-				roomType = gjson.GetBytes(create.Content(), createEventContentKey).Str
+				roomType = gjson.GetBytes(create.Content(), ConstCreateEventContentKey).Str
 			}
 
 			// Add the total number of events to `PublicRoomsChunk` under `num_refs`. Add `PublicRoomsChunk` to `rooms`.
@@ -271,17 +273,42 @@ func (w *walker) stateEvent(roomID, evType, stateKey string) *gomatrixserverlib.
 }
 
 func (w *walker) publicRoomsChunk(roomID string) *gomatrixserverlib.PublicRoom {
-	return nil
+	pubRooms, err := roomserver.PopulatePublicRooms(w.ctx, []string{roomID}, w.rsAPI)
+	if err != nil {
+		util.GetLogger(w.ctx).WithError(err).Error("failed to PopulatePublicRooms")
+		return nil
+	}
+	if len(pubRooms) == 0 {
+		return nil
+	}
+	return &pubRooms[0]
 }
 
 // authorised returns true iff the user is joined this room or the room is world_readable
 func (w *walker) authorised(roomID string) bool {
-	return false
+	var queryRes roomserver.QueryMembershipForUserResponse
+	err := w.rsAPI.QueryMembershipForUser(w.ctx, &roomserver.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: w.caller.UserID,
+	}, &queryRes)
+	if err != nil {
+		util.GetLogger(w.ctx).WithError(err).Error("failed to QueryMembershipForUser")
+		return false
+	}
+	return queryRes.IsInRoom
 }
 
 // references returns all references pointing to or from this room.
 func (w *walker) references(roomID string) (eventLookup, error) {
-	return nil, nil
+	events, err := w.db.References(w.ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	el := make(eventLookup)
+	for _, ev := range events {
+		el.set(ev)
+	}
+	return el, nil
 }
 
 // state event lookup across multiple rooms keyed on event type
