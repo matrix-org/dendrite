@@ -124,6 +124,21 @@ func (n *Notifier) OnNewEvent(
 	}
 }
 
+// OnOldEvent is called when the sync API receives an "old" event, e.g.
+// because it was pulled in by get_missing_events or similar. We need
+// to update the stream position, but we don't bother waking up any
+// clients because the event will be stored as excluded from sync anyway.
+func (n *Notifier) OnOldEvent(
+	ev *gomatrixserverlib.HeaderedEvent, roomID string, userIDs []string,
+	posUpdate types.StreamingToken,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
+	n.currPos.ApplyUpdates(posUpdate)
+	n.removeEmptyUserStreams()
+}
+
 func (n *Notifier) OnNewAccountData(
 	userID string, posUpdate types.StreamingToken,
 ) {

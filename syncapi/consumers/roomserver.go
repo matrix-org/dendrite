@@ -207,10 +207,10 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		ctx,
 		ev,
 		[]*gomatrixserverlib.HeaderedEvent{},
-		[]string{},           // adds no state
-		[]string{},           // removes no state
-		nil,                  // no transaction
-		ev.StateKey() != nil, // exclude from sync?
+		[]string{}, // adds no state
+		[]string{}, // removes no state
+		nil,        // no transaction
+		true,       // exclude from sync?
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -221,13 +221,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return nil
 	}
 
-	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
-		return err
-	}
-
 	s.pduStream.Advance(pduPos)
-	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
+	s.notifier.OnOldEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
