@@ -259,34 +259,8 @@ func (u *latestEventsUpdater) calculateLatest(
 	// First of all, get a list of all of the events in our current
 	// set of forward extremities.
 	existingRefs := make(map[string]*types.StateAtEventAndReference)
-	existingNIDs := make([]types.EventNID, len(oldLatest))
 	for i, old := range oldLatest {
 		existingRefs[old.EventID] = &oldLatest[i]
-		existingNIDs[i] = old.EventNID
-	}
-
-	// Look up the old extremity events. This allows us to find their
-	// prev events.
-	events, err := u.api.DB.Events(u.ctx, existingNIDs)
-	if err != nil {
-		return false, fmt.Errorf("u.api.DB.Events: %w", err)
-	}
-
-	// Make a list of all of the prev events as referenced by all of
-	// the current forward extremities.
-	existingPrevs := make(map[string]struct{})
-	for _, old := range events {
-		for _, prevEventID := range old.PrevEventIDs() {
-			existingPrevs[prevEventID] = struct{}{}
-		}
-	}
-
-	// If the "new" event is already referenced by a forward extremity
-	// then do nothing - it's not a candidate to be a new extremity if
-	// it has been referenced.
-	if _, ok := existingPrevs[newEvent.EventID()]; ok {
-		u.latest = oldLatest
-		return false, nil
 	}
 
 	// If the "new" event is already a forward extremity then stop, as
@@ -294,6 +268,29 @@ func (u *latestEventsUpdater) calculateLatest(
 	if _, ok := existingRefs[newEvent.EventID()]; ok {
 		u.latest = oldLatest
 		return false, nil
+	}
+
+	// If the "new" event is already referenced by an existing event
+	// then do nothing - it's not a candidate to be a new extremity if
+	// it has been referenced.
+	if referenced, err := u.updater.IsReferenced(newEvent.EventReference()); err != nil {
+		return false, fmt.Errorf("u.updater.IsReferenced(new): %w", err)
+	} else if referenced {
+		u.latest = oldLatest
+		return false, nil
+	}
+
+	// Then let's see if any of the existing forward extremities now
+	// have entries in the previous events table. If they do then we
+	// will no longer include them as forward extremities.
+	existingPrevs := make(map[string]struct{})
+	for _, l := range existingRefs {
+		referenced, err := u.updater.IsReferenced(l.EventReference)
+		if err != nil {
+			return false, fmt.Errorf("u.updater.IsReferenced: %w", err)
+		} else if referenced {
+			existingPrevs[l.EventID] = struct{}{}
+		}
 	}
 
 	// Include our new event in the extremities.
