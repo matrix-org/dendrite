@@ -15,6 +15,7 @@
 package consumers
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
@@ -24,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,7 +34,7 @@ import (
 type OutputTypingEventConsumer struct {
 	typingConsumer *internal.ContinualConsumer
 	eduCache       *cache.EDUCache
-	stream         types.StreamProvider
+	streams        *streams.Streams
 	notifier       *notifier.Notifier
 }
 
@@ -44,7 +46,7 @@ func NewOutputTypingEventConsumer(
 	store storage.Database,
 	eduCache *cache.EDUCache,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	streams *streams.Streams,
 ) *OutputTypingEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -58,7 +60,7 @@ func NewOutputTypingEventConsumer(
 		typingConsumer: &consumer,
 		eduCache:       eduCache,
 		notifier:       notifier,
-		stream:         stream,
+		streams:        streams,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -101,8 +103,8 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		)
 	}
 
-	if s.stream.Advance(typingPos) {
-		s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
+	if s.streams.TypingStreamProvider.Advance(typingPos) {
+		s.notifier.OnNewTyping(output.Event.RoomID, s.streams.Latest(context.Background()))
 	}
 
 	return nil

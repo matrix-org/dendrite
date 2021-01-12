@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -32,13 +33,12 @@ import (
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	cfg          *config.SyncAPI
-	rsAPI        api.RoomserverInternalAPI
-	rsConsumer   *internal.ContinualConsumer
-	db           storage.Database
-	pduStream    types.StreamProvider
-	inviteStream types.StreamProvider
-	notifier     *notifier.Notifier
+	cfg        *config.SyncAPI
+	rsAPI      api.RoomserverInternalAPI
+	rsConsumer *internal.ContinualConsumer
+	db         storage.Database
+	streams    *streams.Streams
+	notifier   *notifier.Notifier
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -47,7 +47,7 @@ func NewOutputRoomEventConsumer(
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	pduStream types.StreamProvider,
+	streams *streams.Streams,
 	inviteStream types.StreamProvider,
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
@@ -59,13 +59,12 @@ func NewOutputRoomEventConsumer(
 		PartitionStore: store,
 	}
 	s := &OutputRoomEventConsumer{
-		cfg:          cfg,
-		rsConsumer:   &consumer,
-		db:           store,
-		notifier:     notifier,
-		pduStream:    pduStream,
-		inviteStream: inviteStream,
-		rsAPI:        rsAPI,
+		cfg:        cfg,
+		rsConsumer: &consumer,
+		db:         store,
+		notifier:   notifier,
+		streams:    streams,
+		rsAPI:      rsAPI,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -186,8 +185,8 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
-	if s.pduStream.Advance(pduPos) {
-		s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
+	if s.streams.PDUStreamProvider.Advance(pduPos) {
+		s.notifier.OnNewEvent(ev, ev.RoomID(), nil, s.streams.Latest(ctx))
 	}
 
 	return nil
@@ -227,8 +226,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return err
 	}
 
-	if s.pduStream.Advance(pduPos) {
-		s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
+	if s.streams.PDUStreamProvider.Advance(pduPos) {
+		s.notifier.OnNewEvent(ev, ev.RoomID(), nil, s.streams.Latest(ctx))
 	}
 
 	return nil
@@ -285,8 +284,8 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		return nil
 	}
 
-	if s.inviteStream.Advance(pduPos) {
-		s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
+	if s.streams.InviteStreamProvider.Advance(pduPos) {
+		s.notifier.OnNewInvite(s.streams.Latest(ctx), *msg.Event.StateKey())
 	}
 
 	return nil
@@ -306,8 +305,8 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	}
 
 	// Notify any active sync requests that the invite has been retired.
-	if s.inviteStream.Advance(pduPos) {
-		s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+	if s.streams.InviteStreamProvider.Advance(pduPos) {
+		s.notifier.OnNewInvite(s.streams.Latest(ctx), msg.TargetUserID)
 	}
 
 	return nil
@@ -328,8 +327,8 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	// tell the notifier about the new peek so it knows to wake up new devices
 	// TODO: This only works because the peeks table is reusing the same
 	// index as PDUs, but we should fix this
-	if s.pduStream.Advance(sp) {
-		s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+	if s.streams.PDUStreamProvider.Advance(sp) {
+		s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID, s.streams.Latest(ctx))
 	}
 
 	return nil
@@ -350,8 +349,8 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 	// tell the notifier about the new peek so it knows to wake up new devices
 	// TODO: This only works because the peeks table is reusing the same
 	// index as PDUs, but we should fix this
-	if s.pduStream.Advance(sp) {
-		s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+	if s.streams.PDUStreamProvider.Advance(sp) {
+		s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID, s.streams.Latest(ctx))
 	}
 
 	return nil

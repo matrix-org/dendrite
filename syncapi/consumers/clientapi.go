@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,7 +32,7 @@ import (
 type OutputClientDataConsumer struct {
 	clientAPIConsumer *internal.ContinualConsumer
 	db                storage.Database
-	stream            types.StreamProvider
+	streams           *streams.Streams
 	notifier          *notifier.Notifier
 }
 
@@ -42,7 +42,7 @@ func NewOutputClientDataConsumer(
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	streams *streams.Streams,
 ) *OutputClientDataConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -55,7 +55,7 @@ func NewOutputClientDataConsumer(
 		clientAPIConsumer: &consumer,
 		db:                store,
 		notifier:          notifier,
-		stream:            stream,
+		streams:           streams,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -95,8 +95,8 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		}).Panicf("could not save account data")
 	}
 
-	if s.stream.Advance(streamPos) {
-		s.notifier.OnNewAccountData(string(msg.Key), types.StreamingToken{AccountDataPosition: streamPos})
+	if s.streams.AccountDataStreamProvider.Advance(streamPos) {
+		s.notifier.OnNewAccountData(string(msg.Key), s.streams.Latest(context.Background()))
 	}
 
 	return nil

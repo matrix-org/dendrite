@@ -64,14 +64,14 @@ func AddPublicRoutes(
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
-		consumer, keyAPI, rsAPI, syncDB, notifier, streams.DeviceListStreamProvider,
+		consumer, keyAPI, rsAPI, syncDB, notifier, streams,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start key change consumer")
 	}
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg, consumer, syncDB, notifier, streams.PDUStreamProvider,
+		cfg, consumer, syncDB, notifier, streams,
 		streams.InviteStreamProvider, rsAPI,
 	)
 	if err = roomConsumer.Start(); err != nil {
@@ -79,28 +79,28 @@ func AddPublicRoutes(
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		cfg, consumer, syncDB, notifier, streams.AccountDataStreamProvider,
+		cfg, consumer, syncDB, notifier, streams,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		cfg, consumer, syncDB, eduCache, notifier, streams.TypingStreamProvider,
+		cfg, consumer, syncDB, eduCache, notifier, streams,
 	)
 	if err = typingConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		cfg, consumer, syncDB, notifier, streams.SendToDeviceStreamProvider,
+		cfg, consumer, syncDB, notifier, streams,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		cfg, consumer, syncDB, notifier, streams.ReceiptStreamProvider,
+		cfg, consumer, syncDB, notifier, streams,
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
