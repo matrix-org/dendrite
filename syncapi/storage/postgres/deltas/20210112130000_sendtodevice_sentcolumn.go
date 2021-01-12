@@ -28,7 +28,7 @@ func LoadRemoveSendToDeviceSentColumn(m *sqlutil.Migrations) {
 func UpRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		ALTER TABLE syncapi_send_to_device
-		  DROP COLUMN sent_by_token;
+		  DROP COLUMN IF EXISTS sent_by_token;
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
@@ -39,7 +39,7 @@ func UpRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
 func DownRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		ALTER TABLE syncapi_send_to_device
-		  ADD COLUMN sent_by_token TEXT;
+		  ADD COLUMN IF NOT EXISTS sent_by_token TEXT;
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
