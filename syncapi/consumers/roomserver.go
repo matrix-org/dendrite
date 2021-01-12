@@ -186,8 +186,9 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
-	s.pduStream.Advance(pduPos)
-	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
+	if s.pduStream.Advance(pduPos) {
+		s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
+	}
 
 	return nil
 }
@@ -226,8 +227,9 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return err
 	}
 
-	s.pduStream.Advance(pduPos)
-	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
+	if s.pduStream.Advance(pduPos) {
+		s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
+	}
 
 	return nil
 }
@@ -283,8 +285,9 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 		return nil
 	}
 
-	s.inviteStream.Advance(pduPos)
-	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
+	if s.inviteStream.Advance(pduPos) {
+		s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
+	}
 
 	return nil
 }
@@ -303,8 +306,9 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	}
 
 	// Notify any active sync requests that the invite has been retired.
-	s.inviteStream.Advance(pduPos)
-	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+	if s.inviteStream.Advance(pduPos) {
+		s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+	}
 
 	return nil
 }
@@ -324,8 +328,9 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	// tell the notifier about the new peek so it knows to wake up new devices
 	// TODO: This only works because the peeks table is reusing the same
 	// index as PDUs, but we should fix this
-	s.pduStream.Advance(sp)
-	s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+	if s.pduStream.Advance(sp) {
+		s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+	}
 
 	return nil
 }
@@ -345,8 +350,9 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 	// tell the notifier about the new peek so it knows to wake up new devices
 	// TODO: This only works because the peeks table is reusing the same
 	// index as PDUs, but we should fix this
-	s.pduStream.Advance(sp)
-	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+	if s.pduStream.Advance(sp) {
+		s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+	}
 
 	return nil
 }

@@ -19,13 +19,16 @@ func (p *PartitionedStreamProvider) Setup() {
 
 func (p *PartitionedStreamProvider) Advance(
 	latest types.LogPosition,
-) {
+) bool {
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
 	if latest.IsAfter(&p.latest) {
 		p.latest = latest
+		return true
 	}
+
+	return false
 }
 
 func (p *PartitionedStreamProvider) LatestPosition(

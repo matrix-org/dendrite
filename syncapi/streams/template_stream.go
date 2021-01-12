@@ -19,13 +19,16 @@ func (p *StreamProvider) Setup() {
 
 func (p *StreamProvider) Advance(
 	latest types.StreamPosition,
-) {
+) bool {
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
 	if latest > p.latest {
 		p.latest = latest
+		return true
 	}
+
+	return false
 }
 
 func (p *StreamProvider) LatestPosition(

@@ -101,8 +101,9 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 		)
 	}
 
-	s.stream.Advance(typingPos)
-	s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
+	if s.stream.Advance(typingPos) {
+		s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
+	}
 
 	return nil
 }

@@ -122,9 +122,10 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 		Partition: msg.Partition,
 	}
 
-	s.stream.Advance(posUpdate)
-	for userID := range queryRes.UserIDsToCount {
-		s.notifier.OnNewKeyChange(types.StreamingToken{DeviceListPosition: posUpdate}, userID, output.UserID)
+	if s.stream.Advance(posUpdate) {
+		for userID := range queryRes.UserIDsToCount {
+			s.notifier.OnNewKeyChange(types.StreamingToken{DeviceListPosition: posUpdate}, userID, output.UserID)
+		}
 	}
 
 	return nil

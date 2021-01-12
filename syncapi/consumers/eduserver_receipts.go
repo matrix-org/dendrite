@@ -90,8 +90,9 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 		return err
 	}
 
-	s.stream.Advance(streamPos)
-	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
+	if s.stream.Advance(streamPos) {
+		s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
+	}
 
 	return nil
 }

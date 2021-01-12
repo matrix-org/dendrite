@@ -28,8 +28,8 @@ type StreamProvider interface {
 	Setup()
 
 	// Advance will update the latest position of the stream based on
-	// an update and will wake callers waiting on StreamNotifyAfter.
-	Advance(latest StreamPosition)
+	// an update. It returns true if the position advanced or false otherwise.
+	Advance(latest StreamPosition) bool
 
 	// CompleteSync will update the response to include all updates as needed
 	// for a complete sync. It will always return immediately.
@@ -46,7 +46,7 @@ type StreamProvider interface {
 
 type PartitionedStreamProvider interface {
 	Setup()
-	Advance(latest LogPosition)
+	Advance(latest LogPosition) bool
 	CompleteSync(ctx context.Context, req *SyncRequest) LogPosition
 	IncrementalSync(ctx context.Context, req *SyncRequest, from, to LogPosition) LogPosition
 	LatestPosition(ctx context.Context) LogPosition
