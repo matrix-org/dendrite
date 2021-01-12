@@ -89,10 +89,9 @@ func (s *UserDeviceStream) Broadcast(pos types.StreamingToken) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.pos = pos
+	s.pos.ApplyUpdates(pos)
 
 	close(s.signalChannel)
-
 	s.signalChannel = make(chan struct{})
 }
 
