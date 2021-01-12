@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sync
+package notifier
 
 import (
 	"context"
@@ -48,9 +48,9 @@ type Notifier struct {
 // NewNotifier creates a new notifier set to the given sync position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
 // the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
-func NewNotifier(pos types.StreamingToken) *Notifier {
+func NewNotifier(currPos types.StreamingToken) *Notifier {
 	return &Notifier{
-		currPos:                pos,
+		currPos:                currPos,
 		roomIDToJoinedUsers:    make(map[string]userIDSet),
 		roomIDToPeekingDevices: make(map[string]peekingDeviceSet),
 		userDeviceStreams:      make(map[string]map[string]*UserDeviceStream),
@@ -124,12 +124,24 @@ func (n *Notifier) OnNewEvent(
 	}
 }
 
-func (n *Notifier) OnNewPeek(
-	roomID, userID, deviceID string,
+func (n *Notifier) OnNewAccountData(
+	userID string, posUpdate types.StreamingToken,
 ) {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
+	n.currPos.ApplyUpdates(posUpdate)
+	n.wakeupUsers([]string{userID}, nil, posUpdate)
+}
+
+func (n *Notifier) OnNewPeek(
+	roomID, userID, deviceID string,
+	posUpdate types.StreamingToken,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
+	n.currPos.ApplyUpdates(posUpdate)
 	n.addPeekingDevice(roomID, userID, deviceID)
 
 	// we don't wake up devices here given the roomserver consumer will do this shortly afterwards
@@ -138,10 +150,12 @@ func (n *Notifier) OnNewPeek(
 
 func (n *Notifier) OnRetirePeek(
 	roomID, userID, deviceID string,
+	posUpdate types.StreamingToken,
 ) {
 	n.streamLock.Lock()
 	defer n.streamLock.Unlock()
 
+	n.currPos.ApplyUpdates(posUpdate)
 	n.removePeekingDevice(roomID, userID, deviceID)
 
 	// we don't wake up devices here given the roomserver consumer will do this shortly afterwards
@@ -206,7 +220,7 @@ func (n *Notifier) OnNewInvite(
 // GetListener returns a UserStreamListener that can be used to wait for
 // updates for a user. Must be closed.
 // notify for anything before sincePos
-func (n *Notifier) GetListener(req syncRequest) UserDeviceStreamListener {
+func (n *Notifier) GetListener(req types.SyncRequest) UserDeviceStreamListener {
 	// Do what synapse does: https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/notifier.py#L298
 	// - Bucket request into a lookup map keyed off a list of joined room IDs and separately a user ID
 	// - Incoming events wake requests for a matching room ID
@@ -220,7 +234,7 @@ func (n *Notifier) GetListener(req syncRequest) UserDeviceStreamListener {
 
 	n.removeEmptyUserStreams()
 
-	return n.fetchUserDeviceStream(req.device.UserID, req.device.ID, true).GetListener(req.ctx)
+	return n.fetchUserDeviceStream(req.Device.UserID, req.Device.ID, true).GetListener(req.Context)
 }
 
 // Load the membership states required to notify users correctly.

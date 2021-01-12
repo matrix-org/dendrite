@@ -1,5 +1,18 @@
 # Changelog
 
+## Dendrite 0.3.5 (2021-01-11)
+
+### Features
+
+* All `/sync` streams are now logically separate after a refactoring exercise
+
+## Fixes
+
+* Event references are now deeply checked properly when calculating forward extremities, reducing the amount of forward extremities in most cases, which improves RAM utilisation and reduces the work done by state resolution
+* Sync no longer sends incorrect `next_batch` tokens with old stream positions, reducing flashbacks of old messages in clients
+* The federation `/send` endpoint no longer uses the request context, which could result in some events failing to be persisted if the sending server gave up the HTTP connection
+* Appservices can now auth as users in their namespaces properly
+
 ## Dendrite 0.3.4 (2020-12-18)
 
 ### Features

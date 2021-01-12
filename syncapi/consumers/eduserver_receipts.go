@@ -18,14 +18,13 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/syncapi/types"
-
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,7 +32,8 @@ import (
 type OutputReceiptEventConsumer struct {
 	receiptConsumer *internal.ContinualConsumer
 	db              storage.Database
-	notifier        *sync.Notifier
+	stream          types.StreamProvider
+	notifier        *notifier.Notifier
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
@@ -41,8 +41,9 @@ type OutputReceiptEventConsumer struct {
 func NewOutputReceiptEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
+	notifier *notifier.Notifier,
+	stream types.StreamProvider,
 ) *OutputReceiptEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -55,7 +56,8 @@ func NewOutputReceiptEventConsumer(
 	s := &OutputReceiptEventConsumer{
 		receiptConsumer: &consumer,
 		db:              store,
-		notifier:        n,
+		notifier:        notifier,
+		stream:          stream,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -87,7 +89,8 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 	if err != nil {
 		return err
 	}
-	// update stream position
+
+	s.stream.Advance(streamPos)
 	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
 
 	return nil
