@@ -16,7 +16,6 @@ package deltas
 
 import (
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -25,24 +24,12 @@ func LoadRemoveSendToDeviceSentColumn(m *sqlutil.Migrations) {
 	m.AddMigration(UpRemoveSendToDeviceSentColumn, DownRemoveSendToDeviceSentColumn)
 }
 
-func UpRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`
-		ALTER TABLE syncapi_send_to_device
-		  DROP COLUMN sent_by_token;
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to execute upgrade: %w", err)
-	}
+func UpRemoveSendToDeviceSentColumn(_ *sql.Tx) error {
+	// TODO: Work out how to alter the columns on SQLite
 	return nil
 }
 
-func DownRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`
-		ALTER TABLE syncapi_send_to_device
-		  ADD COLUMN sent_by_token TEXT;
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to execute downgrade: %w", err)
-	}
+func DownRemoveSendToDeviceSentColumn(_ *sql.Tx) error {
+	// TODO: Work out how to alter the columns on SQLite
 	return nil
 }
