@@ -47,7 +47,7 @@ const insertSendToDeviceMessageSQL = `
 const selectSendToDeviceMessagesSQL = `
 	SELECT id, user_id, device_id, content
 	  FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
+	  WHERE user_id = $1 AND device_id = $2 AND id <= $3
 	  ORDER BY id DESC
 `
 
@@ -104,16 +104,16 @@ func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 }
 
 func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string, from, to types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, userID, deviceID string, to types.StreamPosition,
 ) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID, from, to)
+	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID, to)
 	if err != nil {
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectSendToDeviceMessages: rows.close() failed")
 
 	for rows.Next() {
-		var id types.SendToDeviceNID
+		var id types.StreamPosition
 		var userID, deviceID, content string
 		if err = rows.Scan(&id, &userID, &deviceID, &content); err != nil {
 			return
@@ -124,11 +124,11 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			DeviceID: deviceID,
 		}
 		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
-			return
+			continue
 		}
 		events = append(events, event)
-		if types.StreamPosition(id) > lastPos {
-			lastPos = types.StreamPosition(id)
+		if id > lastPos {
+			lastPos = id
 		}
 	}
 

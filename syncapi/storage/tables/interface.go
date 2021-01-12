@@ -147,8 +147,8 @@ type BackwardsExtremities interface {
 // sync response, as the client is seemingly trying to repeat the same /sync.
 type SendToDevice interface {
 	InsertSendToDeviceMessage(ctx context.Context, txn *sql.Tx, userID, deviceID, content string) (pos types.StreamPosition, err error)
-	SelectSendToDeviceMessages(ctx context.Context, txn *sql.Tx, userID, deviceID string, from, to types.StreamPosition) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error)
-	DeleteSendToDeviceMessages(ctx context.Context, txn *sql.Tx, userID, deviceID string, pos types.StreamPosition) (err error)
+	SelectSendToDeviceMessages(ctx context.Context, txn *sql.Tx, userID, deviceID string, to types.StreamPosition) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error)
+	DeleteSendToDeviceMessages(ctx context.Context, txn *sql.Tx, userID, deviceID string, from types.StreamPosition) (err error)
 	SelectMaxSendToDeviceMessageID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }
 

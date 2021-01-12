@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -893,7 +894,7 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	if err != nil {
 		return 0, err
 	}
-	return
+	return newPos, nil
 }
 
 func (d *Database) SendToDeviceUpdatesForSync(
@@ -902,14 +903,14 @@ func (d *Database) SendToDeviceUpdatesForSync(
 	from, to types.StreamPosition,
 ) (types.StreamPosition, []types.SendToDeviceEvent, error) {
 	// First of all, get our send-to-device updates for this user.
-	lastPos, events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID, from, to)
+	lastPos, events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID, to)
 	if err != nil {
-		return 0, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
+		return from, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
 	}
 
 	// If there's nothing to do then stop here.
 	if len(events) == 0 {
-		return 0, nil, nil
+		return to, nil, nil
 	}
 
 	// If we've advanced past this stream position for this
@@ -917,7 +918,7 @@ func (d *Database) SendToDeviceUpdatesForSync(
 	if err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, userID, deviceID, from)
 	}); err != nil {
-		return 0, nil, fmt.Errorf("d.Writer.Do: %w", err)
+		logrus.WithError(err).Errorf("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
 	}
 
 	return lastPos, events, nil
