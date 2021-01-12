@@ -36,7 +36,7 @@ type Notifier struct {
 	// A map of RoomID => Set<UserID> : Must only be accessed by the OnNewEvent goroutine
 	roomIDToPeekingDevices map[string]peekingDeviceSet
 	// Protects currPos and userStreams.
-	streamLock *sync.Mutex
+	streamLock *sync.RWMutex
 	// The latest sync position
 	currPos types.StreamingToken
 	// A map of user_id => device_id => UserStream which can be used to wake a given user's /sync request.
@@ -54,7 +54,7 @@ func NewNotifier(currPos types.StreamingToken) *Notifier {
 		roomIDToJoinedUsers:    make(map[string]userIDSet),
 		roomIDToPeekingDevices: make(map[string]peekingDeviceSet),
 		userDeviceStreams:      make(map[string]map[string]*UserDeviceStream),
-		streamLock:             &sync.Mutex{},
+		streamLock:             &sync.RWMutex{},
 		lastCleanUpTime:        time.Now(),
 	}
 }
@@ -256,8 +256,8 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 
 // CurrentPosition returns the current sync position
 func (n *Notifier) CurrentPosition() types.StreamingToken {
-	n.streamLock.Lock()
-	defer n.streamLock.Unlock()
+	n.streamLock.RLock()
+	defer n.streamLock.RUnlock()
 
 	return n.currPos
 }
