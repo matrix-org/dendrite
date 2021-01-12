@@ -19,25 +19,16 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/pressly/goose"
 )
 
-func LoadFromGoose() {
-	goose.AddMigration(UpFixSequences, DownFixSequences)
-	goose.AddMigration(UpRemoveSendToDeviceSentColumn, DownRemoveSendToDeviceSentColumn)
+func LoadRemoveSendToDeviceSentColumn(m *sqlutil.Migrations) {
+	m.AddMigration(UpRemoveSendToDeviceSentColumn, DownRemoveSendToDeviceSentColumn)
 }
 
-func LoadFixSequences(m *sqlutil.Migrations) {
-	m.AddMigration(UpFixSequences, DownFixSequences)
-}
-
-func UpFixSequences(tx *sql.Tx) error {
+func UpRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
 	_, err := tx.Exec(`
-		-- We need to delete all of the existing receipts because the indexes
-		-- will be wrong, and we'll get primary key violations if we try to
-		-- reuse existing stream IDs from a different sequence.
-		DELETE FROM syncapi_receipts;
-		UPDATE syncapi_stream_id SET stream_id=1 WHERE stream_name="receipt";
+		ALTER TABLE syncapi_send_to_device
+		  DROP COLUMN sent_by_token;
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
@@ -45,12 +36,10 @@ func UpFixSequences(tx *sql.Tx) error {
 	return nil
 }
 
-func DownFixSequences(tx *sql.Tx) error {
+func DownRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
 	_, err := tx.Exec(`
-		-- We need to delete all of the existing receipts because the indexes
-		-- will be wrong, and we'll get primary key violations if we try to
-		-- reuse existing stream IDs from a different sequence.
-		DELETE FROM syncapi_receipts;
+		ALTER TABLE syncapi_send_to_device
+		  ADD COLUMN sent_by_token TEXT;
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
