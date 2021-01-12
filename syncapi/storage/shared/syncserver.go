@@ -909,7 +909,7 @@ func (d *Database) SendToDeviceUpdatesForSync(
 
 	// If there's nothing to do then stop here.
 	if len(events) == 0 {
-		return 0, nil, fmt.Errorf("no send-to-device messages for user %q device %q in range %d -> %d", userID, deviceID, from, to)
+		return 0, nil, nil
 	}
 
 	// If we've advanced past this stream position for this
