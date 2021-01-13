@@ -283,13 +283,6 @@ func (r *messagesReq) retrieveEvents() (
 
 	// Sort the events to ensure we send them in the right order.
 	if r.backwardOrdering {
-		// A stream/topological position is a cursor located between two events.
-		// While they are identified in the code by the event on their right (if
-		// we consider a left to right chronological order), tokens need to refer
-		// to them by the event on their left, therefore we need to decrement the
-		// end position we send in the response if we're going backward.
-		end.Decrement()
-
 		// This reverses the array from old->new to new->old
 		reversed := func(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 			out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
@@ -394,13 +387,25 @@ func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedE
 	return result
 }
 
-// getStartEnd gets the start and end positions of the pagination. It
-// assumes that ordering hasn't been reversed yet for backward ordering.
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
-	start = *r.from
-	end, err = r.db.EventPositionInTopology(
-		r.ctx, events[len(events)-1].EventID(),
-	)
+	if r.backwardOrdering {
+		start = *r.from
+		end, err = r.db.EventPositionInTopology(
+			r.ctx, events[0].EventID(),
+		)
+
+		// A stream/topological position is a cursor located between two events.
+		// While they are identified in the code by the event on their right (if
+		// we consider a left to right chronological order), tokens need to refer
+		// to them by the event on their left, therefore we need to decrement the
+		// end position we send in the response if we're going backward.
+		end.Decrement()
+	} else {
+		start = *r.from
+		end, err = r.db.EventPositionInTopology(
+			r.ctx, events[len(events)-1].EventID(),
+		)
+	}
 	if err != nil {
 		err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
 		return
