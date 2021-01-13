@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -38,11 +37,7 @@ CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 	-- The device ID to send the message to.
 	device_id TEXT NOT NULL,
 	-- The event content JSON.
-	content TEXT NOT NULL,
-	-- The token that was supplied to the /sync at the time that this
-	-- message was included in a sync response, or NULL if we haven't
-	-- included it in a /sync response yet.
-	sent_by_token TEXT
+	content TEXT NOT NULL
 );
 `
 
@@ -52,34 +47,26 @@ const insertSendToDeviceMessageSQL = `
 	  RETURNING id
 `
 
-const countSendToDeviceMessagesSQL = `
-	SELECT COUNT(*)
-	  FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2
-`
-
 const selectSendToDeviceMessagesSQL = `
-	SELECT id, user_id, device_id, content, sent_by_token
+	SELECT id, user_id, device_id, content
 	  FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2
+	  WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
 	  ORDER BY id DESC
 `
 
-const updateSentSendToDeviceMessagesSQL = `
-	UPDATE syncapi_send_to_device SET sent_by_token = $1
-	  WHERE id = ANY($2)
+const deleteSendToDeviceMessagesSQL = `
+	DELETE FROM syncapi_send_to_device
+	  WHERE user_id = $1 AND device_id = $2 AND id < $3
 `
 
-const deleteSendToDeviceMessagesSQL = `
-	DELETE FROM syncapi_send_to_device WHERE id = ANY($1)
-`
+const selectMaxSendToDeviceIDSQL = "" +
+	"SELECT MAX(id) FROM syncapi_send_to_device"
 
 type sendToDeviceStatements struct {
-	insertSendToDeviceMessageStmt      *sql.Stmt
-	countSendToDeviceMessagesStmt      *sql.Stmt
-	selectSendToDeviceMessagesStmt     *sql.Stmt
-	updateSentSendToDeviceMessagesStmt *sql.Stmt
-	deleteSendToDeviceMessagesStmt     *sql.Stmt
+	insertSendToDeviceMessageStmt  *sql.Stmt
+	selectSendToDeviceMessagesStmt *sql.Stmt
+	deleteSendToDeviceMessagesStmt *sql.Stmt
+	selectMaxSendToDeviceIDStmt    *sql.Stmt
 }
 
 func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
@@ -91,16 +78,13 @@ func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 	if s.insertSendToDeviceMessageStmt, err = db.Prepare(insertSendToDeviceMessageSQL); err != nil {
 		return nil, err
 	}
-	if s.countSendToDeviceMessagesStmt, err = db.Prepare(countSendToDeviceMessagesSQL); err != nil {
-		return nil, err
-	}
 	if s.selectSendToDeviceMessagesStmt, err = db.Prepare(selectSendToDeviceMessagesSQL); err != nil {
 		return nil, err
 	}
-	if s.updateSentSendToDeviceMessagesStmt, err = db.Prepare(updateSentSendToDeviceMessagesSQL); err != nil {
+	if s.deleteSendToDeviceMessagesStmt, err = db.Prepare(deleteSendToDeviceMessagesSQL); err != nil {
 		return nil, err
 	}
-	if s.deleteSendToDeviceMessagesStmt, err = db.Prepare(deleteSendToDeviceMessagesSQL); err != nil {
+	if s.selectMaxSendToDeviceIDStmt, err = db.Prepare(selectMaxSendToDeviceIDSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -113,31 +97,23 @@ func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	return
 }
 
-func (s *sendToDeviceStatements) CountSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string,
-) (count int, err error) {
-	row := sqlutil.TxStmt(txn, s.countSendToDeviceMessagesStmt).QueryRowContext(ctx, userID, deviceID)
-	if err = row.Scan(&count); err != nil {
-		return
-	}
-	return count, nil
-}
-
 func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string,
+	ctx context.Context, txn *sql.Tx, userID, deviceID string, from, to types.StreamPosition,
 ) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID)
+	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID, from, to)
 	if err != nil {
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectSendToDeviceMessages: rows.close() failed")
 
 	for rows.Next() {
-		var id types.SendToDeviceNID
+		var id types.StreamPosition
 		var userID, deviceID, content string
-		var sentByToken *string
-		if err = rows.Scan(&id, &userID, &deviceID, &content, &sentByToken); err != nil {
+		if err = rows.Scan(&id, &userID, &deviceID, &content); err != nil {
 			return
+		}
+		if id > lastPos {
+			lastPos = id
 		}
 		event := types.SendToDeviceEvent{
 			ID:       id,
@@ -145,32 +121,31 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			DeviceID: deviceID,
 		}
 		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
-			return
-		}
-		if sentByToken != nil {
-			if token, err := types.NewStreamTokenFromString(*sentByToken); err == nil {
-				event.SentByToken = &token
-			}
+			continue
 		}
 		events = append(events, event)
-		if types.StreamPosition(id) > lastPos {
-			lastPos = types.StreamPosition(id)
-		}
 	}
-
+	if lastPos == 0 {
+		lastPos = to
+	}
 	return lastPos, events, rows.Err()
 }
 
-func (s *sendToDeviceStatements) UpdateSentSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, token string, nids []types.SendToDeviceNID,
+func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
+	ctx context.Context, txn *sql.Tx, userID, deviceID string, pos types.StreamPosition,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.updateSentSendToDeviceMessagesStmt).ExecContext(ctx, token, pq.Array(nids))
+	_, err = sqlutil.TxStmt(txn, s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, userID, deviceID, pos)
 	return
 }
 
-func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, nids []types.SendToDeviceNID,
-) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, pq.Array(nids))
+func (s *sendToDeviceStatements) SelectMaxSendToDeviceMessageID(
+	ctx context.Context, txn *sql.Tx,
+) (id int64, err error) {
+	var nullableID sql.NullInt64
+	stmt := sqlutil.TxStmt(txn, s.selectMaxSendToDeviceIDStmt)
+	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	if nullableID.Valid {
+		id = nullableID.Int64
+	}
 	return
 }

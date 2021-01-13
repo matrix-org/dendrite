@@ -89,6 +89,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
+	deltas.LoadRemoveSendToDeviceSentColumn(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}
