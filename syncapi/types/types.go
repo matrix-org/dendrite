@@ -366,14 +366,14 @@ type Response struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"presence,omitempty"`
 	Rooms struct {
-		Join   map[string]JoinResponse   `json:"join"`
-		Peek   map[string]JoinResponse   `json:"peek"`
-		Invite map[string]InviteResponse `json:"invite"`
-		Leave  map[string]LeaveResponse  `json:"leave"`
-	} `json:"rooms"`
+		Join   map[string]JoinResponse   `json:"join,omitempty"`
+		Peek   map[string]JoinResponse   `json:"peek,omitempty"`
+		Invite map[string]InviteResponse `json:"invite,omitempty"`
+		Leave  map[string]LeaveResponse  `json:"leave,omitempty"`
+	} `json:"rooms,omitempty"`
 	ToDevice struct {
 		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
-	} `json:"to_device"`
+	} `json:"to_device,omitempty"`
 	DeviceLists struct {
 		Changed []string `json:"changed,omitempty"`
 		Left    []string `json:"left,omitempty"`
