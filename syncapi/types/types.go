@@ -360,11 +360,11 @@ type PrevEventRef struct {
 type Response struct {
 	NextBatch   StreamingToken `json:"next_batch"`
 	AccountData struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"account_data,omitempty"`
+		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	} `json:"account_data"`
 	Presence struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"presence,omitempty"`
+		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	} `json:"presence"`
 	Rooms struct {
 		Join   map[string]JoinResponse   `json:"join"`
 		Peek   map[string]JoinResponse   `json:"peek"`
@@ -372,13 +372,13 @@ type Response struct {
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
 	ToDevice struct {
-		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
 	} `json:"to_device"`
 	DeviceLists struct {
 		Changed []string `json:"changed,omitempty"`
 		Left    []string `json:"left,omitempty"`
-	} `json:"device_lists,omitempty"`
-	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count"`
+	} `json:"device_lists"`
+	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count,omitempty"`
 }
 
 // NewResponse creates an empty response with initialised maps.
@@ -386,19 +386,19 @@ func NewResponse() *Response {
 	res := Response{}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
-	res.Rooms.Join = make(map[string]JoinResponse)
-	res.Rooms.Peek = make(map[string]JoinResponse)
-	res.Rooms.Invite = make(map[string]InviteResponse)
-	res.Rooms.Leave = make(map[string]LeaveResponse)
+	res.Rooms.Join = map[string]JoinResponse{}
+	res.Rooms.Peek = map[string]JoinResponse{}
+	res.Rooms.Invite = map[string]InviteResponse{}
+	res.Rooms.Leave = map[string]LeaveResponse{}
 
 	// Also pre-intialise empty slices or else we'll insert 'null' instead of '[]' for the value.
 	// TODO: We really shouldn't have to do all this to coerce encoding/json to Do The Right Thing. We should
 	//       really be using our own Marshal/Unmarshal implementations otherwise this may prove to be a CPU bottleneck.
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
-	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.ToDevice.Events = make([]gomatrixserverlib.SendToDeviceEvent, 0)
-	res.DeviceListsOTKCount = make(map[string]int)
+	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
+	res.Presence.Events = []gomatrixserverlib.ClientEvent{}
+	res.ToDevice.Events = []gomatrixserverlib.SendToDeviceEvent{}
+	res.DeviceListsOTKCount = map[string]int{}
 
 	return &res
 }
@@ -435,10 +435,10 @@ type JoinResponse struct {
 // NewJoinResponse creates an empty response with initialised arrays.
 func NewJoinResponse() *JoinResponse {
 	res := JoinResponse{}
-	res.State.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Ephemeral.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.State.Events = []gomatrixserverlib.ClientEvent{}
+	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
+	res.Ephemeral.Events = []gomatrixserverlib.ClientEvent{}
+	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
 	return &res
 }
 
@@ -487,8 +487,8 @@ type LeaveResponse struct {
 // NewLeaveResponse creates an empty response with initialised arrays.
 func NewLeaveResponse() *LeaveResponse {
 	res := LeaveResponse{}
-	res.State.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.State.Events = []gomatrixserverlib.ClientEvent{}
+	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
 	return &res
 }
 
