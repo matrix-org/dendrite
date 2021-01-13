@@ -109,7 +109,10 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 				}
 			} else {
 				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
-					joinData := req.Response.Rooms.Join[roomID]
+					joinData := *types.NewJoinResponse()
+					if existing, ok := req.Response.Rooms.Join[roomID]; ok {
+						joinData = existing
+					}
 					joinData.AccountData.Events = append(
 						joinData.AccountData.Events,
 						gomatrixserverlib.ClientEvent{

@@ -59,7 +59,10 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 	}
 
 	for roomID, receipts := range receiptsByRoom {
-		jr := req.Response.Rooms.Join[roomID]
+		jr := *types.NewJoinResponse()
+		if existing, ok := req.Response.Rooms.Join[roomID]; ok {
+			jr = existing
+		}
 		var ok bool
 
 		ev := gomatrixserverlib.ClientEvent{
