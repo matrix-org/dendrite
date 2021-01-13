@@ -68,7 +68,8 @@ func Setup(
 				Code: http.StatusOK,
 				JSON: struct {
 					Versions []string `json:"versions"`
-				}{[]string{
+					UnstableFeatures map[string]bool `json:"unstable_features"`
+				}{Versions: []string{
 					"r0.0.1",
 					"r0.1.0",
 					"r0.2.0",
@@ -76,6 +77,8 @@ func Setup(
 					"r0.4.0",
 					"r0.5.0",
 					"r0.6.1",
+				},UnstableFeatures: map[string]bool{
+					"org.matrix.msc2836": true,
 				}},
 			}
 		}),
