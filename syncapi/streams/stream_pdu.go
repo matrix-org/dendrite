@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -249,7 +250,7 @@ func (p *PDUStreamProvider) getResponseForCompleteSync(
 		return
 	}
 
-	recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, device, limited)
+	recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, stateEvents, device, limited)
 
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
@@ -317,9 +318,28 @@ func (p *PDUStreamProvider) getLeaveResponseForCompleteSync(
 // nolint:gocyclo
 func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 	recentStreamEvents []types.StreamEvent,
+	stateEvents []*gomatrixserverlib.HeaderedEvent,
 	device *userapi.Device,
 	limited bool,
 ) ([]types.StreamEvent, bool) {
+	// If the history is world_readable or shared then don't filter.
+	for _, stateEvent := range stateEvents {
+		if stateEvent.Type() == gomatrixserverlib.MRoomHistoryVisibility {
+			var content struct {
+				HistoryVisibility string `json:"history_visibility"`
+			}
+			if err := json.Unmarshal(stateEvent.Content(), &content); err != nil {
+				break
+			}
+			switch content.HistoryVisibility {
+			case "world_readable", "shared":
+				return recentStreamEvents, limited
+			default:
+				break
+			}
+		}
+	}
+
 	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
 	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
 	// which is equiv to history_visibility: joined
