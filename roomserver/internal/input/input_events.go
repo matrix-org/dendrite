@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -28,7 +29,27 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+)
+
+func init() {
+	prometheus.MustRegister(processRoomEventDuration)
+}
+
+var processRoomEventDuration = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Namespace: "dendrite",
+		Subsystem: "roomserver",
+		Name:      "processroomevent_duration_millis",
+		Help:      "How long it takes the roomserver to process an event",
+		Buckets: []float64{ // milliseconds
+			5, 10, 25, 50, 75, 100, 250, 500,
+			1000, 2000, 3000, 4000, 5000, 6000,
+			7000, 8000, 9000, 10000, 15000, 20000,
+		},
+	},
+	[]string{"room_id"},
 )
 
 // processRoomEvent can only be called once at a time
@@ -42,6 +63,15 @@ func (r *Inputer) processRoomEvent(
 	ctx context.Context,
 	input *api.InputRoomEvent,
 ) (eventID string, err error) {
+	// Measure how long it takes to process this event.
+	started := time.Now()
+	defer func() {
+		timetaken := time.Since(started)
+		processRoomEventDuration.With(prometheus.Labels{
+			"room_id": input.Event.RoomID(),
+		}).Observe(float64(timetaken.Milliseconds()))
+	}()
+
 	// Parse and validate the event JSON
 	headered := input.Event
 	event := headered.Unwrap()
