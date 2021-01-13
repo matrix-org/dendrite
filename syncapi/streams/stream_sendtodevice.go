@@ -38,9 +38,18 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 		req.Log.WithError(err).Error("p.DB.SendToDeviceUpdatesForSync failed")
 		return from
 	}
-	// Add the updates into the sync response.
-	for _, event := range events {
-		req.Response.ToDevice.Events = append(req.Response.ToDevice.Events, event.SendToDeviceEvent)
+
+	if len(events) > 0 {
+		// Clean up old send-to-device messages from before this stream position.
+		if err := p.DB.CleanSendToDeviceUpdates(req.Context, req.Device.UserID, req.Device.ID, from); err != nil {
+			req.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
+			return from
+		}
+
+		// Add the updates into the sync response.
+		for _, event := range events {
+			req.Response.ToDevice.Events = append(req.Response.ToDevice.Events, event.SendToDeviceEvent)
+		}
 	}
 
 	return lastPos

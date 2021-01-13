@@ -105,8 +105,6 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		return err
 	}
 
-	util.GetLogger(context.TODO()).Infof("Stored send-to-device message at position %d", streamPos)
-
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewSendToDevice(
 		output.UserID,

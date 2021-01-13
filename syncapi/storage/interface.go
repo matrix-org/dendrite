@@ -119,11 +119,13 @@ type Database interface {
 	// added to the unsigned section of the output event.
 	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*gomatrixserverlib.HeaderedEvent
 	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns the
-	// relevant events, and it automatically truncates old events once we advance past the
-	// stream position of the old send-to-device messages.
+	// relevant events within the given ranges for the supplied user ID and device ID.
 	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, from, to types.StreamPosition) (pos types.StreamPosition, events []types.SendToDeviceEvent, err error)
 	// StoreNewSendForDeviceMessage stores a new send-to-device event for a user's device.
 	StoreNewSendForDeviceMessage(ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
+	// CleanSendToDeviceUpdates removes all send-to-device messages BEFORE the specified
+	// from position, preventing the send-to-device table from growing indefinitely.
+	CleanSendToDeviceUpdates(ctx context.Context, userID, deviceID string, before types.StreamPosition) (err error)
 	// GetFilter looks up the filter associated with a given local user and filter ID.
 	// Returns a filter structure. Otherwise returns an error if no such filter exists
 	// or if there was an error talking to the database.

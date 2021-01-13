@@ -907,21 +907,24 @@ func (d *Database) SendToDeviceUpdatesForSync(
 	if err != nil {
 		return from, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
 	}
-
 	// If there's nothing to do then stop here.
 	if len(events) == 0 {
 		return to, nil, nil
 	}
+	return lastPos, events, nil
+}
 
-	// If we've advanced past this stream position for this
-	// user+device combo then clean up behind.
+func (d *Database) CleanSendToDeviceUpdates(
+	ctx context.Context,
+	userID, deviceID string, before types.StreamPosition,
+) (err error) {
 	if err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, userID, deviceID, from)
+		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, userID, deviceID, before)
 	}); err != nil {
 		logrus.WithError(err).Errorf("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
+		return err
 	}
-
-	return lastPos, events, nil
+	return nil
 }
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
