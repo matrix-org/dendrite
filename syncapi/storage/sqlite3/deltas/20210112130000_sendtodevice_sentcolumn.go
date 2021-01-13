@@ -16,6 +16,7 @@ package deltas
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -24,12 +25,43 @@ func LoadRemoveSendToDeviceSentColumn(m *sqlutil.Migrations) {
 	m.AddMigration(UpRemoveSendToDeviceSentColumn, DownRemoveSendToDeviceSentColumn)
 }
 
-func UpRemoveSendToDeviceSentColumn(_ *sql.Tx) error {
-	// TODO: Work out how to alter the columns on SQLite
+func UpRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		CREATE TEMPORARY TABLE syncapi_send_to_device_backup(id, user_id, device_id, content);
+		INSERT INTO syncapi_send_to_device_backup SELECT id, user_id, device_id, content FROM syncapi_send_to_device;
+		DROP TABLE syncapi_send_to_device;
+		CREATE TABLE syncapi_send_to_device(
+			id INTEGER PRIMARY KEY AUTOINCREMENT, 
+			user_id TEXT NOT NULL,
+			device_id TEXT NOT NULL,
+			content TEXT NOT NULL
+		);
+		INSERT INTO syncapi_send_to_device SELECT id, user_id, device_id, content FROM syncapi_send_to_device_backup;
+		DROP TABLE syncapi_send_to_device_backup;
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
 	return nil
 }
 
-func DownRemoveSendToDeviceSentColumn(_ *sql.Tx) error {
-	// TODO: Work out how to alter the columns on SQLite
+func DownRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		CREATE TEMPORARY TABLE syncapi_send_to_device_backup(id, user_id, device_id, content);
+		INSERT INTO syncapi_send_to_device_backup SELECT id, user_id, device_id, content FROM syncapi_send_to_device;
+		DROP TABLE syncapi_send_to_device;
+		CREATE TABLE syncapi_send_to_device(
+			id INTEGER PRIMARY KEY AUTOINCREMENT, 
+			user_id TEXT NOT NULL, 
+			device_id TEXT NOT NULL, 
+			content TEXT NOT NULL,
+			sent_by_token TEXT
+		);
+		INSERT INTO syncapi_send_to_device SELECT id, user_id, device_id, content FROM syncapi_send_to_device_backup;
+		DROP TABLE syncapi_send_to_device_backup;
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
 	return nil
 }
