@@ -273,8 +273,24 @@ func (r *messagesReq) retrieveEvents() (
 		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
 	}
 
+	// Get the position of the first and the last event in the room's topology.
+	// This position is currently determined by the event's depth, so we could
+	// also use it instead of retrieving from the database. However, if we ever
+	// change the way topological positions are defined (as depth isn't the most
+	// reliable way to define it), it would be easier and less troublesome to
+	// only have to change it in one place, i.e. the database.
+	start, end, err = r.getStartEnd(events)
+
 	// Sort the events to ensure we send them in the right order.
 	if r.backwardOrdering {
+		// A stream/topological position is a cursor located between two events.
+		// While they are identified in the code by the event on their right (if
+		// we consider a left to right chronological order), tokens need to refer
+		// to them by the event on their left, therefore we need to decrement the
+		// end position we send in the response if we're going backward.
+		start, end = end, start
+		end.Decrement()
+
 		// This reverses the array from old->new to new->old
 		reversed := func(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 			out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
@@ -292,14 +308,6 @@ func (r *messagesReq) retrieveEvents() (
 
 	// Convert all of the events into client events.
 	clientEvents = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll)
-	// Get the position of the first and the last event in the room's topology.
-	// This position is currently determined by the event's depth, so we could
-	// also use it instead of retrieving from the database. However, if we ever
-	// change the way topological positions are defined (as depth isn't the most
-	// reliable way to define it), it would be easier and less troublesome to
-	// only have to change it in one place, i.e. the database.
-	start, end, err = r.getStartEnd(events)
-
 	return clientEvents, start, end, err
 }
 
@@ -363,7 +371,7 @@ func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedE
 			return events // apply no filtering as it defaults to Shared.
 		}
 		hisVis, _ := hisVisEvent.HistoryVisibility()
-		if hisVis == "shared" {
+		if hisVis == "shared" || hisVis == "world_readable" {
 			return events // apply no filtering
 		}
 		if membershipEvent == nil {
@@ -387,6 +395,8 @@ func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedE
 	return result
 }
 
+// getStartEnd gets the start and end positions of the pagination. It
+// assumes that ordering hasn't been reversed yet for backward ordering.
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	start, err = r.db.EventPositionInTopology(
 		r.ctx, events[0].EventID(),
@@ -395,26 +405,12 @@ func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (st
 		err = fmt.Errorf("EventPositionInTopology: for start event %s: %w", events[0].EventID(), err)
 		return
 	}
-	if r.backwardOrdering && events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
-		// We've hit the beginning of the room so there's really nowhere else
-		// to go. This seems to fix Riot iOS from looping on /messages endlessly.
-		end = types.TopologyToken{}
-	} else {
-		end, err = r.db.EventPositionInTopology(
-			r.ctx, events[len(events)-1].EventID(),
-		)
-		if err != nil {
-			err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
-			return
-		}
-		if r.backwardOrdering {
-			// A stream/topological position is a cursor located between two events.
-			// While they are identified in the code by the event on their right (if
-			// we consider a left to right chronological order), tokens need to refer
-			// to them by the event on their left, therefore we need to decrement the
-			// end position we send in the response if we're going backward.
-			end.Decrement()
-		}
+	end, err = r.db.EventPositionInTopology(
+		r.ctx, events[len(events)-1].EventID(),
+	)
+	if err != nil {
+		err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
+		return
 	}
 	return
 }
