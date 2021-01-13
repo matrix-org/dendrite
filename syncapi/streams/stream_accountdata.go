@@ -82,11 +82,6 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		return from
 	}
 
-	if len(dataTypes) == 0 {
-		// TODO: this fixes the sytest but is it the right thing to do?
-		dataTypes[""] = []string{"m.push_rules"}
-	}
-
 	// Iterate over the rooms
 	for roomID, dataTypes := range dataTypes {
 		// Request the missing data from the database
@@ -114,7 +109,10 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 				}
 			} else {
 				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
-					joinData := req.Response.Rooms.Join[roomID]
+					joinData := *types.NewJoinResponse()
+					if existing, ok := req.Response.Rooms.Join[roomID]; ok {
+						joinData = existing
+					}
 					joinData.AccountData.Events = append(
 						joinData.AccountData.Events,
 						gomatrixserverlib.ClientEvent{
