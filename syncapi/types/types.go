@@ -360,10 +360,10 @@ type PrevEventRef struct {
 type Response struct {
 	NextBatch   StreamingToken `json:"next_batch"`
 	AccountData struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
+		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
 	} `json:"account_data,omitempty"`
 	Presence struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
+		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
 	} `json:"presence,omitempty"`
 	Rooms struct {
 		Join   map[string]JoinResponse   `json:"join,omitempty"`
@@ -372,13 +372,13 @@ type Response struct {
 		Leave  map[string]LeaveResponse  `json:"leave,omitempty"`
 	} `json:"rooms,omitempty"`
 	ToDevice struct {
-		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
 	} `json:"to_device,omitempty"`
 	DeviceLists struct {
 		Changed []string `json:"changed,omitempty"`
 		Left    []string `json:"left,omitempty"`
 	} `json:"device_lists,omitempty"`
-	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count"`
+	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count,omitempty"`
 }
 
 // NewResponse creates an empty response with initialised maps.
