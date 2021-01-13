@@ -15,8 +15,8 @@
 package sync
 
 import (
-	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -26,24 +26,13 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 const defaultSyncTimeout = time.Duration(0)
-const defaultIncludeLeave = false
+const DefaultTimelineLimit = 20
 
-// syncRequest represents a /sync request, with sensible defaults/sanity checks applied.
-type syncRequest struct {
-	ctx           context.Context
-	device        userapi.Device
-	filter        *gomatrixserverlib.Filter
-	timeout       time.Duration
-	since         types.StreamingToken // nil means that no since token was supplied
-	wantFullState bool
-	log           *log.Entry
-}
-
-func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*syncRequest, error) {
+func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*types.SyncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
@@ -52,7 +41,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		var err error
 		since, err = types.NewStreamTokenFromString(sinceStr)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("types.NewStreamTokenFromString: %w", err)
 		}
 	}
 
@@ -62,30 +51,50 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	if filterQuery != "" {
 		if filterQuery[0] == '{' {
 			// attempt to parse the timeline limit at least
-			json.Unmarshal([]byte(filterQuery), &f)
+			if err := json.Unmarshal([]byte(filterQuery), &f); err != nil {
+				util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
+				return nil, fmt.Errorf("json.Unmarshal: %w", err)
+			}
 		} else {
 			// attempt to load the filter ID
 			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-				return nil, err
+				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
 			f, err = syncDB.GetFilter(req.Context(), localpart, filterQuery)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
-				return nil, err
+				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			}
 		}
 	}
+
+	filter := gomatrixserverlib.DefaultFilter()
+	if f != nil {
+		filter = *f
+	}
 	// TODO: Additional query params: set_presence, filter
-	return &syncRequest{
-		ctx:           req.Context(),
-		device:        device,
-		timeout:       timeout,
-		since:         since,
-		wantFullState: wantFullState,
-		filter:        f,
-		log:           util.GetLogger(req.Context()),
+
+	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
+		"user_id":   device.UserID,
+		"device_id": device.ID,
+		"since":     since,
+		"timeout":   timeout,
+		"limit":     filter.Room.Timeline.Limit,
+	})
+
+	return &types.SyncRequest{
+		Context:       req.Context(),              //
+		Log:           logger,                     //
+		Device:        &device,                    //
+		Response:      types.NewResponse(),        // Populated by all streams
+		Filter:        filter,                     //
+		Since:         since,                      //
+		Timeout:       timeout,                    //
+		Limit:         filter.Room.Timeline.Limit, //
+		Rooms:         make(map[string]string),    // Populated by the PDU stream
+		WantFullState: wantFullState,              //
 	}, nil
 }
 

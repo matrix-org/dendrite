@@ -20,7 +20,6 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
@@ -106,7 +105,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
-		EDUCache:            cache.New(),
 	}
 	return &d, nil
 }

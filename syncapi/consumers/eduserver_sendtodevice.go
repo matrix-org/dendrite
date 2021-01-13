@@ -22,8 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -35,7 +35,8 @@ type OutputSendToDeviceEventConsumer struct {
 	sendToDeviceConsumer *internal.ContinualConsumer
 	db                   storage.Database
 	serverName           gomatrixserverlib.ServerName // our server name
-	notifier             *sync.Notifier
+	stream               types.StreamProvider
+	notifier             *notifier.Notifier
 }
 
 // NewOutputSendToDeviceEventConsumer creates a new OutputSendToDeviceEventConsumer.
@@ -43,8 +44,9 @@ type OutputSendToDeviceEventConsumer struct {
 func NewOutputSendToDeviceEventConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
+	notifier *notifier.Notifier,
+	stream types.StreamProvider,
 ) *OutputSendToDeviceEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -58,7 +60,8 @@ func NewOutputSendToDeviceEventConsumer(
 		sendToDeviceConsumer: &consumer,
 		db:                   store,
 		serverName:           cfg.Matrix.ServerName,
-		notifier:             n,
+		notifier:             notifier,
+		stream:               stream,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -102,6 +105,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		return err
 	}
 
+	s.stream.Advance(streamPos)
 	s.notifier.OnNewSendToDevice(
 		output.UserID,
 		[]string{output.DeviceID},

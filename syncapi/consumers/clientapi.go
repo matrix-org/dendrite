@@ -22,8 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,15 +32,17 @@ import (
 type OutputClientDataConsumer struct {
 	clientAPIConsumer *internal.ContinualConsumer
 	db                storage.Database
-	notifier          *sync.Notifier
+	stream            types.StreamProvider
+	notifier          *notifier.Notifier
 }
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
 func NewOutputClientDataConsumer(
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
+	notifier *notifier.Notifier,
+	stream types.StreamProvider,
 ) *OutputClientDataConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -52,7 +54,8 @@ func NewOutputClientDataConsumer(
 	s := &OutputClientDataConsumer{
 		clientAPIConsumer: &consumer,
 		db:                store,
-		notifier:          n,
+		notifier:          notifier,
+		stream:            stream,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -81,7 +84,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		"room_id": output.RoomID,
 	}).Info("received data from client API server")
 
-	pduPos, err := s.db.UpsertAccountData(
+	streamPos, err := s.db.UpsertAccountData(
 		context.TODO(), string(msg.Key), output.RoomID, output.Type,
 	)
 	if err != nil {
@@ -92,7 +95,8 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		}).Panicf("could not save account data")
 	}
 
-	s.notifier.OnNewEvent(nil, "", []string{string(msg.Key)}, types.StreamingToken{PDUPosition: pduPos})
+	s.stream.Advance(streamPos)
+	s.notifier.OnNewAccountData(string(msg.Key), types.StreamingToken{AccountDataPosition: streamPos})
 
 	return nil
 }

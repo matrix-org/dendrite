@@ -23,8 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	syncapi "github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -34,12 +34,13 @@ import (
 type OutputKeyChangeEventConsumer struct {
 	keyChangeConsumer   *internal.ContinualConsumer
 	db                  storage.Database
+	notifier            *notifier.Notifier
+	stream              types.PartitionedStreamProvider
 	serverName          gomatrixserverlib.ServerName // our server name
 	rsAPI               roomserverAPI.RoomserverInternalAPI
 	keyAPI              api.KeyInternalAPI
 	partitionToOffset   map[int32]int64
 	partitionToOffsetMu sync.Mutex
-	notifier            *syncapi.Notifier
 }
 
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
@@ -48,10 +49,11 @@ func NewOutputKeyChangeEventConsumer(
 	serverName gomatrixserverlib.ServerName,
 	topic string,
 	kafkaConsumer sarama.Consumer,
-	n *syncapi.Notifier,
 	keyAPI api.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	store storage.Database,
+	notifier *notifier.Notifier,
+	stream types.PartitionedStreamProvider,
 ) *OutputKeyChangeEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -69,7 +71,8 @@ func NewOutputKeyChangeEventConsumer(
 		rsAPI:               rsAPI,
 		partitionToOffset:   make(map[int32]int64),
 		partitionToOffsetMu: sync.Mutex{},
-		notifier:            n,
+		notifier:            notifier,
+		stream:              stream,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -114,14 +117,15 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}
 	// make sure we get our own key updates too!
 	queryRes.UserIDsToCount[output.UserID] = 1
-	posUpdate := types.StreamingToken{
-		DeviceListPosition: types.LogPosition{
-			Offset:    msg.Offset,
-			Partition: msg.Partition,
-		},
+	posUpdate := types.LogPosition{
+		Offset:    msg.Offset,
+		Partition: msg.Partition,
 	}
+
+	s.stream.Advance(posUpdate)
 	for userID := range queryRes.UserIDsToCount {
-		s.notifier.OnNewKeyChange(posUpdate, userID, output.UserID)
+		s.notifier.OnNewKeyChange(types.StreamingToken{DeviceListPosition: posUpdate}, userID, output.UserID)
 	}
+
 	return nil
 }
