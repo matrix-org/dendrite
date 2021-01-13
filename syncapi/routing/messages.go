@@ -398,13 +398,7 @@ func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedE
 // getStartEnd gets the start and end positions of the pagination. It
 // assumes that ordering hasn't been reversed yet for backward ordering.
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
-	start, err = r.db.EventPositionInTopology(
-		r.ctx, events[0].EventID(),
-	)
-	if err != nil {
-		err = fmt.Errorf("EventPositionInTopology: for start event %s: %w", events[0].EventID(), err)
-		return
-	}
+	start = *r.from
 	end, err = r.db.EventPositionInTopology(
 		r.ctx, events[len(events)-1].EventID(),
 	)
