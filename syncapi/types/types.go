@@ -35,6 +35,15 @@ var (
 	ErrInvalidSyncTokenLen = fmt.Errorf("Sync token has an invalid length")
 )
 
+type StateDelta struct {
+	RoomID      string
+	StateEvents []*gomatrixserverlib.HeaderedEvent
+	Membership  string
+	// The PDU stream position of the latest membership event for this user, if applicable.
+	// Can be 0 if there is no membership event in this delta.
+	MembershipPos StreamPosition
+}
+
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
 
@@ -114,6 +123,7 @@ type StreamingToken struct {
 	ReceiptPosition      StreamPosition
 	SendToDevicePosition StreamPosition
 	InvitePosition       StreamPosition
+	AccountDataPosition  StreamPosition
 	DeviceListPosition   LogPosition
 }
 
@@ -130,10 +140,10 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
-		t.InvitePosition,
+		t.InvitePosition, t.AccountDataPosition,
 	)
 	if dl := t.DeviceListPosition; !dl.IsEmpty() {
 		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
@@ -154,6 +164,8 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.InvitePosition > other.InvitePosition:
 		return true
+	case t.AccountDataPosition > other.AccountDataPosition:
+		return true
 	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
 		return true
 	}
@@ -161,7 +173,7 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition == 0 && t.DeviceListPosition.IsEmpty()
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition == 0 && t.DeviceListPosition.IsEmpty()
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -178,22 +190,25 @@ func (t *StreamingToken) WithUpdates(other StreamingToken) StreamingToken {
 // streaming token contains any positions that are not 0, they are considered updates
 // and will overwrite the value in the token.
 func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
-	if other.PDUPosition > 0 {
+	if other.PDUPosition > t.PDUPosition {
 		t.PDUPosition = other.PDUPosition
 	}
-	if other.TypingPosition > 0 {
+	if other.TypingPosition > t.TypingPosition {
 		t.TypingPosition = other.TypingPosition
 	}
-	if other.ReceiptPosition > 0 {
+	if other.ReceiptPosition > t.ReceiptPosition {
 		t.ReceiptPosition = other.ReceiptPosition
 	}
-	if other.SendToDevicePosition > 0 {
+	if other.SendToDevicePosition > t.SendToDevicePosition {
 		t.SendToDevicePosition = other.SendToDevicePosition
 	}
-	if other.InvitePosition > 0 {
+	if other.InvitePosition > t.InvitePosition {
 		t.InvitePosition = other.InvitePosition
 	}
-	if other.DeviceListPosition.Offset > 0 {
+	if other.AccountDataPosition > t.AccountDataPosition {
+		t.AccountDataPosition = other.AccountDataPosition
+	}
+	if other.DeviceListPosition.IsAfter(&t.DeviceListPosition) {
 		t.DeviceListPosition = other.DeviceListPosition
 	}
 }
@@ -286,7 +301,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	}
 	categories := strings.Split(tok[1:], ".")
 	parts := strings.Split(categories[0], "_")
-	var positions [5]StreamPosition
+	var positions [6]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -304,6 +319,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		ReceiptPosition:      positions[2],
 		SendToDevicePosition: positions[3],
 		InvitePosition:       positions[4],
+		AccountDataPosition:  positions[5],
 	}
 	// dl-0-1234
 	// $log_name-$partition-$offset
@@ -344,11 +360,11 @@ type PrevEventRef struct {
 type Response struct {
 	NextBatch   StreamingToken `json:"next_batch"`
 	AccountData struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"account_data,omitempty"`
+		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	} `json:"account_data"`
 	Presence struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"presence,omitempty"`
+		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	} `json:"presence"`
 	Rooms struct {
 		Join   map[string]JoinResponse   `json:"join"`
 		Peek   map[string]JoinResponse   `json:"peek"`
@@ -356,13 +372,13 @@ type Response struct {
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
 	ToDevice struct {
-		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
 	} `json:"to_device"`
 	DeviceLists struct {
 		Changed []string `json:"changed,omitempty"`
 		Left    []string `json:"left,omitempty"`
-	} `json:"device_lists,omitempty"`
-	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count"`
+	} `json:"device_lists"`
+	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count,omitempty"`
 }
 
 // NewResponse creates an empty response with initialised maps.
@@ -370,19 +386,19 @@ func NewResponse() *Response {
 	res := Response{}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
-	res.Rooms.Join = make(map[string]JoinResponse)
-	res.Rooms.Peek = make(map[string]JoinResponse)
-	res.Rooms.Invite = make(map[string]InviteResponse)
-	res.Rooms.Leave = make(map[string]LeaveResponse)
+	res.Rooms.Join = map[string]JoinResponse{}
+	res.Rooms.Peek = map[string]JoinResponse{}
+	res.Rooms.Invite = map[string]InviteResponse{}
+	res.Rooms.Leave = map[string]LeaveResponse{}
 
 	// Also pre-intialise empty slices or else we'll insert 'null' instead of '[]' for the value.
 	// TODO: We really shouldn't have to do all this to coerce encoding/json to Do The Right Thing. We should
 	//       really be using our own Marshal/Unmarshal implementations otherwise this may prove to be a CPU bottleneck.
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
-	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.ToDevice.Events = make([]gomatrixserverlib.SendToDeviceEvent, 0)
-	res.DeviceListsOTKCount = make(map[string]int)
+	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
+	res.Presence.Events = []gomatrixserverlib.ClientEvent{}
+	res.ToDevice.Events = []gomatrixserverlib.SendToDeviceEvent{}
+	res.DeviceListsOTKCount = map[string]int{}
 
 	return &res
 }
@@ -419,10 +435,10 @@ type JoinResponse struct {
 // NewJoinResponse creates an empty response with initialised arrays.
 func NewJoinResponse() *JoinResponse {
 	res := JoinResponse{}
-	res.State.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Ephemeral.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.State.Events = []gomatrixserverlib.ClientEvent{}
+	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
+	res.Ephemeral.Events = []gomatrixserverlib.ClientEvent{}
+	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
 	return &res
 }
 
@@ -471,19 +487,16 @@ type LeaveResponse struct {
 // NewLeaveResponse creates an empty response with initialised arrays.
 func NewLeaveResponse() *LeaveResponse {
 	res := LeaveResponse{}
-	res.State.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.State.Events = []gomatrixserverlib.ClientEvent{}
+	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
 	return &res
 }
 
-type SendToDeviceNID int
-
 type SendToDeviceEvent struct {
 	gomatrixserverlib.SendToDeviceEvent
-	ID          SendToDeviceNID
-	UserID      string
-	DeviceID    string
-	SentByToken *StreamingToken
+	ID       StreamPosition
+	UserID   string
+	DeviceID string
 }
 
 type PeekingDevice struct {

@@ -111,6 +111,9 @@ func GetJoinedRooms(
 		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
 		return jsonerror.InternalServerError()
 	}
+	if res.RoomIDs == nil {
+		res.RoomIDs = []string{}
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: getJoinedRoomsResponse{res.RoomIDs},

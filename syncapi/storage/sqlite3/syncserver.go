@@ -21,7 +21,6 @@ import (
 	// Import the sqlite3 package
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
@@ -103,6 +102,7 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
+	deltas.LoadRemoveSendToDeviceSentColumn(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return err
 	}
@@ -119,7 +119,6 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
-		EDUCache:            cache.New(),
 	}
 	return nil
 }
