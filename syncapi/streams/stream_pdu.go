@@ -2,13 +2,10 @@ package streams
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 type PDUStreamProvider struct {
@@ -387,34 +384,7 @@ func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 		sliceEnd = leaveEventIndex
 	}
 
-	type somematrixevent struct {
-		event_id, sender, eventType, origin_server_ts, content string
-	}
-
-	events := make([]somematrixevent, len(recentStreamEvents))
-	for i, v := range recentStreamEvents {
-		events[i] = somematrixevent{
-			event_id:         v.HeaderedEvent.Event.EventID(),
-			sender:           v.HeaderedEvent.Event.Sender(),
-			eventType:        v.HeaderedEvent.Event.Type(),
-			origin_server_ts: strconv.FormatUint(uint64(v.HeaderedEvent.Event.OriginServerTS()), 10),
-			content:          string(v.HeaderedEvent.Event.Content()),
-		}
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"sliceStart":         sliceStart,
-		"sliceEnd":           sliceEnd,
-		"recentStreamEvents": fmt.Sprintf("%+v", events),
-	}).Info("cutting down the events")
-
-	outEvents := recentStreamEvents[sliceStart:sliceEnd]
-
-	logrus.WithFields(logrus.Fields{
-		"recentStreamEvents": fmt.Sprintf("%+v", events[sliceStart:sliceEnd]),
-	}).Info("cutting down the events after")
-
-	return outEvents, limited
+	return recentStreamEvents[sliceStart:sliceEnd], limited
 }
 
 func removeDuplicates(stateEvents, recentEvents []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
