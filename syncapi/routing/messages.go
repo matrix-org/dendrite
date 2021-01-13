@@ -390,16 +390,21 @@ func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedE
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	if r.backwardOrdering {
 		start = *r.from
-		end, err = r.db.EventPositionInTopology(
-			r.ctx, events[0].EventID(),
-		)
-
-		// A stream/topological position is a cursor located between two events.
-		// While they are identified in the code by the event on their right (if
-		// we consider a left to right chronological order), tokens need to refer
-		// to them by the event on their left, therefore we need to decrement the
-		// end position we send in the response if we're going backward.
-		end.Decrement()
+		if events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
+			// NOTSPEC: We've hit the beginning of the room so there's really nowhere
+			// else to go. This seems to fix Riot iOS from looping on /messages endlessly.
+			end = types.TopologyToken{}
+		} else {
+			end, err = r.db.EventPositionInTopology(
+				r.ctx, events[0].EventID(),
+			)
+			// A stream/topological position is a cursor located between two events.
+			// While they are identified in the code by the event on their right (if
+			// we consider a left to right chronological order), tokens need to refer
+			// to them by the event on their left, therefore we need to decrement the
+			// end position we send in the response if we're going backward.
+			end.Decrement()
+		}
 	} else {
 		start = *r.from
 		end, err = r.db.EventPositionInTopology(
