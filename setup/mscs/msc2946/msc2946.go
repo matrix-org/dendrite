@@ -97,7 +97,10 @@ func spacesHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*ht
 	inMemoryBatchCache := make(map[string]set)
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		// Extract the room ID from the request. Sanity check request data.
-		params := mux.Vars(req)
+		params, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
 		roomID := params["roomID"]
 		var r SpacesRequest
 		r.Defaults()
