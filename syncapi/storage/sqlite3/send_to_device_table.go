@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/sirupsen/logrus"
 )
 
 const sendToDeviceSchema = `
@@ -47,7 +48,7 @@ const insertSendToDeviceMessageSQL = `
 const selectSendToDeviceMessagesSQL = `
 	SELECT id, user_id, device_id, content
 	  FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id <= $3
+	  WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
 	  ORDER BY id DESC
 `
 
@@ -104,9 +105,9 @@ func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 }
 
 func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string, to types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, userID, deviceID string, from, to types.StreamPosition,
 ) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID, to)
+	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID, from, to)
 	if err != nil {
 		return
 	}
@@ -116,7 +117,11 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 		var id types.StreamPosition
 		var userID, deviceID, content string
 		if err = rows.Scan(&id, &userID, &deviceID, &content); err != nil {
+			logrus.WithError(err).Errorf("Failed to retrieve send-to-device message")
 			return
+		}
+		if id > lastPos {
+			lastPos = id
 		}
 		event := types.SendToDeviceEvent{
 			ID:       id,
@@ -124,14 +129,14 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			DeviceID: deviceID,
 		}
 		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
+			logrus.WithError(err).Errorf("Failed to unmarshal send-to-device message")
 			continue
 		}
 		events = append(events, event)
-		if id > lastPos {
-			lastPos = id
-		}
 	}
-
+	if lastPos == 0 {
+		lastPos = to
+	}
 	return lastPos, events, rows.Err()
 }
 

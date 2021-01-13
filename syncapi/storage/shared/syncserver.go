@@ -903,7 +903,7 @@ func (d *Database) SendToDeviceUpdatesForSync(
 	from, to types.StreamPosition,
 ) (types.StreamPosition, []types.SendToDeviceEvent, error) {
 	// First of all, get our send-to-device updates for this user.
-	lastPos, events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID, to)
+	lastPos, events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID, from, to)
 	if err != nil {
 		return from, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
 	}
