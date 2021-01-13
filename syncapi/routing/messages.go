@@ -288,7 +288,6 @@ func (r *messagesReq) retrieveEvents() (
 		// we consider a left to right chronological order), tokens need to refer
 		// to them by the event on their left, therefore we need to decrement the
 		// end position we send in the response if we're going backward.
-		start, end = end, start
 		end.Decrement()
 
 		// This reverses the array from old->new to new->old
