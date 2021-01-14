@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -81,6 +82,14 @@ func (d *Database) MaxStreamPositionForInvites(ctx context.Context) (types.Strea
 	id, err := d.Invites.SelectMaxInviteID(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("d.Invites.SelectMaxInviteID: %w", err)
+	}
+	return types.StreamPosition(id), nil
+}
+
+func (d *Database) MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.SendToDevice.SelectMaxSendToDeviceMessageID(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("d.SendToDevice.SelectMaxSendToDeviceMessageID: %w", err)
 	}
 	return types.StreamPosition(id), nil
 }
@@ -167,30 +176,6 @@ func (d *Database) GetEventsInStreamingRange(
 	}
 	return events, err
 }
-
-/*
-func (d *Database) AddTypingUser(
-	userID, roomID string, expireTime *time.Time,
-) types.StreamPosition {
-	return types.StreamPosition(d.EDUCache.AddTypingUser(userID, roomID, expireTime))
-}
-
-func (d *Database) RemoveTypingUser(
-	userID, roomID string,
-) types.StreamPosition {
-	return types.StreamPosition(d.EDUCache.RemoveUser(userID, roomID))
-}
-
-func (d *Database) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
-	d.EDUCache.SetTimeoutCallback(fn)
-}
-*/
-
-/*
-func (d *Database) AddSendToDevice() types.StreamPosition {
-	return types.StreamPosition(d.EDUCache.AddSendToDeviceMessage())
-}
-*/
 
 func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
@@ -891,16 +876,6 @@ func (d *Database) currentStateStreamEventsForRoom(
 	return s, nil
 }
 
-func (d *Database) SendToDeviceUpdatesWaiting(
-	ctx context.Context, userID, deviceID string,
-) (bool, error) {
-	count, err := d.SendToDevice.CountSendToDeviceMessages(ctx, nil, userID, deviceID)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
 func (d *Database) StoreNewSendForDeviceMessage(
 	ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent,
 ) (newPos types.StreamPosition, err error) {
@@ -919,77 +894,37 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	if err != nil {
 		return 0, err
 	}
-	return 0, nil
+	return newPos, nil
 }
 
 func (d *Database) SendToDeviceUpdatesForSync(
 	ctx context.Context,
 	userID, deviceID string,
-	token types.StreamingToken,
-) (types.StreamPosition, []types.SendToDeviceEvent, []types.SendToDeviceNID, []types.SendToDeviceNID, error) {
+	from, to types.StreamPosition,
+) (types.StreamPosition, []types.SendToDeviceEvent, error) {
 	// First of all, get our send-to-device updates for this user.
-	lastPos, events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID)
+	lastPos, events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID, from, to)
 	if err != nil {
-		return 0, nil, nil, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
+		return from, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
 	}
-
 	// If there's nothing to do then stop here.
 	if len(events) == 0 {
-		return 0, nil, nil, nil, nil
+		return to, nil, nil
 	}
-
-	// Work out whether we need to update any of the database entries.
-	toReturn := []types.SendToDeviceEvent{}
-	toUpdate := []types.SendToDeviceNID{}
-	toDelete := []types.SendToDeviceNID{}
-	for _, event := range events {
-		if event.SentByToken == nil {
-			// If the event has no sent-by token yet then we haven't attempted to send
-			// it. Record the current requested sync token in the database.
-			toUpdate = append(toUpdate, event.ID)
-			toReturn = append(toReturn, event)
-			event.SentByToken = &token
-		} else if token.IsAfter(*event.SentByToken) {
-			// The event had a sync token, therefore we've sent it before. The current
-			// sync token is now after the stored one so we can assume that the client
-			// successfully completed the previous sync (it would re-request it otherwise)
-			// so we can remove the entry from the database.
-			toDelete = append(toDelete, event.ID)
-		} else {
-			// It looks like the sync is being re-requested, maybe it timed out or
-			// failed. Re-send any that should have been acknowledged by now.
-			toReturn = append(toReturn, event)
-		}
-	}
-
-	return lastPos, toReturn, toUpdate, toDelete, nil
+	return lastPos, events, nil
 }
 
 func (d *Database) CleanSendToDeviceUpdates(
 	ctx context.Context,
-	toUpdate, toDelete []types.SendToDeviceNID,
-	token types.StreamingToken,
+	userID, deviceID string, before types.StreamPosition,
 ) (err error) {
-	if len(toUpdate) == 0 && len(toDelete) == 0 {
-		return nil
+	if err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, userID, deviceID, before)
+	}); err != nil {
+		logrus.WithError(err).Errorf("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
+		return err
 	}
-	// If we need to write to the database then we'll ask the SendToDeviceWriter to
-	// do that for us. It'll guarantee that we don't lock the table for writes in
-	// more than one place.
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		// Delete any send-to-device messages marked for deletion.
-		if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
-			return fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)
-		}
-
-		// Now update any outstanding send-to-device messages with the new sync token.
-		if e := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); e != nil {
-			return fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
-		}
-
-		return nil
-	})
-	return
+	return nil
 }
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event

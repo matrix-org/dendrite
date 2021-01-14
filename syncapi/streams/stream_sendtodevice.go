@@ -10,6 +10,16 @@ type SendToDeviceStreamProvider struct {
 	StreamProvider
 }
 
+func (p *SendToDeviceStreamProvider) Setup() {
+	p.StreamProvider.Setup()
+
+	id, err := p.DB.MaxStreamPositionForSendToDeviceMessages(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	p.latest = id
+}
+
 func (p *SendToDeviceStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
@@ -23,24 +33,19 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	// See if we have any new tasks to do for the send-to-device messaging.
-	lastPos, events, updates, deletions, err := p.DB.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, req.Since)
+	lastPos, events, err := p.DB.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, from, to)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.SendToDeviceUpdatesForSync failed")
 		return from
 	}
 
-	// Before we return the sync response, make sure that we take action on
-	// any send-to-device database updates or deletions that we need to do.
-	// Then add the updates into the sync response.
-	if len(updates) > 0 || len(deletions) > 0 {
-		// Handle the updates and deletions in the database.
-		err = p.DB.CleanSendToDeviceUpdates(context.Background(), updates, deletions, req.Since)
-		if err != nil {
+	if len(events) > 0 {
+		// Clean up old send-to-device messages from before this stream position.
+		if err := p.DB.CleanSendToDeviceUpdates(req.Context, req.Device.UserID, req.Device.ID, from); err != nil {
 			req.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
 			return from
 		}
-	}
-	if len(events) > 0 {
+
 		// Add the updates into the sync response.
 		for _, event := range events {
 			req.Response.ToDevice.Events = append(req.Response.ToDevice.Events, event.SendToDeviceEvent)

@@ -492,14 +492,11 @@ func NewLeaveResponse() *LeaveResponse {
 	return &res
 }
 
-type SendToDeviceNID int
-
 type SendToDeviceEvent struct {
 	gomatrixserverlib.SendToDeviceEvent
-	ID          SendToDeviceNID
-	UserID      string
-	DeviceID    string
-	SentByToken *StreamingToken
+	ID       StreamPosition
+	UserID   string
+	DeviceID string
 }
 
 type PeekingDevice struct {
