@@ -30,7 +30,7 @@ import (
 )
 
 const defaultSyncTimeout = time.Duration(0)
-const DefaultTimelineLimit = 20
+const defaultTimelineLimit = 20
 
 func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*types.SyncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
@@ -76,16 +76,15 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	}
 	limit := filter.Room.Timeline.Limit
 	if limit == 0 {
-		limit = DefaultTimelineLimit
+		filter.Room.Timeline.Limit = defaultTimelineLimit
 	}
-	// TODO: Additional query params: set_presence, filter
+	// TODO: Additional query params: set_presence
 
 	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"user_id":   device.UserID,
 		"device_id": device.ID,
 		"since":     since,
 		"timeout":   timeout,
-		"limit":     limit,
 	})
 
 	return &types.SyncRequest{
@@ -96,7 +95,6 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		Filter:        filter,                  //
 		Since:         since,                   //
 		Timeout:       timeout,                 //
-		Limit:         limit,                   //
 		Rooms:         make(map[string]string), // Populated by the PDU stream
 		WantFullState: wantFullState,           //
 	}, nil

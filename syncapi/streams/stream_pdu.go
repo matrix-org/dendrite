@@ -8,6 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 type PDUStreamProvider struct {
@@ -146,7 +147,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	}
 
 	for _, delta := range stateDeltas {
-		if err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, req.Limit, req.Response); err != nil {
+		if err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, req.Filter.Room.Timeline.Limit, req.Response); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			return newPos
 		}
@@ -179,6 +180,13 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	if err != nil {
 		return err
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"limited":            limited,
+		"delta.stateEvents":  len(delta.StateEvents),
+		"recentStreamEvents": len(recentStreamEvents),
+	}).Info("isync addRoomDeltaToResponse removeDuplicates")
+
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
 	prevBatch, err := p.DB.GetBackwardTopologyPos(ctx, recentStreamEvents)
@@ -250,7 +258,44 @@ func (p *PDUStreamProvider) getResponseForCompleteSync(
 		return
 	}
 
-	recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, stateEvents, device, limited)
+	events := make([]string, len(recentStreamEvents))
+	for i, v := range recentStreamEvents {
+		events[i] = string(v.HeaderedEvent.Event.JSON())
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"filter.Room.Timeline.Limit": filter.Room.Timeline.Limit,
+		"recentStreamEvents":         fmt.Sprintf("%+v", events),
+	}).Info("getResponseForCompleteSync")
+
+	//recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, stateEvents, device, limited)
+
+	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
+	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
+	// which is equiv to history_visibility: joined
+	joinEventIndex := -1
+	for i := len(recentStreamEvents) - 1; i >= 0; i-- {
+		ev := recentStreamEvents[i]
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(device.UserID) {
+			membership, _ := ev.Membership()
+			if membership == "join" {
+				joinEventIndex = i
+				if i > 0 {
+					// the create event happens before the first join, so we should cut it at that point instead
+					if recentStreamEvents[i-1].Type() == gomatrixserverlib.MRoomCreate && recentStreamEvents[i-1].StateKeyEquals("") {
+						joinEventIndex = i - 1
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+	if joinEventIndex != -1 {
+		// cut all events earlier than the join (but not the join itself)
+		recentStreamEvents = recentStreamEvents[joinEventIndex:]
+		limited = false // so clients know not to try to backpaginate
+	}
 
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
@@ -381,6 +426,17 @@ func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 	if leaveEventIndex != -1 {
 		sliceEnd = leaveEventIndex
 	}
+
+	events := make([]string, len(recentStreamEvents))
+	for i, v := range recentStreamEvents {
+		events[i] = string(v.HeaderedEvent.Event.JSON())
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"sliceStart":                sliceStart,
+		"sliceEnd":                  sliceEnd,
+		"before recentStreamEvents": fmt.Sprintf("%+v", events),
+	}).Info("cutting down the events")
 
 	return recentStreamEvents[sliceStart:sliceEnd], limited
 }

@@ -16,7 +16,6 @@ type SyncRequest struct {
 	Response      *Response
 	Filter        gomatrixserverlib.Filter
 	Since         StreamingToken
-	Limit         int
 	Timeout       time.Duration
 	WantFullState bool
 
