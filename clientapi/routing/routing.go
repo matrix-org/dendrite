@@ -62,6 +62,11 @@ func Setup(
 	rateLimits := newRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
 
+	unstableFeatures := make(map[string]bool)
+	for _,msc := range cfg.MSCs.MSCs {
+		unstableFeatures["org.matrix." + msc] = true
+	}
+
 	publicAPIMux.Handle("/versions",
 		httputil.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
@@ -77,9 +82,7 @@ func Setup(
 					"r0.4.0",
 					"r0.5.0",
 					"r0.6.1",
-				},UnstableFeatures: map[string]bool{
-					"org.matrix.msc2836": true,
-				}},
+				},UnstableFeatures: unstableFeatures},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
