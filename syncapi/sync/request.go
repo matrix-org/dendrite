@@ -17,6 +17,7 @@ package sync
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -74,9 +75,13 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	if f != nil {
 		filter = *f
 	}
-	limit := filter.Room.Timeline.Limit
-	if limit == 0 {
+	// TODO: Get a better to default these
+	// Ideally, we could merge the default base filter with the parsed one
+	if filter.Room.Timeline.Limit == 0 {
 		filter.Room.Timeline.Limit = defaultTimelineLimit
+	}
+	if filter.Room.State.Limit == 0 {
+		filter.Room.State.Limit = math.MaxInt32
 	}
 	// TODO: Additional query params: set_presence
 
