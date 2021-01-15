@@ -244,10 +244,6 @@ func (p *PDUStreamProvider) getResponseForCompleteSync(
 	recentEvents, stateEvents []*gomatrixserverlib.HeaderedEvent,
 	prevBatch *types.TopologyToken, limited bool, err error,
 ) {
-	stateEvents, err = p.DB.CurrentState(ctx, roomID, &filter.Room.State)
-	if err != nil {
-		return
-	}
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 	var recentStreamEvents []types.StreamEvent
@@ -257,18 +253,24 @@ func (p *PDUStreamProvider) getResponseForCompleteSync(
 	if err != nil {
 		return
 	}
+	recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, stateEvents, device, limited)
 
-	events := make([]string, len(recentStreamEvents))
-	for i, v := range recentStreamEvents {
-		events[i] = string(v.HeaderedEvent.Event.JSON())
+	// TODO: How do we apply filter.Room.State to this as well?
+	// Is there a generic function where we can pass a list of events and filter and get the result?
+	// This is based off of Synapse where we derive the state from the resultant timeline events
+	// https://github.com/matrix-org/synapse/blob/14950a45d6ff3a5ea737322af1096a49b079f2eb/synapse/handlers/sync.py#L791-L795
+	for _, event := range recentStreamEvents {
+		if event.HeaderedEvent.Event.StateKey() != nil {
+			stateEvents = append(stateEvents, event.HeaderedEvent)
+		}
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"filter.Room.Timeline.Limit": filter.Room.Timeline.Limit,
-		"recentStreamEvents":         fmt.Sprintf("%+v", events),
-	}).Info("getResponseForCompleteSync")
-
-	recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, stateEvents, device, limited)
+	// Note: I feel like this is flawed. We only want stateEvents in the events we filtered already
+	// so I've opted with the option above to derive the `stateEvents`
+	// stateEvents, err = p.DB.CurrentState(ctx, roomID, &filter.Room.State)
+	// if err != nil {
+	// 	return
+	// }
 
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
@@ -351,6 +353,9 @@ func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 			}
 			switch content.HistoryVisibility {
 			case "world_readable", "shared":
+				logrus.WithFields(logrus.Fields{
+					"content.HistoryVisibility": content.HistoryVisibility,
+				}).Info("filterStreamEventsAccordingToHistoryVisibility: No filtering needed for these events")
 				return recentStreamEvents, limited
 			default:
 				break
@@ -409,7 +414,7 @@ func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 		"sliceStart":                sliceStart,
 		"sliceEnd":                  sliceEnd,
 		"before recentStreamEvents": fmt.Sprintf("%+v", events),
-	}).Info("cutting down the events")
+	}).Info("filterStreamEventsAccordingToHistoryVisibility: cutting down the events")
 
 	return recentStreamEvents[sliceStart:sliceEnd], limited
 }
