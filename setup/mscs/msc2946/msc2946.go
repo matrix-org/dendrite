@@ -41,33 +41,10 @@ const (
 	ConstSpaceParentEventType  = "org.matrix.msc1772.space.parent"
 )
 
-// SpacesRequest is the request body to POST /_matrix/client/r0/rooms/{roomID}/spaces
-type SpacesRequest struct {
-	MaxRoomsPerSpace int    `json:"max_rooms_per_space"`
-	Limit            int    `json:"limit"`
-	Batch            string `json:"batch"`
-}
-
 // Defaults sets the request defaults
-func (r *SpacesRequest) Defaults() {
+func Defaults(r *gomatrixserverlib.MSC2946SpacesRequest) {
 	r.Limit = 100
 	r.MaxRoomsPerSpace = -1
-}
-
-// SpacesResponse is the response body to POST /_matrix/client/r0/rooms/{roomID}/spaces
-type SpacesResponse struct {
-	NextBatch string `json:"next_batch"`
-	// Rooms are nodes on the space graph.
-	Rooms []Room `json:"rooms"`
-	// Events are edges on the space graph, exclusively m.space.child or m.space.parent events
-	Events []gomatrixserverlib.ClientEvent `json:"events"`
-}
-
-// Room is a node on the space graph
-type Room struct {
-	gomatrixserverlib.PublicRoom
-	NumRefs  int    `json:"num_refs"`
-	RoomType string `json:"room_type"`
 }
 
 // Enable this MSC
@@ -127,8 +104,8 @@ func spacesHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*ht
 			return util.ErrorResponse(err)
 		}
 		roomID := params["roomID"]
-		var r SpacesRequest
-		r.Defaults()
+		var r gomatrixserverlib.MSC2946SpacesRequest
+		Defaults(&r)
 		if resErr := chttputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 			return *resErr
 		}
@@ -154,7 +131,7 @@ func spacesHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*ht
 }
 
 type walker struct {
-	req        *SpacesRequest
+	req        *gomatrixserverlib.MSC2946SpacesRequest
 	rootRoomID string
 	caller     *userapi.Device
 	db         Database
@@ -188,8 +165,8 @@ func (w *walker) markSent(id string) {
 }
 
 // nolint:gocyclo
-func (w *walker) walk() *SpacesResponse {
-	var res SpacesResponse
+func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
+	var res gomatrixserverlib.MSC2946SpacesResponse
 	// Begin walking the graph starting with the room ID in the request in a queue of unvisited rooms
 	unvisited := []string{w.rootRoomID}
 	processed := make(set)
@@ -227,7 +204,7 @@ func (w *walker) walk() *SpacesResponse {
 			}
 
 			// Add the total number of events to `PublicRoomsChunk` under `num_refs`. Add `PublicRoomsChunk` to `rooms`.
-			res.Rooms = append(res.Rooms, Room{
+			res.Rooms = append(res.Rooms, gomatrixserverlib.MSC2946Room{
 				PublicRoom: *pubRoom,
 				NumRefs:    refs.len(),
 				RoomType:   roomType,
@@ -241,12 +218,11 @@ func (w *walker) walk() *SpacesResponse {
 		if w.rootRoomID == roomID {
 			for _, ev := range refs.events() {
 				if !w.alreadySent(ev.EventID()) {
-					res.Events = append(res.Events, gomatrixserverlib.HeaderedToClientEvent(
-						ev, gomatrixserverlib.FormatAll,
-					))
+					res.Events = append(res.Events, ev.Event)
 					uniqueRooms[ev.RoomID()] = true
 					uniqueRooms[SpaceTarget(ev)] = true
 					w.markSent(ev.EventID())
+					res.SetRoomVersion(ev.RoomVersion)
 				}
 			}
 		} else {
@@ -263,9 +239,7 @@ func (w *walker) walk() *SpacesResponse {
 				if w.alreadySent(ev.EventID()) {
 					continue
 				}
-				res.Events = append(res.Events, gomatrixserverlib.HeaderedToClientEvent(
-					ev, gomatrixserverlib.FormatAll,
-				))
+				res.Events = append(res.Events, ev.Event)
 				uniqueRooms[ev.RoomID()] = true
 				uniqueRooms[SpaceTarget(ev)] = true
 				w.markSent(ev.EventID())

@@ -41,6 +41,7 @@ var (
 	client = &http.Client{
 		Timeout: 10 * time.Second,
 	}
+	roomVer = gomatrixserverlib.RoomVersionV6
 )
 
 // Basic sanity check of MSC2946 logic. Tests a single room with a few state events
@@ -269,13 +270,13 @@ func TestMSC2946(t *testing.T) {
 	})
 }
 
-func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2946.SpacesRequest {
+func newReq(t *testing.T, jsonBody map[string]interface{}) *gomatrixserverlib.MSC2946SpacesRequest {
 	t.Helper()
 	b, err := json.Marshal(jsonBody)
 	if err != nil {
 		t.Fatalf("Failed to marshal request: %s", err)
 	}
-	var r msc2946.SpacesRequest
+	var r gomatrixserverlib.MSC2946SpacesRequest
 	if err := json.Unmarshal(b, &r); err != nil {
 		t.Fatalf("Failed to unmarshal request: %s", err)
 	}
@@ -299,10 +300,10 @@ func runServer(t *testing.T, router *mux.Router) func() {
 	}
 }
 
-func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *msc2946.SpacesRequest) *msc2946.SpacesResponse {
+func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *gomatrixserverlib.MSC2946SpacesRequest) *gomatrixserverlib.MSC2946SpacesResponse {
 	t.Helper()
-	var r msc2946.SpacesRequest
-	r.Defaults()
+	var r gomatrixserverlib.MSC2946SpacesRequest
+	msc2946.Defaults(&r)
 	data, err := json.Marshal(req)
 	if err != nil {
 		t.Fatalf("failed to marshal request: %s", err)
@@ -324,7 +325,8 @@ func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *m
 		t.Fatalf("wrong response code, got %d want %d - body: %s", res.StatusCode, expectCode, string(body))
 	}
 	if res.StatusCode == 200 {
-		var result msc2946.SpacesResponse
+		var result gomatrixserverlib.MSC2946SpacesResponse
+		result.SetRoomVersion(roomVer)
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("response 200 OK but failed to read response body: %s", err)
@@ -472,7 +474,6 @@ type fledglingEvent struct {
 
 func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
-	roomVer := gomatrixserverlib.RoomVersionV6
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
 	eb := gomatrixserverlib.EventBuilder{
