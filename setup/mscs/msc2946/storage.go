@@ -81,7 +81,7 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	if d.insertEdgeStmt, err = d.db.Prepare(`
 		INSERT INTO msc2946_edges(room_version, source_room_id, dest_room_id, rel_type, event_json)
 		VALUES($1, $2, $3, $4, $5)
-		ON CONFLICT DO NOTHING
+		ON CONFLICT ON CONSTRAINT msc2946_edges_uniq DO UPDATE SET event_json = $5
 	`); err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	if d.insertEdgeStmt, err = d.db.Prepare(`
 		INSERT INTO msc2946_edges(room_version, source_room_id, dest_room_id, rel_type, event_json)
 		VALUES($1, $2, $3, $4, $5)
-		ON CONFLICT DO NOTHING
+		ON CONFLICT (source_room_id, dest_room_id, rel_type) DO UPDATE SET event_json = $5
 	`); err != nil {
 		return nil, err
 	}
