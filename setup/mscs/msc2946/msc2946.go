@@ -143,6 +143,15 @@ type walker struct {
 	mu                 sync.Mutex
 }
 
+func (w *walker) roomIsExcluded(roomID string) bool {
+	for _, exclRoom := range w.req.ExcludeRooms {
+		if exclRoom == roomID {
+			return true
+		}
+	}
+	return false
+}
+
 func (w *walker) alreadySent(id string) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -195,7 +204,7 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 
 		// If this room has not ever been in `rooms` (across multiple requests), extract the
 		// `PublicRoomsChunk` for this room.
-		if !w.alreadySent(roomID) {
+		if !w.alreadySent(roomID) && !w.roomIsExcluded(roomID) {
 			pubRoom := w.publicRoomsChunk(roomID)
 			roomType := ""
 			create := w.stateEvent(roomID, gomatrixserverlib.MRoomCreate, "")
@@ -209,6 +218,7 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 				NumRefs:    refs.len(),
 				RoomType:   roomType,
 			})
+			w.markSent(roomID)
 		}
 
 		uniqueRooms := make(set)
@@ -237,6 +247,11 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 					break
 				}
 				if w.alreadySent(ev.EventID()) {
+					continue
+				}
+				// Skip the room if it's part of exclude_rooms but ONLY IF the source matches, as we still
+				// want to catch arrows which point to excluded rooms.
+				if w.roomIsExcluded(ev.RoomID()) {
 					continue
 				}
 				res.Events = append(res.Events, ev.Event)
