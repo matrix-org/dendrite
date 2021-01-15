@@ -17,6 +17,7 @@ package msc2946
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/gorilla/mux"
 	chttputil "github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -79,19 +81,49 @@ func Enable(
 			if fedReq == nil {
 				return errResp
 			}
-			return federatedSpacesHandler(req.Context(), fedReq, db, rsAPI, fsAPI)
+			// Extract the room ID from the request. Sanity check request data.
+			params, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			roomID := params["roomID"]
+			return federatedSpacesHandler(req.Context(), fedReq, roomID, db, rsAPI, fsAPI)
 		},
 	)).Methods(http.MethodPost, http.MethodOptions)
 	return nil
 }
 
 func federatedSpacesHandler(
-	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database,
+	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, roomID string, db Database,
 	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
 ) util.JSONResponse {
+	inMemoryBatchCache := make(map[string]set)
+	var r gomatrixserverlib.MSC2946SpacesRequest
+	Defaults(&r)
+	if err := json.Unmarshal(fedReq.Content(), &r); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+	if r.Limit > 100 {
+		r.Limit = 100
+	}
+	w := walker{
+		req:        &r,
+		rootRoomID: roomID,
+		serverName: fedReq.Origin(),
+		ctx:        ctx,
+
+		db:                 db,
+		rsAPI:              rsAPI,
+		fsAPI:              fsAPI,
+		inMemoryBatchCache: inMemoryBatchCache,
+	}
+	res := w.walk()
 	return util.JSONResponse{
 		Code: 200,
-		JSON: struct{}{},
+		JSON: res,
 	}
 }
 
@@ -134,8 +166,10 @@ type walker struct {
 	req        *gomatrixserverlib.MSC2946SpacesRequest
 	rootRoomID string
 	caller     *userapi.Device
+	serverName gomatrixserverlib.ServerName
 	db         Database
 	rsAPI      roomserver.RoomserverInternalAPI
+	fsAPI      fs.FederationSenderInternalAPI
 	ctx        context.Context
 
 	// user ID|device ID|batch_num => event/room IDs sent to client
@@ -152,10 +186,17 @@ func (w *walker) roomIsExcluded(roomID string) bool {
 	return false
 }
 
+func (w *walker) callerID() string {
+	if w.caller != nil {
+		return w.caller.UserID + "|" + w.caller.ID
+	}
+	return string(w.serverName)
+}
+
 func (w *walker) alreadySent(id string) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	m, ok := w.inMemoryBatchCache[w.caller.UserID+"|"+w.caller.ID]
+	m, ok := w.inMemoryBatchCache[w.callerID()]
 	if !ok {
 		return false
 	}
@@ -165,12 +206,12 @@ func (w *walker) alreadySent(id string) bool {
 func (w *walker) markSent(id string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	m := w.inMemoryBatchCache[w.caller.UserID+"|"+w.caller.ID]
+	m := w.inMemoryBatchCache[w.callerID()]
 	if m == nil {
 		m = make(set)
 	}
 	m[id] = true
-	w.inMemoryBatchCache[w.caller.UserID+"|"+w.caller.ID] = m
+	w.inMemoryBatchCache[w.callerID()] = m
 }
 
 // nolint:gocyclo
@@ -303,6 +344,56 @@ func (w *walker) publicRoomsChunk(roomID string) *gomatrixserverlib.PublicRoom {
 
 // authorised returns true iff the user is joined this room or the room is world_readable
 func (w *walker) authorised(roomID string) bool {
+	if w.caller != nil {
+		return w.authorisedUser(roomID)
+	}
+	return w.authorisedServer(roomID)
+}
+
+// authorisedServer returns true iff the server is joined this room or the room is world_readable
+func (w *walker) authorisedServer(roomID string) bool {
+	// Check history visibility first
+	hisVisTuple := gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomHistoryVisibility,
+		StateKey:  "",
+	}
+	var queryRoomRes roomserver.QueryCurrentStateResponse
+	err := w.rsAPI.QueryCurrentState(w.ctx, &roomserver.QueryCurrentStateRequest{
+		RoomID: roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{
+			hisVisTuple,
+		},
+	}, &queryRoomRes)
+	if err != nil {
+		util.GetLogger(w.ctx).WithError(err).Error("failed to QueryCurrentState")
+		return false
+	}
+	hisVisEv := queryRoomRes.StateEvents[hisVisTuple]
+	if hisVisEv != nil {
+		hisVis, _ := hisVisEv.HistoryVisibility()
+		if hisVis == "world_readable" {
+			return true
+		}
+	}
+	// check if server is joined to the room
+	var queryRes fs.QueryJoinedHostServerNamesInRoomResponse
+	err = w.fsAPI.QueryJoinedHostServerNamesInRoom(w.ctx, &fs.QueryJoinedHostServerNamesInRoomRequest{
+		RoomID: roomID,
+	}, &queryRes)
+	if err != nil {
+		util.GetLogger(w.ctx).WithError(err).Error("failed to QueryJoinedHostServerNamesInRoom")
+		return false
+	}
+	for _, srv := range queryRes.ServerNames {
+		if srv == w.serverName {
+			return true
+		}
+	}
+	return false
+}
+
+// authorisedUser returns true iff the user is joined this room or the room is world_readable
+func (w *walker) authorisedUser(roomID string) bool {
 	hisVisTuple := gomatrixserverlib.StateKeyTuple{
 		EventType: gomatrixserverlib.MRoomHistoryVisibility,
 		StateKey:  "",
