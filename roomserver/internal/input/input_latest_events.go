@@ -204,30 +204,32 @@ func (u *latestEventsUpdater) latestState() error {
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the
 	// hard work.
-	stateChanged := false
-	oldStateNIDs := make([]types.StateSnapshotNID, 0, len(u.oldLatest))
-	newStateNIDs := make([]types.StateSnapshotNID, 0, len(u.latest))
-	for _, old := range u.oldLatest {
-		oldStateNIDs = append(oldStateNIDs, old.BeforeStateSnapshotNID)
-	}
-	for _, new := range u.latest {
-		newStateNIDs = append(newStateNIDs, new.BeforeStateSnapshotNID)
-	}
-	oldStateNIDs = state.UniqueStateSnapshotNIDs(oldStateNIDs)
-	newStateNIDs = state.UniqueStateSnapshotNIDs(newStateNIDs)
-	if len(oldStateNIDs) != len(newStateNIDs) {
-		stateChanged = true
-	} else {
-		for i := range oldStateNIDs {
-			if oldStateNIDs[i] != newStateNIDs[i] {
-				stateChanged = true
-				break
+	if u.event.StateKey() == nil {
+		stateChanged := false
+		oldStateNIDs := make([]types.StateSnapshotNID, 0, len(u.oldLatest))
+		newStateNIDs := make([]types.StateSnapshotNID, 0, len(u.latest))
+		for _, old := range u.oldLatest {
+			oldStateNIDs = append(oldStateNIDs, old.BeforeStateSnapshotNID)
+		}
+		for _, new := range u.latest {
+			newStateNIDs = append(newStateNIDs, new.BeforeStateSnapshotNID)
+		}
+		oldStateNIDs = state.UniqueStateSnapshotNIDs(oldStateNIDs)
+		newStateNIDs = state.UniqueStateSnapshotNIDs(newStateNIDs)
+		if len(oldStateNIDs) != len(newStateNIDs) {
+			stateChanged = true
+		} else {
+			for i := range oldStateNIDs {
+				if oldStateNIDs[i] != newStateNIDs[i] {
+					stateChanged = true
+					break
+				}
 			}
 		}
-	}
-	if !stateChanged {
-		u.newStateNID = u.oldStateNID
-		return nil
+		if !stateChanged {
+			u.newStateNID = u.oldStateNID
+			return nil
+		}
 	}
 
 	// Get a list of the current latest events. This may or may not
