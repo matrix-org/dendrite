@@ -254,7 +254,26 @@ func TestMSC2946(t *testing.T) {
 		if len(res.Rooms) != len(allRooms) {
 			t.Errorf("got %d rooms, want %d", len(res.Rooms), len(allRooms))
 		}
+	})
+	t.Run("can update the graph", func(t *testing.T) {
+		// remove R3 from the graph
+		rmS1ToR3 := mustCreateEvent(t, fledglingEvent{
+			RoomID:   subSpaceS1,
+			Sender:   alice,
+			Type:     msc2946.ConstSpaceChildEventType,
+			StateKey: &room3,
+			Content:  map[string]interface{}{}, // redacted
+		})
+		nopRsAPI.events[rmS1ToR3.EventID()] = rmS1ToR3
+		hooks.Run(hooks.KindNewEventPersisted, rmS1ToR3)
 
+		res := postSpaces(t, 200, "alice", rootSpace, newReq(t, map[string]interface{}{}))
+		if len(res.Events) != 6 { // one less since we don't return redacted events
+			t.Errorf("got %d events, want 6", len(res.Events))
+		}
+		if len(res.Rooms) != (len(allRooms) - 1) { // one less due to lack of R3
+			t.Errorf("got %d rooms, want %d", len(res.Rooms), len(allRooms)-1)
+		}
 	})
 }
 

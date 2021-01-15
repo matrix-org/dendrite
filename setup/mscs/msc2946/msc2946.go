@@ -333,7 +333,12 @@ func (w *walker) references(roomID string) (eventLookup, error) {
 	}
 	el := make(eventLookup)
 	for _, ev := range events {
-		el.set(ev)
+		// only return events that have a `via` key as per MSC1772
+		// else we'll incorrectly walk redacted events (as the link
+		// is in the state_key)
+		if gjson.GetBytes(ev.Content(), "via").Exists() {
+			el.set(ev)
+		}
 	}
 	return el, nil
 }
