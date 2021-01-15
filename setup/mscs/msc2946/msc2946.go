@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 	chttputil "github.com/matrix-org/dendrite/clientapi/httputil"
+	fs "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
@@ -71,6 +73,7 @@ type Room struct {
 // Enable this MSC
 func Enable(
 	base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI,
+	fsAPI fs.FederationSenderInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
 	db, err := NewDatabase(&base.Cfg.MSCs.Database)
 	if err != nil {
@@ -90,7 +93,29 @@ func Enable(
 	base.PublicClientAPIMux.Handle("/unstable/rooms/{roomID}/spaces",
 		httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(db, rsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	base.PublicFederationAPIMux.Handle("/unstable/spaces/{roomID}", httputil.MakeExternalAPI(
+		"msc2946_fed_spaces", func(req *http.Request) util.JSONResponse {
+			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
+				req, time.Now(), base.Cfg.Global.ServerName, keyRing,
+			)
+			if fedReq == nil {
+				return errResp
+			}
+			return federatedSpacesHandler(req.Context(), fedReq, db, rsAPI, fsAPI)
+		},
+	)).Methods(http.MethodPost, http.MethodOptions)
 	return nil
+}
+
+func federatedSpacesHandler(
+	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database,
+	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
+) util.JSONResponse {
+	return util.JSONResponse{
+		Code: 200,
+		JSON: struct{}{},
+	}
 }
 
 func spacesHandler(db Database, rsAPI roomserver.RoomserverInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {

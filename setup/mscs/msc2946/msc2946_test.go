@@ -452,7 +452,7 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 		PublicFederationAPIMux: mux.NewRouter().PathPrefix(httputil.PublicFederationPathPrefix).Subrouter(),
 	}
 
-	err := msc2946.Enable(base, rsAPI, userAPI)
+	err := msc2946.Enable(base, rsAPI, userAPI, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to enable MSC2946: %s", err)
 	}
