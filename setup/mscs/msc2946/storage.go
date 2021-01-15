@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/tidwall/gjson"
 )
 
 var (
@@ -175,7 +174,7 @@ func SpaceTarget(he *gomatrixserverlib.HeaderedEvent) string {
 	}
 	switch he.Type() {
 	case ConstSpaceParentEventType:
-		return gjson.GetBytes(he.Content(), "room_id").Str
+		return *he.StateKey()
 	case ConstSpaceChildEventType:
 		return *he.StateKey()
 	}

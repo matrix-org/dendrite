@@ -86,8 +86,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &room1,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	rootToR2 := mustCreateEvent(t, fledglingEvent{
@@ -96,8 +95,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &room2,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	rootToS1 := mustCreateEvent(t, fledglingEvent{
@@ -106,8 +104,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &subSpaceS1,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	s1ToR3 := mustCreateEvent(t, fledglingEvent{
@@ -116,8 +113,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &room3,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	s1ToR4 := mustCreateEvent(t, fledglingEvent{
@@ -126,8 +122,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &room4,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	s1ToS2 := mustCreateEvent(t, fledglingEvent{
@@ -136,8 +131,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &subSpaceS2,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	// This is a parent link only
@@ -145,11 +139,9 @@ func TestMSC2946(t *testing.T) {
 		RoomID:   room5,
 		Sender:   alice,
 		Type:     msc2946.ConstSpaceParentEventType,
-		StateKey: &empty,
+		StateKey: &subSpaceS2,
 		Content: map[string]interface{}{
-			"room_id": subSpaceS2,
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	// history visibility for R4
