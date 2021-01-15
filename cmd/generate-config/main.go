@@ -63,7 +63,7 @@ func main() {
 	if *defaultsForCI {
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		cfg.FederationSender.DisableTLSValidation = true
-		cfg.MSCs.MSCs = []string{"msc2836"}
+		cfg.MSCs.MSCs = []string{"msc2836","msc2946"}
 		cfg.Logging[0].Level = "trace"
 		// don't hit matrix.org when running tests!!!
 		cfg.SigningKeyServer.KeyPerspectives = config.KeyPerspectives{}
