@@ -317,7 +317,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: struct {
-					Versions bool `json:"success"`
+					Success bool `json:"success"`
 				}{true},
 			}
 		}),
