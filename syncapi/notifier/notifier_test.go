@@ -367,7 +367,7 @@ func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) typ
 		Timeout:       1 * time.Minute,
 		Since:         since,
 		WantFullState: false,
-		Limit:         20,
+		Filter:        gomatrixserverlib.DefaultFilter(),
 		Log:           util.GetLogger(context.TODO()),
 		Context:       context.TODO(),
 	}

@@ -142,6 +142,14 @@ func (p *PDUStreamProvider) IncrementalSync(
 		}
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"stateFilter":       fmt.Sprintf("%+v", stateFilter),
+		"from":              from,
+		"to":                to,
+		"req.WantFullState": req.WantFullState,
+		"stateDeltas":       stateDeltas,
+	}).Info("IncrementalSync")
+
 	for _, roomID := range joinedRooms {
 		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
