@@ -4,14 +4,15 @@ services:
     hostname: monolith
     image: matrixdotorg/dendrite-monolith:latest
     command: [
-      "--tls-cert=server.crt",
-      "--tls-key=server.key"
+      "--tls-cert=/keys/server.crt",
+      "--tls-key=/keys/server.key"
     ]
     ports:
       - 8008:8008
       - 8448:8448
     volumes:
       - ./config:/etc/dendrite
+      - ./keys:/keys
     networks:
       - internal
 

@@ -34,13 +34,33 @@ runtime config should come from. The mounted folder must contain:
 - `server.crt` certificate file
 - `server.key` private key file for the above certificate
 
-To generate keys:
+**To generate keys:**  
+With Go installed on the host
 
 ```
+mkdir keys
 go run github.com/matrix-org/dendrite/cmd/generate-keys \
-  --private-key=matrix_key.pem \
-  --tls-cert=server.crt \
-  --tls-key=server.key
+  --private-key=keys/matrix_key.pem \
+  --tls-cert=keys/server.crt \
+  --tls-key=keys/server.key
+```
+
+Without Go on the host, with monolith deployment
+
+```
+docker-compose run --entrypoint generate-keys monolith \
+  --private-key=/keys/matrix_key.pem \
+  --tls-cert=/keys/server.crt \
+  --tls-key=/keys/server.key
+```
+
+Without Go on the host, with polylith deployment
+
+```
+docker-compose run --entrypoint generate-keys key_server \
+  --private-key=/keys/matrix_key.pem \
+  --tls-cert=/keys/server.crt \
+  --tls-key=/keys/server.key
 ```
 
 ## Starting Dendrite as a monolith deployment

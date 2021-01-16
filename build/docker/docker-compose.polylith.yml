@@ -69,6 +69,7 @@ services:
     command: keyserver
     volumes:
       - ./config:/etc/dendrite
+      - ./keys:/keys
     networks:
         - internal
 
