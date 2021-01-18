@@ -17,6 +17,13 @@ else
     export FLAGS=""
 fi
 
-go install -trimpath -ldflags "$FLAGS" -v $PWD/`dirname $0`/cmd/...
+for pkg in ./cmd/*; do
+    if [[ -d "$pkg" && ! -L "$pkg" ]]; then
+        # https://unix.stackexchange.com/a/94307/125869 
+        pkg_x="$(basename -- "$pkg"; echo .)"
+        base="${pkg_x%??}"
+        CGO_ENABLED=1 go build -trimpath -ldflags "$FLAGS" -v -o "./bin/$base" "./cmd/$base"
+    fi
+done
 
-GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o bin/main.wasm ./cmd/dendritejs
+CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o bin/main.wasm ./cmd/dendritejs
