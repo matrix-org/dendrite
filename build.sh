@@ -17,13 +17,6 @@ else
     export FLAGS=""
 fi
 
-for pkg in ./cmd/*; do
-    if [[ -d "$pkg" && ! -L "$pkg" ]]; then
-        # https://unix.stackexchange.com/a/94307/125869 
-        pkg_x="$(basename -- "$pkg"; echo .)"
-        base="${pkg_x%??}"
-        CGO_ENABLED=1 go build -trimpath -ldflags "$FLAGS" -v -o "./bin/$base" "./cmd/$base"
-    fi
-done
+CGO_ENABLED=1 go build -trimpath -ldflags "$FLAGS" -v -o "bin/" ./cmd/...
 
 CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o bin/main.wasm ./cmd/dendritejs
