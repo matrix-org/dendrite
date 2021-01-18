@@ -401,16 +401,16 @@ func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 
 	// Default at the start of the array
 	sliceStart := 0
-	// If there is a joinEvent, then cut all events earlier the join (exclude the join itself too)
+	// If there is a joinEvent, then cut all events earlier the join
 	if joinEventIndex != -1 {
-		sliceStart = joinEventIndex + 1
+		sliceStart = joinEventIndex
 		limited = false // so clients know not to try to backpaginate
 	}
 	// Default to spanning the rest of the array
 	sliceEnd := len(recentStreamEvents)
-	// If there is a leaveEvent, then cut all events after the person left (exclude the leave event too)
+	// If there is a leaveEvent, then cut all events after the person left
 	if leaveEventIndex != -1 {
-		sliceEnd = leaveEventIndex
+		sliceEnd = leaveEventIndex + 1
 	}
 
 	events := make([]string, len(recentStreamEvents))
