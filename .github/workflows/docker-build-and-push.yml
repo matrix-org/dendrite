@@ -5,7 +5,7 @@ name: "Docker Multiarch Build & Push"
 on:
   push:
 #    types: [published]
-    branches: [master]
+    branches: [docker]
 
 env:
   DOCKER_HUB_USER: neilalexander
