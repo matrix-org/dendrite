@@ -1,18 +1,6 @@
 #!/bin/bash
 set -eu
 
-case "$1" in
-"pkgs")
-    get_pkgs
-    ;;
-"ccomp")
-    get_compiler
-    ;;
-*)
-    exit 1
-    ;;
-esac
-
 # Given a GOARCH target, return the GCC for that target.
 function get_compiler() {
     case "$GOARCH" in
@@ -45,3 +33,15 @@ function get_pkgs() {
         ;;
     esac
 }
+
+case "$1" in
+"pkgs")
+    get_pkgs
+    ;;
+"ccomp")
+    get_compiler
+    ;;
+*)
+    exit 1
+    ;;
+esac
