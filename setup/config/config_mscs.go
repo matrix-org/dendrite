@@ -3,7 +3,7 @@ package config
 type MSCs struct {
 	Matrix *Global `yaml:"-"`
 
-	// The MSCs to enable, currently only `msc2836` is supported.
+	// The MSCs to enable
 	MSCs []string `yaml:"mscs"`
 
 	Database DatabaseOptions `yaml:"database"`

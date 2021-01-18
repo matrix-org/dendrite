@@ -257,7 +257,8 @@ media_api:
 mscs:
   # A list of enabled MSC's
   # Currently valid values are:
-  # - msc2836         (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
+  # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
+  # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
   mscs: []
   database:
     connection_string: file:mscs.db
