@@ -1,6 +1,24 @@
 #!/bin/bash
 set -eu
 
+# Given a GOARCH target, return what Docker calls that target.
+function get_docker() {
+    case "$GOARCH" in
+    "amd64")
+        echo "linux/amd64"
+        ;;
+    "arm64")
+        echo "linux/arm64/v8"
+        ;;
+    "arm")
+        echo "linux/arm/v7"
+        ;;
+    *)
+        exit 1
+        ;;
+    esac
+}
+
 # Given a GOARCH target, return the GCC for that target.
 function get_compiler() {
     case "$GOARCH" in
@@ -40,6 +58,9 @@ case "$1" in
     ;;
 "ccomp")
     get_compiler
+    ;;
+"docker")
+    get_docker
     ;;
 *)
     exit 1
