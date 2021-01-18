@@ -245,7 +245,7 @@ func (u *DeviceListUpdater) notifyWorkers(userID string) {
 	}
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(remoteServer))
-	index := int(hash.Sum32()) % len(u.workerChans)
+	index := int(int64(hash.Sum32()) % int64(len(u.workerChans)))
 
 	ch := u.assignChannel(userID)
 	u.workerChans[index] <- remoteServer
