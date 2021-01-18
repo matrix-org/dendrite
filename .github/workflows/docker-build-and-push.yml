@@ -4,10 +4,11 @@ name: "Docker Multiarch Build & Push"
 
 on:
   release:
-    types: [published]
+#    types: [published]
+    branches: [master]
 
 env:
-  DOCKER_HUB_USER: matrixdotorg
+  DOCKER_HUB_USER: neilalexander
 
 jobs:
   BuildAndPush:
@@ -50,7 +51,9 @@ jobs:
           file: ./build/docker/Dockerfile.monolith
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
-          tags: ${{ env.DOCKER_HUB_USER }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
+          tags: |
+            ${{ env.DOCKER_HUB_USER }}/dendrite-monolith:latest
+            ${{ env.DOCKER_HUB_USER }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
       -
         name: Build polylith image
         id: docker_build_polylith
@@ -60,7 +63,9 @@ jobs:
           file: ./build/docker/Dockerfile.polylith
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
-          tags: ${{ env.DOCKER_HUB_USER }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
+          tags: |
+            ${{ env.DOCKER_HUB_USER }}/dendrite-polylith:latest
+            ${{ env.DOCKER_HUB_USER }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
       -
         name: Image digest
         run: |
