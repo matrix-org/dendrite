@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/tidwall/gjson"
 )
 
 var (
@@ -81,7 +80,7 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	if d.insertEdgeStmt, err = d.db.Prepare(`
 		INSERT INTO msc2946_edges(room_version, source_room_id, dest_room_id, rel_type, event_json)
 		VALUES($1, $2, $3, $4, $5)
-		ON CONFLICT DO NOTHING
+		ON CONFLICT ON CONSTRAINT msc2946_edges_uniq DO UPDATE SET event_json = $5
 	`); err != nil {
 		return nil, err
 	}
@@ -121,7 +120,7 @@ func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	if d.insertEdgeStmt, err = d.db.Prepare(`
 		INSERT INTO msc2946_edges(room_version, source_room_id, dest_room_id, rel_type, event_json)
 		VALUES($1, $2, $3, $4, $5)
-		ON CONFLICT DO NOTHING
+		ON CONFLICT (source_room_id, dest_room_id, rel_type) DO UPDATE SET event_json = $5
 	`); err != nil {
 		return nil, err
 	}
@@ -175,7 +174,7 @@ func SpaceTarget(he *gomatrixserverlib.HeaderedEvent) string {
 	}
 	switch he.Type() {
 	case ConstSpaceParentEventType:
-		return gjson.GetBytes(he.Content(), "room_id").Str
+		return *he.StateKey()
 	case ConstSpaceChildEventType:
 		return *he.StateKey()
 	}

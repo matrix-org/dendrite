@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -36,7 +37,7 @@ import (
 const (
 	ConstCreateEventContentKey = "org.matrix.msc1772.type"
 	ConstSpaceChildEventType   = "org.matrix.msc1772.space.child"
-	ConstSpaceParentEventType  = "org.matrix.msc1772.room.parent"
+	ConstSpaceParentEventType  = "org.matrix.msc1772.space.parent"
 )
 
 // SpacesRequest is the request body to POST /_matrix/client/r0/rooms/{roomID}/spaces
@@ -57,7 +58,7 @@ type SpacesResponse struct {
 	NextBatch string `json:"next_batch"`
 	// Rooms are nodes on the space graph.
 	Rooms []Room `json:"rooms"`
-	// Events are edges on the space graph, exclusively m.space.child or m.room.parent events
+	// Events are edges on the space graph, exclusively m.space.child or m.space.parent events
 	Events []gomatrixserverlib.ClientEvent `json:"events"`
 }
 
@@ -182,8 +183,8 @@ func (w *walker) walk() *SpacesResponse {
 		if !w.authorised(roomID) {
 			continue
 		}
-		// Get all `m.space.child` and `m.room.parent` state events for the room. *In addition*, get
-		// all `m.space.child` and `m.room.parent` state events which *point to* (via `state_key` or `content.room_id`)
+		// Get all `m.space.child` and `m.space.parent` state events for the room. *In addition*, get
+		// all `m.space.child` and `m.space.parent` state events which *point to* (via `state_key` or `content.room_id`)
 		// this room. This requires servers to store reverse lookups.
 		refs, err := w.references(roomID)
 		if err != nil {
@@ -196,9 +197,10 @@ func (w *walker) walk() *SpacesResponse {
 		if !w.alreadySent(roomID) {
 			pubRoom := w.publicRoomsChunk(roomID)
 			roomType := ""
-			create := w.stateEvent(roomID, "m.room.create", "")
+			create := w.stateEvent(roomID, gomatrixserverlib.MRoomCreate, "")
 			if create != nil {
-				roomType = gjson.GetBytes(create.Content(), ConstCreateEventContentKey).Str
+				// escape the `.`s so gjson doesn't think it's nested
+				roomType = gjson.GetBytes(create.Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
 			}
 
 			// Add the total number of events to `PublicRoomsChunk` under `num_refs`. Add `PublicRoomsChunk` to `rooms`.
@@ -333,7 +335,12 @@ func (w *walker) references(roomID string) (eventLookup, error) {
 	}
 	el := make(eventLookup)
 	for _, ev := range events {
-		el.set(ev)
+		// only return events that have a `via` key as per MSC1772
+		// else we'll incorrectly walk redacted events (as the link
+		// is in the state_key)
+		if gjson.GetBytes(ev.Content(), "via").Exists() {
+			el.set(ev)
+		}
 	}
 	return el, nil
 }
