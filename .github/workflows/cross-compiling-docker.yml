@@ -1,0 +1,22 @@
+name: "(Cross) Compile Dendrite"
+
+# dummy
+on: push
+
+jobs:
+  compile:
+    strategy:
+      matrix:
+        target: [amd64, arm64, armhf]
+    env:
+      GOARCH: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+    - name: install (cross) compiler
+      run: sudo apt install $(./.github/workflows/get-compiler.sh pkgs)
+    - name: set CC env var
+      run: echo "CC=$(./.github/workflows/get-compiler.sh ccomp)" >> $GITHUB_ENV # https://stackoverflow.com/a/57969570/3551604
+    - run: go env
+    - run: ./build.sh
