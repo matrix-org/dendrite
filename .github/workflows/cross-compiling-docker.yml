@@ -31,6 +31,7 @@ jobs:
         target: [amd64, arm64, arm]
     env:
       DOCKER_HUB_USER: dendritegithub
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: actions/download-artifact@v2
