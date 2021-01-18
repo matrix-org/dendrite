@@ -5,7 +5,7 @@ set -eu
 function get_compiler() {
     case "$GOARCH" in
     "amd64")
-        echo "x86_64-pc-linux-gnu-gcc"
+        echo "x86_64-linux-gnu-gcc"
         ;;
     "arm64")
         echo "aarch64-linux-gnu-gcc"
