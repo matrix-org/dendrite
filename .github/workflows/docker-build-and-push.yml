@@ -3,7 +3,7 @@
 name: "Docker Multiarch Build & Push"
 
 on:
-  release:
+  push:
 #    types: [published]
     branches: [master]
 
