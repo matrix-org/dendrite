@@ -5,10 +5,8 @@ require (
 	github.com/Shopify/sarama v1.27.0
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/gologme/log v1.2.0
-	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/klauspost/compress v1.11.0 // indirect
 	github.com/lib/pq v1.8.0
 	github.com/libp2p/go-libp2p v0.11.0
 	github.com/libp2p/go-libp2p-circuit v0.3.1
@@ -30,8 +28,6 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.2
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
-	github.com/onsi/ginkgo v1.14.1 // indirect
-	github.com/onsi/gomega v1.10.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose v2.7.0-rc5+incompatible
@@ -45,15 +41,10 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20201006093556-760d9a7fd5ee
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20201117144127-c1f2f97bffc9
-	golang.org/x/mod v0.4.0 // indirect
-	golang.org/x/net v0.0.0-20201021035429-f5854403a974
+	golang.org/x/net v0.0.0-20200528225125-3c3fba18258b
 	golang.org/x/sys v0.0.0-20201119102817-f84b799fce68 // indirect
-	golang.org/x/text v0.3.4 // indirect
-	golang.org/x/tools v0.0.0-20210105210202-9ed45478a130 // indirect
-	google.golang.org/grpc v1.21.1 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.4
-	gopkg.in/yaml.v2 v2.4.0
-	honnef.co/go/tools v0.0.1-2020.1.6 // indirect
+	gopkg.in/yaml.v2 v2.3.0
 )
 
 go 1.13
