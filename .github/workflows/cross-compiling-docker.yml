@@ -26,6 +26,7 @@ jobs:
         name: bin-${{ matrix.target }}
         path: ./bin
   build-monolith:
+    needs: [compile]
     strategy:
       matrix:
         target: [amd64, arm64, arm]
