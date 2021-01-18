@@ -77,7 +77,7 @@ global:
     # Naffka database options. Not required when using Kafka.
     naffka_database:
       connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_naffka?sslmode=disable
-      max_open_conns: 100
+      max_open_conns: 10
       max_idle_conns: 2
       conn_max_lifetime: -1
 
@@ -98,7 +98,7 @@ app_service_api:
     connect: http://appservice_api:7777
   database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_appservice?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -173,7 +173,7 @@ federation_sender:
     connect: http://federation_sender:7775
   database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_federationsender?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -199,7 +199,7 @@ key_server:
     connect: http://key_server:7779
   database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_keyserver?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -212,7 +212,7 @@ media_api:
     listen: http://0.0.0.0:8074
   database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_mediaapi?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -248,7 +248,7 @@ room_server:
     connect: http://room_server:7770
   database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_roomserver?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -259,7 +259,7 @@ signing_key_server:
     connect: http://signing_key_server:7780
   database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_signingkeyserver?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -288,7 +288,7 @@ sync_api:
       listen: http://0.0.0.0:8073
   database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_syncapi?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -299,12 +299,12 @@ user_api:
     connect: http://user_api:7781
   account_database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_account?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
   device_database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_device?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
 

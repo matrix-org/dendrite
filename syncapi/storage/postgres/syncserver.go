@@ -20,9 +20,9 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 
@@ -36,6 +36,7 @@ type SyncServerDatasource struct {
 }
 
 // NewDatabase creates a new sync server database
+// nolint:gocyclo
 func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
@@ -82,6 +83,16 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if err != nil {
 		return nil, err
 	}
+	receipts, err := NewPostgresReceiptsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadFixSequences(m)
+	deltas.LoadRemoveSendToDeviceSentColumn(m)
+	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Writer:              d.writer,
@@ -94,7 +105,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		BackwardExtremities: backwardExtremities,
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
-		EDUCache:            cache.New(),
+		Receipts:            receipts,
 	}
 	return &d, nil
 }

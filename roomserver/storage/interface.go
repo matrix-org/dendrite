@@ -69,7 +69,7 @@ type Database interface {
 	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
 	// Stores a matrix room event in the database. Returns the room NID, the state snapshot and the redacted event ID if any, or an error.
 	StoreEvent(
-		ctx context.Context, event gomatrixserverlib.Event, txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
+		ctx context.Context, event *gomatrixserverlib.Event, txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
 		isRejected bool,
 	) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
 	// Look up the state entries for a list of string event IDs
@@ -126,7 +126,7 @@ type Database interface {
 	// in this room, along a boolean set to true if the user is still in this room,
 	// false if not.
 	// Returns an error if there was a problem talking to the database.
-	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom bool, err error)
+	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomForgotten bool, err error)
 	// Lookup the membership event numeric IDs for all user that are or have
 	// been members of a given room. Only lookup events of "join" membership if
 	// joinOnly is set to true.
@@ -158,4 +158,6 @@ type Database interface {
 	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
 	// GetKnownRooms returns a list of all rooms we know about.
 	GetKnownRooms(ctx context.Context) ([]string, error)
+	// ForgetRoom sets a flag in the membership table, that the user wishes to forget a specific room
+	ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error
 }

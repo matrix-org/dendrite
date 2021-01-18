@@ -7,6 +7,9 @@ services:
       "--tls-cert=server.crt",
       "--tls-key=server.key"
     ]
+    ports:
+      - 8008:8008
+      - 8448:8448
     volumes:
       - ./config:/etc/dendrite
     networks:

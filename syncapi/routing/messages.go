@@ -22,9 +22,10 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -49,9 +50,10 @@ type messagesReq struct {
 }
 
 type messagesResp struct {
-	Start string                          `json:"start"`
-	End   string                          `json:"end"`
-	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+	Start       string                          `json:"start"`
+	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: so clients can hit /messages then immediately /sync with a latest sync token
+	End         string                          `json:"end"`
+	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
 }
 
 const defaultMessagesLimit = 10
@@ -59,20 +61,44 @@ const defaultMessagesLimit = 10
 // OnIncomingMessagesRequest implements the /messages endpoint from the
 // client-server API.
 // See: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-client-r0-rooms-roomid-messages
+// nolint:gocyclo
 func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string, device *userapi.Device,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
+	srp *sync.RequestPool,
 ) util.JSONResponse {
 	var err error
+
+	// check if the user has already forgotten about this room
+	isForgotten, err := checkIsRoomForgotten(req.Context(), roomID, device.UserID, rsAPI)
+	if err != nil {
+		return jsonerror.InternalServerError()
+	}
+
+	if isForgotten {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user already forgot about this room"),
+		}
+	}
 
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
 	var fromStream *types.StreamingToken
-	from, err := types.NewTopologyTokenFromString(req.URL.Query().Get("from"))
+	fromQuery := req.URL.Query().Get("from")
+	emptyFromSupplied := fromQuery == ""
+	if emptyFromSupplied {
+		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
+		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
+		currPos := srp.Notifier.CurrentPosition()
+		fromQuery = currPos.String()
+	}
+
+	from, err := types.NewTopologyTokenFromString(fromQuery)
 	if err != nil {
-		fs, err2 := types.NewStreamTokenFromString(req.URL.Query().Get("from"))
+		fs, err2 := types.NewStreamTokenFromString(fromQuery)
 		fromStream = &fs
 		if err2 != nil {
 			return util.JSONResponse{
@@ -171,15 +197,33 @@ func OnIncomingMessagesRequest(
 		"return_end":   end.String(),
 	}).Info("Responding")
 
+	res := messagesResp{
+		Chunk: clientEvents,
+		Start: start.String(),
+		End:   end.String(),
+	}
+	if emptyFromSupplied {
+		res.StartStream = fromStream.String()
+	}
+
 	// Respond with the events.
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: messagesResp{
-			Chunk: clientEvents,
-			Start: start.String(),
-			End:   end.String(),
-		},
+		JSON: res,
 	}
+}
+
+func checkIsRoomForgotten(ctx context.Context, roomID, userID string, rsAPI api.RoomserverInternalAPI) (bool, error) {
+	req := api.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: userID,
+	}
+	resp := api.QueryMembershipForUserResponse{}
+	if err := rsAPI.QueryMembershipForUser(ctx, &req, &resp); err != nil {
+		return false, err
+	}
+
+	return resp.IsRoomForgotten, nil
 }
 
 // retrieveEvents retrieves events from the local database for a request on
@@ -208,7 +252,7 @@ func (r *messagesReq) retrieveEvents() (
 		return
 	}
 
-	var events []gomatrixserverlib.HeaderedEvent
+	var events []*gomatrixserverlib.HeaderedEvent
 	util.GetLogger(r.ctx).WithField("start", start).WithField("end", end).Infof("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
@@ -229,11 +273,19 @@ func (r *messagesReq) retrieveEvents() (
 		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
 	}
 
+	// Get the position of the first and the last event in the room's topology.
+	// This position is currently determined by the event's depth, so we could
+	// also use it instead of retrieving from the database. However, if we ever
+	// change the way topological positions are defined (as depth isn't the most
+	// reliable way to define it), it would be easier and less troublesome to
+	// only have to change it in one place, i.e. the database.
+	start, end, err = r.getStartEnd(events)
+
 	// Sort the events to ensure we send them in the right order.
 	if r.backwardOrdering {
 		// This reverses the array from old->new to new->old
-		reversed := func(in []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
-			out := make([]gomatrixserverlib.HeaderedEvent, len(in))
+		reversed := func(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
+			out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
 			for i := 0; i < len(in); i++ {
 				out[i] = in[len(in)-i-1]
 			}
@@ -248,19 +300,11 @@ func (r *messagesReq) retrieveEvents() (
 
 	// Convert all of the events into client events.
 	clientEvents = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll)
-	// Get the position of the first and the last event in the room's topology.
-	// This position is currently determined by the event's depth, so we could
-	// also use it instead of retrieving from the database. However, if we ever
-	// change the way topological positions are defined (as depth isn't the most
-	// reliable way to define it), it would be easier and less troublesome to
-	// only have to change it in one place, i.e. the database.
-	start, end, err = r.getStartEnd(events)
-
 	return clientEvents, start, end, err
 }
 
 // nolint:gocyclo
-func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEvent) []gomatrixserverlib.HeaderedEvent {
+func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
 	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
 	// which is equiv to history_visibility: joined
@@ -275,8 +319,8 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 		}
 	}
 
-	var result []gomatrixserverlib.HeaderedEvent
-	var eventsToCheck []gomatrixserverlib.HeaderedEvent
+	var result []*gomatrixserverlib.HeaderedEvent
+	var eventsToCheck []*gomatrixserverlib.HeaderedEvent
 	if joinEventIndex != -1 {
 		if r.backwardOrdering {
 			result = events[:joinEventIndex+1]
@@ -286,7 +330,7 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 			eventsToCheck = append(eventsToCheck, result[len(result)-1])
 		}
 	} else {
-		eventsToCheck = []gomatrixserverlib.HeaderedEvent{events[0], events[len(events)-1]}
+		eventsToCheck = []*gomatrixserverlib.HeaderedEvent{events[0], events[len(events)-1]}
 		result = events
 	}
 	// make sure the user was in the room for both the earliest and latest events, we need this because
@@ -310,16 +354,16 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 		for i := range queryRes.StateEvents {
 			switch queryRes.StateEvents[i].Type() {
 			case gomatrixserverlib.MRoomMember:
-				membershipEvent = &queryRes.StateEvents[i]
+				membershipEvent = queryRes.StateEvents[i]
 			case gomatrixserverlib.MRoomHistoryVisibility:
-				hisVisEvent = &queryRes.StateEvents[i]
+				hisVisEvent = queryRes.StateEvents[i]
 			}
 		}
 		if hisVisEvent == nil {
 			return events // apply no filtering as it defaults to Shared.
 		}
 		hisVis, _ := hisVisEvent.HistoryVisibility()
-		if hisVis == "shared" {
+		if hisVis == "shared" || hisVis == "world_readable" {
 			return events // apply no filtering
 		}
 		if membershipEvent == nil {
@@ -338,32 +382,22 @@ func (r *messagesReq) filterHistoryVisible(events []gomatrixserverlib.HeaderedEv
 	}
 	if !wasJoined {
 		util.GetLogger(r.ctx).WithField("num_events", len(events)).Warnf("%s was not joined to room during these events, omitting them", r.device.UserID)
-		return []gomatrixserverlib.HeaderedEvent{}
+		return []*gomatrixserverlib.HeaderedEvent{}
 	}
 	return result
 }
 
-func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
-	start, err = r.db.EventPositionInTopology(
-		r.ctx, events[0].EventID(),
-	)
-	if err != nil {
-		err = fmt.Errorf("EventPositionInTopology: for start event %s: %w", events[0].EventID(), err)
-		return
-	}
-	if r.backwardOrdering && events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
-		// We've hit the beginning of the room so there's really nowhere else
-		// to go. This seems to fix Riot iOS from looping on /messages endlessly.
-		end = types.NewTopologyToken(0, 0)
-	} else {
-		end, err = r.db.EventPositionInTopology(
-			r.ctx, events[len(events)-1].EventID(),
-		)
-		if err != nil {
-			err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
-			return
-		}
-		if r.backwardOrdering {
+func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+	if r.backwardOrdering {
+		start = *r.from
+		if events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
+			// NOTSPEC: We've hit the beginning of the room so there's really nowhere
+			// else to go. This seems to fix Riot iOS from looping on /messages endlessly.
+			end = types.TopologyToken{}
+		} else {
+			end, err = r.db.EventPositionInTopology(
+				r.ctx, events[0].EventID(),
+			)
 			// A stream/topological position is a cursor located between two events.
 			// While they are identified in the code by the event on their right (if
 			// we consider a left to right chronological order), tokens need to refer
@@ -371,6 +405,15 @@ func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (sta
 			// end position we send in the response if we're going backward.
 			end.Decrement()
 		}
+	} else {
+		start = *r.from
+		end, err = r.db.EventPositionInTopology(
+			r.ctx, events[len(events)-1].EventID(),
+		)
+	}
+	if err != nil {
+		err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
+		return
 	}
 	return
 }
@@ -383,7 +426,7 @@ func (r *messagesReq) getStartEnd(events []gomatrixserverlib.HeaderedEvent) (sta
 // Returns an error if there was an issue talking with the database or
 // backfilling.
 func (r *messagesReq) handleEmptyEventsSlice() (
-	events []gomatrixserverlib.HeaderedEvent, err error,
+	events []*gomatrixserverlib.HeaderedEvent, err error,
 ) {
 	backwardExtremities, err := r.db.BackwardExtremitiesForRoom(r.ctx, r.roomID)
 
@@ -397,7 +440,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 	} else {
 		// If not, it means the slice was empty because we reached the room's
 		// creation, so return an empty slice.
-		events = []gomatrixserverlib.HeaderedEvent{}
+		events = []*gomatrixserverlib.HeaderedEvent{}
 	}
 
 	return
@@ -409,7 +452,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 // through backfilling if needed.
 // Returns an error if there was an issue while backfilling.
 func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent) (
-	events []gomatrixserverlib.HeaderedEvent, err error,
+	events []*gomatrixserverlib.HeaderedEvent, err error,
 ) {
 	// Check if we have enough events.
 	isSetLargeEnough := len(streamEvents) >= r.limit
@@ -420,11 +463,11 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 				// The condition in the SQL query is a strict "greater than" so
 				// we need to check against to-1.
 				streamPos := types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition)
-				isSetLargeEnough = (r.to.PDUPosition()-1 == streamPos)
+				isSetLargeEnough = (r.to.PDUPosition-1 == streamPos)
 			}
 		} else {
 			streamPos := types.StreamPosition(streamEvents[0].StreamPosition)
-			isSetLargeEnough = (r.from.PDUPosition()-1 == streamPos)
+			isSetLargeEnough = (r.from.PDUPosition-1 == streamPos)
 		}
 	}
 
@@ -437,7 +480,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	// Backfill is needed if we've reached a backward extremity and need more
 	// events. It's only needed if the direction is backward.
 	if len(backwardExtremities) > 0 && !isSetLargeEnough && r.backwardOrdering {
-		var pdus []gomatrixserverlib.HeaderedEvent
+		var pdus []*gomatrixserverlib.HeaderedEvent
 		// Only ask the remote server for enough events to reach the limit.
 		pdus, err = r.backfill(r.roomID, backwardExtremities, r.limit-len(streamEvents))
 		if err != nil {
@@ -455,7 +498,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	return
 }
 
-type eventsByDepth []gomatrixserverlib.HeaderedEvent
+type eventsByDepth []*gomatrixserverlib.HeaderedEvent
 
 func (e eventsByDepth) Len() int {
 	return len(e)
@@ -476,7 +519,7 @@ func (e eventsByDepth) Less(i, j int) bool {
 // event, or if there is no remote homeserver to contact.
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
-func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]gomatrixserverlib.HeaderedEvent, error) {
+func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	var res api.PerformBackfillResponse
 	err := r.rsAPI.PerformBackfill(context.Background(), &api.PerformBackfillRequest{
 		RoomID:               roomID,
@@ -504,8 +547,8 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	for i := range res.Events {
 		_, err = r.db.WriteEvent(
 			context.Background(),
-			&res.Events[i],
-			[]gomatrixserverlib.HeaderedEvent{},
+			res.Events[i],
+			[]*gomatrixserverlib.HeaderedEvent{},
 			[]string{},
 			[]string{},
 			nil, true,
@@ -538,7 +581,7 @@ func setToDefault(
 	if backwardOrdering {
 		// go 1 earlier than the first event so we correctly fetch the earliest event
 		// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
-		to = types.NewTopologyToken(0, 0)
+		to = types.TopologyToken{}
 	} else {
 		to, err = db.MaxTopologicalPosition(ctx, roomID)
 	}

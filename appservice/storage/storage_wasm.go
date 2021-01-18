@@ -18,7 +18,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/appservice/storage/sqlite3"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func NewDatabase(dbProperties *config.DatabaseOptions) (Database, error) {

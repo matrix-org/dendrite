@@ -9,7 +9,6 @@ import (
 	"time"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,8 +32,8 @@ var (
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}],["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"content":{"body":"Test Message"},"depth":6,"event_id":"$MYSbs8m4rEbsCWXD:kaer.morhen","hashes":{"sha256":"kgbYM7v4Ud2YaBsjBTolM4ySg6rHcJNYI6nWhMSdFUA"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$gl2T9l3qm0kUbiIJ:kaer.morhen",{"sha256":"C/rD04h9wGxRdN2G/IBfrgoE1UovzLZ+uskwaKZ37/Q"}]],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"x0UoKh968jj/F5l1/R7Ew0T6CTKuew3PLNHASNxqck/bkNe8yYQiDHXRr+kZxObeqPZZTpaF1+EI+bLU9W8GDQ"}},"type":"m.room.message"}`),
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}],["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"content":{"body":"Test Message"},"depth":7,"event_id":"$N5x9WJkl9ClPrAEg:kaer.morhen","hashes":{"sha256":"FWM8oz4yquTunRZ67qlW2gzPDzdWfBP6RPHXhK1I/x8"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$MYSbs8m4rEbsCWXD:kaer.morhen",{"sha256":"fatqgW+SE8mb2wFn3UN+drmluoD4UJ/EcSrL6Ur9q1M"}]],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"Y+LX/xcyufoXMOIoqQBNOzy6lZfUGB1ffgXIrSugk6obMiyAsiRejHQN/pciZXsHKxMJLYRFAz4zSJoS/LGPAA"}},"type":"m.room.message"}`),
 	}
-	testEvents      = []gomatrixserverlib.HeaderedEvent{}
-	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]gomatrixserverlib.HeaderedEvent)
+	testEvents      = []*gomatrixserverlib.HeaderedEvent{}
+	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
 )
 
 func init() {
@@ -76,15 +75,22 @@ func (p *testEDUProducer) InputSendToDeviceEvent(
 	return nil
 }
 
+func (o *testEDUProducer) InputReceiptEvent(
+	ctx context.Context,
+	request *eduAPI.InputReceiptEventRequest,
+	response *eduAPI.InputReceiptEventResponse,
+) error {
+	return nil
+}
+
 type testRoomserverAPI struct {
+	api.RoomserverInternalAPITrace
 	inputRoomEvents            []api.InputRoomEvent
 	queryMissingAuthPrevEvents func(*api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse
 	queryStateAfterEvents      func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse
 	queryEventsByID            func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse
 	queryLatestEventsAndState  func(*api.QueryLatestEventsAndStateRequest) api.QueryLatestEventsAndStateResponse
 }
-
-func (t *testRoomserverAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {}
 
 func (t *testRoomserverAPI) InputRoomEvents(
 	ctx context.Context,
@@ -95,43 +101,6 @@ func (t *testRoomserverAPI) InputRoomEvents(
 	for _, ire := range request.InputRoomEvents {
 		fmt.Println("InputRoomEvents: ", ire.Event.EventID())
 	}
-}
-
-func (t *testRoomserverAPI) PerformInvite(
-	ctx context.Context,
-	req *api.PerformInviteRequest,
-	res *api.PerformInviteResponse,
-) error {
-	return nil
-}
-
-func (t *testRoomserverAPI) PerformJoin(
-	ctx context.Context,
-	req *api.PerformJoinRequest,
-	res *api.PerformJoinResponse,
-) {
-}
-
-func (t *testRoomserverAPI) PerformPeek(
-	ctx context.Context,
-	req *api.PerformPeekRequest,
-	res *api.PerformPeekResponse,
-) {
-}
-
-func (t *testRoomserverAPI) PerformPublish(
-	ctx context.Context,
-	req *api.PerformPublishRequest,
-	res *api.PerformPublishResponse,
-) {
-}
-
-func (t *testRoomserverAPI) PerformLeave(
-	ctx context.Context,
-	req *api.PerformLeaveRequest,
-	res *api.PerformLeaveResponse,
-) error {
-	return nil
 }
 
 // Query the latest events and state for a room from the room server.
@@ -433,7 +402,7 @@ NextPDU:
 	}
 }
 
-func fromStateTuples(tuples []gomatrixserverlib.StateKeyTuple, omitTuples []gomatrixserverlib.StateKeyTuple) (result []gomatrixserverlib.HeaderedEvent) {
+func fromStateTuples(tuples []gomatrixserverlib.StateKeyTuple, omitTuples []gomatrixserverlib.StateKeyTuple) (result []*gomatrixserverlib.HeaderedEvent) {
 NextTuple:
 	for _, t := range tuples {
 		for _, o := range omitTuples {
@@ -449,7 +418,7 @@ NextTuple:
 	return
 }
 
-func assertInputRoomEvents(t *testing.T, got []api.InputRoomEvent, want []gomatrixserverlib.HeaderedEvent) {
+func assertInputRoomEvents(t *testing.T, got []api.InputRoomEvent, want []*gomatrixserverlib.HeaderedEvent) {
 	for _, g := range got {
 		fmt.Println("GOT ", g.Event.EventID())
 	}
@@ -481,7 +450,7 @@ func TestBasicTransaction(t *testing.T) {
 	}
 	txn := mustCreateTransaction(rsAPI, &txnFedClient{}, pdus)
 	mustProcessTransaction(t, txn, nil)
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
 }
 
 // The purpose of this test is to check that if the event received fails auth checks the event is still sent to the roomserver
@@ -502,7 +471,7 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 	txn := mustCreateTransaction(rsAPI, &txnFedClient{}, pdus)
 	mustProcessTransaction(t, txn, []string{})
 	// expect message to be sent to the roomserver
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
 }
 
 // The purpose of this test is to make sure that when an event is received for which we do not know the prev_events,
@@ -574,7 +543,7 @@ func TestTransactionFetchMissingPrevEvents(t *testing.T) {
 				t.Errorf("call to /get_missing_events wrong latest events: got %v want %v", missing.LatestEvents, inputEvent.EventID())
 			}
 			return gomatrixserverlib.RespMissingEvents{
-				Events: []gomatrixserverlib.Event{
+				Events: []*gomatrixserverlib.Event{
 					prevEvent.Unwrap(),
 				},
 			}, nil
@@ -586,7 +555,7 @@ func TestTransactionFetchMissingPrevEvents(t *testing.T) {
 	}
 	txn := mustCreateTransaction(rsAPI, cli, pdus)
 	mustProcessTransaction(t, txn, nil)
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []gomatrixserverlib.HeaderedEvent{prevEvent, inputEvent})
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{prevEvent, inputEvent})
 }
 
 // The purpose of this test is to check that when there are missing prev_events and we still haven't been able to fill
@@ -641,7 +610,7 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 			} else if askingForEvent == eventB.EventID() {
 				prevEventExists = haveEventB
 			}
-			var stateEvents []gomatrixserverlib.HeaderedEvent
+			var stateEvents []*gomatrixserverlib.HeaderedEvent
 			if prevEventExists {
 				stateEvents = fromStateTuples(req.StateToFetch, omitTuples)
 			}
@@ -759,7 +728,7 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 			}
 			// just return event C, not event B so /state_ids logic kicks in as there will STILL be missing prev_events
 			return gomatrixserverlib.RespMissingEvents{
-				Events: []gomatrixserverlib.Event{
+				Events: []*gomatrixserverlib.Event{
 					eventC.Unwrap(),
 				},
 			}, nil
@@ -771,5 +740,5 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 	}
 	txn := mustCreateTransaction(rsAPI, cli, pdus)
 	mustProcessTransaction(t, txn, nil)
-	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []gomatrixserverlib.HeaderedEvent{eventB, eventC, eventD})
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{eventB, eventC, eventD})
 }

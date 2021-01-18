@@ -91,7 +91,7 @@ func NewPostgresInvitesTable(db *sql.DB) (tables.Invites, error) {
 }
 
 func (s *inviteEventsStatements) InsertInviteEvent(
-	ctx context.Context, txn *sql.Tx, inviteEvent gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, txn *sql.Tx, inviteEvent *gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
 	var headeredJSON []byte
 	headeredJSON, err = json.Marshal(inviteEvent)
@@ -121,15 +121,15 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
-) (map[string]gomatrixserverlib.HeaderedEvent, map[string]gomatrixserverlib.HeaderedEvent, error) {
+) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
 	if err != nil {
 		return nil, nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
-	result := map[string]gomatrixserverlib.HeaderedEvent{}
-	retired := map[string]gomatrixserverlib.HeaderedEvent{}
+	result := map[string]*gomatrixserverlib.HeaderedEvent{}
+	retired := map[string]*gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var (
 			roomID    string
@@ -148,7 +148,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 			continue
 		}
 
-		var event gomatrixserverlib.HeaderedEvent
+		var event *gomatrixserverlib.HeaderedEvent
 		if err := json.Unmarshal(eventJSON, &event); err != nil {
 			return nil, nil, err
 		}

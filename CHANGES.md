@@ -1,5 +1,117 @@
 # Changelog
 
+## Dendrite 0.3.6 (2021-01-18)
+
+### Features
+
+* Experimental support for MSC2946 (Spaces Summary) has been merged
+* Send-to-device messages have been refactored and now take advantage of having their own stream position, making delivery more reliable
+* Unstable features and MSCs are now listed in `/versions` (contributed by [sumitks866](https://github.com/sumitks866))
+* Well-known and DNS SRV record results for federated servers are now cached properly, improving outbound federation performance and reducing traffic
+
+### Fixes
+
+* Updating forward extremities will no longer result in so many unnecessary state snapshots, reducing on-going disk usage in the roomserver database
+* Pagination tokens for `/messages` have been fixed, which should improve the reliability of scrollback/pagination
+* Dendrite now avoids returning `null`s in fields of the `/sync` response, and omitting some fields altogether when not needed, which should fix sync issues with Element Android
+* Requests for user device lists now time out quicker, which prevents federated `/send` requests from also timing out in many cases
+* Empty push rules are no longer sent over and over again in `/sync`
+* An integer overflow in the device list updater which could result in panics on 32-bit platforms has been fixed (contributed by [Lesterpig](https://github.com/Lesterpig))
+* Event IDs are now logged properly in federation sender and sync API consumer errors
+
+## Dendrite 0.3.5 (2021-01-11)
+
+### Features
+
+* All `/sync` streams are now logically separate after a refactoring exercise
+
+### Fixes
+
+* Event references are now deeply checked properly when calculating forward extremities, reducing the amount of forward extremities in most cases, which improves RAM utilisation and reduces the work done by state resolution
+* Sync no longer sends incorrect `next_batch` tokens with old stream positions, reducing flashbacks of old messages in clients
+* The federation `/send` endpoint no longer uses the request context, which could result in some events failing to be persisted if the sending server gave up the HTTP connection
+* Appservices can now auth as users in their namespaces properly
+
+## Dendrite 0.3.4 (2020-12-18)
+
+### Features
+
+* The stream tokens for `/sync` have been refactored, giving PDUs, typing notifications, read receipts, invites and send-to-device messages their own respective stream positions, greatly improving the correctness of sync
+* A new roominfo cache has been added, which results in less database hits in the roomserver
+* Prometheus metrics have been added for sync requests, destination queues and client API event send perceived latency
+
+### Fixes
+
+* Event IDs are no longer recalculated so often in `/sync`, which reduces CPU usage
+* Sync requests are now woken up correctly for our own device list updates
+* The device list stream position is no longer lost, so unnecessary device updates no longer appear in every other sync
+* A crash on concurrent map read/writes has been fixed in the stream token code
+* The roomserver input API no longer starts more worker goroutines than needed
+* The roomserver no longer uses the request context for queued tasks which could lead to send requests failing to be processed
+* A new index has been added to the sync API current state table, which improves lookup performance significantly
+* The client API `/joined_rooms` endpoint no longer incorrectly returns `null` if there are 0 rooms joined
+* The roomserver will now query appservices when looking up a local room alias that isn't known
+* The check on registration for appservice-exclusive namespaces has been fixed
+
+## Dendrite 0.3.3 (2020-12-09)
+
+### Features
+
+* Federation sender should now use considerably less CPU cycles and RAM when sending events into large rooms
+* The roomserver now uses considerably less CPU cycles by not calculating event IDs so often
+* Experimental support for [MSC2836](https://github.com/matrix-org/matrix-doc/pull/2836) (threading) has been merged
+* Dendrite will no longer hold federation HTTP connections open unnecessarily, which should help to reduce ambient CPU/RAM usage and hold fewer long-term file descriptors
+
+### Fixes
+
+* A bug in the latest event updater has been fixed, which should prevent the roomserver from losing forward extremities in some rare cases
+* A panic has been fixed when federation is disabled (contributed by [kraem](https://github.com/kraem))
+* The response format of the `/joined_members` endpoint has been fixed (contributed by [alexkursell](https://github.com/alexkursell))
+
+## Dendrite 0.3.2 (2020-12-02)
+
+### Features
+
+* Federation can now be disabled with the `global.disable_federation` configuration option
+
+### Fixes
+
+* The `"since"` parameter is now checked more thoroughly in the sync API, which led to a bug that could cause forgotten rooms to reappear (contributed by [kaniini](https://github.com/kaniini))
+* The polylith now proxies signing key requests through the federation sender correctly
+* The code for checking if remote servers are allowed to see events now no longer wastes CPU time retrieving irrelevant state events
+
+## Dendrite 0.3.1 (2020-11-20)
+
+### Features
+
+* Memory optimisation by reference passing, significantly reducing the number of allocations and duplication in memory
+* A hook API has been added for experimental MSCs, with an early implementation of MSC2836
+* The last seen timestamp and IP address are now updated automatically when calling `/sync`
+* The last seen timestamp and IP address are now reported in `/_matrix/client/r0/devices` (contributed by [alexkursell](https://github.com/alexkursell))
+* An optional configuration option `sync_api.real_ip_header` has been added for specifying which HTTP header contains the real client IP address (for if Dendrite is running behind a reverse HTTP proxy)
+* Partial implementation of `/_matrix/client/r0/admin/whois` (contributed by [DavidSpenler](https://github.com/DavidSpenler))
+
+### Fixes
+
+* A concurrency bug has been fixed in the federation API that could cause Dendrite to crash
+* The error when registering a username with invalid characters has been corrected (contributed by [bodqhrohro](https://github.com/bodqhrohro))
+
+## Dendrite 0.3.0 (2020-11-16)
+
+### Features
+
+* Read receipts (both inbound and outbound) are now supported (contributed by [S7evinK](https://github.com/S7evinK))
+* Forgetting rooms is now supported (contributed by [S7evinK](https://github.com/S7evinK))
+* The `-version` command line flag has been added (contributed by [S7evinK](https://github.com/S7evinK))
+
+### Fixes
+
+* User accounts that contain the `=` character can now be registered
+* Backfilling should now work properly on rooms with world-readable history visibility (contributed by [MayeulC](https://github.com/MayeulC))
+* The `gjson` dependency has been updated for correct JSON integer ranges
+* Some more client event fields have been marked as omit-when-empty (contributed by [S7evinK](https://github.com/S7evinK))
+* The `build.sh` script has been updated to work properly on all POSIX platforms (contributed by [felix](https://github.com/felix))
+
 ## Dendrite 0.2.1 (2020-10-22)
 
 ### Fixes

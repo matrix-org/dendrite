@@ -65,6 +65,19 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(PerformLastSeenUpdatePath,
+		httputil.MakeInternalAPI("performLastSeenUpdate", func(req *http.Request) util.JSONResponse {
+			request := api.PerformLastSeenUpdateRequest{}
+			response := api.PerformLastSeenUpdateResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformLastSeenUpdate(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(PerformDeviceUpdatePath,
 		httputil.MakeInternalAPI("performDeviceUpdate", func(req *http.Request) util.JSONResponse {
 			request := api.PerformDeviceUpdateRequest{}

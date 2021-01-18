@@ -16,9 +16,9 @@ package storage
 
 import (
 	"context"
-	"time"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
+	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -28,6 +28,27 @@ import (
 
 type Database interface {
 	internal.PartitionStorer
+
+	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamPositionForInvites(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamPositionForAccountData(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error)
+
+	CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
+	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
+	GetStateDeltas(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
+	RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error)
+
+	RecentEvents(ctx context.Context, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
+
+	GetBackwardTopologyPos(ctx context.Context, events []types.StreamEvent) (types.TopologyToken, error)
+	PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error)
+
+	InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error)
+	PeeksInRange(ctx context.Context, userID, deviceID string, r types.Range) (peeks []types.Peek, err error)
+	RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []eduAPI.OutputReceiptEvent, error)
+
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
 	// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
@@ -37,11 +58,11 @@ type Database interface {
 	// If an event is not found in the database then it will be omitted from the list.
 	// Returns an error if there was a problem talking with the database.
 	// Does not include any transaction IDs in the returned events.
-	Events(ctx context.Context, eventIDs []string) ([]gomatrixserverlib.HeaderedEvent, error)
+	Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error)
 	// WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 	// when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 	// Returns an error if there was a problem inserting this event.
-	WriteEvent(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, addStateEvents []gomatrixserverlib.HeaderedEvent,
+	WriteEvent(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, addStateEvents []*gomatrixserverlib.HeaderedEvent,
 		addStateEventIDs []string, removeStateEventIDs []string, transactionID *api.TransactionID, excludeFromSync bool) (types.StreamPosition, error)
 	// PurgeRoomState completely purges room state from the sync API. This is done when
 	// receiving an output event that completely resets the state.
@@ -53,19 +74,7 @@ type Database interface {
 	// GetStateEventsForRoom fetches the state events for a given room.
 	// Returns an empty slice if no state events could be found for this room.
 	// Returns an error if there was an issue with the retrieval.
-	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) (stateEvents []gomatrixserverlib.HeaderedEvent, err error)
-	// SyncPosition returns the latest positions for syncing.
-	SyncPosition(ctx context.Context) (types.StreamingToken, error)
-	// IncrementalSync returns all the data needed in order to create an incremental
-	// sync response for the given user. Events returned will include any client
-	// transaction IDs associated with the given device. These transaction IDs come
-	// from when the device sent the event via an API that included a transaction
-	// ID. A response object must be provided for IncrementaSync to populate - it
-	// will not create one.
-	IncrementalSync(ctx context.Context, res *types.Response, device userapi.Device, fromPos, toPos types.StreamingToken, numRecentEventsPerRoom int, wantFullState bool) (*types.Response, error)
-	// CompleteSync returns a complete /sync API response for the given user. A response object
-	// must be provided for CompleteSync to populate - it will not create one.
-	CompleteSync(ctx context.Context, res *types.Response, device userapi.Device, numRecentEventsPerRoom int) (*types.Response, error)
+	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error)
 	// GetAccountDataInRange returns all account data for a given user inserted or
 	// updated between two given positions
 	// Returns a map following the format data[roomID] = []dataTypes
@@ -82,25 +91,19 @@ type Database interface {
 	// AddInviteEvent stores a new invite event for a user.
 	// If the invite was successfully stored this returns the stream ID it was stored at.
 	// Returns an error if there was a problem communicating with the database.
-	AddInviteEvent(ctx context.Context, inviteEvent gomatrixserverlib.HeaderedEvent) (types.StreamPosition, error)
+	AddInviteEvent(ctx context.Context, inviteEvent *gomatrixserverlib.HeaderedEvent) (types.StreamPosition, error)
 	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
 	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
 	// AddPeek adds a new peek to our DB for a given room by a given user's device.
 	// Returns an error if there was a problem communicating with the database.
 	AddPeek(ctx context.Context, RoomID, UserID, DeviceID string) (types.StreamPosition, error)
+	// DeletePeek removes an existing peek from the database for a given room by a user's device.
+	// Returns an error if there was a problem communicating with the database.
+	DeletePeek(ctx context.Context, roomID, userID, deviceID string) (sp types.StreamPosition, err error)
 	// DeletePeek deletes all peeks for a given room by a given user
 	// Returns an error if there was a problem communicating with the database.
 	DeletePeeks(ctx context.Context, RoomID, UserID string) (types.StreamPosition, error)
-	// SetTypingTimeoutCallback sets a callback function that is called right after
-	// a user is removed from the typing user list due to timeout.
-	SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn)
-	// AddTypingUser adds a typing user to the typing cache.
-	// Returns the newly calculated sync position for typing notifications.
-	AddTypingUser(userID, roomID string, expireTime *time.Time) types.StreamPosition
-	// RemoveTypingUser removes a typing user from the typing cache.
-	// Returns the newly calculated sync position for typing notifications.
-	RemoveTypingUser(userID, roomID string) types.StreamPosition
 	// GetEventsInStreamingRange retrieves all of the events on a given ordering using the given extremities and limit.
 	GetEventsInStreamingRange(ctx context.Context, from, to *types.StreamingToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
 	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit.
@@ -114,29 +117,15 @@ type Database interface {
 	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.
-	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []gomatrixserverlib.HeaderedEvent
-	// AddSendToDevice increases the EDU position in the cache and returns the stream position.
-	AddSendToDevice() types.StreamPosition
-	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns three lists:
-	// - "events": a list of send-to-device events that should be included in the sync
-	// - "changes": a list of send-to-device events that should be updated in the database by
-	//      CleanSendToDeviceUpdates
-	// - "deletions": a list of send-to-device events which have been confirmed as sent and
-	//      can be deleted altogether by CleanSendToDeviceUpdates
-	// The token supplied should be the current requested sync token, e.g. from the "since"
-	// parameter.
-	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, token types.StreamingToken) (events []types.SendToDeviceEvent, changes []types.SendToDeviceNID, deletions []types.SendToDeviceNID, err error)
+	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*gomatrixserverlib.HeaderedEvent
+	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns the
+	// relevant events within the given ranges for the supplied user ID and device ID.
+	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, from, to types.StreamPosition) (pos types.StreamPosition, events []types.SendToDeviceEvent, err error)
 	// StoreNewSendForDeviceMessage stores a new send-to-device event for a user's device.
-	StoreNewSendForDeviceMessage(ctx context.Context, streamPos types.StreamPosition, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
-	// CleanSendToDeviceUpdates will update or remove any send-to-device updates based on the
-	// result to a previous call to SendDeviceUpdatesForSync. This is separate as it allows
-	// SendToDeviceUpdatesForSync to be called multiple times if needed (e.g. before and after
-	// starting to wait for an incremental sync with timeout).
-	// The token supplied should be the current requested sync token, e.g. from the "since"
-	// parameter.
-	CleanSendToDeviceUpdates(ctx context.Context, toUpdate, toDelete []types.SendToDeviceNID, token types.StreamingToken) (err error)
-	// SendToDeviceUpdatesWaiting returns true if there are send-to-device updates waiting to be sent.
-	SendToDeviceUpdatesWaiting(ctx context.Context, userID, deviceID string) (bool, error)
+	StoreNewSendForDeviceMessage(ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
+	// CleanSendToDeviceUpdates removes all send-to-device messages BEFORE the specified
+	// from position, preventing the send-to-device table from growing indefinitely.
+	CleanSendToDeviceUpdates(ctx context.Context, userID, deviceID string, before types.StreamPosition) (err error)
 	// GetFilter looks up the filter associated with a given local user and filter ID.
 	// Returns a filter structure. Otherwise returns an error if no such filter exists
 	// or if there was an error talking to the database.
@@ -147,4 +136,8 @@ type Database interface {
 	PutFilter(ctx context.Context, localpart string, filter *gomatrixserverlib.Filter) (string, error)
 	// RedactEvent wipes an event in the database and sets the unsigned.redacted_because key to the redaction event
 	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error
+	// StoreReceipt stores new receipt events
+	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
+	// GetRoomReceipts gets all receipts for a given roomID
+	GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error)
 }

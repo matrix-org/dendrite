@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -53,15 +54,17 @@ type inputWorker struct {
 	input   chan *inputTask
 }
 
+// Guarded by a CAS on w.running
 func (w *inputWorker) start() {
-	if !w.running.CAS(false, true) {
-		return
-	}
 	defer w.running.Store(false)
 	for {
 		select {
 		case task := <-w.input:
+			hooks.Run(hooks.KindNewEventReceived, task.event.Event)
 			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
+			if task.err == nil {
+				hooks.Run(hooks.KindNewEventPersisted, task.event.Event)
+			}
 			task.wg.Done()
 		case <-time.After(time.Second * 5):
 			return
@@ -92,7 +95,7 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 			})
 			if updates[i].NewRoomEvent.Event.Type() == "m.room.server_acl" && updates[i].NewRoomEvent.Event.StateKeyEquals("") {
 				ev := updates[i].NewRoomEvent.Event.Unwrap()
-				defer r.ACLs.OnServerACLUpdate(&ev)
+				defer r.ACLs.OnServerACLUpdate(ev)
 			}
 		}
 		logger.Infof("Producing to topic '%s'", r.OutputRoomEventTopic)
@@ -102,12 +105,18 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 			Value: sarama.ByteEncoder(value),
 		}
 	}
-	return r.Producer.SendMessages(messages)
+	errs := r.Producer.SendMessages(messages)
+	if errs != nil {
+		for _, err := range errs.(sarama.ProducerErrors) {
+			log.WithError(err).WithField("message_bytes", err.Msg.Value.Length()).Error("Write to kafka failed")
+		}
+	}
+	return errs
 }
 
 // InputRoomEvents implements api.RoomserverInternalAPI
 func (r *Inputer) InputRoomEvents(
-	ctx context.Context,
+	_ context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) {
@@ -131,7 +140,7 @@ func (r *Inputer) InputRoomEvents(
 		// room - the channel will be quite small as it's just pointer types.
 		w, _ := r.workers.LoadOrStore(roomID, &inputWorker{
 			r:     r,
-			input: make(chan *inputTask, 10),
+			input: make(chan *inputTask, 32),
 		})
 		worker := w.(*inputWorker)
 
@@ -139,13 +148,15 @@ func (r *Inputer) InputRoomEvents(
 		// the wait group, so that the worker can notify us when this specific
 		// task has been finished.
 		tasks[i] = &inputTask{
-			ctx:   ctx,
+			ctx:   context.Background(),
 			event: &request.InputRoomEvents[i],
 			wg:    wg,
 		}
 
 		// Send the task to the worker.
-		go worker.start()
+		if worker.running.CAS(false, true) {
+			go worker.start()
+		}
 		worker.input <- tasks[i]
 	}
 

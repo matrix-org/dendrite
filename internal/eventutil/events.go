@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -73,8 +73,7 @@ func BuildEvent(
 		return nil, err
 	}
 
-	h := event.Headered(queryRes.RoomVersion)
-	return &h, nil
+	return event.Headered(queryRes.RoomVersion), nil
 }
 
 // queryRequiredEventsForBuilder queries the roomserver for auth/prev events needed for this builder.
@@ -120,7 +119,7 @@ func addPrevEventsToEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 
 	for i := range queryRes.StateEvents {
-		err = authEvents.AddEvent(&queryRes.StateEvents[i].Event)
+		err = authEvents.AddEvent(queryRes.StateEvents[i].Event)
 		if err != nil {
 			return fmt.Errorf("authEvents.AddEvent: %w", err)
 		}
@@ -186,5 +185,5 @@ func RedactEvent(redactionEvent, redactedEvent *gomatrixserverlib.Event) (*gomat
 	if err != nil {
 		return nil, err
 	}
-	return &r, nil
+	return r, nil
 }

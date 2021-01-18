@@ -105,6 +105,13 @@ func (u *LatestEventsUpdater) SetLatestEvents(
 		if err := u.d.RoomsTable.UpdateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
 			return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
 		}
+		if roomID, ok := u.d.Cache.GetRoomServerRoomID(roomNID); ok {
+			if roomInfo, ok := u.d.Cache.GetRoomInfo(roomID); ok {
+				roomInfo.StateSnapshotNID = currentStateSnapshotNID
+				roomInfo.IsStub = false
+				u.d.Cache.StoreRoomInfo(roomID, roomInfo)
+			}
+		}
 		return nil
 	})
 }

@@ -83,7 +83,8 @@ type PerformJoinRequest struct {
 
 type PerformJoinResponse struct {
 	// The room ID, populated on success.
-	RoomID string `json:"room_id"`
+	RoomID    string `json:"room_id"`
+	JoinedVia gomatrixserverlib.ServerName
 	// If non-nil, the join request failed. Contains more information why it failed.
 	Error *PerformError
 }
@@ -98,7 +99,7 @@ type PerformLeaveResponse struct {
 
 type PerformInviteRequest struct {
 	RoomVersion     gomatrixserverlib.RoomVersion             `json:"room_version"`
-	Event           gomatrixserverlib.HeaderedEvent           `json:"event"`
+	Event           *gomatrixserverlib.HeaderedEvent          `json:"event"`
 	InviteRoomState []gomatrixserverlib.InviteV2StrippedState `json:"invite_room_state"`
 	SendAsServer    string                                    `json:"send_as_server"`
 	TransactionID   *TransactionID                            `json:"transaction_id"`
@@ -118,6 +119,17 @@ type PerformPeekRequest struct {
 type PerformPeekResponse struct {
 	// The room ID, populated on success.
 	RoomID string `json:"room_id"`
+	// If non-nil, the join request failed. Contains more information why it failed.
+	Error *PerformError
+}
+
+type PerformUnpeekRequest struct {
+	RoomID   string `json:"room_id"`
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+}
+
+type PerformUnpeekResponse struct {
 	// If non-nil, the join request failed. Contains more information why it failed.
 	Error *PerformError
 }
@@ -147,7 +159,7 @@ func (r *PerformBackfillRequest) PrevEventIDs() []string {
 // PerformBackfillResponse is a response to PerformBackfill.
 type PerformBackfillResponse struct {
 	// Missing events, arbritrary order.
-	Events []gomatrixserverlib.HeaderedEvent `json:"events"`
+	Events []*gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
 type PerformPublishRequest struct {
@@ -159,3 +171,11 @@ type PerformPublishResponse struct {
 	// If non-nil, the publish request failed. Contains more information why it failed.
 	Error *PerformError
 }
+
+// PerformForgetRequest is a request to PerformForget
+type PerformForgetRequest struct {
+	RoomID string `json:"room_id"`
+	UserID string `json:"user_id"`
+}
+
+type PerformForgetResponse struct{}

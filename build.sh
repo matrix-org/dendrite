@@ -1,4 +1,4 @@
-#!/bin/bash -eu
+#!/bin/sh -eu
 
 # Put installed packages into ./bin
 export GOBIN=$PWD/`dirname $0`/bin
@@ -7,7 +7,7 @@ if [ -d ".git" ]
 then
     export BUILD=`git rev-parse --short HEAD || ""`
     export BRANCH=`(git symbolic-ref --short HEAD | tr -d \/ ) || ""`
-    if [[ $BRANCH == "master" ]]
+    if [ "$BRANCH" = master ]
     then
         export BRANCH=""
     fi
@@ -17,6 +17,6 @@ else
     export FLAGS=""
 fi
 
-go install -trimpath -ldflags "$FLAGS" -v $PWD/`dirname $0`/cmd/...
+CGO_ENABLED=1 go build -trimpath -ldflags "$FLAGS" -v -o "bin/" ./cmd/...
 
-GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o main.wasm ./cmd/dendritejs
+CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o bin/main.wasm ./cmd/dendritejs

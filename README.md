@@ -8,7 +8,6 @@ It intends to provide an **efficient**, **reliable** and **scalable** alternativ
    a [brand new Go test suite](https://github.com/matrix-org/complement).
  - Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
 
-
 As of October 2020, Dendrite has now entered **beta** which means:
 - Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
 - Dendrite has periodic semver releases. We intend to release new versions as we land significant features.
@@ -18,13 +17,13 @@ As of October 2020, Dendrite has now entered **beta** which means:
 This does not mean:
  - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
  - All of the CS/Federation APIs are implemented. We are tracking progress via a script called 'Are We Synapse Yet?'. In particular,
-   read receipts, presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
+   presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
  - Dendrite is ready for massive homeserver deployments. You cannot shard each microservice, only run each one on a different machine.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
 In the future, we will be able to scale up to gigantic servers (equivalent to matrix.org) via polylith mode. 
 
-Join us in:
+If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or join us in:
 
 - **[#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org)** - General chat about the Dendrite project, for users and server admins alike
 - **[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)** - The place for developers, where all Dendrite development discussion happens
@@ -54,31 +53,32 @@ The following instructions are enough to get Dendrite started as a non-federatin
 ```bash
 $ git clone https://github.com/matrix-org/dendrite
 $ cd dendrite
+$ ./build.sh
 
-# generate self-signed certificate and an event signing key for federation
-$ go build ./cmd/generate-keys
-$ ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
+# Generate a Matrix signing key for federation (required)
+$ ./bin/generate-keys --private-key matrix_key.pem
 
-# Copy and modify the config file:
-# you'll need to set a server name and paths to the keys at the very least, along with setting
-# up the database filenames
+# Generate a self-signed certificate (optional, but a valid TLS certificate is normally
+# needed for Matrix federation/clients to work properly!)
+$ ./bin/generate-keys --tls-cert server.crt --tls-key server.key
+
+# Copy and modify the config file - you'll need to set a server name and paths to the keys
+# at the very least, along with setting up the database connection strings.
 $ cp dendrite-config.yaml dendrite.yaml
 
-# build and run the server
-$ go build ./cmd/dendrite-monolith-server
-$ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+# Build and run the server:
+$ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 ```
 
-Then point your favourite Matrix client at `http://localhost:8008`.
+Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
 
 ## Progress
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of October 2020 we're at around 57% CS API coverage and 81% Federation coverage, though check
+updates with CI. As of November 2020 we're at around 58% CS API coverage and 83% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
 servers such as matrix.org reasonably well. There's a long list of features that are not implemented, notably:
- - Receipts
  - Push
  - Search and Context
  - User Directory
@@ -98,6 +98,7 @@ This means Dendrite supports amongst others:
  - Redaction
  - Tagging
  - E2E keys and device lists
+ - Receipts
 
 
 ## Contributing

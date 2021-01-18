@@ -28,8 +28,8 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -255,7 +255,7 @@ func createRoom(
 		historyVisibility = historyVisibilityShared
 	}
 
-	var builtEvents []gomatrixserverlib.HeaderedEvent
+	var builtEvents []*gomatrixserverlib.HeaderedEvent
 
 	// send events into the room in order of:
 	//  1- m.room.create
@@ -327,13 +327,13 @@ func createRoom(
 			return jsonerror.InternalServerError()
 		}
 
-		if err = gomatrixserverlib.Allowed(*ev, &authEvents); err != nil {
+		if err = gomatrixserverlib.Allowed(ev, &authEvents); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.Allowed failed")
 			return jsonerror.InternalServerError()
 		}
 
 		// Add the event to the list of auth events
-		builtEvents = append(builtEvents, (*ev).Headered(roomVersion))
+		builtEvents = append(builtEvents, ev.Headered(roomVersion))
 		err = authEvents.AddEvent(ev)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("authEvents.AddEvent failed")
@@ -397,7 +397,7 @@ func createRoom(
 				ev := event.Event
 				globalStrippedState = append(
 					globalStrippedState,
-					gomatrixserverlib.NewInviteV2StrippedState(&ev),
+					gomatrixserverlib.NewInviteV2StrippedState(ev),
 				)
 			}
 		}
@@ -415,7 +415,7 @@ func createRoom(
 			}
 			inviteStrippedState := append(
 				globalStrippedState,
-				gomatrixserverlib.NewInviteV2StrippedState(&inviteEvent.Event),
+				gomatrixserverlib.NewInviteV2StrippedState(inviteEvent.Event),
 			)
 			// Send the invite event to the roomserver.
 			err = roomserverAPI.SendInvite(
@@ -488,5 +488,5 @@ func buildEvent(
 	if err != nil {
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
 	}
-	return &event, nil
+	return event, nil
 }

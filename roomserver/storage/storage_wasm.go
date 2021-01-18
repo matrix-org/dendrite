@@ -18,8 +18,8 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.

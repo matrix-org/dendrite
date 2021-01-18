@@ -23,9 +23,9 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
@@ -168,6 +168,21 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 	}
 	if len(uploadRes.KeyErrors) > 0 {
 		return fmt.Errorf("Failed to delete device keys, key errors: %+v", uploadRes.KeyErrors)
+	}
+	return nil
+}
+
+func (a *UserInternalAPI) PerformLastSeenUpdate(
+	ctx context.Context,
+	req *api.PerformLastSeenUpdateRequest,
+	res *api.PerformLastSeenUpdateResponse,
+) error {
+	localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+	}
+	if err := a.DeviceDB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr); err != nil {
+		return fmt.Errorf("a.DeviceDB.UpdateDeviceLastSeen: %w", err)
 	}
 	return nil
 }
@@ -375,8 +390,9 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 	if localpart != "" { // AS is masquerading as another user
 		// Verify that the user is registered
 		account, err := a.AccountDB.GetAccountByLocalpart(ctx, localpart)
-		// Verify that account exists & appServiceID matches
-		if err == nil && account.AppServiceID == appService.ID {
+		// Verify that the account exists and either appServiceID matches or
+		// it belongs to the appservice user namespaces
+		if err == nil && (account.AppServiceID == appService.ID || appService.IsInterestedInUserID(appServiceUserID)) {
 			// Set the userID of dummy device
 			dev.UserID = appServiceUserID
 			return &dev, nil

@@ -19,8 +19,8 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -41,6 +41,13 @@ type getJoinedMembersResponse struct {
 
 type joinedMember struct {
 	DisplayName string `json:"display_name"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
+// The database stores 'displayname' without an underscore.
+// Deserialize into this and then change to the actual API response
+type databaseJoinedMember struct {
+	DisplayName string `json:"displayname"`
 	AvatarURL   string `json:"avatar_url"`
 }
 
@@ -72,12 +79,12 @@ func GetMemberships(
 		var res getJoinedMembersResponse
 		res.Joined = make(map[string]joinedMember)
 		for _, ev := range queryRes.JoinEvents {
-			var content joinedMember
+			var content databaseJoinedMember
 			if err := json.Unmarshal(ev.Content, &content); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
 				return jsonerror.InternalServerError()
 			}
-			res.Joined[ev.Sender] = content
+			res.Joined[ev.Sender] = joinedMember(content)
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -103,6 +110,9 @@ func GetJoinedRooms(
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
 		return jsonerror.InternalServerError()
+	}
+	if res.RoomIDs == nil {
+		res.RoomIDs = []string{}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,

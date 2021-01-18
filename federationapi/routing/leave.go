@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -98,7 +98,7 @@ func MakeLeave(
 	// Check that the leave is allowed or not
 	stateEvents := make([]*gomatrixserverlib.Event, len(queryRes.StateEvents))
 	for i := range queryRes.StateEvents {
-		stateEvents[i] = &queryRes.StateEvents[i].Event
+		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
@@ -257,7 +257,7 @@ func SendLeave(
 	if err = api.SendEvents(
 		httpReq.Context(), rsAPI,
 		api.KindNew,
-		[]gomatrixserverlib.HeaderedEvent{
+		[]*gomatrixserverlib.HeaderedEvent{
 			event.Headered(verRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,

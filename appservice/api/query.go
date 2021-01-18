@@ -20,9 +20,9 @@ package api
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -109,7 +109,7 @@ func RetrieveUserProfile(
 
 	// If no user exists, return
 	if !userResp.UserIDExists {
-		return nil, eventutil.ErrProfileNoExists
+		return nil, errors.New("no known profile for given user ID")
 	}
 
 	// Try to query the user from the local database again

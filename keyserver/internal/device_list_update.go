@@ -245,7 +245,7 @@ func (u *DeviceListUpdater) notifyWorkers(userID string) {
 	}
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(remoteServer))
-	index := int(hash.Sum32()) % len(u.workerChans)
+	index := int(int64(hash.Sum32()) % int64(len(u.workerChans)))
 
 	ch := u.assignChannel(userID)
 	u.workerChans[index] <- remoteServer
@@ -319,7 +319,7 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 }
 
 func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerName) (time.Duration, bool) {
-	requestTimeout := time.Minute // max amount of time we want to spend on each request
+	requestTimeout := time.Second * 30 // max amount of time we want to spend on each request
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 	logger := util.GetLogger(ctx).WithField("server_name", serverName)

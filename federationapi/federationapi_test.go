@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/test"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -72,7 +72,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 			t.Errorf("failed to parse event: %s", err)
 		}
 		he := ev.Headered(tc.roomVer)
-		invReq, err := gomatrixserverlib.NewInviteV2Request(&he, nil)
+		invReq, err := gomatrixserverlib.NewInviteV2Request(he, nil)
 		if err != nil {
 			t.Errorf("failed to create invite v2 request: %s", err)
 			continue

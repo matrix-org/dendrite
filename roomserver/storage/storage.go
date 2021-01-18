@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // Open opens a database connection.

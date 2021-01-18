@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/dendrite/signingkeyserver/internal"
 	"github.com/matrix-org/dendrite/signingkeyserver/inthttp"

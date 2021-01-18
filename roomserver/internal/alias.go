@@ -23,6 +23,8 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
 )
 
 // RoomserverInternalAPIDatabase has the storage APIs needed to implement the alias API.
@@ -90,17 +92,13 @@ func (r *RoomserverInternalAPI) GetRoomIDForAlias(
 		return err
 	}
 
-	/*
-		TODO: Why is this here? It creates an unnecessary dependency
-		from the roomserver to the appservice component, which should be
-		altogether optional.
-
+	if r.asAPI != nil { // appservice component is wired in
 		if roomID == "" {
 			// No room found locally, try our application services by making a call to
 			// the appservice component
-			aliasReq := appserviceAPI.RoomAliasExistsRequest{Alias: request.Alias}
-			var aliasResp appserviceAPI.RoomAliasExistsResponse
-			if err = r.AppserviceAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
+			aliasReq := asAPI.RoomAliasExistsRequest{Alias: request.Alias}
+			var aliasResp asAPI.RoomAliasExistsResponse
+			if err = r.asAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
 				return err
 			}
 
@@ -111,7 +109,7 @@ func (r *RoomserverInternalAPI) GetRoomIDForAlias(
 				}
 			}
 		}
-	*/
+	}
 
 	response.RoomID = roomID
 	return nil
@@ -229,7 +227,7 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	// Add auth events
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i := range res.StateEvents {
-		err = authEvents.AddEvent(&res.StateEvents[i].Event)
+		err = authEvents.AddEvent(res.StateEvents[i].Event)
 		if err != nil {
 			return err
 		}

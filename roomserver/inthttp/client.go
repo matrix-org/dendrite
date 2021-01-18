@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsInputAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -27,10 +28,12 @@ const (
 	// Perform operations
 	RoomserverPerformInvitePath   = "/roomserver/performInvite"
 	RoomserverPerformPeekPath     = "/roomserver/performPeek"
+	RoomserverPerformUnpeekPath   = "/roomserver/performUnpeek"
 	RoomserverPerformJoinPath     = "/roomserver/performJoin"
 	RoomserverPerformLeavePath    = "/roomserver/performLeave"
 	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
 	RoomserverPerformPublishPath  = "/roomserver/performPublish"
+	RoomserverPerformForgetPath   = "/roomserver/performForget"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -52,6 +55,7 @@ const (
 	RoomserverQuerySharedUsersPath             = "/roomserver/querySharedUsers"
 	RoomserverQueryKnownUsersPath              = "/roomserver/queryKnownUsers"
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
+	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -79,6 +83,10 @@ func NewRoomserverClient(
 
 // SetFederationSenderInputAPI no-ops in HTTP client mode as there is no chicken/egg scenario
 func (h *httpRoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsInputAPI.FederationSenderInternalAPI) {
+}
+
+// SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario
+func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
 }
 
 // SetRoomAlias implements RoomserverAliasAPI
@@ -200,6 +208,23 @@ func (h *httpRoomserverInternalAPI) PerformPeek(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformPeekPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
+}
+
+func (h *httpRoomserverInternalAPI) PerformUnpeek(
+	ctx context.Context,
+	request *api.PerformUnpeekRequest,
+	response *api.PerformUnpeekResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUnpeek")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformUnpeekPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.PerformError{
@@ -483,6 +508,16 @@ func (h *httpRoomserverInternalAPI) QueryKnownUsers(
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
+func (h *httpRoomserverInternalAPI) QueryAuthChain(
+	ctx context.Context, req *api.QueryAuthChainRequest, res *api.QueryAuthChainResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryAuthChain")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryAuthChainPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
 func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
 	ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse,
 ) error {
@@ -491,4 +526,13 @@ func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
 
 	apiURL := h.roomserverURL + RoomserverQueryServerBannedFromRoomPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) PerformForget(ctx context.Context, req *api.PerformForgetRequest, res *api.PerformForgetResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformForget")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformForgetPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+
 }

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 )
 
@@ -11,6 +12,7 @@ type RoomserverInternalAPI interface {
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
 	SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI)
+	SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI)
 
 	InputRoomEvents(
 		ctx context.Context,
@@ -40,6 +42,12 @@ type RoomserverInternalAPI interface {
 		ctx context.Context,
 		req *PerformPeekRequest,
 		res *PerformPeekResponse,
+	)
+
+	PerformUnpeek(
+		ctx context.Context,
+		req *PerformUnpeekRequest,
+		res *PerformUnpeekResponse,
 	)
 
 	PerformPublish(
@@ -126,6 +134,15 @@ type RoomserverInternalAPI interface {
 		response *QueryStateAndAuthChainResponse,
 	) error
 
+	// QueryAuthChain returns the entire auth chain for the event IDs given.
+	// The response includes the events in the request.
+	// Omits without error for any missing auth events. There will be no duplicates.
+	QueryAuthChain(
+		ctx context.Context,
+		request *QueryAuthChainRequest,
+		response *QueryAuthChainResponse,
+	) error
+
 	// QueryCurrentState retrieves the requested state events. If state events are not found, they will be missing from
 	// the response.
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
@@ -146,6 +163,9 @@ type RoomserverInternalAPI interface {
 		request *PerformBackfillRequest,
 		response *PerformBackfillResponse,
 	) error
+
+	// PerformForget forgets a rooms history for a specific user
+	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
 
 	// Asks for the default room version as preferred by the server.
 	QueryRoomVersionCapabilities(

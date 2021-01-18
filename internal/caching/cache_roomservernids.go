@@ -1,6 +1,8 @@
 package caching
 
 import (
+	"strconv"
+
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -13,10 +15,6 @@ const (
 	RoomServerEventTypeNIDsCacheMaxEntries = 64
 	RoomServerEventTypeNIDsCacheMutable    = false
 
-	RoomServerRoomNIDsCacheName       = "roomserver_room_nids"
-	RoomServerRoomNIDsCacheMaxEntries = 1024
-	RoomServerRoomNIDsCacheMutable    = false
-
 	RoomServerRoomIDsCacheName       = "roomserver_room_ids"
 	RoomServerRoomIDsCacheMaxEntries = 1024
 	RoomServerRoomIDsCacheMutable    = false
@@ -25,6 +23,7 @@ const (
 type RoomServerCaches interface {
 	RoomServerNIDsCache
 	RoomVersionCache
+	RoomInfoCache
 }
 
 // RoomServerNIDsCache contains the subset of functions needed for
@@ -35,9 +34,6 @@ type RoomServerNIDsCache interface {
 
 	GetRoomServerEventTypeNID(eventType string) (types.EventTypeNID, bool)
 	StoreRoomServerEventTypeNID(eventType string, nid types.EventTypeNID)
-
-	GetRoomServerRoomNID(roomID string) (types.RoomNID, bool)
-	StoreRoomServerRoomNID(roomID string, nid types.RoomNID)
 
 	GetRoomServerRoomID(roomNID types.RoomNID) (string, bool)
 	StoreRoomServerRoomID(roomNID types.RoomNID, roomID string)
@@ -71,23 +67,8 @@ func (c Caches) StoreRoomServerEventTypeNID(eventType string, nid types.EventTyp
 	c.RoomServerEventTypeNIDs.Set(eventType, nid)
 }
 
-func (c Caches) GetRoomServerRoomNID(roomID string) (types.RoomNID, bool) {
-	val, found := c.RoomServerRoomNIDs.Get(roomID)
-	if found && val != nil {
-		if roomNID, ok := val.(types.RoomNID); ok {
-			return roomNID, true
-		}
-	}
-	return 0, false
-}
-
-func (c Caches) StoreRoomServerRoomNID(roomID string, roomNID types.RoomNID) {
-	c.RoomServerRoomNIDs.Set(roomID, roomNID)
-	c.RoomServerRoomIDs.Set(string(roomNID), roomID)
-}
-
 func (c Caches) GetRoomServerRoomID(roomNID types.RoomNID) (string, bool) {
-	val, found := c.RoomServerRoomIDs.Get(string(roomNID))
+	val, found := c.RoomServerRoomIDs.Get(strconv.Itoa(int(roomNID)))
 	if found && val != nil {
 		if roomID, ok := val.(string); ok {
 			return roomID, true
@@ -97,5 +78,5 @@ func (c Caches) GetRoomServerRoomID(roomNID types.RoomNID) (string, bool) {
 }
 
 func (c Caches) StoreRoomServerRoomID(roomNID types.RoomNID, roomID string) {
-	c.StoreRoomServerRoomNID(roomID, roomNID)
+	c.RoomServerRoomIDs.Set(strconv.Itoa(int(roomNID)), roomID)
 }

@@ -24,8 +24,10 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
+	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
@@ -34,6 +36,7 @@ import (
 // matrix servers
 type OutgoingQueues struct {
 	db          storage.Database
+	disabled    bool
 	rsAPI       api.RoomserverInternalAPI
 	origin      gomatrixserverlib.ServerName
 	client      *gomatrixserverlib.FederationClient
@@ -43,9 +46,41 @@ type OutgoingQueues struct {
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
+func init() {
+	prometheus.MustRegister(
+		destinationQueueTotal, destinationQueueRunning,
+		destinationQueueBackingOff,
+	)
+}
+
+var destinationQueueTotal = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "federationsender",
+		Name:      "destination_queues_total",
+	},
+)
+
+var destinationQueueRunning = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "federationsender",
+		Name:      "destination_queues_running",
+	},
+)
+
+var destinationQueueBackingOff = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "federationsender",
+		Name:      "destination_queues_backing_off",
+	},
+)
+
 // NewOutgoingQueues makes a new OutgoingQueues
 func NewOutgoingQueues(
 	db storage.Database,
+	disabled bool,
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
@@ -53,6 +88,7 @@ func NewOutgoingQueues(
 	signing *SigningInfo,
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
+		disabled:   disabled,
 		db:         db,
 		rsAPI:      rsAPI,
 		origin:     origin,
@@ -62,28 +98,30 @@ func NewOutgoingQueues(
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
 	// Look up which servers we have pending items for and then rehydrate those queues.
-	time.AfterFunc(time.Second*5, func() {
-		serverNames := map[gomatrixserverlib.ServerName]struct{}{}
-		if names, err := db.GetPendingPDUServerNames(context.Background()); err == nil {
-			for _, serverName := range names {
-				serverNames[serverName] = struct{}{}
+	if !disabled {
+		time.AfterFunc(time.Second*5, func() {
+			serverNames := map[gomatrixserverlib.ServerName]struct{}{}
+			if names, err := db.GetPendingPDUServerNames(context.Background()); err == nil {
+				for _, serverName := range names {
+					serverNames[serverName] = struct{}{}
+				}
+			} else {
+				log.WithError(err).Error("Failed to get PDU server names for destination queue hydration")
 			}
-		} else {
-			log.WithError(err).Error("Failed to get PDU server names for destination queue hydration")
-		}
-		if names, err := db.GetPendingEDUServerNames(context.Background()); err == nil {
-			for _, serverName := range names {
-				serverNames[serverName] = struct{}{}
+			if names, err := db.GetPendingEDUServerNames(context.Background()); err == nil {
+				for _, serverName := range names {
+					serverNames[serverName] = struct{}{}
+				}
+			} else {
+				log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
 			}
-		} else {
-			log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
-		}
-		for serverName := range serverNames {
-			if !queues.getQueue(serverName).statistics.Blacklisted() {
-				queues.getQueue(serverName).wakeQueueIfNeeded()
+			for serverName := range serverNames {
+				if queue := queues.getQueue(serverName); !queue.statistics.Blacklisted() {
+					queue.wakeQueueIfNeeded()
+				}
 			}
-		}
-	})
+		})
+	}
 	return queues
 }
 
@@ -95,11 +133,22 @@ type SigningInfo struct {
 	PrivateKey ed25519.PrivateKey
 }
 
+type queuedPDU struct {
+	receipt *shared.Receipt
+	pdu     *gomatrixserverlib.HeaderedEvent
+}
+
+type queuedEDU struct {
+	receipt *shared.Receipt
+	edu     *gomatrixserverlib.EDU
+}
+
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
 	oq := oqs.queues[destination]
 	if oq == nil {
+		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
 			db:               oqs.db,
 			rsAPI:            oqs.rsAPI,
@@ -107,8 +156,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			destination:      destination,
 			client:           oqs.client,
 			statistics:       oqs.statistics.ForServer(destination),
-			notifyPDUs:       make(chan bool, 1),
-			notifyEDUs:       make(chan bool, 1),
+			notify:           make(chan struct{}, 1),
 			interruptBackoff: make(chan bool),
 			signing:          oqs.signing,
 		}
@@ -117,11 +165,24 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	return oq
 }
 
+type ErrorFederationDisabled struct {
+	Message string
+}
+
+func (e *ErrorFederationDisabled) Error() string {
+	return e.Message
+}
+
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
 	ev *gomatrixserverlib.HeaderedEvent, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
 ) error {
+	if oqs.disabled {
+		return &ErrorFederationDisabled{
+			Message: "Federation disabled",
+		}
+	}
 	if origin != oqs.origin {
 		// TODO: Support virtual hosting; gh issue #577.
 		return fmt.Errorf(
@@ -170,7 +231,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	for destination := range destmap {
-		oqs.getQueue(destination).sendEvent(nid)
+		oqs.getQueue(destination).sendEvent(ev, nid)
 	}
 
 	return nil
@@ -181,6 +242,11 @@ func (oqs *OutgoingQueues) SendEDU(
 	e *gomatrixserverlib.EDU, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
 ) error {
+	if oqs.disabled {
+		return &ErrorFederationDisabled{
+			Message: "Federation disabled",
+		}
+	}
 	if origin != oqs.origin {
 		// TODO: Support virtual hosting; gh issue #577.
 		return fmt.Errorf(
@@ -235,7 +301,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	for destination := range destmap {
-		oqs.getQueue(destination).sendEDU(nid)
+		oqs.getQueue(destination).sendEDU(e, nid)
 	}
 
 	return nil
@@ -243,6 +309,9 @@ func (oqs *OutgoingQueues) SendEDU(
 
 // RetryServer attempts to resend events to the given server if we had given up.
 func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
+	if oqs.disabled {
+		return
+	}
 	q := oqs.getQueue(srv)
 	if q == nil {
 		return

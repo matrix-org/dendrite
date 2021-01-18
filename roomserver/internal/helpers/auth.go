@@ -31,7 +31,7 @@ import (
 func CheckForSoftFail(
 	ctx context.Context,
 	db storage.Database,
-	event gomatrixserverlib.HeaderedEvent,
+	event *gomatrixserverlib.HeaderedEvent,
 	stateEventIDs []string,
 ) (bool, error) {
 	rewritesState := len(stateEventIDs) > 1
@@ -72,7 +72,7 @@ func CheckForSoftFail(
 	}
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
@@ -93,7 +93,7 @@ func CheckForSoftFail(
 func CheckAuthEvents(
 	ctx context.Context,
 	db storage.Database,
-	event gomatrixserverlib.HeaderedEvent,
+	event *gomatrixserverlib.HeaderedEvent,
 	authEventIDs []string,
 ) ([]types.EventNID, error) {
 	// Grab the numeric IDs for the supplied auth state events from the database.
@@ -104,7 +104,7 @@ func CheckAuthEvents(
 	authStateEntries = types.DeduplicateStateEntries(authStateEntries)
 
 	// Work out which of the state events we actually need.
-	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.Event{event.Unwrap()})
+	stateNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event.Unwrap()})
 
 	// Load the actual auth events from the database.
 	authEvents, err := loadAuthEvents(ctx, db, stateNeeded, authStateEntries)
@@ -168,7 +168,7 @@ func (ae *authEvents) lookupEventWithEmptyStateKey(typeNID types.EventTypeNID) *
 	if !ok {
 		return nil
 	}
-	return &event.Event
+	return event.Event
 }
 
 func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *gomatrixserverlib.Event {
@@ -187,7 +187,7 @@ func (ae *authEvents) lookupEvent(typeNID types.EventTypeNID, stateKey string) *
 	if !ok {
 		return nil
 	}
-	return &event.Event
+	return event.Event
 }
 
 // loadAuthEvents loads the events needed for authentication from the supplied room state.
