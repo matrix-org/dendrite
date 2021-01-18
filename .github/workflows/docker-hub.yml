@@ -7,7 +7,8 @@ on:
     types: [published]
 
 env:
-  DOCKER_HUB_USER: matrixdotorg
+  DOCKER_NAMESPACE: matrixdotorg
+  DOCKER_HUB_USER: neilalexander
   PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7
 
 jobs:
@@ -37,8 +38,8 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
-            ${{ env.DOCKER_HUB_USER }}/dendrite-monolith:latest
-            ${{ env.DOCKER_HUB_USER }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:latest
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
 
   Polylith:
     runs-on: ubuntu-latest
@@ -66,5 +67,5 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
-            ${{ env.DOCKER_HUB_USER }}/dendrite-polylith:latest
-            ${{ env.DOCKER_HUB_USER }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:latest
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
