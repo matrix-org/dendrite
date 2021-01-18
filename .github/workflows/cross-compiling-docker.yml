@@ -7,7 +7,7 @@ jobs:
   compile:
     strategy:
       matrix:
-        target: [amd64, arm64, armhf]
+        target: [amd64, arm64, arm]
     env:
       GOARCH: ${{ matrix.target }}
     runs-on: ubuntu-latest

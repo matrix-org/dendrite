@@ -14,20 +14,22 @@ case "$1" in
 esac
 
 # Given a GOARCH target, return the GCC for that target.
-case "$GOARCH" in
-"amd64")
-    echo "x86_64-pc-linux-gnu-gcc"
-    ;;
-"arm64")
-    echo "aarch64-linux-gnu-gcc"
-    ;;
-"armhf")
-    echo "arm-linux-gnueabihf-gcc"
-    ;;
-*)
-    echo "gcc" # Send us a pull request if RISC-V ever takes off
-    ;;
-esac
+function get_compiler() {
+    case "$GOARCH" in
+    "amd64")
+        echo "x86_64-pc-linux-gnu-gcc"
+        ;;
+    "arm64")
+        echo "aarch64-linux-gnu-gcc"
+        ;;
+    "arm")
+        echo "arm-linux-gnueabihf-gcc"
+        ;;
+    *)
+        echo "gcc" # Send us a pull request if RISC-V ever takes off
+        ;;
+    esac
+}
 
 # Given a GOARCH target, return a list of Ubuntu packages needed to compile for that target.
 function get_pkgs() {
@@ -35,7 +37,7 @@ function get_pkgs() {
     "arm64")
         echo "gcc-aarch64-linux-gnu libc6-dev-arm64-cross"
         ;;
-    "armhf")
+    "arm")
         echo "gcc-arm-linux-gnueabihf libc6-dev-armhf-cross"
         ;;
     "amd64" | *)
