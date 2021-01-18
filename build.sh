@@ -1,7 +1,7 @@
 #!/bin/sh -eu
 
 # Put installed packages into ./bin
-export GOBIN=$PWD/`dirname $0`/bin
+mkdir "./bin/"
 
 if [ -d ".git" ] 
 then
@@ -17,6 +17,6 @@ else
     export FLAGS=""
 fi
 
-CGO_ENABLED=1 go build -trimpath -ldflags "$FLAGS" -v -o "bin/" ./cmd/...
+CGO_ENABLED=1 go build -trimpath -ldflags "$FLAGS" -v -o "./bin/" ./cmd/...
 
 CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o bin/main.wasm ./cmd/dendritejs
