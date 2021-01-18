@@ -173,6 +173,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
 			"add":        msg.AddsStateEventIDs,
@@ -215,6 +216,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write old event failure")
@@ -276,6 +278,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   msg.Event.EventID(),
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,

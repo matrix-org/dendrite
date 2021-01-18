@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -250,7 +251,8 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 			roomType := ""
 			create := w.stateEvent(roomID, gomatrixserverlib.MRoomCreate, "")
 			if create != nil {
-				roomType = gjson.GetBytes(create.Content(), ConstCreateEventContentKey).Str
+				// escape the `.`s so gjson doesn't think it's nested
+				roomType = gjson.GetBytes(create.Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
 			}
 
 			// Add the total number of events to `PublicRoomsChunk` under `num_refs`. Add `PublicRoomsChunk` to `rooms`.
