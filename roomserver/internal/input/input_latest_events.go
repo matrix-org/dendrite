@@ -100,7 +100,8 @@ type latestEventsUpdater struct {
 	// The eventID of the event that was processed before this one.
 	lastEventIDSent string
 	// The latest events in the room after processing this event.
-	latest []types.StateAtEventAndReference
+	oldLatest []types.StateAtEventAndReference
+	latest    []types.StateAtEventAndReference
 	// The state entries removed from and added to the current state of the
 	// room as a result of processing this event. They are sorted lists.
 	removed []types.StateEntry
@@ -123,10 +124,10 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// state snapshot from somewhere else, e.g. a federated room join,
 	// then start with an empty set - none of the forward extremities
 	// that we knew about before matter anymore.
-	oldLatest := []types.StateAtEventAndReference{}
+	u.oldLatest = []types.StateAtEventAndReference{}
 	if !u.rewritesState {
 		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
-		oldLatest = u.updater.LatestEvents()
+		u.oldLatest = u.updater.LatestEvents()
 	}
 
 	// If the event has already been written to the output log then we
@@ -140,7 +141,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// Work out what the latest events are. This will include the new
 	// event if it is not already referenced.
 	extremitiesChanged, err := u.calculateLatest(
-		oldLatest, u.event,
+		u.oldLatest, u.event,
 		types.StateAtEventAndReference{
 			EventReference: u.event.EventReference(),
 			StateAtEvent:   u.stateAtEvent,
@@ -199,6 +200,37 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 func (u *latestEventsUpdater) latestState() error {
 	var err error
 	roomState := state.NewStateResolution(u.api.DB, *u.roomInfo)
+
+	// Work out if the state at the extremities has actually changed
+	// or not. If they haven't then we won't bother doing all of the
+	// hard work.
+	if u.event.StateKey() == nil {
+		stateChanged := false
+		oldStateNIDs := make([]types.StateSnapshotNID, 0, len(u.oldLatest))
+		newStateNIDs := make([]types.StateSnapshotNID, 0, len(u.latest))
+		for _, old := range u.oldLatest {
+			oldStateNIDs = append(oldStateNIDs, old.BeforeStateSnapshotNID)
+		}
+		for _, new := range u.latest {
+			newStateNIDs = append(newStateNIDs, new.BeforeStateSnapshotNID)
+		}
+		oldStateNIDs = state.UniqueStateSnapshotNIDs(oldStateNIDs)
+		newStateNIDs = state.UniqueStateSnapshotNIDs(newStateNIDs)
+		if len(oldStateNIDs) != len(newStateNIDs) {
+			stateChanged = true
+		} else {
+			for i := range oldStateNIDs {
+				if oldStateNIDs[i] != newStateNIDs[i] {
+					stateChanged = true
+					break
+				}
+			}
+		}
+		if !stateChanged {
+			u.newStateNID = u.oldStateNID
+			return nil
+		}
+	}
 
 	// Get a list of the current latest events. This may or may not
 	// include the new event from the input path, depending on whether
