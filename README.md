@@ -8,7 +8,6 @@ It intends to provide an **efficient**, **reliable** and **scalable** alternativ
    a [brand new Go test suite](https://github.com/matrix-org/complement).
  - Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
 
-
 As of October 2020, Dendrite has now entered **beta** which means:
 - Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
 - Dendrite has periodic semver releases. We intend to release new versions as we land significant features.
@@ -24,7 +23,7 @@ This does not mean:
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
 In the future, we will be able to scale up to gigantic servers (equivalent to matrix.org) via polylith mode. 
 
-Join us in:
+If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or join us in:
 
 - **[#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org)** - General chat about the Dendrite project, for users and server admins alike
 - **[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)** - The place for developers, where all Dendrite development discussion happens

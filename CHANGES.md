@@ -1,5 +1,54 @@
 # Changelog
 
+## Dendrite 0.3.5 (2021-01-11)
+
+### Features
+
+* All `/sync` streams are now logically separate after a refactoring exercise
+
+## Fixes
+
+* Event references are now deeply checked properly when calculating forward extremities, reducing the amount of forward extremities in most cases, which improves RAM utilisation and reduces the work done by state resolution
+* Sync no longer sends incorrect `next_batch` tokens with old stream positions, reducing flashbacks of old messages in clients
+* The federation `/send` endpoint no longer uses the request context, which could result in some events failing to be persisted if the sending server gave up the HTTP connection
+* Appservices can now auth as users in their namespaces properly
+
+## Dendrite 0.3.4 (2020-12-18)
+
+### Features
+
+* The stream tokens for `/sync` have been refactored, giving PDUs, typing notifications, read receipts, invites and send-to-device messages their own respective stream positions, greatly improving the correctness of sync
+* A new roominfo cache has been added, which results in less database hits in the roomserver
+* Prometheus metrics have been added for sync requests, destination queues and client API event send perceived latency
+
+### Fixes
+
+* Event IDs are no longer recalculated so often in `/sync`, which reduces CPU usage
+* Sync requests are now woken up correctly for our own device list updates
+* The device list stream position is no longer lost, so unnecessary device updates no longer appear in every other sync
+* A crash on concurrent map read/writes has been fixed in the stream token code
+* The roomserver input API no longer starts more worker goroutines than needed
+* The roomserver no longer uses the request context for queued tasks which could lead to send requests failing to be processed
+* A new index has been added to the sync API current state table, which improves lookup performance significantly
+* The client API `/joined_rooms` endpoint no longer incorrectly returns `null` if there are 0 rooms joined
+* The roomserver will now query appservices when looking up a local room alias that isn't known
+* The check on registration for appservice-exclusive namespaces has been fixed
+
+## Dendrite 0.3.3 (2020-12-09)
+
+### Features
+
+* Federation sender should now use considerably less CPU cycles and RAM when sending events into large rooms
+* The roomserver now uses considerably less CPU cycles by not calculating event IDs so often
+* Experimental support for [MSC2836](https://github.com/matrix-org/matrix-doc/pull/2836) (threading) has been merged
+* Dendrite will no longer hold federation HTTP connections open unnecessarily, which should help to reduce ambient CPU/RAM usage and hold fewer long-term file descriptors
+
+### Fixes
+
+* A bug in the latest event updater has been fixed, which should prevent the roomserver from losing forward extremities in some rare cases
+* A panic has been fixed when federation is disabled (contributed by [kraem](https://github.com/kraem))
+* The response format of the `/joined_members` endpoint has been fixed (contributed by [alexkursell](https://github.com/alexkursell))
+
 ## Dendrite 0.3.2 (2020-12-02)
 
 ### Features

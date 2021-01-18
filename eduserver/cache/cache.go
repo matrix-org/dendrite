@@ -113,19 +113,6 @@ func (t *EDUCache) AddTypingUser(
 	return t.GetLatestSyncPosition()
 }
 
-// AddSendToDeviceMessage increases the sync position for
-// send-to-device updates.
-// Returns the sync position before update, as the caller
-// will use this to record the current stream position
-// at the time that the send-to-device message was sent.
-func (t *EDUCache) AddSendToDeviceMessage() int64 {
-	t.Lock()
-	defer t.Unlock()
-	latestSyncPosition := t.latestSyncPosition
-	t.latestSyncPosition++
-	return latestSyncPosition
-}
-
 // addUser with mutex lock & replace the previous timer.
 // Returns the latest typing sync position after update.
 func (t *EDUCache) addUser(

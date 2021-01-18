@@ -21,10 +21,10 @@ import (
 	// Import the sqlite3 package
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
+	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -46,13 +46,14 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		return nil, err
 	}
 	d.writer = sqlutil.NewExclusiveWriter()
-	if err = d.prepare(); err != nil {
+	if err = d.prepare(dbProperties); err != nil {
 		return nil, err
 	}
 	return &d, nil
 }
 
-func (d *SyncServerDatasource) prepare() (err error) {
+// nolint:gocyclo
+func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
 		return err
 	}
@@ -99,6 +100,12 @@ func (d *SyncServerDatasource) prepare() (err error) {
 	if err != nil {
 		return err
 	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadFixSequences(m)
+	deltas.LoadRemoveSendToDeviceSentColumn(m)
+	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+		return err
+	}
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Writer:              d.writer,
@@ -112,7 +119,6 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
-		EDUCache:            cache.New(),
 	}
 	return nil
 }

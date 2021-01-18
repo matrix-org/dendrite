@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS syncapi_stream_id (
 );
 INSERT INTO syncapi_stream_id (stream_name, stream_id) VALUES ("global", 0)
   ON CONFLICT DO NOTHING;
+INSERT INTO syncapi_stream_id (stream_name, stream_id) VALUES ("receipt", 0)
+  ON CONFLICT DO NOTHING;
 `
 
 const increaseStreamIDStmt = "" +
@@ -54,5 +56,15 @@ func (s *streamIDStatements) nextStreamID(ctx context.Context, txn *sql.Tx) (pos
 		return
 	}
 	err = selectStmt.QueryRowContext(ctx, "global").Scan(&pos)
+	return
+}
+
+func (s *streamIDStatements) nextReceiptID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
+	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
+	selectStmt := sqlutil.TxStmt(txn, s.selectStreamIDStmt)
+	if _, err = increaseStmt.ExecContext(ctx, "receipt"); err != nil {
+		return
+	}
+	err = selectStmt.QueryRowContext(ctx, "receipt").Scan(&pos)
 	return
 }

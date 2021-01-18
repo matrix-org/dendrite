@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Shopify/sarama"
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/acls"
@@ -35,6 +36,7 @@ type RoomserverInternalAPI struct {
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
 	fsAPI                  fsAPI.FederationSenderInternalAPI
+	asAPI                  asAPI.AppServiceQueryAPI
 	OutputRoomEventTopic   string // Kafka topic for new output room events
 	PerspectiveServerNames []gomatrixserverlib.ServerName
 }
@@ -124,6 +126,10 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 	r.Forgetter = &perform.Forgetter{
 		DB: r.DB,
 	}
+}
+
+func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+	r.asAPI = asAPI
 }
 
 func (r *RoomserverInternalAPI) PerformInvite(
