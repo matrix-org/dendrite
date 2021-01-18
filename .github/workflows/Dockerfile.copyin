@@ -1,0 +1,11 @@
+FROM alpine:latest
+
+ARG DENDRITE_BINARY=
+ENV DENDRITE_BINARY=/usr/bin/${DENDRITE_BINARY}
+
+COPY ./bin/* /usr/bin
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
+
+ENTRYPOINT ["${DENDRITE_BINARY}"]
