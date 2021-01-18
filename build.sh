@@ -17,6 +17,6 @@ else
     export FLAGS=""
 fi
 
-go install -trimpath -ldflags "$FLAGS" -v $PWD/`dirname $0`/cmd/...
+CGO_ENABLED=1 go build -trimpath -ldflags "$FLAGS" -v -o "bin/" ./cmd/...
 
-GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o bin/main.wasm ./cmd/dendritejs
+CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -trimpath -ldflags "$FLAGS" -o bin/main.wasm ./cmd/dendritejs
