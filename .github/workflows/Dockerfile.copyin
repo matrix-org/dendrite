@@ -1,12 +1,16 @@
+ARG builder
+ARG TARGETARCH
+
+# https://stackoverflow.com/a/63472135/3551604
+FROM ${TARGETARCH}/${builder}:latest as builder
+
 FROM alpine:latest
 
-ARG BUILDER=
-ARG BUILDER_TAG=
-ARG DENDRITE_BINARY=
+ARG DENDRITE_BINARY
 
 ENV DENDRITE_BINARY=${DENDRITE_BINARY}
 
-COPY --from=${BUILDER}:${BUILDER_TAG} /build/bin/* /usr/bin
+COPY --from=builder /build/bin/* /usr/bin/
 
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
