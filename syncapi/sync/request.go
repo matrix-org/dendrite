@@ -68,8 +68,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, err
 			}
-			f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery)
-			if err == nil {
+			if f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery); err == nil {
 				filter = *f
 			}
 		}
