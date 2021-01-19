@@ -1,5 +1,7 @@
 #!/bin/bash
-set -eu
+set -exu
+
+MUSLCC_BASE="https://more.musl.cc/x86_64-linux-musl"
 
 # Given a GOARCH target, return what Docker calls that target.
 function get_docker() {
@@ -23,38 +25,39 @@ function get_docker() {
 function get_compiler() {
     case "$GOARCH" in
     "amd64")
-        echo "x86_64-linux-gnu-gcc"
+        echo "gcc"
         ;;
     "arm64")
-        echo "aarch64-linux-gnu-gcc"
+        echo "./aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
         ;;
     "arm")
-        echo "arm-linux-gnueabihf-gcc"
+        echo "./arm-linux-musleabi-cross/bin/arm-linux-musleabi-gcc"
         ;;
     *)
-        echo "gcc" # Send us a pull request if RISC-V ever takes off
+        exit 1 # Send us a pull request if RISC-V ever takes off
         ;;
     esac
 }
 
-# Given a GOARCH target, return a list of Ubuntu packages needed to compile for that target.
-function get_pkgs() {
+function download_musl() {
     case "$GOARCH" in
     "arm64")
-        echo "gcc-aarch64-linux-gnu libc6-dev-arm64-cross"
+        curl "${MUSLCC_BASE}/aarch64-linux-musl-cross.tgz" -o musl.tgz
+        tar xzf musl.tgz
         ;;
     "arm")
-        echo "gcc-arm-linux-gnueabihf libc6-dev-armhf-cross"
+        curl "${MUSLCC_BASE}/arm-linux-musleabi-cross.tgz" -o musl.tgz
+        tar xzf musl.tgz
         ;;
-    "amd64" | *)
-        # We (currently) don't need to install more packages on amd64.
+    "amd64")
+        echo "nothing to do"
         ;;
     esac
 }
 
 case "$1" in
 "pkgs")
-    get_pkgs
+    download_musl
     ;;
 "ccomp")
     get_compiler

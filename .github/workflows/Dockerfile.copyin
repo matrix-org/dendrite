@@ -1,11 +1,12 @@
 FROM alpine:latest
 
 ARG DENDRITE_BINARY=
-ENV DENDRITE_BINARY=/usr/bin/${DENDRITE_BINARY}
+ARG BIN_DIRECTORY=
+ENV DENDRITE_BINARY=${DENDRITE_BINARY}
 
-COPY ./bin/* /usr/bin
+COPY --from=builder /build/bin/* /usr/bin
 
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
 
-ENTRYPOINT ["${DENDRITE_BINARY}"]
+ENTRYPOINT "/usr/bin/${DENDRITE_BINARY}"
