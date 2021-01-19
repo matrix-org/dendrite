@@ -1,7 +1,7 @@
 FROM docker.io/golang:alpine AS builder
 ARG GOARCH=amd64
 
-RUN apk --update --no-cache add bash build-base
+RUN apk --update --no-cache add bash build-base curl
 
 WORKDIR /build
 
