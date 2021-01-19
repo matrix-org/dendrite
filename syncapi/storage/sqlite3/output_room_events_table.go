@@ -30,7 +30,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -140,6 +139,14 @@ func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Even
 	return s, nil
 }
 
+// prepareWithFilters returns a prepared statement with the
+// relevant filters included. It also includes an []interface{}
+// list of all the relevant parameters to pass straight to
+// QueryContext, QueryRowContext etc.
+// We don't take the filter object directly here because the
+// fields might come from either a StateFilter or an EventFilter,
+// and it's easier just to have the caller extract the relevant
+// parts.
 func (s *outputRoomEventsStatements) prepareWithFilters(
 	query string, params []interface{},
 	senders, notsenders, types, nottypes []string,
@@ -150,36 +157,33 @@ func (s *outputRoomEventsStatements) prepareWithFilters(
 	if count := len(senders); count > 0 {
 		filters += " AND sender IN " + sqlutil.QueryVariadicOffset(count, offset)
 		for _, v := range senders {
-			params = append(params, v)
-			offset++
+			params, offset = append(params, v), offset+1
 		}
 	}
 	if count := len(notsenders); count > 0 {
 		filters += " AND sender NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
 		for _, v := range notsenders {
-			params = append(params, v)
-			offset++
+			params, offset = append(params, v), offset+1
 		}
 	}
 	if count := len(types); count > 0 {
 		filters += " AND type IN " + sqlutil.QueryVariadicOffset(count, offset)
 		for _, v := range types {
-			params = append(params, v)
-			offset++
+			params, offset = append(params, v), offset+1
 		}
 	}
 	if count := len(nottypes); count > 0 {
 		filters += " AND type NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
 		for _, v := range nottypes {
-			params = append(params, v)
-			offset++
+			params, offset = append(params, v), offset+1
 		}
 	}
 	filters += " ORDER BY id " + order
 	filters += fmt.Sprintf(" LIMIT $%d", offset+1)
+
 	params = append(params, limit)
 	query = strings.Replace(query, " $FILTERS", filters, 1)
-	logrus.Infof("QUERY: %s", query)
+
 	stmt, err := s.db.Prepare(query)
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.db.Prepare: %w", err)
