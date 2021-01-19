@@ -181,7 +181,9 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, selectCurrentStateSQL,
-		[]interface{}{},
+		[]interface{}{
+			roomID,
+		},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
 		stateFilter.Limit, "",
