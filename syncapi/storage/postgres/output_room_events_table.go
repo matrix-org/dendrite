@@ -102,7 +102,11 @@ const selectRecentEventsForSyncSQL = "" +
 const selectEarlyEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC LIMIT $4"
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" ORDER BY id ASC LIMIT $8"
 
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
