@@ -326,7 +326,6 @@ func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *g
 	}
 	if res.StatusCode == 200 {
 		var result gomatrixserverlib.MSC2946SpacesResponse
-		result.SetRoomVersion(roomVer)
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("response 200 OK but failed to read response body: %s", err)

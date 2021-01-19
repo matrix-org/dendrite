@@ -271,11 +271,14 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 		if w.rootRoomID == roomID {
 			for _, ev := range refs.events() {
 				if !w.alreadySent(ev.EventID()) {
-					res.Events = append(res.Events, ev.Event)
+					strip := stripped(ev.Event)
+					if strip == nil {
+						continue
+					}
+					res.Events = append(res.Events, *strip)
 					uniqueRooms[ev.RoomID()] = true
 					uniqueRooms[SpaceTarget(ev)] = true
 					w.markSent(ev.EventID())
-					res.SetRoomVersion(ev.RoomVersion)
 				}
 			}
 		} else {
@@ -297,7 +300,11 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 				if w.roomIsExcluded(ev.RoomID()) {
 					continue
 				}
-				res.Events = append(res.Events, ev.Event)
+				strip := stripped(ev.Event)
+				if strip == nil {
+					continue
+				}
+				res.Events = append(res.Events, *strip)
 				uniqueRooms[ev.RoomID()] = true
 				uniqueRooms[SpaceTarget(ev)] = true
 				w.markSent(ev.EventID())
@@ -479,3 +486,16 @@ func (el eventLookup) events() (events []*gomatrixserverlib.HeaderedEvent) {
 }
 
 type set map[string]bool
+
+func stripped(ev *gomatrixserverlib.Event) *gomatrixserverlib.MSC2946StrippedEvent {
+	if ev.StateKey() == nil {
+		return nil
+	}
+	return &gomatrixserverlib.MSC2946StrippedEvent{
+		Type:     ev.Type(),
+		StateKey: *ev.StateKey(),
+		Content:  ev.Content(),
+		Sender:   ev.Sender(),
+		RoomID:   ev.RoomID(),
+	}
+}

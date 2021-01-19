@@ -247,12 +247,11 @@ func (a *FederationSenderInternalAPI) MSC2836EventRelationships(
 
 func (a *FederationSenderInternalAPI) MSC2946Spaces(
 	ctx context.Context, s gomatrixserverlib.ServerName, roomID string, r gomatrixserverlib.MSC2946SpacesRequest,
-	roomVersion gomatrixserverlib.RoomVersion,
 ) (res gomatrixserverlib.MSC2946SpacesResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequest(s, func() (interface{}, error) {
-		return a.federation.MSC2946Spaces(ctx, s, roomID, r, roomVersion)
+		return a.federation.MSC2946Spaces(ctx, s, roomID, r)
 	})
 	if err != nil {
 		return res, err
