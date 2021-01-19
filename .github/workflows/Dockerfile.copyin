@@ -1,8 +1,10 @@
 ARG builder
-ARG TARGETARCH
+ARG TARGETPLATFORM
+
+RUN "echo $TARGETPLATFORM"
 
 # https://stackoverflow.com/a/63472135/3551604
-FROM ${TARGETARCH}/${builder}:latest as builder
+FROM ${TARGETPLATFORM}/${builder}:latest as builder
 
 FROM alpine:latest
 
