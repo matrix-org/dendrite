@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -30,7 +29,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -63,18 +61,18 @@ const selectEventsSQL = "" +
 
 const selectRecentEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" $FILTERS"
+	" WHERE room_id = $1 AND id > $2 AND id <= $3"
+	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectRecentEventsForSyncSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
-	" $FILTERS"
+	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE"
+	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectEarlyEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" $FILTERS"
+	" WHERE room_id = $1 AND id > $2 AND id <= $3"
+	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
@@ -86,8 +84,8 @@ const selectStateInRangeSQL = "" +
 	"SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2)" +
-	" AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))" +
-	" $FILTERS"
+	" AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))"
+	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
@@ -129,61 +127,6 @@ func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Even
 	return s, nil
 }
 
-// prepareWithFilters returns a prepared statement with the
-// relevant filters included. It also includes an []interface{}
-// list of all the relevant parameters to pass straight to
-// QueryContext, QueryRowContext etc.
-// We don't take the filter object directly here because the
-// fields might come from either a StateFilter or an EventFilter,
-// and it's easier just to have the caller extract the relevant
-// parts.
-func (s *outputRoomEventsStatements) prepareWithFilters(
-	query string, params []interface{},
-	senders, notsenders, types, nottypes []string,
-	limit int, order string,
-) (*sql.Stmt, []interface{}, error) {
-	filters := ""
-	offset := len(params)
-	if count := len(senders); count > 0 {
-		filters += " AND sender IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range senders {
-			params, offset = append(params, v), offset+1
-		}
-	}
-	if count := len(notsenders); count > 0 {
-		filters += " AND sender NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range notsenders {
-			params, offset = append(params, v), offset+1
-		}
-	}
-	if count := len(types); count > 0 {
-		filters += " AND type IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range types {
-			params, offset = append(params, v), offset+1
-		}
-	}
-	if count := len(nottypes); count > 0 {
-		filters += " AND type NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range nottypes {
-			params, offset = append(params, v), offset+1
-		}
-	}
-	filters += " ORDER BY id " + order
-	filters += fmt.Sprintf(" LIMIT $%d", offset+1)
-	params = append(params, limit)
-
-	query = strings.Replace(query, " $FILTERS", filters, 1)
-
-	logrus.Infof("QUERY: %s", query)
-	logrus.Infof("PARAMS: %v", params)
-
-	stmt, err := s.db.Prepare(query)
-	if err != nil {
-		return nil, nil, fmt.Errorf("s.db.Prepare: %w", err)
-	}
-	return stmt, params, nil
-}
-
 func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
@@ -200,8 +143,8 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
-	stmt, params, err := s.prepareWithFilters(
-		selectStateInRangeSQL,
+	stmt, params, err := prepareWithFilters(
+		s.db, selectStateInRangeSQL,
 		[]interface{}{
 			r.Low(), r.High(),
 		},
@@ -373,8 +316,8 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		query = selectRecentEventsSQL
 	}
 
-	stmt, params, err := s.prepareWithFilters(
-		query,
+	stmt, params, err := prepareWithFilters(
+		s.db, query,
 		[]interface{}{
 			roomID, r.Low(), r.High(),
 		},
@@ -421,8 +364,8 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 ) ([]types.StreamEvent, error) {
-	stmt, params, err := s.prepareWithFilters(
-		selectEarlyEventsSQL,
+	stmt, params, err := prepareWithFilters(
+		s.db, selectEarlyEventsSQL,
 		[]interface{}{
 			roomID, r.Low(), r.High(),
 		},

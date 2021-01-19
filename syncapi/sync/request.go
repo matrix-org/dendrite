@@ -62,6 +62,8 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			}
 			if f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery); err == nil {
 				filter = *f
+			} else {
+				panic(err)
 			}
 		}
 	}
