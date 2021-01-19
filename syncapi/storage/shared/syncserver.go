@@ -110,7 +110,7 @@ func (d *Database) RoomIDsWithMembership(ctx context.Context, userID string, mem
 	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, nil, userID, membership)
 }
 
-func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.EventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
+func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
 	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
 
@@ -151,7 +151,7 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 func (d *Database) GetEventsInStreamingRange(
 	ctx context.Context,
 	from, to *types.StreamingToken,
-	roomID string, eventFilter *gomatrixserverlib.EventFilter,
+	roomID string, eventFilter *gomatrixserverlib.RoomEventFilter,
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
 	r := types.Range{

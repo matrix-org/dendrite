@@ -14,9 +14,8 @@ type SyncRequest struct {
 	Log           *logrus.Entry
 	Device        *userapi.Device
 	Response      *Response
-	Filter        gomatrixserverlib.EventFilter
+	Filter        gomatrixserverlib.Filter
 	Since         StreamingToken
-	Limit         int
 	Timeout       time.Duration
 	WantFullState bool
 

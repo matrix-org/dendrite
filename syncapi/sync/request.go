@@ -16,6 +16,7 @@ package sync
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -51,16 +52,14 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			return nil, err
 		}
 	}
-	timelineLimit := DefaultTimelineLimit
 	// TODO: read from stored filters too
+	filter := gomatrixserverlib.DefaultFilter()
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {
 		if filterQuery[0] == '{' {
 			// attempt to parse the timeline limit at least
-			var f filter
-			err := json.Unmarshal([]byte(filterQuery), &f)
-			if err == nil && f.Room.Timeline.Limit != nil {
-				timelineLimit = *f.Room.Timeline.Limit
+			if err := json.Unmarshal([]byte(filterQuery), &filter); err != nil {
+				return nil, fmt.Errorf("json.Unmarshal: %w", err)
 			}
 		} else {
 			// attempt to load the filter ID
@@ -71,21 +70,17 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			}
 			f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery)
 			if err == nil {
-				timelineLimit = f.Room.Timeline.Limit
+				filter = *f
 			}
 		}
 	}
-
-	filter := gomatrixserverlib.DefaultEventFilter()
-	filter.Limit = timelineLimit
-	// TODO: Additional query params: set_presence, filter
 
 	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"user_id":   device.UserID,
 		"device_id": device.ID,
 		"since":     since,
 		"timeout":   timeout,
-		"limit":     timelineLimit,
+		"limit":     filter.Room.Timeline.Limit,
 	})
 
 	return &types.SyncRequest{
@@ -96,7 +91,6 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		Filter:        filter,                  //
 		Since:         since,                   //
 		Timeout:       timeout,                 //
-		Limit:         timelineLimit,           //
 		Rooms:         make(map[string]string), // Populated by the PDU stream
 		WantFullState: wantFullState,           //
 	}, nil

@@ -235,7 +235,7 @@ func (r *messagesReq) retrieveEvents() (
 	clientEvents []gomatrixserverlib.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
-	eventFilter := gomatrixserverlib.DefaultEventFilter()
+	eventFilter := gomatrixserverlib.DefaultRoomEventFilter()
 	eventFilter.Limit = r.limit
 
 	// Retrieve the events from the local database.

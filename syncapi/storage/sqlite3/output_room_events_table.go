@@ -336,7 +336,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 
 func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, eventFilter *gomatrixserverlib.EventFilter,
+	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 	chronologicalOrder bool, onlySyncEvents bool,
 ) ([]types.StreamEvent, bool, error) {
 	var stmt *sql.Stmt

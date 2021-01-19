@@ -48,9 +48,8 @@ func (p *PDUStreamProvider) CompleteSync(
 		return from
 	}
 
-	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
-	eventFilter := gomatrixserverlib.DefaultEventFilter()
-	eventFilter.Limit = req.Limit
+	stateFilter := req.Filter.Room.State
+	eventFilter := req.Filter.Room.Timeline
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
@@ -106,10 +105,8 @@ func (p *PDUStreamProvider) IncrementalSync(
 	var stateDeltas []types.StateDelta
 	var joinedRooms []string
 
-	// TODO: use filter provided in request
-	stateFilter := gomatrixserverlib.DefaultStateFilter()
-	eventFilter := gomatrixserverlib.DefaultEventFilter()
-	eventFilter.Limit = req.Limit
+	stateFilter := req.Filter.Room.State
+	eventFilter := req.Filter.Room.Timeline
 
 	if req.WantFullState {
 		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
@@ -142,7 +139,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	device *userapi.Device,
 	r types.Range,
 	delta types.StateDelta,
-	eventFilter *gomatrixserverlib.EventFilter,
+	eventFilter *gomatrixserverlib.RoomEventFilter,
 	res *types.Response,
 ) error {
 	if delta.MembershipPos > 0 && delta.Membership == gomatrixserverlib.Leave {
@@ -213,7 +210,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	roomID string,
 	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
-	eventFilter *gomatrixserverlib.EventFilter,
+	eventFilter *gomatrixserverlib.RoomEventFilter,
 	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
 	var stateEvents []*gomatrixserverlib.HeaderedEvent
