@@ -156,7 +156,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
 
-	rows, err := stmt.QueryContext(ctx, params...)
+	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -329,7 +329,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
 
-	rows, err := stmt.QueryContext(ctx, params...)
+	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
 	if err != nil {
 		return nil, false, err
 	}
@@ -376,7 +376,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
-	rows, err := stmt.QueryContext(ctx, params...)
+	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/sirupsen/logrus"
 )
 
 // prepareWithFilters returns a prepared statement with the
@@ -51,9 +50,6 @@ func prepareWithFilters(
 	}
 	query += fmt.Sprintf(" LIMIT $%d", offset+1)
 	params = append(params, limit)
-
-	logrus.Infof("QUERY: %s", query)
-	logrus.Infof("PARAMS: %v", params)
 
 	stmt, err := db.Prepare(query)
 	if err != nil {

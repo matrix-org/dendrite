@@ -190,7 +190,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
 
-	rows, err := stmt.QueryContext(ctx, params...)
+	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}
