@@ -401,6 +401,12 @@ type testRoomserverAPI struct {
 	pubRoomState map[string]map[gomatrixserverlib.StateKeyTuple]string
 }
 
+func (r *testRoomserverAPI) QueryServerJoinedToRoom(ctx context.Context, req *roomserver.QueryServerJoinedToRoomRequest, res *roomserver.QueryServerJoinedToRoomResponse) error {
+	res.IsInRoom = true
+	res.RoomExists = true
+	return nil
+}
+
 func (r *testRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *roomserver.QueryBulkStateContentRequest, res *roomserver.QueryBulkStateContentResponse) error {
 	res.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
 	for _, roomID := range req.RoomIDs {
