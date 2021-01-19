@@ -503,3 +503,8 @@ A next_batch token can be used in the v1 messages API
 Users receive device_list updates for their own devices
 m.room.history_visibility == "world_readable" allows/forbids appropriately for Guest users
 m.room.history_visibility == "world_readable" allows/forbids appropriately for Real users
+State is included in the timeline in the initial sync
+State from remote users is included in the state in the initial sync
+Changes to state are included in an gapped incremental sync
+A full_state incremental update returns all state
+Can pass a JSON filter as a query parameter

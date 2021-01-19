@@ -235,12 +235,15 @@ func (r *messagesReq) retrieveEvents() (
 	clientEvents []gomatrixserverlib.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
+	eventFilter := gomatrixserverlib.DefaultRoomEventFilter()
+	eventFilter.Limit = r.limit
+
 	// Retrieve the events from the local database.
 	var streamEvents []types.StreamEvent
 	if r.fromStream != nil {
 		toStream := r.to.StreamToken()
 		streamEvents, err = r.db.GetEventsInStreamingRange(
-			r.ctx, r.fromStream, &toStream, r.roomID, r.limit, r.backwardOrdering,
+			r.ctx, r.fromStream, &toStream, r.roomID, &eventFilter, r.backwardOrdering,
 		)
 	} else {
 		streamEvents, err = r.db.GetEventsInTopologicalRange(
