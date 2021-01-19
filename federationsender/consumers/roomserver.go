@@ -102,6 +102,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			default:
 				// panic rather than continue with an inconsistent database
 				log.WithFields(log.Fields{
+					"event_id":   ev.EventID(),
 					"event":      string(ev.JSON()),
 					"add":        output.NewRoomEvent.AddsStateEventIDs,
 					"del":        output.NewRoomEvent.RemovesStateEventIDs,

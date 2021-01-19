@@ -1,12 +1,31 @@
 # Changelog
 
+## Dendrite 0.3.6 (2021-01-18)
+
+### Features
+
+* Experimental support for MSC2946 (Spaces Summary) has been merged
+* Send-to-device messages have been refactored and now take advantage of having their own stream position, making delivery more reliable
+* Unstable features and MSCs are now listed in `/versions` (contributed by [sumitks866](https://github.com/sumitks866))
+* Well-known and DNS SRV record results for federated servers are now cached properly, improving outbound federation performance and reducing traffic
+
+### Fixes
+
+* Updating forward extremities will no longer result in so many unnecessary state snapshots, reducing on-going disk usage in the roomserver database
+* Pagination tokens for `/messages` have been fixed, which should improve the reliability of scrollback/pagination
+* Dendrite now avoids returning `null`s in fields of the `/sync` response, and omitting some fields altogether when not needed, which should fix sync issues with Element Android
+* Requests for user device lists now time out quicker, which prevents federated `/send` requests from also timing out in many cases
+* Empty push rules are no longer sent over and over again in `/sync`
+* An integer overflow in the device list updater which could result in panics on 32-bit platforms has been fixed (contributed by [Lesterpig](https://github.com/Lesterpig))
+* Event IDs are now logged properly in federation sender and sync API consumer errors
+
 ## Dendrite 0.3.5 (2021-01-11)
 
 ### Features
 
 * All `/sync` streams are now logically separate after a refactoring exercise
 
-## Fixes
+### Fixes
 
 * Event references are now deeply checked properly when calculating forward extremities, reducing the amount of forward extremities in most cases, which improves RAM utilisation and reduces the work done by state resolution
 * Sync no longer sends incorrect `next_batch` tokens with old stream positions, reducing flashbacks of old messages in clients
