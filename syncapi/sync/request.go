@@ -32,14 +32,6 @@ import (
 const defaultSyncTimeout = time.Duration(0)
 const DefaultTimelineLimit = 20
 
-type filter struct {
-	Room struct {
-		Timeline struct {
-			Limit *int `json:"limit"`
-		} `json:"timeline"`
-	} `json:"room"`
-}
-
 func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*types.SyncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
