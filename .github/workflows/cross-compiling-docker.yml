@@ -5,57 +5,41 @@ on: push
 
 jobs:
   compile:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         target: [amd64, arm64, arm]
     env:
       GOARCH: ${{ matrix.target }}
-      IMAGE_NAME: "dendrite-builder"
-    runs-on: ubuntu-latest
+      BUILDER_IMAGE_NAME: "dendrite-builder"
+      DOCKER_HUB_USER: dendritegithub
+    services:
+      registry:
+        image: registry:2
+        ports:
+        - 5000:5000
     steps:
     - uses: actions/checkout@v2
     - uses: docker/setup-buildx-action@v1
+      with:
+        driver-opts: network=host
     - name: build dendrite in Docker
       uses: docker/build-push-action@v2
       with:
         context: .
         file: ./.github/workflows/Dockerfile.builder
         load: true # load into local image store
-        tags: "${{ env.IMAGE_NAME }}:${{ matrix.target }}"
-    - name: copy built files out of docker
-      run: docker run -v "$(pwd)/bin:/build/bin-out" "${{ env.IMAGE_NAME }}:${{ matrix.target }}" "/bin/sh" "-c" "cp -a /build/bin/* /build/bin-out"
-    - uses: actions/upload-artifact@v2
-      with:
-        name: bin-${{ matrix.target }}
-        path: ./bin
-  build-monolith:
-    needs: [compile]
-    runs-on: ubuntu-latest
-    services:
-      registry:
-        image: registry:2
-        ports:
-        - 5000:5000
-    strategy:
-      matrix:
-        target: [amd64, arm64, arm]
-    env:
-      DOCKER_HUB_USER: dendritegithub
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/download-artifact@v2
-      with:
-        name: bin-${{ matrix.target }}
+        tags: "${{ env.BUILDER_IMAGE_NAME }}:${{ matrix.target }}"
+        build-args: "GOARCH=${{ env.GOARCH }}"
     # - run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
     - run: echo "DOCKER_TARGET=$(./.github/workflows/get-compiler.sh docker)" >> $GITHUB_ENV 
     - uses: docker/setup-qemu-action@v1
-    - uses: docker/setup-buildx-action@v1
-      with:
-        driver-opts: network=host
-    - uses: docker/build-push-action@v2
+    - name: build monolith
+      uses: docker/build-push-action@v2
       with:
         context: .
         file: ./.github/workflows/Dockerfile.copyin
         platforms: ${{ env.DOCKER_TARGET }}
         push: true
         tags: localhost:5000/matrixdotorg/dendrite-monolith:latest
+        build-args: "BUILDER=${{ env.BUILDER_IMAGE_NAME }}\nBUILDER_TAG=${{ env.GOARCH }}\nDENDRITE_BINARY=dendrite-monolith-server"

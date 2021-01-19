@@ -1,10 +1,12 @@
 FROM alpine:latest
 
+ARG BUILDER=
+ARG BUILDER_TAG=
 ARG DENDRITE_BINARY=
-ARG BIN_DIRECTORY=
+
 ENV DENDRITE_BINARY=${DENDRITE_BINARY}
 
-COPY --from=builder /build/bin/* /usr/bin
+COPY --from=${BUILDER}:${BUILDER_TAG} /build/bin/* /usr/bin
 
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
