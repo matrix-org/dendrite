@@ -30,6 +30,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -81,22 +82,11 @@ const selectMaxEventIDSQL = "" +
 const updateEventJSONSQL = "" +
 	"UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
 
-// In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
-/*
-	$1 = oldPos,
-	$2 = newPos,
-	$3 = pq.StringArray(stateFilterPart.Senders),
-	$4 = pq.StringArray(stateFilterPart.NotSenders),
-	$5 = pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
-	$6 = pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
-	$7 = stateFilterPart.ContainsURL,
-	$8 = stateFilterPart.Limit,
-*/
 const selectStateInRangeSQL = "" +
 	"SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
-	" WHERE (id > $1 AND id <= $2)" + // old/new pos
-	" AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
+	" WHERE (id > $1 AND id <= $2)" +
+	" AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))" +
 	" $FILTERS"
 
 const deleteEventsForRoomSQL = "" +
@@ -180,9 +170,12 @@ func (s *outputRoomEventsStatements) prepareWithFilters(
 	}
 	filters += " ORDER BY id " + order
 	filters += fmt.Sprintf(" LIMIT $%d", offset+1)
-
 	params = append(params, limit)
+
 	query = strings.Replace(query, " $FILTERS", filters, 1)
+
+	logrus.Infof("QUERY: %s", query)
+	logrus.Infof("PARAMS: %v", params)
 
 	stmt, err := s.db.Prepare(query)
 	if err != nil {
@@ -333,11 +326,13 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 
-	addStateJSON, err := json.Marshal(addState)
-	if err != nil {
-		return 0, err
+	var addStateJSON, removeStateJSON []byte
+	if len(addState) > 0 {
+		addStateJSON, err = json.Marshal(addState)
 	}
-	removeStateJSON, err := json.Marshal(removeState)
+	if len(removeState) > 0 {
+		removeStateJSON, err = json.Marshal(removeState)
+	}
 	if err != nil {
 		return 0, err
 	}
