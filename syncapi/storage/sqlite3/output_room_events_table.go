@@ -175,6 +175,9 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilterPart *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
+	params := []interface{}{}
+	_ = params
+
 	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(
@@ -333,7 +336,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 
 func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, limit int,
+	roomID string, r types.Range, eventFilter *gomatrixserverlib.EventFilter,
 	chronologicalOrder bool, onlySyncEvents bool,
 ) ([]types.StreamEvent, bool, error) {
 	var stmt *sql.Stmt
@@ -343,7 +346,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
 	}
 
-	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit+1)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), eventFilter.Limit+1)
 	if err != nil {
 		return nil, false, err
 	}
@@ -362,7 +365,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	}
 	// we queried for 1 more than the limit, so if we returned one more mark limited=true
 	limited := false
-	if len(events) > limit {
+	if len(events) > eventFilter.Limit {
 		limited = true
 		// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
 		if chronologicalOrder {

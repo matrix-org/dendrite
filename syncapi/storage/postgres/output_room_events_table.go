@@ -84,12 +84,20 @@ const selectEventsSQL = "" +
 const selectRecentEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id DESC LIMIT $4"
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" ORDER BY id DESC LIMIT $8"
 
 const selectRecentEventsForSyncSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
-	" ORDER BY id DESC LIMIT $4"
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" ORDER BY id DESC LIMIT $8"
 
 const selectEarlyEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
@@ -322,7 +330,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 // from sync.
 func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, limit int,
+	roomID string, r types.Range, eventFilter *gomatrixserverlib.EventFilter,
 	chronologicalOrder bool, onlySyncEvents bool,
 ) ([]types.StreamEvent, bool, error) {
 	var stmt *sql.Stmt
@@ -331,7 +339,14 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	} else {
 		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
 	}
-	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit+1)
+	rows, err := stmt.QueryContext(
+		ctx, roomID, r.Low(), r.High(),
+		pq.StringArray(eventFilter.Senders),
+		pq.StringArray(eventFilter.NotSenders),
+		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
+		eventFilter.Limit+1,
+	)
 	if err != nil {
 		return nil, false, err
 	}
@@ -350,7 +365,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	}
 	// we queried for 1 more than the limit, so if we returned one more mark limited=true
 	limited := false
-	if len(events) > limit {
+	if len(events) > eventFilter.Limit {
 		limited = true
 		// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
 		if chronologicalOrder {

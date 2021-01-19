@@ -49,12 +49,14 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	stateFilter := gomatrixserverlib.DefaultStateFilter() // TODO: use filter provided in request
+	eventFilter := gomatrixserverlib.DefaultEventFilter()
+	eventFilter.Limit = req.Limit
 
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
 		var jr *types.JoinResponse
 		jr, err = p.getJoinResponseForCompleteSync(
-			ctx, roomID, r, &stateFilter, req.Limit, req.Device,
+			ctx, roomID, r, &stateFilter, &eventFilter, req.Device,
 		)
 		if err != nil {
 			req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -74,7 +76,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, peek.RoomID, r, &stateFilter, req.Limit, req.Device,
+				ctx, peek.RoomID, r, &stateFilter, &eventFilter, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -106,6 +108,8 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	// TODO: use filter provided in request
 	stateFilter := gomatrixserverlib.DefaultStateFilter()
+	eventFilter := gomatrixserverlib.DefaultEventFilter()
+	eventFilter.Limit = req.Limit
 
 	if req.WantFullState {
 		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
@@ -124,7 +128,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	}
 
 	for _, delta := range stateDeltas {
-		if err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, req.Limit, req.Response); err != nil {
+		if err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, &eventFilter, req.Response); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			return newPos
 		}
@@ -138,7 +142,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	device *userapi.Device,
 	r types.Range,
 	delta types.StateDelta,
-	numRecentEventsPerRoom int,
+	eventFilter *gomatrixserverlib.EventFilter,
 	res *types.Response,
 ) error {
 	if delta.MembershipPos > 0 && delta.Membership == gomatrixserverlib.Leave {
@@ -152,7 +156,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 	recentStreamEvents, limited, err := p.DB.RecentEvents(
 		ctx, delta.RoomID, r,
-		numRecentEventsPerRoom, true, true,
+		eventFilter, true, true,
 	)
 	if err != nil {
 		return err
@@ -209,7 +213,8 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	roomID string,
 	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
-	numRecentEventsPerRoom int, device *userapi.Device,
+	eventFilter *gomatrixserverlib.EventFilter,
+	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
 	var stateEvents []*gomatrixserverlib.HeaderedEvent
 	stateEvents, err = p.DB.CurrentState(ctx, roomID, stateFilter)
@@ -221,7 +226,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	var recentStreamEvents []types.StreamEvent
 	var limited bool
 	recentStreamEvents, limited, err = p.DB.RecentEvents(
-		ctx, roomID, r, numRecentEventsPerRoom, true, true,
+		ctx, roomID, r, eventFilter, true, true,
 	)
 	if err != nil {
 		return
