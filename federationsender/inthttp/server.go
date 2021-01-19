@@ -329,4 +329,26 @@ func AddRoutes(intAPI api.FederationSenderInternalAPI, internalAPIMux *mux.Route
 			return util.JSONResponse{Code: http.StatusOK, JSON: request}
 		}),
 	)
+	internalAPIMux.Handle(
+		FederationSenderSpacesSummaryPath,
+		httputil.MakeInternalAPI("MSC2946SpacesSummary", func(req *http.Request) util.JSONResponse {
+			var request spacesReq
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.MSC2946Spaces(req.Context(), request.S, request.RoomID, request.Req)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
 }
