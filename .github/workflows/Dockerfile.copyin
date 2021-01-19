@@ -1,7 +1,7 @@
 ARG builder
 
 # https://stackoverflow.com/a/63472135/3551604
-FROM ${TARGETPLATFORM}/${builder}:latest as builder
+FROM "${builder}" as builder
 
 FROM alpine:latest
 
