@@ -33,8 +33,8 @@ jobs:
       with:
         context: .
         file: ./.github/workflows/Dockerfile.builder
-        load: true # load into local image store
-        tags: "${{ env.BUILDER_IMAGE_TAG }}"
+        push: true
+        tags: "localhost:5000/${{ env.BUILDER_IMAGE_TAG }}"
         build-args: "GOARCH=${{ env.GOARCH }}"
     # - run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
     - run: docker image inspect "${{ env.BUILDER_IMAGE_TAG }}"
@@ -46,4 +46,4 @@ jobs:
         platforms: ${{ env.DOCKER_TARGET }}
         push: true
         tags: localhost:5000/matrixdotorg/dendrite-monolith:latest
-        build-args: "builder=${{ env.BUILDER_IMAGE_TAG }}\nDENDRITE_BINARY=dendrite-monolith-server"
+        build-args: "builder=localhost:5000/${{ env.BUILDER_IMAGE_TAG }}\nDENDRITE_BINARY=dendrite-monolith-server"
