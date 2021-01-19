@@ -10,6 +10,7 @@ jobs:
         target: [amd64, arm64, arm]
     env:
       GOARCH: ${{ matrix.target }}
+      IMAGE_NAME: "dendrite-builder"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -20,9 +21,9 @@ jobs:
         context: .
         file: ./.github/workflows/Dockerfile.builder
         load: true # load into local image store
-        tags: "dendrite-builder:${{ matrix.target }}"
+        tags: "${{ env.IMAGE_NAME }}:${{ matrix.target }}"
     - name: copy built files out of docker
-      run: docker run -v "$(pwd)/bin:/build/bin-out" builder:${{ matrix.target }} "/bin/sh" "-c" "cp -a /build/bin/* /build/bin-out"
+      run: docker run -v "$(pwd)/bin:/build/bin-out" "${{ env.IMAGE_NAME }}:${{ matrix.target }}" "/bin/sh" "-c" "cp -a /build/bin/* /build/bin-out"
     - uses: actions/upload-artifact@v2
       with:
         name: bin-${{ matrix.target }}
