@@ -382,10 +382,17 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 // from a given position, up to a maximum of 'limit'.
 func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, limit int,
+	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 ) ([]types.StreamEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectEarlyEventsStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
+	rows, err := stmt.QueryContext(
+		ctx, roomID, r.Low(), r.High(),
+		pq.StringArray(eventFilter.Senders),
+		pq.StringArray(eventFilter.NotSenders),
+		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
+		eventFilter.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}

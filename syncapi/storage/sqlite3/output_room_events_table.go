@@ -379,10 +379,10 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 
 func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, limit int,
+	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 ) ([]types.StreamEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectEarlyEventsStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
+	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), eventFilter.Limit)
 	if err != nil {
 		return nil, err
 	}

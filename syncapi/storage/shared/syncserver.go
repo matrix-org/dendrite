@@ -169,7 +169,7 @@ func (d *Database) GetEventsInStreamingRange(
 	} else {
 		// When using forward ordering, we want the least recent events first.
 		if events, err = d.OutputEvents.SelectEarlyEvents(
-			ctx, nil, roomID, r, eventFilter.Limit, // TODO: filter here too
+			ctx, nil, roomID, r, eventFilter,
 		); err != nil {
 			return
 		}
