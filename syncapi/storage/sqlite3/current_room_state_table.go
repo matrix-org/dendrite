@@ -186,7 +186,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
-		stateFilter.Limit, "",
+		stateFilter.Limit, FilterOrderNone,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)

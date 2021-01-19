@@ -49,21 +49,22 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {
 		if filterQuery[0] == '{' {
-			// attempt to parse the timeline limit at least
+			// Parse the filter from the query string
 			if err := json.Unmarshal([]byte(filterQuery), &filter); err != nil {
 				return nil, fmt.Errorf("json.Unmarshal: %w", err)
 			}
 		} else {
-			// attempt to load the filter ID
+			// Try to load the filter from the database
 			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-				return nil, err
+				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
-			if f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery); err == nil {
-				filter = *f
+			if f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery); err != nil {
+				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
+				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			} else {
-				panic(err)
+				filter = *f
 			}
 		}
 	}

@@ -150,7 +150,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
-		stateFilter.Limit, "ASC",
+		stateFilter.Limit, FilterOrderAsc,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -273,11 +273,14 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	if len(addState) > 0 {
 		addStateJSON, err = json.Marshal(addState)
 	}
+	if err != nil {
+		return 0, fmt.Errorf("json.Marshal(addState): %w", err)
+	}
 	if len(removeState) > 0 {
 		removeStateJSON, err = json.Marshal(removeState)
 	}
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("json.Marshal(removeState): %w", err)
 	}
 
 	streamPos, err := s.streamIDStatements.nextPDUID(ctx, txn)
@@ -323,7 +326,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
-		eventFilter.Limit+1, "DESC",
+		eventFilter.Limit+1, FilterOrderDesc,
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -371,7 +374,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
-		eventFilter.Limit, "ASC",
+		eventFilter.Limit, FilterOrderAsc,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)

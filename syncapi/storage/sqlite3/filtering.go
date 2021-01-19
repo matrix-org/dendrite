@@ -7,6 +7,14 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
+type FilterOrder int
+
+const (
+	FilterOrderNone = iota
+	FilterOrderAsc
+	FilterOrderDesc
+)
+
 // prepareWithFilters returns a prepared statement with the
 // relevant filters included. It also includes an []interface{}
 // list of all the relevant parameters to pass straight to
@@ -18,7 +26,7 @@ import (
 func prepareWithFilters(
 	db *sql.DB, txn *sql.Tx, query string, params []interface{},
 	senders, notsenders, types, nottypes []string,
-	limit int, order string,
+	limit int, order FilterOrder,
 ) (*sql.Stmt, []interface{}, error) {
 	offset := len(params)
 	if count := len(senders); count > 0 {
@@ -45,8 +53,11 @@ func prepareWithFilters(
 			params, offset = append(params, v), offset+1
 		}
 	}
-	if order != "" {
-		query += " ORDER BY id " + order
+	switch order {
+	case FilterOrderAsc:
+		query += " ORDER BY id ASC"
+	case FilterOrderDesc:
+		query += " ORDER BY id DESC"
 	}
 	query += fmt.Sprintf(" LIMIT $%d", offset+1)
 	params = append(params, limit)
