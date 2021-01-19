@@ -30,6 +30,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -63,20 +64,17 @@ const selectEventsSQL = "" +
 const selectRecentEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" $FILTERS" +
-	" ORDER BY id DESC LIMIT $4"
+	" $FILTERS"
 
 const selectRecentEventsForSyncSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
-	" $FILTERS" +
-	" ORDER BY id DESC LIMIT $4"
+	" $FILTERS"
 
 const selectEarlyEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" $FILTERS" +
-	" ORDER BY id ASC LIMIT $4"
+	" $FILTERS"
 
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
@@ -100,9 +98,7 @@ const selectStateInRangeSQL = "" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2)" + // old/new pos
 	" AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
-	" $FILTERS" +
-	" ORDER BY id ASC" +
-	" LIMIT $8" // limit
+	" $FILTERS"
 
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
@@ -146,7 +142,8 @@ func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Even
 
 func (s *outputRoomEventsStatements) prepareWithFilters(
 	query string, params []interface{},
-	senders, notsenders, types, nottypes []string, limit int,
+	senders, notsenders, types, nottypes []string,
+	limit int, order string,
 ) (*sql.Stmt, []interface{}, error) {
 	filters := ""
 	offset := len(params)
@@ -178,9 +175,11 @@ func (s *outputRoomEventsStatements) prepareWithFilters(
 			offset++
 		}
 	}
+	filters += " ORDER BY id " + order
+	filters += fmt.Sprintf(" LIMIT $%d", offset+1)
 	params = append(params, limit)
 	query = strings.Replace(query, " $FILTERS", filters, 1)
-	// logrus.Infof("QUERY: %s", query)
+	logrus.Infof("QUERY: %s", query)
 	stmt, err := s.db.Prepare(query)
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.db.Prepare: %w", err)
@@ -211,7 +210,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		},
 		stateFilterPart.Senders, stateFilterPart.NotSenders,
 		stateFilterPart.Types, stateFilterPart.NotTypes,
-		stateFilterPart.Limit,
+		stateFilterPart.Limit, "ASC",
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -382,7 +381,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
-		eventFilter.Limit,
+		eventFilter.Limit+1, "DESC",
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -430,7 +429,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
-		eventFilter.Limit,
+		eventFilter.Limit, "ASC",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
