@@ -16,7 +16,7 @@ import (
 // and it's easier just to have the caller extract the relevant
 // parts.
 func prepareWithFilters(
-	db *sql.DB, query string, params []interface{},
+	db *sql.DB, txn *sql.Tx, query string, params []interface{},
 	senders, notsenders, types, nottypes []string,
 	limit int, order string,
 ) (*sql.Stmt, []interface{}, error) {
@@ -51,7 +51,13 @@ func prepareWithFilters(
 	query += fmt.Sprintf(" LIMIT $%d", offset+1)
 	params = append(params, limit)
 
-	stmt, err := db.Prepare(query)
+	var stmt *sql.Stmt
+	var err error
+	if txn != nil {
+		stmt, err = txn.Prepare(query)
+	} else {
+		stmt, err = db.Prepare(query)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.db.Prepare: %w", err)
 	}

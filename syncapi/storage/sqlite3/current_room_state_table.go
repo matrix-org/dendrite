@@ -180,7 +180,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt, params, err := prepareWithFilters(
-		s.db, selectCurrentStateSQL,
+		s.db, txn, selectCurrentStateSQL,
 		[]interface{}{},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
@@ -190,7 +190,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
 
-	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}

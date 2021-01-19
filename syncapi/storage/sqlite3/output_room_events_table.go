@@ -144,7 +144,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt, params, err := prepareWithFilters(
-		s.db, selectStateInRangeSQL,
+		s.db, txn, selectStateInRangeSQL,
 		[]interface{}{
 			r.Low(), r.High(),
 		},
@@ -156,7 +156,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
 
-	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -317,7 +317,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	}
 
 	stmt, params, err := prepareWithFilters(
-		s.db, query,
+		s.db, txn, query,
 		[]interface{}{
 			roomID, r.Low(), r.High(),
 		},
@@ -329,7 +329,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
 
-	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, false, err
 	}
@@ -365,7 +365,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 ) ([]types.StreamEvent, error) {
 	stmt, params, err := prepareWithFilters(
-		s.db, selectEarlyEventsSQL,
+		s.db, txn, selectEarlyEventsSQL,
 		[]interface{}{
 			roomID, r.Low(), r.High(),
 		},
@@ -376,7 +376,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
-	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}
