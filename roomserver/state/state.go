@@ -116,7 +116,7 @@ func (v StateResolution) LoadCombinedStateAfterEvents(
 	// Deduplicate the IDs before passing them to the database.
 	// There could be duplicates because the events could be state events where
 	// the snapshot of the room state before them was the same.
-	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, uniqueStateSnapshotNIDs(stateNIDs))
+	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, UniqueStateSnapshotNIDs(stateNIDs))
 	if err != nil {
 		return nil, fmt.Errorf("v.db.StateBlockNIDs: %w", err)
 	}
@@ -1103,7 +1103,7 @@ func (s stateNIDSorter) Len() int           { return len(s) }
 func (s stateNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
 func (s stateNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-func uniqueStateSnapshotNIDs(nids []types.StateSnapshotNID) []types.StateSnapshotNID {
+func UniqueStateSnapshotNIDs(nids []types.StateSnapshotNID) []types.StateSnapshotNID {
 	return nids[:util.SortAndUnique(stateNIDSorter(nids))]
 }
 

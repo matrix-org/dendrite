@@ -33,6 +33,7 @@ const (
 	FederationSenderGetServerKeysPath      = "/federationsender/client/getServerKeys"
 	FederationSenderLookupServerKeysPath   = "/federationsender/client/lookupServerKeys"
 	FederationSenderEventRelationshipsPath = "/federationsender/client/msc2836eventRelationships"
+	FederationSenderSpacesSummaryPath      = "/federationsender/client/msc2946spacesSummary"
 )
 
 // NewFederationSenderClient creates a FederationSenderInternalAPI implemented by talking to a HTTP POST API.
@@ -440,6 +441,37 @@ func (h *httpFederationSenderInternalAPI) MSC2836EventRelationships(
 	}
 	var response eventRelationships
 	apiURL := h.federationSenderURL + FederationSenderEventRelationshipsPath
+	err = httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return res, err
+	}
+	if response.Err != nil {
+		return res, response.Err
+	}
+	return response.Res, nil
+}
+
+type spacesReq struct {
+	S      gomatrixserverlib.ServerName
+	Req    gomatrixserverlib.MSC2946SpacesRequest
+	RoomID string
+	Res    gomatrixserverlib.MSC2946SpacesResponse
+	Err    *api.FederationClientError
+}
+
+func (h *httpFederationSenderInternalAPI) MSC2946Spaces(
+	ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, r gomatrixserverlib.MSC2946SpacesRequest,
+) (res gomatrixserverlib.MSC2946SpacesResponse, err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "MSC2946Spaces")
+	defer span.Finish()
+
+	request := spacesReq{
+		S:      dst,
+		Req:    r,
+		RoomID: roomID,
+	}
+	var response spacesReq
+	apiURL := h.federationSenderURL + FederationSenderSpacesSummaryPath
 	err = httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return res, err

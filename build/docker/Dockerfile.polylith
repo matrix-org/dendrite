@@ -1,11 +1,20 @@
-FROM matrixdotorg/dendrite:latest AS base
+FROM docker.io/golang:1.15-alpine AS base
+
+RUN apk --update --no-cache add bash build-base
+
+WORKDIR /build
+
+COPY . /build
+
+RUN mkdir -p bin
+RUN go build -trimpath -o bin/ ./cmd/dendrite-polylith-multi
+RUN go build -trimpath -o bin/ ./cmd/goose
+RUN go build -trimpath -o bin/ ./cmd/create-account
+RUN go build -trimpath -o bin/ ./cmd/generate-keys
 
 FROM alpine:latest
 
-COPY --from=base /build/bin/dendrite-polylith-multi /usr/bin
-COPY --from=base /build/bin/goose /usr/bin
-COPY --from=base /build/bin/create-account /usr/bin
-COPY --from=base /build/bin/generate-keys /usr/bin
+COPY --from=base /build/bin/* /usr/bin
 
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite

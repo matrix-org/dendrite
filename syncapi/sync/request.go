@@ -17,7 +17,6 @@ package sync
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,7 +30,7 @@ import (
 )
 
 const defaultSyncTimeout = time.Duration(0)
-const defaultTimelineLimit = 20
+const DefaultTimelineLimit = 20
 
 func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*types.SyncRequest, error) {
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
@@ -45,51 +44,37 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			return nil, fmt.Errorf("types.NewStreamTokenFromString: %w", err)
 		}
 	}
-
-	var f *gomatrixserverlib.Filter
 	// TODO: read from stored filters too
+	filter := gomatrixserverlib.DefaultFilter()
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {
 		if filterQuery[0] == '{' {
-			// attempt to parse the timeline limit at least
-			if err := json.Unmarshal([]byte(filterQuery), &f); err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal failed")
+			// Parse the filter from the query string
+			if err := json.Unmarshal([]byte(filterQuery), &filter); err != nil {
 				return nil, fmt.Errorf("json.Unmarshal: %w", err)
 			}
 		} else {
-			// attempt to load the filter ID
+			// Try to load the filter from the database
 			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
-			f, err = syncDB.GetFilter(req.Context(), localpart, filterQuery)
-			if err != nil {
+			if f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
+			} else {
+				filter = *f
 			}
 		}
 	}
-
-	filter := gomatrixserverlib.DefaultFilter()
-	if f != nil {
-		filter = *f
-	}
-	// TODO: Get a better to default these
-	// Ideally, we could merge the default base filter with the parsed one
-	if filter.Room.Timeline.Limit == 0 {
-		filter.Room.Timeline.Limit = defaultTimelineLimit
-	}
-	if filter.Room.State.Limit == 0 {
-		filter.Room.State.Limit = math.MaxInt32
-	}
-	// TODO: Additional query params: set_presence
 
 	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"user_id":   device.UserID,
 		"device_id": device.ID,
 		"since":     since,
 		"timeout":   timeout,
+		"limit":     filter.Room.Timeline.Limit,
 	})
 
 	return &types.SyncRequest{
