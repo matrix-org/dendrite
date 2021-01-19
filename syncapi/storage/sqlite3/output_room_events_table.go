@@ -198,16 +198,16 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
-	stateFilterPart *gomatrixserverlib.StateFilter,
+	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt, params, err := s.prepareWithFilters(
 		selectStateInRangeSQL,
 		[]interface{}{
 			r.Low(), r.High(),
 		},
-		stateFilterPart.Senders, stateFilterPart.NotSenders,
-		stateFilterPart.Types, stateFilterPart.NotTypes,
-		stateFilterPart.Limit, "ASC",
+		stateFilter.Senders, stateFilter.NotSenders,
+		stateFilter.Types, stateFilter.NotTypes,
+		stateFilter.Limit, "ASC",
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -337,7 +337,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
+	streamPos, err := s.streamIDStatements.nextPDUID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}
