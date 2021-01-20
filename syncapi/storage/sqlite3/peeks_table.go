@@ -108,7 +108,7 @@ func NewSqlitePeeksTable(db *sql.DB, streamID *streamIDStatements) (tables.Peeks
 func (s *peekStatements) InsertPeek(
 	ctx context.Context, txn *sql.Tx, roomID, userID, deviceID string,
 ) (streamPos types.StreamPosition, err error) {
-	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	streamPos, err = s.streamIDStatements.nextPDUID(ctx, txn)
 	if err != nil {
 		return
 	}
@@ -120,7 +120,7 @@ func (s *peekStatements) InsertPeek(
 func (s *peekStatements) DeletePeek(
 	ctx context.Context, txn *sql.Tx, roomID, userID, deviceID string,
 ) (streamPos types.StreamPosition, err error) {
-	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	streamPos, err = s.streamIDStatements.nextPDUID(ctx, txn)
 	if err != nil {
 		return
 	}
@@ -131,7 +131,7 @@ func (s *peekStatements) DeletePeek(
 func (s *peekStatements) DeletePeeks(
 	ctx context.Context, txn *sql.Tx, roomID, userID string,
 ) (types.StreamPosition, error) {
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
+	streamPos, err := s.streamIDStatements.nextPDUID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}

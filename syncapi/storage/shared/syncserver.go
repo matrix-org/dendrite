@@ -110,8 +110,8 @@ func (d *Database) RoomIDsWithMembership(ctx context.Context, userID string, mem
 	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, nil, userID, membership)
 }
 
-func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
-	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, limit, chronologicalOrder, onlySyncEvents)
+func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
+	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
 
 func (d *Database) PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error) {
@@ -151,7 +151,7 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 func (d *Database) GetEventsInStreamingRange(
 	ctx context.Context,
 	from, to *types.StreamingToken,
-	roomID string, limit int,
+	roomID string, eventFilter *gomatrixserverlib.RoomEventFilter,
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
 	r := types.Range{
@@ -162,14 +162,14 @@ func (d *Database) GetEventsInStreamingRange(
 	if backwardOrdering {
 		// When using backward ordering, we want the most recent events first.
 		if events, _, err = d.OutputEvents.SelectRecentEvents(
-			ctx, nil, roomID, r, limit, false, false,
+			ctx, nil, roomID, r, eventFilter, false, false,
 		); err != nil {
 			return
 		}
 	} else {
 		// When using forward ordering, we want the least recent events first.
 		if events, err = d.OutputEvents.SelectEarlyEvents(
-			ctx, nil, roomID, r, limit,
+			ctx, nil, roomID, r, eventFilter,
 		); err != nil {
 			return
 		}
