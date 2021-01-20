@@ -143,14 +143,6 @@ func (p *PDUStreamProvider) IncrementalSync(
 		}
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"stateFilter":       fmt.Sprintf("%+v", stateFilter),
-		"from":              from,
-		"to":                to,
-		"req.WantFullState": req.WantFullState,
-		"stateDeltas":       stateDeltas,
-	}).Info("IncrementalSync")
-
 	for _, roomID := range joinedRooms {
 		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
@@ -189,12 +181,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	if err != nil {
 		return err
 	}
-
-	logrus.WithFields(logrus.Fields{
-		"limited":            limited,
-		"delta.stateEvents":  len(delta.StateEvents),
-		"recentStreamEvents": len(recentStreamEvents),
-	}).Info("isync addRoomDeltaToResponse removeDuplicates")
 
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
@@ -270,22 +256,11 @@ func (p *PDUStreamProvider) getResponseForCompleteSync(
 
 	recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, stateEvents, device, limited)
 
-	// TODO: How do we apply filter.Room.State to this as well?
-	// Is there a generic function where we can pass a list of events and filter and get the result?
-	// This is based off of Synapse where we derive the state from the resultant timeline events
-	// https://github.com/matrix-org/synapse/blob/14950a45d6ff3a5ea737322af1096a49b079f2eb/synapse/handlers/sync.py#L791-L795
 	for _, event := range recentStreamEvents {
 		if event.HeaderedEvent.Event.StateKey() != nil {
 			stateEvents = append(stateEvents, event.HeaderedEvent)
 		}
 	}
-
-	// Note: I feel like this is flawed. We only want stateEvents in the events we filtered already
-	// so I've opted with the option above to derive the `stateEvents`
-	// stateEvents, err = p.DB.CurrentState(ctx, roomID, &filter.Room.State)
-	// if err != nil {
-	// 	return
-	// }
 
 	// Retrieve the backward topology position, i.e. the position of the
 	// oldest event in the room's topology.
