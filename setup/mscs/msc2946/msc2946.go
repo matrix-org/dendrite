@@ -239,33 +239,23 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 		// Mark this room as processed.
 		processed[roomID] = true
 
-		// Is the caller currently joined to the room or is the room `world_readable`
-		// If no, skip this room. If yes, continue.
-		if !w.roomExists(roomID) || !w.authorised(roomID) {
-			// attempt to query this room over federation, as either we've never heard of it before
-			// or we've left it and hence are not authorised (but info may be exposed regardless)
-			fedRes, err := w.federatedRoomInfo(roomID)
+		// Collect rooms/events to send back (either locally or fetched via federation)
+		var discoveredRooms []gomatrixserverlib.MSC2946Room
+		var discoveredEvents []gomatrixserverlib.MSC2946StrippedEvent
+
+		// If we know about this room and the caller is authorised (joined/world_readable) then pull
+		// events locally
+		if w.roomExists(roomID) && w.authorised(roomID) {
+			// Get all `m.space.child` and `m.space.parent` state events for the room. *In addition*, get
+			// all `m.space.child` and `m.space.parent` state events which *point to* (via `state_key` or `content.room_id`)
+			// this room. This requires servers to store reverse lookups.
+			events, err := w.references(roomID)
 			if err != nil {
-				util.GetLogger(w.ctx).WithError(err).WithField("room_id", roomID).Errorf("failed to query federated spaces")
+				util.GetLogger(w.ctx).WithError(err).WithField("room_id", roomID).Error("failed to extract references for room")
 				continue
 			}
-			if fedRes != nil {
-				res = combineResponses(res, *fedRes)
-			}
-			continue
-		}
-		// Get all `m.space.child` and `m.space.parent` state events for the room. *In addition*, get
-		// all `m.space.child` and `m.space.parent` state events which *point to* (via `state_key` or `content.room_id`)
-		// this room. This requires servers to store reverse lookups.
-		refs, err := w.references(roomID)
-		if err != nil {
-			util.GetLogger(w.ctx).WithError(err).WithField("room_id", roomID).Error("failed to extract references for room")
-			continue
-		}
+			discoveredEvents = events
 
-		// If this room has not ever been in `rooms` (across multiple requests), extract the
-		// `PublicRoomsChunk` for this room.
-		if !w.alreadySent(roomID) && !w.roomIsExcluded(roomID) {
 			pubRoom := w.publicRoomsChunk(roomID)
 			roomType := ""
 			create := w.stateEvent(roomID, gomatrixserverlib.MRoomCreate, "")
@@ -275,12 +265,31 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 			}
 
 			// Add the total number of events to `PublicRoomsChunk` under `num_refs`. Add `PublicRoomsChunk` to `rooms`.
-			res.Rooms = append(res.Rooms, gomatrixserverlib.MSC2946Room{
+			discoveredRooms = append(discoveredRooms, gomatrixserverlib.MSC2946Room{
 				PublicRoom: *pubRoom,
-				NumRefs:    refs.len(),
+				NumRefs:    len(discoveredEvents),
 				RoomType:   roomType,
 			})
-			w.markSent(roomID)
+		} else {
+			// attempt to query this room over federation, as either we've never heard of it before
+			// or we've left it and hence are not authorised (but info may be exposed regardless)
+			fedRes, err := w.federatedRoomInfo(roomID)
+			if err != nil {
+				util.GetLogger(w.ctx).WithError(err).WithField("room_id", roomID).Errorf("failed to query federated spaces")
+				continue
+			}
+			if fedRes != nil {
+				discoveredRooms = fedRes.Rooms
+				discoveredEvents = fedRes.Events
+			}
+		}
+
+		// If this room has not ever been in `rooms` (across multiple requests), send it now
+		for _, room := range discoveredRooms {
+			if !w.alreadySent(room.RoomID) && !w.roomIsExcluded(room.RoomID) {
+				res.Rooms = append(res.Rooms, room)
+				w.markSent(room.RoomID)
+			}
 		}
 
 		uniqueRooms := make(set)
@@ -288,45 +297,37 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 		// If this is the root room from the original request, insert all these events into `events` if
 		// they haven't been added before (across multiple requests).
 		if w.rootRoomID == roomID {
-			for _, ev := range refs.events() {
-				if !w.alreadySent(ev.EventID()) {
-					strip := stripped(ev.Event)
-					if strip == nil {
-						continue
-					}
-					res.Events = append(res.Events, *strip)
-					uniqueRooms[ev.RoomID()] = true
-					uniqueRooms[SpaceTarget(ev)] = true
-					w.markSent(ev.EventID())
+			for _, ev := range discoveredEvents {
+				if !w.alreadySent(eventKey(&ev)) {
+					res.Events = append(res.Events, ev)
+					uniqueRooms[ev.RoomID] = true
+					uniqueRooms[spaceTargetStripped(&ev)] = true
+					w.markSent(eventKey(&ev))
 				}
 			}
 		} else {
 			// Else add them to `events` honouring the `limit` and `max_rooms_per_space` values. If either
 			// are exceeded, stop adding events. If the event has already been added, do not add it again.
 			numAdded := 0
-			for _, ev := range refs.events() {
+			for _, ev := range discoveredEvents {
 				if w.req.Limit > 0 && len(res.Events) >= w.req.Limit {
 					break
 				}
 				if w.req.MaxRoomsPerSpace > 0 && numAdded >= w.req.MaxRoomsPerSpace {
 					break
 				}
-				if w.alreadySent(ev.EventID()) {
+				if w.alreadySent(eventKey(&ev)) {
 					continue
 				}
 				// Skip the room if it's part of exclude_rooms but ONLY IF the source matches, as we still
 				// want to catch arrows which point to excluded rooms.
-				if w.roomIsExcluded(ev.RoomID()) {
+				if w.roomIsExcluded(ev.RoomID) {
 					continue
 				}
-				strip := stripped(ev.Event)
-				if strip == nil {
-					continue
-				}
-				res.Events = append(res.Events, *strip)
-				uniqueRooms[ev.RoomID()] = true
-				uniqueRooms[SpaceTarget(ev)] = true
-				w.markSent(ev.EventID())
+				res.Events = append(res.Events, ev)
+				uniqueRooms[ev.RoomID] = true
+				uniqueRooms[spaceTargetStripped(&ev)] = true
+				w.markSent(eventKey(&ev))
 				// we don't distinguish between child state events and parent state events for the purposes of
 				// max_rooms_per_space, maybe we should?
 				numAdded++
@@ -521,49 +522,25 @@ func (w *walker) authorisedUser(roomID string) bool {
 }
 
 // references returns all references pointing to or from this room.
-func (w *walker) references(roomID string) (eventLookup, error) {
+func (w *walker) references(roomID string) ([]gomatrixserverlib.MSC2946StrippedEvent, error) {
 	events, err := w.db.References(w.ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
-	el := make(eventLookup)
+	el := make([]gomatrixserverlib.MSC2946StrippedEvent, 0, len(events))
 	for _, ev := range events {
 		// only return events that have a `via` key as per MSC1772
 		// else we'll incorrectly walk redacted events (as the link
 		// is in the state_key)
 		if gjson.GetBytes(ev.Content(), "via").Exists() {
-			el.set(ev)
+			strip := stripped(ev.Event)
+			if strip == nil {
+				continue
+			}
+			el = append(el, *strip)
 		}
 	}
 	return el, nil
-}
-
-// state event lookup across multiple rooms keyed on event type
-// NOT THREAD SAFE
-type eventLookup map[string][]*gomatrixserverlib.HeaderedEvent
-
-func (el eventLookup) set(ev *gomatrixserverlib.HeaderedEvent) {
-	evs := el[ev.Type()]
-	if evs == nil {
-		evs = make([]*gomatrixserverlib.HeaderedEvent, 0)
-	}
-	evs = append(evs, ev)
-	el[ev.Type()] = evs
-}
-
-func (el eventLookup) len() int {
-	sum := 0
-	for _, evs := range el {
-		sum += len(evs)
-	}
-	return sum
-}
-
-func (el eventLookup) events() (events []*gomatrixserverlib.HeaderedEvent) {
-	for _, evs := range el {
-		events = append(events, evs...)
-	}
-	return
 }
 
 type set map[string]bool
@@ -581,27 +558,19 @@ func stripped(ev *gomatrixserverlib.Event) *gomatrixserverlib.MSC2946StrippedEve
 	}
 }
 
-func combineResponses(local, remote gomatrixserverlib.MSC2946SpacesResponse) gomatrixserverlib.MSC2946SpacesResponse {
-	knownRooms := make(set)
-	for _, room := range local.Rooms {
-		knownRooms[room.RoomID] = true
+func eventKey(event *gomatrixserverlib.MSC2946StrippedEvent) string {
+	return event.RoomID + "|" + event.Type + "|" + event.StateKey
+}
+
+func spaceTargetStripped(event *gomatrixserverlib.MSC2946StrippedEvent) string {
+	if event.StateKey == "" {
+		return "" // no-op
 	}
-	knownEvents := make(set)
-	for _, event := range local.Events {
-		knownEvents[event.RoomID+event.Type+event.StateKey] = true
+	switch event.Type {
+	case ConstSpaceParentEventType:
+		return event.StateKey
+	case ConstSpaceChildEventType:
+		return event.StateKey
 	}
-	// mux in remote entries if and only if they aren't present already
-	for _, room := range remote.Rooms {
-		if knownRooms[room.RoomID] {
-			continue
-		}
-		local.Rooms = append(local.Rooms, room)
-	}
-	for _, event := range remote.Events {
-		if knownEvents[event.RoomID+event.Type+event.StateKey] {
-			continue
-		}
-		local.Events = append(local.Events, event)
-	}
-	return local
+	return ""
 }
