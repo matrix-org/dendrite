@@ -48,6 +48,7 @@ type Database struct {
 	SendToDevice        tables.SendToDevice
 	Filter              tables.Filter
 	Receipts            tables.Receipts
+	Memberships         tables.Memberships
 }
 
 func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
@@ -383,8 +384,8 @@ func (d *Database) WriteEvent(
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
 		}
 		pduPosition = pos
-
-		if err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
+		var topoPosition types.StreamPosition
+		if topoPosition, err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return fmt.Errorf("d.Topology.InsertEventInTopology: %w", err)
 		}
 
@@ -397,7 +398,7 @@ func (d *Database) WriteEvent(
 			return nil
 		}
 
-		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition)
+		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
 	})
 
 	return pduPosition, returnErr
@@ -409,6 +410,7 @@ func (d *Database) updateRoomState(
 	removedEventIDs []string,
 	addedEvents []*gomatrixserverlib.HeaderedEvent,
 	pduPosition types.StreamPosition,
+	topoPosition types.StreamPosition,
 ) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 	for _, eventID := range removedEventIDs {
@@ -429,6 +431,9 @@ func (d *Database) updateRoomState(
 				return fmt.Errorf("event.Membership: %w", err)
 			}
 			membership = &value
+			if err = d.Memberships.UpsertMembership(ctx, txn, event, pduPosition, topoPosition); err != nil {
+				return fmt.Errorf("d.Memberships.UpsertMembership: %w", err)
+			}
 		}
 
 		if err := d.CurrentRoomState.UpsertRoomState(ctx, txn, event, membership, pduPosition); err != nil {
