@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -12,6 +13,7 @@ import (
 
 type PDUStreamProvider struct {
 	StreamProvider
+	rsAPI rsapi.RoomserverInternalAPI
 }
 
 func (p *PDUStreamProvider) Setup() {
@@ -50,11 +52,14 @@ func (p *PDUStreamProvider) CompleteSync(
 		return from
 	}
 
+	stateFilter := req.Filter.Room.State
+	eventFilter := req.Filter.Room.Timeline
+
 	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
 		var jr *types.JoinResponse
 		jr, err = p.getJoinResponseForCompleteSync(
-			ctx, roomID, r, &req.Filter.Room.State, &req.Filter.Room.Timeline, req.Device,
+			ctx, roomID, r, &stateFilter, &eventFilter, req.Device,
 		)
 		if err != nil {
 			req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -74,7 +79,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, peek.RoomID, r, &req.Filter.Room.State, &req.Filter.Room.Timeline, req.Device,
+				ctx, peek.RoomID, r, &stateFilter, &eventFilter, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -96,7 +101,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		for _, roomID := range leaveRoomIDs {
 			var lr *types.LeaveResponse
 			lr, err = p.getLeaveResponseForCompleteSync(
-				ctx, roomID, r, &req.Filter.Room.State, &req.Filter.Room.Timeline, req.Device,
+				ctx, roomID, r, &stateFilter, &eventFilter, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getLeaveResponseForCompleteSync failed")
@@ -170,7 +175,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		// TODO: This will fail on join -> leave -> sensitive msg -> join -> leave
 		//       in a single /sync request
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
-		r.To = delta.MembershipPos
+		if r.Backwards {
+			r.From = delta.MembershipPos
+		} else {
+			r.To = delta.MembershipPos
+		}
 	}
 	recentStreamEvents, limited, err := p.DB.RecentEvents(
 		ctx, delta.RoomID, r,
@@ -226,6 +235,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	return nil
 }
 
+// nolint:gocyclo
 func (p *PDUStreamProvider) getResponseForCompleteSync(
 	ctx context.Context,
 	roomID string,
@@ -241,6 +251,51 @@ func (p *PDUStreamProvider) getResponseForCompleteSync(
 	if err != nil {
 		return
 	}
+
+	// Calculate the current history visibility rule.
+	historyVisibility := "joined"
+	for _, stateEvent := range stateEvents {
+		if stateEvent.Type() == gomatrixserverlib.MRoomHistoryVisibility {
+			var content struct {
+				HistoryVisibility string `json:"history_visibility"`
+			}
+			if err = json.Unmarshal(stateEvent.Content(), &content); err != nil {
+				break
+			}
+			historyVisibility = content.HistoryVisibility
+		}
+	}
+
+	if historyVisibility != "shared" && historyVisibility != "world_readable" {
+		var membershipEvent *gomatrixserverlib.HeaderedEvent
+		var membershipPos types.StreamPosition
+		membershipEvent, membershipPos, err = p.DB.MostRecentMembership(ctx, roomID, device.UserID)
+		if err != nil {
+			return
+		}
+		if membershipEvent != nil {
+			membership, _ := membershipEvent.Membership()
+			switch membership {
+			case "leave", "kick", "ban":
+				if r.Backwards {
+					r.From = membershipPos
+				} else {
+					r.To = membershipPos
+				}
+				queryReq := &rsapi.QueryStateAfterEventsRequest{
+					RoomID:       roomID,
+					PrevEventIDs: []string{membershipEvent.EventID()},
+				}
+				queryRes := &rsapi.QueryStateAfterEventsResponse{}
+				if err = p.rsAPI.QueryStateAfterEvents(ctx, queryReq, queryRes); err != nil {
+					return
+				}
+				stateEvents = p.filterStateEventsAccordingToFilter(queryRes.StateEvents, stateFilter)
+			default:
+			}
+		}
+	}
+
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 	var recentStreamEvents []types.StreamEvent
@@ -251,7 +306,9 @@ func (p *PDUStreamProvider) getResponseForCompleteSync(
 		return
 	}
 
-	recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(recentStreamEvents, stateEvents, device, limited)
+	recentStreamEvents, limited = p.filterStreamEventsAccordingToHistoryVisibility(
+		historyVisibility, recentStreamEvents, device, limited,
+	)
 
 	for _, event := range recentStreamEvents {
 		if event.HeaderedEvent.Event.StateKey() != nil {
@@ -279,7 +336,7 @@ func (p *PDUStreamProvider) getResponseForCompleteSync(
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
 	recentEvents = p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
-	return
+	return // nolint:nakedret
 }
 
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
@@ -329,28 +386,63 @@ func (p *PDUStreamProvider) getLeaveResponseForCompleteSync(
 }
 
 // nolint:gocyclo
-func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
-	recentStreamEvents []types.StreamEvent,
+func (p *PDUStreamProvider) filterStateEventsAccordingToFilter(
 	stateEvents []*gomatrixserverlib.HeaderedEvent,
+	stateFilter *gomatrixserverlib.StateFilter,
+) []*gomatrixserverlib.HeaderedEvent {
+	filterRooms, filterNotRooms := map[string]struct{}{}, map[string]struct{}{}
+	filterTypes, filterNotTypes := map[string]struct{}{}, map[string]struct{}{}
+	for _, r := range stateFilter.Rooms {
+		filterRooms[r] = struct{}{}
+	}
+	for _, r := range stateFilter.NotRooms {
+		filterNotRooms[r] = struct{}{}
+	}
+	for _, t := range stateFilter.Types {
+		filterTypes[t] = struct{}{}
+	}
+	for _, t := range stateFilter.NotTypes {
+		filterNotTypes[t] = struct{}{}
+	}
+
+	newState := make([]*gomatrixserverlib.HeaderedEvent, 0, len(stateEvents))
+	for _, event := range stateEvents {
+		if len(filterRooms) > 0 {
+			if _, ok := filterRooms[event.RoomID()]; !ok {
+				continue
+			}
+		}
+		if len(filterNotRooms) > 0 {
+			if _, ok := filterNotRooms[event.RoomID()]; ok {
+				continue
+			}
+		}
+		if len(filterTypes) > 0 {
+			if _, ok := filterTypes[event.Type()]; !ok {
+				continue
+			}
+		}
+		if len(filterNotTypes) > 0 {
+			if _, ok := filterNotTypes[event.Type()]; ok {
+				continue
+			}
+		}
+		newState = append(newState, event)
+	}
+
+	return newState
+}
+
+// nolint:gocyclo
+func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
+	visibility string,
+	recentStreamEvents []types.StreamEvent,
 	device *userapi.Device,
 	limited bool,
 ) ([]types.StreamEvent, bool) {
 	// If the history is world_readable or shared then don't filter.
-	for _, stateEvent := range stateEvents {
-		if stateEvent.Type() == gomatrixserverlib.MRoomHistoryVisibility {
-			var content struct {
-				HistoryVisibility string `json:"history_visibility"`
-			}
-			if err := json.Unmarshal(stateEvent.Content(), &content); err != nil {
-				break
-			}
-			switch content.HistoryVisibility {
-			case "world_readable", "shared":
-				return recentStreamEvents, limited
-			default:
-				break
-			}
-		}
+	if visibility == "world_readable" || visibility == "shared" {
+		return recentStreamEvents, limited
 	}
 
 	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the

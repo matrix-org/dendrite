@@ -500,6 +500,20 @@ func (d *Database) EventPositionInTopology(
 	return types.TopologyToken{Depth: depth, PDUPosition: stream}, nil
 }
 
+func (d *Database) MostRecentMembership(
+	ctx context.Context, roomID, userID string,
+) (*gomatrixserverlib.HeaderedEvent, types.StreamPosition, error) {
+	event, err := d.CurrentRoomState.SelectStateEvent(ctx, roomID, gomatrixserverlib.MRoomMember, userID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("d.CurrentRoomState.SelectStateEvent: %w", err)
+	}
+	pos, err := d.OutputEvents.SelectPositionInStream(ctx, nil, event.EventID())
+	if err != nil {
+		return nil, 0, fmt.Errorf("d.OutputEvents.SelectPositionInStream: %w", err)
+	}
+	return event, pos, nil
+}
+
 func (d *Database) GetFilter(
 	ctx context.Context, localpart string, filterID string,
 ) (*gomatrixserverlib.Filter, error) {

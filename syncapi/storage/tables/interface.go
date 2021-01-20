@@ -63,6 +63,7 @@ type Events interface {
 	UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
 	// DeleteEventsForRoom removes all event information for a room. This should only be done when removing the room entirely.
 	DeleteEventsForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
+	SelectPositionInStream(ctx context.Context, txn *sql.Tx, eventID string) (pos types.StreamPosition, err error)
 }
 
 // Topology keeps track of the depths and stream positions for all events.
