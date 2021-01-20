@@ -45,11 +45,10 @@ CREATE TABLE IF NOT EXISTS syncapi_memberships (
 	-- The stream position of the change
 	stream_pos BIGINT NOT NULL,
 	-- The topological position of the change in the room
-	topological_pos BIGINT NOT NULL
+	topological_pos BIGINT NOT NULL,
+	-- Unique index
+	CONSTRAINT syncapi_memberships_unique UNIQUE (room_id, user_id, membership)
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS syncapi_memberships_unique
-  ON syncapi_memberships(room_id, user_id, membership);
 `
 
 const upsertMembershipSQL = "" +
