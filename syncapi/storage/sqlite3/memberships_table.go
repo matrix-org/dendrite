@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -59,23 +60,24 @@ const upsertMembershipSQL = "" +
 
 const selectMembershipSQL = "" +
 	"SELECT event_id, stream_pos, topological_pos FROM syncapi_memberships" +
-	" WHERE room_id = $1 AND user_id = $2 AND membership = $3"
+	" WHERE room_id = $1 AND user_id = $2 AND membership IN ($3)" +
+	" ORDER BY stream_pos DESC" +
+	" LIMIT 1"
 
 type membershipsStatements struct {
+	db                   *sql.DB
 	upsertMembershipStmt *sql.Stmt
-	selectMembershipStmt *sql.Stmt
 }
 
 func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
-	s := &membershipsStatements{}
+	s := &membershipsStatements{
+		db: db,
+	}
 	_, err := db.Exec(membershipsSchema)
 	if err != nil {
 		return nil, err
 	}
 	if s.upsertMembershipStmt, err = db.Prepare(upsertMembershipSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMembershipStmt, err = db.Prepare(selectMembershipSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -102,9 +104,17 @@ func (s *membershipsStatements) UpsertMembership(
 }
 
 func (s *membershipsStatements) SelectMembership(
-	ctx context.Context, txn *sql.Tx, roomID, userID, membership string,
+	ctx context.Context, txn *sql.Tx, roomID, userID, memberships []string,
 ) (eventID string, streamPos, topologyPos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMembershipStmt)
-	err = stmt.QueryRowContext(ctx, roomID, userID, membership).Scan(&eventID, &streamPos, &topologyPos)
+	params := []interface{}{roomID, userID}
+	for _, membership := range memberships {
+		params = append(params, membership)
+	}
+	orig := strings.Replace(selectMembershipSQL, "($3)", sqlutil.QueryVariadicOffset(len(memberships), 2), 1)
+	stmt, err := s.db.Prepare(orig)
+	if err != nil {
+		return "", 0, 0, err
+	}
+	err = sqlutil.TxStmt(txn, stmt).QueryRowContext(ctx, params...).Scan(&eventID, &streamPos, &topologyPos)
 	return
 }
