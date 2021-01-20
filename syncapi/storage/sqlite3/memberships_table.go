@@ -57,8 +57,13 @@ const upsertMembershipSQL = "" +
 	" ON CONFLICT (room_id, user_id, membership)" +
 	" DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6"
 
+const selectMembershipSQL = "" +
+	"SELECT event_id, stream_pos, topological_pos FROM syncapi_memberships" +
+	" WHERE room_id = $1 AND user_id = $2 AND membership = $3"
+
 type membershipsStatements struct {
 	upsertMembershipStmt *sql.Stmt
+	selectMembershipStmt *sql.Stmt
 }
 
 func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -68,6 +73,9 @@ func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 		return nil, err
 	}
 	if s.upsertMembershipStmt, err = db.Prepare(upsertMembershipSQL); err != nil {
+		return nil, err
+	}
+	if s.selectMembershipStmt, err = db.Prepare(selectMembershipSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -91,4 +99,12 @@ func (s *membershipsStatements) UpsertMembership(
 		topologicalPos,
 	)
 	return err
+}
+
+func (s *membershipsStatements) SelectMembership(
+	ctx context.Context, txn *sql.Tx, roomID, userID, membership string,
+) (eventID string, streamPos, topologyPos types.StreamPosition, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipStmt)
+	err = stmt.QueryRowContext(ctx, roomID, userID, membership).Scan(&eventID, &streamPos, &topologyPos)
+	return
 }
