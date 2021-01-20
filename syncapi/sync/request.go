@@ -41,7 +41,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		var err error
 		since, err = types.NewStreamTokenFromString(sinceStr)
 		if err != nil {
-			return nil, fmt.Errorf("types.NewStreamTokenFromString: %w", err)
+			return nil, err
 		}
 	}
 	// TODO: read from stored filters too

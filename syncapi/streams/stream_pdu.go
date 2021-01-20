@@ -54,7 +54,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	for _, roomID := range joinedRoomIDs {
 		var jr *types.JoinResponse
 		jr, err = p.getJoinResponseForCompleteSync(
-			ctx, roomID, r, &req.Filter, req.Device,
+			ctx, roomID, r, &req.Filter.Room.State, &req.Filter.Room.Timeline, req.Device,
 		)
 		if err != nil {
 			req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -74,7 +74,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, peek.RoomID, r, &req.Filter, req.Device,
+				ctx, peek.RoomID, r, &req.Filter.Room.State, &req.Filter.Room.Timeline, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -96,7 +96,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		for _, roomID := range leaveRoomIDs {
 			var lr *types.LeaveResponse
 			lr, err = p.getLeaveResponseForCompleteSync(
-				ctx, roomID, r, &req.Filter, req.Device,
+				ctx, roomID, r, &req.Filter.Room.State, &req.Filter.Room.Timeline, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getLeaveResponseForCompleteSync failed")
@@ -179,7 +179,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	if err != nil {
 		return err
 	}
-
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
 	prevBatch, err := p.DB.GetBackwardTopologyPos(ctx, recentStreamEvents)
@@ -287,11 +286,12 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	ctx context.Context,
 	roomID string,
 	r types.Range,
-	filter *gomatrixserverlib.Filter,
+	stateFilter *gomatrixserverlib.StateFilter,
+	eventFilter *gomatrixserverlib.RoomEventFilter,
 	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
 	recentEvents, stateEvents, prevBatch, limited, err := p.getResponseForCompleteSync(
-		ctx, roomID, r, &filter.Room.State, &filter.Room.Timeline, device,
+		ctx, roomID, r, stateFilter, eventFilter, device,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("p.getResponseForCompleteSync: %w", err)
@@ -309,11 +309,12 @@ func (p *PDUStreamProvider) getLeaveResponseForCompleteSync(
 	ctx context.Context,
 	roomID string,
 	r types.Range,
-	filter *gomatrixserverlib.Filter,
+	stateFilter *gomatrixserverlib.StateFilter,
+	eventFilter *gomatrixserverlib.RoomEventFilter,
 	device *userapi.Device,
 ) (lr *types.LeaveResponse, err error) {
 	recentEvents, stateEvents, prevBatch, limited, err := p.getResponseForCompleteSync(
-		ctx, roomID, r, &filter.Room.State, &filter.Room.Timeline, device,
+		ctx, roomID, r, stateFilter, eventFilter, device,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("p.getResponseForCompleteSync: %w", err)
