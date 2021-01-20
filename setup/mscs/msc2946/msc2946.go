@@ -250,10 +250,27 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 				continue
 			}
 			if fedRes != nil {
-				res = combineResponses(res, *fedRes)
+				for _, room := range fedRes.Rooms {
+					if !w.alreadySent(room.RoomID) && !w.roomIsExcluded(room.RoomID) {
+						res.Rooms = append(res.Rooms, room)
+						w.markSent(room.RoomID)
+						unvisited = append(unvisited, room.RoomID)
+					}
+				}
+				for _, event := range fedRes.Events {
+					if !w.alreadySent(eventKey(&event)) {
+						res.Events = append(res.Events, event)
+						w.markSent(eventKey(&event))
+						unvisited = append(unvisited, event.StateKey)
+					}
+				}
 			}
 			continue
 		}
+
+		// var discoveredRooms []gomatrixserverlib.MSC2946Room
+		// var discoveredEvents []gomatrixserverlib.MSC2946StrippedEvent
+
 		// Get all `m.space.child` and `m.space.parent` state events for the room. *In addition*, get
 		// all `m.space.child` and `m.space.parent` state events which *point to* (via `state_key` or `content.room_id`)
 		// this room. This requires servers to store reverse lookups.
@@ -289,15 +306,15 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 		// they haven't been added before (across multiple requests).
 		if w.rootRoomID == roomID {
 			for _, ev := range refs.events() {
-				if !w.alreadySent(ev.EventID()) {
-					strip := stripped(ev.Event)
-					if strip == nil {
-						continue
-					}
+				strip := stripped(ev.Event)
+				if strip == nil {
+					continue
+				}
+				if !w.alreadySent(eventKey(strip)) {
 					res.Events = append(res.Events, *strip)
 					uniqueRooms[ev.RoomID()] = true
 					uniqueRooms[SpaceTarget(ev)] = true
-					w.markSent(ev.EventID())
+					w.markSent(eventKey(strip))
 				}
 			}
 		} else {
@@ -311,7 +328,11 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 				if w.req.MaxRoomsPerSpace > 0 && numAdded >= w.req.MaxRoomsPerSpace {
 					break
 				}
-				if w.alreadySent(ev.EventID()) {
+				strip := stripped(ev.Event)
+				if strip == nil {
+					continue
+				}
+				if w.alreadySent(eventKey(strip)) {
 					continue
 				}
 				// Skip the room if it's part of exclude_rooms but ONLY IF the source matches, as we still
@@ -319,14 +340,10 @@ func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 				if w.roomIsExcluded(ev.RoomID()) {
 					continue
 				}
-				strip := stripped(ev.Event)
-				if strip == nil {
-					continue
-				}
 				res.Events = append(res.Events, *strip)
 				uniqueRooms[ev.RoomID()] = true
 				uniqueRooms[SpaceTarget(ev)] = true
-				w.markSent(ev.EventID())
+				w.markSent(eventKey(strip))
 				// we don't distinguish between child state events and parent state events for the purposes of
 				// max_rooms_per_space, maybe we should?
 				numAdded++
@@ -581,27 +598,6 @@ func stripped(ev *gomatrixserverlib.Event) *gomatrixserverlib.MSC2946StrippedEve
 	}
 }
 
-func combineResponses(local, remote gomatrixserverlib.MSC2946SpacesResponse) gomatrixserverlib.MSC2946SpacesResponse {
-	knownRooms := make(set)
-	for _, room := range local.Rooms {
-		knownRooms[room.RoomID] = true
-	}
-	knownEvents := make(set)
-	for _, event := range local.Events {
-		knownEvents[event.RoomID+event.Type+event.StateKey] = true
-	}
-	// mux in remote entries if and only if they aren't present already
-	for _, room := range remote.Rooms {
-		if knownRooms[room.RoomID] {
-			continue
-		}
-		local.Rooms = append(local.Rooms, room)
-	}
-	for _, event := range remote.Events {
-		if knownEvents[event.RoomID+event.Type+event.StateKey] {
-			continue
-		}
-		local.Events = append(local.Events, event)
-	}
-	return local
+func eventKey(event *gomatrixserverlib.MSC2946StrippedEvent) string {
+	return event.RoomID + "|" + event.Type + "|" + event.StateKey
 }
