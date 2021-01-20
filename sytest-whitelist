@@ -509,3 +509,8 @@ State from remote users is included in the state in the initial sync
 Changes to state are included in an gapped incremental sync
 A full_state incremental update returns all state
 Can pass a JSON filter as a query parameter
+Guest users can sync from world_readable guest_access rooms if joined
+Guest users can sync from default guest_access rooms if joined
+Real users can sync from world_readable guest_access rooms if joined
+Real users can sync from default guest_access rooms if joined
+Left rooms appear in the leave section of sync
