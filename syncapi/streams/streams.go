@@ -29,7 +29,6 @@ func NewSyncStreamProviders(
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
-			rsAPI:          rsAPI,
 		},
 		TypingStreamProvider: &TypingStreamProvider{
 			StreamProvider: StreamProvider{DB: d},

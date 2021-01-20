@@ -130,10 +130,6 @@ const selectStateInRangeSQL = "" +
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
 
-const selectPositionInStreamSQL = "" +
-	"SELECT id FROM syncapi_output_room_events" +
-	" WHERE event_id = $1"
-
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -144,7 +140,6 @@ type outputRoomEventsStatements struct {
 	selectStateInRangeStmt        *sql.Stmt
 	updateEventJSONStmt           *sql.Stmt
 	deleteEventsForRoomStmt       *sql.Stmt
-	selectPositionInStreamStmt    *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -178,9 +173,6 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		return nil, err
 	}
 	if s.deleteEventsForRoomStmt, err = db.Prepare(deleteEventsForRoomSQL); err != nil {
-		return nil, err
-	}
-	if s.selectPositionInStreamStmt, err = db.Prepare(selectPositionInStreamSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -441,15 +433,6 @@ func (s *outputRoomEventsStatements) DeleteEventsForRoom(
 ) (err error) {
 	_, err = sqlutil.TxStmt(txn, s.deleteEventsForRoomStmt).ExecContext(ctx, roomID)
 	return err
-}
-
-// SelectPositionInStream returns the position of a given event in the
-// global stream topology.
-func (s *outputRoomEventsStatements) SelectPositionInStream(
-	ctx context.Context, txn *sql.Tx, eventID string,
-) (pos types.StreamPosition, err error) {
-	err = s.selectPositionInStreamStmt.QueryRowContext(ctx, eventID).Scan(&pos)
-	return
 }
 
 func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
