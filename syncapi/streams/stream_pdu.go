@@ -8,7 +8,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 type PDUStreamProvider struct {
@@ -103,7 +102,6 @@ func (p *PDUStreamProvider) CompleteSync(
 				req.Log.WithError(err).Error("p.getLeaveResponseForCompleteSync failed")
 				return from
 			}
-
 			req.Response.Rooms.Leave[roomID] = *lr
 		}
 	}
@@ -347,9 +345,6 @@ func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 			}
 			switch content.HistoryVisibility {
 			case "world_readable", "shared":
-				logrus.WithFields(logrus.Fields{
-					"content.HistoryVisibility": content.HistoryVisibility,
-				}).Info("filterStreamEventsAccordingToHistoryVisibility: No filtering needed for these events")
 				return recentStreamEvents, limited
 			default:
 				break
@@ -399,38 +394,23 @@ func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 		sliceEnd = leaveEventIndex + 1
 	}
 
-	events := make([]string, len(recentStreamEvents))
-	for i, v := range recentStreamEvents {
-		events[i] = string(v.HeaderedEvent.Event.JSON())
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"sliceStart":                sliceStart,
-		"sliceEnd":                  sliceEnd,
-		"before recentStreamEvents": fmt.Sprintf("%+v", events),
-	}).Info("filterStreamEventsAccordingToHistoryVisibility: cutting down the events")
-
 	return recentStreamEvents[sliceStart:sliceEnd], limited
 }
 
 func removeDuplicates(stateEvents, recentEvents []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
-	for _, recentEv := range recentEvents {
-		if recentEv.StateKey() == nil {
-			continue // not a state event
+	timeline := map[string]struct{}{}
+	for _, event := range recentEvents {
+		if event.StateKey() == nil {
+			continue
 		}
-		// TODO: This is a linear scan over all the current state events in this room. This will
-		//       be slow for big rooms. We should instead sort the state events by event ID  (ORDER BY)
-		//       then do a binary search to find matching events, similar to what roomserver does.
-		for j := 0; j < len(stateEvents); j++ {
-			if stateEvents[j].EventID() == recentEv.EventID() {
-				// overwrite the element to remove with the last element then pop the last element.
-				// This is orders of magnitude faster than re-slicing, but doesn't preserve ordering
-				// (we don't care about the order of stateEvents)
-				stateEvents[j] = stateEvents[len(stateEvents)-1]
-				stateEvents = stateEvents[:len(stateEvents)-1]
-				break // there shouldn't be multiple events with the same event ID
-			}
-		}
+		timeline[event.EventID()] = struct{}{}
 	}
-	return stateEvents
+	state := []*gomatrixserverlib.HeaderedEvent{}
+	for _, event := range stateEvents {
+		if _, ok := timeline[event.EventID()]; ok {
+			continue
+		}
+		state = append(state, event)
+	}
+	return state
 }
