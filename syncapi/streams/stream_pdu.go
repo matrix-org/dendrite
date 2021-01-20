@@ -305,6 +305,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	return jr, nil
 }
 
+// nolint:unparam
 func (p *PDUStreamProvider) getLeaveResponseForCompleteSync(
 	ctx context.Context,
 	roomID string,
@@ -313,18 +314,20 @@ func (p *PDUStreamProvider) getLeaveResponseForCompleteSync(
 	eventFilter *gomatrixserverlib.RoomEventFilter,
 	device *userapi.Device,
 ) (lr *types.LeaveResponse, err error) {
-	recentEvents, stateEvents, prevBatch, limited, err := p.getResponseForCompleteSync(
-		ctx, roomID, r, stateFilter, eventFilter, device,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("p.getResponseForCompleteSync: %w", err)
-	}
+	/*
+		recentEvents, stateEvents, prevBatch, limited, err := p.getResponseForCompleteSync(
+			ctx, roomID, r, stateFilter, eventFilter, device,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("p.getResponseForCompleteSync: %w", err)
+		}
+	*/
 
 	lr = types.NewLeaveResponse()
-	lr.Timeline.PrevBatch = prevBatch
-	lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-	lr.Timeline.Limited = limited
-	lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
+	//lr.Timeline.PrevBatch = prevBatch
+	//lr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+	//lr.Timeline.Limited = limited
+	//lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 	return lr, nil
 }
 
@@ -398,6 +401,11 @@ func (p *PDUStreamProvider) filterStreamEventsAccordingToHistoryVisibility(
 	return recentStreamEvents[sliceStart:sliceEnd], limited
 }
 
+// removeDuplicates takes a set of state events and timeline events and
+// builds up a new set of state events. The returned state set will
+// exclude any state events that appear in the timeline, so that the
+// returned sync response doesn't duplicate them across both the state
+// and timeline keys.
 func removeDuplicates(stateEvents, recentEvents []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 	timeline := map[string]struct{}{}
 	for _, event := range recentEvents {
