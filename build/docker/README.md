@@ -7,13 +7,15 @@ They can be found on Docker Hub:
 - [matrixdotorg/dendrite-monolith](https://hub.docker.com/r/matrixdotorg/dendrite-monolith) for monolith deployments
 - [matrixdotorg/dendrite-polylith](https://hub.docker.com/r/matrixdotorg/dendrite-polylith) for polylith deployments
 
-## Dockerfiles
+## Building the image
 
-The `Dockerfile` builds the base image which contains all of the Dendrite
-components. The `Dockerfile.component` file takes the given component, as
-specified with `--buildarg component=` from the base image and produce
-smaller component-specific images, which are substantially smaller and do
-not contain the Go toolchain etc.
+The `Dockerfile` can build both monolith and polylith images for Dendrite.
+To choose which is selected, set `--build-arg DENDRITE_BINARY=$binary`,
+where `$binary` is `dendrite-monolith-server` or `dendrite-polylith-multi`
+for monolith or polylith respectively.
+
+Note that you **must** use BuildKit to build the images. You can enable
+it for the build with `DOCKER_BUILDKIT=1 docker build [...]`
 
 ## Compose files
 
