@@ -45,7 +45,7 @@ const insertEventInTopologySQL = "" +
 	"INSERT INTO syncapi_output_room_events_topology (event_id, topological_position, room_id, stream_position)" +
 	" VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (topological_position, stream_position, room_id) DO UPDATE SET event_id = $1" +
-	" ON CONFLICT (event_id) DO NOTHING"
+	" ON CONFLICT (event_id) DO NOTHING" +
 	" RETURNING topological_position"
 
 const selectEventIDsInRangeASCSQL = "" +
