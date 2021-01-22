@@ -73,6 +73,7 @@ type BaseDendrite struct {
 	httpClient             *http.Client
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
+	DNSCache               *gomatrixserverlib.DNSCache
 	//	KafkaConsumer          sarama.Consumer
 	//	KafkaProducer          sarama.SyncProducer
 }
@@ -109,6 +110,20 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	cache, err := caching.NewInMemoryLRUCache(true)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
+	}
+
+	var dnsCache *gomatrixserverlib.DNSCache
+	if cfg.Global.DNSCache.Enabled {
+		lifetime := time.Second * cfg.Global.DNSCache.CacheLifetime
+		dnsCache = gomatrixserverlib.NewDNSCache(
+			cfg.Global.DNSCache.CacheSize,
+			lifetime,
+		)
+		logrus.Infof(
+			"DNS cache enabled (size %d, lifetime %s)",
+			cfg.Global.DNSCache.CacheSize,
+			lifetime,
+		)
 	}
 
 	apiClient := http.Client{
@@ -152,6 +167,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		tracerCloser:           closer,
 		Cfg:                    cfg,
 		Caches:                 cache,
+		DNSCache:               dnsCache,
 		PublicClientAPIMux:     mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicClientPathPrefix).Subrouter().UseEncodedPath(),
 		PublicFederationAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
 		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
@@ -252,8 +268,12 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 	if b.Cfg.Global.DisableFederation {
 		return gomatrixserverlib.NewClientWithTransport(noOpHTTPTransport)
 	}
+	opts := []interface{}{}
+	if b.Cfg.Global.DNSCache.Enabled {
+		opts = append(opts, gomatrixserverlib.WithDNSCache{DNSCache: b.DNSCache})
+	}
 	client := gomatrixserverlib.NewClient(
-		b.Cfg.FederationSender.DisableTLSValidation,
+		b.Cfg.FederationSender.DisableTLSValidation, opts...,
 	)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client
@@ -268,9 +288,13 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 			b.Cfg.FederationSender.DisableTLSValidation, noOpHTTPTransport,
 		)
 	}
+	opts := []interface{}{}
+	if b.Cfg.Global.DNSCache.Enabled {
+		opts = append(opts, gomatrixserverlib.WithDNSCache{DNSCache: b.DNSCache})
+	}
 	client := gomatrixserverlib.NewFederationClientWithTimeout(
 		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
-		b.Cfg.FederationSender.DisableTLSValidation, time.Minute*5,
+		b.Cfg.FederationSender.DisableTLSValidation, time.Minute*5, opts...,
 	)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client

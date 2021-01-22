@@ -103,6 +103,17 @@ global:
       username: metrics
       password: metrics
 
+  # DNS cache options. The DNS cache may reduce the load on DNS servers
+  # if there is no local caching resolver available for use.
+  dns_cache:
+    # Whether or not the DNS cache is enabled.
+    enabled: false
+
+    # Maximum number of entries to hold in the DNS cache, and
+    # for how long those items should be considered valid in seconds.
+    cache_size: 256
+    cache_lifetime: 300
+
 # Configuration for the Appservice API.
 app_service_api:
   internal_api:
