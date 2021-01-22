@@ -46,6 +46,7 @@ func AddPublicRoutes(
 	userAPI userapi.UserInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
+	mscCfg *config.MSCs,
 ) {
 	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
@@ -57,6 +58,6 @@ func AddPublicRoutes(
 	routing.Setup(
 		router, cfg, eduInputAPI, rsAPI, asAPI,
 		accountsDB, userAPI, federation,
-		syncProducer, transactionsCache, fsAPI, keyAPI, extRoomsProvider,
+		syncProducer, transactionsCache, fsAPI, keyAPI, extRoomsProvider, mscCfg,
 	)
 }
