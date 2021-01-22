@@ -110,7 +110,7 @@ global:
     enabled: false
 
     # Maximum number of entries to hold in the DNS cache, and
-    # for how long those items should be considered valid.
+    # for how long those items should be considered valid in seconds.
     cache_size: 256
     cache_lifetime: 300
 
