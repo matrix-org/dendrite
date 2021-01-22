@@ -100,7 +100,7 @@ global:
     # Maximum number of entries to hold in the DNS cache, and
     # for how long those items should be considered valid.
     cache_size: 256
-    cache_lifetime: 600
+    cache_lifetime: 300
 
 # Configuration for the Appservice API.
 app_service_api:
