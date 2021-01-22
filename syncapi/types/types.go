@@ -372,7 +372,7 @@ type Response struct {
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
 	ToDevice struct {
-		Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
 	} `json:"to_device"`
 	DeviceLists struct {
 		Changed []string `json:"changed,omitempty"`
