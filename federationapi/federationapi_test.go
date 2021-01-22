@@ -38,9 +38,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 
 	fedCli := gomatrixserverlib.NewFederationClient(
 		serverName, cfg.Global.KeyID, cfg.Global.PrivateKey, true,
-		gomatrixserverlib.WithSkipVerify{
-			SkipVerify: true,
-		},
+		gomatrixserverlib.WithSkipVerify(true),
 	)
 
 	testCases := []struct {

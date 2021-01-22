@@ -79,9 +79,7 @@ func createFederationClient(
 	return gomatrixserverlib.NewFederationClient(
 		base.Base.Cfg.Global.ServerName, base.Base.Cfg.Global.KeyID,
 		base.Base.Cfg.Global.PrivateKey, true,
-		gomatrixserverlib.WithTransport{
-			Transport: tr,
-		},
+		gomatrixserverlib.WithTransport(tr),
 	)
 }
 
@@ -94,9 +92,7 @@ func createClient(
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
 	return gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport{
-			Transport: tr,
-		},
+		gomatrixserverlib.WithTransport(tr),
 	)
 }
 

@@ -109,9 +109,7 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) *gomatrix
 		gomatrixserverlib.ServerName("example.test"), gomatrixserverlib.KeyID("ed25519:test"), pkey, true,
 	)
 	fedClient.Client = *gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport{
-			Transport: &roundTripper{tripper},
-		},
+		gomatrixserverlib.WithTransport(&roundTripper{tripper}),
 	)
 	return fedClient
 }
