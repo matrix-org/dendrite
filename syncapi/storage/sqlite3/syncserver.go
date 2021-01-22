@@ -100,6 +100,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	memberships, err := NewSqliteMembershipsTable(d.db)
+	if err != nil {
+		return err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -119,6 +123,7 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
+		Memberships:         memberships,
 	}
 	return nil
 }
