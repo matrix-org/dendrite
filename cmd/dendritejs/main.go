@@ -139,7 +139,7 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 	tr := go_http_js_libp2p.NewP2pTransport(node)
 
 	fed := gomatrixserverlib.NewFederationClient(
-		cfg.Global.ServerName, cfg.Global.KeyID, cfg.Global.PrivateKey, true,
+		cfg.Global.ServerName, cfg.Global.KeyID, cfg.Global.PrivateKey,
 		gomatrixserverlib.WithTransport(tr),
 	)
 

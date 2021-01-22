@@ -270,12 +270,11 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 			gomatrixserverlib.WithTransport(noOpHTTPTransport),
 		)
 	}
-	opts := []gomatrixserverlib.ClientOption{}
+	opts := []gomatrixserverlib.ClientOption{
+		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationSender.DisableTLSValidation),
+	}
 	if b.Cfg.Global.DNSCache.Enabled {
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
-	}
-	if validation := b.Cfg.FederationSender.DisableTLSValidation; validation {
-		opts = append(opts, gomatrixserverlib.WithSkipVerify(validation))
 	}
 	client := gomatrixserverlib.NewClient(opts...)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
@@ -287,20 +286,20 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
 	if b.Cfg.Global.DisableFederation {
 		return gomatrixserverlib.NewFederationClient(
-			b.Cfg.Global.ServerName, b.Cfg.Global.KeyID,
-			b.Cfg.Global.PrivateKey, b.Cfg.FederationSender.DisableTLSValidation,
+			b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
 			gomatrixserverlib.WithTransport(noOpHTTPTransport),
 		)
 	}
 	opts := []gomatrixserverlib.ClientOption{
 		gomatrixserverlib.WithTimeout(time.Minute * 5),
+		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationSender.DisableTLSValidation),
 	}
 	if b.Cfg.Global.DNSCache.Enabled {
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
 	}
 	client := gomatrixserverlib.NewFederationClient(
-		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
-		b.Cfg.FederationSender.DisableTLSValidation, opts...,
+		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID,
+		b.Cfg.Global.PrivateKey, opts...,
 	)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client

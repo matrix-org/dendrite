@@ -54,7 +54,6 @@ func main() {
 		gomatrixserverlib.ServerName(*requestFrom),
 		gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),
 		privateKey,
-		false,
 	)
 
 	u, err := url.Parse(flag.Arg(0))

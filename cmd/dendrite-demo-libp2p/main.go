@@ -78,7 +78,7 @@ func createFederationClient(
 	)
 	return gomatrixserverlib.NewFederationClient(
 		base.Base.Cfg.Global.ServerName, base.Base.Cfg.Global.KeyID,
-		base.Base.Cfg.Global.PrivateKey, true,
+		base.Base.Cfg.Global.PrivateKey,
 		gomatrixserverlib.WithTransport(tr),
 	)
 }

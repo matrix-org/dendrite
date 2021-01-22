@@ -37,7 +37,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
 
 	fedCli := gomatrixserverlib.NewFederationClient(
-		serverName, cfg.Global.KeyID, cfg.Global.PrivateKey, true,
+		serverName, cfg.Global.KeyID, cfg.Global.PrivateKey,
 		gomatrixserverlib.WithSkipVerify(true),
 	)
 
