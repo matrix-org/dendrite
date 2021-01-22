@@ -33,7 +33,11 @@ func (n *Node) CreateClient(
 			},
 		},
 	)
-	return gomatrixserverlib.NewClientWithTransport(tr)
+	return gomatrixserverlib.NewClient(
+		gomatrixserverlib.WithTransport{
+			Transport: tr,
+		},
+	)
 }
 
 func (n *Node) CreateFederationClient(
@@ -53,8 +57,11 @@ func (n *Node) CreateFederationClient(
 			},
 		},
 	)
-	return gomatrixserverlib.NewFederationClientWithTransport(
+	return gomatrixserverlib.NewFederationClient(
 		base.Cfg.Global.ServerName, base.Cfg.Global.KeyID,
-		base.Cfg.Global.PrivateKey, true, tr,
+		base.Cfg.Global.PrivateKey, true,
+		gomatrixserverlib.WithTransport{
+			Transport: tr,
+		},
 	)
 }

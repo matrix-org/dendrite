@@ -108,7 +108,11 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) *gomatrix
 	fedClient := gomatrixserverlib.NewFederationClient(
 		gomatrixserverlib.ServerName("example.test"), gomatrixserverlib.KeyID("ed25519:test"), pkey, true,
 	)
-	fedClient.Client = *gomatrixserverlib.NewClientWithTransport(&roundTripper{tripper})
+	fedClient.Client = *gomatrixserverlib.NewClient(
+		gomatrixserverlib.WithTransport{
+			Transport: &roundTripper{tripper},
+		},
+	)
 	return fedClient
 }
 
