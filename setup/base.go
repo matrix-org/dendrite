@@ -113,18 +113,15 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	}
 
 	var dnsCache *gomatrixserverlib.DNSCache
-	if cfg.Matrix.DNSCache.Enabled {
-		dnsCache, err = gomatrixserverlib.NewDNSCache(
-			cfg.Matrix.DNSCache.CacheSize,
-			cfg.Matrix.DNSCache.CacheLifetime,
+	if cfg.Global.DNSCache.Enabled {
+		dnsCache = gomatrixserverlib.NewDNSCache(
+			cfg.Global.DNSCache.CacheSize,
+			cfg.Global.DNSCache.CacheLifetime,
 		)
-		if err != nil {
-			logrus.WithError(err).Warnf("Failed to create DNS cache")
-		}
 		logrus.Infof(
 			"DNS cache enabled (size %d, lifetime %s)",
-			cfg.Matrix.DNSCache.CacheSize,
-			cfg.Matrix.DNSCache.CacheLifetime,
+			cfg.Global.DNSCache.CacheSize,
+			cfg.Global.DNSCache.CacheLifetime,
 		)
 	}
 

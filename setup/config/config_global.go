@@ -162,6 +162,6 @@ func (c *DNSCacheOptions) Defaults() {
 }
 
 func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkPositive(configErrs, "cache_size", c.CacheSize)
-	checkPositive(configErrs, "cache_lifetime", c.CacheLifetime)
+	checkPositive(configErrs, "cache_size", int64(c.CacheSize))
+	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
 }
