@@ -270,7 +270,7 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 	}
 	opts := []interface{}{}
 	if b.Cfg.Global.DNSCache.Enabled {
-		opts = append(opts, b.DNSCache)
+		opts = append(opts, gomatrixserverlib.WithDNSCache{Cache: b.DNSCache})
 	}
 	client := gomatrixserverlib.NewClient(
 		b.Cfg.FederationSender.DisableTLSValidation, opts...,
@@ -290,7 +290,7 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	}
 	opts := []interface{}{}
 	if b.Cfg.Global.DNSCache.Enabled {
-		opts = append(opts, b.DNSCache)
+		opts = append(opts, gomatrixserverlib.WithDNSCache{Cache: b.DNSCache})
 	}
 	client := gomatrixserverlib.NewFederationClientWithTimeout(
 		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
