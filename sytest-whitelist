@@ -508,3 +508,6 @@ State from remote users is included in the state in the initial sync
 Changes to state are included in an gapped incremental sync
 A full_state incremental update returns all state
 Can pass a JSON filter as a query parameter
+Local room members can get room messages
+Remote room members can get room messages
+Guest users can send messages to guest_access rooms if joined
