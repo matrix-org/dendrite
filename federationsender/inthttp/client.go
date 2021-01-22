@@ -20,6 +20,7 @@ const (
 	FederationSenderPerformJoinRequestPath            = "/federationsender/performJoinRequest"
 	FederationSenderPerformLeaveRequestPath           = "/federationsender/performLeaveRequest"
 	FederationSenderPerformInviteRequestPath          = "/federationsender/performInviteRequest"
+	FederationSenderPerformOutboundPeekRequestPath    = "/federationsender/performOutboundPeekRequest"
 	FederationSenderPerformServersAlivePath           = "/federationsender/performServersAlive"
 	FederationSenderPerformBroadcastEDUPath           = "/federationsender/performBroadcastEDU"
 
@@ -73,6 +74,19 @@ func (h *httpFederationSenderInternalAPI) PerformInvite(
 	defer span.Finish()
 
 	apiURL := h.federationSenderURL + FederationSenderPerformInviteRequestPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// Handle starting a peek on a remote server.
+func (h *httpFederationSenderInternalAPI) PerformOutboundPeek(
+	ctx context.Context,
+	request *api.PerformOutboundPeekRequest,
+	response *api.PerformOutboundPeekResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformOutboundPeekRequest")
+	defer span.Finish()
+
+	apiURL := h.federationSenderURL + FederationSenderPerformOutboundPeekRequestPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

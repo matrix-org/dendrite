@@ -111,6 +111,14 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 			}
 			return nil
 		}
+	case api.OutputTypeNewInboundPeek:
+		if err := s.processInboundPeek(*output.NewInboundPeek); err != nil {
+			log.WithFields(log.Fields{
+				"event":      output.NewInboundPeek,
+				log.ErrorKey: err,
+			}).Panicf("roomserver output log: remote peek event failure")
+			return nil
+		}
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -119,6 +127,23 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	return nil
+}
+
+// processInboundPeek starts tracking a new federated inbound peek (replacing the existing one if any)
+// causing the federationsender to start sending messages to the peeking server
+func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPeek) error {
+
+	// FIXME: there's a race here - we should start /sending new peeked events
+	// atomically after the orp.LatestEventID to ensure there are no gaps between
+	// the peek beginning and the send stream beginning.
+	//
+	// We probably need to track orp.LatestEventID on the inbound peek, but it's
+	// unclear how we then use that to prevent the race when we start the send
+	// stream.
+	//
+	// This is making the tests flakey.
+
+	return s.db.AddInboundPeek(context.TODO(), orp.ServerName, orp.RoomID, orp.PeekID, orp.RenewalInterval)
 }
 
 // processMessage updates the list of currently joined hosts in the room
@@ -164,6 +189,10 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 		return err
 	}
 
+	// TODO: do housekeeping to evict unrenewed peeking hosts
+
+	// TODO: implement query to let the fedapi check whether a given peek is live or not
+
 	// Send the event.
 	return s.queues.SendEvent(
 		ore.Event, gomatrixserverlib.ServerName(ore.SendAsServer), joinedHostsAtEvent,
@@ -171,7 +200,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 }
 
 // joinedHostsAtEvent works out a list of matrix servers that were joined to
-// the room at the event.
+// the room at the event (including peeking ones)
 // It is important to use the state at the event for sending messages because:
 //   1) We shouldn't send messages to servers that weren't in the room.
 //   2) If a server is kicked from the rooms it should still be told about the
@@ -220,6 +249,15 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		// This m.room.member event was part of the state of the room at the
 		// event, but isn't part of the current state of the room now.
 		joined[joinedHost.ServerName] = true
+	}
+
+	// handle peeking hosts
+	inboundPeeks, err := s.db.GetInboundPeeks(context.TODO(), ore.Event.Event.RoomID())
+	if err != nil {
+		return nil, err
+	}
+	for _, inboundPeek := range inboundPeeks {
+		joined[inboundPeek.ServerName] = true
 	}
 
 	var result []gomatrixserverlib.ServerName
