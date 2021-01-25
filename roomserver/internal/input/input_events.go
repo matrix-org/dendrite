@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -62,6 +63,7 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
 	input *api.InputRoomEvent,
+	wg *sync.WaitGroup,
 ) (eventID string, err error) {
 	// Measure how long it takes to process this event.
 	started := time.Now()
@@ -192,9 +194,10 @@ func (r *Inputer) processRoomEvent(
 
 	switch input.Kind {
 	case api.KindNew:
-		errch := make(chan error)
+		wg.Add(1)
 		go func() {
-			errch <- r.updateLatestEvents(
+			defer wg.Done()
+			if err = r.updateLatestEvents(
 				ctx,                 // context
 				roomInfo,            // room info for the room being updated
 				stateAtEvent,        // state at event (below)
@@ -202,12 +205,10 @@ func (r *Inputer) processRoomEvent(
 				input.SendAsServer,  // send as server
 				input.TransactionID, // transaction ID
 				input.HasState,      // rewrites state?
-			)
-			close(errch)
+			); err != nil {
+				logrus.WithError(err).Error("r.updateLatestEvents failed")
+			}
 		}()
-		if err = <-errch; err != nil {
-			return "", fmt.Errorf("r.updateLatestEvents: %w", err)
-		}
 	case api.KindOld:
 		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
 			{
