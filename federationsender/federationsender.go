@@ -59,7 +59,8 @@ func NewInternalAPI(
 	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
 	queues := queue.NewOutgoingQueues(
-		federationSenderDB, cfg.Matrix.DisableFederation,
+		federationSenderDB, base.ProcessContext,
+		cfg.Matrix.DisableFederation,
 		cfg.Matrix.ServerName, federation, rsAPI, stats,
 		&queue.SigningInfo{
 			KeyID:      cfg.Matrix.KeyID,

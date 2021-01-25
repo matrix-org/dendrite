@@ -20,6 +20,10 @@ func NewProcessContext() *ProcessContext {
 	}
 }
 
+func (b *ProcessContext) Context() context.Context {
+	return context.WithValue(b.ctx, "scope", "process") // nolint:staticcheck
+}
+
 func (b *ProcessContext) ComponentStarted() {
 	b.wg.Add(1)
 }
