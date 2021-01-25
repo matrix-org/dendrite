@@ -192,15 +192,20 @@ func (r *Inputer) processRoomEvent(
 
 	switch input.Kind {
 	case api.KindNew:
-		if err = r.updateLatestEvents(
-			ctx,                 // context
-			roomInfo,            // room info for the room being updated
-			stateAtEvent,        // state at event (below)
-			event,               // event
-			input.SendAsServer,  // send as server
-			input.TransactionID, // transaction ID
-			input.HasState,      // rewrites state?
-		); err != nil {
+		errch := make(chan error)
+		go func() {
+			errch <- r.updateLatestEvents(
+				ctx,                 // context
+				roomInfo,            // room info for the room being updated
+				stateAtEvent,        // state at event (below)
+				event,               // event
+				input.SendAsServer,  // send as server
+				input.TransactionID, // transaction ID
+				input.HasState,      // rewrites state?
+			)
+			close(errch)
+		}()
+		if err = <-errch; err != nil {
 			return "", fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
 	case api.KindOld:
