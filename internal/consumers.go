@@ -107,7 +107,6 @@ func (c *ContinualConsumer) StartOffsets() ([]sqlutil.PartitionOffset, error) {
 		go c.consumePartition(pc)
 		if c.Process != nil {
 			c.Process.ComponentStarted()
-			logrus.Infof("Started consumer for %q topic %q", c.ComponentName, c.Topic)
 			go func(pc sarama.PartitionConsumer) {
 				<-c.Process.WaitForShutdown()
 				_ = pc.Close()
