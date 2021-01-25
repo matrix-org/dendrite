@@ -19,6 +19,7 @@ package input
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -55,6 +56,11 @@ func (r *Inputer) updateLatestEvents(
 	transactionID *api.TransactionID,
 	rewritesState bool,
 ) (err error) {
+	v, _ := r.latestEventsMutexes.LoadOrStore(roomInfo.RoomNID, &sync.Mutex{})
+	mutex := v.(*sync.Mutex)
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	updater, err := r.DB.GetLatestEventsForUpdate(ctx, *roomInfo)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetLatestEventsForUpdate: %w", err)
