@@ -69,7 +69,7 @@ func NewInternalAPI(
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		cfg, consumer, queues,
+		base.ProcessContext, cfg, consumer, queues,
 		federationSenderDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
@@ -77,13 +77,13 @@ func NewInternalAPI(
 	}
 
 	tsConsumer := consumers.NewOutputEDUConsumer(
-		cfg, consumer, queues, federationSenderDB,
+		base.ProcessContext, cfg, consumer, queues, federationSenderDB,
 	)
 	if err := tsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
-		&base.Cfg.KeyServer, consumer, queues, federationSenderDB, rsAPI,
+		base.ProcessContext, &base.Cfg.KeyServer, consumer, queues, federationSenderDB, rsAPI,
 	)
 	if err := keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")

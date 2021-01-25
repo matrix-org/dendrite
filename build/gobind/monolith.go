@@ -166,6 +166,7 @@ func (m *DendriteMonolith) Start() {
 		),
 	}
 	monolith.AddAllPublicRoutes(
+		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,

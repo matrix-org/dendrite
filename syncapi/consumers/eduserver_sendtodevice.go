@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -42,6 +43,7 @@ type OutputSendToDeviceEventConsumer struct {
 // NewOutputSendToDeviceEventConsumer creates a new OutputSendToDeviceEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputSendToDeviceEventConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
@@ -50,6 +52,7 @@ func NewOutputSendToDeviceEventConsumer(
 ) *OutputSendToDeviceEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/eduserver/sendtodevice",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
 		Consumer:       kafkaConsumer,

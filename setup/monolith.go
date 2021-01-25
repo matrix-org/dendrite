@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	serverKeyAPI "github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -56,7 +57,7 @@ type Monolith struct {
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
-func (m *Monolith) AddAllPublicRoutes(csMux, ssMux, keyMux, mediaMux *mux.Router) {
+func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ssMux, keyMux, mediaMux *mux.Router) {
 	clientapi.AddPublicRoutes(
 		csMux, &m.Config.ClientAPI, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
@@ -71,7 +72,7 @@ func (m *Monolith) AddAllPublicRoutes(csMux, ssMux, keyMux, mediaMux *mux.Router
 	)
 	mediaapi.AddPublicRoutes(mediaMux, &m.Config.MediaAPI, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(
-		csMux, m.UserAPI, m.RoomserverAPI,
+		process, csMux, m.UserAPI, m.RoomserverAPI,
 		m.KeyAPI, m.FedClient, &m.Config.SyncAPI,
 	)
 }
