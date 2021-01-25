@@ -102,7 +102,6 @@ func (r *Inputer) InputRoomEvents(
 	tasks := make([]*inputTask, len(request.InputRoomEvents))
 
 	for i := range request.InputRoomEvents {
-		wg.Add(1)
 		tasks[i] = &inputTask{
 			ctx:   context.Background(),
 			event: &request.InputRoomEvents[i],
