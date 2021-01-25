@@ -231,6 +231,7 @@ func main() {
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}
 	monolith.AddAllPublicRoutes(
+		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
