@@ -424,7 +424,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	_ = internalServ.Shutdown(ctx)
 	_ = externalServ.Shutdown(ctx)
-	logrus.Warnf("Stopped HTTP listeners")
+	logrus.Infof("Stopped HTTP listeners")
 }
 
 func (b *BaseDendrite) WaitForShutdown() {
@@ -433,10 +433,9 @@ func (b *BaseDendrite) WaitForShutdown() {
 	<-sigs
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
-	logrus.Warnf("Received shutdown signal")
-	b.ProcessContext.ShutdownDendrite()
+	logrus.Warnf("Shutdown signal received")
 
-	logrus.Warnf("Waiting for components to shutdown")
+	b.ProcessContext.ShutdownDendrite()
 	b.ProcessContext.WaitForComponentsToFinish()
 
 	logrus.Warnf("Dendrite is exiting now")
