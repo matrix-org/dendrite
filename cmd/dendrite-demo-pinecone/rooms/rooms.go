@@ -25,13 +25,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
-	pineconeSwitch "github.com/matrix-org/pinecone/packetswitch"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 )
 
 type PineconeRoomProvider struct {
-	s         *pineconeSwitch.Switch
 	r         *pineconeRouter.Router
 	q         *pineconeSessions.QUIC
 	fedSender api.FederationSenderInternalAPI
@@ -39,14 +37,12 @@ type PineconeRoomProvider struct {
 }
 
 func NewPineconeRoomProvider(
-	s *pineconeSwitch.Switch,
 	r *pineconeRouter.Router,
 	q *pineconeSessions.QUIC,
 	fedSender api.FederationSenderInternalAPI,
 	fedClient *gomatrixserverlib.FederationClient,
 ) *PineconeRoomProvider {
 	p := &PineconeRoomProvider{
-		s:         s,
 		r:         r,
 		q:         q,
 		fedSender: fedSender,
@@ -57,7 +53,7 @@ func NewPineconeRoomProvider(
 
 func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
 	known := []ed25519.PublicKey{}
-	known = append(known, p.s.KnownNodes()...)
+	known = append(known, p.r.KnownNodes()...)
 	if successor := p.r.DHTSuccessor(); successor != nil {
 		known = append(known, successor)
 	}

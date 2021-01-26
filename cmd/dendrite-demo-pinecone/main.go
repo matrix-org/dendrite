@@ -39,19 +39,17 @@ import (
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
-	pineconeSwitch "github.com/matrix-org/pinecone/packetswitch"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
-	pineconeTypes "github.com/matrix-org/pinecone/types"
 
 	"github.com/sirupsen/logrus"
 )
@@ -90,13 +88,7 @@ func main() {
 	}
 
 	logger := log.New(os.Stdout, "", 0)
-
-	rL, rR := net.Pipe()
-	pSwitch := pineconeSwitch.NewSwitch(logger, sk, pk, false)
-	pRouter := pineconeRouter.NewRouter(logger, sk, pk, rL, "router", nil)
-	if _, err := pSwitch.Connect(rR, pineconeTypes.PublicKey{}, ""); err != nil {
-		panic(err)
-	}
+	pRouter := pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
 
 	if instancePeer != nil && *instancePeer != "" {
 		go func(peer string) {
@@ -106,7 +98,7 @@ func main() {
 				return
 			}
 
-			if _, err := pSwitch.AuthenticatedConnect(parent, "static"); err != nil {
+			if _, err := pRouter.AuthenticatedConnect(parent, "static"); err != nil {
 				logrus.WithError(err).Errorf("Failed to connect Pinecone static peer to switch")
 			}
 		}(*instancePeer)
@@ -127,7 +119,7 @@ func main() {
 				continue
 			}
 
-			port, err := pSwitch.AuthenticatedConnect(conn, "")
+			port, err := pRouter.AuthenticatedConnect(conn, "")
 			if err != nil {
 				logrus.WithError(err).Error("pSwitch.AuthenticatedConnect failed")
 				continue
@@ -138,7 +130,7 @@ func main() {
 	}()
 
 	pQUIC := pineconeSessions.NewQUIC(logger, pRouter)
-	_ = pineconeMulticast.NewMulticast(logger, pSwitch)
+	_ = pineconeMulticast.NewMulticast(logger, pRouter)
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
@@ -202,9 +194,10 @@ func main() {
 		RoomserverAPI:          rsAPI,
 		UserAPI:                userAPI,
 		KeyAPI:                 keyAPI,
-		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pSwitch, pRouter, pQUIC, fsAPI, federation),
+		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pQUIC, fsAPI, federation),
 	}
 	monolith.AddAllPublicRoutes(
+		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
@@ -238,7 +231,8 @@ func main() {
 	}
 
 	go func() {
-		logrus.Info("Listening on ", hex.EncodeToString(pRouter.PublicKey()))
+		pubkey := pRouter.PublicKey()
+		logrus.Info("Listening on ", hex.EncodeToString(pubkey[:]))
 		logrus.Fatal(httpServer.Serve(pQUIC))
 	}()
 	go func() {
@@ -255,5 +249,5 @@ func main() {
 		}
 	}()
 
-	select {}
+	base.WaitForShutdown()
 }

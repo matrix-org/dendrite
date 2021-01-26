@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
@@ -38,7 +38,9 @@ func CreateClient(
 			},
 		},
 	)
-	return gomatrixserverlib.NewClientWithTransport(tr)
+	return gomatrixserverlib.NewClient(
+		gomatrixserverlib.WithTransport(tr),
+	)
 }
 
 func CreateFederationClient(
@@ -60,8 +62,10 @@ func CreateFederationClient(
 			},
 		},
 	)
-	return gomatrixserverlib.NewFederationClientWithTransport(
-		base.Cfg.Global.ServerName, base.Cfg.Global.KeyID,
-		base.Cfg.Global.PrivateKey, true, tr,
+	return gomatrixserverlib.NewFederationClient(
+		base.Cfg.Global.ServerName,
+		base.Cfg.Global.KeyID,
+		base.Cfg.Global.PrivateKey,
+		gomatrixserverlib.WithTransport(tr),
 	)
 }
