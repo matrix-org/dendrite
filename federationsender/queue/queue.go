@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -36,6 +37,7 @@ import (
 // matrix servers
 type OutgoingQueues struct {
 	db          storage.Database
+	process     *process.ProcessContext
 	disabled    bool
 	rsAPI       api.RoomserverInternalAPI
 	origin      gomatrixserverlib.ServerName
@@ -80,6 +82,7 @@ var destinationQueueBackingOff = prometheus.NewGauge(
 // NewOutgoingQueues makes a new OutgoingQueues
 func NewOutgoingQueues(
 	db storage.Database,
+	process *process.ProcessContext,
 	disabled bool,
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
@@ -89,6 +92,7 @@ func NewOutgoingQueues(
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
 		disabled:   disabled,
+		process:    process,
 		db:         db,
 		rsAPI:      rsAPI,
 		origin:     origin,
@@ -151,6 +155,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
 			db:               oqs.db,
+			process:          oqs.process,
 			rsAPI:            oqs.rsAPI,
 			origin:           oqs.origin,
 			destination:      destination,

@@ -192,6 +192,7 @@ func main() {
 		ExtPublicRoomsProvider: provider,
 	}
 	monolith.AddAllPublicRoutes(
+		base.Base.ProcessContext,
 		base.Base.PublicClientAPIMux,
 		base.Base.PublicFederationAPIMux,
 		base.Base.PublicKeyAPIMux,
@@ -234,5 +235,5 @@ func main() {
 	}
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
-	select {}
+	base.Base.WaitForShutdown()
 }

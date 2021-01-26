@@ -20,6 +20,8 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/sirupsen/logrus"
 )
 
 // A PartitionStorer has the storage APIs needed by the consumer.
@@ -33,6 +35,9 @@ type PartitionStorer interface {
 // A ContinualConsumer continually consumes logs even across restarts. It requires a PartitionStorer to
 // remember the offset it reached.
 type ContinualConsumer struct {
+	// The parent context for the listener, stop consuming when this context is done
+	Process *process.ProcessContext
+	// The component name
 	ComponentName string
 	// The kafkaesque topic to consume events from.
 	// This is the name used in kafka to identify the stream to consume events from.
@@ -100,6 +105,15 @@ func (c *ContinualConsumer) StartOffsets() ([]sqlutil.PartitionOffset, error) {
 	}
 	for _, pc := range partitionConsumers {
 		go c.consumePartition(pc)
+		if c.Process != nil {
+			c.Process.ComponentStarted()
+			go func(pc sarama.PartitionConsumer) {
+				<-c.Process.WaitForShutdown()
+				_ = pc.Close()
+				c.Process.ComponentFinished()
+				logrus.Infof("Stopped consumer for %q topic %q", c.ComponentName, c.Topic)
+			}(pc)
+		}
 	}
 
 	return storedOffsets, nil
