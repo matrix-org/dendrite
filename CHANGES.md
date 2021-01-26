@@ -1,5 +1,19 @@
 # Changelog
 
+## Dendrite 0.3.7 (2021-01-26)
+
+### Features
+
+* Sync filtering support (for event types, senders and limits)
+* In-process DNS caching support for deployments where a local DNS caching resolver is not available (disabled by default)
+* Experimental support for MSC2444 (Peeking over Federation) has been merged
+* Experimental federation support for MSC2946 (Spaces Summary) has been merged
+
+### Fixes
+
+* Dendrite will no longer load a given event more than once for state resolution, which may help to reduce memory usage and database I/O slightly in some cases
+* Large well-known responses will no longer use significant amounts of memory
+
 ## Dendrite 0.3.6 (2021-01-18)
 
 ### Features
