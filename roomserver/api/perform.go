@@ -123,6 +123,17 @@ type PerformPeekResponse struct {
 	Error *PerformError
 }
 
+type PerformUnpeekRequest struct {
+	RoomID   string `json:"room_id"`
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+}
+
+type PerformUnpeekResponse struct {
+	// If non-nil, the join request failed. Contains more information why it failed.
+	Error *PerformError
+}
+
 // PerformBackfillRequest is a request to PerformBackfill.
 type PerformBackfillRequest struct {
 	// The room to backfill
@@ -159,6 +170,28 @@ type PerformPublishRequest struct {
 type PerformPublishResponse struct {
 	// If non-nil, the publish request failed. Contains more information why it failed.
 	Error *PerformError
+}
+
+type PerformInboundPeekRequest struct {
+	UserID          string                       `json:"user_id"`
+	RoomID          string                       `json:"room_id"`
+	PeekID          string                       `json:"peek_id"`
+	ServerName      gomatrixserverlib.ServerName `json:"server_name"`
+	RenewalInterval int64                        `json:"renewal_interval"`
+}
+
+type PerformInboundPeekResponse struct {
+	// Does the room exist on this roomserver?
+	// If the room doesn't exist this will be false and StateEvents will be empty.
+	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
+	// The current state and auth chain events.
+	// The lists will be in an arbitrary order.
+	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
+	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	// The event at which this state was captured
+	LatestEvent *gomatrixserverlib.HeaderedEvent `json:"latest_event"`
 }
 
 // PerformForgetRequest is a request to PerformForget

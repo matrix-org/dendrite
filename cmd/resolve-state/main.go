@@ -8,10 +8,10 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

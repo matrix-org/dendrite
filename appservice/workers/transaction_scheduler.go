@@ -26,7 +26,7 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -185,14 +185,14 @@ func createTransaction(
 		}
 	}
 
-	var ev []*gomatrixserverlib.Event
-	for _, e := range events {
-		ev = append(ev, e.Event)
+	var ev []*gomatrixserverlib.HeaderedEvent
+	for i := range events {
+		ev = append(ev, &events[i])
 	}
 
 	// Create a transaction and store the events inside
 	transaction := gomatrixserverlib.ApplicationServiceTransaction{
-		Events: ev,
+		Events: gomatrixserverlib.HeaderedToClientEvents(ev, gomatrixserverlib.FormatAll),
 	}
 
 	transactionJSON, err = json.Marshal(transaction)

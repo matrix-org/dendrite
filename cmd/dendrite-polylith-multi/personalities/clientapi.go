@@ -16,9 +16,9 @@ package personalities
 
 import (
 	"github.com/matrix-org/dendrite/clientapi"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/internal/transactions"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func ClientAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
@@ -35,6 +35,7 @@ func ClientAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
 	clientapi.AddPublicRoutes(
 		base.PublicClientAPIMux, &base.Cfg.ClientAPI, accountDB, federation,
 		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI, keyAPI, nil,
+		&cfg.MSCs,
 	)
 
 	base.SetupAndServeHTTP(

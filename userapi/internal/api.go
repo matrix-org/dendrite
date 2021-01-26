@@ -23,9 +23,9 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
@@ -390,8 +390,9 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 	if localpart != "" { // AS is masquerading as another user
 		// Verify that the user is registered
 		account, err := a.AccountDB.GetAccountByLocalpart(ctx, localpart)
-		// Verify that account exists & appServiceID matches
-		if err == nil && account.AppServiceID == appService.ID {
+		// Verify that the account exists and either appServiceID matches or
+		// it belongs to the appservice user namespaces
+		if err == nil && (account.AppServiceID == appService.ID || appService.IsInterestedInUserID(appServiceUserID)) {
 			// Set the userID of dummy device
 			dev.UserID = appServiceUserID
 			return &dev, nil

@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/cmd/dendrite-polylith-multi/personalities"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -74,5 +74,6 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, component, false) // TODO
 	defer base.Close()                                   // nolint: errcheck
 
-	start(base, cfg)
+	go start(base, cfg)
+	base.WaitForShutdown()
 }

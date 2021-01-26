@@ -19,9 +19,9 @@ package storage
 import (
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/keyserver/storage/postgres"
 	"github.com/matrix-org/dendrite/keyserver/storage/sqlite3"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)

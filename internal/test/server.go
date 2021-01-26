@@ -26,7 +26,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // Defaulting allows assignment of string variables with a fallback default value

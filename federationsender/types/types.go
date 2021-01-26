@@ -49,3 +49,23 @@ func (e EventIDMismatchError) Error() string {
 		e.DatabaseID, e.RoomServerID,
 	)
 }
+
+// tracks peeks we're performing on another server over federation
+type OutboundPeek struct {
+	PeekID            string
+	RoomID            string
+	ServerName        gomatrixserverlib.ServerName
+	CreationTimestamp int64
+	RenewedTimestamp  int64
+	RenewalInterval   int64
+}
+
+// tracks peeks other servers are performing on us over federation
+type InboundPeek struct {
+	PeekID            string
+	RoomID            string
+	ServerName        gomatrixserverlib.ServerName
+	CreationTimestamp int64
+	RenewedTimestamp  int64
+	RenewalInterval   int64
+}

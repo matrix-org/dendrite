@@ -9,8 +9,8 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/statistics"
 	"github.com/matrix-org/dendrite/federationsender/storage"
-	"github.com/matrix-org/dendrite/internal/config"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -228,4 +228,33 @@ func (a *FederationSenderInternalAPI) LookupServerKeys(
 		return []gomatrixserverlib.ServerKeys{}, err
 	}
 	return ires.([]gomatrixserverlib.ServerKeys), nil
+}
+
+func (a *FederationSenderInternalAPI) MSC2836EventRelationships(
+	ctx context.Context, s gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest,
+	roomVersion gomatrixserverlib.RoomVersion,
+) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.MSC2836EventRelationships(ctx, s, r, roomVersion)
+	})
+	if err != nil {
+		return res, err
+	}
+	return ires.(gomatrixserverlib.MSC2836EventRelationshipsResponse), nil
+}
+
+func (a *FederationSenderInternalAPI) MSC2946Spaces(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID string, r gomatrixserverlib.MSC2946SpacesRequest,
+) (res gomatrixserverlib.MSC2946SpacesResponse, err error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.MSC2946Spaces(ctx, s, roomID, r)
+	})
+	if err != nil {
+		return res, err
+	}
+	return ires.(gomatrixserverlib.MSC2946SpacesResponse), nil
 }

@@ -15,7 +15,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/config"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -87,8 +87,9 @@ func TestMain(m *testing.M) {
 		transport.RegisterProtocol("matrix", &MockRoundTripper{})
 
 		// Create the federation client.
-		s.fedclient = gomatrixserverlib.NewFederationClientWithTransport(
-			s.config.Matrix.ServerName, serverKeyID, testPriv, true, transport,
+		s.fedclient = gomatrixserverlib.NewFederationClient(
+			s.config.Matrix.ServerName, serverKeyID, testPriv,
+			gomatrixserverlib.WithTransport(transport),
 		)
 
 		// Finally, build the server key APIs.

@@ -21,10 +21,10 @@ import (
 	"strings"
 
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -151,11 +151,28 @@ func (r *Peeker) performPeekRoomByID(
 		}
 	}
 
-	// If the server name in the room ID isn't ours then it's a
-	// possible candidate for finding the room via federation. Add
-	// it to the list of servers to try.
+	// handle federated peeks
+	// FIXME: don't create an outbound peek if we already have one going.
 	if domain != r.Cfg.Matrix.ServerName {
+		// If the server name in the room ID isn't ours then it's a
+		// possible candidate for finding the room via federation. Add
+		// it to the list of servers to try.
 		req.ServerNames = append(req.ServerNames, domain)
+
+		// Try peeking by all of the supplied server names.
+		fedReq := fsAPI.PerformOutboundPeekRequest{
+			RoomID:      req.RoomIDOrAlias, // the room ID to try and peek
+			ServerNames: req.ServerNames,   // the servers to try peeking via
+		}
+		fedRes := fsAPI.PerformOutboundPeekResponse{}
+		_ = r.FSAPI.PerformOutboundPeek(ctx, &fedReq, &fedRes)
+		if fedRes.LastError != nil {
+			return "", &api.PerformError{
+				Code:       api.PerformErrRemote,
+				Msg:        fedRes.LastError.Message,
+				RemoteCode: fedRes.LastError.Code,
+			}
+		}
 	}
 
 	// If this room isn't world_readable, we reject.
@@ -163,8 +180,7 @@ func (r *Peeker) performPeekRoomByID(
 	// XXX: we should probably factor out history_visibility checks into a common utility method somewhere
 	// which handles the default value etc.
 	var worldReadable = false
-	ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", "")
-	if ev != nil {
+	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", ""); ev != nil {
 		content := map[string]string{}
 		if err = json.Unmarshal(ev.Content(), &content); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
@@ -179,6 +195,13 @@ func (r *Peeker) performPeekRoomByID(
 		return "", &api.PerformError{
 			Code: api.PerformErrorNotAllowed,
 			Msg:  "Room is not world-readable",
+		}
+	}
+
+	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.encryption", ""); ev != nil {
+		return "", &api.PerformError{
+			Code: api.PerformErrorNotAllowed,
+			Msg:  "Cannot peek into an encrypted room",
 		}
 	}
 

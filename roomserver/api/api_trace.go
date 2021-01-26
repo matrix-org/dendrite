@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/util"
 )
@@ -17,6 +18,10 @@ type RoomserverInternalAPITrace struct {
 
 func (t *RoomserverInternalAPITrace) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
 	t.Impl.SetFederationSenderAPI(fsAPI)
+}
+
+func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+	t.Impl.SetAppserviceAPI(asAPI)
 }
 
 func (t *RoomserverInternalAPITrace) InputRoomEvents(
@@ -46,6 +51,15 @@ func (t *RoomserverInternalAPITrace) PerformPeek(
 	util.GetLogger(ctx).Infof("PerformPeek req=%+v res=%+v", js(req), js(res))
 }
 
+func (t *RoomserverInternalAPITrace) PerformUnpeek(
+	ctx context.Context,
+	req *PerformUnpeekRequest,
+	res *PerformUnpeekResponse,
+) {
+	t.Impl.PerformUnpeek(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformUnpeek req=%+v res=%+v", js(req), js(res))
+}
+
 func (t *RoomserverInternalAPITrace) PerformJoin(
 	ctx context.Context,
 	req *PerformJoinRequest,
@@ -72,6 +86,16 @@ func (t *RoomserverInternalAPITrace) PerformPublish(
 ) {
 	t.Impl.PerformPublish(ctx, req, res)
 	util.GetLogger(ctx).Infof("PerformPublish req=%+v res=%+v", js(req), js(res))
+}
+
+func (t *RoomserverInternalAPITrace) PerformInboundPeek(
+	ctx context.Context,
+	req *PerformInboundPeekRequest,
+	res *PerformInboundPeekResponse,
+) error {
+	err := t.Impl.PerformInboundPeek(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformInboundPeek req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) QueryPublishedRooms(
@@ -312,6 +336,16 @@ func (t *RoomserverInternalAPITrace) QueryKnownUsers(ctx context.Context, req *Q
 func (t *RoomserverInternalAPITrace) QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error {
 	err := t.Impl.QueryServerBannedFromRoom(ctx, req, res)
 	util.GetLogger(ctx).WithError(err).Infof("QueryServerBannedFromRoom req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *RoomserverInternalAPITrace) QueryAuthChain(
+	ctx context.Context,
+	request *QueryAuthChainRequest,
+	response *QueryAuthChainResponse,
+) error {
+	err := t.Impl.QueryAuthChain(ctx, request, response)
+	util.GetLogger(ctx).WithError(err).Infof("QueryAuthChain req=%+v res=%+v", js(request), js(response))
 	return err
 }
 

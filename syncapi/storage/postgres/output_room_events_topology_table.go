@@ -44,7 +44,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_topological_position_idx ON sync
 const insertEventInTopologySQL = "" +
 	"INSERT INTO syncapi_output_room_events_topology (event_id, topological_position, room_id, stream_position)" +
 	" VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT (topological_position, stream_position, room_id) DO UPDATE SET event_id = $1"
+	" ON CONFLICT (topological_position, stream_position, room_id) DO UPDATE SET event_id = $1" +
+	" RETURNING topological_position"
 
 const selectEventIDsInRangeASCSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events_topology" +
@@ -115,10 +116,10 @@ func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
 // on the event's depth.
 func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
-) (err error) {
-	_, err = s.insertEventInTopologyStmt.ExecContext(
+) (topoPos types.StreamPosition, err error) {
+	err = sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).QueryRowContext(
 		ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
-	)
+	).Scan(&topoPos)
 	return
 }
 

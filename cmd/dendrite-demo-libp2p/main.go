@@ -31,11 +31,12 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/setup"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -75,9 +76,10 @@ func createFederationClient(
 		"matrix",
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
-	return gomatrixserverlib.NewFederationClientWithTransport(
+	return gomatrixserverlib.NewFederationClient(
 		base.Base.Cfg.Global.ServerName, base.Base.Cfg.Global.KeyID,
-		base.Base.Cfg.Global.PrivateKey, true, tr,
+		base.Base.Cfg.Global.PrivateKey,
+		gomatrixserverlib.WithTransport(tr),
 	)
 }
 
@@ -89,7 +91,9 @@ func createClient(
 		"matrix",
 		p2phttp.NewTransport(base.LibP2P, p2phttp.ProtocolOption("/matrix")),
 	)
-	return gomatrixserverlib.NewClientWithTransport(tr)
+	return gomatrixserverlib.NewClient(
+		gomatrixserverlib.WithTransport(tr),
+	)
 }
 
 func main() {
@@ -130,6 +134,8 @@ func main() {
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
+	cfg.MSCs.MSCs = []string{"msc2836"}
+	cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -158,6 +164,7 @@ func main() {
 		&base.Base, cache.New(), userAPI,
 	)
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
+	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationsender.NewInternalAPI(
 		&base.Base, federation, rsAPI, keyRing,
 	)
@@ -185,11 +192,15 @@ func main() {
 		ExtPublicRoomsProvider: provider,
 	}
 	monolith.AddAllPublicRoutes(
+		base.Base.ProcessContext,
 		base.Base.PublicClientAPIMux,
 		base.Base.PublicFederationAPIMux,
 		base.Base.PublicKeyAPIMux,
 		base.Base.PublicMediaAPIMux,
 	)
+	if err := mscs.Enable(&base.Base, &monolith); err != nil {
+		logrus.WithError(err).Fatalf("Failed to enable MSCs")
+	}
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.Base.InternalAPIMux)
@@ -224,5 +235,5 @@ func main() {
 	}
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
-	select {}
+	base.Base.WaitForShutdown()
 }

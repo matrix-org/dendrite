@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_state(event_id, room_id, type, sender, contains_url);
 -- for querying membership states of users
 CREATE INDEX IF NOT EXISTS syncapi_membership_idx ON syncapi_current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
+-- for querying state by event IDs
+CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON syncapi_current_room_state(event_id);
 `
 
 const upsertRoomStateSQL = "" +
@@ -76,7 +78,7 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectCurrentStateSQL = "" +
-	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
+	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
 	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
 	" AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) )" +
 	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
@@ -92,10 +94,10 @@ const selectStateEventSQL = "" +
 
 const selectEventsWithEventIDsSQL = "" +
 	// TODO: The session_id and transaction_id blanks are here because otherwise
-	// the rowsToStreamEvents expects there to be exactly five columns. We need to
+	// the rowsToStreamEvents expects there to be exactly six columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
 	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
 type currentRoomStateStatements struct {
@@ -278,13 +280,14 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	result := []*gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
+		var eventID string
 		var eventBytes []byte
-		if err := rows.Scan(&eventBytes); err != nil {
+		if err := rows.Scan(&eventID, &eventBytes); err != nil {
 			return nil, err
 		}
 		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
-		if err := json.Unmarshal(eventBytes, &ev); err != nil {
+		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
 			return nil, err
 		}
 		result = append(result, &ev)

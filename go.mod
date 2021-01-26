@@ -26,7 +26,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20201116151724-6e7b24e4956c
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20210122154608-a38974bd8a37
 	github.com/matrix-org/naffka v0.0.0-20200901083833-bcdd62999a91
 	github.com/matrix-org/pinecone v0.0.0-00010101000000-000000000000
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
@@ -38,16 +38,15 @@ require (
 	github.com/pressly/goose v2.7.0-rc5+incompatible
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.7.0
-	github.com/tidwall/gjson v1.6.3
-	github.com/tidwall/sjson v1.1.1
+	github.com/tidwall/gjson v1.6.7
+	github.com/tidwall/sjson v1.1.4
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20201006093556-760d9a7fd5ee
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.0.0-20201117144127-c1f2f97bffc9
-	golang.org/x/mobile v0.0.0-20200801112145-973feb4309de // indirect
+	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
-	golang.org/x/sys v0.0.0-20201119102817-f84b799fce68
+	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.4
 	gopkg.in/yaml.v2 v2.3.0
 )

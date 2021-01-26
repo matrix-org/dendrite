@@ -16,8 +16,8 @@ package personalities
 
 import (
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/internal/config"
-	"github.com/matrix-org/dendrite/internal/setup"
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func FederationAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
@@ -33,6 +33,7 @@ func FederationAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
 		base.PublicFederationAPIMux, base.PublicKeyAPIMux,
 		&base.Cfg.FederationAPI, userAPI, federation, keyRing,
 		rsAPI, fsAPI, base.EDUServerClient(), keyAPI,
+		&base.Cfg.MSCs,
 	)
 
 	base.SetupAndServeHTTP(

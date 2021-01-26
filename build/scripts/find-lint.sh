@@ -8,7 +8,7 @@
 # - `DENDRITE_LINT_CONCURRENCY` - number of concurrent linters to run,
 #   golangci-lint defaults this to NumCPU
 # - `GOGC` - how often to perform garbage collection during golangci-lint runs.
-#   Essentially a ratio of memory/speed. See https://github.com/golangci/golangci-lint#memory-usage-of-golangci-lint
+#   Essentially a ratio of memory/speed. See https://golangci-lint.run/usage/performance/#memory-usage
 #   for more info.
 
 
@@ -24,8 +24,6 @@ fi
 echo "Installing golangci-lint..."
 
 # Make a backup of go.{mod,sum} first
-# TODO: Once go 1.13 is out, use go get's -mod=readonly option
-# https://github.com/golang/go/issues/30667
 cp go.mod go.mod.bak && cp go.sum go.sum.bak
 go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.19.1
 

@@ -17,24 +17,27 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/tables"
 	"github.com/matrix-org/dendrite/federationsender/types"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database struct {
-	DB                          *sql.DB
-	Writer                      sqlutil.Writer
-	FederationSenderQueuePDUs   tables.FederationSenderQueuePDUs
-	FederationSenderQueueEDUs   tables.FederationSenderQueueEDUs
-	FederationSenderQueueJSON   tables.FederationSenderQueueJSON
-	FederationSenderJoinedHosts tables.FederationSenderJoinedHosts
-	FederationSenderRooms       tables.FederationSenderRooms
-	FederationSenderBlacklist   tables.FederationSenderBlacklist
+	DB                            *sql.DB
+	Cache                         caching.FederationSenderCache
+	Writer                        sqlutil.Writer
+	FederationSenderQueuePDUs     tables.FederationSenderQueuePDUs
+	FederationSenderQueueEDUs     tables.FederationSenderQueueEDUs
+	FederationSenderQueueJSON     tables.FederationSenderQueueJSON
+	FederationSenderJoinedHosts   tables.FederationSenderJoinedHosts
+	FederationSenderRooms         tables.FederationSenderRooms
+	FederationSenderBlacklist     tables.FederationSenderBlacklist
+	FederationSenderOutboundPeeks tables.FederationSenderOutboundPeeks
+	FederationSenderInboundPeeks  tables.FederationSenderInboundPeeks
 }
 
 // An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
@@ -42,16 +45,11 @@ type Database struct {
 // to pass them back so that we can clean up if the transaction sends
 // successfully.
 type Receipt struct {
-	nids []int64
+	nid int64
 }
 
-func (e *Receipt) Empty() bool {
-	return len(e.nids) == 0
-}
-
-func (e *Receipt) String() string {
-	j, _ := json.Marshal(e.nids)
-	return string(j)
+func (r *Receipt) String() string {
+	return fmt.Sprintf("%d", r.nid)
 }
 
 // UpdateRoom updates the joined hosts for a room and returns what the joined
@@ -144,7 +142,7 @@ func (d *Database) StoreJSON(
 		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
 	return &Receipt{
-		nids: []int64{nid},
+		nid: nid,
 	}, nil
 }
 
@@ -176,4 +174,44 @@ func (d *Database) RemoveServerFromBlacklist(serverName gomatrixserverlib.Server
 
 func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
 	return d.FederationSenderBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
+}
+
+func (d *Database) AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderOutboundPeeks.InsertOutboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	})
+}
+
+func (d *Database) RenewOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderOutboundPeeks.RenewOutboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	})
+}
+
+func (d *Database) GetOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.OutboundPeek, error) {
+	return d.FederationSenderOutboundPeeks.SelectOutboundPeek(ctx, nil, serverName, roomID, peekID)
+}
+
+func (d *Database) GetOutboundPeeks(ctx context.Context, roomID string) ([]types.OutboundPeek, error) {
+	return d.FederationSenderOutboundPeeks.SelectOutboundPeeks(ctx, nil, roomID)
+}
+
+func (d *Database) AddInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderInboundPeeks.InsertInboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	})
+}
+
+func (d *Database) RenewInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderInboundPeeks.RenewInboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	})
+}
+
+func (d *Database) GetInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.InboundPeek, error) {
+	return d.FederationSenderInboundPeeks.SelectInboundPeek(ctx, nil, serverName, roomID, peekID)
+}
+
+func (d *Database) GetInboundPeeks(ctx context.Context, roomID string) ([]types.InboundPeek, error) {
+	return d.FederationSenderInboundPeeks.SelectInboundPeeks(ctx, nil, roomID)
 }

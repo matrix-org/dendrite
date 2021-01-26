@@ -10,30 +10,14 @@ import (
 
 func TestNewSyncTokenWithLogs(t *testing.T) {
 	tests := map[string]*StreamingToken{
-		"s4_0": &StreamingToken{
-			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
-			logs:      make(map[string]*LogPosition),
+		"s4_0_0_0_0_0": {
+			PDUPosition: 4,
 		},
-		"s4_0.dl-0-123": &StreamingToken{
-			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
-			logs: map[string]*LogPosition{
-				"dl": &LogPosition{
-					Partition: 0,
-					Offset:    123,
-				},
-			},
-		},
-		"s4_0.ab-1-14419482332.dl-0-123": &StreamingToken{
-			syncToken: syncToken{Type: "s", Positions: []StreamPosition{4, 0}},
-			logs: map[string]*LogPosition{
-				"ab": &LogPosition{
-					Partition: 1,
-					Offset:    14419482332,
-				},
-				"dl": &LogPosition{
-					Partition: 0,
-					Offset:    123,
-				},
+		"s4_0_0_0_0_0.dl-0-123": {
+			PDUPosition: 4,
+			DeviceListPosition: LogPosition{
+				Partition: 0,
+				Offset:    123,
 			},
 		},
 	}
@@ -56,16 +40,22 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 	}
 }
 
-func TestNewSyncTokenFromString(t *testing.T) {
-	shouldPass := map[string]syncToken{
-		"s4_0": NewStreamToken(4, 0, nil).syncToken,
-		"s3_1": NewStreamToken(3, 1, nil).syncToken,
-		"t3_1": NewTopologyToken(3, 1).syncToken,
+func TestSyncTokens(t *testing.T) {
+	shouldPass := map[string]string{
+		"s4_0_0_0_0_0":        StreamingToken{4, 0, 0, 0, 0, 0, LogPosition{}}.String(),
+		"s3_1_0_0_0_0.dl-1-2": StreamingToken{3, 1, 0, 0, 0, 0, LogPosition{1, 2}}.String(),
+		"s3_1_2_3_5_0":        StreamingToken{3, 1, 2, 3, 5, 0, LogPosition{}}.String(),
+		"t3_1":                TopologyToken{3, 1}.String(),
+	}
+
+	for a, b := range shouldPass {
+		if a != b {
+			t.Errorf("expected %q, got %q", a, b)
+		}
 	}
 
 	shouldFail := []string{
 		"",
-		"s_1",
 		"s_",
 		"a3_4",
 		"b",
@@ -74,19 +64,15 @@ func TestNewSyncTokenFromString(t *testing.T) {
 		"2",
 	}
 
-	for test, expected := range shouldPass {
-		result, _, err := newSyncTokenFromString(test)
-		if err != nil {
-			t.Error(err)
-		}
-		if result.String() != expected.String() {
-			t.Errorf("%s expected %v but got %v", test, expected.String(), result.String())
+	for _, f := range append(shouldFail, "t1_2") {
+		if _, err := NewStreamTokenFromString(f); err == nil {
+			t.Errorf("NewStreamTokenFromString %q should have failed", f)
 		}
 	}
 
-	for _, test := range shouldFail {
-		if _, _, err := newSyncTokenFromString(test); err == nil {
-			t.Errorf("input '%v' should have errored but didn't", test)
+	for _, f := range append(shouldFail, "s1_2_3_4") {
+		if _, err := NewTopologyTokenFromString(f); err == nil {
+			t.Errorf("NewTopologyTokenFromString %q should have failed", f)
 		}
 	}
 }

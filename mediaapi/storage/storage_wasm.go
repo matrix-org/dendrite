@@ -17,8 +17,8 @@ package storage
 import (
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/config"
 	"github.com/matrix-org/dendrite/mediaapi/storage/sqlite3"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // Open opens a postgres database.

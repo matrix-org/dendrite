@@ -21,6 +21,8 @@ type FederationClient interface {
 	QueryKeys(ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string) (res gomatrixserverlib.RespQueryKeys, err error)
 	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
 	GetServerKeys(ctx context.Context, matrixServer gomatrixserverlib.ServerName) (gomatrixserverlib.ServerKeys, error)
+	MSC2836EventRelationships(ctx context.Context, dst gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error)
+	MSC2946Spaces(ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, r gomatrixserverlib.MSC2946SpacesRequest) (res gomatrixserverlib.MSC2946SpacesResponse, err error)
 	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
 }
 
@@ -60,6 +62,12 @@ type FederationSenderInternalAPI interface {
 		request *PerformJoinRequest,
 		response *PerformJoinResponse,
 	)
+	// Handle an instruction to peek a room on a remote server.
+	PerformOutboundPeek(
+		ctx context.Context,
+		request *PerformOutboundPeekRequest,
+		response *PerformOutboundPeekResponse,
+	) error
 	// Handle an instruction to make_leave & send_leave with a remote server.
 	PerformLeave(
 		ctx context.Context,
@@ -106,6 +114,16 @@ type PerformJoinRequest struct {
 
 type PerformJoinResponse struct {
 	JoinedVia gomatrixserverlib.ServerName
+	LastError *gomatrix.HTTPError
+}
+
+type PerformOutboundPeekRequest struct {
+	RoomID string `json:"room_id"`
+	// The sorted list of servers to try. Servers will be tried sequentially, after de-duplication.
+	ServerNames types.ServerNames `json:"server_names"`
+}
+
+type PerformOutboundPeekResponse struct {
 	LastError *gomatrix.HTTPError
 }
 
