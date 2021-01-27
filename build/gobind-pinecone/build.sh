@@ -1,5 +1,22 @@
 #!/bin/sh
 
+TARGET=""
+
+while getopts "ai" option
+do
+    case "$option"
+    in
+    a) TARGET="android";;
+    i) TARGET="ios";;
+    esac
+done
+
+if [[ $TARGET = "" ]];
+then
+    echo "No target specified, specify -a or -i"
+    exit 1
+fi
+
 gomobile bind -v \
-    -target ios \
+    -target $TARGET \
     github.com/matrix-org/dendrite/build/gobind-pinecone
