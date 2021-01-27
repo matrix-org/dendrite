@@ -29,7 +29,9 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
+	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 
@@ -48,6 +50,8 @@ type DendriteMonolith struct {
 	StorageDirectory  string
 	listener          net.Listener
 	httpServer        *http.Server
+	processContext    *process.ProcessContext
+	userAPI           userapiAPI.UserInternalAPI
 }
 
 func (m *DendriteMonolith) BaseURL() string {
@@ -91,6 +95,35 @@ func (m *DendriteMonolith) DisconnectMulticastPeers() {
 	// TODO
 }
 
+func (m *DendriteMonolith) RegisterUser(localpart, password string) (string, error) {
+	deviceID := "P2P"
+	userReq := &userapiAPI.PerformAccountCreationRequest{
+		AccountType: userapiAPI.AccountTypeUser,
+		Localpart:   localpart,
+		Password:    password,
+	}
+	userRes := &userapiAPI.PerformAccountCreationResponse{}
+	if err := m.userAPI.PerformAccountCreation(context.Background(), userReq, userRes); err != nil {
+		return "", fmt.Errorf("userAPI.PerformAccountCreation: %w", err)
+	}
+	if !userRes.AccountCreated {
+		return "", fmt.Errorf("account was not created")
+	}
+	loginReq := &userapiAPI.PerformDeviceCreationRequest{
+		Localpart: localpart,
+		DeviceID:  &deviceID,
+	}
+	loginRes := &userapiAPI.PerformDeviceCreationResponse{}
+	if err := m.userAPI.PerformDeviceCreation(context.Background(), loginReq, loginRes); err != nil {
+		return "", fmt.Errorf("userAPI.PerformDeviceCreation: %w", err)
+	}
+	if !loginRes.DeviceCreated {
+		return "", fmt.Errorf("device was not created")
+	}
+	return loginRes.Device.AccessToken, nil
+}
+
+// nolint:gocyclo
 func (m *DendriteMonolith) Start() {
 	m.config = yggdrasilConfig.GenerateConfig()
 	// If we already have an Yggdrasil config file from the Ygg
@@ -146,8 +179,7 @@ func (m *DendriteMonolith) Start() {
 	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
-	logger := log.New(os.Stdout, "", 0)
-
+	logger := log.New(os.Stdout, "PINECONE: ", 0)
 	m.PineconeRouter = pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
 	m.PineconeQUIC = pineconeSessions.NewQUIC(logger, m.PineconeRouter)
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
@@ -192,14 +224,14 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
+	m.userAPI = userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
+	keyAPI.SetUserAPI(m.userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), userAPI,
+		base, cache.New(), m.userAPI,
 	)
 
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, m.userAPI, rsAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
@@ -216,7 +248,7 @@ func (m *DendriteMonolith) Start() {
 		EDUInternalAPI:         eduInputAPI,
 		FederationSenderAPI:    fsAPI,
 		RoomserverAPI:          rsAPI,
-		UserAPI:                userAPI,
+		UserAPI:                m.userAPI,
 		KeyAPI:                 keyAPI,
 		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(m.PineconeRouter, m.PineconeQUIC, fsAPI, federation),
 	}
@@ -252,6 +284,7 @@ func (m *DendriteMonolith) Start() {
 		},
 		Handler: pMux,
 	}
+	m.processContext = base.ProcessContext
 
 	go func() {
 		m.logger.Info("Listening on ", cfg.Global.ServerName)
@@ -269,6 +302,10 @@ func (m *DendriteMonolith) Start() {
 			logrus.WithError(err).Error("Failed to send wake-up message to known nodes")
 		}
 	}()
+}
+
+func (m *DendriteMonolith) Stop() {
+	m.processContext.ShutdownDendrite()
 }
 
 func (m *DendriteMonolith) Suspend() {
