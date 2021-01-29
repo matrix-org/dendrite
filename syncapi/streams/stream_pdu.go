@@ -55,7 +55,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	for _, roomID := range joinedRoomIDs {
 		var jr *types.JoinResponse
 		jr, err = p.getJoinResponseForCompleteSync(
-			ctx, roomID, r, &stateFilter, &eventFilter, req.Device,
+			ctx, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
 		)
 		if err != nil {
 			req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -75,7 +75,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, peek.RoomID, r, &stateFilter, &eventFilter, req.Device,
+				ctx, peek.RoomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -212,6 +212,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 	eventFilter *gomatrixserverlib.RoomEventFilter,
+	wantFullState bool,
 	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
@@ -224,10 +225,13 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	}
 
 	// Get the event IDs of the stream events we fetched. There's no point in us
-	excludingEventIDs := make([]string, 0, len(recentStreamEvents))
-	for _, event := range recentStreamEvents {
-		if event.StateKey() != nil {
-			excludingEventIDs = append(excludingEventIDs, event.EventID())
+	var excludingEventIDs []string
+	if !wantFullState {
+		excludingEventIDs = make([]string, 0, len(recentStreamEvents))
+		for _, event := range recentStreamEvents {
+			if event.StateKey() != nil {
+				excludingEventIDs = append(excludingEventIDs, event.EventID())
+			}
 		}
 	}
 
