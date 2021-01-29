@@ -1,5 +1,11 @@
 # Changelog
 
+## Dendrite 0.3.8 (2021-01-28)
+
+### Fixes
+
+* A well-known lookup regression in version 0.3.7 has been fixed
+
 ## Dendrite 0.3.7 (2021-01-26)
 
 ### Features
