@@ -11,8 +11,14 @@ import (
 	"go.uber.org/atomic"
 )
 
-const PDU_STREAM_QUEUESIZE = 2048
+// The max number of per-room goroutines to have running.
+// Too high and this will consume lots of CPU, too low and complete
+// sync responses will take longer to process.
 const PDU_STREAM_WORKERS = 256
+
+// The maximum number of tasks that can be queued in total before
+// backpressure will build up and the rests will start to block.
+const PDU_STREAM_QUEUESIZE = PDU_STREAM_WORKERS * 8
 
 type PDUStreamProvider struct {
 	StreamProvider
