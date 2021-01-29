@@ -3,6 +3,7 @@ package gobind
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/hjson/hjson-go"
 	"github.com/matrix-org/dendrite/appservice"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
@@ -95,8 +97,30 @@ func (m *DendriteMonolith) DisconnectMulticastPeers() {
 	// TODO
 }
 
+func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
+	l, r := net.Pipe()
+	go func() {
+		for i := 1; i <= 10; i++ {
+			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
+			p, err := m.PineconeRouter.AuthenticatedConnect(l, zone)
+			if err == nil {
+				logrus.Errorf("Authenticated connect succeeded, connected to port %d (attempt %d)", p, i)
+				return
+			}
+			logrus.WithError(err).Errorf("Authenticated connect failed (attempt %d)", i)
+		}
+		_ = l.Close()
+		_ = r.Close()
+	}()
+	return &Conduit{conn: r}, nil
+}
+
 func (m *DendriteMonolith) RegisterUser(localpart, password string) (string, error) {
-	deviceID := "P2P"
+	pubkey := m.PineconeRouter.PublicKey()
+	userID := userutil.MakeUserID(
+		localpart,
+		gomatrixserverlib.ServerName(hex.EncodeToString(pubkey[:])),
+	)
 	userReq := &userapiAPI.PerformAccountCreationRequest{
 		AccountType: userapiAPI.AccountTypeUser,
 		Localpart:   localpart,
@@ -104,14 +128,21 @@ func (m *DendriteMonolith) RegisterUser(localpart, password string) (string, err
 	}
 	userRes := &userapiAPI.PerformAccountCreationResponse{}
 	if err := m.userAPI.PerformAccountCreation(context.Background(), userReq, userRes); err != nil {
-		return "", fmt.Errorf("userAPI.PerformAccountCreation: %w", err)
+		return userID, fmt.Errorf("userAPI.PerformAccountCreation: %w", err)
 	}
-	if !userRes.AccountCreated {
-		return "", fmt.Errorf("account was not created")
+	return userID, nil
+}
+
+func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, error) {
+	accessTokenBytes := make([]byte, 16)
+	n, err := rand.Read(accessTokenBytes)
+	if err != nil {
+		return "", fmt.Errorf("rand.Read: %w", err)
 	}
 	loginReq := &userapiAPI.PerformDeviceCreationRequest{
-		Localpart: localpart,
-		DeviceID:  &deviceID,
+		Localpart:   localpart,
+		DeviceID:    &deviceID,
+		AccessToken: hex.EncodeToString(accessTokenBytes[:n]),
 	}
 	loginRes := &userapiAPI.PerformDeviceCreationResponse{}
 	if err := m.userAPI.PerformDeviceCreation(context.Background(), loginReq, loginRes); err != nil {
@@ -182,7 +213,7 @@ func (m *DendriteMonolith) Start() {
 	logger := log.New(os.Stdout, "PINECONE: ", 0)
 	m.PineconeRouter = pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
 	m.PineconeQUIC = pineconeSessions.NewQUIC(logger, m.PineconeRouter)
-	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
+	//m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
@@ -313,4 +344,20 @@ func (m *DendriteMonolith) Suspend() {
 	if err := m.httpServer.Close(); err != nil {
 		m.logger.Warn("Error stopping HTTP server:", err)
 	}
+}
+
+type Conduit struct {
+	conn net.Conn
+}
+
+func (c *Conduit) Read(b []byte) (int, error) {
+	return c.conn.Read(b)
+}
+
+func (c *Conduit) Write(b []byte) (int, error) {
+	return c.conn.Write(b)
+}
+
+func (c *Conduit) Close() error {
+	return c.conn.Close()
 }
