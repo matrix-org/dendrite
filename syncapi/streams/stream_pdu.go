@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"sync"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -54,7 +55,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Build up a /sync response. Add joined rooms.
 	var reqMutex sync.Mutex
 	var reqWaitGroup sync.WaitGroup
-	reqWaitGroup.add(len(joinedRooms))
+	reqWaitGroup.Add(len(joinedRooms))
 	for _, roomID := range joinedRoomIDs {
 		go func() {
 			defer reqWaitGroup.Done()
@@ -64,7 +65,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
-				return from
+				return //from
 			}
 			reqMutex.Lock()
 			defer reqMutex.Unlock()
