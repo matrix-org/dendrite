@@ -223,12 +223,12 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	}
 
 	// Get the event IDs of the stream events we fetched. There's no point in us
-	recentStreamEventIDs := make([]string, 0, len(recentStreamEvents))
+	excludingEventIDs := make([]string, 0, len(recentStreamEvents))
 	for _, eventID := range recentStreamEvents {
-		recentStreamEventIDs = append(recentStreamEventIDs, eventID.EventID())
+		excludingEventIDs = append(excludingEventIDs, eventID.EventID())
 	}
 
-	stateEvents, err := p.DB.CurrentState(ctx, roomID, stateFilter, recentStreamEventIDs)
+	stateEvents, err := p.DB.CurrentState(ctx, roomID, stateFilter, excludingEventIDs)
 	if err != nil {
 		return
 	}
