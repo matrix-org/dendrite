@@ -55,9 +55,9 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Build up a /sync response. Add joined rooms.
 	var reqMutex sync.Mutex
 	var reqWaitGroup sync.WaitGroup
-	reqWaitGroup.Add(len(joinedRooms))
+	reqWaitGroup.Add(len(joinedRoomIDs))
 	for _, roomID := range joinedRoomIDs {
-		go func() {
+		go func(roomID string) {
 			defer reqWaitGroup.Done()
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
@@ -71,7 +71,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			defer reqMutex.Unlock()
 			req.Response.Rooms.Join[roomID] = *jr
 			req.Rooms[roomID] = gomatrixserverlib.Join
-		}()
+		}(roomID)
 	}
 
 	// Add peeked rooms.
