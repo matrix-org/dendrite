@@ -18,7 +18,7 @@ func (p *TypingStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.LatestPosition(ctx)
 }
 
 func (p *TypingStreamProvider) IncrementalSync(
