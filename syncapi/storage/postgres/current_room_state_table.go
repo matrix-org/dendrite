@@ -84,7 +84,7 @@ const selectCurrentStateSQL = "" +
 	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
 	" AND ( $6::bool IS NULL   OR     contains_url = $6  )" +
-	" AND event_id != ANY($7)" +
+	" AND NOT (event_id = ANY($7))" +
 	" LIMIT $8"
 
 const selectJoinedUsersSQL = "" +
