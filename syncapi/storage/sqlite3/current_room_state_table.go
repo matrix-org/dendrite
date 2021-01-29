@@ -178,6 +178,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
+	_ []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, selectCurrentStateSQL,

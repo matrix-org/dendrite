@@ -213,18 +213,22 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	eventFilter *gomatrixserverlib.RoomEventFilter,
 	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
-	var stateEvents []*gomatrixserverlib.HeaderedEvent
-	stateEvents, err = p.DB.CurrentState(ctx, roomID, stateFilter)
+	// TODO: When filters are added, we may need to call this multiple times to get enough events.
+	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
+	recentStreamEvents, limited, err := p.DB.RecentEvents(
+		ctx, roomID, r, eventFilter, true, true,
+	)
 	if err != nil {
 		return
 	}
-	// TODO: When filters are added, we may need to call this multiple times to get enough events.
-	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-	var recentStreamEvents []types.StreamEvent
-	var limited bool
-	recentStreamEvents, limited, err = p.DB.RecentEvents(
-		ctx, roomID, r, eventFilter, true, true,
-	)
+
+	// Get the event IDs of the stream events we fetched. There's no point in us
+	recentStreamEventIDs := make([]string, 0, len(recentStreamEvents))
+	for _, eventID := range recentStreamEvents {
+		recentStreamEventIDs = append(recentStreamEventIDs, eventID.EventID())
+	}
+
+	stateEvents, err := p.DB.CurrentState(ctx, roomID, stateFilter, recentStreamEventIDs)
 	if err != nil {
 		return
 	}
