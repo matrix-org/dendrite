@@ -205,6 +205,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	return nil
 }
 
+// nolint:gocyclo
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	ctx context.Context,
 	roomID string,
