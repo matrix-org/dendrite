@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -100,14 +101,23 @@ func (m *DendriteMonolith) DisconnectMulticastPeers() {
 func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
 	l, r := net.Pipe()
 	go func() {
+	loop:
 		for i := 1; i <= 10; i++ {
 			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
 			p, err := m.PineconeRouter.AuthenticatedConnect(l, zone)
-			if err == nil {
+			switch err {
+			case io.ErrClosedPipe:
+				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
+				return
+			case io.EOF:
+				logrus.Errorf("Authenticated connect failed due to EOF (attempt %d)", i)
+				break loop
+			case nil:
 				logrus.Errorf("Authenticated connect succeeded, connected to port %d (attempt %d)", p, i)
 				return
+			default:
+				logrus.WithError(err).Errorf("Authenticated connect failed (attempt %d)", i)
 			}
-			logrus.WithError(err).Errorf("Authenticated connect failed (attempt %d)", i)
 		}
 		_ = l.Close()
 		_ = r.Close()
