@@ -120,7 +120,7 @@ func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
 				logrus.Errorf("Authenticated connect failed due to EOF (attempt %d)", i)
 				break loop
 			case nil:
-				logrus.Errorf("Authenticated connect succeeded, connected to port %d (attempt %d)", p, i)
+				logrus.Errorf("Authenticated connect succeeded, connected to port %d (attempt %d)", conduit.port, i)
 				return
 			default:
 				logrus.WithError(err).Errorf("Authenticated connect failed (attempt %d)", i)
