@@ -41,6 +41,7 @@ import (
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
+	"github.com/matrix-org/pinecone/types"
 	yggdrasilConfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 )
 
@@ -98,13 +99,19 @@ func (m *DendriteMonolith) DisconnectMulticastPeers() {
 	// TODO
 }
 
+func (m *DendriteMonolith) DisconnectPort(port int) error {
+	return m.PineconeRouter.Disconnect(types.SwitchPortID(port))
+}
+
 func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
 	l, r := net.Pipe()
+	var p types.SwitchPortID
 	go func() {
 	loop:
 		for i := 1; i <= 10; i++ {
 			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
-			p, err := m.PineconeRouter.AuthenticatedConnect(l, zone)
+			var err error
+			p, err = m.PineconeRouter.AuthenticatedConnect(l, zone)
 			switch err {
 			case io.ErrClosedPipe:
 				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
@@ -117,12 +124,13 @@ func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
 				return
 			default:
 				logrus.WithError(err).Errorf("Authenticated connect failed (attempt %d)", i)
+				time.Sleep(time.Second)
 			}
 		}
 		_ = l.Close()
 		_ = r.Close()
 	}()
-	return &Conduit{conn: r}, nil
+	return &Conduit{conn: r, port: p}, nil
 }
 
 func (m *DendriteMonolith) RegisterUser(localpart, password string) (string, error) {
@@ -358,6 +366,11 @@ func (m *DendriteMonolith) Suspend() {
 
 type Conduit struct {
 	conn net.Conn
+	port types.SwitchPortID
+}
+
+func (c *Conduit) Port() int {
+	return int(c.port)
 }
 
 func (c *Conduit) Read(b []byte) (int, error) {
