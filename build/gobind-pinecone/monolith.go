@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -107,6 +108,8 @@ func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
 	l, r := net.Pipe()
 	conduit := &Conduit{conn: r, port: 0}
 	go func() {
+		conduit.portMutex.Lock()
+		defer conduit.portMutex.Unlock()
 	loop:
 		for i := 1; i <= 10; i++ {
 			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
@@ -365,11 +368,14 @@ func (m *DendriteMonolith) Suspend() {
 }
 
 type Conduit struct {
-	conn net.Conn
-	port types.SwitchPortID
+	conn      net.Conn
+	port      types.SwitchPortID
+	portMutex sync.Mutex
 }
 
 func (c *Conduit) Port() int {
+	c.portMutex.Lock()
+	defer c.portMutex.Unlock()
 	return int(c.port)
 }
 
