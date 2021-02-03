@@ -38,10 +38,11 @@ func AddPublicRoutes(
 	federationSenderAPI federationSenderAPI.FederationSenderInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
+	mscCfg *config.MSCs,
 ) {
 	routing.Setup(
 		fedRouter, keyRouter, cfg, rsAPI,
 		eduAPI, federationSenderAPI, keyRing,
-		federation, userAPI, keyAPI,
+		federation, userAPI, keyAPI, mscCfg,
 	)
 }

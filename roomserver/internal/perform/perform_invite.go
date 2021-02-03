@@ -225,7 +225,7 @@ func buildInviteStrippedState(
 	for _, t := range []string{
 		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
 		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
-		"m.room.avatar", "m.room.encryption",
+		"m.room.avatar", "m.room.encryption", gomatrixserverlib.MRoomCreate,
 	} {
 		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
 			EventType: t,

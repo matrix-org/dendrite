@@ -5,6 +5,7 @@ After=network.target
 After=postgresql.service
 
 [Service]
+Environment=GODEBUG=madvdontneed=1
 RestartSec=2s
 Type=simple
 User=dendrite

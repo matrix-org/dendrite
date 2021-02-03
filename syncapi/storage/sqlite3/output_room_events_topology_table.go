@@ -111,12 +111,11 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 // on the event's depth.
 func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
-) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt)
-	_, err = stmt.ExecContext(
+) (types.StreamPosition, error) {
+	_, err := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).ExecContext(
 		ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
 	)
-	return
+	return types.StreamPosition(event.Depth()), err
 }
 
 func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(

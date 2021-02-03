@@ -107,7 +107,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		}
 		authEventIDs = util.UniqueStrings(authEventIDs)
 
-		authEvents, err := getAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
+		authEvents, err := GetAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
 		if err != nil {
 			return fmt.Errorf("getAuthChain: %w", err)
 		}
@@ -447,10 +447,12 @@ func (r *Queryer) QueryStateAndAuthChain(
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
-	stateEvents, err := r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
+	var stateEvents []*gomatrixserverlib.Event
+	stateEvents, err = r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
 	if err != nil {
 		return err
 	}
+
 	response.PrevEventsExist = true
 
 	// add the auth event IDs for the current state events too
@@ -461,7 +463,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 	authEventIDs = util.UniqueStrings(authEventIDs) // de-dupe
 
-	authEvents, err := getAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
+	authEvents, err := GetAuthChain(ctx, r.DB.EventsFromIDs, authEventIDs)
 	if err != nil {
 		return err
 	}
@@ -510,11 +512,11 @@ func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomIn
 
 type eventsFromIDs func(context.Context, []string) ([]types.Event, error)
 
-// getAuthChain fetches the auth chain for the given auth events. An auth chain
+// GetAuthChain fetches the auth chain for the given auth events. An auth chain
 // is the list of all events that are referenced in the auth_events section, and
 // all their auth_events, recursively. The returned set of events contain the
 // given events. Will *not* error if we don't have all auth events.
-func getAuthChain(
+func GetAuthChain(
 	ctx context.Context, fn eventsFromIDs, authEventIDs []string,
 ) ([]*gomatrixserverlib.Event, error) {
 	// List of event IDs to fetch. On each pass, these events will be requested
@@ -718,7 +720,7 @@ func (r *Queryer) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryS
 }
 
 func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainRequest, res *api.QueryAuthChainResponse) error {
-	chain, err := getAuthChain(ctx, r.DB.EventsFromIDs, req.EventIDs)
+	chain, err := GetAuthChain(ctx, r.DB.EventsFromIDs, req.EventIDs)
 	if err != nil {
 		return err
 	}

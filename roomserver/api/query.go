@@ -221,7 +221,7 @@ type QueryStateAndAuthChainRequest struct {
 	// The room ID to query the state in.
 	RoomID string `json:"room_id"`
 	// The list of prev events for the event. Used to calculate the state at
-	// the event
+	// the event.
 	PrevEventIDs []string `json:"prev_event_ids"`
 	// The list of auth events for the event. Used to calculate the auth chain
 	AuthEventIDs []string `json:"auth_event_ids"`

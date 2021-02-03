@@ -23,8 +23,9 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -32,34 +33,42 @@ import (
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	cfg        *config.SyncAPI
-	rsAPI      api.RoomserverInternalAPI
-	rsConsumer *internal.ContinualConsumer
-	db         storage.Database
-	notifier   *sync.Notifier
+	cfg          *config.SyncAPI
+	rsAPI        api.RoomserverInternalAPI
+	rsConsumer   *internal.ContinualConsumer
+	db           storage.Database
+	pduStream    types.StreamProvider
+	inviteStream types.StreamProvider
+	notifier     *notifier.Notifier
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
+	notifier *notifier.Notifier,
+	pduStream types.StreamProvider,
+	inviteStream types.StreamProvider,
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/roomserver",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
 	s := &OutputRoomEventConsumer{
-		cfg:        cfg,
-		rsConsumer: &consumer,
-		db:         store,
-		notifier:   n,
-		rsAPI:      rsAPI,
+		cfg:          cfg,
+		rsConsumer:   &consumer,
+		db:           store,
+		notifier:     notifier,
+		pduStream:    pduStream,
+		inviteStream: inviteStream,
+		rsAPI:        rsAPI,
 	}
 	consumer.ProcessMessage = s.onMessage
 
@@ -167,6 +176,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
 			"add":        msg.AddsStateEventIDs,
@@ -180,7 +190,8 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
-	s.notifier.OnNewEvent(ev, "", nil, types.StreamingToken{PDUPosition: pduPos})
+	s.pduStream.Advance(pduPos)
+	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -208,6 +219,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write old event failure")
@@ -219,7 +231,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return err
 	}
 
-	s.notifier.OnNewEvent(ev, "", nil, types.StreamingToken{PDUPosition: pduPos})
+	s.pduStream.Advance(pduPos)
+	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -268,13 +281,17 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   msg.Event.EventID(),
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write invite failure")
 		return nil
 	}
+
+	s.inviteStream.Advance(pduPos)
 	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, *msg.Event.StateKey())
+
 	return nil
 }
 
@@ -290,9 +307,11 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		}).Panicf("roomserver output log: remove invite failure")
 		return nil
 	}
+
 	// Notify any active sync requests that the invite has been retired.
-	// Invites share the same stream counter as PDUs
+	s.inviteStream.Advance(pduPos)
 	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
+
 	return nil
 }
 
@@ -307,12 +326,13 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 		}).Panicf("roomserver output log: write peek failure")
 		return nil
 	}
-	// tell the notifier about the new peek so it knows to wake up new devices
-	s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID)
 
-	// we need to wake up the users who might need to now be peeking into this room,
-	// so we send in a dummy event to trigger a wakeup
-	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
+	// tell the notifier about the new peek so it knows to wake up new devices
+	// TODO: This only works because the peeks table is reusing the same
+	// index as PDUs, but we should fix this
+	s.pduStream.Advance(sp)
+	s.notifier.OnNewPeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+
 	return nil
 }
 
@@ -327,12 +347,13 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 		}).Panicf("roomserver output log: write peek failure")
 		return nil
 	}
-	// tell the notifier about the new peek so it knows to wake up new devices
-	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID)
 
-	// we need to wake up the users who might need to now be peeking into this room,
-	// so we send in a dummy event to trigger a wakeup
-	s.notifier.OnNewEvent(nil, msg.RoomID, nil, types.StreamingToken{PDUPosition: sp})
+	// tell the notifier about the new peek so it knows to wake up new devices
+	// TODO: This only works because the peeks table is reusing the same
+	// index as PDUs, but we should fix this
+	s.pduStream.Advance(sp)
+	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+
 	return nil
 }
 

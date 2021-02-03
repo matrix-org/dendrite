@@ -19,10 +19,12 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,20 +32,25 @@ import (
 // OutputTypingEventConsumer consumes events that originated in the EDU server.
 type OutputTypingEventConsumer struct {
 	typingConsumer *internal.ContinualConsumer
-	db             storage.Database
-	notifier       *sync.Notifier
+	eduCache       *cache.EDUCache
+	stream         types.StreamProvider
+	notifier       *notifier.Notifier
 }
 
 // NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputTypingEventConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
+	eduCache *cache.EDUCache,
+	notifier *notifier.Notifier,
+	stream types.StreamProvider,
 ) *OutputTypingEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/eduserver/typing",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
 		Consumer:       kafkaConsumer,
@@ -52,8 +59,9 @@ func NewOutputTypingEventConsumer(
 
 	s := &OutputTypingEventConsumer{
 		typingConsumer: &consumer,
-		db:             store,
-		notifier:       n,
+		eduCache:       eduCache,
+		notifier:       notifier,
+		stream:         stream,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -63,10 +71,10 @@ func NewOutputTypingEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
-	s.db.SetTypingTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
-		s.notifier.OnNewTyping(roomID, types.StreamingToken{TypingPosition: types.StreamPosition(latestSyncPosition)})
+	s.eduCache.SetTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
+		pos := types.StreamPosition(latestSyncPosition)
+		s.notifier.OnNewTyping(roomID, types.StreamingToken{TypingPosition: pos})
 	})
-
 	return s.typingConsumer.Start()
 }
 
@@ -87,11 +95,17 @@ func (s *OutputTypingEventConsumer) onMessage(msg *sarama.ConsumerMessage) error
 	var typingPos types.StreamPosition
 	typingEvent := output.Event
 	if typingEvent.Typing {
-		typingPos = s.db.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime)
+		typingPos = types.StreamPosition(
+			s.eduCache.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime),
+		)
 	} else {
-		typingPos = s.db.RemoveTypingUser(typingEvent.UserID, typingEvent.RoomID)
+		typingPos = types.StreamPosition(
+			s.eduCache.RemoveUser(typingEvent.UserID, typingEvent.RoomID),
+		)
 	}
 
+	s.stream.Advance(typingPos)
 	s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
+
 	return nil
 }
