@@ -105,13 +105,13 @@ func (m *DendriteMonolith) DisconnectPort(port int) error {
 
 func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
 	l, r := net.Pipe()
-	var p types.SwitchPortID
+	conduit := &Conduit{conn: r, port: 0}
 	go func() {
 	loop:
 		for i := 1; i <= 10; i++ {
 			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
 			var err error
-			p, err = m.PineconeRouter.AuthenticatedConnect(l, zone)
+			conduit.port, err = m.PineconeRouter.AuthenticatedConnect(l, zone)
 			switch err {
 			case io.ErrClosedPipe:
 				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
@@ -130,7 +130,7 @@ func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
 		_ = l.Close()
 		_ = r.Close()
 	}()
-	return &Conduit{conn: r, port: p}, nil
+	return conduit, nil
 }
 
 func (m *DendriteMonolith) RegisterUser(localpart, password string) (string, error) {
