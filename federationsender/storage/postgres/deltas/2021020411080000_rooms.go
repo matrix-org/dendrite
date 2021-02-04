@@ -32,7 +32,7 @@ func LoadRemoveRoomsTable(m *sqlutil.Migrations) {
 
 func UpRemoveRoomsTable(tx *sql.Tx) error {
 	_, err := tx.Exec(`
-		DROP TABLE federationsender_rooms;
+		DROP TABLE IF EXIST federationsender_rooms;
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
