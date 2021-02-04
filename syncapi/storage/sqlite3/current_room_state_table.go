@@ -178,6 +178,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
+	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, selectCurrentStateSQL,
@@ -186,7 +187,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
-		stateFilter.Limit, FilterOrderNone,
+		excludeEventIDs, stateFilter.Limit, FilterOrderNone,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
