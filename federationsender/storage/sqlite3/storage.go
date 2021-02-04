@@ -21,6 +21,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
+	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -68,6 +69,11 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	}
 	inboundPeeks, err := NewSQLiteInboundPeeksTable(d.db)
 	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadRemoveRoomsTable(m)
+	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{

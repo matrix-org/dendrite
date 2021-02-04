@@ -18,6 +18,7 @@ package postgres
 import (
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/federationsender/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -66,6 +67,11 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	}
 	outboundPeeks, err := NewPostgresOutboundPeeksTable(d.db)
 	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadRemoveRoomsTable(m)
+	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{
