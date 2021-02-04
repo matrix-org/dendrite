@@ -46,10 +46,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	if err != nil {
 		return nil, err
 	}
-	rooms, err := NewSQLiteRoomsTable(d.db)
-	if err != nil {
-		return nil, err
-	}
 	queuePDUs, err := NewSQLiteQueuePDUsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -82,7 +78,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 		FederationSenderQueuePDUs:     queuePDUs,
 		FederationSenderQueueEDUs:     queueEDUs,
 		FederationSenderQueueJSON:     queueJSON,
-		FederationSenderRooms:         rooms,
 		FederationSenderBlacklist:     blacklist,
 		FederationSenderOutboundPeeks: outboundPeeks,
 		FederationSenderInboundPeeks:  inboundPeeks,

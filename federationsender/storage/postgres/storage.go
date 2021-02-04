@@ -56,10 +56,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	if err != nil {
 		return nil, err
 	}
-	rooms, err := NewPostgresRoomsTable(d.db)
-	if err != nil {
-		return nil, err
-	}
 	blacklist, err := NewPostgresBlacklistTable(d.db)
 	if err != nil {
 		return nil, err
@@ -80,7 +76,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 		FederationSenderQueuePDUs:     queuePDUs,
 		FederationSenderQueueEDUs:     queueEDUs,
 		FederationSenderQueueJSON:     queueJSON,
-		FederationSenderRooms:         rooms,
 		FederationSenderBlacklist:     blacklist,
 		FederationSenderInboundPeeks:  inboundPeeks,
 		FederationSenderOutboundPeeks: outboundPeeks,

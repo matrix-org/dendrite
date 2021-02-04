@@ -34,7 +34,6 @@ type Database struct {
 	FederationSenderQueueEDUs     tables.FederationSenderQueueEDUs
 	FederationSenderQueueJSON     tables.FederationSenderQueueJSON
 	FederationSenderJoinedHosts   tables.FederationSenderJoinedHosts
-	FederationSenderRooms         tables.FederationSenderRooms
 	FederationSenderBlacklist     tables.FederationSenderBlacklist
 	FederationSenderOutboundPeeks tables.FederationSenderOutboundPeeks
 	FederationSenderInboundPeeks  tables.FederationSenderInboundPeeks
@@ -64,11 +63,6 @@ func (d *Database) UpdateRoom(
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		err = d.FederationSenderRooms.InsertRoom(ctx, txn, roomID)
-		if err != nil {
-			return err
-		}
-
 		joinedHosts, err = d.FederationSenderJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID)
 		if err != nil {
 			return err
