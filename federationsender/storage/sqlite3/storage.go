@@ -66,16 +66,26 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	if err != nil {
 		return nil, err
 	}
+	outboundPeeks, err := NewSQLiteOutboundPeeksTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	inboundPeeks, err := NewSQLiteInboundPeeksTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
-		DB:                          d.db,
-		Cache:                       cache,
-		Writer:                      d.writer,
-		FederationSenderJoinedHosts: joinedHosts,
-		FederationSenderQueuePDUs:   queuePDUs,
-		FederationSenderQueueEDUs:   queueEDUs,
-		FederationSenderQueueJSON:   queueJSON,
-		FederationSenderRooms:       rooms,
-		FederationSenderBlacklist:   blacklist,
+		DB:                            d.db,
+		Cache:                         cache,
+		Writer:                        d.writer,
+		FederationSenderJoinedHosts:   joinedHosts,
+		FederationSenderQueuePDUs:     queuePDUs,
+		FederationSenderQueueEDUs:     queueEDUs,
+		FederationSenderQueueJSON:     queueJSON,
+		FederationSenderRooms:         rooms,
+		FederationSenderBlacklist:     blacklist,
+		FederationSenderOutboundPeeks: outboundPeeks,
+		FederationSenderInboundPeeks:  inboundPeeks,
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
 		return nil, err

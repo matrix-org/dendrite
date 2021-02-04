@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -39,6 +40,7 @@ type OutputReceiptEventConsumer struct {
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputReceiptEventConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
@@ -47,6 +49,7 @@ func NewOutputReceiptEventConsumer(
 ) *OutputReceiptEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/eduserver/receipt",
 		Topic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
 		Consumer:       kafkaConsumer,

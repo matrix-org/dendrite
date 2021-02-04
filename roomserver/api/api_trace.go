@@ -88,6 +88,16 @@ func (t *RoomserverInternalAPITrace) PerformPublish(
 	util.GetLogger(ctx).Infof("PerformPublish req=%+v res=%+v", js(req), js(res))
 }
 
+func (t *RoomserverInternalAPITrace) PerformInboundPeek(
+	ctx context.Context,
+	req *PerformInboundPeekRequest,
+	res *PerformInboundPeekResponse,
+) error {
+	err := t.Impl.PerformInboundPeek(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformInboundPeek req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func (t *RoomserverInternalAPITrace) QueryPublishedRooms(
 	ctx context.Context,
 	req *QueryPublishedRoomsRequest,

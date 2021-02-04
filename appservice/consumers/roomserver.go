@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/Shopify/sarama"
@@ -41,6 +42,7 @@ type OutputRoomEventConsumer struct {
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call
 // Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
+	process *process.ProcessContext,
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	appserviceDB storage.Database,
@@ -48,6 +50,7 @@ func NewOutputRoomEventConsumer(
 	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "appservice/roomserver",
 		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
 		Consumer:       kafkaConsumer,

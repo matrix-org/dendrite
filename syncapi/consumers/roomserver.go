@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -43,6 +44,7 @@ type OutputRoomEventConsumer struct {
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
@@ -53,6 +55,7 @@ func NewOutputRoomEventConsumer(
 ) *OutputRoomEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/roomserver",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
 		Consumer:       kafkaConsumer,
@@ -173,6 +176,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
 			"add":        msg.AddsStateEventIDs,
@@ -215,6 +219,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write old event failure")
@@ -271,6 +276,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   msg.Event.EventID(),
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,

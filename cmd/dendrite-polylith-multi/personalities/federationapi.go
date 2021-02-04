@@ -33,6 +33,7 @@ func FederationAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
 		base.PublicFederationAPIMux, base.PublicKeyAPIMux,
 		&base.Cfg.FederationAPI, userAPI, federation, keyRing,
 		rsAPI, fsAPI, base.EDUServerClient(), keyAPI,
+		&base.Cfg.MSCs,
 	)
 
 	base.SetupAndServeHTTP(

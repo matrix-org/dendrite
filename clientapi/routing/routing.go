@@ -58,17 +58,24 @@ func Setup(
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
+	mscCfg *config.MSCs,
 ) {
 	rateLimits := newRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
+
+	unstableFeatures := make(map[string]bool)
+	for _, msc := range cfg.MSCs.MSCs {
+		unstableFeatures["org.matrix."+msc] = true
+	}
 
 	publicAPIMux.Handle("/versions",
 		httputil.MakeExternalAPI("versions", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: struct {
-					Versions []string `json:"versions"`
-				}{[]string{
+					Versions         []string        `json:"versions"`
+					UnstableFeatures map[string]bool `json:"unstable_features"`
+				}{Versions: []string{
 					"r0.0.1",
 					"r0.1.0",
 					"r0.2.0",
@@ -76,7 +83,7 @@ func Setup(
 					"r0.4.0",
 					"r0.5.0",
 					"r0.6.1",
-				}},
+				}, UnstableFeatures: unstableFeatures},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -104,20 +111,23 @@ func Setup(
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	r0mux.Handle("/peek/{roomIDOrAlias}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.rateLimit(req); r != nil {
-				return *r
-			}
-			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-			if err != nil {
-				return util.ErrorResponse(err)
-			}
-			return PeekRoomByIDOrAlias(
-				req, device, rsAPI, accountDB, vars["roomIDOrAlias"],
-			)
-		}),
-	).Methods(http.MethodPost, http.MethodOptions)
+
+	if mscCfg.Enabled("msc2753") {
+		r0mux.Handle("/peek/{roomIDOrAlias}",
+			httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+				if r := rateLimits.rateLimit(req); r != nil {
+					return *r
+				}
+				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+				if err != nil {
+					return util.ErrorResponse(err)
+				}
+				return PeekRoomByIDOrAlias(
+					req, device, rsAPI, accountDB, vars["roomIDOrAlias"],
+				)
+			}),
+		).Methods(http.MethodPost, http.MethodOptions)
+	}
 	r0mux.Handle("/joined_rooms",
 		httputil.MakeAuthAPI("joined_rooms", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetJoinedRooms(req, device, rsAPI)

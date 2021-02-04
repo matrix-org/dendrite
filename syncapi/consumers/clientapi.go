@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -38,14 +39,15 @@ type OutputClientDataConsumer struct {
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
 func NewOutputClientDataConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
 ) *OutputClientDataConsumer {
-
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/clientapi",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData)),
 		Consumer:       kafkaConsumer,

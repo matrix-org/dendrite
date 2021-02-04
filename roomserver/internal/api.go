@@ -24,6 +24,7 @@ type RoomserverInternalAPI struct {
 	*perform.Inviter
 	*perform.Joiner
 	*perform.Peeker
+	*perform.InboundPeeker
 	*perform.Unpeeker
 	*perform.Leaver
 	*perform.Publisher
@@ -96,6 +97,10 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
 		Inputer:    r.Inputer,
+	}
+	r.InboundPeeker = &perform.InboundPeeker{
+		DB:      r.DB,
+		Inputer: r.Inputer,
 	}
 	r.Unpeeker = &perform.Unpeeker{
 		ServerName: r.Cfg.Matrix.ServerName,

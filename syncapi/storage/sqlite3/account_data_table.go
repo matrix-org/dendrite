@@ -82,7 +82,7 @@ func (s *accountDataStatements) InsertAccountData(
 	ctx context.Context, txn *sql.Tx,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
-	pos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	pos, err = s.streamIDStatements.nextAccountDataID(ctx, txn)
 	if err != nil {
 		return
 	}

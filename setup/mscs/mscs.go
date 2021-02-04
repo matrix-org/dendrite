@@ -41,8 +41,11 @@ func EnableMSC(base *setup.BaseDendrite, monolith *setup.Monolith, msc string) e
 	case "msc2836":
 		return msc2836.Enable(base, monolith.RoomserverAPI, monolith.FederationSenderAPI, monolith.UserAPI, monolith.KeyRing)
 	case "msc2946":
-		return msc2946.Enable(base, monolith.RoomserverAPI, monolith.UserAPI)
+		return msc2946.Enable(base, monolith.RoomserverAPI, monolith.UserAPI, monolith.FederationSenderAPI, monolith.KeyRing)
+	case "msc2444": // enabled inside federationapi
+	case "msc2753": // enabled inside clientapi
 	default:
 		return fmt.Errorf("EnableMSC: unknown msc '%s'", msc)
 	}
+	return nil
 }

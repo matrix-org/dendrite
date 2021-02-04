@@ -41,6 +41,7 @@ var (
 	client = &http.Client{
 		Timeout: 10 * time.Second,
 	}
+	roomVer = gomatrixserverlib.RoomVersionV6
 )
 
 // Basic sanity check of MSC2946 logic. Tests a single room with a few state events
@@ -86,8 +87,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &room1,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	rootToR2 := mustCreateEvent(t, fledglingEvent{
@@ -96,8 +96,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &room2,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	rootToS1 := mustCreateEvent(t, fledglingEvent{
@@ -106,8 +105,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &subSpaceS1,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	s1ToR3 := mustCreateEvent(t, fledglingEvent{
@@ -116,8 +114,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &room3,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	s1ToR4 := mustCreateEvent(t, fledglingEvent{
@@ -126,8 +123,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &room4,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	s1ToS2 := mustCreateEvent(t, fledglingEvent{
@@ -136,8 +132,7 @@ func TestMSC2946(t *testing.T) {
 		Type:     msc2946.ConstSpaceChildEventType,
 		StateKey: &subSpaceS2,
 		Content: map[string]interface{}{
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	// This is a parent link only
@@ -145,11 +140,9 @@ func TestMSC2946(t *testing.T) {
 		RoomID:   room5,
 		Sender:   alice,
 		Type:     msc2946.ConstSpaceParentEventType,
-		StateKey: &empty,
+		StateKey: &subSpaceS2,
 		Content: map[string]interface{}{
-			"room_id": subSpaceS2,
-			"via":     []string{"localhost"},
-			"present": true,
+			"via": []string{"localhost"},
 		},
 	})
 	// history visibility for R4
@@ -277,13 +270,13 @@ func TestMSC2946(t *testing.T) {
 	})
 }
 
-func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2946.SpacesRequest {
+func newReq(t *testing.T, jsonBody map[string]interface{}) *gomatrixserverlib.MSC2946SpacesRequest {
 	t.Helper()
 	b, err := json.Marshal(jsonBody)
 	if err != nil {
 		t.Fatalf("Failed to marshal request: %s", err)
 	}
-	var r msc2946.SpacesRequest
+	var r gomatrixserverlib.MSC2946SpacesRequest
 	if err := json.Unmarshal(b, &r); err != nil {
 		t.Fatalf("Failed to unmarshal request: %s", err)
 	}
@@ -307,10 +300,10 @@ func runServer(t *testing.T, router *mux.Router) func() {
 	}
 }
 
-func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *msc2946.SpacesRequest) *msc2946.SpacesResponse {
+func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *gomatrixserverlib.MSC2946SpacesRequest) *gomatrixserverlib.MSC2946SpacesResponse {
 	t.Helper()
-	var r msc2946.SpacesRequest
-	r.Defaults()
+	var r gomatrixserverlib.MSC2946SpacesRequest
+	msc2946.Defaults(&r)
 	data, err := json.Marshal(req)
 	if err != nil {
 		t.Fatalf("failed to marshal request: %s", err)
@@ -332,7 +325,7 @@ func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *m
 		t.Fatalf("wrong response code, got %d want %d - body: %s", res.StatusCode, expectCode, string(body))
 	}
 	if res.StatusCode == 200 {
-		var result msc2946.SpacesResponse
+		var result gomatrixserverlib.MSC2946SpacesResponse
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("response 200 OK but failed to read response body: %s", err)
@@ -408,6 +401,12 @@ type testRoomserverAPI struct {
 	pubRoomState map[string]map[gomatrixserverlib.StateKeyTuple]string
 }
 
+func (r *testRoomserverAPI) QueryServerJoinedToRoom(ctx context.Context, req *roomserver.QueryServerJoinedToRoomRequest, res *roomserver.QueryServerJoinedToRoomResponse) error {
+	res.IsInRoom = true
+	res.RoomExists = true
+	return nil
+}
+
 func (r *testRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *roomserver.QueryBulkStateContentRequest, res *roomserver.QueryBulkStateContentResponse) error {
 	res.Rooms = make(map[string]map[gomatrixserverlib.StateKeyTuple]string)
 	for _, roomID := range req.RoomIDs {
@@ -460,7 +459,7 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 		PublicFederationAPIMux: mux.NewRouter().PathPrefix(httputil.PublicFederationPathPrefix).Subrouter(),
 	}
 
-	err := msc2946.Enable(base, rsAPI, userAPI)
+	err := msc2946.Enable(base, rsAPI, userAPI, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to enable MSC2946: %s", err)
 	}
@@ -480,7 +479,6 @@ type fledglingEvent struct {
 
 func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
-	roomVer := gomatrixserverlib.RoomVersionV6
 	seed := make([]byte, ed25519.SeedSize) // zero seed
 	key := ed25519.NewKeyFromSeed(seed)
 	eb := gomatrixserverlib.EventBuilder{
