@@ -234,7 +234,7 @@ func (m *DendriteMonolith) Start() {
 	logger := log.New(os.Stdout, "PINECONE: ", 0)
 	m.PineconeRouter = pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
 	m.PineconeQUIC = pineconeSessions.NewQUIC(logger, m.PineconeRouter)
-	//m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
+	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
