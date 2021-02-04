@@ -150,6 +150,7 @@ func main() {
 		),
 	}
 	monolith.AddAllPublicRoutes(
+		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
@@ -200,5 +201,6 @@ func main() {
 		}
 	}()
 
-	select {}
+	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
+	base.WaitForShutdown()
 }

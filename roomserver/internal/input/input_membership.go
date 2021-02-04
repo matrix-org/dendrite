@@ -107,13 +107,6 @@ func (r *Inputer) updateMembership(
 		return updates, nil
 	}
 
-	if add == nil {
-		// This can happen when we have rejoined a room and suddenly we have a
-		// divergence between the former state and the new one. We don't want to
-		// act on removals and apparently there are no adds, so stop here.
-		return updates, nil
-	}
-
 	mu, err := updater.MembershipUpdater(targetUserNID, r.isLocalTarget(add))
 	if err != nil {
 		return nil, err

@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -46,6 +47,7 @@ const (
 // at a time.
 type destinationQueue struct {
 	db                 storage.Database
+	process            *process.ProcessContext
 	signing            *SigningInfo
 	rsAPI              api.RoomserverInternalAPI
 	client             *gomatrixserverlib.FederationClient // federation client
@@ -411,7 +413,7 @@ func (oq *destinationQueue) nextTransaction(
 	// TODO: we should check for 500-ish fails vs 400-ish here,
 	// since we shouldn't queue things indefinitely in response
 	// to a 400-ish error
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(oq.process.Context(), time.Minute*5)
 	defer cancel()
 	_, err := oq.client.SendTransaction(ctx, t)
 	switch err.(type) {
@@ -442,7 +444,7 @@ func (oq *destinationQueue) nextTransaction(
 		log.WithFields(log.Fields{
 			"destination": oq.destination,
 			log.ErrorKey:  err,
-		}).Infof("Failed to send transaction %q", t.TransactionID)
+		}).Debugf("Failed to send transaction %q", t.TransactionID)
 		return false, 0, 0, err
 	}
 }

@@ -19,7 +19,7 @@ func (p *DeviceListStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.LogPosition {
-	return p.IncrementalSync(ctx, req, types.LogPosition{}, p.LatestPosition(ctx))
+	return p.LatestPosition(ctx)
 }
 
 func (p *DeviceListStreamProvider) IncrementalSync(
