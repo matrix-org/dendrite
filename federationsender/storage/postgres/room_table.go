@@ -81,4 +81,3 @@ func (s *roomStatements) SelectRoomForUpdate(
 	}
 	return lastEventID, nil
 }
-
