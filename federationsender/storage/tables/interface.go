@@ -59,7 +59,6 @@ type FederationSenderJoinedHosts interface {
 type FederationSenderRooms interface {
 	InsertRoom(ctx context.Context, txn *sql.Tx, roomID string) error
 	SelectRoomForUpdate(ctx context.Context, txn *sql.Tx, roomID string) (string, error)
-	UpdateRoom(ctx context.Context, txn *sql.Tx, roomID, lastEventID string) error
 }
 
 type FederationSenderBlacklist interface {

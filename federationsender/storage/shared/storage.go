@@ -69,24 +69,6 @@ func (d *Database) UpdateRoom(
 			return err
 		}
 
-		lastSentEventID, err := d.FederationSenderRooms.SelectRoomForUpdate(ctx, txn, roomID)
-		if err != nil {
-			return err
-		}
-
-		if lastSentEventID == newEventID {
-			// We've handled this message before, so let's just ignore it.
-			// We can only get a duplicate for the last message we processed,
-			// so its enough just to compare the newEventID with lastSentEventID
-			return nil
-		}
-
-		if lastSentEventID != "" && lastSentEventID != oldEventID {
-			return types.EventIDMismatchError{
-				DatabaseID: lastSentEventID, RoomServerID: oldEventID,
-			}
-		}
-
 		joinedHosts, err = d.FederationSenderJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID)
 		if err != nil {
 			return err
@@ -101,7 +83,7 @@ func (d *Database) UpdateRoom(
 		if err = d.FederationSenderJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
 			return err
 		}
-		return d.FederationSenderRooms.UpdateRoom(ctx, txn, roomID, newEventID)
+		return nil
 	})
 	return
 }
