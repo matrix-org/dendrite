@@ -150,7 +150,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
-		stateFilter.Limit, FilterOrderAsc,
+		nil, stateFilter.Limit, FilterOrderAsc,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -326,7 +326,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
-		eventFilter.Limit+1, FilterOrderDesc,
+		nil, eventFilter.Limit+1, FilterOrderDesc,
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -374,7 +374,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
-		eventFilter.Limit, FilterOrderAsc,
+		nil, eventFilter.Limit, FilterOrderAsc,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)

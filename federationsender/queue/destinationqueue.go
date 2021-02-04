@@ -444,7 +444,7 @@ func (oq *destinationQueue) nextTransaction(
 		log.WithFields(log.Fields{
 			"destination": oq.destination,
 			log.ErrorKey:  err,
-		}).Infof("Failed to send transaction %q", t.TransactionID)
+		}).Debugf("Failed to send transaction %q", t.TransactionID)
 		return false, 0, 0, err
 	}
 }

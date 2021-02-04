@@ -1,5 +1,19 @@
 # Changelog
 
+## Dendrite 0.3.9 (2021-02-04)
+
+### Features
+
+* Performance of initial/complete syncs has been improved dramatically
+* State events that can't be authed are now dropped when joining a room rather than unexpectedly causing the room join to fail
+* State events that already appear in the timeline will no longer be requested from the sync API database more than once, which may reduce memory usage in some cases
+
+### Fixes
+
+* A crash at startup due to a conflict in the sync API account data has been fixed
+* A crash at startup due to mismatched event IDs in the federation sender has been fixed
+* A redundant check which may cause the roomserver memberships table to get out of sync has been removed
+
 ## Dendrite 0.3.8 (2021-01-28)
 
 ### Fixes

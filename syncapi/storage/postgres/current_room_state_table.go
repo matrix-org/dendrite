@@ -84,7 +84,8 @@ const selectCurrentStateSQL = "" +
 	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
 	" AND ( $6::bool IS NULL   OR     contains_url = $6  )" +
-	" LIMIT $7"
+	" AND (event_id = ANY($7)) IS NOT TRUE" +
+	" LIMIT $8"
 
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
@@ -197,6 +198,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
+	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
 	rows, err := stmt.QueryContext(ctx, roomID,
@@ -205,6 +207,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
 		stateFilter.ContainsURL,
+		pq.StringArray(excludeEventIDs),
 		stateFilter.Limit,
 	)
 	if err != nil {
