@@ -383,6 +383,15 @@ func (c *Conduit) Read(b []byte) (int, error) {
 	return c.conn.Read(b)
 }
 
+func (c *Conduit) ReadCopy() ([]byte, error) {
+	var buf [65535 * 2]byte
+	n, err := c.conn.Read(buf[:])
+	if err != nil {
+		return nil, err
+	}
+	return buf[:n], nil
+}
+
 func (c *Conduit) Write(b []byte) (int, error) {
 	return c.conn.Write(b)
 }
