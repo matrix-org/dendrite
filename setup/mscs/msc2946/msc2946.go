@@ -46,7 +46,7 @@ const (
 
 // Defaults sets the request defaults
 func Defaults(r *gomatrixserverlib.MSC2946SpacesRequest) {
-	r.Limit = 100
+	r.Limit = 2000
 	r.MaxRoomsPerSpace = -1
 }
 
@@ -107,9 +107,6 @@ func federatedSpacesHandler(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
-	}
-	if r.Limit > 100 {
-		r.Limit = 100
 	}
 	w := walker{
 		req:        &r,
