@@ -106,7 +106,7 @@ func (r *Inputer) updateMembership(
 		// immediately, unless it's a Join update (e.g. profile update).
 		return updates, nil
 	}
-	
+
 	// In an ideal world, we shouldn't ever have "add" be nil and "remove" be
 	// set, as this implies that we're deleting a state event without replacing
 	// it (a thing that ordinarily shouldn't happen in Matrix). However, state
