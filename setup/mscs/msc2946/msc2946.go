@@ -144,9 +144,6 @@ func spacesHandler(
 		if resErr := chttputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 			return *resErr
 		}
-		if r.Limit > 100 {
-			r.Limit = 100
-		}
 		w := walker{
 			req:        &r,
 			rootRoomID: roomID,
