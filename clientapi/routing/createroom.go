@@ -48,7 +48,7 @@ type createRoomRequest struct {
 	RoomAliasName             string                        `json:"room_alias_name"`
 	GuestCanJoin              bool                          `json:"guest_can_join"`
 	RoomVersion               gomatrixserverlib.RoomVersion `json:"room_version"`
-	PowerLevelContentOverride map[string]interface{}        `json:"power_level_content_override"`
+	PowerLevelContentOverride json.RawMessage               `json:"power_level_content_override"`
 }
 
 const (
@@ -261,16 +261,7 @@ func createRoom(
 	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
 	if r.PowerLevelContentOverride != nil {
 		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
-		var powerLevelContentOverrideBytes []byte
-		powerLevelContentOverrideBytes, err = json.Marshal(r.PowerLevelContentOverride)
-		if err != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("malformed power_level_content_override"),
-			}
-		}
-
-		err = json.Unmarshal(powerLevelContentOverrideBytes, &powerLevelContent)
+		err = json.Unmarshal(r.PowerLevelContentOverride, &powerLevelContent)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
