@@ -261,7 +261,8 @@ func createRoom(
 	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
 	if r.PowerLevelContentOverride != nil {
 		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
-		powerLevelContentOverrideBytes, err := json.Marshal(r.PowerLevelContentOverride)
+		var powerLevelContentOverrideBytes []byte
+		powerLevelContentOverrideBytes, err = json.Marshal(r.PowerLevelContentOverride)
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
