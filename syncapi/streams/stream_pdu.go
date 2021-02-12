@@ -98,7 +98,7 @@ func (p *PDUStreamProvider) CompleteSync(
 
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, roomID, r, &stateFilter, &eventFilter, req.Device,
+				ctx, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -124,7 +124,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, peek.RoomID, r, &stateFilter, &eventFilter, req.Device,
+				ctx, peek.RoomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -254,26 +254,37 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	return nil
 }
 
+// nolint:gocyclo
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	ctx context.Context,
 	roomID string,
 	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 	eventFilter *gomatrixserverlib.RoomEventFilter,
+	wantFullState bool,
 	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
-	var stateEvents []*gomatrixserverlib.HeaderedEvent
-	stateEvents, err = p.DB.CurrentState(ctx, roomID, stateFilter)
+	// TODO: When filters are added, we may need to call this multiple times to get enough events.
+	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
+	recentStreamEvents, limited, err := p.DB.RecentEvents(
+		ctx, roomID, r, eventFilter, true, true,
+	)
 	if err != nil {
 		return
 	}
-	// TODO: When filters are added, we may need to call this multiple times to get enough events.
-	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-	var recentStreamEvents []types.StreamEvent
-	var limited bool
-	recentStreamEvents, limited, err = p.DB.RecentEvents(
-		ctx, roomID, r, eventFilter, true, true,
-	)
+
+	// Get the event IDs of the stream events we fetched. There's no point in us
+	var excludingEventIDs []string
+	if !wantFullState {
+		excludingEventIDs = make([]string, 0, len(recentStreamEvents))
+		for _, event := range recentStreamEvents {
+			if event.StateKey() != nil {
+				excludingEventIDs = append(excludingEventIDs, event.EventID())
+			}
+		}
+	}
+
+	stateEvents, err := p.DB.CurrentState(ctx, roomID, stateFilter, excludingEventIDs)
 	if err != nil {
 		return
 	}

@@ -46,7 +46,7 @@ const (
 
 // Defaults sets the request defaults
 func Defaults(r *gomatrixserverlib.MSC2946SpacesRequest) {
-	r.Limit = 100
+	r.Limit = 2000
 	r.MaxRoomsPerSpace = -1
 }
 
@@ -108,9 +108,6 @@ func federatedSpacesHandler(
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
-	if r.Limit > 100 {
-		r.Limit = 100
-	}
 	w := walker{
 		req:        &r,
 		rootRoomID: roomID,
@@ -146,9 +143,6 @@ func spacesHandler(
 		Defaults(&r)
 		if resErr := chttputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 			return *resErr
-		}
-		if r.Limit > 100 {
-			r.Limit = 100
 		}
 		w := walker{
 			req:        &r,

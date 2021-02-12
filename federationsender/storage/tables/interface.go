@@ -56,12 +56,6 @@ type FederationSenderJoinedHosts interface {
 	SelectJoinedHostsForRooms(ctx context.Context, roomIDs []string) ([]gomatrixserverlib.ServerName, error)
 }
 
-type FederationSenderRooms interface {
-	InsertRoom(ctx context.Context, txn *sql.Tx, roomID string) error
-	SelectRoomForUpdate(ctx context.Context, txn *sql.Tx, roomID string) (string, error)
-	UpdateRoom(ctx context.Context, txn *sql.Tx, roomID, lastEventID string) error
-}
-
 type FederationSenderBlacklist interface {
 	InsertBlacklist(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
 	SelectBlacklist(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (bool, error)
