@@ -54,12 +54,6 @@ func NewPineconeRoomProvider(
 func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
 	known := []ed25519.PublicKey{}
 	known = append(known, p.r.KnownNodes()...)
-	if successor := p.r.DHTSuccessor(); successor != nil {
-		known = append(known, successor)
-	}
-	if predecessor := p.r.DHTPredecessor(); predecessor != nil {
-		known = append(known, predecessor)
-	}
 	known = append(known, p.q.Sessions()...)
 	list := []gomatrixserverlib.ServerName{}
 	for _, k := range known {
