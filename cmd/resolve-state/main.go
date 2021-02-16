@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
@@ -105,7 +104,7 @@ func main() {
 	}
 
 	fmt.Println("Resolving state")
-	resolved, err := state.ResolveConflictsAdhoc(
+	resolved, err := gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion),
 		events,
 		authEvents,
