@@ -159,10 +159,6 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 // then we will interrupt the backoff, causing any federation
 // requests to retry.
 func (oq *destinationQueue) wakeQueueIfNeeded() {
-	// If the destination is blacklisted then do nothing.
-	if _, blacklisted := oq.statistics.BackoffInfo(); blacklisted {
-		return
-	}
 	// If we are backing off then interrupt the backoff.
 	if oq.backingOff.CAS(true, false) {
 		oq.interruptBackoff <- true

@@ -101,7 +101,6 @@ func NewOutgoingQueues(
 		signing:    signing,
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
-	queues.clearQueues()
 	// Look up which servers we have pending items for and then rehydrate those queues.
 	if !disabled {
 		time.AfterFunc(time.Second*5, func() {
@@ -121,7 +120,7 @@ func NewOutgoingQueues(
 				log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
 			}
 			for serverName := range serverNames {
-				if queue := queues.getQueue(serverName); !queue.statistics.Blacklisted() {
+				if queue := queues.getQueue(serverName); queue != nil {
 					queue.wakeQueueIfNeeded()
 				}
 			}
@@ -149,6 +148,9 @@ type queuedEDU struct {
 }
 
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
+	if _, blacklisted := oqs.statistics.ForServer(destination).BackoffInfo(); blacklisted {
+		return nil
+	}
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
 	oq := oqs.queues[destination]
@@ -172,24 +174,10 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	return oq
 }
 
-func (oqs *OutgoingQueues) clearQueues() {
-	oqs.queuesMutex.Lock()
-	defer oqs.queuesMutex.Unlock()
-	for _, q := range oqs.queues {
-		oqs.clearQueue(q)
-	}
-	time.AfterFunc(time.Minute, oqs.clearQueues)
-}
-
 func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
-	switch {
-	case oq.running.Load():
-		return
-	case oq.backingOff.Load():
-		return
-	}
+
 	close(oq.notify)
 	close(oq.interruptBackoff)
 	delete(oqs.queues, oq.destination)
@@ -262,7 +250,9 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	for destination := range destmap {
-		oqs.getQueue(destination).sendEvent(ev, nid)
+		if queue := oqs.getQueue(destination); queue != nil {
+			queue.sendEvent(ev, nid)
+		}
 	}
 
 	return nil
@@ -332,7 +322,9 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	for destination := range destmap {
-		oqs.getQueue(destination).sendEDU(e, nid)
+		if queue := oqs.getQueue(destination); queue != nil {
+			queue.sendEDU(e, nid)
+		}
 	}
 
 	return nil
@@ -343,9 +335,7 @@ func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
 	if oqs.disabled {
 		return
 	}
-	q := oqs.getQueue(srv)
-	if q == nil {
-		return
+	if queue := oqs.getQueue(srv); queue != nil {
+		queue.wakeQueueIfNeeded()
 	}
-	q.wakeQueueIfNeeded()
 }
