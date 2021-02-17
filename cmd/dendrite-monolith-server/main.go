@@ -126,6 +126,7 @@ func main() {
 		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
 	}
+	rsAPI.SetAppserviceAPI(asAPI)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
@@ -143,6 +144,7 @@ func main() {
 		KeyAPI:              keyAPI,
 	}
 	monolith.AddAllPublicRoutes(
+		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
@@ -175,5 +177,5 @@ func main() {
 	}
 
 	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
-	select {}
+	base.WaitForShutdown()
 }

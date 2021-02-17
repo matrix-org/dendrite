@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -49,9 +50,10 @@ type messagesReq struct {
 }
 
 type messagesResp struct {
-	Start string                          `json:"start"`
-	End   string                          `json:"end"`
-	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+	Start       string                          `json:"start"`
+	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: so clients can hit /messages then immediately /sync with a latest sync token
+	End         string                          `json:"end"`
+	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
 }
 
 const defaultMessagesLimit = 10
@@ -65,6 +67,7 @@ func OnIncomingMessagesRequest(
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
+	srp *sync.RequestPool,
 ) util.JSONResponse {
 	var err error
 
@@ -84,9 +87,18 @@ func OnIncomingMessagesRequest(
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
 	var fromStream *types.StreamingToken
-	from, err := types.NewTopologyTokenFromString(req.URL.Query().Get("from"))
+	fromQuery := req.URL.Query().Get("from")
+	emptyFromSupplied := fromQuery == ""
+	if emptyFromSupplied {
+		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
+		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
+		currPos := srp.Notifier.CurrentPosition()
+		fromQuery = currPos.String()
+	}
+
+	from, err := types.NewTopologyTokenFromString(fromQuery)
 	if err != nil {
-		fs, err2 := types.NewStreamTokenFromString(req.URL.Query().Get("from"))
+		fs, err2 := types.NewStreamTokenFromString(fromQuery)
 		fromStream = &fs
 		if err2 != nil {
 			return util.JSONResponse{
@@ -185,14 +197,19 @@ func OnIncomingMessagesRequest(
 		"return_end":   end.String(),
 	}).Info("Responding")
 
+	res := messagesResp{
+		Chunk: clientEvents,
+		Start: start.String(),
+		End:   end.String(),
+	}
+	if emptyFromSupplied {
+		res.StartStream = fromStream.String()
+	}
+
 	// Respond with the events.
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: messagesResp{
-			Chunk: clientEvents,
-			Start: start.String(),
-			End:   end.String(),
-		},
+		JSON: res,
 	}
 }
 
@@ -218,12 +235,15 @@ func (r *messagesReq) retrieveEvents() (
 	clientEvents []gomatrixserverlib.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
+	eventFilter := gomatrixserverlib.DefaultRoomEventFilter()
+	eventFilter.Limit = r.limit
+
 	// Retrieve the events from the local database.
 	var streamEvents []types.StreamEvent
 	if r.fromStream != nil {
 		toStream := r.to.StreamToken()
 		streamEvents, err = r.db.GetEventsInStreamingRange(
-			r.ctx, r.fromStream, &toStream, r.roomID, r.limit, r.backwardOrdering,
+			r.ctx, r.fromStream, &toStream, r.roomID, &eventFilter, r.backwardOrdering,
 		)
 	} else {
 		streamEvents, err = r.db.GetEventsInTopologicalRange(
@@ -256,6 +276,14 @@ func (r *messagesReq) retrieveEvents() (
 		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
 	}
 
+	// Get the position of the first and the last event in the room's topology.
+	// This position is currently determined by the event's depth, so we could
+	// also use it instead of retrieving from the database. However, if we ever
+	// change the way topological positions are defined (as depth isn't the most
+	// reliable way to define it), it would be easier and less troublesome to
+	// only have to change it in one place, i.e. the database.
+	start, end, err = r.getStartEnd(events)
+
 	// Sort the events to ensure we send them in the right order.
 	if r.backwardOrdering {
 		// This reverses the array from old->new to new->old
@@ -275,14 +303,6 @@ func (r *messagesReq) retrieveEvents() (
 
 	// Convert all of the events into client events.
 	clientEvents = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll)
-	// Get the position of the first and the last event in the room's topology.
-	// This position is currently determined by the event's depth, so we could
-	// also use it instead of retrieving from the database. However, if we ever
-	// change the way topological positions are defined (as depth isn't the most
-	// reliable way to define it), it would be easier and less troublesome to
-	// only have to change it in one place, i.e. the database.
-	start, end, err = r.getStartEnd(events)
-
 	return clientEvents, start, end, err
 }
 
@@ -346,7 +366,7 @@ func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedE
 			return events // apply no filtering as it defaults to Shared.
 		}
 		hisVis, _ := hisVisEvent.HistoryVisibility()
-		if hisVis == "shared" {
+		if hisVis == "shared" || hisVis == "world_readable" {
 			return events // apply no filtering
 		}
 		if membershipEvent == nil {
@@ -371,26 +391,16 @@ func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedE
 }
 
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
-	start, err = r.db.EventPositionInTopology(
-		r.ctx, events[0].EventID(),
-	)
-	if err != nil {
-		err = fmt.Errorf("EventPositionInTopology: for start event %s: %w", events[0].EventID(), err)
-		return
-	}
-	if r.backwardOrdering && events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
-		// We've hit the beginning of the room so there's really nowhere else
-		// to go. This seems to fix Riot iOS from looping on /messages endlessly.
-		end = types.TopologyToken{}
-	} else {
-		end, err = r.db.EventPositionInTopology(
-			r.ctx, events[len(events)-1].EventID(),
-		)
-		if err != nil {
-			err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
-			return
-		}
-		if r.backwardOrdering {
+	if r.backwardOrdering {
+		start = *r.from
+		if events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
+			// NOTSPEC: We've hit the beginning of the room so there's really nowhere
+			// else to go. This seems to fix Riot iOS from looping on /messages endlessly.
+			end = types.TopologyToken{}
+		} else {
+			end, err = r.db.EventPositionInTopology(
+				r.ctx, events[0].EventID(),
+			)
 			// A stream/topological position is a cursor located between two events.
 			// While they are identified in the code by the event on their right (if
 			// we consider a left to right chronological order), tokens need to refer
@@ -398,6 +408,15 @@ func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (st
 			// end position we send in the response if we're going backward.
 			end.Decrement()
 		}
+	} else {
+		start = *r.from
+		end, err = r.db.EventPositionInTopology(
+			r.ctx, events[len(events)-1].EventID(),
+		)
+	}
+	if err != nil {
+		err = fmt.Errorf("EventPositionInTopology: for end event %s: %w", events[len(events)-1].EventID(), err)
+		return
 	}
 	return
 }

@@ -53,7 +53,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account
 const insertAccountDataSQL = "" +
 	"INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($1, $2, $3)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_account_data_unique" +
-	" DO UPDATE SET id = EXCLUDED.id" +
+	" DO UPDATE SET id = nextval('syncapi_stream_id')" +
 	" RETURNING id"
 
 const selectAccountDataInRangeSQL = "" +

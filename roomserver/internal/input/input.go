@@ -54,10 +54,8 @@ type inputWorker struct {
 	input   chan *inputTask
 }
 
+// Guarded by a CAS on w.running
 func (w *inputWorker) start() {
-	if !w.running.CAS(false, true) {
-		return
-	}
 	defer w.running.Store(false)
 	for {
 		select {
@@ -118,7 +116,7 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 
 // InputRoomEvents implements api.RoomserverInternalAPI
 func (r *Inputer) InputRoomEvents(
-	ctx context.Context,
+	_ context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) {
@@ -142,7 +140,7 @@ func (r *Inputer) InputRoomEvents(
 		// room - the channel will be quite small as it's just pointer types.
 		w, _ := r.workers.LoadOrStore(roomID, &inputWorker{
 			r:     r,
-			input: make(chan *inputTask, 10),
+			input: make(chan *inputTask, 32),
 		})
 		worker := w.(*inputWorker)
 
@@ -150,13 +148,15 @@ func (r *Inputer) InputRoomEvents(
 		// the wait group, so that the worker can notify us when this specific
 		// task has been finished.
 		tasks[i] = &inputTask{
-			ctx:   ctx,
+			ctx:   context.Background(),
 			event: &request.InputRoomEvents[i],
 			wg:    wg,
 		}
 
 		// Send the task to the worker.
-		go worker.start()
+		if worker.running.CAS(false, true) {
+			go worker.start()
+		}
 		worker.input <- tasks[i]
 	}
 

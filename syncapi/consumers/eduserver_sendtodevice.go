@@ -22,8 +22,9 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -35,19 +36,23 @@ type OutputSendToDeviceEventConsumer struct {
 	sendToDeviceConsumer *internal.ContinualConsumer
 	db                   storage.Database
 	serverName           gomatrixserverlib.ServerName // our server name
-	notifier             *sync.Notifier
+	stream               types.StreamProvider
+	notifier             *notifier.Notifier
 }
 
 // NewOutputSendToDeviceEventConsumer creates a new OutputSendToDeviceEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputSendToDeviceEventConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
-	n *sync.Notifier,
 	store storage.Database,
+	notifier *notifier.Notifier,
+	stream types.StreamProvider,
 ) *OutputSendToDeviceEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/eduserver/sendtodevice",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent)),
 		Consumer:       kafkaConsumer,
@@ -58,7 +63,8 @@ func NewOutputSendToDeviceEventConsumer(
 		sendToDeviceConsumer: &consumer,
 		db:                   store,
 		serverName:           cfg.Matrix.ServerName,
-		notifier:             n,
+		notifier:             notifier,
+		stream:               stream,
 	}
 
 	consumer.ProcessMessage = s.onMessage
@@ -94,16 +100,15 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		"event_type": output.Type,
 	}).Info("sync API received send-to-device event from EDU server")
 
-	streamPos := s.db.AddSendToDevice()
-
-	_, err = s.db.StoreNewSendForDeviceMessage(
-		context.TODO(), streamPos, output.UserID, output.DeviceID, output.SendToDeviceEvent,
+	streamPos, err := s.db.StoreNewSendForDeviceMessage(
+		context.TODO(), output.UserID, output.DeviceID, output.SendToDeviceEvent,
 	)
 	if err != nil {
 		log.WithError(err).Errorf("failed to store send-to-device message")
 		return err
 	}
 
+	s.stream.Advance(streamPos)
 	s.notifier.OnNewSendToDevice(
 		output.UserID,
 		[]string{output.DeviceID},

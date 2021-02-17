@@ -130,6 +130,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	rsAPI.SetAppserviceAPI(asAPI)
 
 	ygg.SetSessionFunc(func(address string) {
 		req := &api.PerformServersAliveRequest{
@@ -165,6 +166,7 @@ func (m *DendriteMonolith) Start() {
 		),
 	}
 	monolith.AddAllPublicRoutes(
+		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,

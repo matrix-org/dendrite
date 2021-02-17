@@ -106,7 +106,7 @@ func TestGetAuthChainSingle(t *testing.T) {
 		t.Fatalf("Failed to add events to db: %v", err)
 	}
 
-	result, err := getAuthChain(context.TODO(), db.EventsFromIDs, []string{"e"})
+	result, err := GetAuthChain(context.TODO(), db.EventsFromIDs, []string{"e"})
 	if err != nil {
 		t.Fatalf("getAuthChain failed: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestGetAuthChainMultiple(t *testing.T) {
 		t.Fatalf("Failed to add events to db: %v", err)
 	}
 
-	result, err := getAuthChain(context.TODO(), db.EventsFromIDs, []string{"e", "f"})
+	result, err := GetAuthChain(context.TODO(), db.EventsFromIDs, []string{"e", "f"})
 	if err != nil {
 		t.Fatalf("getAuthChain failed: %v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsInputAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -25,14 +26,15 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath   = "/roomserver/performInvite"
-	RoomserverPerformPeekPath     = "/roomserver/performPeek"
-	RoomserverPerformUnpeekPath   = "/roomserver/performUnpeek"
-	RoomserverPerformJoinPath     = "/roomserver/performJoin"
-	RoomserverPerformLeavePath    = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath  = "/roomserver/performPublish"
-	RoomserverPerformForgetPath   = "/roomserver/performForget"
+	RoomserverPerformInvitePath      = "/roomserver/performInvite"
+	RoomserverPerformPeekPath        = "/roomserver/performPeek"
+	RoomserverPerformUnpeekPath      = "/roomserver/performUnpeek"
+	RoomserverPerformJoinPath        = "/roomserver/performJoin"
+	RoomserverPerformLeavePath       = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath    = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath     = "/roomserver/performPublish"
+	RoomserverPerformInboundPeekPath = "/roomserver/performInboundPeek"
+	RoomserverPerformForgetPath      = "/roomserver/performForget"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -82,6 +84,10 @@ func NewRoomserverClient(
 
 // SetFederationSenderInputAPI no-ops in HTTP client mode as there is no chicken/egg scenario
 func (h *httpRoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsInputAPI.FederationSenderInternalAPI) {
+}
+
+// SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario
+func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
 }
 
 // SetRoomAlias implements RoomserverAliasAPI
@@ -209,6 +215,18 @@ func (h *httpRoomserverInternalAPI) PerformPeek(
 			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
 		}
 	}
+}
+
+func (h *httpRoomserverInternalAPI) PerformInboundPeek(
+	ctx context.Context,
+	request *api.PerformInboundPeekRequest,
+	response *api.PerformInboundPeekResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInboundPeek")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformInboundPeekPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpRoomserverInternalAPI) PerformUnpeek(

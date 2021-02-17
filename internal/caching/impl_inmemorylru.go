@@ -2,6 +2,7 @@ package caching
 
 import (
 	"fmt"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,19 +46,19 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
-	roomServerRoomNIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerRoomNIDsCacheName,
-		RoomServerRoomNIDsCacheMutable,
-		RoomServerRoomNIDsCacheMaxEntries,
+	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
+		RoomServerRoomIDsCacheName,
+		RoomServerRoomIDsCacheMutable,
+		RoomServerRoomIDsCacheMaxEntries,
 		enablePrometheus,
 	)
 	if err != nil {
 		return nil, err
 	}
-	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerRoomIDsCacheName,
-		RoomServerRoomIDsCacheMutable,
-		RoomServerRoomIDsCacheMaxEntries,
+	roomInfos, err := NewInMemoryLRUCachePartition(
+		RoomInfoCacheName,
+		RoomInfoCacheMutable,
+		RoomInfoCacheMaxEntries,
 		enablePrometheus,
 	)
 	if err != nil {
@@ -72,15 +73,34 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
+	go cacheCleaner(
+		roomVersions, serverKeys, roomServerStateKeyNIDs,
+		roomServerEventTypeNIDs, roomServerRoomIDs,
+		roomInfos, federationEvents,
+	)
 	return &Caches{
 		RoomVersions:            roomVersions,
 		ServerKeys:              serverKeys,
 		RoomServerStateKeyNIDs:  roomServerStateKeyNIDs,
 		RoomServerEventTypeNIDs: roomServerEventTypeNIDs,
-		RoomServerRoomNIDs:      roomServerRoomNIDs,
 		RoomServerRoomIDs:       roomServerRoomIDs,
+		RoomInfos:               roomInfos,
 		FederationEvents:        federationEvents,
 	}, nil
+}
+
+func cacheCleaner(caches ...*InMemoryLRUCachePartition) {
+	for {
+		time.Sleep(time.Minute)
+		for _, cache := range caches {
+			// Hold onto the last 10% of the cache entries, since
+			// otherwise a quiet period might cause us to evict all
+			// cache entries entirely.
+			if cache.lru.Len() > cache.maxEntries/10 {
+				cache.lru.RemoveOldest()
+			}
+		}
+	}
 }
 
 type InMemoryLRUCachePartition struct {

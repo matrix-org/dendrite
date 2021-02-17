@@ -82,6 +82,7 @@ func (s *keyChangesStatements) SelectKeyChanges(
 	if toOffset == sarama.OffsetNewest {
 		toOffset = math.MaxInt64
 	}
+	latestOffset = fromOffset
 	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, partition, fromOffset, toOffset)
 	if err != nil {
 		return nil, 0, err

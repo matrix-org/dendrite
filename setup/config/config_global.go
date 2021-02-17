@@ -48,6 +48,9 @@ type Global struct {
 
 	// Metrics configuration
 	Metrics Metrics `yaml:"metrics"`
+
+	// DNS caching options for all outbound HTTP requests
+	DNSCache DNSCacheOptions `yaml:"dns_cache"`
 }
 
 func (c *Global) Defaults() {
@@ -59,6 +62,7 @@ func (c *Global) Defaults() {
 
 	c.Kafka.Defaults()
 	c.Metrics.Defaults()
+	c.DNSCache.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -67,6 +71,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 	c.Kafka.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
+	c.DNSCache.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -139,4 +144,24 @@ func (c DatabaseOptions) MaxOpenConns() int {
 // ConnMaxLifetime returns maximum amount of time a connection may be reused
 func (c DatabaseOptions) ConnMaxLifetime() time.Duration {
 	return time.Duration(c.ConnMaxLifetimeSeconds) * time.Second
+}
+
+type DNSCacheOptions struct {
+	// Whether the DNS cache is enabled or not
+	Enabled bool `yaml:"enabled"`
+	// How many entries to store in the DNS cache at a given time
+	CacheSize int `yaml:"cache_size"`
+	// How long a cache entry should be considered valid for
+	CacheLifetime time.Duration `yaml:"cache_lifetime"`
+}
+
+func (c *DNSCacheOptions) Defaults() {
+	c.Enabled = false
+	c.CacheSize = 256
+	c.CacheLifetime = time.Minute * 5
+}
+
+func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	checkPositive(configErrs, "cache_size", int64(c.CacheSize))
+	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
 }

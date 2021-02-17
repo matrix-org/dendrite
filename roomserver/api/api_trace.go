@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/util"
 )
@@ -17,6 +18,10 @@ type RoomserverInternalAPITrace struct {
 
 func (t *RoomserverInternalAPITrace) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
 	t.Impl.SetFederationSenderAPI(fsAPI)
+}
+
+func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+	t.Impl.SetAppserviceAPI(asAPI)
 }
 
 func (t *RoomserverInternalAPITrace) InputRoomEvents(
@@ -81,6 +86,16 @@ func (t *RoomserverInternalAPITrace) PerformPublish(
 ) {
 	t.Impl.PerformPublish(ctx, req, res)
 	util.GetLogger(ctx).Infof("PerformPublish req=%+v res=%+v", js(req), js(res))
+}
+
+func (t *RoomserverInternalAPITrace) PerformInboundPeek(
+	ctx context.Context,
+	req *PerformInboundPeekRequest,
+	res *PerformInboundPeekResponse,
+) error {
+	err := t.Impl.PerformInboundPeek(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformInboundPeek req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) QueryPublishedRooms(

@@ -24,6 +24,7 @@ import (
 
 func LoadFromGoose() {
 	goose.AddMigration(UpFixSequences, DownFixSequences)
+	goose.AddMigration(UpRemoveSendToDeviceSentColumn, DownRemoveSendToDeviceSentColumn)
 }
 
 func LoadFixSequences(m *sqlutil.Migrations) {

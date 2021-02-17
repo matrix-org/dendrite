@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -45,7 +46,9 @@ const (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
+	queues             *OutgoingQueues
 	db                 storage.Database
+	process            *process.ProcessContext
 	signing            *SigningInfo
 	rsAPI              api.RoomserverInternalAPI
 	client             *gomatrixserverlib.FederationClient // federation client
@@ -242,6 +245,9 @@ func (oq *destinationQueue) backgroundSend() {
 	if !oq.running.CAS(false, true) {
 		return
 	}
+	destinationQueueRunning.Inc()
+	defer destinationQueueRunning.Dec()
+	defer oq.queues.clearQueue(oq)
 	defer oq.running.Store(false)
 
 	// Mark the queue as overflowed, so we will consult the database
@@ -295,10 +301,14 @@ func (oq *destinationQueue) backgroundSend() {
 			// time.
 			duration := time.Until(*until)
 			log.Warnf("Backing off %q for %s", oq.destination, duration)
+			oq.backingOff.Store(true)
+			destinationQueueBackingOff.Inc()
 			select {
 			case <-time.After(duration):
 			case <-oq.interruptBackoff:
 			}
+			destinationQueueBackingOff.Dec()
+			oq.backingOff.Store(false)
 		}
 
 		// Work out which PDUs/EDUs to include in the next transaction.
@@ -405,7 +415,7 @@ func (oq *destinationQueue) nextTransaction(
 	// TODO: we should check for 500-ish fails vs 400-ish here,
 	// since we shouldn't queue things indefinitely in response
 	// to a 400-ish error
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(oq.process.Context(), time.Minute*5)
 	defer cancel()
 	_, err := oq.client.SendTransaction(ctx, t)
 	switch err.(type) {
@@ -436,7 +446,7 @@ func (oq *destinationQueue) nextTransaction(
 		log.WithFields(log.Fields{
 			"destination": oq.destination,
 			log.ErrorKey:  err,
-		}).Infof("Failed to send transaction %q", t.TransactionID)
+		}).Debugf("Failed to send transaction %q", t.TransactionID)
 		return false, 0, 0, err
 	}
 }

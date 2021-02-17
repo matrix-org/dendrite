@@ -74,5 +74,6 @@ func main() {
 	base := setup.NewBaseDendrite(cfg, component, false) // TODO
 	defer base.Close()                                   // nolint: errcheck
 
-	start(base, cfg)
+	go start(base, cfg)
+	base.WaitForShutdown()
 }

@@ -17,7 +17,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -36,6 +35,15 @@ var (
 	ErrInvalidSyncTokenLen = fmt.Errorf("Sync token has an invalid length")
 )
 
+type StateDelta struct {
+	RoomID      string
+	StateEvents []*gomatrixserverlib.HeaderedEvent
+	Membership  string
+	// The PDU stream position of the latest membership event for this user, if applicable.
+	// Can be 0 if there is no membership event in this delta.
+	MembershipPos StreamPosition
+}
+
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
 
@@ -43,6 +51,10 @@ type StreamPosition int64
 type LogPosition struct {
 	Partition int32
 	Offset    int64
+}
+
+func (p *LogPosition) IsEmpty() bool {
+	return p.Offset == 0
 }
 
 // IsAfter returns true if this position is after `lp`.
@@ -110,38 +122,33 @@ type StreamingToken struct {
 	TypingPosition       StreamPosition
 	ReceiptPosition      StreamPosition
 	SendToDevicePosition StreamPosition
-	Logs                 map[string]*LogPosition
+	InvitePosition       StreamPosition
+	AccountDataPosition  StreamPosition
+	DeviceListPosition   LogPosition
 }
 
-func (t *StreamingToken) SetLog(name string, lp *LogPosition) {
-	if t.Logs == nil {
-		t.Logs = make(map[string]*LogPosition)
-	}
-	t.Logs[name] = lp
+// This will be used as a fallback by json.Marshal.
+func (s StreamingToken) MarshalText() ([]byte, error) {
+	return []byte(s.String()), nil
 }
 
-func (t *StreamingToken) Log(name string) *LogPosition {
-	l, ok := t.Logs[name]
-	if !ok {
-		return nil
-	}
-	return l
+// This will be used as a fallback by json.Unmarshal.
+func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
+	*s, err = NewStreamTokenFromString(string(text))
+	return err
 }
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
+		t.InvitePosition, t.AccountDataPosition,
 	)
-	var logStrings []string
-	for name, lp := range t.Logs {
-		logStr := fmt.Sprintf("%s-%d-%d", name, lp.Partition, lp.Offset)
-		logStrings = append(logStrings, logStr)
+	if dl := t.DeviceListPosition; !dl.IsEmpty() {
+		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
 	}
-	sort.Strings(logStrings)
-	// E.g s11_22_33_44.dl0-134.ab1-441
-	return strings.Join(append([]string{posStr}, logStrings...), ".")
+	return posStr
 }
 
 // IsAfter returns true if ANY position in this token is greater than `other`.
@@ -155,54 +162,71 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.SendToDevicePosition > other.SendToDevicePosition:
 		return true
-	}
-	for name := range t.Logs {
-		otherLog := other.Log(name)
-		if otherLog == nil {
-			continue
-		}
-		if t.Logs[name].IsAfter(otherLog) {
-			return true
-		}
+	case t.InvitePosition > other.InvitePosition:
+		return true
+	case t.AccountDataPosition > other.AccountDataPosition:
+		return true
+	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
+		return true
 	}
 	return false
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition == 0
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition == 0 && t.DeviceListPosition.IsEmpty()
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
 // If the latter StreamingToken contains a field that is not 0, it is considered an update,
 // and its value will replace the corresponding value in the StreamingToken on which WithUpdates is called.
 // If the other token has a log, they will replace any existing log on this token.
-func (t *StreamingToken) WithUpdates(other StreamingToken) (ret StreamingToken) {
-	ret = *t
-	switch {
-	case other.PDUPosition > 0:
-		ret.PDUPosition = other.PDUPosition
-	case other.TypingPosition > 0:
-		ret.TypingPosition = other.TypingPosition
-	case other.ReceiptPosition > 0:
-		ret.ReceiptPosition = other.ReceiptPosition
-	case other.SendToDevicePosition > 0:
-		ret.SendToDevicePosition = other.SendToDevicePosition
-	}
-	ret.Logs = make(map[string]*LogPosition)
-	for name := range t.Logs {
-		otherLog := other.Log(name)
-		if otherLog == nil {
-			continue
-		}
-		copy := *otherLog
-		ret.Logs[name] = &copy
-	}
+func (t *StreamingToken) WithUpdates(other StreamingToken) StreamingToken {
+	ret := *t
+	ret.ApplyUpdates(other)
 	return ret
+}
+
+// ApplyUpdates applies any changes from the supplied StreamingToken. If the supplied
+// streaming token contains any positions that are not 0, they are considered updates
+// and will overwrite the value in the token.
+func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
+	if other.PDUPosition > t.PDUPosition {
+		t.PDUPosition = other.PDUPosition
+	}
+	if other.TypingPosition > t.TypingPosition {
+		t.TypingPosition = other.TypingPosition
+	}
+	if other.ReceiptPosition > t.ReceiptPosition {
+		t.ReceiptPosition = other.ReceiptPosition
+	}
+	if other.SendToDevicePosition > t.SendToDevicePosition {
+		t.SendToDevicePosition = other.SendToDevicePosition
+	}
+	if other.InvitePosition > t.InvitePosition {
+		t.InvitePosition = other.InvitePosition
+	}
+	if other.AccountDataPosition > t.AccountDataPosition {
+		t.AccountDataPosition = other.AccountDataPosition
+	}
+	if other.DeviceListPosition.IsAfter(&t.DeviceListPosition) {
+		t.DeviceListPosition = other.DeviceListPosition
+	}
 }
 
 type TopologyToken struct {
 	Depth       StreamPosition
 	PDUPosition StreamPosition
+}
+
+// This will be used as a fallback by json.Marshal.
+func (t TopologyToken) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// This will be used as a fallback by json.Unmarshal.
+func (t *TopologyToken) UnmarshalText(text []byte) (err error) {
+	*t, err = NewTopologyTokenFromString(string(text))
+	return err
 }
 
 func (t *TopologyToken) StreamToken() StreamingToken {
@@ -277,7 +301,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	}
 	categories := strings.Split(tok[1:], ".")
 	parts := strings.Split(categories[0], "_")
-	var positions [4]StreamPosition
+	var positions [6]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -294,29 +318,32 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		TypingPosition:       positions[1],
 		ReceiptPosition:      positions[2],
 		SendToDevicePosition: positions[3],
-		Logs:                 make(map[string]*LogPosition),
+		InvitePosition:       positions[4],
+		AccountDataPosition:  positions[5],
 	}
 	// dl-0-1234
 	// $log_name-$partition-$offset
 	for _, logStr := range categories[1:] {
 		segments := strings.Split(logStr, "-")
 		if len(segments) != 3 {
-			err = fmt.Errorf("token %s - invalid log: %s", tok, logStr)
+			err = fmt.Errorf("invalid log position %q", logStr)
 			return
 		}
-		var partition int64
-		partition, err = strconv.ParseInt(segments[1], 10, 32)
-		if err != nil {
+		switch segments[0] {
+		case "dl":
+			// Device list syncing
+			var partition, offset int
+			if partition, err = strconv.Atoi(segments[1]); err != nil {
+				return
+			}
+			if offset, err = strconv.Atoi(segments[2]); err != nil {
+				return
+			}
+			token.DeviceListPosition.Partition = int32(partition)
+			token.DeviceListPosition.Offset = int64(offset)
+		default:
+			err = fmt.Errorf("unrecognised token type %q", segments[0])
 			return
-		}
-		var offset int64
-		offset, err = strconv.ParseInt(segments[2], 10, 64)
-		if err != nil {
-			return
-		}
-		token.Logs[segments[0]] = &LogPosition{
-			Partition: int32(partition),
-			Offset:    offset,
 		}
 	}
 	return token, nil
@@ -331,13 +358,13 @@ type PrevEventRef struct {
 
 // Response represents a /sync API response. See https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-client-r0-sync
 type Response struct {
-	NextBatch   string `json:"next_batch"`
+	NextBatch   StreamingToken `json:"next_batch"`
 	AccountData struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"account_data,omitempty"`
+		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	} `json:"account_data"`
 	Presence struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"presence,omitempty"`
+		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+	} `json:"presence"`
 	Rooms struct {
 		Join   map[string]JoinResponse   `json:"join"`
 		Peek   map[string]JoinResponse   `json:"peek"`
@@ -350,8 +377,8 @@ type Response struct {
 	DeviceLists struct {
 		Changed []string `json:"changed,omitempty"`
 		Left    []string `json:"left,omitempty"`
-	} `json:"device_lists,omitempty"`
-	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count"`
+	} `json:"device_lists"`
+	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count,omitempty"`
 }
 
 // NewResponse creates an empty response with initialised maps.
@@ -359,19 +386,19 @@ func NewResponse() *Response {
 	res := Response{}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
-	res.Rooms.Join = make(map[string]JoinResponse)
-	res.Rooms.Peek = make(map[string]JoinResponse)
-	res.Rooms.Invite = make(map[string]InviteResponse)
-	res.Rooms.Leave = make(map[string]LeaveResponse)
+	res.Rooms.Join = map[string]JoinResponse{}
+	res.Rooms.Peek = map[string]JoinResponse{}
+	res.Rooms.Invite = map[string]InviteResponse{}
+	res.Rooms.Leave = map[string]LeaveResponse{}
 
 	// Also pre-intialise empty slices or else we'll insert 'null' instead of '[]' for the value.
 	// TODO: We really shouldn't have to do all this to coerce encoding/json to Do The Right Thing. We should
 	//       really be using our own Marshal/Unmarshal implementations otherwise this may prove to be a CPU bottleneck.
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
-	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Presence.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.ToDevice.Events = make([]gomatrixserverlib.SendToDeviceEvent, 0)
-	res.DeviceListsOTKCount = make(map[string]int)
+	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
+	res.Presence.Events = []gomatrixserverlib.ClientEvent{}
+	res.ToDevice.Events = []gomatrixserverlib.SendToDeviceEvent{}
+	res.DeviceListsOTKCount = map[string]int{}
 
 	return &res
 }
@@ -395,7 +422,7 @@ type JoinResponse struct {
 	Timeline struct {
 		Events    []gomatrixserverlib.ClientEvent `json:"events"`
 		Limited   bool                            `json:"limited"`
-		PrevBatch string                          `json:"prev_batch"`
+		PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
 	} `json:"timeline"`
 	Ephemeral struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
@@ -408,10 +435,10 @@ type JoinResponse struct {
 // NewJoinResponse creates an empty response with initialised arrays.
 func NewJoinResponse() *JoinResponse {
 	res := JoinResponse{}
-	res.State.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Ephemeral.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.AccountData.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.State.Events = []gomatrixserverlib.ClientEvent{}
+	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
+	res.Ephemeral.Events = []gomatrixserverlib.ClientEvent{}
+	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
 	return &res
 }
 
@@ -453,26 +480,23 @@ type LeaveResponse struct {
 	Timeline struct {
 		Events    []gomatrixserverlib.ClientEvent `json:"events"`
 		Limited   bool                            `json:"limited"`
-		PrevBatch string                          `json:"prev_batch"`
+		PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
 	} `json:"timeline"`
 }
 
 // NewLeaveResponse creates an empty response with initialised arrays.
 func NewLeaveResponse() *LeaveResponse {
 	res := LeaveResponse{}
-	res.State.Events = make([]gomatrixserverlib.ClientEvent, 0)
-	res.Timeline.Events = make([]gomatrixserverlib.ClientEvent, 0)
+	res.State.Events = []gomatrixserverlib.ClientEvent{}
+	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
 	return &res
 }
 
-type SendToDeviceNID int
-
 type SendToDeviceEvent struct {
 	gomatrixserverlib.SendToDeviceEvent
-	ID          SendToDeviceNID
-	UserID      string
-	DeviceID    string
-	SentByToken *StreamingToken
+	ID       StreamPosition
+	UserID   string
+	DeviceID string
 }
 
 type PeekingDevice struct {
