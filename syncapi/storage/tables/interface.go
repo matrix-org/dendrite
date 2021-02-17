@@ -56,9 +56,9 @@ type Events interface {
 	// SelectRecentEvents returns events between the two stream positions: exclusive of low and inclusive of high.
 	// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude from sync.
 	// Returns up to `limit` events. Returns `limited=true` if there are more events in this range but we hit the `limit`.
-	SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
+	SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
 	// SelectEarlyEvents returns the earliest events in the given room.
-	SelectEarlyEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, limit int) ([]types.StreamEvent, error)
+	SelectEarlyEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter) ([]types.StreamEvent, error)
 	SelectEvents(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StreamEvent, error)
 	UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
 	// DeleteEventsForRoom removes all event information for a room. This should only be done when removing the room entirely.
@@ -70,7 +70,7 @@ type Events interface {
 type Topology interface {
 	// InsertEventInTopology inserts the given event in the room's topology, based on the event's depth.
 	// `pos` is the stream position of this event in the events table, and is used to order events which have the same depth.
-	InsertEventInTopology(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition) (err error)
+	InsertEventInTopology(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition) (topoPos types.StreamPosition, err error)
 	// SelectEventIDsInRange selects the IDs of events whose depths are within a given range in a given room's topological order.
 	// Events with `minDepth` are *exclusive*, as is the event which has exactly `minDepth`,`maxStreamPos`.
 	// `maxStreamPos` is only used when events have the same depth as `maxDepth`, which results in events less than `maxStreamPos` being returned.
@@ -91,7 +91,7 @@ type CurrentRoomState interface {
 	DeleteRoomStateByEventID(ctx context.Context, txn *sql.Tx, eventID string) error
 	DeleteRoomStateForRoom(ctx context.Context, txn *sql.Tx, roomID string) error
 	// SelectCurrentState returns all the current state events for the given room.
-	SelectCurrentState(ctx context.Context, txn *sql.Tx, roomID string, stateFilter *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
+	SelectCurrentState(ctx context.Context, txn *sql.Tx, roomID string, stateFilter *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error)
 	// SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
 	SelectRoomIDsWithMembership(ctx context.Context, txn *sql.Tx, userID string, membership string) ([]string, error)
 	// SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
@@ -161,4 +161,9 @@ type Receipts interface {
 	UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
 	SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []eduAPI.OutputReceiptEvent, error)
 	SelectMaxReceiptID(ctx context.Context, txn *sql.Tx) (id int64, err error)
+}
+
+type Memberships interface {
+	UpsertMembership(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, streamPos, topologicalPos types.StreamPosition) error
+	SelectMembership(ctx context.Context, txn *sql.Tx, roomID, userID, memberships []string) (eventID string, streamPos, topologyPos types.StreamPosition, err error)
 }

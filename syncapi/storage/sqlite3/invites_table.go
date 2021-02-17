@@ -93,7 +93,7 @@ func NewSqliteInvitesTable(db *sql.DB, streamID *streamIDStatements) (tables.Inv
 func (s *inviteEventsStatements) InsertInviteEvent(
 	ctx context.Context, txn *sql.Tx, inviteEvent *gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
-	streamPos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	streamPos, err = s.streamIDStatements.nextInviteID(ctx, txn)
 	if err != nil {
 		return
 	}
@@ -119,7 +119,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 func (s *inviteEventsStatements) DeleteInviteEvent(
 	ctx context.Context, txn *sql.Tx, inviteEventID string,
 ) (types.StreamPosition, error) {
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
+	streamPos, err := s.streamIDStatements.nextInviteID(ctx, txn)
 	if err != nil {
 		return streamPos, err
 	}

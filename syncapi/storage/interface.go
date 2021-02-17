@@ -35,12 +35,12 @@ type Database interface {
 	MaxStreamPositionForAccountData(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error)
 
-	CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
+	CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error)
 	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
 	GetStateDeltas(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
 	RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error)
 
-	RecentEvents(ctx context.Context, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
+	RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
 
 	GetBackwardTopologyPos(ctx context.Context, events []types.StreamEvent) (types.TopologyToken, error)
 	PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error)
@@ -105,7 +105,7 @@ type Database interface {
 	// Returns an error if there was a problem communicating with the database.
 	DeletePeeks(ctx context.Context, RoomID, UserID string) (types.StreamPosition, error)
 	// GetEventsInStreamingRange retrieves all of the events on a given ordering using the given extremities and limit.
-	GetEventsInStreamingRange(ctx context.Context, from, to *types.StreamingToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
+	GetEventsInStreamingRange(ctx context.Context, from, to *types.StreamingToken, roomID string, eventFilter *gomatrixserverlib.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, err error)
 	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit.
 	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
 	// EventPositionInTopology returns the depth and stream position of the given event.

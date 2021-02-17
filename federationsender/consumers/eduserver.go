@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -44,6 +45,7 @@ type OutputEDUConsumer struct {
 
 // NewOutputEDUConsumer creates a new OutputEDUConsumer. Call Start() to begin consuming from EDU servers.
 func NewOutputEDUConsumer(
+	process *process.ProcessContext,
 	cfg *config.FederationSender,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
@@ -51,18 +53,21 @@ func NewOutputEDUConsumer(
 ) *OutputEDUConsumer {
 	c := &OutputEDUConsumer{
 		typingConsumer: &internal.ContinualConsumer{
+			Process:        process,
 			ComponentName:  "eduserver/typing",
 			Topic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		sendToDeviceConsumer: &internal.ContinualConsumer{
+			Process:        process,
 			ComponentName:  "eduserver/sendtodevice",
 			Topic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		receiptConsumer: &internal.ContinualConsumer{
+			Process:        process,
 			ComponentName:  "eduserver/receipt",
 			Topic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
 			Consumer:       kafkaConsumer,

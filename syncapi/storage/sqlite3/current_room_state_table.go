@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -66,13 +67,8 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectCurrentStateSQL = "" +
-	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
-	" AND ( $2 IS NULL OR     sender IN ($2)  )" +
-	" AND ( $3 IS NULL OR NOT(sender IN ($3)) )" +
-	" AND ( $4 IS NULL OR     type   IN ($4)  )" +
-	" AND ( $5 IS NULL OR NOT(type   IN ($5)) )" +
-	" AND ( $6 IS NULL OR     contains_url = $6  )" +
-	" LIMIT $7"
+	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1"
+	// WHEN, ORDER BY and LIMIT will be added by prepareWithFilter
 
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
@@ -95,7 +91,6 @@ type currentRoomStateStatements struct {
 	deleteRoomStateByEventIDStmt    *sql.Stmt
 	DeleteRoomStateForRoomStmt      *sql.Stmt
 	selectRoomIDsWithMembershipStmt *sql.Stmt
-	selectCurrentStateStmt          *sql.Stmt
 	selectJoinedUsersStmt           *sql.Stmt
 	selectStateEventStmt            *sql.Stmt
 }
@@ -119,9 +114,6 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *streamIDStatements) (t
 		return nil, err
 	}
 	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
-		return nil, err
-	}
-	if s.selectCurrentStateStmt, err = db.Prepare(selectCurrentStateSQL); err != nil {
 		return nil, err
 	}
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
@@ -185,17 +177,23 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 // CurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
-	stateFilterPart *gomatrixserverlib.StateFilter,
+	stateFilter *gomatrixserverlib.StateFilter,
+	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
-	rows, err := stmt.QueryContext(ctx, roomID,
-		nil, // FIXME: pq.StringArray(stateFilterPart.Senders),
-		nil, // FIXME: pq.StringArray(stateFilterPart.NotSenders),
-		nil, // FIXME: pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
-		nil, // FIXME: pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
-		stateFilterPart.ContainsURL,
-		stateFilterPart.Limit,
+	stmt, params, err := prepareWithFilters(
+		s.db, txn, selectCurrentStateSQL,
+		[]interface{}{
+			roomID,
+		},
+		stateFilter.Senders, stateFilter.NotSenders,
+		stateFilter.Types, stateFilter.NotTypes,
+		excludeEventIDs, stateFilter.Limit, FilterOrderNone,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
+	}
+
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}

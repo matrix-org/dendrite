@@ -139,16 +139,18 @@ func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLoc
 	tr := go_http_js_libp2p.NewP2pTransport(node)
 
 	fed := gomatrixserverlib.NewFederationClient(
-		cfg.Global.ServerName, cfg.Global.KeyID, cfg.Global.PrivateKey, true,
+		cfg.Global.ServerName, cfg.Global.KeyID, cfg.Global.PrivateKey,
+		gomatrixserverlib.WithTransport(tr),
 	)
-	fed.Client = *gomatrixserverlib.NewClientWithTransport(tr)
 
 	return fed
 }
 
 func createClient(node *go_http_js_libp2p.P2pLocalNode) *gomatrixserverlib.Client {
 	tr := go_http_js_libp2p.NewP2pTransport(node)
-	return gomatrixserverlib.NewClientWithTransport(tr)
+	return gomatrixserverlib.NewClient(
+		gomatrixserverlib.WithTransport(tr),
+	)
 }
 
 func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
@@ -229,6 +231,7 @@ func main() {
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}
 	monolith.AddAllPublicRoutes(
+		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,

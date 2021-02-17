@@ -87,6 +87,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if err != nil {
 		return nil, err
 	}
+	memberships, err := NewPostgresMembershipsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -106,6 +110,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
+		Memberships:         memberships,
 	}
 	return &d, nil
 }

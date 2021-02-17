@@ -43,7 +43,7 @@ func SendEvents(
 
 // SendEventWithState writes an event with the specified kind to the roomserver
 // with the state at the event as KindOutlier before it. Will not send any event that is
-// marked as `true` in haveEventIDs
+// marked as `true` in haveEventIDs.
 func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, kind Kind,
 	state *gomatrixserverlib.RespState, event *gomatrixserverlib.HeaderedEvent,

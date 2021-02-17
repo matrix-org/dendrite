@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
 const insertAccountDataSQL = "" +
 	"INSERT INTO syncapi_account_data_type (id, user_id, room_id, type) VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (user_id, room_id, type) DO UPDATE" +
-	" SET id = EXCLUDED.id"
+	" SET id = $5"
 
 const selectAccountDataInRangeSQL = "" +
 	"SELECT room_id, type FROM syncapi_account_data_type" +
@@ -82,11 +82,11 @@ func (s *accountDataStatements) InsertAccountData(
 	ctx context.Context, txn *sql.Tx,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
-	pos, err = s.streamIDStatements.nextStreamID(ctx, txn)
+	pos, err = s.streamIDStatements.nextAccountDataID(ctx, txn)
 	if err != nil {
 		return
 	}
-	_, err = sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, pos, userID, roomID, dataType)
+	_, err = sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, pos, userID, roomID, dataType, pos)
 	return
 }
 

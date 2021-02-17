@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -60,18 +61,18 @@ const selectEventsSQL = "" +
 
 const selectRecentEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id DESC LIMIT $4"
+	" WHERE room_id = $1 AND id > $2 AND id <= $3"
+	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectRecentEventsForSyncSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
-	" ORDER BY id DESC LIMIT $4"
+	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE"
+	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectEarlyEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC LIMIT $4"
+	" WHERE room_id = $1 AND id > $2 AND id <= $3"
+	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectMaxEventIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_output_room_events"
@@ -79,45 +80,24 @@ const selectMaxEventIDSQL = "" +
 const updateEventJSONSQL = "" +
 	"UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
 
-// In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
-/*
-	$1 = oldPos,
-	$2 = newPos,
-	$3 = pq.StringArray(stateFilterPart.Senders),
-	$4 = pq.StringArray(stateFilterPart.NotSenders),
-	$5 = pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
-	$6 = pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
-	$7 = stateFilterPart.ContainsURL,
-	$8 = stateFilterPart.Limit,
-*/
 const selectStateInRangeSQL = "" +
 	"SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
-	" WHERE (id > $1 AND id <= $2)" + // old/new pos
-	" AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
-	/*	" AND ( $3 IS NULL OR     sender  IN ($3)  )" + // sender
-		" AND ( $4 IS NULL OR NOT(sender  IN ($4)) )" + // not sender
-		" AND ( $5 IS NULL OR     type    IN ($5)  )" + // type
-		" AND ( $6 IS NULL OR NOT(type    IN ($6)) )" + // not type
-		" AND ( $7 IS NULL OR     contains_url = $7)" + // contains URL? */
-	" ORDER BY id ASC" +
-	" LIMIT $8" // limit
+	" WHERE (id > $1 AND id <= $2)" +
+	" AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))"
+	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
 
 type outputRoomEventsStatements struct {
-	db                            *sql.DB
-	streamIDStatements            *streamIDStatements
-	insertEventStmt               *sql.Stmt
-	selectEventsStmt              *sql.Stmt
-	selectMaxEventIDStmt          *sql.Stmt
-	selectRecentEventsStmt        *sql.Stmt
-	selectRecentEventsForSyncStmt *sql.Stmt
-	selectEarlyEventsStmt         *sql.Stmt
-	selectStateInRangeStmt        *sql.Stmt
-	updateEventJSONStmt           *sql.Stmt
-	deleteEventsForRoomStmt       *sql.Stmt
+	db                      *sql.DB
+	streamIDStatements      *streamIDStatements
+	insertEventStmt         *sql.Stmt
+	selectEventsStmt        *sql.Stmt
+	selectMaxEventIDStmt    *sql.Stmt
+	updateEventJSONStmt     *sql.Stmt
+	deleteEventsForRoomStmt *sql.Stmt
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
@@ -136,18 +116,6 @@ func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Even
 		return nil, err
 	}
 	if s.selectMaxEventIDStmt, err = db.Prepare(selectMaxEventIDSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRecentEventsForSyncStmt, err = db.Prepare(selectRecentEventsForSyncSQL); err != nil {
-		return nil, err
-	}
-	if s.selectEarlyEventsStmt, err = db.Prepare(selectEarlyEventsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
 		return nil, err
 	}
 	if s.updateEventJSONStmt, err = db.Prepare(updateEventJSONSQL); err != nil {
@@ -173,19 +141,22 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
-	stateFilterPart *gomatrixserverlib.StateFilter,
+	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
-
-	rows, err := stmt.QueryContext(
-		ctx, r.Low(), r.High(),
-		/*pq.StringArray(stateFilterPart.Senders),
-		pq.StringArray(stateFilterPart.NotSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilterPart.NotTypes)),
-		stateFilterPart.ContainsURL,*/
-		stateFilterPart.Limit,
+	stmt, params, err := prepareWithFilters(
+		s.db, txn, selectStateInRangeSQL,
+		[]interface{}{
+			r.Low(), r.High(),
+		},
+		stateFilter.Senders, stateFilter.NotSenders,
+		stateFilter.Types, stateFilter.NotTypes,
+		nil, stateFilter.Limit, FilterOrderAsc,
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
+	}
+
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -298,16 +269,21 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 
-	addStateJSON, err := json.Marshal(addState)
-	if err != nil {
-		return 0, err
+	var addStateJSON, removeStateJSON []byte
+	if len(addState) > 0 {
+		addStateJSON, err = json.Marshal(addState)
 	}
-	removeStateJSON, err := json.Marshal(removeState)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("json.Marshal(addState): %w", err)
+	}
+	if len(removeState) > 0 {
+		removeStateJSON, err = json.Marshal(removeState)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("json.Marshal(removeState): %w", err)
 	}
 
-	streamPos, err := s.streamIDStatements.nextStreamID(ctx, txn)
+	streamPos, err := s.streamIDStatements.nextPDUID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}
@@ -333,17 +309,30 @@ func (s *outputRoomEventsStatements) InsertEvent(
 
 func (s *outputRoomEventsStatements) SelectRecentEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, limit int,
+	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 	chronologicalOrder bool, onlySyncEvents bool,
 ) ([]types.StreamEvent, bool, error) {
-	var stmt *sql.Stmt
+	var query string
 	if onlySyncEvents {
-		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsForSyncStmt)
+		query = selectRecentEventsForSyncSQL
 	} else {
-		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
+		query = selectRecentEventsSQL
 	}
 
-	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit+1)
+	stmt, params, err := prepareWithFilters(
+		s.db, txn, query,
+		[]interface{}{
+			roomID, r.Low(), r.High(),
+		},
+		eventFilter.Senders, eventFilter.NotSenders,
+		eventFilter.Types, eventFilter.NotTypes,
+		nil, eventFilter.Limit+1, FilterOrderDesc,
+	)
+	if err != nil {
+		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
+	}
+
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, false, err
 	}
@@ -362,7 +351,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	}
 	// we queried for 1 more than the limit, so if we returned one more mark limited=true
 	limited := false
-	if len(events) > limit {
+	if len(events) > eventFilter.Limit {
 		limited = true
 		// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
 		if chronologicalOrder {
@@ -376,10 +365,21 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 
 func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, limit int,
+	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 ) ([]types.StreamEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectEarlyEventsStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, r.Low(), r.High(), limit)
+	stmt, params, err := prepareWithFilters(
+		s.db, txn, selectEarlyEventsSQL,
+		[]interface{}{
+			roomID, r.Low(), r.High(),
+		},
+		eventFilter.Senders, eventFilter.NotSenders,
+		eventFilter.Types, eventFilter.NotTypes,
+		nil, eventFilter.Limit, FilterOrderAsc,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
+	}
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}
