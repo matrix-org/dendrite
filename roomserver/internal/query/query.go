@@ -112,7 +112,7 @@ func (r *Queryer) QueryStateAfterEvents(
 			return fmt.Errorf("getAuthChain: %w", err)
 		}
 
-		stateEvents, err = state.ResolveConflictsAdhoc(info.RoomVersion, stateEvents, authEvents)
+		stateEvents, err = gomatrixserverlib.ResolveConflicts(info.RoomVersion, stateEvents, authEvents)
 		if err != nil {
 			return fmt.Errorf("state.ResolveConflictsAdhoc: %w", err)
 		}
@@ -469,7 +469,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	if request.ResolveState {
-		if stateEvents, err = state.ResolveConflictsAdhoc(
+		if stateEvents, err = gomatrixserverlib.ResolveConflicts(
 			info.RoomVersion, stateEvents, authEvents,
 		); err != nil {
 			return err
