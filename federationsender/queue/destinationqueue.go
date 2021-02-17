@@ -46,6 +46,7 @@ const (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
+	queues             *OutgoingQueues
 	db                 storage.Database
 	process            *process.ProcessContext
 	signing            *SigningInfo
@@ -270,6 +271,7 @@ func (oq *destinationQueue) backgroundSend() {
 			// The worker is idle so stop the goroutine. It'll get
 			// restarted automatically the next time we have an event to
 			// send.
+			oq.queues.clearQueue(oq.destination)
 			return
 		}
 

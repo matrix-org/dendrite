@@ -154,6 +154,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	if oq == nil {
 		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
+			queues:           oqs,
 			db:               oqs.db,
 			process:          oqs.process,
 			rsAPI:            oqs.rsAPI,
@@ -168,6 +169,22 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 		oqs.queues[destination] = oq
 	}
 	return oq
+}
+
+func (oqs *OutgoingQueues) clearQueue(destination gomatrixserverlib.ServerName) {
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+	oq, ok := oqs.queues[destination]
+	switch {
+	case !ok:
+		return
+	case oq.running.Load():
+		return
+	case oq.backingOff.Load():
+		return
+	}
+	delete(oqs.queues, destination)
+	destinationQueueTotal.Dec()
 }
 
 type ErrorFederationDisabled struct {
