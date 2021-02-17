@@ -183,6 +183,8 @@ func (oqs *OutgoingQueues) clearQueue(destination gomatrixserverlib.ServerName) 
 	case oq.backingOff.Load():
 		return
 	}
+	close(oq.notify)
+	close(oq.interruptBackoff)
 	delete(oqs.queues, destination)
 	destinationQueueTotal.Dec()
 }
