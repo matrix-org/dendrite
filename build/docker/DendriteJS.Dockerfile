@@ -23,13 +23,13 @@ RUN apt-get update && apt-get -y install python
 WORKDIR /build
 ADD https://github.com/matrix-org/go-http-js-libp2p/archive/master.tar.gz /build/libp2p.tar.gz
 RUN tar xvfz libp2p.tar.gz
-ADD https://github.com/vector-im/riot-web/archive/matthew/p2p.tar.gz /build/p2p.tar.gz
+ADD https://github.com/vector-im/element-web/archive/matthew/p2p.tar.gz /build/p2p.tar.gz
 RUN tar xvfz p2p.tar.gz
 
-# Install deps for riot-web, symlink in libp2p repo and build that too
-WORKDIR /build/riot-web-matthew-p2p
+# Install deps for element-web, symlink in libp2p repo and build that too
+WORKDIR /build/element-web-matthew-p2p
 RUN yarn install
-RUN ln -s /build/go-http-js-libp2p-master /build/riot-web-matthew-p2p/node_modules/go-http-js-libp2p
+RUN ln -s /build/go-http-js-libp2p-master /build/element-web-matthew-p2p/node_modules/go-http-js-libp2p
 RUN (cd node_modules/go-http-js-libp2p && yarn install)
 COPY --from=gobuild /build/dendrite-master/main.wasm ./src/vector/dendrite.wasm
 # build it all
@@ -108,4 +108,4 @@ server { \n\
     } \n\
 }' > /etc/nginx/conf.d/default.conf
 RUN sed -i 's/}/    application\/wasm  wasm;\n}/g' /etc/nginx/mime.types
-COPY --from=jsbuild /build/riot-web-matthew-p2p/webapp /usr/share/nginx/html
+COPY --from=jsbuild /build/element-web-matthew-p2p/webapp /usr/share/nginx/html

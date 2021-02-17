@@ -109,7 +109,7 @@ func RemoveDir(dir types.Path, logger *log.Entry) {
 // WriteTempFile writes to a new temporary file.
 // The file is deleted if there was an error while writing.
 func WriteTempFile(
-	ctx context.Context, reqReader io.Reader, maxFileSizeBytes config.FileSizeBytes, absBasePath config.Path,
+	ctx context.Context, reqReader io.Reader, absBasePath config.Path,
 ) (hash types.Base64Hash, size types.FileSizeBytes, path types.Path, err error) {
 	size = -1
 	logger := util.GetLogger(ctx)
@@ -124,18 +124,11 @@ func WriteTempFile(
 		}
 	}()
 
-	// If the max_file_size_bytes configuration option is set to a positive
-	// number then limit the upload to that size. Otherwise, just read the
-	// whole file.
-	limitedReader := reqReader
-	if maxFileSizeBytes > 0 {
-		limitedReader = io.LimitReader(reqReader, int64(maxFileSizeBytes))
-	}
 	// Hash the file data. The hash will be returned. The hash is useful as a
 	// method of deduplicating files to save storage, as well as a way to conduct
 	// integrity checks on the file data in the repository.
 	hasher := sha256.New()
-	teeReader := io.TeeReader(limitedReader, hasher)
+	teeReader := io.TeeReader(reqReader, hasher)
 	bytesWritten, err := io.Copy(tmpFileWriter, teeReader)
 	if err != nil && err != io.EOF {
 		RemoveDir(tmpDir, logger)

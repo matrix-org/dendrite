@@ -120,7 +120,7 @@ func NewOutgoingQueues(
 				log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
 			}
 			for serverName := range serverNames {
-				if queue := queues.getQueue(serverName); !queue.statistics.Blacklisted() {
+				if queue := queues.getQueue(serverName); queue != nil {
 					queue.wakeQueueIfNeeded()
 				}
 			}
@@ -148,12 +148,16 @@ type queuedEDU struct {
 }
 
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
+	if oqs.statistics.ForServer(destination).Blacklisted() {
+		return nil
+	}
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
-	oq := oqs.queues[destination]
-	if oq == nil {
+	oq, ok := oqs.queues[destination]
+	if !ok {
 		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
+			queues:           oqs,
 			db:               oqs.db,
 			process:          oqs.process,
 			rsAPI:            oqs.rsAPI,
@@ -168,6 +172,16 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 		oqs.queues[destination] = oq
 	}
 	return oq
+}
+
+func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
+	oqs.queuesMutex.Lock()
+	defer oqs.queuesMutex.Unlock()
+
+	close(oq.notify)
+	close(oq.interruptBackoff)
+	delete(oqs.queues, oq.destination)
+	destinationQueueTotal.Dec()
 }
 
 type ErrorFederationDisabled struct {
@@ -236,7 +250,9 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	for destination := range destmap {
-		oqs.getQueue(destination).sendEvent(ev, nid)
+		if queue := oqs.getQueue(destination); queue != nil {
+			queue.sendEvent(ev, nid)
+		}
 	}
 
 	return nil
@@ -306,7 +322,9 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	for destination := range destmap {
-		oqs.getQueue(destination).sendEDU(e, nid)
+		if queue := oqs.getQueue(destination); queue != nil {
+			queue.sendEDU(e, nid)
+		}
 	}
 
 	return nil
@@ -317,9 +335,7 @@ func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
 	if oqs.disabled {
 		return
 	}
-	q := oqs.getQueue(srv)
-	if q == nil {
-		return
+	if queue := oqs.getQueue(srv); queue != nil {
+		queue.wakeQueueIfNeeded()
 	}
-	q.wakeQueueIfNeeded()
 }
