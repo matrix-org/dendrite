@@ -247,6 +247,7 @@ func (oq *destinationQueue) backgroundSend() {
 	}
 	destinationQueueRunning.Inc()
 	defer destinationQueueRunning.Dec()
+	defer oq.queues.clearQueue(oq.destination)
 	defer oq.running.Store(false)
 
 	// Mark the queue as overflowed, so we will consult the database
@@ -271,7 +272,6 @@ func (oq *destinationQueue) backgroundSend() {
 			// The worker is idle so stop the goroutine. It'll get
 			// restarted automatically the next time we have an event to
 			// send.
-			oq.queues.clearQueue(oq.destination)
 			return
 		}
 
