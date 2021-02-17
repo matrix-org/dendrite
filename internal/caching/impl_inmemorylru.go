@@ -93,7 +93,12 @@ func cacheCleaner(caches ...*InMemoryLRUCachePartition) {
 	for {
 		time.Sleep(time.Minute)
 		for _, cache := range caches {
-			cache.lru.RemoveOldest()
+			// Hold onto the last 10% of the cache entries, since
+			// otherwise a quiet period might cause us to evict all
+			// cache entries entirely.
+			if cache.lru.Len() > cache.maxEntries/10 {
+				cache.lru.RemoveOldest()
+			}
 		}
 	}
 }
