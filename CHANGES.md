@@ -1,5 +1,21 @@
 # Changelog
 
+## Dendrite 0.3.10 (2021-02-17)
+
+### Features
+
+* In-memory caches will now gradually evict old entries, reducing idle memory usage
+* Federation sender queues will now be fully unloaded when idle, reducing idle memory usage
+* The `power_level_content_override` option is now supported in `/createRoom`
+* The `/send` endpoint will now attempt more servers in the room when trying to fetch missing events or state
+
+### Fixes
+
+* A panic in the membership updater has been fixed
+* Events in the sync API that weren't excluded from sync can no longer be incorrectly excluded from sync by backfill
+* Retrieving remote media now correcly respects the locally configured maximum file size, even when the `Content-Length` header is unavailable
+* The `/send` endpoint will no longer hit the database more than once to find servers in the room
+
 ## Dendrite 0.3.9 (2021-02-04)
 
 ### Features
