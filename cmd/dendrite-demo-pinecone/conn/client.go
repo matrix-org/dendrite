@@ -1,14 +1,47 @@
 package conn
 
 import (
+	"context"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
+	"nhooyr.io/websocket"
 
+	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 )
+
+func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) {
+	var parent net.Conn
+	if strings.HasPrefix(peer, "ws://") || strings.HasPrefix(peer, "wss://") {
+		c, _, err := websocket.Dial(context.Background(), peer, &websocket.DialOptions{
+			Subprotocols: []string{"pinecone"},
+		})
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer via WebSockets")
+			return
+		}
+		parent = websocket.NetConn(context.Background(), c, websocket.MessageBinary)
+	} else {
+		var err error
+		parent, err = net.Dial("tcp", peer)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer via TCP")
+			return
+		}
+	}
+	if parent == nil {
+		return
+	}
+	if _, err := pRouter.AuthenticatedConnect(parent, "static"); err != nil {
+		logrus.WithError(err).Errorf("Failed to connect Pinecone static peer to switch")
+	}
+}
 
 type RoundTripper struct {
 	inner *http.Transport

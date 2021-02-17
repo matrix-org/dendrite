@@ -76,19 +76,7 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 }
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) error {
-	go func() {
-		parent, err := net.Dial("tcp", uri)
-		if err != nil {
-			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer")
-			return
-		}
-
-		if _, err := m.PineconeRouter.AuthenticatedConnect(parent, "static"); err != nil {
-			logrus.WithError(err).Errorf("Failed to connect Pinecone static peer to switch")
-			return
-		}
-	}()
-
+	go conn.ConnectToPeer(m.PineconeRouter, uri)
 	return nil
 }
 
