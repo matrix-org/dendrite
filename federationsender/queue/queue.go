@@ -148,13 +148,13 @@ type queuedEDU struct {
 }
 
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
-	if _, blacklisted := oqs.statistics.ForServer(destination).BackoffInfo(); blacklisted {
+	if oqs.statistics.ForServer(destination).Blacklisted() {
 		return nil
 	}
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
-	oq := oqs.queues[destination]
-	if oq == nil {
+	oq, ok := oqs.queues[destination]
+	if !ok {
 		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
 			queues:           oqs,
