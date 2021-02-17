@@ -101,6 +101,7 @@ func NewOutgoingQueues(
 		signing:    signing,
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
 	}
+	queues.clearQueues()
 	// Look up which servers we have pending items for and then rehydrate those queues.
 	if !disabled {
 		time.AfterFunc(time.Second*5, func() {
@@ -167,14 +168,29 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			signing:          oqs.signing,
 		}
 		oqs.queues[destination] = oq
-		oq.wakeQueueIfNeeded()
 	}
 	return oq
+}
+
+func (oqs *OutgoingQueues) clearQueues() {
+	oqs.queuesMutex.Lock()
+	queues := oqs.queues
+	oqs.queuesMutex.Unlock()
+	for _, q := range queues {
+		oqs.clearQueue(q)
+	}
+	time.AfterFunc(time.Minute, oqs.clearQueues)
 }
 
 func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
+	switch {
+	case oq.running.Load():
+		return
+	case oq.backingOff.Load():
+		return
+	}
 
 	close(oq.notify)
 	close(oq.interruptBackoff)
