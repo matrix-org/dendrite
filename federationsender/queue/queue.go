@@ -167,6 +167,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 			signing:          oqs.signing,
 		}
 		oqs.queues[destination] = oq
+		oq.wakeQueueIfNeeded()
 	}
 	return oq
 }
