@@ -23,7 +23,7 @@ func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) {
 			Subprotocols: []string{"pinecone"},
 		})
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer via WebSockets")
+			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer %q via WebSockets", peer)
 			return
 		}
 		parent = websocket.NetConn(context.Background(), c, websocket.MessageBinary)
@@ -31,7 +31,7 @@ func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) {
 		var err error
 		parent, err = net.Dial("tcp", peer)
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer via TCP")
+			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer %q via TCP", peer)
 			return
 		}
 	}
