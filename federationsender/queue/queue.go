@@ -174,9 +174,8 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 
 func (oqs *OutgoingQueues) clearQueues() {
 	oqs.queuesMutex.Lock()
-	queues := oqs.queues
-	oqs.queuesMutex.Unlock()
-	for _, q := range queues {
+	defer oqs.queuesMutex.Unlock()
+	for _, q := range oqs.queues {
 		oqs.clearQueue(q)
 	}
 	time.AfterFunc(time.Minute, oqs.clearQueues)
@@ -191,7 +190,6 @@ func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 	case oq.backingOff.Load():
 		return
 	}
-
 	close(oq.notify)
 	close(oq.interruptBackoff)
 	delete(oqs.queues, oq.destination)
