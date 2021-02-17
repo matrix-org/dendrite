@@ -247,7 +247,7 @@ func (oq *destinationQueue) backgroundSend() {
 	}
 	destinationQueueRunning.Inc()
 	defer destinationQueueRunning.Dec()
-	defer oq.queues.clearQueue(oq.destination)
+	defer oq.queues.clearQueue(oq)
 	defer oq.running.Store(false)
 
 	// Mark the queue as overflowed, so we will consult the database
