@@ -37,11 +37,10 @@ require (
 	github.com/tidwall/sjson v1.1.4
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible
-	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20201006093556-760d9a7fd5ee
+	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20210218094457-e77ca8019daa
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
-	golang.org/x/net v0.0.0-20200528225125-3c3fba18258b
-	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
+	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
 	gopkg.in/h2non/bimg.v1 v1.1.4
 	gopkg.in/yaml.v2 v2.3.0
 )
