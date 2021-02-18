@@ -154,7 +154,7 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
 	oq, ok := oqs.queues[destination]
-	if !ok && oq != nil {
+	if !ok || oq != nil {
 		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
 			queues:           oqs,
