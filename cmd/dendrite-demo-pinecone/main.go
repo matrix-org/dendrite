@@ -210,7 +210,7 @@ func main() {
 			_ = wsc.Close(websocket.StatusGoingAway, "Only the pinecone service is supported")
 			return
 		}
-		conn := websocket.NetConn(context.Background(), wsc, websocket.MessageBinary)
+		conn := websocket.NetConn(r.Context(), wsc, websocket.MessageBinary)
 		if _, err = pRouter.AuthenticatedConnect(conn, "ws"); err != nil {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
