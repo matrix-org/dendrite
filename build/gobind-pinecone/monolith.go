@@ -81,11 +81,19 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) error {
 }
 
 func (m *DendriteMonolith) DisconnectNonMulticastPeers() {
-	// TODO
+	for _, p := range m.PineconeRouter.Peers() {
+		if p.Zone == "static" {
+			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port))
+		}
+	}
 }
 
 func (m *DendriteMonolith) DisconnectMulticastPeers() {
-	// TODO
+	for _, p := range m.PineconeRouter.Peers() {
+		if p.Zone != "static" {
+			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port))
+		}
+	}
 }
 
 func (m *DendriteMonolith) DisconnectPort(port int) error {
