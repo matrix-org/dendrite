@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/embed"
@@ -46,7 +47,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
-	"nhooyr.io/websocket"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
@@ -194,24 +194,19 @@ func main() {
 		base.PublicMediaAPIMux,
 	)
 
+	wsUpgrader := websocket.Upgrader{}
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
-	httpRouter.HandleFunc("/pinecone", func(w http.ResponseWriter, r *http.Request) {
-		wsc, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-			Subprotocols: []string{"pinecone"},
-		})
+	httpRouter.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		c, err := wsUpgrader.Upgrade(w, r, nil)
 		if err != nil {
-			logrus.WithError(err).Error("websocket.Accept failed")
+			logrus.WithError(err).Error("Failed to upgrade WebSocket connection")
 			return
 		}
-		if wsc.Subprotocol() != "pinecone" {
-			_ = wsc.Close(websocket.StatusGoingAway, "Only the pinecone service is supported")
-			return
-		}
-		conn := websocket.NetConn(r.Context(), wsc, websocket.MessageBinary)
-		if _, err = pRouter.AuthenticatedConnect(conn, "ws"); err != nil {
+		conn := conn.WrapWebSocketConn(c)
+		if _, err = pRouter.AuthenticatedConnect(conn, "websocket"); err != nil {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
 	})

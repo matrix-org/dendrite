@@ -1,16 +1,15 @@
 package conn
 
 import (
-	"context"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	"nhooyr.io/websocket"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
@@ -19,14 +18,12 @@ import (
 func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) {
 	var parent net.Conn
 	if strings.HasPrefix(peer, "ws://") || strings.HasPrefix(peer, "wss://") {
-		c, _, err := websocket.Dial(context.Background(), peer, &websocket.DialOptions{
-			Subprotocols: []string{"pinecone"},
-		})
+		c, _, err := websocket.DefaultDialer.Dial(peer, nil)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer %q via WebSockets", peer)
 			return
 		}
-		parent = websocket.NetConn(context.Background(), c, websocket.MessageBinary)
+		parent = WrapWebSocketConn(c)
 	} else {
 		var err error
 		parent, err = net.Dial("tcp", peer)

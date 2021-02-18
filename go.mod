@@ -8,6 +8,7 @@ require (
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hjson/hjson-go v3.0.2-0.20200316202735-d5d0e8b0617d+incompatible
 	github.com/lib/pq v1.8.0
@@ -43,10 +44,11 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20210218094457-e77ca8019daa
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+	golang.org/x/mobile v0.0.0-20210208171126-f462b3930c8f // indirect
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
+	golang.org/x/tools v0.0.0-20200117012304-6edc0a871e69 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.4
 	gopkg.in/yaml.v2 v2.3.0
-	nhooyr.io/websocket v1.8.6
 )
 
 go 1.13
