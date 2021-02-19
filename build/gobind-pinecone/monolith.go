@@ -356,8 +356,8 @@ func (m *DendriteMonolith) Stop() {
 	_ = m.listener.Close()
 	m.PineconeMulticast.Stop()
 	_ = m.PineconeQUIC.Close()
-	_ = m.PineconeRouter.Close()
 	m.processContext.ShutdownDendrite()
+	_ = m.PineconeRouter.Close()
 }
 
 func (m *DendriteMonolith) Suspend() {
