@@ -46,6 +46,12 @@ import (
 	yggdrasilConfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 )
 
+const (
+	PeerTypeRemote    = pineconeRouter.PeerTypeRemote
+	PeerTypeMulticast = pineconeRouter.PeerTypeMulticast
+	PeerTypeBluetooth = pineconeRouter.PeerTypeBluetooth
+)
+
 type DendriteMonolith struct {
 	logger            logrus.Logger
 	config            *yggdrasilConfig.NodeConfig
@@ -72,25 +78,32 @@ func (m *DendriteMonolith) SessionCount() int {
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
-	// TODO
+	if enabled {
+		m.PineconeMulticast.Start()
+	} else {
+		m.PineconeMulticast.Stop()
+		m.DisconnectType(pineconeRouter.PeerTypeMulticast)
+	}
 }
 
-func (m *DendriteMonolith) SetStaticPeer(uri string) error {
-	go conn.ConnectToPeer(m.PineconeRouter, uri)
-	return nil
+func (m *DendriteMonolith) SetStaticPeer(uri string) {
+	m.DisconnectType(pineconeRouter.PeerTypeRemote)
+	if uri != "" {
+		go conn.ConnectToPeer(m.PineconeRouter, uri)
+	}
 }
 
-func (m *DendriteMonolith) DisconnectNonMulticastPeers() {
+func (m *DendriteMonolith) DisconnectType(peertype int) {
 	for _, p := range m.PineconeRouter.Peers() {
-		if p.Zone == "static" {
+		if peertype == p.PeerType {
 			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port))
 		}
 	}
 }
 
-func (m *DendriteMonolith) DisconnectMulticastPeers() {
+func (m *DendriteMonolith) DisconnectZone(zone string) {
 	for _, p := range m.PineconeRouter.Peers() {
-		if p.Zone != "static" {
+		if zone == p.Zone {
 			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port))
 		}
 	}
@@ -100,7 +113,7 @@ func (m *DendriteMonolith) DisconnectPort(port int) error {
 	return m.PineconeRouter.Disconnect(types.SwitchPortID(port))
 }
 
-func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
+func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) {
 	l, r := net.Pipe()
 	conduit := &Conduit{conn: r, port: 0}
 	go func() {
@@ -110,7 +123,7 @@ func (m *DendriteMonolith) Conduit(zone string) (*Conduit, error) {
 		for i := 1; i <= 10; i++ {
 			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
 			var err error
-			conduit.port, err = m.PineconeRouter.AuthenticatedConnect(l, zone)
+			conduit.port, err = m.PineconeRouter.AuthenticatedConnect(l, zone, peertype)
 			switch err {
 			case io.ErrClosedPipe:
 				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
@@ -358,13 +371,6 @@ func (m *DendriteMonolith) Stop() {
 	_ = m.PineconeQUIC.Close()
 	m.processContext.ShutdownDendrite()
 	_ = m.PineconeRouter.Close()
-}
-
-func (m *DendriteMonolith) Suspend() {
-	m.logger.Info("Suspending monolith")
-	if err := m.httpServer.Close(); err != nil {
-		m.logger.Warn("Error stopping HTTP server:", err)
-	}
 }
 
 type Conduit struct {

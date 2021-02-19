@@ -48,6 +48,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 
@@ -109,7 +110,7 @@ func main() {
 				continue
 			}
 
-			port, err := pRouter.AuthenticatedConnect(conn, "")
+			port, err := pRouter.AuthenticatedConnect(conn, "", pineconeRouter.PeerTypeRemote)
 			if err != nil {
 				logrus.WithError(err).Error("pSwitch.AuthenticatedConnect failed")
 				continue
@@ -120,7 +121,8 @@ func main() {
 	}()
 
 	pQUIC := pineconeSessions.NewQUIC(logger, pRouter)
-	//_ = pineconeMulticast.NewMulticast(logger, pRouter)
+	pMulticast := pineconeMulticast.NewMulticast(logger, pRouter)
+	pMulticast.Start()
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
@@ -206,7 +208,7 @@ func main() {
 			return
 		}
 		conn := conn.WrapWebSocketConn(c)
-		if _, err = pRouter.AuthenticatedConnect(conn, "websocket"); err != nil {
+		if _, err = pRouter.AuthenticatedConnect(conn, "websocket", pineconeRouter.PeerTypeRemote); err != nil {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
 	})

@@ -35,7 +35,7 @@ func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) {
 	if parent == nil {
 		return
 	}
-	if _, err := pRouter.AuthenticatedConnect(parent, "static"); err != nil {
+	if _, err := pRouter.AuthenticatedConnect(parent, "static", pineconeRouter.PeerTypeRemote); err != nil {
 		logrus.WithError(err).Errorf("Failed to connect Pinecone static peer to switch")
 	}
 }
