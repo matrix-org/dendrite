@@ -126,9 +126,9 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 	return nil
 }
 
-// appserviceHasMembershipInRoom returns a boolean depending on whether a given
+// appserviceJoinedAtEvent returns a boolean depending on whether a given
 // appservice has membership at the time a given event was created.
-func (s *OutputRoomEventConsumer) appserviceHasMembershipForEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
 	// Check if any of the members in the room match the appservice
 	membershipReq := api.QueryStateAfterEventsRequest{
 		PrevEventIDs: []string{event.EventID()},
@@ -194,5 +194,5 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	}
 
 	// Check if any of the members in the room match the appservice
-	return s.appserviceHasMembershipForEvent(ctx, event, appservice)
+	return s.appserviceJoinedAtEvent(ctx, event, appservice)
 }
