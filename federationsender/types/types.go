@@ -15,8 +15,6 @@
 package types
 
 import (
-	"fmt"
-
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -34,18 +32,22 @@ func (s ServerNames) Len() int           { return len(s) }
 func (s ServerNames) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s ServerNames) Less(i, j int) bool { return s[i] < s[j] }
 
-// A EventIDMismatchError indicates that we have got out of sync with the
-// room server.
-type EventIDMismatchError struct {
-	// The event ID we have stored in our local database.
-	DatabaseID string
-	// The event ID received from the room server.
-	RoomServerID string
+// tracks peeks we're performing on another server over federation
+type OutboundPeek struct {
+	PeekID            string
+	RoomID            string
+	ServerName        gomatrixserverlib.ServerName
+	CreationTimestamp int64
+	RenewedTimestamp  int64
+	RenewalInterval   int64
 }
 
-func (e EventIDMismatchError) Error() string {
-	return fmt.Sprintf(
-		"mismatched last sent event ID: had %q in database got %q from room server",
-		e.DatabaseID, e.RoomServerID,
-	)
+// tracks peeks other servers are performing on us over federation
+type InboundPeek struct {
+	PeekID            string
+	RoomID            string
+	ServerName        gomatrixserverlib.ServerName
+	CreationTimestamp int64
+	RenewedTimestamp  int64
+	RenewalInterval   int64
 }

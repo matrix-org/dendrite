@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
+	"github.com/matrix-org/dendrite/setup/mscs/msc2946"
 	"github.com/matrix-org/util"
 )
 
@@ -39,7 +40,12 @@ func EnableMSC(base *setup.BaseDendrite, monolith *setup.Monolith, msc string) e
 	switch msc {
 	case "msc2836":
 		return msc2836.Enable(base, monolith.RoomserverAPI, monolith.FederationSenderAPI, monolith.UserAPI, monolith.KeyRing)
+	case "msc2946":
+		return msc2946.Enable(base, monolith.RoomserverAPI, monolith.UserAPI, monolith.FederationSenderAPI, monolith.KeyRing)
+	case "msc2444": // enabled inside federationapi
+	case "msc2753": // enabled inside clientapi
 	default:
 		return fmt.Errorf("EnableMSC: unknown msc '%s'", msc)
 	}
+	return nil
 }
