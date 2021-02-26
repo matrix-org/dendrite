@@ -520,7 +520,9 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 				Err: fmt.Sprintf("a.DB.OneTimeKeysCount: %s", err),
 			}
 		}
-		res.OneTimeKeyCounts = append(res.OneTimeKeyCounts, *counts)
+		if counts != nil {
+			res.OneTimeKeyCounts = append(res.OneTimeKeyCounts, *counts)
+		}
 		return
 	}
 	for _, key := range req.OneTimeKeys {
