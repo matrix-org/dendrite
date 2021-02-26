@@ -514,7 +514,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 
 func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
 	if len(req.OneTimeKeys) == 0 {
-		counts, err := a.DB.OneTimeKeysCount(ctx, req.DeviceID, req.UserID)
+		counts, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 		if err != nil {
 			res.Error = &api.KeyError{
 				Err: fmt.Sprintf("a.DB.OneTimeKeysCount: %s", err),
