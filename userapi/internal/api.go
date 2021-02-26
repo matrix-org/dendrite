@@ -379,7 +379,8 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		// Use AS dummy device ID
 		ID: types.AppServiceDeviceID,
 		// AS dummy device has AS's token.
-		AccessToken: token,
+		AccessToken:  token,
+		AppserviceID: appService.ID,
 	}
 
 	localpart, err := userutil.ParseUsernameParam(appServiceUserID, &a.ServerName)
