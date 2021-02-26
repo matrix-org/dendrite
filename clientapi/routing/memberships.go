@@ -57,6 +57,11 @@ func GetMemberships(
 	_ *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
+	resErr := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
+	if resErr != nil {
+		return *resErr
+	}
+
 	queryReq := api.QueryMembershipsForRoomRequest{
 		JoinedOnly: joinedOnly,
 		RoomID:     roomID,

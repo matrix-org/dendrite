@@ -243,11 +243,6 @@ func (r *Queryer) QueryMembershipsForRoom(
 		return err
 	}
 
-	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
-	if err != nil {
-		return err
-	}
-
 	response.IsRoomForgotten = isRoomforgotten
 
 	if membershipEventNID == 0 {
