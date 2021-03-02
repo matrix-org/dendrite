@@ -108,8 +108,8 @@ type OneTimeKeysCount struct {
 
 // PerformUploadKeysRequest is the request to PerformUploadKeys
 type PerformUploadKeysRequest struct {
-	UserID      string // User performing the request
-	DeviceID    string // Device performing the request
+	UserID      string // Required - User performing the request
+	DeviceID    string // Optional - Device performing the request, for fetching OTK count
 	DeviceKeys  []DeviceKeys
 	OneTimeKeys []OneTimeKeys
 	// OnlyDisplayNameUpdates should be `true` if ALL the DeviceKeys are present to update

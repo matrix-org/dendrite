@@ -218,6 +218,7 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		// display name has changed: update the device key
 		var uploadRes keyapi.PerformUploadKeysResponse
 		a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+			UserID: req.RequestingUserID,
 			DeviceKeys: []keyapi.DeviceKeys{
 				{
 					DeviceID:    dev.ID,
