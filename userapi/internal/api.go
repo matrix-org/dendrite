@@ -161,6 +161,7 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 
 	var uploadRes keyapi.PerformUploadKeysResponse
 	a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+		UserID:     userID,
 		DeviceKeys: deviceKeys,
 	}, &uploadRes)
 	if uploadRes.Error != nil {

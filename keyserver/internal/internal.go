@@ -513,12 +513,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 }
 
 func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
-	if req.UserID == "" || req.DeviceID == "" {
-		res.Error = &api.KeyError{
-			Err: "user ID or device ID missing",
-		}
-	}
-	if len(req.OneTimeKeys) == 0 {
+	if req.UserID != "" && req.DeviceID != "" && len(req.OneTimeKeys) == 0 {
 		counts, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 		if err != nil {
 			res.Error = &api.KeyError{
