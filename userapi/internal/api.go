@@ -87,7 +87,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 			ServerName:   a.ServerName,
 			UserID:       fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
 		}
-		return nil
+		return err
 	}
 
 	if err = a.AccountDB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
