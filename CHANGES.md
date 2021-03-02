@@ -1,5 +1,13 @@
 # Changelog
 
+## Dendrite 0.3.11 (2021-03-02)
+
+### Fixes
+
+- **SECURITY:** A bug in SQLite mode which could cause the registration flow to complete unexpectedly for existing accounts has been fixed (PostgreSQL deployments are not affected)
+- A panic in the federation sender has been fixed when shutting down destination queues
+- The `/keys/upload` endpoint now correctly returns the number of one-time keys in response to an empty upload request
+
 ## Dendrite 0.3.10 (2021-02-17)
 
 ### Features
