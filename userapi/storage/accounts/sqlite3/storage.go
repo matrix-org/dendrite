@@ -204,6 +204,7 @@ func (d *Database) createAccount(
 	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
 ) (*api.Account, error) {
 	var err error
+	var account *api.Account
 	// Generate a password hash if this is not a password-less user
 	hash := ""
 	if plaintextPassword != "" {
@@ -212,14 +213,13 @@ func (d *Database) createAccount(
 			return nil, err
 		}
 	}
-	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
-		if isConstraintError(err) {
-			return nil, sqlutil.ErrUserExists
-		}
+	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID); err != nil {
+		return nil, sqlutil.ErrUserExists
+	}
+	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		return nil, err
 	}
-
-	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
+	if err = d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
 		"global": {
 			"content": [],
 			"override": [],
@@ -230,7 +230,7 @@ func (d *Database) createAccount(
 	}`)); err != nil {
 		return nil, err
 	}
-	return d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID)
+	return account, nil
 }
 
 // SaveAccountData saves new account data for a given user and a given room.
