@@ -1,6 +1,6 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/matrix-org/pinecone => /Users/neilalexander/Desktop/pinecone
+replace github.com/matrix-org/pinecone => /Volumes/Workspace/pinecone
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
@@ -46,7 +46,6 @@ require (
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/mobile v0.0.0-20210208171126-f462b3930c8f // indirect
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
-	golang.org/x/tools v0.0.0-20200117012304-6edc0a871e69 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.4
 	gopkg.in/yaml.v2 v2.3.0
 )
