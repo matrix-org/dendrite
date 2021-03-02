@@ -309,7 +309,7 @@ func postSpaces(t *testing.T, expectCode int, accessToken, roomID string, req *g
 		t.Fatalf("failed to marshal request: %s", err)
 	}
 	httpReq, err := http.NewRequest(
-		"POST", "http://localhost:8010/_matrix/client/unstable/rooms/"+url.PathEscape(roomID)+"/spaces",
+		"POST", "http://localhost:8010/_matrix/client/unstable/org.matrix.msc2946/rooms/"+url.PathEscape(roomID)+"/spaces",
 		bytes.NewBuffer(data),
 	)
 	httpReq.Header.Set("Authorization", "Bearer "+accessToken)
