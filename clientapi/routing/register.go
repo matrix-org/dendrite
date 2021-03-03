@@ -591,9 +591,10 @@ func handleRegistrationFlow(
 	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
 
 	// Appservices are special and are not affected by disabled
-	// registration or user exclusivity.
-	if r.Auth.Type == authtypes.LoginTypeApplicationService ||
-		(r.Auth.Type == "" && accessTokenErr == nil) {
+	// registration or user exclusivity. We'll go onto the appservice
+	// registration flow if a valid access token was provided or if
+	// the login type specifically requests it.
+	if r.Auth.Type == authtypes.LoginTypeApplicationService || accessTokenErr == nil {
 		return handleApplicationServiceRegistration(
 			accessToken, accessTokenErr, req, r, cfg, userAPI,
 		)
