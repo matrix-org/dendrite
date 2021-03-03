@@ -37,7 +37,6 @@ type getEventRequest struct {
 
 // GetEvent implements GET /_matrix/client/r0/rooms/{roomId}/event/{eventId}
 // https://matrix.org/docs/spec/client_server/r0.4.0.html#get-matrix-client-r0-rooms-roomid-event-eventid
-// nolint:gocyclo
 func GetEvent(
 	req *http.Request,
 	device *userapi.Device,
@@ -105,7 +104,7 @@ func GetEvent(
 	}
 
 	for _, stateEvent := range stateResp.StateEvents {
-		if stateEvent.StateKeyEquals(device.UserID) {
+		if !stateEvent.StateKeyEquals(device.UserID) {
 			continue
 		}
 		membership, err := stateEvent.Membership()
