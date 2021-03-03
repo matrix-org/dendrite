@@ -62,7 +62,7 @@ func SetupTransactionWorkers(
 func worker(db storage.Database, ws types.ApplicationServiceWorkerState) {
 	log.WithFields(log.Fields{
 		"appservice": ws.AppService.ID,
-	}).Info("starting application service")
+	}).Info("Starting application service")
 	ctx := context.Background()
 
 	// Create a HTTP client for sending requests to app services

@@ -85,9 +85,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	if output.Type != api.OutputTypeNewRoomEvent {
-		log.WithField("type", output.Type).Debug(
-			"roomserver output log: ignoring unknown output type",
-		)
 		return nil
 	}
 
@@ -114,6 +111,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 				// Queue this event to be sent off to the application service
 				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, event); err != nil {
 					log.WithError(err).Warn("failed to insert incoming event into appservices database")
+					return err
 				} else {
 					// Tell our worker to send out new messages by updating remaining message
 					// count and waking them up with a broadcast
@@ -143,14 +141,12 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 	// e.g. the event came over federation but we do not have the full state persisted.
 	if err := s.rsAPI.QueryMembershipsForRoom(ctx, membershipReq, membershipRes); err == nil {
 		for _, ev := range membershipRes.JoinEvents {
-			if ev.Type == gomatrixserverlib.MRoomMember {
-				var membership gomatrixserverlib.MemberContent
-				if err = json.Unmarshal(ev.Content, &membership); err != nil || ev.StateKey == nil {
-					continue
-				}
-				if membership.Membership == gomatrixserverlib.Join && appservice.IsInterestedInUserID(*ev.StateKey) {
-					return true
-				}
+			var membership gomatrixserverlib.MemberContent
+			if err = json.Unmarshal(ev.Content, &membership); err != nil || ev.StateKey == nil {
+				continue
+			}
+			if appservice.IsInterestedInUserID(*ev.StateKey) {
+				return true
 			}
 		}
 	} else {
