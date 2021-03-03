@@ -124,8 +124,8 @@ func (r *Joiner) performJoinRoomByAlias(
 		req.ServerNames = append(req.ServerNames, dirRes.ServerNames...)
 	} else {
 		var getRoomReq = rsAPI.GetRoomIDForAliasRequest{
-			Alias:               req.RoomIDOrAlias,
-			ShouldHitAppservice: true,
+			Alias:              req.RoomIDOrAlias,
+			IncludeAppservices: true,
 		}
 		var getRoomRes = rsAPI.GetRoomIDForAliasResponse{}
 		// Otherwise, look up if we know this room alias locally.

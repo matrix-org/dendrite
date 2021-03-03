@@ -217,8 +217,8 @@ func createRoom(
 		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
 		// check it's free TODO: This races but is better than nothing
 		hasAliasReq := roomserverAPI.GetRoomIDForAliasRequest{
-			Alias:               roomAlias,
-			ShouldHitAppservice: false,
+			Alias:              roomAlias,
+			IncludeAppservices: false,
 		}
 
 		var aliasResp roomserverAPI.GetRoomIDForAliasResponse
