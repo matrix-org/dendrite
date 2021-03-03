@@ -309,12 +309,12 @@ user_api:
     listen: http://0.0.0.0:7781
     connect: http://user_api:7781
   account_database:
-    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_account?sslmode=disable
+    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_userapi_accounts?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
   device_database:
-    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_device?sslmode=disable
+    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_userapi_devices?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1

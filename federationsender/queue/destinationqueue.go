@@ -46,6 +46,7 @@ const (
 // ensures that only one request is in flight to a given destination
 // at a time.
 type destinationQueue struct {
+	queues             *OutgoingQueues
 	db                 storage.Database
 	process            *process.ProcessContext
 	signing            *SigningInfo
@@ -246,6 +247,7 @@ func (oq *destinationQueue) backgroundSend() {
 	}
 	destinationQueueRunning.Inc()
 	defer destinationQueueRunning.Dec()
+	defer oq.queues.clearQueue(oq)
 	defer oq.running.Store(false)
 
 	// Mark the queue as overflowed, so we will consult the database
