@@ -270,7 +270,6 @@ func CheckServerAllowedToSeeEvent(
 }
 
 // TODO: Remove this when we have tests to assert correctness of this function
-// nolint:gocyclo
 func ScanEventTree(
 	ctx context.Context, db storage.Database, info types.RoomInfo, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,

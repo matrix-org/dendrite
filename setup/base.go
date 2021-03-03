@@ -316,7 +316,6 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
-// nolint:gocyclo
 func (b *BaseDendrite) SetupAndServeHTTP(
 	internalHTTPAddr, externalHTTPAddr config.HTTPAddress,
 	certFile, keyFile *string,

@@ -61,7 +61,6 @@ const defaultMessagesLimit = 10
 // OnIncomingMessagesRequest implements the /messages endpoint from the
 // client-server API.
 // See: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-client-r0-rooms-roomid-messages
-// nolint:gocyclo
 func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string, device *userapi.Device,
 	federation *gomatrixserverlib.FederationClient,
@@ -306,7 +305,6 @@ func (r *messagesReq) retrieveEvents() (
 	return clientEvents, start, end, err
 }
 
-// nolint:gocyclo
 func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
 	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
