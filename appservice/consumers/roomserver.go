@@ -129,9 +129,12 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 // appserviceJoinedAtEvent returns a boolean depending on whether a given
 // appservice has membership at the time a given event was created.
 func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
-	// Check if any of the members in the room match the appservice
+	// TODO: This is only checking the current room state, not the state at
+	// the event in question. Pretty sure this is what Synapse does too, but
+	// until we have a lighter way of checking the state before the event that
+	// doesn't involve state res, then this is probably OK.
 	membershipReq := &api.QueryMembershipsForRoomRequest{
-		JoinedOnly: false,
+		JoinedOnly: true,
 		RoomID:     event.RoomID(),
 	}
 	membershipRes := &api.QueryMembershipsForRoomResponse{}
