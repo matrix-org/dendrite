@@ -23,7 +23,6 @@ const (
 // fields might come from either a StateFilter or an EventFilter,
 // and it's easier just to have the caller extract the relevant
 // parts.
-// nolint:gocyclo
 func prepareWithFilters(
 	db *sql.DB, txn *sql.Tx, query string, params []interface{},
 	senders, notsenders, types, nottypes []string, excludeEventIDs []string,

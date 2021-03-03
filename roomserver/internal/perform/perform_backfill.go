@@ -381,7 +381,6 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // It returns a list of servers which can be queried for backfill requests. These servers
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
-// nolint:gocyclo
 func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []gomatrixserverlib.ServerName {
 	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
 	// its successor, so look it up.

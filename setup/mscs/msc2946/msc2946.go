@@ -217,7 +217,6 @@ func (w *walker) markSent(id string) {
 	w.inMemoryBatchCache[w.callerID()] = m
 }
 
-// nolint:gocyclo
 func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 	var res gomatrixserverlib.MSC2946SpacesResponse
 	// Begin walking the graph starting with the room ID in the request in a queue of unvisited rooms

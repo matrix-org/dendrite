@@ -46,7 +46,6 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, 
 // DeviceListCatchup fills in the given response for the given user ID to bring it up-to-date with device lists. hasNew=true if the response
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
-// nolint:gocyclo
 func DeviceListCatchup(
 	ctx context.Context, keyAPI keyapi.KeyInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
 	userID string, res *types.Response, from, to types.LogPosition,
@@ -137,7 +136,6 @@ func DeviceListCatchup(
 }
 
 // TrackChangedUsers calculates the values of device_lists.changed|left in the /sync response.
-// nolint:gocyclo
 func TrackChangedUsers(
 	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, userID string, newlyJoinedRooms, newlyLeftRooms []string,
 ) (changed, left []string, err error) {
