@@ -243,6 +243,29 @@ func (r *Queryer) QueryMembershipsForRoom(
 		return err
 	}
 
+	if request.Sender == "" {
+		var events []types.Event
+		var eventNIDs []types.EventNID
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
+		}
+		events, err = r.DB.Events(ctx, eventNIDs)
+		if err != nil {
+			return fmt.Errorf("r.DB.Events: %w", err)
+		}
+		for _, event := range events {
+			clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
+			response.JoinEvents = append(response.JoinEvents, clientEvent)
+		}
+		return nil
+	}
+
+	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
+	if err != nil {
+		return err
+	}
+
 	response.IsRoomForgotten = isRoomforgotten
 
 	if membershipEventNID == 0 {

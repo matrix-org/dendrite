@@ -151,6 +151,10 @@ type QueryMembershipsForRoomRequest struct {
 	JoinedOnly bool `json:"joined_only"`
 	// ID of the room to fetch memberships from
 	RoomID string `json:"room_id"`
+	// Optional - ID of the user sending the request, for checking if the
+	// user is allowed to see the memberships. If not specified then all
+	// room memberships will be returned.
+	Sender string `json:"sender"`
 }
 
 // QueryMembershipsForRoomResponse is a response to QueryMembershipsForRoom
