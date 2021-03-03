@@ -61,9 +61,12 @@ func DirectoryRoom(
 	var res roomDirectoryResponse
 
 	// Query the roomserver API to check if the alias exists locally.
-	queryReq := roomserverAPI.GetRoomIDForAliasRequest{Alias: roomAlias}
-	var queryRes roomserverAPI.GetRoomIDForAliasResponse
-	if err = rsAPI.GetRoomIDForAlias(req.Context(), &queryReq, &queryRes); err != nil {
+	queryReq := &roomserverAPI.GetRoomIDForAliasRequest{
+		Alias:              roomAlias,
+		IncludeAppservices: true,
+	}
+	queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
+	if err = rsAPI.GetRoomIDForAlias(req.Context(), queryReq, queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.GetRoomIDForAlias failed")
 		return jsonerror.InternalServerError()
 	}
