@@ -46,7 +46,7 @@ const (
 
 // Defaults sets the request defaults
 func Defaults(r *gomatrixserverlib.MSC2946SpacesRequest) {
-	r.Limit = 100
+	r.Limit = 2000
 	r.MaxRoomsPerSpace = -1
 }
 
@@ -70,11 +70,11 @@ func Enable(
 		}
 	})
 
-	base.PublicClientAPIMux.Handle("/unstable/rooms/{roomID}/spaces",
+	base.PublicClientAPIMux.Handle("/unstable/org.matrix.msc2946/rooms/{roomID}/spaces",
 		httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(db, rsAPI, fsAPI, base.Cfg.Global.ServerName)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	base.PublicFederationAPIMux.Handle("/unstable/spaces/{roomID}", httputil.MakeExternalAPI(
+	base.PublicFederationAPIMux.Handle("/unstable/org.matrix.msc2946/spaces/{roomID}", httputil.MakeExternalAPI(
 		"msc2946_fed_spaces", func(req *http.Request) util.JSONResponse {
 			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
 				req, time.Now(), base.Cfg.Global.ServerName, keyRing,
@@ -107,9 +107,6 @@ func federatedSpacesHandler(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
-	}
-	if r.Limit > 100 {
-		r.Limit = 100
 	}
 	w := walker{
 		req:        &r,
@@ -146,9 +143,6 @@ func spacesHandler(
 		Defaults(&r)
 		if resErr := chttputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 			return *resErr
-		}
-		if r.Limit > 100 {
-			r.Limit = 100
 		}
 		w := walker{
 			req:        &r,
@@ -223,7 +217,6 @@ func (w *walker) markSent(id string) {
 	w.inMemoryBatchCache[w.callerID()] = m
 }
 
-// nolint:gocyclo
 func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
 	var res gomatrixserverlib.MSC2946SpacesResponse
 	// Begin walking the graph starting with the room ID in the request in a queue of unvisited rooms

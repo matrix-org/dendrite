@@ -103,8 +103,8 @@ func (d *Database) MaxStreamPositionForAccountData(ctx context.Context) (types.S
 	return types.StreamPosition(id), nil
 }
 
-func (d *Database) CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	return d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilterPart)
+func (d *Database) CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	return d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilterPart, excludeEventIDs)
 }
 
 func (d *Database) RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error) {
@@ -195,7 +195,7 @@ func (d *Database) GetStateEvent(
 func (d *Database) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *gomatrixserverlib.StateFilter,
 ) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error) {
-	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilter)
+	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilter, nil)
 	return
 }
 
@@ -661,7 +661,6 @@ func (d *Database) fetchMissingStateEvents(
 // exclusive of oldPos, inclusive of newPos, for the rooms in which
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
-// nolint:gocyclo
 func (d *Database) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
@@ -773,7 +772,6 @@ func (d *Database) GetStateDeltas(
 // requests with full_state=true.
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
-// nolint:gocyclo
 func (d *Database) GetStateDeltasForFullStateSync(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
@@ -870,7 +868,7 @@ func (d *Database) currentStateStreamEventsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]types.StreamEvent, error) {
-	allState, err := d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
+	allState, err := d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter, nil)
 	if err != nil {
 		return nil, err
 	}

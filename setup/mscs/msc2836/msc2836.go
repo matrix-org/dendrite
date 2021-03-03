@@ -238,7 +238,6 @@ func federatedEventRelationship(
 	}
 }
 
-// nolint:gocyclo
 func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsResponse, *util.JSONResponse) {
 	var res gomatrixserverlib.MSC2836EventRelationshipsResponse
 	var returnEvents []*gomatrixserverlib.HeaderedEvent

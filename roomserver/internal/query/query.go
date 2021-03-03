@@ -49,7 +49,6 @@ func (r *Queryer) QueryLatestEventsAndState(
 }
 
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
-// nolint:gocyclo
 func (r *Queryer) QueryStateAfterEvents(
 	ctx context.Context,
 	request *api.QueryStateAfterEventsRequest,
@@ -112,7 +111,7 @@ func (r *Queryer) QueryStateAfterEvents(
 			return fmt.Errorf("getAuthChain: %w", err)
 		}
 
-		stateEvents, err = state.ResolveConflictsAdhoc(info.RoomVersion, stateEvents, authEvents)
+		stateEvents, err = gomatrixserverlib.ResolveConflicts(info.RoomVersion, stateEvents, authEvents)
 		if err != nil {
 			return fmt.Errorf("state.ResolveConflictsAdhoc: %w", err)
 		}
@@ -372,7 +371,6 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 }
 
 // QueryMissingEvents implements api.RoomserverInternalAPI
-// nolint:gocyclo
 func (r *Queryer) QueryMissingEvents(
 	ctx context.Context,
 	request *api.QueryMissingEventsRequest,
@@ -469,7 +467,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	if request.ResolveState {
-		if stateEvents, err = state.ResolveConflictsAdhoc(
+		if stateEvents, err = gomatrixserverlib.ResolveConflicts(
 			info.RoomVersion, stateEvents, authEvents,
 		); err != nil {
 			return err

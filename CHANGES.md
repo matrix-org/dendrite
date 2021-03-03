@@ -1,5 +1,43 @@
 # Changelog
 
+## Dendrite 0.3.11 (2021-03-02)
+
+### Fixes
+
+- **SECURITY:** A bug in SQLite mode which could cause the registration flow to complete unexpectedly for existing accounts has been fixed (PostgreSQL deployments are not affected)
+- A panic in the federation sender has been fixed when shutting down destination queues
+- The `/keys/upload` endpoint now correctly returns the number of one-time keys in response to an empty upload request
+
+## Dendrite 0.3.10 (2021-02-17)
+
+### Features
+
+* In-memory caches will now gradually evict old entries, reducing idle memory usage
+* Federation sender queues will now be fully unloaded when idle, reducing idle memory usage
+* The `power_level_content_override` option is now supported in `/createRoom`
+* The `/send` endpoint will now attempt more servers in the room when trying to fetch missing events or state
+
+### Fixes
+
+* A panic in the membership updater has been fixed
+* Events in the sync API that weren't excluded from sync can no longer be incorrectly excluded from sync by backfill
+* Retrieving remote media now correcly respects the locally configured maximum file size, even when the `Content-Length` header is unavailable
+* The `/send` endpoint will no longer hit the database more than once to find servers in the room
+
+## Dendrite 0.3.9 (2021-02-04)
+
+### Features
+
+* Performance of initial/complete syncs has been improved dramatically
+* State events that can't be authed are now dropped when joining a room rather than unexpectedly causing the room join to fail
+* State events that already appear in the timeline will no longer be requested from the sync API database more than once, which may reduce memory usage in some cases
+
+### Fixes
+
+* A crash at startup due to a conflict in the sync API account data has been fixed
+* A crash at startup due to mismatched event IDs in the federation sender has been fixed
+* A redundant check which may cause the roomserver memberships table to get out of sync has been removed
+
 ## Dendrite 0.3.8 (2021-01-28)
 
 ### Fixes

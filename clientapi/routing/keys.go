@@ -38,7 +38,10 @@ func UploadKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.De
 		return *resErr
 	}
 
-	uploadReq := &api.PerformUploadKeysRequest{}
+	uploadReq := &api.PerformUploadKeysRequest{
+		DeviceID: device.ID,
+		UserID:   device.UserID,
+	}
 	if r.DeviceKeys != nil {
 		uploadReq.DeviceKeys = []api.DeviceKeys{
 			{

@@ -25,7 +25,7 @@ const (
 // parts.
 func prepareWithFilters(
 	db *sql.DB, txn *sql.Tx, query string, params []interface{},
-	senders, notsenders, types, nottypes []string,
+	senders, notsenders, types, nottypes []string, excludeEventIDs []string,
 	limit int, order FilterOrder,
 ) (*sql.Stmt, []interface{}, error) {
 	offset := len(params)
@@ -50,6 +50,12 @@ func prepareWithFilters(
 	if count := len(nottypes); count > 0 {
 		query += " AND type NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
 		for _, v := range nottypes {
+			params, offset = append(params, v), offset+1
+		}
+	}
+	if count := len(excludeEventIDs); count > 0 {
+		query += " AND event_id NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
+		for _, v := range excludeEventIDs {
 			params, offset = append(params, v), offset+1
 		}
 	}

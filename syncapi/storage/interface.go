@@ -35,7 +35,7 @@ type Database interface {
 	MaxStreamPositionForAccountData(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error)
 
-	CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
+	CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error)
 	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
 	GetStateDeltas(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
 	RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error)

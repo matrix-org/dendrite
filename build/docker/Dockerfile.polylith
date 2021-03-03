@@ -14,7 +14,7 @@ RUN go build -trimpath -o bin/ ./cmd/generate-keys
 
 FROM alpine:latest
 
-COPY --from=base /build/bin/* /usr/bin
+COPY --from=base /build/bin/* /usr/bin/
 
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
