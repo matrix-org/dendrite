@@ -80,11 +80,10 @@ func GetEvent(
 	stateReq := api.QueryStateAfterEventsRequest{
 		RoomID:       r.requestedEvent.RoomID(),
 		PrevEventIDs: r.requestedEvent.PrevEventIDs(),
-		// XXX: Appservices require you to fetch the lot
-		// StateToFetch: []gomatrixserverlib.StateKeyTuple{{
-		// 	EventType: gomatrixserverlib.MRoomMember,
-		// 	StateKey:  device.UserID,
-		// }},
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{{
+			EventType: gomatrixserverlib.MRoomMember,
+			StateKey:  device.UserID,
+		}},
 	}
 	var stateResp api.QueryStateAfterEventsResponse
 	if err := rsAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
@@ -104,24 +103,9 @@ func GetEvent(
 			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
 		}
 	}
-	var appService *config.ApplicationService
-	if device.AppserviceID != "" {
-		for _, as := range cfg.Derived.ApplicationServices {
-			if as.ID == device.AppserviceID {
-				appService = &as
-				break
-			}
-		}
-	}
 
 	for _, stateEvent := range stateResp.StateEvents {
-		if stateEvent.Type() != gomatrixserverlib.MRoomMember {
-			continue
-		}
-		// Allow appservices to fetch events
-		if appService != nil && !appService.IsInterestedInUserID(*stateEvent.StateKey()) {
-			continue
-		} else if stateEvent.StateKeyEquals(device.UserID) {
+		if stateEvent.StateKeyEquals(device.UserID) {
 			continue
 		}
 		membership, err := stateEvent.Membership()
