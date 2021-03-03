@@ -12,6 +12,7 @@ services:
       - 8448:8448
     volumes:
       - ./config:/etc/dendrite
+      - ./media:/var/dendrite/media
     networks:
       - internal
 

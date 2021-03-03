@@ -147,7 +147,7 @@ func (r *uploadRequest) doUpload(
 	//   r.storeFileAndMetadata(ctx, tmpDir, ...)
 	// before you return from doUpload else we will leak a temp file. We could make this nicer with a `WithTransaction` style of
 	// nested function to guarantee either storage or cleanup.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, *cfg.MaxFileSizeBytes, cfg.AbsBasePath)
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, cfg.AbsBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": *cfg.MaxFileSizeBytes,

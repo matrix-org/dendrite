@@ -143,7 +143,6 @@ Local new device changes appear in v2 /sync
 Local update device changes appear in v2 /sync
 Get left notifs for other users in sync and /keys/changes when user leaves
 Local device key changes get to remote servers
-Local device key changes get to remote servers with correct prev_id
 Server correctly handles incoming m.device_list_update
 If remote user leaves room, changes device and rejoins we see update in sync
 If remote user leaves room, changes device and rejoins we see update in /keys/changes
