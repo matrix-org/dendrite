@@ -130,19 +130,22 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 // appservice has membership at the time a given event was created.
 func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
 	// Check if any of the members in the room match the appservice
-	membershipReq := api.QueryStateAfterEventsRequest{
-		PrevEventIDs: []string{event.EventID()},
-		RoomID:       event.RoomID(),
+	membershipReq := &api.QueryMembershipsForRoomRequest{
+		JoinedOnly: false,
+		RoomID:     event.RoomID(),
 	}
-	var membershipRes api.QueryStateAfterEventsResponse
+	membershipRes := &api.QueryMembershipsForRoomResponse{}
 
 	// XXX: This could potentially race if the state for the event is not known yet
 	// e.g. the event came over federation but we do not have the full state persisted.
-	if err := s.rsAPI.QueryStateAfterEvents(ctx, &membershipReq, &membershipRes); err == nil {
-		for _, ev := range membershipRes.StateEvents {
-			if ev.Type() == gomatrixserverlib.MRoomMember {
-				var membership, _ = ev.Membership()
-				if membership == gomatrixserverlib.Join && appservice.IsInterestedInUserID(*ev.StateKey()) {
+	if err := s.rsAPI.QueryMembershipsForRoom(ctx, membershipReq, membershipRes); err == nil {
+		for _, ev := range membershipRes.JoinEvents {
+			if ev.Type == gomatrixserverlib.MRoomMember {
+				var membership gomatrixserverlib.MemberContent
+				if err = json.Unmarshal(ev.Content, &membership); err != nil || ev.StateKey == nil {
+					continue
+				}
+				if membership.Membership == gomatrixserverlib.Join && appservice.IsInterestedInUserID(*ev.StateKey) {
 					return true
 				}
 			}
