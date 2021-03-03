@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/appservice/storage"
 	"github.com/matrix-org/dendrite/appservice/types"
@@ -133,26 +134,16 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 	// the event in question. Pretty sure this is what Synapse does too, but
 	// until we have a lighter way of checking the state before the event that
 	// doesn't involve state res, then this is probably OK.
-	membershipReq := &api.QueryMembershipsForRoomRequest{
-		JoinedOnly: true,
-		RoomID:     event.RoomID(),
+	membershipReq := &api.QueryMembershipForUserRequest{
+		RoomID: event.RoomID(),
+		UserID: fmt.Sprintf("@%s:%s", appservice.SenderLocalpart, s.serverName),
 	}
-	membershipRes := &api.QueryMembershipsForRoomResponse{}
+	membershipRes := &api.QueryMembershipForUserResponse{}
 
 	// XXX: This could potentially race if the state for the event is not known yet
 	// e.g. the event came over federation but we do not have the full state persisted.
-	if err := s.rsAPI.QueryMembershipsForRoom(ctx, membershipReq, membershipRes); err == nil {
-		for _, ev := range membershipRes.JoinEvents {
-			if ev.Type == gomatrixserverlib.MRoomMember {
-				var membership gomatrixserverlib.MemberContent
-				if err = json.Unmarshal(ev.Content, &membership); err != nil || ev.StateKey == nil {
-					continue
-				}
-				if membership.Membership == gomatrixserverlib.Join && appservice.IsInterestedInUserID(*ev.StateKey) {
-					return true
-				}
-			}
-		}
+	if err := s.rsAPI.QueryMembershipForUser(ctx, membershipReq, membershipRes); err == nil {
+		return membershipRes.IsInRoom
 	} else {
 		log.WithFields(log.Fields{
 			"room_id": event.RoomID(),
