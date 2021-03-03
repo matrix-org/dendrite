@@ -85,9 +85,6 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	}
 
 	if output.Type != api.OutputTypeNewRoomEvent {
-		log.WithField("type", output.Type).Debug(
-			"roomserver output log: ignoring unknown output type",
-		)
 		return nil
 	}
 
@@ -114,6 +111,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 				// Queue this event to be sent off to the application service
 				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, event); err != nil {
 					log.WithError(err).Warn("failed to insert incoming event into appservices database")
+					return err
 				} else {
 					// Tell our worker to send out new messages by updating remaining message
 					// count and waking them up with a broadcast
@@ -126,25 +124,29 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 	return nil
 }
 
-// appserviceHasMembershipInRoom returns a boolean depending on whether a given
+// appserviceJoinedAtEvent returns a boolean depending on whether a given
 // appservice has membership at the time a given event was created.
-func (s *OutputRoomEventConsumer) appserviceHasMembershipForEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
-	// Check if any of the members in the room match the appservice
-	membershipReq := api.QueryStateAfterEventsRequest{
-		PrevEventIDs: []string{event.EventID()},
-		RoomID:       event.RoomID(),
+func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
+	// TODO: This is only checking the current room state, not the state at
+	// the event in question. Pretty sure this is what Synapse does too, but
+	// until we have a lighter way of checking the state before the event that
+	// doesn't involve state res, then this is probably OK.
+	membershipReq := &api.QueryMembershipsForRoomRequest{
+		RoomID:     event.RoomID(),
+		JoinedOnly: true,
 	}
-	var membershipRes api.QueryStateAfterEventsResponse
+	membershipRes := &api.QueryMembershipsForRoomResponse{}
 
 	// XXX: This could potentially race if the state for the event is not known yet
 	// e.g. the event came over federation but we do not have the full state persisted.
-	if err := s.rsAPI.QueryStateAfterEvents(ctx, &membershipReq, &membershipRes); err == nil {
-		for _, ev := range membershipRes.StateEvents {
-			if ev.Type() == gomatrixserverlib.MRoomMember {
-				var membership, _ = ev.Membership()
-				if membership == gomatrixserverlib.Join && appservice.IsInterestedInUserID(*ev.StateKey()) {
-					return true
-				}
+	if err := s.rsAPI.QueryMembershipsForRoom(ctx, membershipReq, membershipRes); err == nil {
+		for _, ev := range membershipRes.JoinEvents {
+			var membership gomatrixserverlib.MemberContent
+			if err = json.Unmarshal(ev.Content, &membership); err != nil || ev.StateKey == nil {
+				continue
+			}
+			if appservice.IsInterestedInUserID(*ev.StateKey) {
+				return true
 			}
 		}
 	} else {
@@ -194,5 +196,5 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	}
 
 	// Check if any of the members in the room match the appservice
-	return s.appserviceHasMembershipForEvent(ctx, event, appservice)
+	return s.appserviceJoinedAtEvent(ctx, event, appservice)
 }

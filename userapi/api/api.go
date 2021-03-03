@@ -241,6 +241,9 @@ type Device struct {
 	LastSeenTS  int64
 	LastSeenIP  string
 	UserAgent   string
+	// If the device is for an appservice user,
+	// this is the appservice ID.
+	AppserviceID string
 }
 
 // Account represents a Matrix account on this home server.
