@@ -52,7 +52,6 @@ var (
 	instancePeer = flag.String("peer", "", "an internet Yggdrasil peer to connect to")
 )
 
-// nolint:gocyclo
 func main() {
 	flag.Parse()
 	internal.SetupPprof()

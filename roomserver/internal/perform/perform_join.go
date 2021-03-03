@@ -139,7 +139,6 @@ func (r *Joiner) performJoinRoomByAlias(
 }
 
 // TODO: Break this function up a bit
-// nolint:gocyclo
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
