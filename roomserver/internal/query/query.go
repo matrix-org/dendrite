@@ -242,6 +242,9 @@ func (r *Queryer) QueryMembershipsForRoom(
 		return err
 	}
 
+	// If no sender is specified then we will just return the entire
+	// set of memberships for the room, regardless of whether a specific
+	// user is allowed to see them or not.
 	if request.Sender == "" {
 		var events []types.Event
 		var eventNIDs []types.EventNID
