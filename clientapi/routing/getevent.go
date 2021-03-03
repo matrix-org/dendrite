@@ -103,8 +103,22 @@ func GetEvent(
 		}
 	}
 
+	var appService *config.ApplicationService
+	if device.AppserviceID != "" {
+		for _, as := range cfg.Derived.ApplicationServices {
+			if as.ID == device.AppserviceID {
+				appService = &as
+				break
+			}
+		}
+	}
+
 	for _, stateEvent := range stateResp.StateEvents {
-		if !stateEvent.StateKeyEquals(device.UserID) {
+		if appService != nil {
+			if !appService.IsInterestedInUserID(*stateEvent.StateKey()) {
+				continue
+			}
+		} else if !stateEvent.StateKeyEquals(device.UserID) {
 			continue
 		}
 		membership, err := stateEvent.Membership()
