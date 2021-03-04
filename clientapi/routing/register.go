@@ -46,6 +46,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -496,11 +497,20 @@ func Register(
 		r.Username = strconv.FormatInt(id, 10)
 	}
 
+	// Is this an appservice registration? It will be if the access
+	// token is supplied
+	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
+
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
-
-	if resErr = validateUsername(r.Username); resErr != nil {
-		return *resErr
+	if r.Auth.Type == authtypes.LoginTypeApplicationService || accessTokenErr == nil {
+		if resErr = validateApplicationServiceUsername(r.Username); resErr != nil {
+			return *resErr
+		}
+	} else {
+		if resErr = validateUsername(r.Username); resErr != nil {
+			return *resErr
+		}
 	}
 	if resErr = validatePassword(r.Password); resErr != nil {
 		return *resErr
@@ -513,7 +523,7 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI)
+	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
 }
 
 func handleGuestRegistration(
@@ -579,6 +589,8 @@ func handleRegistrationFlow(
 	sessionID string,
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
+	accessToken string,
+	accessTokenErr error,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
@@ -588,7 +600,6 @@ func handleRegistrationFlow(
 	// TODO: Handle mapping registrationRequest parameters into session parameters
 
 	// TODO: email / msisdn auth types.
-	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
 
 	// Appservices are special and are not affected by disabled
 	// registration or user exclusivity. We'll go onto the appservice
@@ -680,6 +691,8 @@ func handleApplicationServiceRegistration(
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
+	logrus.Warnf("APPSERVICE Is appservice registration %q", r.Username)
+
 	// Check if we previously had issues extracting the access token from the
 	// request.
 	if tokenErr != nil {
