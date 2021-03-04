@@ -46,7 +46,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -691,8 +690,6 @@ func handleApplicationServiceRegistration(
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
-	logrus.Warnf("APPSERVICE Is appservice registration %q", r.Username)
-
 	// Check if we previously had issues extracting the access token from the
 	// request.
 	if tokenErr != nil {

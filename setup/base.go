@@ -290,8 +290,9 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 	return client
 }
 
-// CreateClient creates a new client (normally used for media fetch requests).
-// Should only be called once per component.
+// CreateAppserviceClient creates a new client for application services.
+// It has a specific timeout and obeys TLS validation from the appservice
+// config rather than the federation config.
 func (b *BaseDendrite) CreateAppserviceClient() *gomatrixserverlib.Client {
 	opts := []gomatrixserverlib.ClientOption{
 		gomatrixserverlib.WithSkipVerify(b.Cfg.AppServiceAPI.DisableTLSValidation),
