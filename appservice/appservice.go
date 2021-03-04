@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/kafka"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
@@ -44,10 +43,10 @@ func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQuer
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *setup.BaseDendrite,
-	client *gomatrixserverlib.Client,
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
+	client := base.CreateAppserviceClient()
 	consumer, _ := kafka.SetupConsumerProducer(&base.Cfg.Global.Kafka)
 
 	// Create a connection to the appservice postgres DB

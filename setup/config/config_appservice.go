@@ -33,6 +33,10 @@ type AppServiceAPI struct {
 
 	Database DatabaseOptions `yaml:"database"`
 
+	// DisableTLSValidation disables the validation of X.509 TLS certs
+	// on appservice endpoints. This is not recommended in production!
+	DisableTLSValidation bool `yaml:"disable_tls_validation"`
+
 	ConfigFiles []string `yaml:"config_files"`
 }
 
