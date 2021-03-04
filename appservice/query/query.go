@@ -20,7 +20,6 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -159,11 +158,4 @@ func (a *AppServiceQueryAPI) UserIDExists(
 
 	response.UserIDExists = false
 	return nil
-}
-
-// makeHTTPClient creates an HTTP client with certain options that will be used for all query requests to application services
-func makeHTTPClient() *http.Client {
-	return &http.Client{
-		Timeout: time.Second * 30,
-	}
 }
