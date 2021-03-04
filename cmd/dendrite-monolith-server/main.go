@@ -121,7 +121,9 @@ func main() {
 		eduInputAPI = base.EDUServerClient()
 	}
 
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	client := base.CreateClient()
+
+	asAPI := appservice.NewInternalAPI(base, client, userAPI, rsAPI)
 	if base.UseHTTPAPIs {
 		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
@@ -131,7 +133,7 @@ func main() {
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
-		Client:    base.CreateClient(),
+		Client:    client,
 		FedClient: federation,
 		KeyRing:   keyRing,
 

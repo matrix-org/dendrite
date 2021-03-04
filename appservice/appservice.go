@@ -16,9 +16,7 @@ package appservice
 
 import (
 	"context"
-	"net/http"
 	"sync"
-	"time"
 
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -33,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/kafka"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,6 +44,7 @@ func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQuer
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *setup.BaseDendrite,
+	client *gomatrixserverlib.Client,
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
@@ -79,10 +79,8 @@ func NewInternalAPI(
 	// Create appserivce query API with an HTTP client that will be used for all
 	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := &query.AppServiceQueryAPI{
-		HTTPClient: &http.Client{
-			Timeout: time.Second * 30,
-		},
-		Cfg: base.Cfg,
+		HTTPClient: client,
+		Cfg:        base.Cfg,
 	}
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
@@ -98,7 +96,7 @@ func NewInternalAPI(
 	}
 
 	// Create application service transaction workers
-	if err := workers.SetupTransactionWorkers(appserviceDB, workerStates); err != nil {
+	if err := workers.SetupTransactionWorkers(client, appserviceDB, workerStates); err != nil {
 		logrus.WithError(err).Panicf("failed to start app service transaction workers")
 	}
 	return appserviceQueryAPI

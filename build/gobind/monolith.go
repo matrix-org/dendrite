@@ -129,7 +129,7 @@ func (m *DendriteMonolith) Start() {
 		base, cache.New(), userAPI,
 	)
 
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, base.CreateClient(), userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 
 	ygg.SetSessionFunc(func(address string) {

@@ -34,8 +34,6 @@ import (
 var (
 	// Maximum size of events sent in each transaction.
 	transactionBatchSize = 50
-	// Timeout for sending a single transaction to an application service.
-	transactionTimeout = time.Second * 60
 )
 
 // SetupTransactionWorkers spawns a separate goroutine for each application
@@ -44,6 +42,7 @@ var (
 // size), then send that off to the AS's /transactions/{txnID} endpoint. It also
 // handles exponentially backing off in case the AS isn't currently available.
 func SetupTransactionWorkers(
+	client *gomatrixserverlib.Client,
 	appserviceDB storage.Database,
 	workerStates []types.ApplicationServiceWorkerState,
 ) error {
@@ -51,7 +50,7 @@ func SetupTransactionWorkers(
 	for _, workerState := range workerStates {
 		// Don't create a worker if this AS doesn't want to receive events
 		if workerState.AppService.URL != "" {
-			go worker(appserviceDB, workerState)
+			go worker(client, appserviceDB, workerState)
 		}
 	}
 	return nil
@@ -59,16 +58,11 @@ func SetupTransactionWorkers(
 
 // worker is a goroutine that sends any queued events to the application service
 // it is given.
-func worker(db storage.Database, ws types.ApplicationServiceWorkerState) {
+func worker(client *gomatrixserverlib.Client, db storage.Database, ws types.ApplicationServiceWorkerState) {
 	log.WithFields(log.Fields{
 		"appservice": ws.AppService.ID,
 	}).Info("Starting application service")
 	ctx := context.Background()
-
-	// Create a HTTP client for sending requests to app services
-	client := &http.Client{
-		Timeout: transactionTimeout,
-	}
 
 	// Initial check for any leftover events to send from last time
 	eventCount, err := db.CountEventsWithAppServiceID(ctx, ws.AppService.ID)
@@ -206,7 +200,7 @@ func createTransaction(
 // send sends events to an application service. Returns an error if an OK was not
 // received back from the application service or the request timed out.
 func send(
-	client *http.Client,
+	client *gomatrixserverlib.Client,
 	appservice config.ApplicationService,
 	txnID int,
 	transaction []byte,
@@ -219,7 +213,7 @@ func send(
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := client.DoHTTPRequest(context.TODO(), req)
 	if err != nil {
 		return err
 	}

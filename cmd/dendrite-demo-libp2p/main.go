@@ -163,7 +163,7 @@ func main() {
 	eduInputAPI := eduserver.NewInternalAPI(
 		&base.Base, cache.New(), userAPI,
 	)
-	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(&base.Base, base.Base.CreateClient(), userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationsender.NewInternalAPI(
 		&base.Base, federation, rsAPI, keyRing,
