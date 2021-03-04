@@ -295,6 +295,7 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 func (b *BaseDendrite) CreateAppserviceClient() *gomatrixserverlib.Client {
 	opts := []gomatrixserverlib.ClientOption{
 		gomatrixserverlib.WithSkipVerify(b.Cfg.AppServiceAPI.DisableTLSValidation),
+		gomatrixserverlib.WithTimeout(time.Second * 60),
 	}
 	if b.Cfg.Global.DNSCache.Enabled {
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
