@@ -123,7 +123,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			if err != nil {
 				return err
 			}
-			resp, err := a.HTTPClient.Do(req)
+			resp, err := a.HTTPClient.Do(req.WithContext(ctx))
 			if resp != nil {
 				defer func() {
 					err = resp.Body.Close()
