@@ -16,7 +16,10 @@ package appservice
 
 import (
 	"context"
+	"crypto/tls"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -46,7 +49,15 @@ func NewInternalAPI(
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
-	client := base.CreateAppserviceClient()
+	client := &http.Client{
+		Timeout: time.Second * 30,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: base.Cfg.AppServiceAPI.DisableTLSValidation,
+			},
+		},
+	}
 	consumer, _ := kafka.SetupConsumerProducer(&base.Cfg.Global.Kafka)
 
 	// Create a connection to the appservice postgres DB
