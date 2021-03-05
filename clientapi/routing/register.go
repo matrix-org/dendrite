@@ -502,7 +502,7 @@ func Register(
 
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
-	if r.Auth.Type == authtypes.LoginTypeApplicationService {
+	if r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil {
 		if resErr = validateApplicationServiceUsername(r.Username); resErr != nil {
 			return *resErr
 		}
@@ -604,7 +604,7 @@ func handleRegistrationFlow(
 	// registration or user exclusivity. We'll go onto the appservice
 	// registration flow if a valid access token was provided or if
 	// the login type specifically requests it.
-	if r.Auth.Type == authtypes.LoginTypeApplicationService {
+	if r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil {
 		return handleApplicationServiceRegistration(
 			accessToken, accessTokenErr, req, r, cfg, userAPI,
 		)
