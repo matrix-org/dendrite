@@ -197,7 +197,7 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 // setupRegexps will create regex objects for exclusive and non-exclusive
 // usernames, aliases and rooms of all application services, so that other
 // methods can quickly check if a particular string matches any of them.
-func setupRegexps(_ *AppServiceAPI, derived *Derived) (err error) {
+func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 	// Combine all exclusive namespaces for later string checking
 	var exclusiveUsernameStrings, exclusiveAliasStrings []string
 
@@ -205,6 +205,16 @@ func setupRegexps(_ *AppServiceAPI, derived *Derived) (err error) {
 	// its contents to the overall exlusive regex string. Room regex
 	// not necessary as we aren't denying exclusive room ID creation
 	for _, appservice := range derived.ApplicationServices {
+		// The sender_localpart can be considered an exclusive regex for a single user, so let's do that
+		// to simplify the code
+		var senderUserIDSlice = []string{fmt.Sprintf("@%s:%s", appservice.SenderLocalpart, asAPI.Matrix.ServerName)}
+		usersSlice, found := appservice.NamespaceMap["users"]
+		if !found {
+			usersSlice = []ApplicationServiceNamespace{}
+			appservice.NamespaceMap["users"] = usersSlice
+		}
+		appendExclusiveNamespaceRegexs(&senderUserIDSlice, usersSlice)
+
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			switch key {
 			case "users":
