@@ -510,3 +510,9 @@ Can pass a JSON filter as a query parameter
 Local room members can get room messages
 Remote room members can get room messages
 Guest users can send messages to guest_access rooms if joined
+AS can create a user
+AS can create a user with an underscore
+AS can create a user with inhibit_login
+AS can set avatar for ghosted users
+AS can set displayname for ghosted users
+Ghost user must register before joining room

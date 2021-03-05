@@ -61,6 +61,7 @@ func main() {
 	}
 
 	if *defaultsForCI {
+		cfg.AppServiceAPI.DisableTLSValidation = true
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		cfg.FederationSender.DisableTLSValidation = true
 		cfg.MSCs.MSCs = []string{"msc2836", "msc2946", "msc2444", "msc2753"}

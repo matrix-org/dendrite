@@ -20,10 +20,10 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -33,7 +33,7 @@ const userIDExistsPath = "/users/"
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
 type AppServiceQueryAPI struct {
-	HTTPClient *http.Client
+	HTTPClient *gomatrixserverlib.Client
 	Cfg        *config.Dendrite
 }
 
@@ -46,11 +46,6 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 ) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceRoomAlias")
 	defer span.Finish()
-
-	// Create an HTTP client if one does not already exist
-	if a.HTTPClient == nil {
-		a.HTTPClient = makeHTTPClient()
-	}
 
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
@@ -68,7 +63,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 			}
 			req = req.WithContext(ctx)
 
-			resp, err := a.HTTPClient.Do(req)
+			resp, err := a.HTTPClient.DoHTTPRequest(ctx, req)
 			if resp != nil {
 				defer func() {
 					err = resp.Body.Close()
@@ -115,11 +110,6 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "ApplicationServiceUserID")
 	defer span.Finish()
 
-	// Create an HTTP client if one does not already exist
-	if a.HTTPClient == nil {
-		a.HTTPClient = makeHTTPClient()
-	}
-
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInUserID(request.UserID) {
@@ -134,7 +124,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			if err != nil {
 				return err
 			}
-			resp, err := a.HTTPClient.Do(req.WithContext(ctx))
+			resp, err := a.HTTPClient.DoHTTPRequest(ctx, req)
 			if resp != nil {
 				defer func() {
 					err = resp.Body.Close()
@@ -168,11 +158,4 @@ func (a *AppServiceQueryAPI) UserIDExists(
 
 	response.UserIDExists = false
 	return nil
-}
-
-// makeHTTPClient creates an HTTP client with certain options that will be used for all query requests to application services
-func makeHTTPClient() *http.Client {
-	return &http.Client{
-		Timeout: time.Second * 30,
-	}
 }

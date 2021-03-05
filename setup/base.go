@@ -290,6 +290,22 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 	return client
 }
 
+// CreateAppserviceClient creates a new client for application services.
+// It has a specific timeout and obeys TLS validation from the appservice
+// config rather than the federation config.
+func (b *BaseDendrite) CreateAppserviceClient() *gomatrixserverlib.Client {
+	opts := []gomatrixserverlib.ClientOption{
+		gomatrixserverlib.WithSkipVerify(b.Cfg.AppServiceAPI.DisableTLSValidation),
+		gomatrixserverlib.WithTimeout(time.Second * 60),
+	}
+	if b.Cfg.Global.DNSCache.Enabled {
+		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
+	}
+	client := gomatrixserverlib.NewClient(opts...)
+	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	return client
+}
+
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {

@@ -125,6 +125,11 @@ app_service_api:
     max_idle_conns: 2
     conn_max_lifetime: -1
 
+  # Disable the validation of TLS certificates of appservices. This is
+  # not recommended in production since it may allow appservice traffic
+  # to be sent to an unverified endpoint.
+  disable_tls_validation: false
+
   # Appservice configuration files to load into this homeserver.
   config_files: []
 

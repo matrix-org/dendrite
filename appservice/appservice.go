@@ -16,9 +16,7 @@ package appservice
 
 import (
 	"context"
-	"net/http"
 	"sync"
-	"time"
 
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -48,6 +46,7 @@ func NewInternalAPI(
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
+	client := base.CreateAppserviceClient()
 	consumer, _ := kafka.SetupConsumerProducer(&base.Cfg.Global.Kafka)
 
 	// Create a connection to the appservice postgres DB
@@ -79,10 +78,8 @@ func NewInternalAPI(
 	// Create appserivce query API with an HTTP client that will be used for all
 	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := &query.AppServiceQueryAPI{
-		HTTPClient: &http.Client{
-			Timeout: time.Second * 30,
-		},
-		Cfg: base.Cfg,
+		HTTPClient: client,
+		Cfg:        base.Cfg,
 	}
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
@@ -98,7 +95,7 @@ func NewInternalAPI(
 	}
 
 	// Create application service transaction workers
-	if err := workers.SetupTransactionWorkers(appserviceDB, workerStates); err != nil {
+	if err := workers.SetupTransactionWorkers(client, appserviceDB, workerStates); err != nil {
 		logrus.WithError(err).Panicf("failed to start app service transaction workers")
 	}
 	return appserviceQueryAPI
