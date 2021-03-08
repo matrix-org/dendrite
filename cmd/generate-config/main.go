@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"
 )
 
@@ -68,6 +69,7 @@ func main() {
 		cfg.Logging[0].Level = "trace"
 		// don't hit matrix.org when running tests!!!
 		cfg.SigningKeyServer.KeyPerspectives = config.KeyPerspectives{}
+		cfg.UserAPI.BCryptCost = bcrypt.MinCost
 	}
 
 	j, err := yaml.Marshal(cfg)
