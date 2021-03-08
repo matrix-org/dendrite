@@ -1,9 +1,14 @@
 package config
 
+import "golang.org/x/crypto/bcrypt"
+
 type UserAPI struct {
 	Matrix *Global `yaml:"-"`
 
 	InternalAPI InternalAPIOptions `yaml:"internal_api"`
+
+	// The cost when hashing passwords.
+	BCryptCost int `yaml:"bcrypt_cost"`
 
 	// The Account database stores the login details and account information
 	// for local users. It is accessed by the UserAPI.
@@ -20,6 +25,7 @@ func (c *UserAPI) Defaults() {
 	c.DeviceDatabase.Defaults(10)
 	c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
 	c.DeviceDatabase.ConnectionString = "file:userapi_devices.db"
+	c.BCryptCost = bcrypt.DefaultCost
 }
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
