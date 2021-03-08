@@ -153,10 +153,11 @@ func (r *Joiner) performJoinRoomByID(
 ) (string, gomatrixserverlib.ServerName, error) {
 	// The original client request ?server_name=... may include this HS so filter that out so we
 	// don't attempt to make_join with ourselves
-	for i, srv := range req.ServerNames {
-		if srv == r.Cfg.Matrix.ServerName {
+	for i := 0; i < len(req.ServerNames); i++ {
+		if req.ServerNames[i] == r.Cfg.Matrix.ServerName {
 			// delete this entry
 			req.ServerNames = append(req.ServerNames[:i], req.ServerNames[i+1:]...)
+			i--
 		}
 	}
 
