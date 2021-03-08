@@ -16,8 +16,8 @@ type UserAPI struct {
 func (c *UserAPI) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7781"
 	c.InternalAPI.Connect = "http://localhost:7781"
-	c.AccountDatabase.Defaults()
-	c.DeviceDatabase.Defaults()
+	c.AccountDatabase.Defaults(10)
+	c.DeviceDatabase.Defaults(10)
 	c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
 	c.DeviceDatabase.ConnectionString = "file:userapi_devices.db"
 }
