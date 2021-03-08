@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const usage = `Usage: %s
@@ -57,7 +58,7 @@ func main() {
 
 	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
 		ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
-	}, cfg.Global.ServerName)
+	}, cfg.Global.ServerName, bcrypt.DefaultCost)
 	if err != nil {
 		logrus.Fatalln("Failed to connect to the database:", err.Error())
 	}

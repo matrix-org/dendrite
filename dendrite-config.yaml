@@ -240,7 +240,7 @@ media_api:
     listen: http://[::]:8074
   database:
     connection_string: file:mediaapi.db
-    max_open_conns: 10
+    max_open_conns: 5
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -278,7 +278,7 @@ mscs:
   mscs: []
   database:
     connection_string: file:mscs.db
-    max_open_conns: 10
+    max_open_conns: 5
     max_idle_conns: 2
     conn_max_lifetime: -1
 
@@ -340,6 +340,13 @@ sync_api:
 
 # Configuration for the User API.
 user_api:
+  # The cost when hashing passwords on registration/login. Default: 10. Min: 4, Max: 31
+  # See https://pkg.go.dev/golang.org/x/crypto/bcrypt for more information.
+  # Setting this lower makes registration/login consume less CPU resources at the cost of security
+  # should the database be compromised. Setting this higher makes registration/login consume more
+  # CPU resources but makes it harder to brute force password hashes.
+  # This value can be low if performing tests or on embedded Dendrite instances (e.g WASM builds)
+  # bcrypt_cost: 10
   internal_api:
     listen: http://localhost:7781
     connect: http://localhost:7781

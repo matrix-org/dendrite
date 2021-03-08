@@ -39,7 +39,7 @@ func (c *MediaAPI) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7774"
 	c.InternalAPI.Connect = "http://localhost:7774"
 	c.ExternalAPI.Listen = "http://[::]:8074"
-	c.Database.Defaults()
+	c.Database.Defaults(5)
 	c.Database.ConnectionString = "file:mediaapi.db"
 
 	defaultMaxFileSizeBytes := FileSizeBytes(10485760)

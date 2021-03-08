@@ -122,8 +122,8 @@ type DatabaseOptions struct {
 	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
 }
 
-func (c *DatabaseOptions) Defaults() {
-	c.MaxOpenConnections = 100
+func (c *DatabaseOptions) Defaults(conns int) {
+	c.MaxOpenConnections = conns
 	c.MaxIdleConnections = 2
 	c.ConnMaxLifetimeSeconds = -1
 }
