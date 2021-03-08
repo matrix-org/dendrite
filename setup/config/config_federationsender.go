@@ -25,7 +25,7 @@ type FederationSender struct {
 func (c *FederationSender) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7775"
 	c.InternalAPI.Connect = "http://localhost:7775"
-	c.Database.Defaults()
+	c.Database.Defaults(10)
 	c.Database.ConnectionString = "file:federationsender.db"
 
 	c.FederationMaxRetries = 16
