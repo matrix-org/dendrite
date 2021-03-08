@@ -725,7 +725,7 @@ func handleApplicationServiceRegistration(
 	// application service registration is entirely separate.
 	return completeRegistration(
 		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(),
-		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+		true, r.InitialDisplayName, r.DeviceID,
 	)
 }
 
