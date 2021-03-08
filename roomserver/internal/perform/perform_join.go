@@ -151,6 +151,16 @@ func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) (string, gomatrixserverlib.ServerName, error) {
+	// The original client request ?server_name=... may include this HS so filter that out so we
+	// don't attempt to make_join with ourselves
+	for i := 0; i < len(req.ServerNames); i++ {
+		if req.ServerNames[i] == r.Cfg.Matrix.ServerName {
+			// delete this entry
+			req.ServerNames = append(req.ServerNames[:i], req.ServerNames[i+1:]...)
+			i--
+		}
+	}
+
 	// Get the domain part of the room ID.
 	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
 	if err != nil {
