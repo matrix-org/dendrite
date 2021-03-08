@@ -347,6 +347,9 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 				} else if fcerr.Blacklisted {
 					waitTime = time.Hour * 8
 				}
+			} else {
+				waitTime = time.Hour
+				logger.WithError(err).Warn("GetUserDevices returned unknown error type")
 			}
 			hasFailures = true
 			continue
