@@ -43,7 +43,7 @@ type AppServiceAPI struct {
 func (c *AppServiceAPI) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7777"
 	c.InternalAPI.Connect = "http://localhost:7777"
-	c.Database.Defaults(10)
+	c.Database.Defaults(5)
 	c.Database.ConnectionString = "file:appservice.db"
 }
 
