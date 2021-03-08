@@ -502,11 +502,23 @@ func Register(
 
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
-	if r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil {
+	switch {
+	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
+		// Spec-compliant case (the access_token is specified and the login type
+		// is correctly set, so it's an appservice registration)
 		if resErr = validateApplicationServiceUsername(r.Username); resErr != nil {
 			return *resErr
 		}
-	} else {
+	case accessTokenErr == nil:
+		// Non-spec-compliant case (the access_token is specified but the login
+		// type is not known or specified)
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
+		}
+	default:
+		// Spec-compliant case (neither the access_token nor the login type are
+		// specified, so it's a normal user registration)
 		if resErr = validateUsername(r.Username); resErr != nil {
 			return *resErr
 		}
