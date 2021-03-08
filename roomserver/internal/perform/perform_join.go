@@ -24,6 +24,7 @@ import (
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -36,6 +37,7 @@ type Joiner struct {
 	ServerName gomatrixserverlib.ServerName
 	Cfg        *config.RoomServer
 	FSAPI      fsAPI.FederationSenderInternalAPI
+	RSAPI      rsAPI.RoomserverInternalAPI
 	DB         storage.Database
 
 	Inputer *input.Inputer
@@ -121,11 +123,17 @@ func (r *Joiner) performJoinRoomByAlias(
 		roomID = dirRes.RoomID
 		req.ServerNames = append(req.ServerNames, dirRes.ServerNames...)
 	} else {
+		var getRoomReq = rsAPI.GetRoomIDForAliasRequest{
+			Alias:              req.RoomIDOrAlias,
+			IncludeAppservices: true,
+		}
+		var getRoomRes = rsAPI.GetRoomIDForAliasResponse{}
 		// Otherwise, look up if we know this room alias locally.
-		roomID, err = r.DB.GetRoomIDForAlias(ctx, req.RoomIDOrAlias)
+		err = r.RSAPI.GetRoomIDForAlias(ctx, &getRoomReq, &getRoomRes)
 		if err != nil {
 			return "", "", fmt.Errorf("Lookup room alias %q failed: %w", req.RoomIDOrAlias, err)
 		}
+		roomID = getRoomRes.RoomID
 	}
 
 	// If the room ID is empty then we failed to look up the alias.
@@ -139,7 +147,6 @@ func (r *Joiner) performJoinRoomByAlias(
 }
 
 // TODO: Break this function up a bit
-// nolint:gocyclo
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,

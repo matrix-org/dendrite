@@ -37,7 +37,6 @@ type Inviter struct {
 	Inputer *input.Inputer
 }
 
-// nolint:gocyclo
 func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,

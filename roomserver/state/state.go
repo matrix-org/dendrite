@@ -770,7 +770,6 @@ func (v *StateResolution) resolveConflictsV1(
 // Returns a list that combines the entries without conflicts with the result of state resolution for the entries with conflicts.
 // The returned list is sorted by state key tuple.
 // Returns an error if there was a problem talking to the database.
-// nolint:gocyclo
 func (v *StateResolution) resolveConflictsV2(
 	ctx context.Context,
 	notConflicted, conflicted []types.StateEntry,

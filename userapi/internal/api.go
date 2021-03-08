@@ -87,7 +87,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 			ServerName:   a.ServerName,
 			UserID:       fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
 		}
-		return err
+		return nil
 	}
 
 	if err = a.AccountDB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
@@ -381,7 +381,8 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		// Use AS dummy device ID
 		ID: types.AppServiceDeviceID,
 		// AS dummy device has AS's token.
-		AccessToken: token,
+		AccessToken:  token,
+		AppserviceID: appService.ID,
 	}
 
 	localpart, err := userutil.ParseUsernameParam(appServiceUserID, &a.ServerName)
