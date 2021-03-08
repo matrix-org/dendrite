@@ -15,7 +15,7 @@ func (c *SyncAPI) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7773"
 	c.InternalAPI.Connect = "http://localhost:7773"
 	c.ExternalAPI.Listen = "http://localhost:8073"
-	c.Database.Defaults()
+	c.Database.Defaults(10)
 	c.Database.ConnectionString = "file:syncapi.db"
 }
 
