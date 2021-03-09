@@ -496,11 +496,32 @@ func Register(
 		r.Username = strconv.FormatInt(id, 10)
 	}
 
+	// Is this an appservice registration? It will be if the access
+	// token is supplied
+	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
+
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
-
-	if resErr = validateUsername(r.Username); resErr != nil {
-		return *resErr
+	switch {
+	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
+		// Spec-compliant case (the access_token is specified and the login type
+		// is correctly set, so it's an appservice registration)
+		if resErr = validateApplicationServiceUsername(r.Username); resErr != nil {
+			return *resErr
+		}
+	case accessTokenErr == nil:
+		// Non-spec-compliant case (the access_token is specified but the login
+		// type is not known or specified)
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
+		}
+	default:
+		// Spec-compliant case (neither the access_token nor the login type are
+		// specified, so it's a normal user registration)
+		if resErr = validateUsername(r.Username); resErr != nil {
+			return *resErr
+		}
 	}
 	if resErr = validatePassword(r.Password); resErr != nil {
 		return *resErr
@@ -513,7 +534,7 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI)
+	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
 }
 
 func handleGuestRegistration(
@@ -579,6 +600,8 @@ func handleRegistrationFlow(
 	sessionID string,
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
+	accessToken string,
+	accessTokenErr error,
 ) util.JSONResponse {
 	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
@@ -588,12 +611,12 @@ func handleRegistrationFlow(
 	// TODO: Handle mapping registrationRequest parameters into session parameters
 
 	// TODO: email / msisdn auth types.
-	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
 
 	// Appservices are special and are not affected by disabled
-	// registration or user exclusivity.
-	if r.Auth.Type == authtypes.LoginTypeApplicationService ||
-		(r.Auth.Type == "" && accessTokenErr == nil) {
+	// registration or user exclusivity. We'll go onto the appservice
+	// registration flow if a valid access token was provided or if
+	// the login type specifically requests it.
+	if r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil {
 		return handleApplicationServiceRegistration(
 			accessToken, accessTokenErr, req, r, cfg, userAPI,
 		)

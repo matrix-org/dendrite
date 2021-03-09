@@ -73,7 +73,6 @@ func (n *Node) DialerContext(ctx context.Context, network, address string) (net.
 	return n.Dialer(network, address)
 }
 
-// nolint:gocyclo
 func Setup(instanceName, storageDirectory string) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasil.Core{},

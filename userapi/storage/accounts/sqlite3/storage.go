@@ -42,6 +42,7 @@ type Database struct {
 	accountDatas accountDataStatements
 	threepids    threepidStatements
 	serverName   gomatrixserverlib.ServerName
+	bcryptCost   int
 
 	accountsMu     sync.Mutex
 	profilesMu     sync.Mutex
@@ -50,7 +51,7 @@ type Database struct {
 }
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int) (*Database, error) {
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
@@ -59,6 +60,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		serverName: serverName,
 		db:         db,
 		writer:     sqlutil.NewExclusiveWriter(),
+		bcryptCost: bcryptCost,
 	}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
@@ -143,7 +145,7 @@ func (d *Database) SetDisplayName(
 func (d *Database) SetPassword(
 	ctx context.Context, localpart, plaintextPassword string,
 ) error {
-	hash, err := hashPassword(plaintextPassword)
+	hash, err := d.hashPassword(plaintextPassword)
 	if err != nil {
 		return err
 	}
@@ -208,7 +210,7 @@ func (d *Database) createAccount(
 	// Generate a password hash if this is not a password-less user
 	hash := ""
 	if plaintextPassword != "" {
-		hash, err = hashPassword(plaintextPassword)
+		hash, err = d.hashPassword(plaintextPassword)
 		if err != nil {
 			return nil, err
 		}
@@ -278,8 +280,8 @@ func (d *Database) GetNewNumericLocalpart(
 	return d.accounts.selectNewNumericLocalpart(ctx, nil)
 }
 
-func hashPassword(plaintext string) (hash string, err error) {
-	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcrypt.DefaultCost)
+func (d *Database) hashPassword(plaintext string) (hash string, err error) {
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), d.bcryptCost)
 	return string(hashBytes), err
 }
 

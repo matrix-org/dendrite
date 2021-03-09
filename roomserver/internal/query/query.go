@@ -49,7 +49,6 @@ func (r *Queryer) QueryLatestEventsAndState(
 }
 
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
-// nolint:gocyclo
 func (r *Queryer) QueryStateAfterEvents(
 	ctx context.Context,
 	request *api.QueryStateAfterEventsRequest,
@@ -243,6 +242,27 @@ func (r *Queryer) QueryMembershipsForRoom(
 		return err
 	}
 
+	// If no sender is specified then we will just return the entire
+	// set of memberships for the room, regardless of whether a specific
+	// user is allowed to see them or not.
+	if request.Sender == "" {
+		var events []types.Event
+		var eventNIDs []types.EventNID
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
+		}
+		events, err = r.DB.Events(ctx, eventNIDs)
+		if err != nil {
+			return fmt.Errorf("r.DB.Events: %w", err)
+		}
+		for _, event := range events {
+			clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
+			response.JoinEvents = append(response.JoinEvents, clientEvent)
+		}
+		return nil
+	}
+
 	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
 	if err != nil {
 		return err
@@ -372,7 +392,6 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 }
 
 // QueryMissingEvents implements api.RoomserverInternalAPI
-// nolint:gocyclo
 func (r *Queryer) QueryMissingEvents(
 	ctx context.Context,
 	request *api.QueryMissingEventsRequest,
