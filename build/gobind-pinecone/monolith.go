@@ -59,6 +59,8 @@ type DendriteMonolith struct {
 	PineconeMulticast *pineconeMulticast.Multicast
 	PineconeQUIC      *pineconeSessions.QUIC
 	StorageDirectory  string
+	staticPeerURI     string
+	staticPeerMutex   sync.RWMutex
 	listener          net.Listener
 	httpServer        *http.Server
 	processContext    *process.ProcessContext
@@ -89,6 +91,9 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.DisconnectType(pineconeRouter.PeerTypeRemote)
 	if uri != "" {
+		m.staticPeerMutex.Lock()
+		m.staticPeerURI = uri
+		m.staticPeerMutex.Unlock()
 		go conn.ConnectToPeer(m.PineconeRouter, uri)
 	}
 }
@@ -96,7 +101,7 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 func (m *DendriteMonolith) DisconnectType(peertype int) {
 	for _, p := range m.PineconeRouter.Peers() {
 		if peertype == p.PeerType {
-			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port))
+			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
 		}
 	}
 }
@@ -104,13 +109,13 @@ func (m *DendriteMonolith) DisconnectType(peertype int) {
 func (m *DendriteMonolith) DisconnectZone(zone string) {
 	for _, p := range m.PineconeRouter.Peers() {
 		if zone == p.Zone {
-			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port))
+			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
 		}
 	}
 }
 
 func (m *DendriteMonolith) DisconnectPort(port int) error {
-	return m.PineconeRouter.Disconnect(types.SwitchPortID(port))
+	return m.PineconeRouter.Disconnect(types.SwitchPortID(port), nil)
 }
 
 func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) {
@@ -244,6 +249,34 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeRouter = pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
 	m.PineconeQUIC = pineconeSessions.NewQUIC(logger, m.PineconeRouter)
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
+
+	go func() {
+		for {
+			select {
+			case <-m.processContext.Context().Done():
+				return
+			default:
+			}
+			if m.PineconeRouter == nil {
+				return
+			}
+			m.staticPeerMutex.RLock()
+			if m.staticPeerURI != "" {
+				found := false
+				for _, p := range m.PineconeRouter.Peers() {
+					if p.PeerType == pineconeRouter.PeerTypeRemote {
+						found = true
+						break
+					}
+				}
+				if !found {
+					conn.ConnectToPeer(m.PineconeRouter, m.staticPeerURI)
+				}
+			}
+			m.staticPeerMutex.RUnlock()
+			time.Sleep(time.Second * 5)
+		}
+	}()
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
