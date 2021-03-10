@@ -71,8 +71,8 @@ func (m *DendriteMonolith) BaseURL() string {
 	return fmt.Sprintf("http://%s", m.listener.Addr().String())
 }
 
-func (m *DendriteMonolith) PeerCount() int {
-	return m.PineconeRouter.PeerCount()
+func (m *DendriteMonolith) PeerCount(peertype int) int {
+	return m.PineconeRouter.PeerCount(peertype)
 }
 
 func (m *DendriteMonolith) SessionCount() int {
@@ -249,34 +249,6 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeRouter = pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
 	m.PineconeQUIC = pineconeSessions.NewQUIC(logger, m.PineconeRouter)
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
-
-	go func() {
-		for {
-			select {
-			case <-m.processContext.Context().Done():
-				return
-			default:
-			}
-			if m.PineconeRouter == nil {
-				return
-			}
-			m.staticPeerMutex.RLock()
-			if m.staticPeerURI != "" {
-				found := false
-				for _, p := range m.PineconeRouter.Peers() {
-					if p.PeerType == pineconeRouter.PeerTypeRemote {
-						found = true
-						break
-					}
-				}
-				if !found {
-					conn.ConnectToPeer(m.PineconeRouter, m.staticPeerURI)
-				}
-			}
-			m.staticPeerMutex.RUnlock()
-			time.Sleep(time.Second * 5)
-		}
-	}()
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
