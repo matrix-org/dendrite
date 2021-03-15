@@ -38,6 +38,8 @@ import (
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -339,6 +341,7 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeQUIC.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
 
 	// Build both ends of a HTTP multiplex.
+	h2s := &http2.Server{}
 	m.httpServer = &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
@@ -348,7 +351,7 @@ func (m *DendriteMonolith) Start() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
-		Handler: pMux,
+		Handler: h2c.NewHandler(pMux, h2s),
 	}
 	m.processContext = base.ProcessContext
 

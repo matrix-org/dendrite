@@ -4,12 +4,12 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
@@ -41,7 +41,7 @@ func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) {
 }
 
 type RoundTripper struct {
-	inner *http.Transport
+	inner *http2.Transport
 }
 
 func (y *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -55,16 +55,9 @@ func CreateClient(
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
-			inner: &http.Transport{
-				//MaxIdleConnsPerHost:   -1,
-				DisableKeepAlives:     true,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ResponseHeaderTimeout: 10 * time.Second,
-				IdleConnTimeout:       60 * time.Second,
-				Dial:                  s.Dial,
-				DialContext:           s.DialContext,
-				DialTLS:               s.DialTLS,
-				DialTLSContext:        s.DialTLSContext,
+			inner: &http2.Transport{
+				AllowHTTP: true,
+				DialTLS:   s.DialTLSForH2C,
 			},
 		},
 	)
@@ -79,16 +72,9 @@ func CreateFederationClient(
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
-			inner: &http.Transport{
-				//MaxIdleConnsPerHost:   -1,
-				DisableKeepAlives:     true,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ResponseHeaderTimeout: 10 * time.Second,
-				IdleConnTimeout:       60 * time.Second,
-				Dial:                  s.Dial,
-				DialContext:           s.DialContext,
-				DialTLS:               s.DialTLS,
-				DialTLSContext:        s.DialTLSContext,
+			inner: &http2.Transport{
+				AllowHTTP: true,
+				DialTLS:   s.DialTLSForH2C,
 			},
 		},
 	)
