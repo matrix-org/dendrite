@@ -31,20 +31,20 @@ import (
 
 type PineconeRoomProvider struct {
 	r         *pineconeRouter.Router
-	q         *pineconeSessions.QUIC
+	s         *pineconeSessions.Sessions
 	fedSender api.FederationSenderInternalAPI
 	fedClient *gomatrixserverlib.FederationClient
 }
 
 func NewPineconeRoomProvider(
 	r *pineconeRouter.Router,
-	q *pineconeSessions.QUIC,
+	s *pineconeSessions.Sessions,
 	fedSender api.FederationSenderInternalAPI,
 	fedClient *gomatrixserverlib.FederationClient,
 ) *PineconeRoomProvider {
 	p := &PineconeRoomProvider{
 		r:         r,
-		q:         q,
+		s:         s,
 		fedSender: fedSender,
 		fedClient: fedClient,
 	}
@@ -54,7 +54,7 @@ func NewPineconeRoomProvider(
 func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
 	known := []ed25519.PublicKey{}
 	known = append(known, p.r.KnownNodes()...)
-	known = append(known, p.q.Sessions()...)
+	known = append(known, p.s.Sessions()...)
 	list := []gomatrixserverlib.ServerName{}
 	for _, k := range known {
 		if len(k) == ed25519.PublicKeySize {

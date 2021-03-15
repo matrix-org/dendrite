@@ -57,7 +57,7 @@ type DendriteMonolith struct {
 	config            *yggdrasilConfig.NodeConfig
 	PineconeRouter    *pineconeRouter.Router
 	PineconeMulticast *pineconeMulticast.Multicast
-	PineconeQUIC      *pineconeSessions.QUIC
+	PineconeQUIC      *pineconeSessions.Sessions
 	StorageDirectory  string
 	staticPeerURI     string
 	staticPeerMutex   sync.RWMutex

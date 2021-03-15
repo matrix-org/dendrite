@@ -50,21 +50,21 @@ func (y *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func CreateClient(
-	base *setup.BaseDendrite, quic *pineconeSessions.QUIC,
+	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
 ) *gomatrixserverlib.Client {
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
 			inner: &http.Transport{
-				MaxIdleConnsPerHost:   -1,
+				//MaxIdleConnsPerHost:   -1,
 				DisableKeepAlives:     true,
 				TLSHandshakeTimeout:   10 * time.Second,
 				ResponseHeaderTimeout: 10 * time.Second,
-				IdleConnTimeout:       5 * time.Second,
-				Dial:                  quic.Dial,
-				DialContext:           quic.DialContext,
-				DialTLS:               quic.DialTLS,
-				DialTLSContext:        quic.DialTLSContext,
+				IdleConnTimeout:       60 * time.Second,
+				Dial:                  s.Dial,
+				DialContext:           s.DialContext,
+				DialTLS:               s.DialTLS,
+				DialTLSContext:        s.DialTLSContext,
 			},
 		},
 	)
@@ -74,21 +74,21 @@ func CreateClient(
 }
 
 func CreateFederationClient(
-	base *setup.BaseDendrite, quic *pineconeSessions.QUIC,
+	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
 ) *gomatrixserverlib.FederationClient {
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
 			inner: &http.Transport{
-				MaxIdleConnsPerHost:   -1,
+				//MaxIdleConnsPerHost:   -1,
 				DisableKeepAlives:     true,
 				TLSHandshakeTimeout:   10 * time.Second,
 				ResponseHeaderTimeout: 10 * time.Second,
-				IdleConnTimeout:       5 * time.Second,
-				Dial:                  quic.Dial,
-				DialContext:           quic.DialContext,
-				DialTLS:               quic.DialTLS,
-				DialTLSContext:        quic.DialTLSContext,
+				IdleConnTimeout:       60 * time.Second,
+				Dial:                  s.Dial,
+				DialContext:           s.DialContext,
+				DialTLS:               s.DialTLS,
+				DialTLSContext:        s.DialTLSContext,
 			},
 		},
 	)

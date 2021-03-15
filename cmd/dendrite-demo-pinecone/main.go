@@ -227,7 +227,7 @@ func main() {
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
