@@ -47,8 +47,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -224,7 +222,6 @@ func main() {
 	pQUIC.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
 
 	// Build both ends of a HTTP multiplex.
-	h2s := &http2.Server{}
 	httpServer := &http.Server{
 		Addr:         ":0",
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
@@ -234,7 +231,7 @@ func main() {
 		BaseContext: func(_ net.Listener) context.Context {
 			return context.Background()
 		},
-		Handler: h2c.NewHandler(pMux, h2s),
+		Handler: pMux,
 	}
 
 	go func() {
