@@ -38,6 +38,7 @@ import (
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
@@ -45,6 +46,7 @@ import (
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 	"github.com/matrix-org/pinecone/types"
+	pineconeTypes "github.com/matrix-org/pinecone/types"
 	yggdrasilConfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 )
 
@@ -55,18 +57,19 @@ const (
 )
 
 type DendriteMonolith struct {
-	logger            logrus.Logger
-	config            *yggdrasilConfig.NodeConfig
-	PineconeRouter    *pineconeRouter.Router
-	PineconeMulticast *pineconeMulticast.Multicast
-	PineconeQUIC      *pineconeSessions.Sessions
-	StorageDirectory  string
-	staticPeerURI     string
-	staticPeerMutex   sync.RWMutex
-	listener          net.Listener
-	httpServer        *http.Server
-	processContext    *process.ProcessContext
-	userAPI           userapiAPI.UserInternalAPI
+	logger             logrus.Logger
+	config             *yggdrasilConfig.NodeConfig
+	PineconeRouter     *pineconeRouter.Router
+	PineconeMulticast  *pineconeMulticast.Multicast
+	PineconeQUIC       *pineconeSessions.Sessions
+	StorageDirectory   string
+	staticPeerURI      string
+	staticPeerMutex    sync.RWMutex
+	staticPeerAttempts atomic.Uint32
+	listener           net.Listener
+	httpServer         *http.Server
+	processContext     *process.ProcessContext
+	userAPI            userapiAPI.UserInternalAPI
 }
 
 func (m *DendriteMonolith) BaseURL() string {
@@ -251,6 +254,15 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeRouter = pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
 	m.PineconeQUIC = pineconeSessions.NewQUIC(logger, m.PineconeRouter)
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
+
+	m.PineconeRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
+		m.staticPeerMutex.RLock()
+		uri := m.staticPeerURI
+		m.staticPeerMutex.RUnlock()
+		if peertype == pineconeRouter.PeerTypeRemote && uri != "" && err != nil {
+			conn.ConnectToPeer(m.PineconeRouter, uri)
+		}
+	})
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()

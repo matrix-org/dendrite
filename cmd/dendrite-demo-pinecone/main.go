@@ -51,6 +51,7 @@ import (
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
+	pineconeTypes "github.com/matrix-org/pinecone/types"
 
 	"github.com/sirupsen/logrus"
 )
@@ -123,6 +124,13 @@ func main() {
 	pQUIC := pineconeSessions.NewQUIC(logger, pRouter)
 	pMulticast := pineconeMulticast.NewMulticast(logger, pRouter)
 	pMulticast.Start()
+
+	pRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
+		uri := *instancePeer
+		if peertype == pineconeRouter.PeerTypeRemote && uri != "" && err != nil {
+			conn.ConnectToPeer(pRouter, uri)
+		}
+	})
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
