@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -94,12 +95,12 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 }
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
+	m.staticPeerMutex.Lock()
+	m.staticPeerURI = uri
+	m.staticPeerMutex.Unlock()
 	m.DisconnectType(pineconeRouter.PeerTypeRemote)
 	if uri != "" {
-		m.staticPeerMutex.Lock()
-		m.staticPeerURI = uri
-		m.staticPeerMutex.Unlock()
-		go conn.ConnectToPeer(m.PineconeRouter, uri)
+		m.staticPeerConnect()
 	}
 }
 
@@ -194,6 +195,21 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 	return loginRes.Device.AccessToken, nil
 }
 
+func (m *DendriteMonolith) staticPeerConnect() {
+	m.staticPeerMutex.RLock()
+	uri := m.staticPeerURI
+	m.staticPeerMutex.RUnlock()
+	if uri == "" {
+		return
+	}
+	if err := conn.ConnectToPeer(m.PineconeRouter, uri); err != nil {
+		exp := time.Second * time.Duration(math.Exp2(float64(m.staticPeerAttempts.Inc())))
+		time.AfterFunc(exp, m.staticPeerConnect)
+	} else {
+		m.staticPeerAttempts.Store(0)
+	}
+}
+
 // nolint:gocyclo
 func (m *DendriteMonolith) Start() {
 	m.config = yggdrasilConfig.GenerateConfig()
@@ -256,11 +272,9 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
 
 	m.PineconeRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
-		m.staticPeerMutex.RLock()
-		uri := m.staticPeerURI
-		m.staticPeerMutex.RUnlock()
-		if peertype == pineconeRouter.PeerTypeRemote && uri != "" && err != nil {
-			conn.ConnectToPeer(m.PineconeRouter, uri)
+		if peertype == pineconeRouter.PeerTypeRemote && err != nil {
+			m.staticPeerAttempts.Store(0)
+			time.AfterFunc(time.Second, m.staticPeerConnect)
 		}
 	})
 

@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -8,35 +9,31 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 )
 
-func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) {
+func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) error {
 	var parent net.Conn
 	if strings.HasPrefix(peer, "ws://") || strings.HasPrefix(peer, "wss://") {
 		c, _, err := websocket.DefaultDialer.Dial(peer, nil)
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer %q via WebSockets", peer)
-			return
+			return fmt.Errorf("websocket.DefaultDialer.Dial: %w", err)
 		}
 		parent = WrapWebSocketConn(c)
 	} else {
 		var err error
 		parent, err = net.Dial("tcp", peer)
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to connect to Pinecone static peer %q via TCP", peer)
-			return
+			return fmt.Errorf("net.Dial: %w", err)
 		}
 	}
 	if parent == nil {
-		return
+		return fmt.Errorf("failed to wrap connection")
 	}
-	if _, err := pRouter.AuthenticatedConnect(parent, "static", pineconeRouter.PeerTypeRemote); err != nil {
-		logrus.WithError(err).Errorf("Failed to connect Pinecone static peer to switch")
-	}
+	_, err := pRouter.AuthenticatedConnect(parent, "static", pineconeRouter.PeerTypeRemote)
+	return err
 }
 
 type RoundTripper struct {

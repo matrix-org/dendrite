@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -47,6 +48,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
+	"go.uber.org/atomic"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
@@ -92,10 +94,6 @@ func main() {
 	logger := log.New(os.Stdout, "", 0)
 	pRouter := pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
 
-	if instancePeer != nil && *instancePeer != "" {
-		go conn.ConnectToPeer(pRouter, *instancePeer)
-	}
-
 	go func() {
 		listener, err := net.Listen("tcp", *instanceListen)
 		if err != nil {
@@ -125,12 +123,27 @@ func main() {
 	pMulticast := pineconeMulticast.NewMulticast(logger, pRouter)
 	pMulticast.Start()
 
-	pRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
+	var staticPeerAttempts atomic.Uint32
+	var connectToStaticPeer func()
+	connectToStaticPeer = func() {
 		uri := *instancePeer
-		if peertype == pineconeRouter.PeerTypeRemote && uri != "" && err != nil {
-			conn.ConnectToPeer(pRouter, uri)
+		if uri == "" {
+			return
+		}
+		if err := conn.ConnectToPeer(pRouter, uri); err != nil {
+			exp := time.Second * time.Duration(math.Exp2(float64(staticPeerAttempts.Inc())))
+			time.AfterFunc(exp, connectToStaticPeer)
+		} else {
+			staticPeerAttempts.Store(0)
+		}
+	}
+	pRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
+		if peertype == pineconeRouter.PeerTypeRemote && err != nil {
+			staticPeerAttempts.Store(0)
+			time.AfterFunc(time.Second, connectToStaticPeer)
 		}
 	})
+	go connectToStaticPeer()
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
