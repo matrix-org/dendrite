@@ -29,6 +29,8 @@ import (
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 )
 
+const pineconeRoomAttempts = 3
+
 type PineconeRoomProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
@@ -84,12 +86,20 @@ func bulkFetchPublicRoomsFromServers(
 		go func(homeserverDomain gomatrixserverlib.ServerName) {
 			defer wg.Done()
 			util.GetLogger(ctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")
-			fres, err := fedClient.GetPublicRooms(ctx, homeserverDomain, int(limit), "", false, "")
-			if err != nil {
-				util.GetLogger(ctx).WithError(err).WithField("hs", homeserverDomain).Warn(
-					"bulkFetchPublicRoomsFromServers: failed to query hs",
-				)
-				return
+			var fres gomatrixserverlib.RespPublicRooms
+			var err error
+			for i := 0; i < pineconeRoomAttempts; i++ {
+				fres, err = fedClient.GetPublicRooms(ctx, homeserverDomain, int(limit), "", false, "")
+				if err != nil {
+					util.GetLogger(ctx).WithError(err).WithField("hs", homeserverDomain).Warn(
+						"bulkFetchPublicRoomsFromServers: failed to query hs",
+					)
+					if i == pineconeRoomAttempts-1 {
+						return
+					}
+				} else {
+					break
+				}
 			}
 			for _, room := range fres.Chunk {
 				// atomically send a room or stop
