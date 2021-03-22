@@ -20,6 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
+	"hash/fnv"
+	"time"
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -413,4 +416,43 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	err := a.AccountDB.DeactivateAccount(ctx, req.Localpart)
 	res.AccountDeactivated = err == nil
 	return err
+}
+
+// PerformOpenIDTokenCreation creates a new token that a relying party uses to authenticate a user
+func (a *UserInternalAPI) PerformOpenIDTokenCreation(ctx context.Context, req *api.PerformOpenIDTokenCreationRequest, res *api.PerformOpenIDTokenCreationResponse) error {
+	token := util.RandomString(24)
+	tokenHash := getTokenHash(token)
+	nowMS := time.Now().UnixNano() / int64(time.Millisecond)
+	expiresMS := nowMS + (3600 * 1000) // 60 minutes
+
+	err := a.AccountDB.CreateOpenIDToken(ctx, fmt.Sprint(tokenHash.Sum32()), req.UserID, expiresMS)
+
+	res.Token = api.OpenIDToken{
+		Token:     token,
+		UserID:    req.UserID,
+		ExpiresTS: expiresMS,
+	}
+
+	return err
+}
+
+// QueryOpenIDToken validates that the OpenID token was issued for the user, the replying party uses this for validation
+func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOpenIDTokenRequest, res *api.QueryOpenIDTokenResponse) error {
+	tokenHash := getTokenHash(req.Token)
+	openIDTokenAttrs, err := a.AccountDB.GetOpenIDTokenAttributes(ctx, fmt.Sprint(tokenHash.Sum32()))
+	if err != nil {
+		return err
+	}
+
+	res.Sub = openIDTokenAttrs.UserID
+	res.ExpiresTS = openIDTokenAttrs.ExpiresTS
+
+	return nil
+}
+
+// used for getting the format in which the token is stored to prevent plaintext storage of sensitive info
+func getTokenHash(token string) hash.Hash32 {
+	tokenHash := fnv.New32a()
+	_, _ = tokenHash.Write([]byte(token))
+	return tokenHash
 }
