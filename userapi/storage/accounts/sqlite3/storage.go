@@ -41,6 +41,7 @@ type Database struct {
 	profiles     profilesStatements
 	accountDatas accountDataStatements
 	threepids    threepidStatements
+	openIDTokens tokenStatements
 	serverName   gomatrixserverlib.ServerName
 	bcryptCost   int
 
@@ -48,6 +49,7 @@ type Database struct {
 	profilesMu     sync.Mutex
 	accountDatasMu sync.Mutex
 	threepidsMu    sync.Mutex
+	openIDsMu      sync.Mutex
 }
 
 // NewDatabase creates a new accounts and profiles database
@@ -88,6 +90,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, err
 	}
 	if err = d.threepids.prepare(db); err != nil {
+		return nil, err
+	}
+	if err = d.openIDTokens.prepare(db, serverName); err != nil {
 		return nil, err
 	}
 
@@ -378,4 +383,25 @@ func (d *Database) SearchProfiles(ctx context.Context, searchString string, limi
 // DeactivateAccount deactivates the user's account, removing all ability for the user to login again.
 func (d *Database) DeactivateAccount(ctx context.Context, localpart string) (err error) {
 	return d.accounts.deactivateAccount(ctx, localpart)
+}
+
+// CreateOpenIDToken persists a new token that was issued for OpenID Connect
+func (d *Database) CreateOpenIDToken(
+	ctx context.Context,
+	tokenHash, localpart string,
+	expirationTS int64,
+) error {
+	d.openIDsMu.Lock()
+	defer d.openIDsMu.Unlock()
+	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		return d.openIDTokens.insertToken(ctx, txn, tokenHash, localpart, expirationTS)
+	})
+}
+
+// GetOpenIDTokenAttributes gets the attributes of issued an OIDC auth token
+func (d *Database) GetOpenIDTokenAttributes(
+	ctx context.Context,
+	tokenHash string,
+) (*api.OpenIDTokenAttributes, error) {
+	return d.openIDTokens.selectOpenIDTokenAtrributesByTokenHash(ctx, tokenHash)
 }
