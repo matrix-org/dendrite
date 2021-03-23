@@ -41,7 +41,7 @@ var (
 			Subsystem: "federationapi",
 			Name:      "recv_pdus",
 		},
-		[]string{"success", "total"},
+		[]string{"status"},
 	)
 	eduCountTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
