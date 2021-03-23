@@ -236,7 +236,7 @@ func MakeFedAPI(
 		go wakeup.Wakeup(req.Context(), fedReq.Origin())
 		vars, err := URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
-			return util.MatrixErrorResponse(400, "M_UNRECOGNIZED", "badly encoded query params")
+			return util.MatrixErrorResponse(400, "M_UNRECOGNISED", "badly encoded query params")
 		}
 
 		jsonRes := f(req, fedReq, vars)
