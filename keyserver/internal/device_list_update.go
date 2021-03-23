@@ -330,16 +330,16 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		logger.WithError(err).Error("failed to load stale device lists")
 		return waitTime, true
 	}
-	hasFailures := false
+	failCount := 0
 	for _, userID := range userIDs {
 		if ctx.Err() != nil {
 			// we've timed out, give up and go to the back of the queue to let another server be processed.
-			hasFailures = true
+			failCount += 1
 			break
 		}
 		res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
 		if err != nil {
-			logger.WithError(err).WithField("user_id", userID).Error("failed to query device keys for user")
+			failCount += 1
 			fcerr, ok := err.(*fedsenderapi.FederationClientError)
 			if ok {
 				if fcerr.RetryAfter > 0 {
@@ -351,20 +351,22 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 				waitTime = time.Hour
 				logger.WithError(err).Warn("GetUserDevices returned unknown error type")
 			}
-			hasFailures = true
 			continue
 		}
 		err = u.updateDeviceList(&res)
 		if err != nil {
 			logger.WithError(err).WithField("user_id", userID).Error("fetched device list but failed to store/emit it")
-			hasFailures = true
+			failCount += 1
 		}
+	}
+	if failCount > 0 {
+		logger.WithField("total", len(userIDs)).WithField("failed", failCount).Error("failed to query device keys for some users")
 	}
 	for _, userID := range userIDs {
 		// always clear the channel to unblock Update calls regardless of success/failure
 		u.clearChannel(userID)
 	}
-	return waitTime, hasFailures
+	return waitTime, failCount > 0
 }
 
 func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevices) error {
