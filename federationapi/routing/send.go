@@ -35,12 +35,13 @@ import (
 )
 
 var (
-	pduCountTotal = prometheus.NewCounter(
+	pduCountTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "dendrite",
 			Subsystem: "federationapi",
 			Name:      "recv_pdus",
 		},
+		[]string{"success", "total"},
 	)
 	eduCountTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
@@ -49,18 +50,11 @@ var (
 			Name:      "recv_edus",
 		},
 	)
-	pduSuccessTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: "dendrite",
-			Subsystem: "federationapi",
-			Name:      "recv_pdus_success",
-		},
-	)
 )
 
 func init() {
 	prometheus.MustRegister(
-		pduCountTotal, eduCountTotal, pduSuccessTotal,
+		pduCountTotal, eduCountTotal,
 	)
 }
 
@@ -164,7 +158,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 
 	pdus := []*gomatrixserverlib.HeaderedEvent{}
 	for _, pdu := range t.PDUs {
-		pduCountTotal.Inc()
+		pduCountTotal.WithLabelValues("total").Inc()
 		var header struct {
 			RoomID string `json:"room_id"`
 		}
@@ -256,7 +250,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			}
 		} else {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
-			pduSuccessTotal.Inc()
+			pduCountTotal.WithLabelValues("success").Inc()
 		}
 	}
 
