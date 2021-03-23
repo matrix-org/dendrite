@@ -67,6 +67,15 @@ func MakeAuthAPI(
 			hub.Scope().SetTag("user_id", device.UserID)
 			hub.Scope().SetTag("device_id", device.ID)
 		}
+		defer func() {
+			if r := recover(); r != nil {
+				if hub != nil {
+					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
+				}
+				// re-panic to return the 500
+				panic(r)
+			}
+		}()
 
 		jsonRes := f(req, device)
 		// do not log 4xx as errors as they are client fails, not server fails
