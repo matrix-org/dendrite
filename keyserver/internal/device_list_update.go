@@ -26,8 +26,27 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
+
+var (
+	deviceListUpdateCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "dendrite",
+			Subsystem: "keyserver",
+			Name:      "device_list_update",
+			Help:      "Number of times we have attempted to update device lists from this server",
+		},
+		[]string{"server"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(
+		deviceListUpdateCount,
+	)
+}
 
 // DeviceListUpdater handles device list updates from remote servers.
 //
@@ -319,6 +338,7 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 }
 
 func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerName) (time.Duration, bool) {
+	deviceListUpdateCount.WithLabelValues(string(serverName)).Inc()
 	requestTimeout := time.Second * 30 // max amount of time we want to spend on each request
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
