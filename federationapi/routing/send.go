@@ -30,8 +30,39 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
+
+var (
+	pduCountTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "dendrite",
+			Subsystem: "federationapi",
+			Name:      "recv_pdus",
+		},
+	)
+	eduCountTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "dendrite",
+			Subsystem: "federationapi",
+			Name:      "recv_edus",
+		},
+	)
+	pduSuccessTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "dendrite",
+			Subsystem: "federationapi",
+			Name:      "recv_pdus_success",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(
+		pduCountTotal, eduCountTotal, pduSuccessTotal,
+	)
+}
 
 // Send implements /_matrix/federation/v1/send/{txnID}
 func Send(
@@ -133,6 +164,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 
 	pdus := []*gomatrixserverlib.HeaderedEvent{}
 	for _, pdu := range t.PDUs {
+		pduCountTotal.Inc()
 		var header struct {
 			RoomID string `json:"room_id"`
 		}
@@ -224,6 +256,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			}
 		} else {
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
+			pduSuccessTotal.Inc()
 		}
 	}
 
@@ -281,6 +314,7 @@ func (t *txnReq) haveEventIDs() map[string]bool {
 
 func (t *txnReq) processEDUs(ctx context.Context) {
 	for _, e := range t.EDUs {
+		eduCountTotal.Inc()
 		switch e.Type {
 		case gomatrixserverlib.MTyping:
 			// https://matrix.org/docs/spec/server_server/latest#typing-notifications
