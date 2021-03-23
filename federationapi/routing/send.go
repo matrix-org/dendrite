@@ -264,7 +264,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 				util.GetLogger(ctx).Warnf("Processing %s failed fatally: %s", e.EventID(), err)
 				jsonErr := util.ErrorResponse(err)
 				processEventSummary.WithLabelValues(t.work, MetricsOutcomeFatal).Observe(
-					float64(time.Now().Sub(evStart).Nanoseconds()) / 1000.,
+					float64(time.Since(evStart).Nanoseconds()) / 1000.,
 				)
 				return nil, &jsonErr
 			} else {
@@ -280,7 +280,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 					"Failed to process incoming federation event, skipping",
 				)
 				processEventSummary.WithLabelValues(t.work, outcome).Observe(
-					float64(time.Now().Sub(evStart).Nanoseconds()) / 1000.,
+					float64(time.Since(evStart).Nanoseconds()) / 1000.,
 				)
 				results[e.EventID()] = gomatrixserverlib.PDUResult{
 					Error: errMsg,
@@ -290,7 +290,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			results[e.EventID()] = gomatrixserverlib.PDUResult{}
 			pduCountTotal.WithLabelValues("success").Inc()
 			processEventSummary.WithLabelValues(t.work, MetricsOutcomeOK).Observe(
-				float64(time.Now().Sub(evStart).Nanoseconds()) / 1000.,
+				float64(time.Since(evStart).Nanoseconds()) / 1000.,
 			)
 		}
 	}
