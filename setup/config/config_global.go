@@ -49,6 +49,9 @@ type Global struct {
 	// Metrics configuration
 	Metrics Metrics `yaml:"metrics"`
 
+	// Sentry configuration
+	Sentry Sentry `yaml:"sentry"`
+
 	// DNS caching options for all outbound HTTP requests
 	DNSCache DNSCacheOptions `yaml:"dns_cache"`
 }
@@ -63,6 +66,7 @@ func (c *Global) Defaults() {
 	c.Kafka.Defaults()
 	c.Metrics.Defaults()
 	c.DNSCache.Defaults()
+	c.Sentry.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -71,6 +75,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 	c.Kafka.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
+	c.Sentry.Verify(configErrs, isMonolith)
 	c.DNSCache.Verify(configErrs, isMonolith)
 }
 
@@ -109,6 +114,24 @@ func (c *Metrics) Defaults() {
 }
 
 func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {
+}
+
+// The configuration to use for Sentry error reporting
+type Sentry struct {
+	Enabled bool `yaml:"enabled"`
+	// The DSN to connect to e.g "https://examplePublicKey@o0.ingest.sentry.io/0"
+	// See https://docs.sentry.io/platforms/go/configuration/options/
+	DSN string `yaml:"dsn"`
+	// The environment e.g "production"
+	// See https://docs.sentry.io/platforms/go/configuration/environments/
+	Environment string `yaml:"environment"`
+}
+
+func (c *Sentry) Defaults() {
+	c.Enabled = false
+}
+
+func (c *Sentry) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 type DatabaseOptions struct {

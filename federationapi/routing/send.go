@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
@@ -259,6 +260,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			// If we bail and stop processing then we risk wedging incoming
 			// transactions from that server forever.
 			if isProcessingErrorFatal(err) {
+				sentry.CaptureException(err)
 				// Any other error should be the result of a temporary error in
 				// our server so we should bail processing the transaction entirely.
 				util.GetLogger(ctx).Warnf("Processing %s failed fatally: %s", e.EventID(), err)
