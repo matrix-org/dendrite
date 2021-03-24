@@ -16,6 +16,7 @@ package httputil
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -59,8 +61,29 @@ func MakeAuthAPI(
 		logger := util.GetLogger((req.Context()))
 		logger = logger.WithField("user_id", device.UserID)
 		req = req.WithContext(util.ContextWithLogger(req.Context(), logger))
+		// add the user to Sentry, if enabled
+		hub := sentry.GetHubFromContext(req.Context())
+		if hub != nil {
+			hub.Scope().SetTag("user_id", device.UserID)
+			hub.Scope().SetTag("device_id", device.ID)
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				if hub != nil {
+					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
+				}
+				// re-panic to return the 500
+				panic(r)
+			}
+		}()
 
-		return f(req, device)
+		jsonRes := f(req, device)
+		// do not log 4xx as errors as they are client fails, not server fails
+		if hub != nil && jsonRes.Code >= 500 {
+			hub.Scope().SetExtra("response", jsonRes)
+			hub.CaptureException(fmt.Errorf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
+		}
+		return jsonRes
 	}
 	return MakeExternalAPI(metricsName, h)
 }
@@ -195,13 +218,34 @@ func MakeFedAPI(
 		if fedReq == nil {
 			return errResp
 		}
+		// add the user to Sentry, if enabled
+		hub := sentry.GetHubFromContext(req.Context())
+		if hub != nil {
+			hub.Scope().SetTag("origin", string(fedReq.Origin()))
+			hub.Scope().SetTag("uri", fedReq.RequestURI())
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				if hub != nil {
+					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
+				}
+				// re-panic to return the 500
+				panic(r)
+			}
+		}()
 		go wakeup.Wakeup(req.Context(), fedReq.Origin())
 		vars, err := URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
-			return util.ErrorResponse(err)
+			return util.MatrixErrorResponse(400, "M_UNRECOGNISED", "badly encoded query params")
 		}
 
-		return f(req, fedReq, vars)
+		jsonRes := f(req, fedReq, vars)
+		// do not log 4xx as errors as they are client fails, not server fails
+		if hub != nil && jsonRes.Code >= 500 {
+			hub.Scope().SetExtra("response", jsonRes)
+			hub.CaptureException(fmt.Errorf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
+		}
+		return jsonRes
 	}
 	return MakeExternalAPI(metricsName, h)
 }

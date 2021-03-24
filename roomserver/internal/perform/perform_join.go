@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -51,6 +52,7 @@ func (r *Joiner) PerformJoin(
 ) {
 	roomID, joinedVia, err := r.performJoin(ctx, req)
 	if err != nil {
+		sentry.CaptureException(err)
 		perr, ok := err.(*api.PerformError)
 		if ok {
 			res.Error = perr
