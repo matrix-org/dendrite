@@ -16,21 +16,23 @@ func NewMutexByRoom() *MutexByRoom {
 
 func (m *MutexByRoom) Lock(roomID string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	roomMu := m.roomToMu[roomID]
 	if roomMu == nil {
 		roomMu = &sync.Mutex{}
 	}
-	roomMu.Lock()
 	m.roomToMu[roomID] = roomMu
+	m.mu.Unlock()
+	// don't lock inside m.mu else we can deadlock
+	roomMu.Lock()
 }
 
 func (m *MutexByRoom) Unlock(roomID string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	roomMu := m.roomToMu[roomID]
 	if roomMu == nil {
 		panic("MutexByRoom: Unlock before Lock")
 	}
+	m.mu.Unlock()
+
 	roomMu.Unlock()
 }
