@@ -19,9 +19,11 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -38,14 +40,15 @@ type OutputClientDataConsumer struct {
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
 func NewOutputClientDataConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
 ) *OutputClientDataConsumer {
-
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/clientapi",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData)),
 		Consumer:       kafkaConsumer,
@@ -76,6 +79,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("client API server output log: message parse failure")
+		sentry.CaptureException(err)
 		return nil
 	}
 
@@ -88,6 +92,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		context.TODO(), string(msg.Key), output.RoomID, output.Type,
 	)
 	if err != nil {
+		sentry.CaptureException(err)
 		log.WithFields(log.Fields{
 			"type":       output.Type,
 			"room_id":    output.RoomID,

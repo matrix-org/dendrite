@@ -37,7 +37,6 @@ type Inviter struct {
 	Inputer *input.Inputer
 }
 
-// nolint:gocyclo
 func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
@@ -225,7 +224,7 @@ func buildInviteStrippedState(
 	for _, t := range []string{
 		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
 		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
-		"m.room.avatar", "m.room.encryption",
+		"m.room.avatar", "m.room.encryption", gomatrixserverlib.MRoomCreate,
 	} {
 		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
 			EventType: t,

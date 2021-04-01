@@ -102,7 +102,7 @@ linters-settings:
     #local-prefixes: github.com/org/project
   gocyclo:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 13
+    min-complexity: 25
   maligned:
     # print struct with more effective memory layout or not, false by default
     suggest-new: true

@@ -15,22 +15,30 @@
 package setup
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 
 	"github.com/gorilla/mux"
@@ -61,6 +69,7 @@ import (
 // should only be used during start up.
 // Must be closed when shutting down.
 type BaseDendrite struct {
+	*process.ProcessContext
 	componentName          string
 	tracerCloser           io.Closer
 	PublicClientAPIMux     *mux.Router
@@ -73,6 +82,7 @@ type BaseDendrite struct {
 	httpClient             *http.Client
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
+	DNSCache               *gomatrixserverlib.DNSCache
 	//	KafkaConsumer          sarama.Consumer
 	//	KafkaProducer          sarama.SyncProducer
 }
@@ -106,9 +116,38 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}
 
+	if cfg.Global.Sentry.Enabled {
+		logrus.Info("Setting up Sentry for debugging...")
+		err = sentry.Init(sentry.ClientOptions{
+			Dsn:              cfg.Global.Sentry.DSN,
+			Environment:      cfg.Global.Sentry.Environment,
+			Debug:            true,
+			ServerName:       string(cfg.Global.ServerName),
+			Release:          "dendrite@" + internal.VersionString(),
+			AttachStacktrace: true,
+		})
+		if err != nil {
+			logrus.WithError(err).Panic("failed to start Sentry")
+		}
+	}
+
 	cache, err := caching.NewInMemoryLRUCache(true)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
+	}
+
+	var dnsCache *gomatrixserverlib.DNSCache
+	if cfg.Global.DNSCache.Enabled {
+		lifetime := time.Second * cfg.Global.DNSCache.CacheLifetime
+		dnsCache = gomatrixserverlib.NewDNSCache(
+			cfg.Global.DNSCache.CacheSize,
+			lifetime,
+		)
+		logrus.Infof(
+			"DNS cache enabled (size %d, lifetime %s)",
+			cfg.Global.DNSCache.CacheSize,
+			lifetime,
+		)
 	}
 
 	apiClient := http.Client{
@@ -146,12 +185,15 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	// We need to be careful with media APIs if they read from a filesystem to make sure they
 	// are not inadvertently reading paths without cleaning, else this could introduce a
 	// directory traversal attack e.g /../../../etc/passwd
+
 	return &BaseDendrite{
+		ProcessContext:         process.NewProcessContext(),
 		componentName:          componentName,
 		UseHTTPAPIs:            useHTTPAPIs,
 		tracerCloser:           closer,
 		Cfg:                    cfg,
 		Caches:                 cache,
+		DNSCache:               dnsCache,
 		PublicClientAPIMux:     mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicClientPathPrefix).Subrouter().UseEncodedPath(),
 		PublicFederationAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
 		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
@@ -238,7 +280,7 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
-	db, err := accounts.NewDatabase(&b.Cfg.UserAPI.AccountDatabase, b.Cfg.Global.ServerName)
+	db, err := accounts.NewDatabase(&b.Cfg.UserAPI.AccountDatabase, b.Cfg.Global.ServerName, b.Cfg.UserAPI.BCryptCost)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
@@ -250,11 +292,17 @@ func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
 // Should only be called once per component.
 func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 	if b.Cfg.Global.DisableFederation {
-		return gomatrixserverlib.NewClientWithTransport(noOpHTTPTransport)
+		return gomatrixserverlib.NewClient(
+			gomatrixserverlib.WithTransport(noOpHTTPTransport),
+		)
 	}
-	client := gomatrixserverlib.NewClient(
-		b.Cfg.FederationSender.DisableTLSValidation,
-	)
+	opts := []gomatrixserverlib.ClientOption{
+		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationSender.DisableTLSValidation),
+	}
+	if b.Cfg.Global.DNSCache.Enabled {
+		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
+	}
+	client := gomatrixserverlib.NewClient(opts...)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client
 }
@@ -263,14 +311,21 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
 	if b.Cfg.Global.DisableFederation {
-		return gomatrixserverlib.NewFederationClientWithTransport(
+		return gomatrixserverlib.NewFederationClient(
 			b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
-			b.Cfg.FederationSender.DisableTLSValidation, noOpHTTPTransport,
+			gomatrixserverlib.WithTransport(noOpHTTPTransport),
 		)
 	}
-	client := gomatrixserverlib.NewFederationClientWithTimeout(
-		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
-		b.Cfg.FederationSender.DisableTLSValidation, time.Minute*5,
+	opts := []gomatrixserverlib.ClientOption{
+		gomatrixserverlib.WithTimeout(time.Minute * 5),
+		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationSender.DisableTLSValidation),
+	}
+	if b.Cfg.Global.DNSCache.Enabled {
+		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
+	}
+	client := gomatrixserverlib.NewFederationClient(
+		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID,
+		b.Cfg.Global.PrivateKey, opts...,
 	)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client
@@ -278,7 +333,6 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
-// nolint:gocyclo
 func (b *BaseDendrite) SetupAndServeHTTP(
 	internalHTTPAddr, externalHTTPAddr config.HTTPAddress,
 	certFile, keyFile *string,
@@ -316,23 +370,51 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
-	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(b.PublicClientAPIMux)
+	var clientHandler http.Handler
+	clientHandler = b.PublicClientAPIMux
+	if b.Cfg.Global.Sentry.Enabled {
+		sentryHandler := sentryhttp.New(sentryhttp.Options{
+			Repanic: true,
+		})
+		clientHandler = sentryHandler.Handle(b.PublicClientAPIMux)
+	}
+	var federationHandler http.Handler
+	federationHandler = b.PublicFederationAPIMux
+	if b.Cfg.Global.Sentry.Enabled {
+		sentryHandler := sentryhttp.New(sentryhttp.Options{
+			Repanic: true,
+		})
+		federationHandler = sentryHandler.Handle(b.PublicFederationAPIMux)
+	}
+	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(clientHandler)
 	if !b.Cfg.Global.DisableFederation {
 		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
-		externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(b.PublicFederationAPIMux)
+		externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(federationHandler)
 	}
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 
 	if internalAddr != NoListener && internalAddr != externalAddr {
 		go func() {
+			var internalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
 			logrus.Infof("Starting internal %s listener on %s", b.componentName, internalServ.Addr)
+			b.ProcessContext.ComponentStarted()
+			internalServ.RegisterOnShutdown(func() {
+				if internalShutdown.CAS(false, true) {
+					b.ProcessContext.ComponentFinished()
+					logrus.Infof("Stopped internal HTTP listener")
+				}
+			})
 			if certFile != nil && keyFile != nil {
 				if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
-					logrus.WithError(err).Fatal("failed to serve HTTPS")
+					if err != http.ErrServerClosed {
+						logrus.WithError(err).Fatal("failed to serve HTTPS")
+					}
 				}
 			} else {
 				if err := internalServ.ListenAndServe(); err != nil {
-					logrus.WithError(err).Fatal("failed to serve HTTP")
+					if err != http.ErrServerClosed {
+						logrus.WithError(err).Fatal("failed to serve HTTP")
+					}
 				}
 			}
 			logrus.Infof("Stopped internal %s listener on %s", b.componentName, internalServ.Addr)
@@ -341,19 +423,57 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	if externalAddr != NoListener {
 		go func() {
+			var externalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
 			logrus.Infof("Starting external %s listener on %s", b.componentName, externalServ.Addr)
+			b.ProcessContext.ComponentStarted()
+			externalServ.RegisterOnShutdown(func() {
+				if externalShutdown.CAS(false, true) {
+					b.ProcessContext.ComponentFinished()
+					logrus.Infof("Stopped external HTTP listener")
+				}
+			})
 			if certFile != nil && keyFile != nil {
 				if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
-					logrus.WithError(err).Fatal("failed to serve HTTPS")
+					if err != http.ErrServerClosed {
+						logrus.WithError(err).Fatal("failed to serve HTTPS")
+					}
 				}
 			} else {
 				if err := externalServ.ListenAndServe(); err != nil {
-					logrus.WithError(err).Fatal("failed to serve HTTP")
+					if err != http.ErrServerClosed {
+						logrus.WithError(err).Fatal("failed to serve HTTP")
+					}
 				}
 			}
 			logrus.Infof("Stopped external %s listener on %s", b.componentName, externalServ.Addr)
 		}()
 	}
 
-	select {}
+	<-b.ProcessContext.WaitForShutdown()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_ = internalServ.Shutdown(ctx)
+	_ = externalServ.Shutdown(ctx)
+	logrus.Infof("Stopped HTTP listeners")
+}
+
+func (b *BaseDendrite) WaitForShutdown() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	<-sigs
+	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+
+	logrus.Warnf("Shutdown signal received")
+
+	b.ProcessContext.ShutdownDendrite()
+	b.ProcessContext.WaitForComponentsToFinish()
+	if b.Cfg.Global.Sentry.Enabled {
+		if !sentry.Flush(time.Second * 5) {
+			logrus.Warnf("failed to flush all Sentry events!")
+		}
+	}
+
+	logrus.Warnf("Dendrite is exiting now")
 }

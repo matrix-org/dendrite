@@ -26,14 +26,15 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath   = "/roomserver/performInvite"
-	RoomserverPerformPeekPath     = "/roomserver/performPeek"
-	RoomserverPerformUnpeekPath   = "/roomserver/performUnpeek"
-	RoomserverPerformJoinPath     = "/roomserver/performJoin"
-	RoomserverPerformLeavePath    = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath  = "/roomserver/performPublish"
-	RoomserverPerformForgetPath   = "/roomserver/performForget"
+	RoomserverPerformInvitePath      = "/roomserver/performInvite"
+	RoomserverPerformPeekPath        = "/roomserver/performPeek"
+	RoomserverPerformUnpeekPath      = "/roomserver/performUnpeek"
+	RoomserverPerformJoinPath        = "/roomserver/performJoin"
+	RoomserverPerformLeavePath       = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath    = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath     = "/roomserver/performPublish"
+	RoomserverPerformInboundPeekPath = "/roomserver/performInboundPeek"
+	RoomserverPerformForgetPath      = "/roomserver/performForget"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -214,6 +215,18 @@ func (h *httpRoomserverInternalAPI) PerformPeek(
 			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
 		}
 	}
+}
+
+func (h *httpRoomserverInternalAPI) PerformInboundPeek(
+	ctx context.Context,
+	request *api.PerformInboundPeekRequest,
+	response *api.PerformInboundPeekResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInboundPeek")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformInboundPeekPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 func (h *httpRoomserverInternalAPI) PerformUnpeek(

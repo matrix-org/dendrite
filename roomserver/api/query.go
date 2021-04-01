@@ -151,7 +151,9 @@ type QueryMembershipsForRoomRequest struct {
 	JoinedOnly bool `json:"joined_only"`
 	// ID of the room to fetch memberships from
 	RoomID string `json:"room_id"`
-	// ID of the user sending the request
+	// Optional - ID of the user sending the request, for checking if the
+	// user is allowed to see the memberships. If not specified then all
+	// room memberships will be returned.
 	Sender string `json:"sender"`
 }
 
@@ -221,7 +223,7 @@ type QueryStateAndAuthChainRequest struct {
 	// The room ID to query the state in.
 	RoomID string `json:"room_id"`
 	// The list of prev events for the event. Used to calculate the state at
-	// the event
+	// the event.
 	PrevEventIDs []string `json:"prev_event_ids"`
 	// The list of auth events for the event. Used to calculate the auth chain
 	AuthEventIDs []string `json:"auth_event_ids"`

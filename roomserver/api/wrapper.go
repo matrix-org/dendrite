@@ -43,7 +43,7 @@ func SendEvents(
 
 // SendEventWithState writes an event with the specified kind to the roomserver
 // with the state at the event as KindOutlier before it. Will not send any event that is
-// marked as `true` in haveEventIDs
+// marked as `true` in haveEventIDs.
 func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, kind Kind,
 	state *gomatrixserverlib.RespState, event *gomatrixserverlib.HeaderedEvent,
@@ -172,7 +172,6 @@ func IsServerBannedFromRoom(ctx context.Context, rsAPI RoomserverInternalAPI, ro
 // PopulatePublicRooms extracts PublicRoom information for all the provided room IDs. The IDs are not checked to see if they are visible in the
 // published room directory.
 // due to lots of switches
-// nolint:gocyclo
 func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI RoomserverInternalAPI) ([]gomatrixserverlib.PublicRoom, error) {
 	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
 	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}

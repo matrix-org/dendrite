@@ -20,9 +20,11 @@ import (
 	"fmt"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -43,6 +45,7 @@ type OutputRoomEventConsumer struct {
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
+	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	kafkaConsumer sarama.Consumer,
 	store storage.Database,
@@ -53,6 +56,7 @@ func NewOutputRoomEventConsumer(
 ) *OutputRoomEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/roomserver",
 		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
 		Consumer:       kafkaConsumer,
@@ -145,18 +149,21 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	ev, err := s.updateStateEvent(ev)
 	if err != nil {
+		sentry.CaptureException(err)
 		return err
 	}
 
 	for i := range addsStateEvents {
 		addsStateEvents[i], err = s.updateStateEvent(addsStateEvents[i])
 		if err != nil {
+			sentry.CaptureException(err)
 			return err
 		}
 	}
 
 	if msg.RewritesState {
 		if err = s.db.PurgeRoomState(ctx, ev.RoomID()); err != nil {
+			sentry.CaptureException(err)
 			return fmt.Errorf("s.db.PurgeRoom: %w", err)
 		}
 	}
@@ -173,6 +180,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
 			"add":        msg.AddsStateEventIDs,
@@ -183,6 +191,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		sentry.CaptureException(err)
 		return err
 	}
 
@@ -215,6 +224,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	if err != nil {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write old event failure")
@@ -274,8 +284,10 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
+		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
+			"event_id":   msg.Event.EventID(),
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,
@@ -294,6 +306,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 ) error {
 	pduPos, err := s.db.RetireInviteEvent(ctx, msg.EventID)
 	if err != nil {
+		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,
@@ -314,6 +327,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 ) error {
 	sp, err := s.db.AddPeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
+		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,

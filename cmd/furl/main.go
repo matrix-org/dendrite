@@ -20,7 +20,6 @@ var requestFrom = flag.String("from", "", "the server name that the request shou
 var requestKey = flag.String("key", "matrix_key.pem", "the private key to use when signing the request")
 var requestPost = flag.Bool("post", false, "send a POST request instead of GET (pipe input into stdin or type followed by Ctrl-D)")
 
-// nolint:gocyclo
 func main() {
 	flag.Parse()
 
@@ -54,7 +53,6 @@ func main() {
 		gomatrixserverlib.ServerName(*requestFrom),
 		gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),
 		privateKey,
-		false,
 	)
 
 	u, err := url.Parse(flag.Arg(0))

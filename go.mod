@@ -2,49 +2,47 @@ module github.com/matrix-org/dendrite
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/Shopify/sarama v1.27.0
-	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
+	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
+	github.com/Shopify/sarama v1.28.0
+	github.com/getsentry/sentry-go v0.10.0
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/lib/pq v1.8.0
-	github.com/libp2p/go-libp2p v0.11.0
-	github.com/libp2p/go-libp2p-circuit v0.3.1
-	github.com/libp2p/go-libp2p-core v0.6.1
-	github.com/libp2p/go-libp2p-gostream v0.2.1
-	github.com/libp2p/go-libp2p-http v0.1.5
-	github.com/libp2p/go-libp2p-kad-dht v0.9.0
-	github.com/libp2p/go-libp2p-pubsub v0.3.5
+	github.com/lib/pq v1.9.0
+	github.com/libp2p/go-libp2p v0.13.0
+	github.com/libp2p/go-libp2p-circuit v0.4.0
+	github.com/libp2p/go-libp2p-core v0.8.3
+	github.com/libp2p/go-libp2p-gostream v0.3.1
+	github.com/libp2p/go-libp2p-http v0.2.0
+	github.com/libp2p/go-libp2p-kad-dht v0.11.1
+	github.com/libp2p/go-libp2p-pubsub v0.4.1
 	github.com/libp2p/go-libp2p-record v0.1.3
-	github.com/libp2p/go-yamux v1.3.9 // indirect
 	github.com/lucas-clemente/quic-go v0.17.3
 	github.com/matrix-org/dugong v0.0.0-20180820122854-51a565b5666b
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20201209172200-eb6a8903f9fb
-	github.com/matrix-org/naffka v0.0.0-20200901083833-bcdd62999a91
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20210302161955-6142fe3f8c2c
+	github.com/matrix-org/naffka v0.0.0-20201009174903-d26a3b9cb161
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
-	github.com/mattn/go-sqlite3 v1.14.2
+	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pressly/goose v2.7.0-rc5+incompatible
-	github.com/prometheus/client_golang v1.7.1
-	github.com/sirupsen/logrus v1.7.0
-	github.com/tidwall/gjson v1.6.3
-	github.com/tidwall/match v1.0.2 // indirect
-	github.com/tidwall/sjson v1.1.2
+	github.com/pressly/goose v2.7.0+incompatible
+	github.com/prometheus/client_golang v1.9.0
+	github.com/sirupsen/logrus v1.8.0
+	github.com/tidwall/gjson v1.6.8
+	github.com/tidwall/sjson v1.1.5
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
-	github.com/uber/jaeger-lib v2.2.0+incompatible
-	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20201006093556-760d9a7fd5ee
-	go.uber.org/atomic v1.6.0
-	golang.org/x/crypto v0.0.0-20201117144127-c1f2f97bffc9
-	golang.org/x/net v0.0.0-20200528225125-3c3fba18258b
-	golang.org/x/sys v0.0.0-20201119102817-f84b799fce68 // indirect
-	gopkg.in/h2non/bimg.v1 v1.1.4
-	gopkg.in/yaml.v2 v2.3.0
+	github.com/uber/jaeger-lib v2.4.0+incompatible
+	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20210218094457-e77ca8019daa
+	go.uber.org/atomic v1.7.0
+	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+	gopkg.in/h2non/bimg.v1 v1.1.5
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 go 1.13

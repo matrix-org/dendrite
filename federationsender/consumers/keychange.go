@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -41,6 +42,7 @@ type KeyChangeConsumer struct {
 
 // NewKeyChangeConsumer creates a new KeyChangeConsumer. Call Start() to begin consuming from key servers.
 func NewKeyChangeConsumer(
+	process *process.ProcessContext,
 	cfg *config.KeyServer,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
@@ -49,6 +51,7 @@ func NewKeyChangeConsumer(
 ) *KeyChangeConsumer {
 	c := &KeyChangeConsumer{
 		consumer: &internal.ContinualConsumer{
+			Process:        process,
 			ComponentName:  "federationsender/keychange",
 			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
 			Consumer:       kafkaConsumer,

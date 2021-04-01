@@ -20,9 +20,11 @@ import (
 	"sync"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -46,6 +48,7 @@ type OutputKeyChangeEventConsumer struct {
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
 // Call Start() to begin consuming from the key server.
 func NewOutputKeyChangeEventConsumer(
+	process *process.ProcessContext,
 	serverName gomatrixserverlib.ServerName,
 	topic string,
 	kafkaConsumer sarama.Consumer,
@@ -57,6 +60,7 @@ func NewOutputKeyChangeEventConsumer(
 ) *OutputKeyChangeEventConsumer {
 
 	consumer := internal.ContinualConsumer{
+		Process:        process,
 		ComponentName:  "syncapi/keychange",
 		Topic:          topic,
 		Consumer:       kafkaConsumer,
@@ -104,6 +108,7 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Error("syncapi: failed to unmarshal key change event from key server")
+		sentry.CaptureException(err)
 		return err
 	}
 	// work out who we need to notify about the new key
@@ -113,6 +118,7 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}, &queryRes)
 	if err != nil {
 		log.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		sentry.CaptureException(err)
 		return err
 	}
 	// make sure we get our own key updates too!

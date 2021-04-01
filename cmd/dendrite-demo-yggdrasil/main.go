@@ -52,7 +52,6 @@ var (
 	instancePeer = flag.String("peer", "", "an internet Yggdrasil peer to connect to")
 )
 
-// nolint:gocyclo
 func main() {
 	flag.Parse()
 	internal.SetupPprof()
@@ -150,6 +149,7 @@ func main() {
 		),
 	}
 	monolith.AddAllPublicRoutes(
+		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
@@ -200,5 +200,6 @@ func main() {
 		}
 	}()
 
-	select {}
+	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
+	base.WaitForShutdown()
 }

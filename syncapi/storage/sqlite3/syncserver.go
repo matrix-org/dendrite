@@ -52,7 +52,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	return &d, nil
 }
 
-// nolint:gocyclo
 func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
 		return err
@@ -100,8 +99,13 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	memberships, err := NewSqliteMembershipsTable(d.db)
+	if err != nil {
+		return err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
+	deltas.LoadRemoveSendToDeviceSentColumn(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return err
 	}
@@ -118,6 +122,7 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Filter:              filter,
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
+		Memberships:         memberships,
 	}
 	return nil
 }

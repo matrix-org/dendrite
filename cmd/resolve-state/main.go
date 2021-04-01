@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
@@ -25,7 +24,6 @@ import (
 
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 
-// nolint:gocyclo
 func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)
@@ -105,7 +103,7 @@ func main() {
 	}
 
 	fmt.Println("Resolving state")
-	resolved, err := state.ResolveConflictsAdhoc(
+	resolved, err := gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion),
 		events,
 		authEvents,

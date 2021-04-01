@@ -48,6 +48,12 @@ type Global struct {
 
 	// Metrics configuration
 	Metrics Metrics `yaml:"metrics"`
+
+	// Sentry configuration
+	Sentry Sentry `yaml:"sentry"`
+
+	// DNS caching options for all outbound HTTP requests
+	DNSCache DNSCacheOptions `yaml:"dns_cache"`
 }
 
 func (c *Global) Defaults() {
@@ -59,6 +65,8 @@ func (c *Global) Defaults() {
 
 	c.Kafka.Defaults()
 	c.Metrics.Defaults()
+	c.DNSCache.Defaults()
+	c.Sentry.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -67,6 +75,8 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 	c.Kafka.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
+	c.Sentry.Verify(configErrs, isMonolith)
+	c.DNSCache.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -106,6 +116,24 @@ func (c *Metrics) Defaults() {
 func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
+// The configuration to use for Sentry error reporting
+type Sentry struct {
+	Enabled bool `yaml:"enabled"`
+	// The DSN to connect to e.g "https://examplePublicKey@o0.ingest.sentry.io/0"
+	// See https://docs.sentry.io/platforms/go/configuration/options/
+	DSN string `yaml:"dsn"`
+	// The environment e.g "production"
+	// See https://docs.sentry.io/platforms/go/configuration/environments/
+	Environment string `yaml:"environment"`
+}
+
+func (c *Sentry) Defaults() {
+	c.Enabled = false
+}
+
+func (c *Sentry) Verify(configErrs *ConfigErrors, isMonolith bool) {
+}
+
 type DatabaseOptions struct {
 	// The connection string, file:filename.db or postgres://server....
 	ConnectionString DataSource `yaml:"connection_string"`
@@ -117,8 +145,8 @@ type DatabaseOptions struct {
 	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
 }
 
-func (c *DatabaseOptions) Defaults() {
-	c.MaxOpenConnections = 100
+func (c *DatabaseOptions) Defaults(conns int) {
+	c.MaxOpenConnections = conns
 	c.MaxIdleConnections = 2
 	c.ConnMaxLifetimeSeconds = -1
 }
@@ -139,4 +167,24 @@ func (c DatabaseOptions) MaxOpenConns() int {
 // ConnMaxLifetime returns maximum amount of time a connection may be reused
 func (c DatabaseOptions) ConnMaxLifetime() time.Duration {
 	return time.Duration(c.ConnMaxLifetimeSeconds) * time.Second
+}
+
+type DNSCacheOptions struct {
+	// Whether the DNS cache is enabled or not
+	Enabled bool `yaml:"enabled"`
+	// How many entries to store in the DNS cache at a given time
+	CacheSize int `yaml:"cache_size"`
+	// How long a cache entry should be considered valid for
+	CacheLifetime time.Duration `yaml:"cache_lifetime"`
+}
+
+func (c *DNSCacheOptions) Defaults() {
+	c.Enabled = false
+	c.CacheSize = 256
+	c.CacheLifetime = time.Minute * 5
+}
+
+func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	checkPositive(configErrs, "cache_size", int64(c.CacheSize))
+	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
 }

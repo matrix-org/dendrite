@@ -16,6 +16,7 @@ package appservice
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	"sync"
 	"time"
@@ -48,6 +49,15 @@ func NewInternalAPI(
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
+	client := &http.Client{
+		Timeout: time.Second * 30,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: base.Cfg.AppServiceAPI.DisableTLSValidation,
+			},
+		},
+	}
 	consumer, _ := kafka.SetupConsumerProducer(&base.Cfg.Global.Kafka)
 
 	// Create a connection to the appservice postgres DB
@@ -79,17 +89,15 @@ func NewInternalAPI(
 	// Create appserivce query API with an HTTP client that will be used for all
 	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := &query.AppServiceQueryAPI{
-		HTTPClient: &http.Client{
-			Timeout: time.Second * 30,
-		},
-		Cfg: base.Cfg,
+		HTTPClient: client,
+		Cfg:        base.Cfg,
 	}
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
 	if len(workerStates) > 0 {
 		consumer := consumers.NewOutputRoomEventConsumer(
-			base.Cfg, consumer, appserviceDB,
+			base.ProcessContext, base.Cfg, consumer, appserviceDB,
 			rsAPI, workerStates,
 		)
 		if err := consumer.Start(); err != nil {
@@ -98,7 +106,7 @@ func NewInternalAPI(
 	}
 
 	// Create application service transaction workers
-	if err := workers.SetupTransactionWorkers(appserviceDB, workerStates); err != nil {
+	if err := workers.SetupTransactionWorkers(client, appserviceDB, workerStates); err != nil {
 		logrus.WithError(err).Panicf("failed to start app service transaction workers")
 	}
 	return appserviceQueryAPI

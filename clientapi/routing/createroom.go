@@ -38,16 +38,17 @@ import (
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
 type createRoomRequest struct {
-	Invite          []string                      `json:"invite"`
-	Name            string                        `json:"name"`
-	Visibility      string                        `json:"visibility"`
-	Topic           string                        `json:"topic"`
-	Preset          string                        `json:"preset"`
-	CreationContent map[string]interface{}        `json:"creation_content"`
-	InitialState    []fledglingEvent              `json:"initial_state"`
-	RoomAliasName   string                        `json:"room_alias_name"`
-	GuestCanJoin    bool                          `json:"guest_can_join"`
-	RoomVersion     gomatrixserverlib.RoomVersion `json:"room_version"`
+	Invite                    []string                      `json:"invite"`
+	Name                      string                        `json:"name"`
+	Visibility                string                        `json:"visibility"`
+	Topic                     string                        `json:"topic"`
+	Preset                    string                        `json:"preset"`
+	CreationContent           map[string]interface{}        `json:"creation_content"`
+	InitialState              []fledglingEvent              `json:"initial_state"`
+	RoomAliasName             string                        `json:"room_alias_name"`
+	GuestCanJoin              bool                          `json:"guest_can_join"`
+	RoomVersion               gomatrixserverlib.RoomVersion `json:"room_version"`
+	PowerLevelContentOverride json.RawMessage               `json:"power_level_content_override"`
 }
 
 const (
@@ -216,7 +217,8 @@ func createRoom(
 		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
 		// check it's free TODO: This races but is better than nothing
 		hasAliasReq := roomserverAPI.GetRoomIDForAliasRequest{
-			Alias: roomAlias,
+			Alias:              roomAlias,
+			IncludeAppservices: false,
 		}
 
 		var aliasResp roomserverAPI.GetRoomIDForAliasResponse
@@ -257,6 +259,18 @@ func createRoom(
 
 	var builtEvents []*gomatrixserverlib.HeaderedEvent
 
+	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
+	if r.PowerLevelContentOverride != nil {
+		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
+		err = json.Unmarshal(r.PowerLevelContentOverride, &powerLevelContent)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("malformed power_level_content_override"),
+			}
+		}
+	}
+
 	// send events into the room in order of:
 	//  1- m.room.create
 	//  2- room creator join member
@@ -278,7 +292,7 @@ func createRoom(
 	eventsToMake := []fledglingEvent{
 		{"m.room.create", "", r.CreationContent},
 		{"m.room.member", userID, membershipContent},
-		{"m.room.power_levels", "", eventutil.InitialPowerLevelsContent(userID)},
+		{"m.room.power_levels", "", powerLevelContent},
 		{"m.room.join_rules", "", gomatrixserverlib.JoinRuleContent{JoinRule: joinRules}},
 		{"m.room.history_visibility", "", eventutil.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
 	}

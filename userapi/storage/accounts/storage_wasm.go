@@ -25,10 +25,11 @@ import (
 func NewDatabase(
 	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
+	bcryptCost int,
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName)
+		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

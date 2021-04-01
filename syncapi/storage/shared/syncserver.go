@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,6 +48,7 @@ type Database struct {
 	SendToDevice        tables.SendToDevice
 	Filter              tables.Filter
 	Receipts            tables.Receipts
+	Memberships         tables.Memberships
 }
 
 func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
@@ -85,6 +87,14 @@ func (d *Database) MaxStreamPositionForInvites(ctx context.Context) (types.Strea
 	return types.StreamPosition(id), nil
 }
 
+func (d *Database) MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.SendToDevice.SelectMaxSendToDeviceMessageID(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("d.SendToDevice.SelectMaxSendToDeviceMessageID: %w", err)
+	}
+	return types.StreamPosition(id), nil
+}
+
 func (d *Database) MaxStreamPositionForAccountData(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.AccountData.SelectMaxAccountDataID(ctx, nil)
 	if err != nil {
@@ -93,16 +103,16 @@ func (d *Database) MaxStreamPositionForAccountData(ctx context.Context) (types.S
 	return types.StreamPosition(id), nil
 }
 
-func (d *Database) CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	return d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilterPart)
+func (d *Database) CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	return d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilterPart, excludeEventIDs)
 }
 
 func (d *Database) RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error) {
 	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, nil, userID, membership)
 }
 
-func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, limit int, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
-	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, limit, chronologicalOrder, onlySyncEvents)
+func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
+	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
 
 func (d *Database) PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error) {
@@ -142,7 +152,7 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 func (d *Database) GetEventsInStreamingRange(
 	ctx context.Context,
 	from, to *types.StreamingToken,
-	roomID string, limit int,
+	roomID string, eventFilter *gomatrixserverlib.RoomEventFilter,
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
 	r := types.Range{
@@ -153,44 +163,20 @@ func (d *Database) GetEventsInStreamingRange(
 	if backwardOrdering {
 		// When using backward ordering, we want the most recent events first.
 		if events, _, err = d.OutputEvents.SelectRecentEvents(
-			ctx, nil, roomID, r, limit, false, false,
+			ctx, nil, roomID, r, eventFilter, false, false,
 		); err != nil {
 			return
 		}
 	} else {
 		// When using forward ordering, we want the least recent events first.
 		if events, err = d.OutputEvents.SelectEarlyEvents(
-			ctx, nil, roomID, r, limit,
+			ctx, nil, roomID, r, eventFilter,
 		); err != nil {
 			return
 		}
 	}
 	return events, err
 }
-
-/*
-func (d *Database) AddTypingUser(
-	userID, roomID string, expireTime *time.Time,
-) types.StreamPosition {
-	return types.StreamPosition(d.EDUCache.AddTypingUser(userID, roomID, expireTime))
-}
-
-func (d *Database) RemoveTypingUser(
-	userID, roomID string,
-) types.StreamPosition {
-	return types.StreamPosition(d.EDUCache.RemoveUser(userID, roomID))
-}
-
-func (d *Database) SetTypingTimeoutCallback(fn cache.TimeoutCallbackFn) {
-	d.EDUCache.SetTimeoutCallback(fn)
-}
-*/
-
-/*
-func (d *Database) AddSendToDevice() types.StreamPosition {
-	return types.StreamPosition(d.EDUCache.AddSendToDeviceMessage())
-}
-*/
 
 func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
@@ -209,7 +195,7 @@ func (d *Database) GetStateEvent(
 func (d *Database) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *gomatrixserverlib.StateFilter,
 ) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error) {
-	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilter)
+	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, nil, roomID, stateFilter, nil)
 	return
 }
 
@@ -398,8 +384,8 @@ func (d *Database) WriteEvent(
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
 		}
 		pduPosition = pos
-
-		if err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
+		var topoPosition types.StreamPosition
+		if topoPosition, err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
 			return fmt.Errorf("d.Topology.InsertEventInTopology: %w", err)
 		}
 
@@ -412,7 +398,7 @@ func (d *Database) WriteEvent(
 			return nil
 		}
 
-		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition)
+		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
 	})
 
 	return pduPosition, returnErr
@@ -424,6 +410,7 @@ func (d *Database) updateRoomState(
 	removedEventIDs []string,
 	addedEvents []*gomatrixserverlib.HeaderedEvent,
 	pduPosition types.StreamPosition,
+	topoPosition types.StreamPosition,
 ) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 	for _, eventID := range removedEventIDs {
@@ -444,6 +431,9 @@ func (d *Database) updateRoomState(
 				return fmt.Errorf("event.Membership: %w", err)
 			}
 			membership = &value
+			if err = d.Memberships.UpsertMembership(ctx, txn, event, pduPosition, topoPosition); err != nil {
+				return fmt.Errorf("d.Memberships.UpsertMembership: %w", err)
+			}
 		}
 
 		if err := d.CurrentRoomState.UpsertRoomState(ctx, txn, event, membership, pduPosition); err != nil {
@@ -671,7 +661,6 @@ func (d *Database) fetchMissingStateEvents(
 // exclusive of oldPos, inclusive of newPos, for the rooms in which
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
-// nolint:gocyclo
 func (d *Database) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
@@ -783,7 +772,6 @@ func (d *Database) GetStateDeltas(
 // requests with full_state=true.
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
-// nolint:gocyclo
 func (d *Database) GetStateDeltasForFullStateSync(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
@@ -880,7 +868,7 @@ func (d *Database) currentStateStreamEventsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]types.StreamEvent, error) {
-	allState, err := d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter)
+	allState, err := d.CurrentRoomState.SelectCurrentState(ctx, txn, roomID, stateFilter, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -889,16 +877,6 @@ func (d *Database) currentStateStreamEventsForRoom(
 		s[i] = types.StreamEvent{HeaderedEvent: allState[i], StreamPosition: 0}
 	}
 	return s, nil
-}
-
-func (d *Database) SendToDeviceUpdatesWaiting(
-	ctx context.Context, userID, deviceID string,
-) (bool, error) {
-	count, err := d.SendToDevice.CountSendToDeviceMessages(ctx, nil, userID, deviceID)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
 }
 
 func (d *Database) StoreNewSendForDeviceMessage(
@@ -919,77 +897,37 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	if err != nil {
 		return 0, err
 	}
-	return 0, nil
+	return newPos, nil
 }
 
 func (d *Database) SendToDeviceUpdatesForSync(
 	ctx context.Context,
 	userID, deviceID string,
-	token types.StreamingToken,
-) (types.StreamPosition, []types.SendToDeviceEvent, []types.SendToDeviceNID, []types.SendToDeviceNID, error) {
+	from, to types.StreamPosition,
+) (types.StreamPosition, []types.SendToDeviceEvent, error) {
 	// First of all, get our send-to-device updates for this user.
-	lastPos, events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID)
+	lastPos, events, err := d.SendToDevice.SelectSendToDeviceMessages(ctx, nil, userID, deviceID, from, to)
 	if err != nil {
-		return 0, nil, nil, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
+		return from, nil, fmt.Errorf("d.SendToDevice.SelectSendToDeviceMessages: %w", err)
 	}
-
 	// If there's nothing to do then stop here.
 	if len(events) == 0 {
-		return 0, nil, nil, nil, nil
+		return to, nil, nil
 	}
-
-	// Work out whether we need to update any of the database entries.
-	toReturn := []types.SendToDeviceEvent{}
-	toUpdate := []types.SendToDeviceNID{}
-	toDelete := []types.SendToDeviceNID{}
-	for _, event := range events {
-		if event.SentByToken == nil {
-			// If the event has no sent-by token yet then we haven't attempted to send
-			// it. Record the current requested sync token in the database.
-			toUpdate = append(toUpdate, event.ID)
-			toReturn = append(toReturn, event)
-			event.SentByToken = &token
-		} else if token.IsAfter(*event.SentByToken) {
-			// The event had a sync token, therefore we've sent it before. The current
-			// sync token is now after the stored one so we can assume that the client
-			// successfully completed the previous sync (it would re-request it otherwise)
-			// so we can remove the entry from the database.
-			toDelete = append(toDelete, event.ID)
-		} else {
-			// It looks like the sync is being re-requested, maybe it timed out or
-			// failed. Re-send any that should have been acknowledged by now.
-			toReturn = append(toReturn, event)
-		}
-	}
-
-	return lastPos, toReturn, toUpdate, toDelete, nil
+	return lastPos, events, nil
 }
 
 func (d *Database) CleanSendToDeviceUpdates(
 	ctx context.Context,
-	toUpdate, toDelete []types.SendToDeviceNID,
-	token types.StreamingToken,
+	userID, deviceID string, before types.StreamPosition,
 ) (err error) {
-	if len(toUpdate) == 0 && len(toDelete) == 0 {
-		return nil
+	if err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, userID, deviceID, before)
+	}); err != nil {
+		logrus.WithError(err).Errorf("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
+		return err
 	}
-	// If we need to write to the database then we'll ask the SendToDeviceWriter to
-	// do that for us. It'll guarantee that we don't lock the table for writes in
-	// more than one place.
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		// Delete any send-to-device messages marked for deletion.
-		if e := d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, toDelete); e != nil {
-			return fmt.Errorf("d.SendToDevice.DeleteSendToDeviceMessages: %w", e)
-		}
-
-		// Now update any outstanding send-to-device messages with the new sync token.
-		if e := d.SendToDevice.UpdateSentSendToDeviceMessages(ctx, txn, token.String(), toUpdate); e != nil {
-			return fmt.Errorf("d.SendToDevice.UpdateSentSendToDeviceMessages: %w", err)
-		}
-
-		return nil
-	})
-	return
+	return nil
 }
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event

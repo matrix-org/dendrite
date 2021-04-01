@@ -27,15 +27,16 @@ import (
 )
 
 type Database struct {
-	DB                          *sql.DB
-	Cache                       caching.FederationSenderCache
-	Writer                      sqlutil.Writer
-	FederationSenderQueuePDUs   tables.FederationSenderQueuePDUs
-	FederationSenderQueueEDUs   tables.FederationSenderQueueEDUs
-	FederationSenderQueueJSON   tables.FederationSenderQueueJSON
-	FederationSenderJoinedHosts tables.FederationSenderJoinedHosts
-	FederationSenderRooms       tables.FederationSenderRooms
-	FederationSenderBlacklist   tables.FederationSenderBlacklist
+	DB                            *sql.DB
+	Cache                         caching.FederationSenderCache
+	Writer                        sqlutil.Writer
+	FederationSenderQueuePDUs     tables.FederationSenderQueuePDUs
+	FederationSenderQueueEDUs     tables.FederationSenderQueueEDUs
+	FederationSenderQueueJSON     tables.FederationSenderQueueJSON
+	FederationSenderJoinedHosts   tables.FederationSenderJoinedHosts
+	FederationSenderBlacklist     tables.FederationSenderBlacklist
+	FederationSenderOutboundPeeks tables.FederationSenderOutboundPeeks
+	FederationSenderInboundPeeks  tables.FederationSenderInboundPeeks
 }
 
 // An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
@@ -62,29 +63,6 @@ func (d *Database) UpdateRoom(
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		err = d.FederationSenderRooms.InsertRoom(ctx, txn, roomID)
-		if err != nil {
-			return err
-		}
-
-		lastSentEventID, err := d.FederationSenderRooms.SelectRoomForUpdate(ctx, txn, roomID)
-		if err != nil {
-			return err
-		}
-
-		if lastSentEventID == newEventID {
-			// We've handled this message before, so let's just ignore it.
-			// We can only get a duplicate for the last message we processed,
-			// so its enough just to compare the newEventID with lastSentEventID
-			return nil
-		}
-
-		if lastSentEventID != "" && lastSentEventID != oldEventID {
-			return types.EventIDMismatchError{
-				DatabaseID: lastSentEventID, RoomServerID: oldEventID,
-			}
-		}
-
 		joinedHosts, err = d.FederationSenderJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID)
 		if err != nil {
 			return err
@@ -99,7 +77,7 @@ func (d *Database) UpdateRoom(
 		if err = d.FederationSenderJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
 			return err
 		}
-		return d.FederationSenderRooms.UpdateRoom(ctx, txn, roomID, newEventID)
+		return nil
 	})
 	return
 }
@@ -172,4 +150,44 @@ func (d *Database) RemoveServerFromBlacklist(serverName gomatrixserverlib.Server
 
 func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
 	return d.FederationSenderBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
+}
+
+func (d *Database) AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderOutboundPeeks.InsertOutboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	})
+}
+
+func (d *Database) RenewOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderOutboundPeeks.RenewOutboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	})
+}
+
+func (d *Database) GetOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.OutboundPeek, error) {
+	return d.FederationSenderOutboundPeeks.SelectOutboundPeek(ctx, nil, serverName, roomID, peekID)
+}
+
+func (d *Database) GetOutboundPeeks(ctx context.Context, roomID string) ([]types.OutboundPeek, error) {
+	return d.FederationSenderOutboundPeeks.SelectOutboundPeeks(ctx, nil, roomID)
+}
+
+func (d *Database) AddInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderInboundPeeks.InsertInboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	})
+}
+
+func (d *Database) RenewInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderInboundPeeks.RenewInboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	})
+}
+
+func (d *Database) GetInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.InboundPeek, error) {
+	return d.FederationSenderInboundPeeks.SelectInboundPeek(ctx, nil, serverName, roomID, peekID)
+}
+
+func (d *Database) GetInboundPeeks(ctx context.Context, roomID string) ([]types.InboundPeek, error) {
+	return d.FederationSenderInboundPeeks.SelectInboundPeeks(ctx, nil, roomID)
 }

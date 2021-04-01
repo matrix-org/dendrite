@@ -87,8 +87,9 @@ func TestMain(m *testing.M) {
 		transport.RegisterProtocol("matrix", &MockRoundTripper{})
 
 		// Create the federation client.
-		s.fedclient = gomatrixserverlib.NewFederationClientWithTransport(
-			s.config.Matrix.ServerName, serverKeyID, testPriv, true, transport,
+		s.fedclient = gomatrixserverlib.NewFederationClient(
+			s.config.Matrix.ServerName, serverKeyID, testPriv,
+			gomatrixserverlib.WithTransport(transport),
 		)
 
 		// Finally, build the server key APIs.

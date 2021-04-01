@@ -56,6 +56,12 @@ type RoomserverInternalAPI interface {
 		res *PerformPublishResponse,
 	)
 
+	PerformInboundPeek(
+		ctx context.Context,
+		req *PerformInboundPeekRequest,
+		res *PerformInboundPeekResponse,
+	) error
+
 	QueryPublishedRooms(
 		ctx context.Context,
 		req *QueryPublishedRoomsRequest,

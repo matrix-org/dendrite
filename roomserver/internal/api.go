@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -24,6 +25,7 @@ type RoomserverInternalAPI struct {
 	*perform.Inviter
 	*perform.Joiner
 	*perform.Peeker
+	*perform.InboundPeeker
 	*perform.Unpeeker
 	*perform.Leaver
 	*perform.Publisher
@@ -88,6 +90,7 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		Cfg:        r.Cfg,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
+		RSAPI:      r,
 		Inputer:    r.Inputer,
 	}
 	r.Peeker = &perform.Peeker{
@@ -96,6 +99,10 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
 		Inputer:    r.Inputer,
+	}
+	r.InboundPeeker = &perform.InboundPeeker{
+		DB:      r.DB,
+		Inputer: r.Inputer,
 	}
 	r.Unpeeker = &perform.Unpeeker{
 		ServerName: r.Cfg.Matrix.ServerName,
@@ -139,6 +146,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 ) error {
 	outputEvents, err := r.Inviter.PerformInvite(ctx, req, res)
 	if err != nil {
+		sentry.CaptureException(err)
 		return err
 	}
 	if len(outputEvents) == 0 {
@@ -154,6 +162,7 @@ func (r *RoomserverInternalAPI) PerformLeave(
 ) error {
 	outputEvents, err := r.Leaver.PerformLeave(ctx, req, res)
 	if err != nil {
+		sentry.CaptureException(err)
 		return err
 	}
 	if len(outputEvents) == 0 {
