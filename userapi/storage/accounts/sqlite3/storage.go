@@ -21,6 +21,7 @@ import (
 	"errors"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -37,32 +38,33 @@ type Database struct {
 	writer sqlutil.Writer
 
 	sqlutil.PartitionOffsetStatements
-	accounts     accountsStatements
-	profiles     profilesStatements
-	accountDatas accountDataStatements
-	threepids    threepidStatements
-	openIDTokens tokenStatements
-	serverName   gomatrixserverlib.ServerName
-	bcryptCost   int
+	accounts              accountsStatements
+	profiles              profilesStatements
+	accountDatas          accountDataStatements
+	threepids             threepidStatements
+	openIDTokens          tokenStatements
+	serverName            gomatrixserverlib.ServerName
+	bcryptCost            int
+	openIDTokenLifetimeMS int64
 
 	accountsMu     sync.Mutex
 	profilesMu     sync.Mutex
 	accountDatasMu sync.Mutex
 	threepidsMu    sync.Mutex
-	openIDsMu      sync.Mutex
 }
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64) (*Database, error) {
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
 	}
 	d := &Database{
-		serverName: serverName,
-		db:         db,
-		writer:     sqlutil.NewExclusiveWriter(),
-		bcryptCost: bcryptCost,
+		serverName:            serverName,
+		db:                    db,
+		writer:                sqlutil.NewExclusiveWriter(),
+		bcryptCost:            bcryptCost,
+		openIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
@@ -388,20 +390,19 @@ func (d *Database) DeactivateAccount(ctx context.Context, localpart string) (err
 // CreateOpenIDToken persists a new token that was issued for OpenID Connect
 func (d *Database) CreateOpenIDToken(
 	ctx context.Context,
-	tokenHash, localpart string,
-	expirationTS int64,
-) error {
-	d.openIDsMu.Lock()
-	defer d.openIDsMu.Unlock()
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.openIDTokens.insertToken(ctx, txn, tokenHash, localpart, expirationTS)
+	token, localpart string,
+) (int64, error) {
+	expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + d.openIDTokenLifetimeMS
+	err := d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		return d.openIDTokens.insertToken(ctx, txn, token, localpart, expiresAtMS)
 	})
+	return expiresAtMS, err
 }
 
 // GetOpenIDTokenAttributes gets the attributes of issued an OIDC auth token
 func (d *Database) GetOpenIDTokenAttributes(
 	ctx context.Context,
-	tokenHash string,
+	token string,
 ) (*api.OpenIDTokenAttributes, error) {
-	return d.openIDTokens.selectOpenIDTokenAtrributesByTokenHash(ctx, tokenHash)
+	return d.openIDTokens.selectOpenIDTokenAtrributes(ctx, token)
 }

@@ -64,7 +64,7 @@ func CreateOpenIDToken(
 			AccessToken:      response.Token.Token,
 			TokenType:        "Bearer",
 			MatrixServerName: string(cfg.Matrix.ServerName),
-			ExpiresIn:        response.Token.ExpiresTS / 1000, // convert ms to s
+			ExpiresIn:        response.Token.ExpiresAtMS / 1000, // convert ms to s
 		},
 	}
 }

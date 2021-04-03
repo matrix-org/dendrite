@@ -53,7 +53,7 @@ func GetOpenIDUserInfo(
 	var res interface{} = openIDUserInfoResponse{Sub: openIDTokenAttrResponse.Sub}
 	code := http.StatusOK
 	nowMS := time.Now().UnixNano() / int64(time.Millisecond)
-	if openIDTokenAttrResponse.Sub == "" || nowMS > openIDTokenAttrResponse.ExpiresTS {
+	if openIDTokenAttrResponse.Sub == "" || nowMS > openIDTokenAttrResponse.ExpiresAtMS {
 		code = http.StatusUnauthorized
 		res = jsonerror.UnknownToken("Access Token unknown or expired")
 	}

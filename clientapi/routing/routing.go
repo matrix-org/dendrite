@@ -685,7 +685,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet)
 
-	r0mux.Handle("/user/{userId}/openid/request_token",
+	r0mux.Handle("/user/{userID}/openid/request_token",
 		httputil.MakeAuthAPI("openid_request_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
@@ -694,7 +694,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return CreateOpenIDToken(req, userAPI, device, vars["userId"], cfg)
+			return CreateOpenIDToken(req, userAPI, device, vars["userID"], cfg)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

@@ -13,20 +13,20 @@ import (
 const openIDTokenSchema = `
 -- Stores data about accounts.
 CREATE TABLE IF NOT EXISTS open_id_tokens (
-	-- This is the hash of the token value
-	token_hash TEXT NOT NULL PRIMARY KEY,
+	-- The value of the token issued to a user
+	token TEXT NOT NULL PRIMARY KEY,
     -- The Matrix user ID for this account
 	localpart TEXT NOT NULL,
 	-- When the token expires, as a unix timestamp (ms resolution).
-	token_expires_ts BIGINT NOT NULL
+	token_expires_at_ms BIGINT NOT NULL
 );
 `
 
 const insertTokenSQL = "" +
-	"INSERT INTO open_id_tokens(token_hash, localpart, token_expires_ts) VALUES ($1, $2, $3)"
+	"INSERT INTO open_id_tokens(token, localpart, token_expires_at_ms) VALUES ($1, $2, $3)"
 
 const selectTokenSQL = "" +
-	"SELECT localpart, token_expires_ts FROM open_id_tokens WHERE token_hash = $1"
+	"SELECT localpart, token_expires_at_ms FROM open_id_tokens WHERE token = $1"
 
 type tokenStatements struct {
 	db              *sql.DB
@@ -52,28 +52,28 @@ func (s *tokenStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerNam
 }
 
 // insertToken inserts a new OpenID Connect token to the DB.
-// Returns new token, otherwise returns error if token hash already exists.
+// Returns new token, otherwise returns error if the token already exists.
 func (s *tokenStatements) insertToken(
 	ctx context.Context,
 	txn *sql.Tx,
-	token_hash, localpart string,
-	expiresTimeMS int64,
+	token, localpart string,
+	expiresAtMS int64,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
-	_, err = stmt.ExecContext(ctx, token_hash, localpart, expiresTimeMS)
+	_, err = stmt.ExecContext(ctx, token, localpart, expiresAtMS)
 	return
 }
 
-// selectOpenIDTokenAtrributesByTokenHash gets the attributes associated with an OpenID token from the DB
+// selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the DB
 // Returns the existing token's attributes, or err if no token is found
-func (s *tokenStatements) selectOpenIDTokenAtrributesByTokenHash(
+func (s *tokenStatements) selectOpenIDTokenAtrributes(
 	ctx context.Context,
-	tokenHash string,
+	token string,
 ) (*api.OpenIDTokenAttributes, error) {
 	var openIDTokenAttrs api.OpenIDTokenAttributes
-	err := s.selectTokenStmt.QueryRowContext(ctx, tokenHash).Scan(
+	err := s.selectTokenStmt.QueryRowContext(ctx, token).Scan(
 		&openIDTokenAttrs.UserID,
-		&openIDTokenAttrs.ExpiresTS,
+		&openIDTokenAttrs.ExpiresAtMS,
 	)
 	if err != nil {
 		if err != sql.ErrNoRows {

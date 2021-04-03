@@ -20,9 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash"
-	"hash/fnv"
-	"time"
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -421,16 +418,13 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 // PerformOpenIDTokenCreation creates a new token that a relying party uses to authenticate a user
 func (a *UserInternalAPI) PerformOpenIDTokenCreation(ctx context.Context, req *api.PerformOpenIDTokenCreationRequest, res *api.PerformOpenIDTokenCreationResponse) error {
 	token := util.RandomString(24)
-	tokenHash := getTokenHash(token)
-	nowMS := time.Now().UnixNano() / int64(time.Millisecond)
-	expiresMS := nowMS + (3600 * 1000) // 60 minutes
 
-	err := a.AccountDB.CreateOpenIDToken(ctx, fmt.Sprint(tokenHash.Sum32()), req.UserID, expiresMS)
+	exp, err := a.AccountDB.CreateOpenIDToken(ctx, token, req.UserID)
 
 	res.Token = api.OpenIDToken{
-		Token:     token,
-		UserID:    req.UserID,
-		ExpiresTS: expiresMS,
+		Token:       token,
+		UserID:      req.UserID,
+		ExpiresAtMS: exp,
 	}
 
 	return err
@@ -438,21 +432,13 @@ func (a *UserInternalAPI) PerformOpenIDTokenCreation(ctx context.Context, req *a
 
 // QueryOpenIDToken validates that the OpenID token was issued for the user, the replying party uses this for validation
 func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOpenIDTokenRequest, res *api.QueryOpenIDTokenResponse) error {
-	tokenHash := getTokenHash(req.Token)
-	openIDTokenAttrs, err := a.AccountDB.GetOpenIDTokenAttributes(ctx, fmt.Sprint(tokenHash.Sum32()))
+	openIDTokenAttrs, err := a.AccountDB.GetOpenIDTokenAttributes(ctx, req.Token)
 	if err != nil {
 		return err
 	}
 
 	res.Sub = openIDTokenAttrs.UserID
-	res.ExpiresTS = openIDTokenAttrs.ExpiresTS
+	res.ExpiresAtMS = openIDTokenAttrs.ExpiresAtMS
 
 	return nil
-}
-
-// used for getting the format in which the token is stored to prevent plaintext storage of sensitive info
-func getTokenHash(token string) hash.Hash32 {
-	tokenHash := fnv.New32a()
-	_, _ = tokenHash.Write([]byte(token))
-	return tokenHash
 }

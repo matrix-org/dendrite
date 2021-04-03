@@ -245,8 +245,8 @@ type QueryOpenIDTokenRequest struct {
 
 // QueryOpenIDTokenResponse is the response for QueryOpenIDToken
 type QueryOpenIDTokenResponse struct {
-	Sub       string // The Matrix User ID that generated the token
-	ExpiresTS int64
+	Sub         string // The Matrix User ID that generated the token
+	ExpiresAtMS int64
 }
 
 // Device represents a client's device (mobile, web, etc)
@@ -281,15 +281,15 @@ type Account struct {
 
 // OpenIDToken represents an OpenID token
 type OpenIDToken struct {
-	Token     string
-	UserID    string
-	ExpiresTS int64
+	Token       string
+	UserID      string
+	ExpiresAtMS int64
 }
 
 // OpenIDTokenInfo represents the attributes associated with an issued OpenID token
 type OpenIDTokenAttributes struct {
-	UserID    string
-	ExpiresTS int64
+	UserID      string
+	ExpiresAtMS int64
 }
 
 // UserInfo is for returning information about the user an OpenID token was issued for
