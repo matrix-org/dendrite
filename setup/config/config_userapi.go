@@ -21,6 +21,8 @@ type UserAPI struct {
 	DeviceDatabase DatabaseOptions `yaml:"device_database"`
 }
 
+const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
+
 func (c *UserAPI) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7781"
 	c.InternalAPI.Connect = "http://localhost:7781"
@@ -29,7 +31,7 @@ func (c *UserAPI) Defaults() {
 	c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
 	c.DeviceDatabase.ConnectionString = "file:userapi_devices.db"
 	c.BCryptCost = bcrypt.DefaultCost
-	c.OpenIDTokenLifetimeMS = 3600000 // 60 minutes
+	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
 }
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
