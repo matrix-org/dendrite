@@ -384,4 +384,4 @@ logging:
 - type: file
   level: info
   params:
-    path: /var/log/dendrite
+    path: ./logs

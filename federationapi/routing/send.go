@@ -26,6 +26,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/internal"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -98,6 +99,7 @@ func Send(
 	keyAPI keyapi.KeyInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
+	mu *internal.MutexByRoom,
 ) util.JSONResponse {
 	t := txnReq{
 		rsAPI:      rsAPI,
@@ -107,6 +109,7 @@ func Send(
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
 		newEvents:  make(map[string]bool),
 		keyAPI:     keyAPI,
+		roomsMu:    mu,
 	}
 
 	var txnEvents struct {
@@ -163,6 +166,7 @@ type txnReq struct {
 	federation   txnFederationClient
 	servers      []gomatrixserverlib.ServerName
 	serversMutex sync.RWMutex
+	roomsMu      *internal.MutexByRoom
 	// local cache of events for auth checks, etc - this may include events
 	// which the roomserver is unaware of.
 	haveEvents map[string]*gomatrixserverlib.HeaderedEvent
@@ -494,6 +498,8 @@ func (t *txnReq) getServers(ctx context.Context, roomID string) []gomatrixserver
 }
 
 func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) error {
+	t.roomsMu.Lock(e.RoomID())
+	defer t.roomsMu.Unlock(e.RoomID())
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
 	t.work = "" // reset from previous event
 
