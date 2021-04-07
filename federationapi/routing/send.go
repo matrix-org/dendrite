@@ -786,7 +786,7 @@ func (t *txnReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrix
 	default:
 		return nil, false, fmt.Errorf("t.lookupEvent: %w", err)
 	}
-	t.haveEvents[h.EventID()] = h
+	t.cacheAndReturn(h)
 	if h.StateKey() != nil {
 		addedToState := false
 		for i := range respState.StateEvents {
@@ -820,7 +820,7 @@ func (t *txnReq) lookupStateAfterEventLocally(ctx context.Context, roomID, event
 		PrevEventIDs: []string{eventID},
 	}, &res)
 	if err != nil || !res.PrevEventsExist {
-		util.GetLogger(ctx).WithField("room_id", roomID).WithError(err).Warnf("failed to query state after %s locally", eventID)
+		util.GetLogger(ctx).WithField("room_id", roomID).WithError(err).Warnf("failed to query state after %s locally, prev exists=%v", eventID, res.PrevEventsExist)
 		return nil
 	}
 	stateEvents := make([]*gomatrixserverlib.HeaderedEvent, len(res.StateEvents))
@@ -1052,14 +1052,16 @@ func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, even
 	}
 	for i := range queryRes.Events {
 		evID := queryRes.Events[i].EventID()
-		t.haveEvents[evID] = queryRes.Events[i]
+		t.cacheAndReturn(queryRes.Events[i])
 		if missing[evID] {
 			delete(missing, evID)
 		}
 	}
+	queryRes.Events = nil // allow it to be GCed
 
 	concurrentRequests := 8
 	missingCount := len(missing)
+	util.GetLogger(ctx).WithField("room_id", roomID).WithField("event_id", eventID).Infof("lookupMissingStateViaStateIDs missing %d/%d events", missingCount, len(wantIDs))
 
 	// If over 50% of the auth/state events from /state_ids are missing
 	// then we'll just call /state instead, otherwise we'll just end up
@@ -1124,7 +1126,7 @@ func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, even
 				return
 			}
 			haveEventsMutex.Lock()
-			t.haveEvents[h.EventID()] = h
+			t.cacheAndReturn(h)
 			haveEventsMutex.Unlock()
 		}
 
