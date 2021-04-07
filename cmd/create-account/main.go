@@ -58,7 +58,7 @@ func main() {
 
 	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
 		ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
-	}, cfg.Global.ServerName, bcrypt.DefaultCost)
+	}, cfg.Global.ServerName, bcrypt.DefaultCost, cfg.UserAPI.OpenIDTokenLifetimeMS)
 	if err != nil {
 		logrus.Fatalln("Failed to connect to the database:", err.Error())
 	}

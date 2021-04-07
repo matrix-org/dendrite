@@ -462,4 +462,10 @@ func Setup(
 			return QueryDeviceKeys(httpReq, request, keyAPI, cfg.Matrix.ServerName)
 		},
 	)).Methods(http.MethodPost)
+
+	v1fedmux.Handle("/openid/userinfo",
+		httputil.MakeExternalAPI("federation_openid_userinfo", func(req *http.Request) util.JSONResponse {
+			return GetOpenIDUserInfo(req, userAPI)
+		}),
+	).Methods(http.MethodGet)
 }

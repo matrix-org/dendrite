@@ -469,7 +469,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	// Stub endpoints required by Riot
+	// Stub endpoints required by Element
 
 	r0mux.Handle("/login",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
@@ -506,7 +506,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	// Riot user settings
+	// Element user settings
 
 	r0mux.Handle("/profile/{userID}",
 		httputil.MakeExternalAPI("profile", func(req *http.Request) util.JSONResponse {
@@ -592,7 +592,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	// Riot logs get flooded unless this is handled
+	// Element logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",
 		httputil.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {
@@ -684,6 +684,19 @@ func Setup(
 			return GetAdminWhois(req, userAPI, device, vars["userID"])
 		}),
 	).Methods(http.MethodGet)
+
+	r0mux.Handle("/user/{userID}/openid/request_token",
+		httputil.MakeAuthAPI("openid_request_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return CreateOpenIDToken(req, userAPI, device, vars["userID"], cfg)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/user_directory/search",
 		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
