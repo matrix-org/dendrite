@@ -34,6 +34,9 @@ type SetRoomAliasResponse struct {
 type GetRoomIDForAliasRequest struct {
 	// Alias we want to lookup
 	Alias string `json:"alias"`
+	// Should we ask appservices for their aliases as a part of
+	// the request?
+	IncludeAppservices bool `json:"include_appservices"`
 }
 
 // GetRoomIDForAliasResponse is a response to GetRoomIDForAlias

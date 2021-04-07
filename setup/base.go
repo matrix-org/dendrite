@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -112,6 +114,21 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")
+	}
+
+	if cfg.Global.Sentry.Enabled {
+		logrus.Info("Setting up Sentry for debugging...")
+		err = sentry.Init(sentry.ClientOptions{
+			Dsn:              cfg.Global.Sentry.DSN,
+			Environment:      cfg.Global.Sentry.Environment,
+			Debug:            true,
+			ServerName:       string(cfg.Global.ServerName),
+			Release:          "dendrite@" + internal.VersionString(),
+			AttachStacktrace: true,
+		})
+		if err != nil {
+			logrus.WithError(err).Panic("failed to start Sentry")
+		}
 	}
 
 	cache, err := caching.NewInMemoryLRUCache(true)
@@ -263,7 +280,7 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
-	db, err := accounts.NewDatabase(&b.Cfg.UserAPI.AccountDatabase, b.Cfg.Global.ServerName)
+	db, err := accounts.NewDatabase(&b.Cfg.UserAPI.AccountDatabase, b.Cfg.Global.ServerName, b.Cfg.UserAPI.BCryptCost)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
@@ -316,7 +333,6 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
-// nolint:gocyclo
 func (b *BaseDendrite) SetupAndServeHTTP(
 	internalHTTPAddr, externalHTTPAddr config.HTTPAddress,
 	certFile, keyFile *string,
@@ -354,10 +370,26 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
-	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(b.PublicClientAPIMux)
+	var clientHandler http.Handler
+	clientHandler = b.PublicClientAPIMux
+	if b.Cfg.Global.Sentry.Enabled {
+		sentryHandler := sentryhttp.New(sentryhttp.Options{
+			Repanic: true,
+		})
+		clientHandler = sentryHandler.Handle(b.PublicClientAPIMux)
+	}
+	var federationHandler http.Handler
+	federationHandler = b.PublicFederationAPIMux
+	if b.Cfg.Global.Sentry.Enabled {
+		sentryHandler := sentryhttp.New(sentryhttp.Options{
+			Repanic: true,
+		})
+		federationHandler = sentryHandler.Handle(b.PublicFederationAPIMux)
+	}
+	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(clientHandler)
 	if !b.Cfg.Global.DisableFederation {
 		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
-		externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(b.PublicFederationAPIMux)
+		externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(federationHandler)
 	}
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 
@@ -437,6 +469,11 @@ func (b *BaseDendrite) WaitForShutdown() {
 
 	b.ProcessContext.ShutdownDendrite()
 	b.ProcessContext.WaitForComponentsToFinish()
+	if b.Cfg.Global.Sentry.Enabled {
+		if !sentry.Flush(time.Second * 5) {
+			logrus.Warnf("failed to flush all Sentry events!")
+		}
+	}
 
 	logrus.Warnf("Dendrite is exiting now")
 }

@@ -88,31 +88,35 @@ func (r *RoomserverInternalAPI) GetRoomIDForAlias(
 ) error {
 	// Look up the room ID in the database
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
-	if err != nil {
-		return err
+	if err == nil && roomID != "" {
+		response.RoomID = roomID
+		return nil
 	}
 
-	if r.asAPI != nil { // appservice component is wired in
-		if roomID == "" {
-			// No room found locally, try our application services by making a call to
-			// the appservice component
-			aliasReq := asAPI.RoomAliasExistsRequest{Alias: request.Alias}
-			var aliasResp asAPI.RoomAliasExistsResponse
-			if err = r.asAPI.RoomAliasExists(ctx, &aliasReq, &aliasResp); err != nil {
+	// Check appservice on err, but only if the appservice API is
+	// wired in and no room ID was found.
+	if r.asAPI != nil && request.IncludeAppservices && roomID == "" {
+		// No room found locally, try our application services by making a call to
+		// the appservice component
+		aliasReq := &asAPI.RoomAliasExistsRequest{
+			Alias: request.Alias,
+		}
+		aliasRes := &asAPI.RoomAliasExistsResponse{}
+		if err = r.asAPI.RoomAliasExists(ctx, aliasReq, aliasRes); err != nil {
+			return err
+		}
+
+		if aliasRes.AliasExists {
+			roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
+			if err != nil {
 				return err
 			}
-
-			if aliasResp.AliasExists {
-				roomID, err = r.DB.GetRoomIDForAlias(ctx, request.Alias)
-				if err != nil {
-					return err
-				}
-			}
+			response.RoomID = roomID
+			return nil
 		}
 	}
 
-	response.RoomID = roomID
-	return nil
+	return err
 }
 
 // GetAliasesForRoomID implements alias.RoomserverInternalAPI

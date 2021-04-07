@@ -11,7 +11,7 @@ type RoomServer struct {
 func (c *RoomServer) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7770"
 	c.InternalAPI.Connect = "http://localhost:7770"
-	c.Database.Defaults()
+	c.Database.Defaults(10)
 	c.Database.ConnectionString = "file:roomserver.db"
 }
 

@@ -44,10 +44,11 @@ type Database struct {
 	accountDatas accountDataStatements
 	threepids    threepidStatements
 	serverName   gomatrixserverlib.ServerName
+	bcryptCost   int
 }
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int) (*Database, error) {
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
@@ -56,6 +57,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		serverName: serverName,
 		db:         db,
 		writer:     sqlutil.NewDummyWriter(),
+		bcryptCost: bcryptCost,
 	}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
@@ -131,7 +133,7 @@ func (d *Database) SetDisplayName(
 func (d *Database) SetPassword(
 	ctx context.Context, localpart, plaintextPassword string,
 ) error {
-	hash, err := hashPassword(plaintextPassword)
+	hash, err := d.hashPassword(plaintextPassword)
 	if err != nil {
 		return err
 	}
@@ -170,24 +172,26 @@ func (d *Database) CreateAccount(
 func (d *Database) createAccount(
 	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
 ) (*api.Account, error) {
+	var account *api.Account
 	var err error
-
 	// Generate a password hash if this is not a password-less user
 	hash := ""
 	if plaintextPassword != "" {
-		hash, err = hashPassword(plaintextPassword)
+		hash, err = d.hashPassword(plaintextPassword)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
+	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID); err != nil {
 		if sqlutil.IsUniqueConstraintViolationErr(err) {
 			return nil, sqlutil.ErrUserExists
 		}
 		return nil, err
 	}
-
-	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
+	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {
+		return nil, err
+	}
+	if err = d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
 		"global": {
 			"content": [],
 			"override": [],
@@ -198,7 +202,7 @@ func (d *Database) createAccount(
 	}`)); err != nil {
 		return nil, err
 	}
-	return d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID)
+	return account, nil
 }
 
 // SaveAccountData saves new account data for a given user and a given room.
@@ -244,8 +248,8 @@ func (d *Database) GetNewNumericLocalpart(
 	return d.accounts.selectNewNumericLocalpart(ctx, nil)
 }
 
-func hashPassword(plaintext string) (hash string, err error) {
-	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcrypt.DefaultCost)
+func (d *Database) hashPassword(plaintext string) (hash string, err error) {
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), d.bcryptCost)
 	return string(hashBytes), err
 }
 

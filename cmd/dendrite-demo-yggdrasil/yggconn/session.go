@@ -128,7 +128,6 @@ func (n *Node) Dial(network, address string) (net.Conn, error) {
 }
 
 // Implements http.Transport.DialContext
-// nolint:gocyclo
 func (n *Node) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	s, ok1 := n.sessions.Load(address)
 	session, ok2 := s.(*session)

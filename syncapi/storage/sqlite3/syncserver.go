@@ -52,7 +52,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	return &d, nil
 }
 
-// nolint:gocyclo
 func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
 		return err
