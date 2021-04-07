@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -148,18 +149,21 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	ev, err := s.updateStateEvent(ev)
 	if err != nil {
+		sentry.CaptureException(err)
 		return err
 	}
 
 	for i := range addsStateEvents {
 		addsStateEvents[i], err = s.updateStateEvent(addsStateEvents[i])
 		if err != nil {
+			sentry.CaptureException(err)
 			return err
 		}
 	}
 
 	if msg.RewritesState {
 		if err = s.db.PurgeRoomState(ctx, ev.RoomID()); err != nil {
+			sentry.CaptureException(err)
 			return fmt.Errorf("s.db.PurgeRoom: %w", err)
 		}
 	}
@@ -187,6 +191,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		sentry.CaptureException(err)
 		return err
 	}
 
@@ -279,6 +284,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
+		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event_id":   msg.Event.EventID(),
@@ -300,6 +306,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 ) error {
 	pduPos, err := s.db.RetireInviteEvent(ctx, msg.EventID)
 	if err != nil {
+		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,
@@ -320,6 +327,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 ) error {
 	sp, err := s.db.AddPeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
+		sentry.CaptureException(err)
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,

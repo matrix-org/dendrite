@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -107,6 +108,7 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Error("syncapi: failed to unmarshal key change event from key server")
+		sentry.CaptureException(err)
 		return err
 	}
 	// work out who we need to notify about the new key
@@ -116,6 +118,7 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}, &queryRes)
 	if err != nil {
 		log.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		sentry.CaptureException(err)
 		return err
 	}
 	// make sure we get our own key updates too!

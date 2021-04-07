@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -82,11 +83,13 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		sentry.CaptureException(err)
 		return err
 	}
 
 	_, domain, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
+		sentry.CaptureException(err)
 		return err
 	}
 	if domain != s.serverName {
@@ -104,6 +107,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *sarama.ConsumerMessage)
 		context.TODO(), output.UserID, output.DeviceID, output.SendToDeviceEvent,
 	)
 	if err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).Errorf("failed to store send-to-device message")
 		return err
 	}
