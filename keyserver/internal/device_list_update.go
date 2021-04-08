@@ -305,7 +305,7 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 			retriesMu.Lock()
 			now := time.Now()
 			for srv, retryAt := range retries {
-				if retryAt.After(now) {
+				if now.After(retryAt) {
 					serversToRetry = append(serversToRetry, srv)
 				}
 			}
@@ -374,7 +374,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		}
 	}
 	if failCount > 0 {
-		logger.WithField("total", len(userIDs)).WithField("failed", failCount).Error("failed to query device keys for some users")
+		logger.WithField("total", len(userIDs)).WithField("failed", failCount).WithField("wait", waitTime).Error("failed to query device keys for some users")
 	}
 	for _, userID := range userIDs {
 		// always clear the channel to unblock Update calls regardless of success/failure
