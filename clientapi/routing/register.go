@@ -161,15 +161,6 @@ type userInteractiveResponse struct {
 	Session   string                 `json:"session"`
 }
 
-// legacyRegisterRequest represents the submitted registration request for v1 API.
-type legacyRegisterRequest struct {
-	Password string                      `json:"password"`
-	Username string                      `json:"user"`
-	Admin    bool                        `json:"admin"`
-	Type     authtypes.LoginType         `json:"type"`
-	Mac      gomatrixserverlib.HexString `json:"mac"`
-}
-
 // newUserInteractiveResponse will return a struct to be sent back to the client
 // during registration.
 func newUserInteractiveResponse(
