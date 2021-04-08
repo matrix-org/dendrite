@@ -89,7 +89,6 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
-	v1mux := publicAPIMux.PathPrefix("/api/v1").Subrouter()
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
 
 	r0mux.Handle("/createRoom",
@@ -304,13 +303,6 @@ func Setup(
 			return *r
 		}
 		return Register(req, userAPI, accountDB, cfg)
-	})).Methods(http.MethodPost, http.MethodOptions)
-
-	v1mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		if r := rateLimits.rateLimit(req); r != nil {
-			return *r
-		}
-		return LegacyRegister(req, userAPI, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
