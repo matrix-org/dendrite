@@ -161,15 +161,6 @@ type userInteractiveResponse struct {
 	Session   string                 `json:"session"`
 }
 
-// legacyRegisterRequest represents the submitted registration request for v1 API.
-type legacyRegisterRequest struct {
-	Password string                      `json:"password"`
-	Username string                      `json:"user"`
-	Admin    bool                        `json:"admin"`
-	Type     authtypes.LoginType         `json:"type"`
-	Mac      gomatrixserverlib.HexString `json:"mac"`
-}
-
 // newUserInteractiveResponse will return a struct to be sent back to the client
 // during registration.
 func newUserInteractiveResponse(
@@ -755,85 +746,6 @@ func checkAndCompleteFlow(
 		JSON: newUserInteractiveResponse(sessionID,
 			cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 	}
-}
-
-// LegacyRegister process register requests from the legacy v1 API
-func LegacyRegister(
-	req *http.Request,
-	userAPI userapi.UserInternalAPI,
-	cfg *config.ClientAPI,
-) util.JSONResponse {
-	var r legacyRegisterRequest
-	resErr := parseAndValidateLegacyLogin(req, &r)
-	if resErr != nil {
-		return *resErr
-	}
-
-	logger := util.GetLogger(req.Context())
-	logger.WithFields(log.Fields{
-		"username":  r.Username,
-		"auth.type": r.Type,
-	}).Info("Processing registration request")
-
-	if cfg.RegistrationDisabled && r.Type != authtypes.LoginTypeSharedSecret {
-		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
-	}
-
-	switch r.Type {
-	case authtypes.LoginTypeSharedSecret:
-		if cfg.RegistrationSharedSecret == "" {
-			return util.MessageResponse(http.StatusBadRequest, "Shared secret registration is disabled")
-		}
-
-		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Mac)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
-			return jsonerror.InternalServerError()
-		}
-
-		if !valid {
-			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
-		}
-
-		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), false, nil, nil)
-	case authtypes.LoginTypeDummy:
-		// there is nothing to do
-		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), false, nil, nil)
-	default:
-		return util.JSONResponse{
-			Code: http.StatusNotImplemented,
-			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
-		}
-	}
-}
-
-// parseAndValidateLegacyLogin parses the request into r and checks that the
-// request is valid (e.g. valid user names, etc)
-func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *util.JSONResponse {
-	resErr := httputil.UnmarshalJSONRequest(req, &r)
-	if resErr != nil {
-		return resErr
-	}
-
-	// Squash username to all lowercase letters
-	r.Username = strings.ToLower(r.Username)
-
-	if resErr = validateUsername(r.Username); resErr != nil {
-		return resErr
-	}
-	if resErr = validatePassword(r.Password); resErr != nil {
-		return resErr
-	}
-
-	// All registration requests must specify what auth they are using to perform this request
-	if r.Type == "" {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("invalid type"),
-		}
-	}
-
-	return nil
 }
 
 // completeRegistration runs some rudimentary checks against the submitted
