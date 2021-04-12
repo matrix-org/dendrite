@@ -595,7 +595,7 @@ func (d *Database) fetchStateEvents(
 	if len(missingEvents) > 0 {
 		// This happens when add_state_ids has an event ID which is not in the provided range.
 		// We need to explicitly fetch them.
-		allMissingEventIDs := []string{}
+		var allMissingEventIDs []string
 		for _, missingEvIDs := range missingEvents {
 			allMissingEventIDs = append(allMissingEventIDs, missingEvIDs...)
 		}
@@ -651,7 +651,7 @@ func (d *Database) fetchMissingStateEvents(
 		// this error again when we work out what it is and fix it, otherwise we
 		// just end up returning lots of 500s to the client and that breaks
 		// pretty much everything, rather than just sending what we have.
-		//return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
+		// return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
 	}
 	events = append(events, stateEvents...)
 	return events, nil

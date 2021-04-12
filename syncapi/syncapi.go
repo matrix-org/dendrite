@@ -65,7 +65,7 @@ func AddPublicRoutes(
 	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		process, cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
+		process, cfg.Matrix.ServerName, cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent),
 		consumer, keyAPI, rsAPI, syncDB, notifier, streams.DeviceListStreamProvider,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {

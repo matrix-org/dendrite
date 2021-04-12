@@ -62,9 +62,9 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		checkURL(configErrs, "client_api.external_api.listen", string(c.ExternalAPI.Listen))
 	}
 	if c.RecaptchaEnabled {
-		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", string(c.RecaptchaPublicKey))
-		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", string(c.RecaptchaPrivateKey))
-		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", string(c.RecaptchaSiteVerifyAPI))
+		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", c.RecaptchaPublicKey)
+		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", c.RecaptchaPrivateKey)
+		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", c.RecaptchaSiteVerifyAPI)
 	}
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
