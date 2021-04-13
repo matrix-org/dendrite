@@ -621,6 +621,8 @@ func checkAllowedByState(e *gomatrixserverlib.Event, stateEvents []*gomatrixserv
 func (t *txnReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
 ) error {
+	t.roomsMu.Lock(e.RoomID())
+	defer t.roomsMu.Unlock(e.RoomID())
 	// Do this with a fresh context, so that we keep working even if the
 	// original request times out. With any luck, by the time the remote
 	// side retries, we'll have fetched the missing state.
@@ -716,9 +718,7 @@ func (t *txnReq) processEventWithMissingState(
 			respStates[i] = states[i].RespState
 		}
 		// There's more than one previous state - run them all through state res
-		t.roomsMu.Lock(e.RoomID())
 		resolvedState, err = t.resolveStatesAndCheck(gmectx, roomVersion, respStates, backwardsExtremity)
-		t.roomsMu.Unlock(e.RoomID())
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("Failed to resolve state conflicts for event %s", backwardsExtremity.EventID())
 			return err
