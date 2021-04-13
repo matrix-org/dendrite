@@ -150,7 +150,32 @@ type authDict struct {
 
 	// Recaptcha
 	Response string `json:"response"`
+	// m.login.email.identity and m.login.msisdn
+	ThreePidCreds *threepidCreds `json:"threepidCreds"`
 	// TODO: Lots of custom keys depending on the type
+}
+
+type threepidCreds struct {
+	Sid           string `json:"sid"`
+	ClientSecret  string `json:"client_secret"`
+	IdServer      string `json:"id_server"`
+	IdAccessToken string `json:"id_access_token"`
+}
+
+func (c *threepidCreds) validate() *jsonerror.MatrixError {
+	if c.Sid == "" {
+		return jsonerror.BadJSON("sid field in threepidCreds is required")
+	}
+	if c.ClientSecret == "" {
+		return jsonerror.BadJSON("client_secret in threepidCreds is required")
+	}
+	if c.IdServer == "" {
+		return jsonerror.BadJSON("id_server in threepidCreds is required")
+	}
+	if c.IdAccessToken == "" {
+		return jsonerror.BadJSON("id_access_token in threepidCreds is required")
+	}
+	return nil
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
@@ -308,6 +333,55 @@ func validateRecaptcha(
 		}
 	}
 	return nil
+}
+
+func validateEmailIdentity(
+	ctx context.Context,
+	cred *threepidCreds,
+	// cfg *config.ClientAPI,
+) *util.JSONResponse {
+	url := strings.Join([]string{
+		cred.IdServer,
+		"_matrix/identity/api/v1/3pid/getValidated3pid",
+	}, "/")
+	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
+	q := req.URL.Query()
+	q.Add("client_secret", cred.ClientSecret)
+	q.Add("sid", cred.Sid)
+	req.URL.RawQuery = q.Encode()
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("validate 3pid on indentity server failed"),
+		}
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case 404:
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("provided sid or client_secret not found on identity server"),
+		}
+	case 400:
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("session has not been validated"),
+		}
+	case 200:
+		return nil
+	default:
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalServerError(),
+		}
+	}
 }
 
 // UserIDIsWithinApplicationServiceNamespace checks to see if a given userID
@@ -658,6 +732,24 @@ func handleRegistrationFlow(
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
 		AddCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+
+	case authtypes.LoginTypeEmailIdentity:
+		if r.Auth.ThreePidCreds == nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("threepidCreds not found in auth field"),
+			}
+		}
+		if err := r.Auth.ThreePidCreds.validate(); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: err,
+			}
+		}
+		if err := validateEmailIdentity(req.Context(), r.Auth.ThreePidCreds); err != nil {
+			return *err
+		}
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeApplicationService)
 
 	case "":
 		// An empty auth type means that we want to fetch the available
