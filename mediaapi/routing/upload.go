@@ -221,12 +221,6 @@ func (r *uploadRequest) doUpload(
 
 // Validate validates the uploadRequest fields
 func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JSONResponse {
-	if r.MediaMetadata.FileSizeBytes < 1 {
-		return &util.JSONResponse{
-			Code: http.StatusLengthRequired,
-			JSON: jsonerror.Unknown("HTTP Content-Length request header must be greater than zero."),
-		}
-	}
 	if maxFileSizeBytes > 0 && r.MediaMetadata.FileSizeBytes > types.FileSizeBytes(maxFileSizeBytes) {
 		return &util.JSONResponse{
 			Code: http.StatusRequestEntityTooLarge,
