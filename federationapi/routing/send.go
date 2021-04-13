@@ -498,8 +498,6 @@ func (t *txnReq) getServers(ctx context.Context, roomID string) []gomatrixserver
 }
 
 func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) error {
-	t.roomsMu.Lock(e.RoomID())
-	defer t.roomsMu.Unlock(e.RoomID())
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
 	t.work = "" // reset from previous event
 
@@ -718,7 +716,9 @@ func (t *txnReq) processEventWithMissingState(
 			respStates[i] = states[i].RespState
 		}
 		// There's more than one previous state - run them all through state res
+		t.roomsMu.Lock(e.RoomID())
 		resolvedState, err = t.resolveStatesAndCheck(gmectx, roomVersion, respStates, backwardsExtremity)
+		t.roomsMu.Unlock(e.RoomID())
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("Failed to resolve state conflicts for event %s", backwardsExtremity.EventID())
 			return err
