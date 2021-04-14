@@ -158,8 +158,8 @@ func (r *uploadRequest) doUpload(
 		}
 	}
 
-	// If Content-Length header is not set, check if temp file size exceeds max file size configuration
-	if r.MediaMetadata.FileSizeBytes < 1 && bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
+	// Check if temp file size exceeds max file size configuration
+	if bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
 		fileutils.RemoveDir(tmpDir, r.Logger) // delete temp file
 		return requestEntityTooLargeJSONResponse(*cfg.MaxFileSizeBytes)
 	}
