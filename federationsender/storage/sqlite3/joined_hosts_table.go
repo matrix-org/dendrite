@@ -47,8 +47,8 @@ CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
 `
 
 const insertJoinedHostsSQL = "" +
-	"INSERT INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
-	" VALUES ($1, $2, $3) ON CONFLICT IGNORE"
+	"INSERT OR IGNORE INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
+	" VALUES ($1, $2, $3)"
 
 const deleteJoinedHostsSQL = "" +
 	"DELETE FROM federationsender_joined_hosts WHERE event_id = $1"
