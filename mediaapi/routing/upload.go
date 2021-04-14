@@ -158,6 +158,12 @@ func (r *uploadRequest) doUpload(
 		}
 	}
 
+	// Check if temp file size exceeds max file size configuration
+	if bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
+		fileutils.RemoveDir(tmpDir, r.Logger) // delete temp file
+		return requestEntityTooLargeJSONResponse(*cfg.MaxFileSizeBytes)
+	}
+
 	// Look up the media by the file hash. If we already have the file but under a
 	// different media ID then we won't upload the file again - instead we'll just
 	// add a new metadata entry that refers to the same file.
@@ -219,19 +225,17 @@ func (r *uploadRequest) doUpload(
 	)
 }
 
+func requestEntityTooLargeJSONResponse(maxFileSizeBytes config.FileSizeBytes) *util.JSONResponse {
+	return &util.JSONResponse{
+		Code: http.StatusRequestEntityTooLarge,
+		JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
+	}
+}
+
 // Validate validates the uploadRequest fields
 func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JSONResponse {
-	if r.MediaMetadata.FileSizeBytes < 1 {
-		return &util.JSONResponse{
-			Code: http.StatusLengthRequired,
-			JSON: jsonerror.Unknown("HTTP Content-Length request header must be greater than zero."),
-		}
-	}
 	if maxFileSizeBytes > 0 && r.MediaMetadata.FileSizeBytes > types.FileSizeBytes(maxFileSizeBytes) {
-		return &util.JSONResponse{
-			Code: http.StatusRequestEntityTooLarge,
-			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
-		}
+		return requestEntityTooLargeJSONResponse(maxFileSizeBytes)
 	}
 	// TODO: Check if the Content-Type is a valid type?
 	if r.MediaMetadata.ContentType == "" {
