@@ -233,13 +233,6 @@ func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JS
 			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
 		}
 	}
-	// TODO: Check if the Content-Type is a valid type?
-	if r.MediaMetadata.ContentType == "" {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("HTTP Content-Type request header must be set."),
-		}
-	}
 	if strings.HasPrefix(string(r.MediaMetadata.UploadName), "~") {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
