@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"time"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 type ClientAPI struct {
@@ -34,6 +36,13 @@ type ClientAPI struct {
 
 	// TURN options
 	TURN TURN `yaml:"turn"`
+
+	// Allowable flows for registration
+	// https://spec.matrix.org/unstable/client-server-api/#get_matrixclientr0login
+	Registration authtypes.InteractiveAuth `yaml:"registration"`
+	// Allowable flows for login
+	// https://spec.matrix.org/unstable/client-server-api/#post_matrixclientr0register
+	Login authtypes.InteractiveAuth `yaml:"login"`
 
 	// Rate-limiting options
 	RateLimiting RateLimiting `yaml:"rate_limiting"`

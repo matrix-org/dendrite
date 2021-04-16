@@ -823,7 +823,7 @@ func checkAndCompleteFlow(
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
-	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
+	if checkFlowCompleted(flow, cfg.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
 			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(),
@@ -836,7 +836,7 @@ func checkAndCompleteFlow(
 	return util.JSONResponse{
 		Code: http.StatusUnauthorized,
 		JSON: newUserInteractiveResponse(sessionID,
-			cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
+			cfg.Registration.Flows, cfg.Registration.Params),
 	}
 }
 

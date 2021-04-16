@@ -140,7 +140,14 @@ client_api:
     connect: http://localhost:7771
   external_api:
     listen: http://[::]:8071
-
+  registration:
+    flows:
+      - stages:
+        - m.login.email.identity
+  login:
+    flows:
+      - stages:
+        - m.login.password
   # Prevents new users from being able to register on this homeserver, except when
   # using the registration shared secret below.
   registration_disabled: false
