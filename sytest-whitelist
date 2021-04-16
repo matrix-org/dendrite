@@ -71,6 +71,7 @@ GET /rooms/:room_id/joined_members fetches my membership
 Both GET and PUT work
 POST /rooms/:room_id/read_markers can create read marker
 User signups are forbidden from starting with '_'
+Can register using an email address via identity server
 Request to logout with invalid an access token is rejected
 Request to logout without an access token is rejected
 Room creation reports m.room.create to myself

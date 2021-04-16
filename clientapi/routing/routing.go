@@ -312,6 +312,13 @@ func Setup(
 		return RegisterAvailable(req, cfg, accountDB)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
+	r0mux.Handle("/register/email/requestToken", httputil.MakeExternalAPI("registerEmailRequestToken", func(req *http.Request) util.JSONResponse {
+		if r := rateLimits.rateLimit(req); r != nil {
+			return *r
+		}
+		return RegisterEmailRequestToken(req, cfg)
+	})).Methods(http.MethodPost, http.MethodOptions)
+
 	r0mux.Handle("/directory/room/{roomAlias}",
 		httputil.MakeExternalAPI("directory_room", func(req *http.Request) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))

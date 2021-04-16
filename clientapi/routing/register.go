@@ -16,9 +16,11 @@
 package routing
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -143,6 +145,15 @@ type registerRequest struct {
 	Type authtypes.LoginType `json:"type"`
 }
 
+type registerEmailRequestTokenRequest struct {
+	ClientSecret  string `json:"client_secret"`
+	Email         string `json:"email"`
+	IdAccessToken string `json:"id_access_token,omitempty"`
+	IdServer      string `json:"id_server,omitempty"`
+	NextLink      string `json:"next_link"`
+	SendAttempt   int    `json:"send_attempt"`
+}
+
 type authDict struct {
 	Type    authtypes.LoginType         `json:"type"`
 	Session string                      `json:"session"`
@@ -212,6 +223,11 @@ type recaptchaResponse struct {
 	ChallengeTS time.Time `json:"challenge_ts"`
 	Hostname    string    `json:"hostname"`
 	ErrorCodes  []int     `json:"error-codes"`
+}
+
+// server response for
+type registerEmailRequestTokenResponse struct {
+	Sid string `json:"sid"`
 }
 
 // validateUsername returns an error response if the username is invalid
@@ -340,10 +356,13 @@ func validateEmailIdentity(
 	cred *threepidCreds,
 	// cfg *config.ClientAPI,
 ) *util.JSONResponse {
-	url := strings.Join([]string{
-		cred.IdServer,
-		"_matrix/identity/api/v1/3pid/getValidated3pid",
-	}, "/")
+	url := fmt.Sprintf(
+		"https://%s/_matrix/identity/v2/3pid/getValidated3pid",
+		cred.IdServer)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return &util.JSONResponse{
@@ -355,11 +374,13 @@ func validateEmailIdentity(
 	q.Add("client_secret", cred.ClientSecret)
 	q.Add("sid", cred.Sid)
 	req.URL.RawQuery = q.Encode()
-	resp, err := http.DefaultClient.Do(req)
+	req.Header.Add("Authorization", "Bearer swordfish")
+	resp, err := client.Do(req)
 	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("failed conecting to identity server")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("validate 3pid on indentity server failed"),
+			JSON: jsonerror.Unknown("failed conecting to identity server"),
 		}
 	}
 	defer resp.Body.Close()
@@ -1083,4 +1104,102 @@ func RegisterAvailable(
 			Available: true,
 		},
 	}
+}
+
+func RegisterEmailRequestToken(
+	req *http.Request,
+	cfg *config.ClientAPI,
+) util.JSONResponse {
+	var r registerEmailRequestTokenRequest
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return *resErr
+	}
+	idServer := r.IdServer
+	idAccessToken := r.IdAccessToken
+	// if !isServerTrusted(idServer, cfg.Matrix.TrustedIDServers) {
+	// 	return util.JSONResponse{
+	// 		Code: http.StatusForbidden,
+	// 		JSON: jsonerror.NotTrusted(fmt.Sprintf("identity server %s is not trusted.", idServer)),
+	// 	}
+	// }
+	r.IdServer = ""
+	r.IdAccessToken = ""
+	return requestEmailTokenFromIdServer(req.Context(), idServer, idAccessToken, &r)
+}
+
+func isServerTrusted(s string, trusted []string) bool {
+	for _, t := range trusted {
+		if s == t {
+			return true
+		}
+	}
+	return false
+}
+
+func requestEmailTokenFromIdServer(
+	ctx context.Context,
+	idServer, idAccessToken string,
+	r *registerEmailRequestTokenRequest,
+) util.JSONResponse {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	b := bytes.Buffer{}
+	enc := json.NewEncoder(&b)
+	err := enc.Encode(r)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("enc.Encode failed")
+		return jsonerror.InternalServerError()
+	}
+	idReq, err := http.NewRequest(
+		// ctx,
+		"POST",
+		fmt.Sprintf(
+			"https://%s/_matrix/identity/v2/validate/email/requestToken",
+			idServer),
+		&b)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("http.NewRequestWithContext failed")
+		return jsonerror.InternalServerError()
+	}
+	idReq.Header.Add("Authentication", "Bearer "+idAccessToken)
+	idReq.Header.Add("Content-Type", "application/json")
+	// util.GetLogger(ctx).WithError(err).Warnf("buffer %s")
+	// io.Copy(os.Stdout, &b)
+	idResp, err := client.Do(idReq)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Errorf("failed to connect to identity server %s", idServer)
+		return jsonerror.InternalServerError()
+	}
+	defer idResp.Body.Close()
+	decoder := json.NewDecoder(idResp.Body)
+	if idResp.StatusCode < 300 {
+		var resp registerEmailRequestTokenResponse
+		decoder.Decode(&resp)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("failed to decode identity server response body")
+			return jsonerror.InternalServerError()
+		}
+		return util.JSONResponse{
+			Code: idResp.StatusCode,
+			JSON: resp,
+		}
+	}
+	if idResp.StatusCode < 500 {
+		var resp jsonerror.MatrixError
+		decoder.Decode(&resp)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("failed to decode identity server response body")
+			return jsonerror.InternalServerError()
+		}
+		return util.JSONResponse{
+			Code: idResp.StatusCode,
+			JSON: resp,
+		}
+	}
+	// We got 500 status code from indentity server
+	util.GetLogger(ctx).WithError(err).Error("identity server internal server error")
+	return jsonerror.InternalServerError()
 }
