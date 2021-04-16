@@ -226,7 +226,6 @@ func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 			case "aliases":
 				err = appendExclusiveNamespaceRegexs(&exclusiveAliasStrings, namespaceSlice)
 			}
-
 			if err != nil {
 				return fmt.Errorf("invalid regex in appservice %q, namespace %q: %w", appservice.ID, key, err)
 			}
