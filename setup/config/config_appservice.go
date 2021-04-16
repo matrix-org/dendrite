@@ -213,14 +213,22 @@ func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 			usersSlice = []ApplicationServiceNamespace{}
 			appservice.NamespaceMap["users"] = usersSlice
 		}
-		appendExclusiveNamespaceRegexs(&senderUserIDSlice, usersSlice)
+
+		err = appendExclusiveNamespaceRegexs(&senderUserIDSlice, usersSlice)
+		if err != nil {
+			return fmt.Errorf("invalid regex in appservice %q: %w", appservice.ID, err)
+		}
 
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			switch key {
 			case "users":
-				appendExclusiveNamespaceRegexs(&exclusiveUsernameStrings, namespaceSlice)
+				err = appendExclusiveNamespaceRegexs(&exclusiveUsernameStrings, namespaceSlice)
 			case "aliases":
-				appendExclusiveNamespaceRegexs(&exclusiveAliasStrings, namespaceSlice)
+				err = appendExclusiveNamespaceRegexs(&exclusiveAliasStrings, namespaceSlice)
+			}
+
+			if err != nil {
+				return fmt.Errorf("invalid regex in appservice %q, namespace %q: %w", appservice.ID, key, err)
 			}
 		}
 	}
@@ -257,7 +265,7 @@ func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 // into the string slice
 func appendExclusiveNamespaceRegexs(
 	exclusiveStrings *[]string, namespaces []ApplicationServiceNamespace,
-) {
+) error {
 	for index, namespace := range namespaces {
 		if namespace.Exclusive {
 			// We append parenthesis to later separate each regex when we compile
@@ -266,8 +274,15 @@ func appendExclusiveNamespaceRegexs(
 		}
 
 		// Compile this regex into a Regexp object for later use
-		namespaces[index].RegexpObject, _ = regexp.Compile(namespace.Regex)
+		r, err := regexp.Compile(namespace.Regex)
+		if err != nil {
+			return fmt.Errorf("regex at namespace %d: %w", index, err)
+		}
+
+		namespaces[index].RegexpObject = r
 	}
+
+	return nil
 }
 
 // checkErrors checks for any configuration errors amongst the loaded
