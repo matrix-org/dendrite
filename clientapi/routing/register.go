@@ -614,7 +614,10 @@ func handleRegistrationFlow(
 	}
 
 	if cfg.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
-		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Registration is disabled"),
+		}
 	}
 
 	// Make sure normal user isn't registering under an exclusive application
