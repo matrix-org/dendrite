@@ -354,7 +354,6 @@ func validateRecaptcha(
 func validateEmailIdentity(
 	ctx context.Context,
 	cred *threepidCreds,
-	// cfg *config.ClientAPI,
 ) *util.JSONResponse {
 	url := fmt.Sprintf(
 		"https://%s/_matrix/identity/v2/3pid/getValidated3pid",
