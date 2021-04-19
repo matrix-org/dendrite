@@ -1153,8 +1153,8 @@ func requestEmailTokenFromIdServer(
 		util.GetLogger(ctx).WithError(err).Error("enc.Encode failed")
 		return jsonerror.InternalServerError()
 	}
-	idReq, err := http.NewRequest(
-		// ctx,
+	idReq, err := http.NewRequestWithContext(
+		ctx,
 		"POST",
 		fmt.Sprintf(
 			"https://%s/_matrix/identity/v2/validate/email/requestToken",
@@ -1166,8 +1166,6 @@ func requestEmailTokenFromIdServer(
 	}
 	idReq.Header.Add("Authentication", "Bearer "+idAccessToken)
 	idReq.Header.Add("Content-Type", "application/json")
-	// util.GetLogger(ctx).WithError(err).Warnf("buffer %s")
-	// io.Copy(os.Stdout, &b)
 	idResp, err := client.Do(idReq)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("failed to connect to identity server %s", idServer)
