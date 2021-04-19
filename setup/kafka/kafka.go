@@ -2,9 +2,9 @@ package kafka
 
 import (
 	"github.com/Shopify/sarama"
+	"github.com/kilosliu/naffka"
+	naffkaStorage "github.com/kilosliu/naffka/storage"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/naffka"
-	naffkaStorage "github.com/matrix-org/naffka/storage"
 	"github.com/sirupsen/logrus"
 )
 

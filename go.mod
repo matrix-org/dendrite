@@ -8,6 +8,7 @@ require (
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/kilosliu/naffka v0.0.0-20210419032723-dc792b083977
 	github.com/lib/pq v1.9.0
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
@@ -23,7 +24,6 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20210302161955-6142fe3f8c2c
-	github.com/matrix-org/naffka v0.0.0-20201009174903-d26a3b9cb161
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
