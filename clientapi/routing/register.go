@@ -356,7 +356,7 @@ func validateEmailIdentity(
 	cred *threepidCreds,
 ) *util.JSONResponse {
 	url := fmt.Sprintf(
-		"https://%s/_matrix/identity/v2/3pid/getValidated3pid",
+		"https://%s/_matrix/identity/api/v1/3pid/getValidated3pid",
 		cred.IdServer)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -1156,14 +1156,13 @@ func requestEmailTokenFromIdServer(
 		ctx,
 		"POST",
 		fmt.Sprintf(
-			"https://%s/_matrix/identity/v2/validate/email/requestToken",
+			"https://%s/_matrix/identity/api/v1/validate/email/requestToken",
 			idServer),
 		&b)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("http.NewRequestWithContext failed")
 		return jsonerror.InternalServerError()
 	}
-	idReq.Header.Add("Authentication", "Bearer "+idAccessToken)
 	idReq.Header.Add("Content-Type", "application/json")
 	idResp, err := client.Do(idReq)
 	if err != nil {
