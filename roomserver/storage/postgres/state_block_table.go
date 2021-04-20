@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS roomserver_state_block (
 const insertStateDataSQL = "" +
 	"INSERT INTO roomserver_state_block (state_block_hash, event_nids)" +
 	" VALUES ($1, $2)" +
-	" ON CONFLICT (event_nids) DO UPDATE SET event_nids=$2" +
+	" ON CONFLICT (state_block_hash) DO UPDATE SET event_nids=$2" +
 	" RETURNING state_block_nid"
 
 const bulkSelectStateBlockEntriesSQL = "" +

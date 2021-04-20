@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
 const insertStateSQL = "" +
 	"INSERT INTO roomserver_state_snapshots (state_snapshot_hash, room_nid, state_block_nids)" +
 	" VALUES ($1, $2, $3)" +
-	" ON CONFLICT (room_nid, state_block_nids) DO UPDATE SET room_nid=$2" +
+	" ON CONFLICT (state_snapshot_hash) DO UPDATE SET room_nid=$2" +
 	// Performing an update, above, ensures that the RETURNING statement
 	// below will always return a valid state snapshot ID
 	" RETURNING state_snapshot_nid"
