@@ -64,14 +64,16 @@ type roomAliasesStatements struct {
 	deleteRoomAliasStmt          *sql.Stmt
 }
 
-func NewSqliteRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
+func createRoomAliasesTable(db *sql.DB) error {
+	_, err := db.Exec(roomAliasesSchema)
+	return err
+}
+
+func prepareRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
 	s := &roomAliasesStatements{
 		db: db,
 	}
-	_, err := db.Exec(roomAliasesSchema)
-	if err != nil {
-		return nil, err
-	}
+
 	return s, shared.StatementList{
 		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
 		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},

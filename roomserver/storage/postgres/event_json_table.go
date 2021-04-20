@@ -59,12 +59,14 @@ type eventJSONStatements struct {
 	bulkSelectEventJSONStmt *sql.Stmt
 }
 
-func NewPostgresEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
-	s := &eventJSONStatements{}
+func createEventJSONTable(db *sql.DB) error {
 	_, err := db.Exec(eventJSONSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
+	s := &eventJSONStatements{}
+
 	return s, shared.StatementList{
 		{&s.insertEventJSONStmt, insertEventJSONSQL},
 		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},

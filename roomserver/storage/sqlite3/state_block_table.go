@@ -56,13 +56,14 @@ type stateBlockStatements struct {
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
 }
 
-func NewSqliteStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+func createStateBlockTable(db *sql.DB) error {
+	_, err := db.Exec(stateDataSchema)
+	return err
+}
+
+func prepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{
 		db: db,
-	}
-	_, err := db.Exec(stateDataSchema)
-	if err != nil {
-		return nil, err
 	}
 
 	return s, shared.StatementList{

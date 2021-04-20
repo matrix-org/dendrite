@@ -59,13 +59,14 @@ type stateSnapshotStatements struct {
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 
-func NewSqliteStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
+func createStateSnapshotTable(db *sql.DB) error {
+	_, err := db.Exec(stateSnapshotSchema)
+	return err
+}
+
+func prepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 	s := &stateSnapshotStatements{
 		db: db,
-	}
-	_, err := db.Exec(stateSnapshotSchema)
-	if err != nil {
-		return nil, err
 	}
 
 	return s, shared.StatementList{

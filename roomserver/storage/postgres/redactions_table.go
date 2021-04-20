@@ -60,12 +60,13 @@ type redactionStatements struct {
 	markRedactionValidatedStmt                  *sql.Stmt
 }
 
-func NewPostgresRedactionsTable(db *sql.DB) (tables.Redactions, error) {
-	s := &redactionStatements{}
+func createRedactionsTable(db *sql.DB) error {
 	_, err := db.Exec(redactionsSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareRedactionsTable(db *sql.DB) (tables.Redactions, error) {
+	s := &redactionStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertRedactionStmt, insertRedactionSQL},

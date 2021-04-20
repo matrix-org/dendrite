@@ -121,13 +121,14 @@ type eventStatements struct {
 	//selectRoomNIDsForEventNIDsStmt           *sql.Stmt
 }
 
-func NewSqliteEventsTable(db *sql.DB) (tables.Events, error) {
+func createEventsTable(db *sql.DB) error {
+	_, err := db.Exec(eventsSchema)
+	return err
+}
+
+func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 	s := &eventStatements{
 		db: db,
-	}
-	_, err := db.Exec(eventsSchema)
-	if err != nil {
-		return nil, err
 	}
 
 	return s, shared.StatementList{

@@ -61,12 +61,13 @@ type stateBlockStatements struct {
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
 }
 
-func NewPostgresStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
-	s := &stateBlockStatements{}
+func createStateBlockTable(db *sql.DB) error {
 	_, err := db.Exec(stateDataSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+	s := &stateBlockStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertStateDataStmt, insertStateDataSQL},

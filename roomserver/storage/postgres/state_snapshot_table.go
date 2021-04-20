@@ -67,12 +67,13 @@ type stateSnapshotStatements struct {
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 
-func NewPostgresStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
-	s := &stateSnapshotStatements{}
+func createStateSnapshotTable(db *sql.DB) error {
 	_, err := db.Exec(stateSnapshotSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
+	s := &stateSnapshotStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertStateStmt, insertStateSQL},

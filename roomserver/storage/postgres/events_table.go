@@ -149,12 +149,13 @@ type eventStatements struct {
 	selectRoomNIDsForEventNIDsStmt         *sql.Stmt
 }
 
-func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
-	s := &eventStatements{}
+func createEventsTable(db *sql.DB) error {
 	_, err := db.Exec(eventsSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareEventsTable(db *sql.DB) (tables.Events, error) {
+	s := &eventStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
