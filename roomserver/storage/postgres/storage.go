@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -39,22 +40,23 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	var db *sql.DB
 	var err error
 	if db, err = sqlutil.Open(dbProperties); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("sqlutil.Open: %w", err)
 	}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
 	// and THEN prepare statements so we don't fail due to referencing new columns
 	ms := membershipStatements{}
 	if err := ms.execSchema(db); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ms.execSchema: %w", err)
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadAddForgottenColumn(m)
+	deltas.LoadStateBlocksRefactor(m)
 	if err := m.RunDeltas(db, dbProperties); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("m.RunDeltas: %w", err)
 	}
 	if err := d.prepare(db, cache); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("d.prepare: %w", err)
 	}
 
 	return &d, nil

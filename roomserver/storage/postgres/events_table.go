@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
@@ -88,6 +89,13 @@ const bulkSelectStateEventByIDSQL = "" +
 	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
+const bulkSelectStateEventByNIDSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
+	" WHERE event_nid = ANY($1)" +
+	" AND (CARDINALITY($2::bigint[]) = 0 OR event_type_nid = ANY($2))" +
+	" AND (CARDINALITY($3::bigint[]) = 0 OR event_state_key_nid = ANY($3))" +
+	" ORDER BY event_type_nid, event_state_key_nid ASC"
+
 const bulkSelectStateAtEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, is_rejected FROM roomserver_events" +
 	" WHERE event_id = ANY($1)"
@@ -127,6 +135,7 @@ type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
 	bulkSelectStateEventByIDStmt           *sql.Stmt
+	bulkSelectStateEventByNIDStmt          *sql.Stmt
 	bulkSelectStateAtEventByIDStmt         *sql.Stmt
 	updateEventStateStmt                   *sql.Stmt
 	selectEventSentToOutputStmt            *sql.Stmt
@@ -151,6 +160,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
+		{&s.bulkSelectStateEventByNIDStmt, bulkSelectStateEventByNIDSQL},
 		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
 		{&s.updateEventStateStmt, updateEventStateSQL},
 		{&s.updateEventSentToOutputStmt, updateEventSentToOutputSQL},
@@ -234,6 +244,42 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		return nil, types.MissingEventError(
 			fmt.Sprintf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs)),
 		)
+	}
+	return results, nil
+}
+
+// bulkSelectStateEventByNID lookups a list of state events by event NID.
+// If any of the requested events are missing from the database it returns a types.MissingEventError
+func (s *eventStatements) BulkSelectStateEventByNID(
+	ctx context.Context, eventNIDs []types.EventNID,
+	stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntry, error) {
+	tuples := stateKeyTupleSorter(stateKeyTuples)
+	sort.Sort(tuples)
+	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
+	rows, err := s.bulkSelectStateEventByNIDStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs), eventTypeNIDArray, eventStateKeyNIDArray)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
+	// We know that we will only get as many results as event IDs
+	// because of the unique constraint on event IDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
+	results := make([]types.StateEntry, len(eventNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		if err = rows.Scan(
+			&result.EventTypeNID,
+			&result.EventStateKeyNID,
+			&result.EventNID,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 	return results, nil
 }

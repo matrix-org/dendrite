@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/util"
 )
 
 const stateSnapshotSchema = `
@@ -38,21 +39,20 @@ const stateSnapshotSchema = `
 -- because room state tends to accumulate small changes over time. Although if
 -- the list of deltas becomes too long it becomes more efficient to encode
 -- the full state under single state_block_nid.
-CREATE SEQUENCE IF NOT EXISTS roomserver_state_snapshot_nid_seq;
 CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
-    -- Local numeric ID for the state.
-    state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_snapshot_nid_seq'),
-    -- Local numeric ID of the room this state is for.
-    -- Unused in normal operation, but useful for background work or ad-hoc debugging.
-    room_nid bigint NOT NULL,
-    -- List of state_block_nids, stored sorted by state_block_nid.
-    state_block_nids bigint[] NOT NULL
+	state_snapshot_nid bigserial PRIMARY KEY,
+	state_snapshot_hash BYTEA UNIQUE,
+	room_nid bigint NOT NULL,
+	state_block_nids bigint[] NOT NULL
 );
 `
 
 const insertStateSQL = "" +
-	"INSERT INTO roomserver_state_snapshots (room_nid, state_block_nids)" +
-	" VALUES ($1, $2)" +
+	"INSERT INTO roomserver_state_snapshots (state_snapshot_hash, room_nid, state_block_nids)" +
+	" VALUES ($1, $2, $3)" +
+	" ON CONFLICT (room_nid, state_block_nids) DO UPDATE SET room_nid=$2" +
+	// Performing an update, above, ensures that the RETURNING statement
+	// below will always return a valid state snapshot ID
 	" RETURNING state_snapshot_nid"
 
 // Bulk state data NID lookup.
@@ -81,13 +81,15 @@ func NewPostgresStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 }
 
 func (s *stateSnapshotStatements) InsertState(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, nids types.StateBlockNIDs,
 ) (stateNID types.StateSnapshotNID, err error) {
-	nids := make([]int64, len(stateBlockNIDs))
-	for i := range stateBlockNIDs {
-		nids[i] = int64(stateBlockNIDs[i])
+	nids = nids[:util.SortAndUnique(nids)]
+	var id int64
+	err = sqlutil.TxStmt(txn, s.insertStateStmt).QueryRowContext(ctx, nids.Hash(), int64(roomNID), stateBlockNIDsAsArray(nids)).Scan(&id)
+	if err != nil {
+		return 0, err
 	}
-	err = sqlutil.TxStmt(txn, s.insertStateStmt).QueryRowContext(ctx, int64(roomNID), pq.Int64Array(nids)).Scan(&stateNID)
+	stateNID = types.StateSnapshotNID(id)
 	return
 }
 

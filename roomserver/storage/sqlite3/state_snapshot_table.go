@@ -27,19 +27,24 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/util"
 )
 
 const stateSnapshotSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
     state_snapshot_nid INTEGER PRIMARY KEY AUTOINCREMENT,
+	state_snapshot_hash BLOB UNIQUE,
     room_nid INTEGER NOT NULL,
     state_block_nids TEXT NOT NULL DEFAULT '[]'
   );
 `
 
 const insertStateSQL = `
-	INSERT INTO roomserver_state_snapshots (room_nid, state_block_nids)
-	  VALUES ($1, $2);`
+	INSERT INTO roomserver_state_snapshots (state_snapshot_hash, room_nid, state_block_nids)
+	  VALUES ($1, $2, $3)
+	  ON CONFLICT (state_snapshot_hash) DO UPDATE SET room_nid=$2
+	  RETURNING state_snapshot_nid
+`
 
 // Bulk state data NID lookup.
 // Sorting by state_snapshot_nid means we can use binary search over the result
@@ -70,22 +75,20 @@ func NewSqliteStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 }
 
 func (s *stateSnapshotStatements) InsertState(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs types.StateBlockNIDs,
 ) (stateNID types.StateSnapshotNID, err error) {
+	stateBlockNIDs = stateBlockNIDs[:util.SortAndUnique(stateBlockNIDs)]
 	stateBlockNIDsJSON, err := json.Marshal(stateBlockNIDs)
 	if err != nil {
 		return
 	}
 	insertStmt := sqlutil.TxStmt(txn, s.insertStateStmt)
-	res, err := insertStmt.ExecContext(ctx, int64(roomNID), string(stateBlockNIDsJSON))
+	var id int64
+	err = insertStmt.QueryRowContext(ctx, stateBlockNIDs.Hash(), int64(roomNID), string(stateBlockNIDsJSON)).Scan(&id)
 	if err != nil {
 		return 0, err
 	}
-	lastRowID, err := res.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-	stateNID = types.StateSnapshotNID(lastRowID)
+	stateNID = types.StateSnapshotNID(id)
 	return
 }
 
