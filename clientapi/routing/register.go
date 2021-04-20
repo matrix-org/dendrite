@@ -769,7 +769,7 @@ func handleRegistrationFlow(
 		if err := validateEmailIdentity(req.Context(), r.Auth.ThreePidCreds); err != nil {
 			return *err
 		}
-		AddCompletedSessionStage(sessionID, authtypes.LoginTypeApplicationService)
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeEmailIdentity)
 
 	case "":
 		// An empty auth type means that we want to fetch the available
