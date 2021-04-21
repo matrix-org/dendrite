@@ -39,7 +39,7 @@ const stateSnapshotSchema = `
 -- because room state tends to accumulate small changes over time. Although if
 -- the list of deltas becomes too long it becomes more efficient to encode
 -- the full state under single state_block_nid.
-CREATE SEQUENCE roomserver_state_snapshot_nid_seq START AT $1;
+CREATE SEQUENCE IF NOT EXISTS roomserver_state_snapshot_nid_seq;
 CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
 	state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_snapshot_nid_seq'),
 	state_snapshot_hash BYTEA UNIQUE,
