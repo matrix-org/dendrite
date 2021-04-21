@@ -1,0 +1,2 @@
+#To create a new user in this directory execute:
+../../bin/create-account --config ../../build/docker/config/dendrite-config-monolith-sqlite.yaml --username alice3 --password foobarbaz
