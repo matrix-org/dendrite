@@ -65,26 +65,30 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	if _, err := tx.Exec(`ALTER TABLE roomserver_state_snapshots RENAME TO _roomserver_state_snapshots;`); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
+	if _, err := tx.Exec(`CREATE SEQUENCE roomserver_state_block_nid_sequence START WITH $1;`, maxblockid); err != nil {
+		return fmt.Errorf("tx.Exec: %w", err)
+	}
+	if _, err := tx.Exec(`CREATE SEQUENCE roomserver_state_snapshot_nid_sequence START WITH $1;`, maxsnapshotid); err != nil {
+		return fmt.Errorf("tx.Exec: %w", err)
+	}
 	_, err := tx.Exec(`
-		CREATE SEQUENCE roomserver_state_block_nid_sequence START WITH $1;
 		CREATE TABLE IF NOT EXISTS roomserver_state_block (
 			state_block_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_block_nid_sequence'),
 			state_block_hash BYTEA UNIQUE,
 			event_nids bigint[] NOT NULL
 		);
-	`, maxblockid)
+	`)
 	if err != nil {
 		return fmt.Errorf("tx.Exec (create blocks table): %w", err)
 	}
 	_, err = tx.Exec(`
-		CREATE SEQUENCE roomserver_state_snapshot_nid_sequence START WITH $1;
 		CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
 			state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_snapshot_nid_sequence'),
 			state_snapshot_hash BYTEA UNIQUE,
 			room_nid bigint NOT NULL,
 			state_block_nids bigint[] NOT NULL
 		);
-	`, maxsnapshotid)
+	`)
 	if err != nil {
 		return fmt.Errorf("tx.Exec (create snapshots table): %w", err)
 	}
