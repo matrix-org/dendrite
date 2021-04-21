@@ -32,7 +32,19 @@ func LoadStateBlocksRefactor(m *sqlutil.Migrations) {
 }
 
 func UpStateBlocksRefactor(tx *sql.Tx) error {
-	logrus.Warn("Performing state block refactor upgrade. Please wait, this may take some time!")
+	logrus.Warn("Performing state storage upgrade. Please wait, this may take some time!")
+	defer logrus.Warn("State storage upgrade complete")
+
+	var maxsnapshotid int
+	var maxblockid int
+	if err := tx.QueryRow(`SELECT MAX(state_snapshot_nid) FROM roomserver_state_snapshots;`).Scan(&maxsnapshotid); err != nil {
+		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
+	}
+	if err := tx.QueryRow(`SELECT MAX(state_block_nid) FROM roomserver_state_block;`).Scan(&maxblockid); err != nil {
+		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
+	}
+	maxsnapshotid++
+	maxblockid++
 
 	if _, err := tx.Exec(`ALTER TABLE roomserver_state_block RENAME TO _roomserver_state_block;`); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
@@ -102,14 +114,15 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 
 				var blocknid types.StateBlockNID
 				err = tx.QueryRow(`
-					INSERT INTO roomserver_state_block (state_block_hash, event_nids)
-						VALUES ($1, $2)
-						ON CONFLICT (state_block_hash) DO UPDATE SET event_nids=$2
+					INSERT INTO roomserver_state_block (state_block_nid, state_block_hash, event_nids)
+						VALUES ($1, $2, $3)
+						ON CONFLICT (state_block_hash) DO UPDATE SET event_nids=$3
 						RETURNING state_block_nid
-				`, events.Hash(), eventjson).Scan(&blocknid)
+				`, maxblockid, events.Hash(), eventjson).Scan(&blocknid)
 				if err != nil {
 					return fmt.Errorf("tx.QueryRow.Scan (insert new block): %w", err)
 				}
+				maxblockid++
 				newblocks = append(newblocks, blocknid)
 				return nil
 			}(); err != nil {
@@ -122,19 +135,19 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 			}
 			var newsnapshot types.StateSnapshotNID
 			err = tx.QueryRow(`
-				INSERT INTO roomserver_state_snapshots (state_snapshot_hash, room_nid, state_block_nids)
-					VALUES ($1, $2, $3)
-					ON CONFLICT (state_snapshot_hash) DO UPDATE SET room_nid=$2
+				INSERT INTO roomserver_state_snapshots (state_snapshot_nid, state_snapshot_hash, room_nid, state_block_nids)
+					VALUES ($1, $2, $3, $4)
+					ON CONFLICT (state_snapshot_hash) DO UPDATE SET room_nid=$3
 					RETURNING state_snapshot_nid
-			`, newblocks.Hash(), room, newblocksjson).Scan(&newsnapshot)
+			`, maxsnapshotid, newblocks.Hash(), room, newblocksjson).Scan(&newsnapshot)
 			if err != nil {
 				return fmt.Errorf("tx.QueryRow.Scan (insert new snapshot): %w", err)
 			}
-
-			if _, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2`, newsnapshot, snapshot); err != nil {
+			maxsnapshotid++
+			if _, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newsnapshot, snapshot, maxsnapshotid); err != nil {
 				return fmt.Errorf("tx.Exec (update events): %w", err)
 			}
-			if _, err = tx.Exec(`UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2`, newsnapshot, snapshot); err != nil {
+			if _, err = tx.Exec(`UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newsnapshot, snapshot, maxsnapshotid); err != nil {
 				return fmt.Errorf("tx.Exec (update rooms): %w", err)
 			}
 		}
