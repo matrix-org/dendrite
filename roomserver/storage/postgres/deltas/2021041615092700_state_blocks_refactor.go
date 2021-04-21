@@ -65,10 +65,15 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	if _, err := tx.Exec(`ALTER TABLE roomserver_state_snapshots RENAME TO _roomserver_state_snapshots;`); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
-	createblock, err := tx.Query(`
+	_, err := tx.Exec(`
 		DROP SEQUENCE IF EXISTS roomserver_state_block_nid_seq;
+		DROP SEQUENCE IF EXISTS roomserver_state_snapshot_nid_seq;
+	`)
+	if err != nil {
+		return fmt.Errorf("tx.Exec (drop sequences): %w", err)
+	}
+	_, err = tx.Exec(`
 		CREATE SEQUENCE roomserver_state_block_nid_seq START WITH $1;
-
 		CREATE TABLE IF NOT EXISTS roomserver_state_block (
 			state_block_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_block_nid_seq'),
 			state_block_hash BYTEA UNIQUE,
@@ -76,15 +81,10 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 		);
 	`, maxblockid)
 	if err != nil {
-		return fmt.Errorf("tx.Exec: %w", err)
+		return fmt.Errorf("tx.Exec (create blocks table): %w", err)
 	}
-	if err = createblock.Close(); err != nil {
-		return fmt.Errorf("snapshots.Close: %w", err)
-	}
-	createsnapshot, err := tx.Query(`
-		DROP SEQUENCE IF EXISTS roomserver_state_snapshot_nid_seq;
+	_, err = tx.Exec(`
 		CREATE SEQUENCE roomserver_state_snapshot_nid_seq START WITH $1;
-
 		CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
 			state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_snapshot_nid_seq'),
 			state_snapshot_hash BYTEA UNIQUE,
@@ -93,10 +93,7 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 		);
 	`, maxsnapshotid)
 	if err != nil {
-		return fmt.Errorf("tx.Exec: %w", err)
-	}
-	if err = createsnapshot.Close(); err != nil {
-		return fmt.Errorf("snapshots.Close: %w", err)
+		return fmt.Errorf("tx.Exec (create snapshots table): %w", err)
 	}
 	logrus.Warn("New tables created...")
 
