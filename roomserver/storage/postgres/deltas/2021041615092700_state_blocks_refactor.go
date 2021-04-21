@@ -199,7 +199,7 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 
 	if _, err = tx.Exec(`
 		DROP TABLE _roomserver_state_snapshots;
-		DROP SEQUENCE roomserver_state_snapshots_nid_seq;
+		DROP SEQUENCE roomserver_state_snapshot_nid_seq;
 	`); err != nil {
 		return fmt.Errorf("tx.Exec (delete old snapshot table): %w", err)
 	}
