@@ -144,15 +144,6 @@ type registerRequest struct {
 	Type authtypes.LoginType `json:"type"`
 }
 
-type registerEmailRequestTokenRequest struct {
-	ClientSecret  string `json:"client_secret"`
-	Email         string `json:"email"`
-	IdAccessToken string `json:"id_access_token,omitempty"`
-	IdServer      string `json:"id_server,omitempty"`
-	NextLink      string `json:"next_link"`
-	SendAttempt   int    `json:"send_attempt"`
-}
-
 type authDict struct {
 	Type    authtypes.LoginType         `json:"type"`
 	Session string                      `json:"session"`
@@ -199,11 +190,6 @@ type recaptchaResponse struct {
 	ChallengeTS time.Time `json:"challenge_ts"`
 	Hostname    string    `json:"hostname"`
 	ErrorCodes  []int     `json:"error-codes"`
-}
-
-// server response for
-type registerEmailRequestTokenResponse struct {
-	Sid string `json:"sid"`
 }
 
 // validateUsername returns an error response if the username is invalid
