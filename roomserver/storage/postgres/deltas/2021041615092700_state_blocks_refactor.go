@@ -40,6 +40,7 @@ func LoadStateBlocksRefactor(m *sqlutil.Migrations) {
 	m.AddMigration(UpStateBlocksRefactor, DownStateBlocksRefactor)
 }
 
+// nolint:gocyclo
 func UpStateBlocksRefactor(tx *sql.Tx) error {
 	logrus.Warn("Performing state storage upgrade. Please wait, this may take some time!")
 	defer logrus.Warn("State storage upgrade complete")
@@ -65,10 +66,10 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	if _, err := tx.Exec(`ALTER TABLE roomserver_state_snapshots RENAME TO _roomserver_state_snapshots;`); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
-	if _, err := tx.Exec(`CREATE SEQUENCE roomserver_state_block_nid_sequence START WITH $1;`, maxblockid); err != nil {
+	if _, err := tx.Exec(fmt.Sprintf(`CREATE SEQUENCE roomserver_state_block_nid_sequence START WITH %d;`, maxblockid)); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
-	if _, err := tx.Exec(`CREATE SEQUENCE roomserver_state_snapshot_nid_sequence START WITH $1;`, maxsnapshotid); err != nil {
+	if _, err := tx.Exec(fmt.Sprintf(`CREATE SEQUENCE roomserver_state_snapshot_nid_sequence START WITH %d;`, maxsnapshotid)); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
 	_, err := tx.Exec(`
