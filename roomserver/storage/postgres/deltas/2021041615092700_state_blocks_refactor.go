@@ -67,7 +67,7 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	}
 	_, err := tx.Exec(`
 		DROP SEQUENCE IF EXISTS roomserver_state_block_nid_seq;
-		CREATE SEQUENCE roomserver_state_block_nid_seq START AT $1;
+		CREATE SEQUENCE roomserver_state_block_nid_seq START WITH $1;
 
 		CREATE TABLE IF NOT EXISTS roomserver_state_block (
 			state_block_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_block_nid_seq'),
@@ -80,7 +80,7 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	}
 	_, err = tx.Exec(`
 		DROP SEQUENCE IF EXISTS roomserver_state_snapshot_nid_seq;
-		CREATE SEQUENCE roomserver_state_snapshot_nid_seq START AT $1;
+		CREATE SEQUENCE roomserver_state_snapshot_nid_seq START WITH $1;
 
 		CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
 			state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_snapshot_nid_seq'),
