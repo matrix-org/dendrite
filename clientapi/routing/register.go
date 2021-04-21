@@ -348,7 +348,12 @@ func validateEmailIdentity(
 			JSON: jsonerror.Unknown("failed conecting to identity server"),
 		}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("validateEmailIdentity: unable to close response body")
+		}
+	}()
 	switch resp.StatusCode {
 	case 404:
 		return &util.JSONResponse{

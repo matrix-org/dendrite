@@ -26,6 +26,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/util"
 )
 
 // EmailAssociationRequest represents the request defined at https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-register-email-requesttoken
@@ -92,7 +93,12 @@ func CreateSession(
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("CreateSession: unable to close response body")
+		}
+	}()
 
 	// Error if the status isn't OK
 	if resp.StatusCode != http.StatusOK {
@@ -131,7 +137,12 @@ func CheckAssociation(
 	if err != nil {
 		return false, "", "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("CheckAssociation: unable to close response body")
+		}
+	}()
 	var respBody struct {
 		Medium      string `json:"medium"`
 		ValidatedAt int64  `json:"validated_at"`
