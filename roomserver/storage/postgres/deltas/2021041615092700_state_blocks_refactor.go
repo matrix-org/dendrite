@@ -44,6 +44,21 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	logrus.Warn("Performing state storage upgrade. Please wait, this may take some time!")
 	defer logrus.Warn("State storage upgrade complete")
 
+	var snapshotcount int
+	var maxsnapshotid int
+	var maxblockid int
+	if err := tx.QueryRow(`SELECT COUNT(DISTINCT state_snapshot_nid) FROM _roomserver_state_snapshots;`).Scan(&snapshotcount); err != nil {
+		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
+	}
+	if err := tx.QueryRow(`SELECT MAX(state_snapshot_nid) FROM _roomserver_state_snapshots;`).Scan(&maxsnapshotid); err != nil {
+		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
+	}
+	if err := tx.QueryRow(`SELECT MAX(state_block_nid) FROM _roomserver_state_block;`).Scan(&maxblockid); err != nil {
+		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
+	}
+	maxsnapshotid++
+	maxblockid++
+
 	if _, err := tx.Exec(`ALTER TABLE roomserver_state_block RENAME TO _roomserver_state_block;`); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
@@ -51,35 +66,33 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
 	_, err := tx.Exec(`
+		DROP SEQUENCE IF EXISTS roomserver_state_block_nid_seq;
+		CREATE SEQUENCE roomserver_state_block_nid_seq START AT $1;
+
 		CREATE TABLE IF NOT EXISTS roomserver_state_block (
-			state_block_nid bigserial PRIMARY KEY,
+			state_block_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_block_nid_seq'),
 			state_block_hash BYTEA UNIQUE,
 			event_nids bigint[] NOT NULL
 		);
-	`)
+	`, maxblockid)
 	if err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
 	_, err = tx.Exec(`
+		DROP SEQUENCE IF EXISTS roomserver_state_snapshot_nid_seq;
+		CREATE SEQUENCE roomserver_state_snapshot_nid_seq START AT $1;
+
 		CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
-			state_snapshot_nid bigserial PRIMARY KEY,
+			state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_snapshot_nid_seq'),
 			state_snapshot_hash BYTEA UNIQUE,
 			room_nid bigint NOT NULL,
 			state_block_nids bigint[] NOT NULL
 		);
-	`)
+	`, maxsnapshotid)
 	if err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
 	logrus.Warn("New tables created...")
-
-	var snapshotcount int
-	err = tx.QueryRow(`
-		SELECT COUNT(DISTINCT state_snapshot_nid) FROM _roomserver_state_snapshots;
-	`).Scan(&snapshotcount)
-	if err != nil {
-		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
-	}
 
 	batchsize := 100
 	for batchoffset := 0; batchoffset < snapshotcount; batchoffset += batchsize {
@@ -173,11 +186,11 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 				return fmt.Errorf("tx.QueryRow.Scan (insert new snapshot): %w", err)
 			}
 
-			if _, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2`, newNID, snapshotdata.StateSnapshotNID); err != nil {
+			if _, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newNID, snapshotdata.StateSnapshotNID, maxsnapshotid); err != nil {
 				return fmt.Errorf("tx.Exec (update events): %w", err)
 			}
 
-			if _, err = tx.Exec(`UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2`, newNID, snapshotdata.StateSnapshotNID); err != nil {
+			if _, err = tx.Exec(`UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newNID, snapshotdata.StateSnapshotNID, maxsnapshotid); err != nil {
 				return fmt.Errorf("tx.Exec (update rooms): %w", err)
 			}
 		}

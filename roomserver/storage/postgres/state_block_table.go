@@ -39,8 +39,9 @@ const stateDataSchema = `
 -- lookup a specific (type, state_key) pair for an event. It also makes it easy
 -- to read the state for a given state_block_nid ordered by (type, state_key)
 -- which in turn makes it easier to merge state data blocks.
+CREATE SEQUENCE roomserver_state_block_nid_seq START AT $1;
 CREATE TABLE IF NOT EXISTS roomserver_state_block (
-	state_block_nid bigserial PRIMARY KEY,
+	state_block_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_block_nid_seq'),
 	state_block_hash BYTEA UNIQUE,
 	event_nids bigint[] NOT NULL
 );
