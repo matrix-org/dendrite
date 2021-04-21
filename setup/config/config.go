@@ -16,10 +16,14 @@ package config
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"path/filepath"
 	"regexp"
@@ -96,6 +100,9 @@ type Derived struct {
 		// registration in order to complete registration stages.
 		Params map[string]interface{} `json:"params"`
 	}
+
+	// Used for request to identity server
+	HttpClient *http.Client
 
 	// Application services parsed from their config files
 	// The paths of which were given above in the main config file
@@ -287,6 +294,26 @@ func (config *Dendrite) Derive() error {
 	// Load application service configuration files
 	if err := loadAppServices(&config.AppServiceAPI, &config.Derived); err != nil {
 		return err
+	}
+
+	if config.ClientAPI.CustomCaPath != "" {
+		// Add custom CA cert
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil {
+			return err
+		}
+		certs, err := ioutil.ReadFile(config.ClientAPI.CustomCaPath)
+		if err != nil {
+			return err
+		}
+		if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
+			return errors.New("failed to append custom certificate")
+		}
+		trConfig := &tls.Config{
+			RootCAs: rootCAs,
+		}
+		tr := &http.Transport{TLSClientConfig: trConfig}
+		config.Derived.HttpClient = &http.Client{Transport: tr}
 	}
 
 	return nil

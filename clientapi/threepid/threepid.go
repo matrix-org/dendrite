@@ -15,15 +15,16 @@
 package threepid
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -48,6 +49,19 @@ type Credentials struct {
 	Secret   string `json:"client_secret"`
 }
 
+func (c *Credentials) Validate() *jsonerror.MatrixError {
+	if c.SID == "" {
+		return jsonerror.BadJSON("sid field in threepidCreds is required")
+	}
+	if c.Secret == "" {
+		return jsonerror.BadJSON("client_secret in threepidCreds is required")
+	}
+	if c.IDServer == "" {
+		return jsonerror.BadJSON("id_server in threepidCreds is required")
+	}
+	return nil
+}
+
 // CreateSession creates a session on an identity server.
 // Returns the session's ID.
 // Returns an error if there was a problem sending the request or decoding the
@@ -62,22 +76,23 @@ func CreateSession(
 	// Create a session on the ID server
 	postURL := fmt.Sprintf("https://%s/_matrix/identity/api/v1/validate/email/requestToken", req.IDServer)
 
-	data := url.Values{}
-	data.Add("client_secret", req.Secret)
-	data.Add("email", req.Email)
-	data.Add("send_attempt", strconv.Itoa(req.SendAttempt))
-
-	request, err := http.NewRequest(http.MethodPost, postURL, strings.NewReader(data.Encode()))
+	b := bytes.Buffer{}
+	enc := json.NewEncoder(&b)
+	err := enc.Encode(req)
 	if err != nil {
 		return "", err
 	}
-	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	client := http.Client{}
-	resp, err := client.Do(request.WithContext(ctx))
+	request, err := http.NewRequest(http.MethodPost, postURL, &b)
 	if err != nil {
 		return "", err
 	}
+	request.Header.Add("Content-Type", "application/json")
+
+	resp, err := cfg.Derived.HttpClient.Do(request.WithContext(ctx))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
 
 	// Error if the status isn't OK
 	if resp.StatusCode != http.StatusOK {
@@ -112,11 +127,11 @@ func CheckAssociation(
 	if err != nil {
 		return false, "", "", err
 	}
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	resp, err := cfg.Derived.HttpClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return false, "", "", err
 	}
-
+	defer resp.Body.Close()
 	var respBody struct {
 		Medium      string `json:"medium"`
 		ValidatedAt int64  `json:"validated_at"`
@@ -160,8 +175,7 @@ func PublishAssociation(creds Credentials, userID string, cfg *config.ClientAPI)
 	}
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	client := http.Client{}
-	resp, err := client.Do(request)
+	resp, err := cfg.Derived.HttpClient.Do(request)
 	if err != nil {
 		return err
 	}

@@ -19,7 +19,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +39,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -161,31 +161,8 @@ type authDict struct {
 	// Recaptcha
 	Response string `json:"response"`
 	// m.login.email.identity and m.login.msisdn
-	ThreePidCreds *threepidCreds `json:"threepidCreds"`
+	ThreePidCreds *threepid.Credentials `json:"threepidCreds"`
 	// TODO: Lots of custom keys depending on the type
-}
-
-type threepidCreds struct {
-	Sid           string `json:"sid"`
-	ClientSecret  string `json:"client_secret"`
-	IdServer      string `json:"id_server"`
-	IdAccessToken string `json:"id_access_token"`
-}
-
-func (c *threepidCreds) validate() *jsonerror.MatrixError {
-	if c.Sid == "" {
-		return jsonerror.BadJSON("sid field in threepidCreds is required")
-	}
-	if c.ClientSecret == "" {
-		return jsonerror.BadJSON("client_secret in threepidCreds is required")
-	}
-	if c.IdServer == "" {
-		return jsonerror.BadJSON("id_server in threepidCreds is required")
-	}
-	if c.IdAccessToken == "" {
-		return jsonerror.BadJSON("id_access_token in threepidCreds is required")
-	}
-	return nil
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
@@ -352,15 +329,19 @@ func validateRecaptcha(
 
 func validateEmailIdentity(
 	ctx context.Context,
-	cred *threepidCreds,
+	cred *threepid.Credentials,
+	cfg *config.ClientAPI,
 ) *util.JSONResponse {
+	if err := isTrusted(cred.IDServer, cfg); err != nil {
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.NotTrusted(cred.IDServer),
+		}
+	}
+	util.GetLogger(ctx).Infof("conecting to identity server: %s", cred.IDServer)
 	url := fmt.Sprintf(
 		"https://%s/_matrix/identity/api/v1/3pid/getValidated3pid",
-		cred.IdServer)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
+		cred.IDServer)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return &util.JSONResponse{
@@ -369,11 +350,11 @@ func validateEmailIdentity(
 		}
 	}
 	q := req.URL.Query()
-	q.Add("client_secret", cred.ClientSecret)
-	q.Add("sid", cred.Sid)
+	q.Add("client_secret", cred.Secret)
+	q.Add("sid", cred.SID)
 	req.URL.RawQuery = q.Encode()
 	req.Header.Add("Authorization", "Bearer swordfish")
-	resp, err := client.Do(req)
+	resp, err := cfg.Derived.HttpClient.Do(req)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("failed conecting to identity server")
 		return &util.JSONResponse{
@@ -401,6 +382,18 @@ func validateEmailIdentity(
 			JSON: jsonerror.InternalServerError(),
 		}
 	}
+}
+
+// isTrusted checks if a given identity server is part of the list of trusted
+// identity servers in the configuration file.
+// Returns an error if the server isn't trusted.
+func isTrusted(idServer string, cfg *config.ClientAPI) error {
+	for _, server := range cfg.Matrix.TrustedIDServers {
+		if idServer == server {
+			return nil
+		}
+	}
+	return threepid.ErrNotTrusted
 }
 
 // UserIDIsWithinApplicationServiceNamespace checks to see if a given userID
@@ -759,13 +752,13 @@ func handleRegistrationFlow(
 				JSON: jsonerror.BadJSON("threepidCreds not found in auth field"),
 			}
 		}
-		if err := r.Auth.ThreePidCreds.validate(); err != nil {
+		if err := r.Auth.ThreePidCreds.Validate(); err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: err,
 			}
 		}
-		if err := validateEmailIdentity(req.Context(), r.Auth.ThreePidCreds); err != nil {
+		if err := validateEmailIdentity(req.Context(), r.Auth.ThreePidCreds, cfg); err != nil {
 			return *err
 		}
 		AddCompletedSessionStage(sessionID, authtypes.LoginTypeEmailIdentity)

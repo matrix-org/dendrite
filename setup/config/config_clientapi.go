@@ -11,6 +11,9 @@ type ClientAPI struct {
 	Matrix  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
+	// The path to file of custom CA certificate to be added to root CA
+	CustomCaPath string `yaml:"custom_ca_path"`
+
 	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
 
