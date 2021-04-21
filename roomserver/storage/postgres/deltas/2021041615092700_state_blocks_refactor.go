@@ -51,10 +51,10 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	if err := tx.QueryRow(`SELECT COUNT(DISTINCT state_snapshot_nid) FROM roomserver_state_snapshots;`).Scan(&snapshotcount); err != nil {
 		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
 	}
-	if err := tx.QueryRow(`SELECT MAX(state_snapshot_nid) FROM roomserver_state_snapshots;`).Scan(&maxsnapshotid); err != nil {
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(state_snapshot_nid),0) FROM roomserver_state_snapshots;`).Scan(&maxsnapshotid); err != nil {
 		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
 	}
-	if err := tx.QueryRow(`SELECT MAX(state_block_nid) FROM roomserver_state_block;`).Scan(&maxblockid); err != nil {
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(state_block_nid),0) FROM roomserver_state_block;`).Scan(&maxblockid); err != nil {
 		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
 	}
 	maxsnapshotid++
