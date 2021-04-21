@@ -1,0 +1,15 @@
+version: "3.4"
+services:
+  nginx:
+    image: nginx:latest
+    hostname: load_balancer
+    networks:
+      - internal
+    volumes:
+      - ./default.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - 80:80
+      
+networks:
+  internal:
+    attachable: true

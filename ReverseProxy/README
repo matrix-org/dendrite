@@ -1,0 +1,5 @@
+This Proxy helps when deving against a local dendrite version and using a local instance of the client. CORS will give you a headache.
+Simply run docker-compose -f docker-compose.yml up -d and then:
+
+Client available:   localhost/client/
+Server available: 	localhost/server/
