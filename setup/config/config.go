@@ -89,18 +89,6 @@ type Dendrite struct {
 
 // TODO: Kill Derived
 type Derived struct {
-	Registration struct {
-		// Flows is a slice of flows, which represent one possible way that the client can authenticate a request.
-		// http://matrix.org/docs/spec/HEAD/client_server/r0.3.0.html#user-interactive-authentication-api
-		// As long as the generated flows only rely on config file options,
-		// we can generate them on startup and store them until needed
-		Flows []authtypes.Flow `json:"flows"`
-
-		// Params that need to be returned to the client during
-		// registration in order to complete registration stages.
-		Params map[string]interface{} `json:"params"`
-	}
-
 	// Used for request to identity server
 	HttpClient *http.Client
 
@@ -277,18 +265,29 @@ func loadConfig(
 func (config *Dendrite) Derive() error {
 	// Determine registrations flows based off config values
 
-	config.Derived.Registration.Params = make(map[string]interface{})
+	config.ClientAPI.Registration.Params = make(map[string]interface{})
 
-	// TODO: Add email auth type
 	// TODO: Add MSISDN auth type
 
-	if config.ClientAPI.RecaptchaEnabled {
-		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
-	} else {
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+	// Setup default m.login.dummy flow for registration if no flows are provided.
+	if len(config.ClientAPI.Registration.Flows) == 0 {
+		// Handle recaptcha configuration.
+		if config.ClientAPI.RecaptchaEnabled {
+			config.ClientAPI.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
+			config.ClientAPI.Registration.Flows = append(config.ClientAPI.Registration.Flows,
+				authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
+		} else {
+			config.ClientAPI.Registration.Flows = append(config.ClientAPI.Registration.Flows,
+				authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+		}
+	}
+	// Setup default m.login.password flow for login if no flows are provided.
+	if len(config.ClientAPI.Login.Flows) == 0 {
+		config.ClientAPI.Login.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{
+				authtypes.LoginTypePassword,
+			}},
+		}
 	}
 
 	// Load application service configuration files
