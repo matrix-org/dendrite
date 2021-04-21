@@ -65,7 +65,7 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	if _, err := tx.Exec(`ALTER TABLE roomserver_state_snapshots RENAME TO _roomserver_state_snapshots;`); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
-	_, err := tx.Exec(`
+	createblock, err := tx.Query(`
 		DROP SEQUENCE IF EXISTS roomserver_state_block_nid_seq;
 		CREATE SEQUENCE roomserver_state_block_nid_seq START WITH $1;
 
@@ -78,7 +78,10 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
-	_, err = tx.Exec(`
+	if err = createblock.Close(); err != nil {
+		return fmt.Errorf("snapshots.Close: %w", err)
+	}
+	createsnapshot, err := tx.Query(`
 		DROP SEQUENCE IF EXISTS roomserver_state_snapshot_nid_seq;
 		CREATE SEQUENCE roomserver_state_snapshot_nid_seq START WITH $1;
 
@@ -91,6 +94,9 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	`, maxsnapshotid)
 	if err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
+	}
+	if err = createsnapshot.Close(); err != nil {
+		return fmt.Errorf("snapshots.Close: %w", err)
 	}
 	logrus.Warn("New tables created...")
 
