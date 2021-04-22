@@ -70,3 +70,6 @@ Can re-join room if re-invited
 
 # Blacklisted due to flakiness after #1774
 Local device key changes get to remote servers with correct prev_id
+
+# Flakey
+Local device key changes appear in /keys/changes

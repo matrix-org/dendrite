@@ -517,3 +517,6 @@ AS can set avatar for ghosted users
 AS can set displayname for ghosted users
 Ghost user must register before joining room
 Inviting an AS-hosted user asks the AS server
+Can generate a openid access_token that can be exchanged for information about a user
+Invalid openid access tokens are rejected
+Requests to userinfo without access tokens are rejected

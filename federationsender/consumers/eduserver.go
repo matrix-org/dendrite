@@ -212,8 +212,7 @@ func (t *OutputEDUConsumer) onReceiptEvent(msg *sarama.ConsumerMessage) error {
 		return nil
 	}
 	if receiptServerName != t.ServerName {
-		log.WithField("other_server", receiptServerName).Info("Suppressing receipt notif: originated elsewhere")
-		return nil
+		return nil // don't log, very spammy as it logs for each remote receipt
 	}
 
 	joined, err := t.db.GetJoinedHosts(context.TODO(), receipt.RoomID)

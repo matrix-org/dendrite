@@ -26,7 +26,7 @@ const (
 func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database) {
 	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
 		ConnectionString: "file::memory:",
-	}, serverName, bcrypt.MinCost)
+	}, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS)
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -92,12 +93,13 @@ func Setup(
 	v2keysmux.Handle("/query", notaryKeys).Methods(http.MethodPost)
 	v2keysmux.Handle("/query/{serverName}/{keyID}", notaryKeys).Methods(http.MethodGet)
 
+	mu := internal.NewMutexByRoom()
 	v1fedmux.Handle("/send/{txnID}", httputil.MakeFedAPI(
 		"federation_send", cfg.Matrix.ServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, rsAPI, eduAPI, keyAPI, keys, federation,
+				cfg, rsAPI, eduAPI, keyAPI, keys, federation, mu,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
@@ -460,4 +462,10 @@ func Setup(
 			return QueryDeviceKeys(httpReq, request, keyAPI, cfg.Matrix.ServerName)
 		},
 	)).Methods(http.MethodPost)
+
+	v1fedmux.Handle("/openid/userinfo",
+		httputil.MakeExternalAPI("federation_openid_userinfo", func(req *http.Request) util.JSONResponse {
+			return GetOpenIDUserInfo(req, userAPI)
+		}),
+	).Methods(http.MethodGet)
 }
