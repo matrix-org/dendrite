@@ -268,7 +268,7 @@ func (m *DendriteMonolith) Start() {
 
 	logger := log.New(os.Stdout, "PINECONE: ", 0)
 	m.PineconeRouter = pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
-	m.PineconeQUIC = pineconeSessions.NewQUIC(logger, m.PineconeRouter)
+	m.PineconeQUIC = pineconeSessions.NewSessions(logger, m.PineconeRouter)
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
 
 	m.PineconeRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
