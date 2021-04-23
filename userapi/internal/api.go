@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
+	"github.com/matrix-org/dendrite/userapi/storage/pushers"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -37,6 +38,7 @@ import (
 type UserInternalAPI struct {
 	AccountDB  accounts.Database
 	DeviceDB   devices.Database
+	PusherDB   pushers.Database
 	ServerName gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
@@ -303,6 +305,22 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 		return err
 	}
 	res.Devices = devs
+	return nil
+}
+
+func (a *UserInternalAPI) QueryPushers(ctx context.Context, req *api.QueryPushersRequest, res *api.QueryPushersResponse) error {
+	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot query pushers of remote users: got %s want %s", domain, a.ServerName)
+	}
+	pushers, err := a.PusherDB.GetPushersByLocalpart(ctx, local)
+	if err != nil {
+		return err
+	}
+	res.Pushers = pushers
 	return nil
 }
 
