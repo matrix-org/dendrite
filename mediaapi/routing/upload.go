@@ -159,8 +159,9 @@ func (r *uploadRequest) doUpload(
 		}
 	}
 
-	// Check if temp file size exceeds max file size configuration
-	if bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
+	// Check if temp file size is greater (should not happen, LimitReader stops when the defined size is reached.)
+	// or equal to the max file size configuration.
+	if bytesWritten >= types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
 		fileutils.RemoveDir(tmpDir, r.Logger) // delete temp file
 		return requestEntityTooLargeJSONResponse(*cfg.MaxFileSizeBytes)
 	}
