@@ -48,9 +48,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 
 	// create testdata folder and remove when done
 	_ = os.Mkdir(testdataPath, os.ModePerm)
-	t.Cleanup(func() {
-		fileutils.RemoveDir(types.Path(testdataPath), nil)
-	})
+	defer fileutils.RemoveDir(types.Path(testdataPath), nil)
 
 	db, err := storage.Open(&config.DatabaseOptions{
 		ConnectionString:       "file::memory:?cache=shared",
