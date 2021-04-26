@@ -89,6 +89,9 @@ const bulkSelectStateEventByIDSQL = "" +
 	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
+// Bulk look up of events by event NID, optionally filtering by the event type
+// or event state key NIDs if provided. (The CARDINALITY check will return true
+// if the provided arrays are empty, ergo no filtering).
 const bulkSelectStateEventByNIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
 	" WHERE event_nid = ANY($1)" +
@@ -282,7 +285,7 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	return results, nil
+	return results[:i], nil
 }
 
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.

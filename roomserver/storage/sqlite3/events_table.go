@@ -291,7 +291,7 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 			return nil, err
 		}
 	}
-	return results, err
+	return results[:i], err
 }
 
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.

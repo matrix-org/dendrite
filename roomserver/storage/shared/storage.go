@@ -278,7 +278,7 @@ func (d *Database) StateEntries(
 	if err != nil {
 		return nil, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", err)
 	}
-	lists := []types.StateEntryList{}
+	lists := make([]types.StateEntryList, 0, len(entries))
 	for i, entry := range entries {
 		eventNIDs, err := d.EventsTable.BulkSelectStateEventByNID(ctx, entry, nil)
 		if err != nil {

@@ -32,13 +32,23 @@ import (
 
 const stateSnapshotSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
+	-- The state snapshot NID that identifies this snapshot.
     state_snapshot_nid INTEGER PRIMARY KEY AUTOINCREMENT,
+	-- The hash of the state snapshot, which is used to enforce uniqueness. The hash is
+	-- generated in Dendrite and passed through to the database, as a btree index over 
+	-- this column is cheap and fits within the maximum index size.
 	state_snapshot_hash BLOB UNIQUE,
+	-- The room NID that the snapshot belongs to.
     room_nid INTEGER NOT NULL,
+	-- The state blocks contained within this snapshot, encoded as JSON.
     state_block_nids TEXT NOT NULL DEFAULT '[]'
   );
 `
 
+// Insert a new state snapshot. If we conflict on the hash column then
+// we must perform an update so that the RETURNING statement returns the
+// ID of the row that we conflicted with, so that we can then refer to
+// the original snapshot.
 const insertStateSQL = `
 	INSERT INTO roomserver_state_snapshots (state_snapshot_hash, room_nid, state_block_nids)
 	  VALUES ($1, $2, $3)

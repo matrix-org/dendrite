@@ -33,12 +33,21 @@ import (
 
 const stateDataSchema = `
   CREATE TABLE IF NOT EXISTS roomserver_state_block (
+	-- The state snapshot NID that identifies this snapshot.
     state_block_nid INTEGER PRIMARY KEY AUTOINCREMENT,
+	-- The hash of the state block, which is used to enforce uniqueness. The hash is
+	-- generated in Dendrite and passed through to the database, as a btree index over 
+	-- this column is cheap and fits within the maximum index size.
 	state_block_hash BLOB UNIQUE,
+	-- The event NIDs contained within the state block, encoded as JSON.
     event_nids TEXT NOT NULL DEFAULT '[]'
   );
 `
 
+// Insert a new state block. If we conflict on the hash column then
+// we must perform an update so that the RETURNING statement returns the
+// ID of the row that we conflicted with, so that we can then refer to
+// the original block.
 const insertStateDataSQL = `
 	INSERT INTO roomserver_state_block (state_block_hash, event_nids)
 		VALUES ($1, $2)

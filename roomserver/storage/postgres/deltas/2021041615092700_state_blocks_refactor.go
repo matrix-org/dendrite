@@ -66,6 +66,11 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	if _, err := tx.Exec(`ALTER TABLE roomserver_state_snapshots RENAME TO _roomserver_state_snapshots;`); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
+	// We create new sequences starting with the maximum state snapshot and block NIDs.
+	// This means that all newly created snapshots and blocks by the migration will have
+	// NIDs higher than these values, so that when we come to update the references to
+	// these NIDs using UPDATE statements, we can guarantee we are only ever updating old
+	// values and not accidentally overwriting new ones.
 	if _, err := tx.Exec(fmt.Sprintf(`CREATE SEQUENCE roomserver_state_block_nid_sequence START WITH %d;`, maxblockid)); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
 	}
