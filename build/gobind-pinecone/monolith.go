@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,7 +18,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/hjson/hjson-go"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
@@ -48,7 +46,6 @@ import (
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 	"github.com/matrix-org/pinecone/types"
 	pineconeTypes "github.com/matrix-org/pinecone/types"
-	yggdrasilConfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
 )
 
 const (
@@ -59,11 +56,11 @@ const (
 
 type DendriteMonolith struct {
 	logger             logrus.Logger
-	config             *yggdrasilConfig.NodeConfig
 	PineconeRouter     *pineconeRouter.Router
 	PineconeMulticast  *pineconeMulticast.Multicast
 	PineconeQUIC       *pineconeSessions.Sessions
 	StorageDirectory   string
+	CacheDirectory     string
 	staticPeerURI      string
 	staticPeerMutex    sync.RWMutex
 	staticPeerAttempts atomic.Uint32
@@ -212,49 +209,27 @@ func (m *DendriteMonolith) staticPeerConnect() {
 
 // nolint:gocyclo
 func (m *DendriteMonolith) Start() {
-	m.config = yggdrasilConfig.GenerateConfig()
-	// If we already have an Yggdrasil config file from the Ygg
-	// demo then we'll just reuse the ed25519 keys from that.
+	var err error
 	var sk ed25519.PrivateKey
 	var pk ed25519.PublicKey
-	yggfile := fmt.Sprintf("%s/dendrite-yggdrasil.conf", m.StorageDirectory)
-	if _, err := os.Stat(yggfile); err == nil {
-		yggconf, e := ioutil.ReadFile(yggfile)
-		if e != nil {
-			panic(err)
-		}
-		mapconf := map[string]interface{}{}
-		if err = hjson.Unmarshal([]byte(yggconf), &mapconf); err != nil {
-			panic(err)
-		}
-		if mapconf["SigningPrivateKey"] != nil && mapconf["SigningPublicKey"] != nil {
-			m.config.SigningPrivateKey = mapconf["SigningPrivateKey"].(string)
-			m.config.SigningPublicKey = mapconf["SigningPublicKey"].(string)
-			if sk, err = hex.DecodeString(m.config.SigningPrivateKey); err != nil {
-				panic(err)
-			}
-			if pk, err = hex.DecodeString(m.config.SigningPublicKey); err != nil {
-				panic(err)
-			}
-		} else {
-			panic("should have private and public signing keys")
-		}
-	} else {
+	keyfile := fmt.Sprintf("%s/p2p.key", m.StorageDirectory)
+	if _, err = os.Stat(keyfile); os.IsNotExist(err) {
 		if pk, sk, err = ed25519.GenerateKey(nil); err != nil {
 			panic(err)
 		}
-		m.config.SigningPrivateKey = hex.EncodeToString(sk)
-		m.config.SigningPublicKey = hex.EncodeToString(pk)
-		yggconf, err := json.Marshal(m.config)
-		if err != nil {
+		if err = ioutil.WriteFile(keyfile, sk, 0644); err != nil {
 			panic(err)
 		}
-		if err := ioutil.WriteFile(yggfile, yggconf, 0644); err != nil {
+	} else if err == nil {
+		if sk, err = ioutil.ReadFile(keyfile); err != nil {
 			panic(err)
 		}
+		if len(sk) != ed25519.PrivateKeySize {
+			panic("the private key is not long enough")
+		}
+		pk = sk.Public().(ed25519.PublicKey)
 	}
 
-	var err error
 	m.listener, err = net.Listen("tcp", "localhost:65432")
 	if err != nil {
 		panic(err)
@@ -278,24 +253,25 @@ func (m *DendriteMonolith) Start() {
 		}
 	})
 
+	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-naffka.db", m.StorageDirectory))
-	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-account.db", m.StorageDirectory))
-	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-device.db", m.StorageDirectory))
-	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-mediaapi.db", m.StorageDirectory))
-	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-syncapi.db", m.StorageDirectory))
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-roomserver.db", m.StorageDirectory))
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-signingkeyserver.db", m.StorageDirectory))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-keyserver.db", m.StorageDirectory))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-federationsender.db", m.StorageDirectory))
-	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-appservice.db", m.StorageDirectory))
-	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
-	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
+	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-naffka.db", m.StorageDirectory, prefix))
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-account.db", m.StorageDirectory, prefix))
+	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-device.db", m.StorageDirectory, prefix))
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-mediaapi.db", m.CacheDirectory, prefix))
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-syncapi.db", m.StorageDirectory, prefix))
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
+	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-signingkeyserver.db", m.StorageDirectory, prefix))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
+	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
+	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
+	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
+	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	if err := cfg.Derive(); err != nil {
 		panic(err)
 	}

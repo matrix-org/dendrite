@@ -119,7 +119,7 @@ func main() {
 		}
 	}()
 
-	pQUIC := pineconeSessions.NewQUIC(logger, pRouter)
+	pQUIC := pineconeSessions.NewSessions(logger, pRouter)
 	pMulticast := pineconeMulticast.NewMulticast(logger, pRouter)
 	pMulticast.Start()
 
