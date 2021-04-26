@@ -70,13 +70,14 @@ type inviteStatements struct {
 	selectInvitesAboutToRetireStmt      *sql.Stmt
 }
 
-func NewSqliteInvitesTable(db *sql.DB) (tables.Invites, error) {
+func createInvitesTable(db *sql.DB) error {
+	_, err := db.Exec(inviteSchema)
+	return err
+}
+
+func prepareInvitesTable(db *sql.DB) (tables.Invites, error) {
 	s := &inviteStatements{
 		db: db,
-	}
-	_, err := db.Exec(inviteSchema)
-	if err != nil {
-		return nil, err
 	}
 
 	return s, shared.StatementList{
