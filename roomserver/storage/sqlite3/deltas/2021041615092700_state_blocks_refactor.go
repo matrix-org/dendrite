@@ -144,10 +144,10 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 				return fmt.Errorf("tx.QueryRow.Scan (insert new snapshot): %w", err)
 			}
 			maxsnapshotid++
-			if _, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$2`, newsnapshot, snapshot, maxsnapshotid); err != nil {
+			if _, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newsnapshot, snapshot, maxsnapshotid); err != nil {
 				return fmt.Errorf("tx.Exec (update events): %w", err)
 			}
-			if _, err = tx.Exec(`UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$2`, newsnapshot, snapshot, maxsnapshotid); err != nil {
+			if _, err = tx.Exec(`UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newsnapshot, snapshot, maxsnapshotid); err != nil {
 				return fmt.Errorf("tx.Exec (update rooms): %w", err)
 			}
 		}
