@@ -50,12 +50,14 @@ type publishedStatements struct {
 	selectPublishedStmt    *sql.Stmt
 }
 
-func NewPostgresPublishedTable(db *sql.DB) (tables.Published, error) {
-	s := &publishedStatements{}
+func createPublishedTable(db *sql.DB) error {
 	_, err := db.Exec(publishedSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func preparePublishedTable(db *sql.DB) (tables.Published, error) {
+	s := &publishedStatements{}
+
 	return s, shared.StatementList{
 		{&s.upsertPublishedStmt, upsertPublishedSQL},
 		{&s.selectAllPublishedStmt, selectAllPublishedSQL},
