@@ -222,6 +222,10 @@ func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 			case "aliases":
 				appendExclusiveNamespaceRegexs(&exclusiveAliasStrings, namespaceSlice)
 			}
+
+			if err = compileNamespaceRegexes(namespaceSlice); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -258,16 +262,26 @@ func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 func appendExclusiveNamespaceRegexs(
 	exclusiveStrings *[]string, namespaces []ApplicationServiceNamespace,
 ) {
-	for index, namespace := range namespaces {
+	for _, namespace := range namespaces {
 		if namespace.Exclusive {
 			// We append parenthesis to later separate each regex when we compile
 			// i.e. "app1.*", "app2.*" -> "(app1.*)|(app2.*)"
 			*exclusiveStrings = append(*exclusiveStrings, "("+namespace.Regex+")")
 		}
-
-		// Compile this regex into a Regexp object for later use
-		namespaces[index].RegexpObject, _ = regexp.Compile(namespace.Regex)
 	}
+}
+
+// compileNamespaceRegexes turns strings into regex objects and complains
+// if some of there are bad
+func compileNamespaceRegexes(namespaces []ApplicationServiceNamespace) (err error) {
+	for index, namespace := range namespaces {
+		// Compile this regex into a Regexp object for later use
+		if namespaces[index].RegexpObject, err = regexp.Compile(namespace.Regex); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // checkErrors checks for any configuration errors amongst the loaded
