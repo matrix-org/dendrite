@@ -101,7 +101,7 @@ func (a *ApplicationService) IsInterestedInRoomID(
 ) bool {
 	if namespaceSlice, ok := a.NamespaceMap["rooms"]; ok {
 		for _, namespace := range namespaceSlice {
-			if namespace.RegexpObject.MatchString(roomID) {
+			if namespace.RegexpObject != nil && namespace.RegexpObject.MatchString(roomID) {
 				return true
 			}
 		}
