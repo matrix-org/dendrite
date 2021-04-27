@@ -62,12 +62,14 @@ type roomAliasesStatements struct {
 	deleteRoomAliasStmt          *sql.Stmt
 }
 
-func NewPostgresRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
-	s := &roomAliasesStatements{}
+func createRoomAliasesTable(db *sql.DB) error {
 	_, err := db.Exec(roomAliasesSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
+	s := &roomAliasesStatements{}
+
 	return s, shared.StatementList{
 		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
 		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},

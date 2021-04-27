@@ -24,6 +24,7 @@ import (
 
 func LoadFromGoose() {
 	goose.AddMigration(UpAddForgottenColumn, DownAddForgottenColumn)
+	goose.AddMigration(UpStateBlocksRefactor, DownStateBlocksRefactor)
 }
 
 func LoadAddForgottenColumn(m *sqlutil.Migrations) {
