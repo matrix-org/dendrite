@@ -147,7 +147,7 @@ func (r *uploadRequest) doUpload(
 	//   r.storeFileAndMetadata(ctx, tmpDir, ...)
 	// before you return from doUpload else we will leak a temp file. We could make this nicer with a `WithTransaction` style of
 	// nested function to guarantee either storage or cleanup.
-	lr := io.LimitReader(reqReader, int64(*cfg.MaxFileSizeBytes))
+	lr := io.LimitReader(reqReader, int64(*cfg.MaxFileSizeBytes)+1)
 	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, lr, cfg.AbsBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
@@ -159,9 +159,8 @@ func (r *uploadRequest) doUpload(
 		}
 	}
 
-	// Check if temp file size is greater (should not happen, LimitReader stops when the defined size is reached.)
-	// or equal to the max file size configuration.
-	if bytesWritten >= types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
+	// Check if temp file size exceeds max file size configuration
+	if bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
 		fileutils.RemoveDir(tmpDir, r.Logger) // delete temp file
 		return requestEntityTooLargeJSONResponse(*cfg.MaxFileSizeBytes)
 	}

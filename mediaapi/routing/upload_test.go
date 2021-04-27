@@ -84,6 +84,23 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 			want: nil,
 		},
 		{
+			name: "upload ok (exact size)",
+			args: args{
+				ctx:       context.Background(),
+				reqReader: strings.NewReader("testtest"),
+				cfg:       cfg,
+				db:        db,
+			},
+			fields: fields{
+				Logger: logger,
+				MediaMetadata: &types.MediaMetadata{
+					MediaID:    "1338",
+					UploadName: "test ok (exact size)",
+				},
+			},
+			want: nil,
+		},
+		{
 			name: "upload not ok",
 			args: args{
 				ctx:       context.Background(),
@@ -94,7 +111,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 			fields: fields{
 				Logger: logger,
 				MediaMetadata: &types.MediaMetadata{
-					MediaID:    "1337",
+					MediaID:    "1339",
 					UploadName: "test fail",
 				},
 			},
