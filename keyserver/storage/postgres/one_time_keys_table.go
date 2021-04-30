@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
@@ -94,7 +95,7 @@ func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
 }
 
 func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
-	rows, err := s.selectKeysStmt.QueryContext(ctx, userID, deviceID, keyIDsWithAlgorithms)
+	rows, err := s.selectKeysStmt.QueryContext(ctx, userID, deviceID, pq.Array(keyIDsWithAlgorithms))
 	if err != nil {
 		return nil, err
 	}
