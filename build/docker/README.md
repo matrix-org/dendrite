@@ -46,10 +46,7 @@ go run github.com/matrix-org/dendrite/cmd/generate-keys \
 ## Starting Dendrite as a monolith deployment
 
 Create your config based on the `dendrite.yaml` configuration file in the `docker/config`
-folder in the [Dendrite repository](https://github.com/matrix-org/dendrite). Additionally,
-make the following changes to the configuration:
-
-- Enable Naffka: `use_naffka: true`
+folder in the [Dendrite repository](https://github.com/matrix-org/dendrite).
 
 Once in place, start the PostgreSQL dependency:
 
