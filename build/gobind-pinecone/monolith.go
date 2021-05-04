@@ -247,7 +247,7 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
 
 	m.PineconeRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
-		if peertype == pineconeRouter.PeerTypeRemote && err != nil {
+		if peertype == pineconeRouter.PeerTypeRemote {
 			m.staticPeerAttempts.Store(0)
 			time.AfterFunc(time.Second, m.staticPeerConnect)
 		}
