@@ -55,7 +55,9 @@ func NewPineconeRoomProvider(
 
 func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
 	known := []ed25519.PublicKey{}
-	known = append(known, p.r.KnownNodes()...)
+	for _, k := range p.r.KnownNodes() {
+		known = append(known, k[:])
+	}
 	known = append(known, p.s.Sessions()...)
 	list := []gomatrixserverlib.ServerName{}
 	for _, k := range known {

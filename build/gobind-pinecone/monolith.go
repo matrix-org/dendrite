@@ -339,8 +339,9 @@ func (m *DendriteMonolith) Start() {
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	m.PineconeQUIC.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
-	m.PineconeQUIC.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
+	pHTTP := m.PineconeQUIC.HTTP()
+	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
+	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
 
 	// Build both ends of a HTTP multiplex.
 	h2s := &http2.Server{}

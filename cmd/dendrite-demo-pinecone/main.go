@@ -239,8 +239,9 @@ func main() {
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	pQUIC.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
-	pQUIC.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
+	pHTTP := pQUIC.HTTP()
+	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
+	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{
