@@ -224,7 +224,7 @@ func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 			}
 
 			if err = compileNamespaceRegexes(namespaceSlice); err != nil {
-				return err
+				return fmt.Errorf("invalid regex in appservice %q, namespace %q: %w", appservice.ID, key, err)
 			}
 		}
 	}
@@ -276,9 +276,12 @@ func appendExclusiveNamespaceRegexs(
 func compileNamespaceRegexes(namespaces []ApplicationServiceNamespace) (err error) {
 	for index, namespace := range namespaces {
 		// Compile this regex into a Regexp object for later use
-		if namespaces[index].RegexpObject, err = regexp.Compile(namespace.Regex); err != nil {
-			return err
+		r, err := regexp.Compile(namespace.Regex)
+		if err != nil {
+			return fmt.Errorf("regex at namespace %d: %w", index, err)
 		}
+
+		namespaces[index].RegexpObject = r
 	}
 
 	return nil
