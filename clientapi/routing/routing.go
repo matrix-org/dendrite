@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
+	pushserverAPI "github.com/matrix-org/dendrite/pushserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -57,6 +58,7 @@ func Setup(
 	transactionsCache *transactions.Cache,
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
+	psAPI pushserverAPI.PushserverInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
 ) {
@@ -805,7 +807,7 @@ func Setup(
 
 	r0mux.Handle("/pushers",
 		httputil.MakeAuthAPI("get_pushers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return GetPushersByLocalpart(req, userAPI, device)
+			return GetPushersByLocalpart(req, device, userAPI, psAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -814,7 +816,7 @@ func Setup(
 			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
-			return SetPusherByLocalpart(req, userAPI, device)
+			return SetPusherByLocalpart(req, device, userAPI, psAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

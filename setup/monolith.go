@@ -64,8 +64,8 @@ func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ss
 		csMux, &m.Config.ClientAPI, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
-		m.FederationSenderAPI, m.UserAPI, m.KeyAPI, m.ExtPublicRoomsProvider,
-		&m.Config.MSCs,
+		m.FederationSenderAPI, m.UserAPI, m.KeyAPI, m.PushserverAPI,
+		m.ExtPublicRoomsProvider, &m.Config.MSCs,
 	)
 	federationapi.AddPublicRoutes(
 		ssMux, keyMux, &m.Config.FederationAPI, m.UserAPI, m.FedClient,

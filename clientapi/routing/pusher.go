@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	pushserver "github.com/matrix-org/dendrite/pushserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
@@ -44,7 +45,8 @@ type pushersJSON struct {
 
 // GetPushersByLocalpart handles /_matrix/client/r0/pushers
 func GetPushersByLocalpart(
-	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
+	req *http.Request, device *api.Device,
+	userAPI userapi.UserInternalAPI, pushserverAPI pushserver.PushserverInternalAPI,
 ) util.JSONResponse {
 	var queryRes userapi.QueryPushersResponse
 	err := userAPI.QueryPushers(req.Context(), &userapi.QueryPushersRequest{
@@ -87,7 +89,8 @@ func GetPushersByLocalpart(
 // This endpoint allows the creation, modification and deletion of pushers for this user ID.
 // The behaviour of this endpoint varies depending on the values in the JSON body.
 func SetPusherByLocalpart(
-	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
+	req *http.Request, device *api.Device,
+	userAPI userapi.UserInternalAPI, pushserverAPI pushserver.PushserverInternalAPI,
 ) util.JSONResponse {
 	var deletionRes userapi.PerformPusherDeletionResponse
 	body := pusherJSON{}
