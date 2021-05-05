@@ -65,6 +65,7 @@ type Dendrite struct {
 	SigningKeyServer SigningKeyServer `yaml:"signing_key_server"`
 	SyncAPI          SyncAPI          `yaml:"sync_api"`
 	UserAPI          UserAPI          `yaml:"user_api"`
+	PushServer       PushServer       `yaml:"push_server"`
 
 	MSCs MSCs `yaml:"mscs"`
 
@@ -308,6 +309,7 @@ func (c *Dendrite) Defaults() {
 	c.SyncAPI.Defaults()
 	c.UserAPI.Defaults()
 	c.AppServiceAPI.Defaults()
+	c.PushServer.Defaults()
 	c.MSCs.Defaults()
 
 	c.Wiring()
@@ -340,6 +342,7 @@ func (c *Dendrite) Wiring() {
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
+	c.PushServer.Matrix = &c.Global
 	c.MSCs.Matrix = &c.Global
 
 	c.ClientAPI.Derived = &c.Derived
@@ -545,6 +548,15 @@ func (config *Dendrite) KeyServerURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return string(config.KeyServer.InternalAPI.Connect)
+}
+
+// PushServerURL returns an HTTP URL for where the push server is listening.
+func (config *Dendrite) PushServerURL() string {
+	// Hard code the push server to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return string(config.PushServer.InternalAPI.Connect)
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.

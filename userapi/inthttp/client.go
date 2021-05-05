@@ -29,17 +29,21 @@ const (
 	InputAccountDataPath = "/userapi/inputAccountData"
 
 	PerformDeviceCreationPath      = "/userapi/performDeviceCreation"
+	PerformPusherCreationPath      = "/userapi/performPusherCreation"
 	PerformAccountCreationPath     = "/userapi/performAccountCreation"
 	PerformPasswordUpdatePath      = "/userapi/performPasswordUpdate"
 	PerformDeviceDeletionPath      = "/userapi/performDeviceDeletion"
+	PerformPusherDeletionPath      = "/userapi/performPusherDeletion"
 	PerformLastSeenUpdatePath      = "/userapi/performLastSeenUpdate"
 	PerformDeviceUpdatePath        = "/userapi/performDeviceUpdate"
+	PerformPusherUpdatePath        = "/userapi/performPusherUpdate"
 	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
 	PerformOpenIDTokenCreationPath = "/userapi/performOpenIDTokenCreation"
 
 	QueryProfilePath        = "/userapi/queryProfile"
 	QueryAccessTokenPath    = "/userapi/queryAccessToken"
 	QueryDevicesPath        = "/userapi/queryDevices"
+	QueryPushersPath        = "/userapi/queryPushers"
 	QueryAccountDataPath    = "/userapi/queryAccountData"
 	QueryDeviceInfosPath    = "/userapi/queryDeviceInfos"
 	QuerySearchProfilesPath = "/userapi/querySearchProfiles"
@@ -122,6 +126,42 @@ func (h *httpUserInternalAPI) PerformDeviceDeletion(
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
+func (h *httpUserInternalAPI) PerformPusherCreation(
+	ctx context.Context,
+	request *api.PerformPusherCreationRequest,
+	response *api.PerformPusherCreationResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPusherCreation")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformPusherCreationPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) PerformPusherUpdate(
+	ctx context.Context,
+	request *api.PerformPusherUpdateRequest,
+	response *api.PerformPusherUpdateResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPusherUpdate")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformPusherUpdatePath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) PerformPusherDeletion(
+	ctx context.Context,
+	request *api.PerformPusherDeletionRequest,
+	response *api.PerformPusherDeletionResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPusherDeletion")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformPusherDeletionPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
 func (h *httpUserInternalAPI) PerformLastSeenUpdate(
 	ctx context.Context,
 	req *api.PerformLastSeenUpdateRequest,
@@ -199,6 +239,14 @@ func (h *httpUserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDe
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryDevicesPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) QueryPushers(ctx context.Context, req *api.QueryPushersRequest, res *api.QueryPushersResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPushers")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryPushersPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 

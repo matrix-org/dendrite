@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 type newPasswordRequest struct {
@@ -37,6 +38,11 @@ func Password(
 	// Check that the existing password is right.
 	var r newPasswordRequest
 	r.LogoutDevices = true
+
+	logrus.WithFields(logrus.Fields{
+		"sessionId": device.SessionID,
+		"userId":    device.UserID,
+	}).Debug("Changing password")
 
 	// Unmarshal the request.
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
@@ -107,6 +113,7 @@ func Password(
 	// If the request asks us to log out all other devices then
 	// ask the user API to do that.
 	if r.LogoutDevices {
+		logrus.Debug("Logging out devices...")
 		logoutReq := &userapi.PerformDeviceDeletionRequest{
 			UserID:         device.UserID,
 			DeviceIDs:      nil,
@@ -117,6 +124,41 @@ func Password(
 			util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 			return jsonerror.InternalServerError()
 		}
+
+		pushersReq := &userapi.QueryPushersRequest{
+			UserID: device.UserID,
+		}
+		pushersRes := &userapi.QueryPushersResponse{}
+		if err := userAPI.QueryPushers(req.Context(), pushersReq, pushersRes); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("QueryPushers failed")
+			return jsonerror.InternalServerError()
+		}
+
+		var deleted = len(pushersRes.Pushers)
+		// Deletes all pushers from other devices
+		for _, pusher := range pushersRes.Pushers {
+			if pusher.SessionID == device.SessionID {
+				logrus.Debugf("✅ Skipping pusher %d", pusher.SessionID)
+				continue
+			}
+			if pusher.UserID == device.UserID {
+				deletionRes := userapi.PerformPusherDeletionResponse{}
+				if err := userAPI.PerformPusherDeletion(req.Context(), &userapi.PerformPusherDeletionRequest{
+					AppID:   pusher.AppID,
+					PushKey: pusher.PushKey,
+					UserID:  pusher.UserID,
+				}, &deletionRes); err != nil {
+					util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
+					return jsonerror.InternalServerError()
+				}
+				logrus.Debugf("💥 Successfully deleted pusher %d", pusher.SessionID)
+			}
+		}
+		if err := userAPI.QueryPushers(req.Context(), pushersReq, pushersRes); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("QueryPushers failed")
+			return jsonerror.InternalServerError()
+		}
+		logrus.Debugf("🗑 Deleted %d pushers...", deleted-len(pushersRes.Pushers))
 	}
 
 	// Return a success code.

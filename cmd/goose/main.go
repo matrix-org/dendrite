@@ -28,6 +28,7 @@ const (
 	SyncAPI          = "syncapi"
 	UserAPIAccounts  = "userapi_accounts"
 	UserAPIDevices   = "userapi_devices"
+	UserAPIPushers   = "userapi_pushers"
 )
 
 var (
@@ -35,7 +36,7 @@ var (
 	flags     = flag.NewFlagSet("goose", flag.ExitOnError)
 	component = flags.String("component", "", "dendrite component name")
 	knownDBs  = []string{
-		AppService, FederationSender, KeyServer, MediaAPI, RoomServer, SigningKeyServer, SyncAPI, UserAPIAccounts, UserAPIDevices,
+		AppService, FederationSender, KeyServer, MediaAPI, RoomServer, SigningKeyServer, SyncAPI, UserAPIAccounts, UserAPIDevices, UserAPIPushers,
 	}
 )
 

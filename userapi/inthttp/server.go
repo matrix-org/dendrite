@@ -52,6 +52,32 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(PerformPusherCreationPath,
+		httputil.MakeInternalAPI("performPusherCreation", func(req *http.Request) util.JSONResponse {
+			request := api.PerformPusherCreationRequest{}
+			response := api.PerformPusherCreationResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformPusherCreation(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(PerformPusherUpdatePath,
+		httputil.MakeInternalAPI("performPusherUpdate", func(req *http.Request) util.JSONResponse {
+			request := api.PerformPusherUpdateRequest{}
+			response := api.PerformPusherUpdateResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformPusherUpdate(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(PerformDeviceCreationPath,
 		httputil.MakeInternalAPI("performDeviceCreation", func(req *http.Request) util.JSONResponse {
 			request := api.PerformDeviceCreationRequest{}
@@ -99,6 +125,19 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.PerformDeviceDeletion(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(PerformPusherDeletionPath,
+		httputil.MakeInternalAPI("performPusherDeletion", func(req *http.Request) util.JSONResponse {
+			request := api.PerformPusherDeletionRequest{}
+			response := api.PerformPusherDeletionResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformPusherDeletion(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
@@ -164,6 +203,19 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			if err := s.QueryDevices(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QueryPushersPath,
+		httputil.MakeInternalAPI("queryPushers", func(req *http.Request) util.JSONResponse {
+			request := api.QueryPushersRequest{}
+			response := api.QueryPushersResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.QueryPushers(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}

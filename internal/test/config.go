@@ -96,6 +96,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(database)
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(database)
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(database)
+	cfg.UserAPI.PusherDatabase.ConnectionString = config.DataSource(database)
 
 	cfg.AppServiceAPI.InternalAPI.Listen = assignAddress()
 	cfg.EDUServer.InternalAPI.Listen = assignAddress()

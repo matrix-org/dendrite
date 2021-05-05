@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/pushserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup"
@@ -66,6 +67,7 @@ func main() {
 		cfg.RoomServer.InternalAPI.Connect = httpAPIAddr
 		cfg.SigningKeyServer.InternalAPI.Connect = httpAPIAddr
 		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
+		cfg.PushServer.InternalAPI.Connect = httpAPIAddr
 	}
 
 	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
@@ -128,6 +130,12 @@ func main() {
 	}
 	rsAPI.SetAppserviceAPI(asAPI)
 
+	psAPI := pushserver.NewInternalAPI(base)
+	if base.UseHTTPAPIs {
+		pushserver.AddInternalRoutes(base.InternalAPIMux, psAPI)
+		psAPI = base.PushServerHTTPClient()
+	}
+
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
@@ -142,6 +150,7 @@ func main() {
 		ServerKeyAPI:        skAPI,
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
+		PushserverAPI:       psAPI,
 	}
 	monolith.AddAllPublicRoutes(
 		base.ProcessContext,

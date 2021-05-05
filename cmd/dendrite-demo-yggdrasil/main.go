@@ -36,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/pushserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -75,6 +76,7 @@ func main() {
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
+	cfg.UserAPI.PusherDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-pusher.db", *instanceName))
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
@@ -129,6 +131,12 @@ func main() {
 		}
 	})
 
+	psAPI := pushserver.NewInternalAPI(base)
+	if base.UseHTTPAPIs {
+		pushserver.AddInternalRoutes(base.InternalAPIMux, psAPI)
+		psAPI = base.PushServerHTTPClient()
+	}
+
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
 	monolith := setup.Monolith{
@@ -144,6 +152,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
+		PushserverAPI:       psAPI,
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,
 		),

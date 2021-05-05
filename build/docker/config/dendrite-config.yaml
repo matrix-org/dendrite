@@ -318,6 +318,11 @@ user_api:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
+  pusher_database:
+    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_userapi_pushers?sslmode=disable
+    max_open_conns: 10
+    max_idle_conns: 2
+    conn_max_lifetime: -1
 
 # Configuration for Opentracing.
 # See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on

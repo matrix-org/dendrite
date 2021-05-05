@@ -109,7 +109,7 @@ On macOS, omit `sudo -u postgres` from the below commands.
 * If you want to run each Dendrite component with its own database:
 
   ```bash
-  for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_accounts userapi_devices naffka; do
+  for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_accounts userapi_devices userapi_pushers naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```

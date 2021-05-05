@@ -31,11 +31,15 @@ type UserInternalAPI interface {
 	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
 	PerformLastSeenUpdate(ctx context.Context, req *PerformLastSeenUpdateRequest, res *PerformLastSeenUpdateResponse) error
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
+	PerformPusherCreation(ctx context.Context, req *PerformPusherCreationRequest, res *PerformPusherCreationResponse) error
+	PerformPusherDeletion(ctx context.Context, req *PerformPusherDeletionRequest, res *PerformPusherDeletionResponse) error
+	PerformPusherUpdate(ctx context.Context, req *PerformPusherUpdateRequest, res *PerformPusherUpdateResponse) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
+	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
@@ -75,6 +79,15 @@ type PerformDeviceDeletionRequest struct {
 }
 
 type PerformDeviceDeletionResponse struct {
+}
+
+type PerformPusherDeletionRequest struct {
+	AppID   string
+	PushKey string
+	UserID  string
+}
+
+type PerformPusherDeletionResponse struct {
 }
 
 // QueryDeviceInfosRequest is the request to QueryDeviceInfos
@@ -126,6 +139,17 @@ type QueryDevicesRequest struct {
 type QueryDevicesResponse struct {
 	UserExists bool
 	Devices    []Device
+}
+
+// QueryPushersRequest is the request for QueryPushers
+type QueryPushersRequest struct {
+	UserID string
+}
+
+// QueryPushersResponse is the response for QueryPushers
+type QueryPushersResponse struct {
+	UserExists bool
+	Pushers    []Pusher
 }
 
 // QueryProfileRequest is the request for QueryProfile
@@ -218,6 +242,40 @@ type PerformDeviceCreationResponse struct {
 	Device        *Device
 }
 
+// PerformPusherCreationRequest is the request for PerformPusherCreation
+type PerformPusherCreationRequest struct {
+	Device            *Device
+	PushKey           string
+	Kind              string
+	AppID             string
+	AppDisplayName    string
+	DeviceDisplayName string
+	ProfileTag        string
+	Language          string
+	Data              map[string]json.RawMessage
+}
+
+// PerformPusherCreationResponse is the response for PerformPusherCreation
+type PerformPusherCreationResponse struct {
+}
+
+// PerformPusherUpdateRequest is the request for PerformPusherUpdate
+type PerformPusherUpdateRequest struct {
+	Device            *Device
+	PushKey           string
+	Kind              string
+	AppID             string
+	AppDisplayName    string
+	DeviceDisplayName string
+	ProfileTag        string
+	Language          string
+	Data              map[string]json.RawMessage
+}
+
+// PerformPusherUpdateResponse is the response for PerformPusherUpdate
+type PerformPusherUpdateResponse struct {
+}
+
 // PerformAccountDeactivationRequest is the request for PerformAccountDeactivation
 type PerformAccountDeactivationRequest struct {
 	Localpart string
@@ -267,6 +325,20 @@ type Device struct {
 	// If the device is for an appservice user,
 	// this is the appservice ID.
 	AppserviceID string
+}
+
+// Pusher represents a push notification subscriber
+type Pusher struct {
+	UserID            string
+	SessionID         int64
+	PushKey           string
+	Kind              string
+	AppID             string
+	AppDisplayName    string
+	DeviceDisplayName string
+	ProfileTag        string
+	Language          string
+	Data              string
 }
 
 // Account represents a Matrix account on this home server.
