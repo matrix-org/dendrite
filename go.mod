@@ -1,7 +1,5 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/matrix-org/pinecone => /Volumes/Workspace/pinecone
-
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
@@ -11,7 +9,6 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hjson/hjson-go v3.0.2-0.20200316202735-d5d0e8b0617d+incompatible
 	github.com/lib/pq v1.9.0
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
@@ -28,7 +25,7 @@ require (
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20210302161955-6142fe3f8c2c
 	github.com/matrix-org/naffka v0.0.0-20201009174903-d26a3b9cb161
-	github.com/matrix-org/pinecone v0.0.0-00010101000000-000000000000
+	github.com/matrix-org/pinecone v0.0.0-20210505144958-30c2fbab2cb0
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.7-0.20210414154423-1157a4212dcb
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
@@ -45,7 +42,6 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20210218094457-e77ca8019daa
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
-	golang.org/x/mobile v0.0.0-20210220033013-bdb1ca9a1e08 // indirect
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/tools v0.0.0-20200117012304-6edc0a871e69 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.5
