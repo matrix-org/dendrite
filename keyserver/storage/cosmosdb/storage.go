@@ -15,12 +15,14 @@
 package cosmosdb
 
 import (
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+	dbProperties.ConnectionString = cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err

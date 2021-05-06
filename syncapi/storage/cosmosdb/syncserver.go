@@ -16,6 +16,7 @@
 package cosmosdb
 
 import (
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"database/sql"
 
 	// Import the sqlite3 package
@@ -40,6 +41,7 @@ type SyncServerDatasource struct {
 // NewDatabase creates a new sync server database
 // nolint: gocyclo
 func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+	dbProperties.ConnectionString = cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
 	var d SyncServerDatasource
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
