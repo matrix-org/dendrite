@@ -25,6 +25,8 @@ import (
 // NewPublicRoomsServerDatabase opens a database connection.
 func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return nil, fmt.Errorf("can't use CosmosDB implementation")
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.Open(dbProperties, cache)
 	case dbProperties.ConnectionString.IsPostgres():

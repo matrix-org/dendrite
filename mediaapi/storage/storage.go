@@ -19,6 +19,7 @@ package storage
 import (
 	"fmt"
 
+	"github.com/matrix-org/dendrite/mediaapi/storage/cosmosdb"
 	"github.com/matrix-org/dendrite/mediaapi/storage/postgres"
 	"github.com/matrix-org/dendrite/mediaapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -27,6 +28,8 @@ import (
 // Open opens a postgres database.
 func Open(dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return cosmosdb.Open(dbProperties)
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.Open(dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():

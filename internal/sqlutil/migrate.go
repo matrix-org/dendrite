@@ -48,8 +48,13 @@ func (m *Migrations) RunDeltas(db *sql.DB, props *config.DatabaseOptions) error 
 	if err != nil {
 		return fmt.Errorf("RunDeltas: Failed to collect migrations: %w", err)
 	}
-	if props.ConnectionString.IsPostgres() {
+	if props.ConnectionString.IsCosmosDB() {
 		if err = goose.SetDialect("postgres"); err != nil {
+			return err
+		}
+	} else if props.ConnectionString.IsPostgres() {
+		//HACK: Not supported
+		if err = goose.SetDialect("cosmosdb"); err != nil {
 			return err
 		}
 	} else if props.ConnectionString.IsSQLite() {

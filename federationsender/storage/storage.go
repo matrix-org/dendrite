@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3"
+	"github.com/matrix-org/dendrite/federationsender/storage/cosmosdb"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -28,6 +29,8 @@ import (
 // NewDatabase opens a new database
 func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationSenderCache) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return cosmosdb.NewDatabase(dbProperties, cache)
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties, cache)
 	case dbProperties.ConnectionString.IsPostgres():

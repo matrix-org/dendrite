@@ -47,6 +47,9 @@ type DB struct {
 
 // NewDatabase loads the database for msc2836
 func NewDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
+	if dbOpts.ConnectionString.IsCosmosDB() {
+		return newCosmosDBDatabase(dbOpts)
+	}
 	if dbOpts.ConnectionString.IsPostgres() {
 		return newPostgresDatabase(dbOpts)
 	}
@@ -94,6 +97,46 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 }
 
 func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
+	d := DB{
+		writer: sqlutil.NewExclusiveWriter(),
+	}
+	var err error
+	if d.db, err = sqlutil.Open(dbOpts); err != nil {
+		return nil, err
+	}
+	_, err = d.db.Exec(`
+	CREATE TABLE IF NOT EXISTS msc2946_edges (
+		room_version TEXT NOT NULL,
+		-- the room ID of the event, the source of the arrow
+		source_room_id TEXT NOT NULL,
+		-- the target room ID, the arrow destination
+		dest_room_id TEXT NOT NULL,
+		-- the kind of relation, either child or parent (1,2)
+		rel_type SMALLINT NOT NULL,
+		event_json TEXT NOT NULL,
+		UNIQUE (source_room_id, dest_room_id, rel_type)
+	);
+	`)
+	if err != nil {
+		return nil, err
+	}
+	if d.insertEdgeStmt, err = d.db.Prepare(`
+		INSERT INTO msc2946_edges(room_version, source_room_id, dest_room_id, rel_type, event_json)
+		VALUES($1, $2, $3, $4, $5)
+		ON CONFLICT (source_room_id, dest_room_id, rel_type) DO UPDATE SET event_json = $5
+	`); err != nil {
+		return nil, err
+	}
+	if d.selectEdgesStmt, err = d.db.Prepare(`
+		SELECT room_version, event_json FROM msc2946_edges
+		WHERE source_room_id = $1 OR dest_room_id = $2
+	`); err != nil {
+		return nil, err
+	}
+	return &d, err
+}
+
+func newCosmosDBDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	d := DB{
 		writer: sqlutil.NewExclusiveWriter(),
 	}

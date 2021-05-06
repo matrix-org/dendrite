@@ -103,6 +103,11 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 	var err error
 	var driverName, dsn string
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		//HACK: Not supported
+		driverName = "cosmosdb"
+		dsn = string(dbProperties.ConnectionString)
+		return nil, fmt.Errorf("CosmosDB %q", dbProperties.ConnectionString)
 	case dbProperties.ConnectionString.IsSQLite():
 		driverName = SQLiteDriverName()
 		dsn, err = ParseFileURI(dbProperties.ConnectionString)

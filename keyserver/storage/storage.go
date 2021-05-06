@@ -19,6 +19,7 @@ package storage
 import (
 	"fmt"
 
+	"github.com/matrix-org/dendrite/keyserver/storage/cosmosdb"
 	"github.com/matrix-org/dendrite/keyserver/storage/postgres"
 	"github.com/matrix-org/dendrite/keyserver/storage/sqlite3"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -28,6 +29,8 @@ import (
 // and sets postgres connection parameters
 func NewDatabase(dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return cosmosdb.NewDatabase(dbProperties)
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():

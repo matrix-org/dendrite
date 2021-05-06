@@ -29,6 +29,8 @@ func NewDatabase(
 	openIDTokenLifetimeMS int64,
 ) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return nil, fmt.Errorf("can't use CosmosDB implementation")
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS)
 	case dbProperties.ConnectionString.IsPostgres():

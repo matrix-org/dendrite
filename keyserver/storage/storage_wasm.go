@@ -23,6 +23,8 @@ import (
 
 func NewDatabase(dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return nil, fmt.Errorf("can't use CosmosDB implementation")
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
