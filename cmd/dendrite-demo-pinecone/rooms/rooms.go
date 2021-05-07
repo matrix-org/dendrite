@@ -27,8 +27,6 @@ import (
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 )
 
-const pineconeRoomAttempts = 3
-
 type PineconeRoomProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
@@ -77,31 +75,24 @@ func bulkFetchPublicRoomsFromServers(
 	var wg sync.WaitGroup
 	wg.Add(len(homeservers))
 	// concurrently query for public rooms
-	reqctx, reqcancel := context.WithCancel(ctx)
+	reqctx, reqcancel := context.WithTimeout(ctx, time.Second*5)
 	for _, hs := range homeservers {
 		go func(homeserverDomain gomatrixserverlib.ServerName) {
 			defer wg.Done()
 			util.GetLogger(reqctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")
-			var fres gomatrixserverlib.RespPublicRooms
-			var err error
-			for i := 0; i < pineconeRoomAttempts; i++ {
-				fres, err = fedClient.GetPublicRooms(reqctx, homeserverDomain, int(limit), "", false, "")
-				if err != nil {
-					util.GetLogger(reqctx).WithError(err).WithField("hs", homeserverDomain).Warn(
-						"bulkFetchPublicRoomsFromServers: failed to query hs",
-					)
-					if i == pineconeRoomAttempts-1 {
-						return
-					}
-				} else {
-					break
-				}
+			fres, err := fedClient.GetPublicRooms(reqctx, homeserverDomain, int(limit), "", false, "")
+			if err != nil {
+				util.GetLogger(reqctx).WithError(err).WithField("hs", homeserverDomain).Warn(
+					"bulkFetchPublicRoomsFromServers: failed to query hs",
+				)
+				return
 			}
 			for _, room := range fres.Chunk {
 				// atomically send a room or stop
 				select {
 				case roomCh <- room:
 				case <-done:
+				case <-reqctx.Done():
 					util.GetLogger(reqctx).WithError(err).WithField("hs", homeserverDomain).Info("Interrupted whilst sending rooms")
 					return
 				}
