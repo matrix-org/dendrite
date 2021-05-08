@@ -521,6 +521,18 @@ func (u *testUserAPI) PerformDeviceUpdate(ctx context.Context, req *userapi.Perf
 func (u *testUserAPI) PerformLastSeenUpdate(ctx context.Context, req *userapi.PerformLastSeenUpdateRequest, res *userapi.PerformLastSeenUpdateResponse) error {
 	return nil
 }
+func (u *testUserAPI) PerformPusherCreation(ctx context.Context, req *userapi.PerformPusherCreationRequest, res *userapi.PerformPusherCreationResponse) error {
+	return nil
+}
+func (u *testUserAPI) QueryPushers(ctx context.Context, req *userapi.QueryPushersRequest, res *userapi.QueryPushersResponse) error {
+	return nil
+}
+func (u *testUserAPI) PerformPusherUpdate(ctx context.Context, req *userapi.PerformPusherUpdateRequest, res *userapi.PerformPusherUpdateResponse) error {
+	return nil
+}
+func (u *testUserAPI) PerformPusherDeletion(ctx context.Context, req *userapi.PerformPusherDeletionRequest, res *userapi.PerformPusherDeletionResponse) error {
+	return nil
+}
 func (u *testUserAPI) PerformAccountDeactivation(ctx context.Context, req *userapi.PerformAccountDeactivationRequest, res *userapi.PerformAccountDeactivationResponse) error {
 	return nil
 }
