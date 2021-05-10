@@ -71,13 +71,14 @@ type previousEventStatements struct {
 	selectPreviousEventExistsStmt *sql.Stmt
 }
 
-func NewSqlitePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
+func createPrevEventsTable(db *sql.DB) error {
+	_, err := db.Exec(previousEventSchema)
+	return err
+}
+
+func preparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
 	s := &previousEventStatements{
 		db: db,
-	}
-	_, err := db.Exec(previousEventSchema)
-	if err != nil {
-		return nil, err
 	}
 
 	return s, shared.StatementList{

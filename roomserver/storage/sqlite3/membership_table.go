@@ -115,7 +115,12 @@ type membershipStatements struct {
 	updateMembershipForgetRoomStmt                  *sql.Stmt
 }
 
-func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
+func createMembershipTable(db *sql.DB) error {
+	_, err := db.Exec(membershipSchema)
+	return err
+}
+
+func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 	s := &membershipStatements{
 		db: db,
 	}
@@ -133,11 +138,6 @@ func NewSqliteMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectKnownUsersStmt, selectKnownUsersSQL},
 		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 	}.Prepare(db)
-}
-
-func (s *membershipStatements) execSchema(db *sql.DB) error {
-	_, err := db.Exec(membershipSchema)
-	return err
 }
 
 func (s *membershipStatements) InsertMembership(

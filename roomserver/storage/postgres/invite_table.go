@@ -82,12 +82,13 @@ type inviteStatements struct {
 	updateInviteRetiredStmt             *sql.Stmt
 }
 
-func NewPostgresInvitesTable(db *sql.DB) (tables.Invites, error) {
-	s := &inviteStatements{}
+func createInvitesTable(db *sql.DB) error {
 	_, err := db.Exec(inviteSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareInvitesTable(db *sql.DB) (tables.Invites, error) {
+	s := &inviteStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertInviteEventStmt, insertInviteEventSQL},

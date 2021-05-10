@@ -25,7 +25,7 @@ use in production environments just yet!
 
 Dendrite requires:
 
-* Go 1.13 or higher
+* Go 1.14 or higher
 * Postgres 9.6 or higher (if using Postgres databases, not needed for SQLite)
 
 If you want to run a polylith deployment, you also need:

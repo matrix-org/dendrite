@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -78,6 +79,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		sentry.CaptureException(err)
 		return nil
 	}
 
@@ -90,6 +92,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 		output.Timestamp,
 	)
 	if err != nil {
+		sentry.CaptureException(err)
 		return err
 	}
 

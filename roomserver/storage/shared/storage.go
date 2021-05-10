@@ -118,9 +118,24 @@ func (d *Database) StateEntriesForTuples(
 	stateBlockNIDs []types.StateBlockNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
-	return d.StateBlockTable.BulkSelectFilteredStateBlockEntries(
-		ctx, stateBlockNIDs, stateKeyTuples,
+	entries, err := d.StateBlockTable.BulkSelectStateBlockEntries(
+		ctx, stateBlockNIDs,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", err)
+	}
+	lists := []types.StateEntryList{}
+	for i, entry := range entries {
+		entries, err := d.EventsTable.BulkSelectStateEventByNID(ctx, entry, stateKeyTuples)
+		if err != nil {
+			return nil, fmt.Errorf("d.EventsTable.BulkSelectStateEventByNID: %w", err)
+		}
+		lists = append(lists, types.StateEntryList{
+			StateBlockNID: stateBlockNIDs[i],
+			StateEntries:  entries,
+		})
+	}
+	return lists, nil
 }
 
 func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
@@ -141,8 +156,28 @@ func (d *Database) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
+	if len(stateBlockNIDs) > 0 {
+		// Check to see if the event already appears in any of the existing state
+		// blocks. If it does then we should not add it again, as this will just
+		// result in excess state blocks and snapshots.
+		// TODO: Investigate why this is happening - probably input_events.go!
+		blocks, berr := d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs)
+		if berr != nil {
+			return 0, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", berr)
+		}
+		for i := len(state) - 1; i >= 0; i-- {
+			for _, events := range blocks {
+				for _, event := range events {
+					if state[i].EventNID == event {
+						state = append(state[:i], state[i+1:]...)
+					}
+				}
+			}
+		}
+	}
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if len(state) > 0 {
+			// If there's any state left to add then let's add new blocks.
 			var stateBlockNID types.StateBlockNID
 			stateBlockNID, err = d.StateBlockTable.BulkInsertStateData(ctx, txn, state)
 			if err != nil {
@@ -237,7 +272,24 @@ func (d *Database) StateBlockNIDs(
 func (d *Database) StateEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
-	return d.StateBlockTable.BulkSelectStateBlockEntries(ctx, stateBlockNIDs)
+	entries, err := d.StateBlockTable.BulkSelectStateBlockEntries(
+		ctx, stateBlockNIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", err)
+	}
+	lists := make([]types.StateEntryList, 0, len(entries))
+	for i, entry := range entries {
+		eventNIDs, err := d.EventsTable.BulkSelectStateEventByNID(ctx, entry, nil)
+		if err != nil {
+			return nil, fmt.Errorf("d.EventsTable.BulkSelectStateEventByNID: %w", err)
+		}
+		lists = append(lists, types.StateEntryList{
+			StateBlockNID: stateBlockNIDs[i],
+			StateEntries:  eventNIDs,
+		})
+	}
+	return lists, nil
 }
 
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
@@ -412,7 +464,6 @@ func (d *Database) GetLatestEventsForUpdate(
 	return updater, err
 }
 
-// nolint:gocyclo
 func (d *Database) StoreEvent(
 	ctx context.Context, event *gomatrixserverlib.Event,
 	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID, isRejected bool,
@@ -672,7 +723,6 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 // to cross-reference with other tables when loading.
 //
 // Returns the redaction event and the event ID of the redacted event if this call resulted in a redaction.
-// nolint:gocyclo
 func (d *Database) handleRedactions(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, event *gomatrixserverlib.Event,
 ) (*gomatrixserverlib.Event, string, error) {
@@ -802,7 +852,6 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 // GetStateEvent returns the current state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
-// nolint:gocyclo
 func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error) {
 	roomInfo, err := d.RoomInfo(ctx, roomID)
 	if err != nil {
@@ -893,7 +942,6 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership 
 
 // GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 // If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
-// nolint:gocyclo
 func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error) {
 	eventTypes := make([]string, 0, len(tuples))
 	for _, tuple := range tuples {
