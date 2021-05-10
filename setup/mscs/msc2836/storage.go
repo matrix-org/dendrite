@@ -59,6 +59,9 @@ type DB struct {
 
 // NewDatabase loads the database for msc2836
 func NewDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
+	if dbOpts.ConnectionString.IsCosmosDB() {
+		return newCosmosDBDatabase(dbOpts)
+	}
 	if dbOpts.ConnectionString.IsPostgres() {
 		return newPostgresDatabase(dbOpts)
 	}
@@ -146,6 +149,86 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 }
 
 func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
+	d := DB{
+		writer: sqlutil.NewExclusiveWriter(),
+	}
+	var err error
+	if d.db, err = sqlutil.Open(dbOpts); err != nil {
+		return nil, err
+	}
+	_, err = d.db.Exec(`
+	CREATE TABLE IF NOT EXISTS msc2836_edges (
+		parent_event_id TEXT NOT NULL,
+		child_event_id TEXT NOT NULL,
+		rel_type TEXT NOT NULL,
+		parent_room_id TEXT NOT NULL,
+		parent_servers TEXT NOT NULL,
+		UNIQUE (parent_event_id, child_event_id, rel_type)
+	);
+
+	CREATE TABLE IF NOT EXISTS msc2836_nodes (
+		event_id TEXT PRIMARY KEY NOT NULL,
+		origin_server_ts BIGINT NOT NULL,
+		room_id TEXT NOT NULL,
+		unsigned_children_count BIGINT NOT NULL,
+		unsigned_children_hash TEXT NOT NULL,
+		explored SMALLINT NOT NULL
+	);
+	`)
+	if err != nil {
+		return nil, err
+	}
+	if d.insertEdgeStmt, err = d.db.Prepare(`
+		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type, parent_room_id, parent_servers)
+		VALUES($1, $2, $3, $4, $5)
+		ON CONFLICT (parent_event_id, child_event_id, rel_type) DO NOTHING
+	`); err != nil {
+		return nil, err
+	}
+	if d.insertNodeStmt, err = d.db.Prepare(`
+		INSERT INTO msc2836_nodes(event_id, origin_server_ts, room_id, unsigned_children_count, unsigned_children_hash, explored)
+		VALUES($1, $2, $3, $4, $5, $6)
+		ON CONFLICT DO NOTHING
+	`); err != nil {
+		return nil, err
+	}
+	selectChildrenQuery := `
+	SELECT child_event_id, origin_server_ts, room_id FROM msc2836_edges
+	LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
+	WHERE parent_event_id = $1 AND rel_type = $2
+	ORDER BY origin_server_ts
+	`
+	if d.selectChildrenForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenQuery + "ASC"); err != nil {
+		return nil, err
+	}
+	if d.selectChildrenForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenQuery + "DESC"); err != nil {
+		return nil, err
+	}
+	if d.selectParentForChildStmt, err = d.db.Prepare(`
+		SELECT parent_event_id, parent_room_id FROM msc2836_edges
+		WHERE child_event_id = $1 AND rel_type = $2
+	`); err != nil {
+		return nil, err
+	}
+	if d.updateChildMetadataStmt, err = d.db.Prepare(`
+		UPDATE msc2836_nodes SET unsigned_children_count=$1, unsigned_children_hash=$2, explored=$3 WHERE event_id=$4
+	`); err != nil {
+		return nil, err
+	}
+	if d.selectChildMetadataStmt, err = d.db.Prepare(`
+		SELECT unsigned_children_count, unsigned_children_hash, explored FROM msc2836_nodes WHERE event_id=$1
+	`); err != nil {
+		return nil, err
+	}
+	if d.updateChildMetadataExploredStmt, err = d.db.Prepare(`
+		UPDATE msc2836_nodes SET explored=$1 WHERE event_id=$2
+	`); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func newCosmosDBDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	d := DB{
 		writer: sqlutil.NewExclusiveWriter(),
 	}

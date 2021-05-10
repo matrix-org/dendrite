@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/roomserver/storage/cosmosdb"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -28,6 +29,8 @@ import (
 // Open opens a database connection.
 func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return cosmosdb.Open(dbProperties, cache)
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.Open(dbProperties, cache)
 	case dbProperties.ConnectionString.IsPostgres():

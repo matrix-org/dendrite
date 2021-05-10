@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts/cosmosdb"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts/postgres"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -29,6 +30,8 @@ import (
 // and sets postgres connection parameters
 func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return cosmosdb.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS)
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS)
 	case dbProperties.ConnectionString.IsPostgres():

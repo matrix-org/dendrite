@@ -22,6 +22,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/signingkeyserver/storage/cosmosdb"
 	"github.com/matrix-org/dendrite/signingkeyserver/storage/postgres"
 	"github.com/matrix-org/dendrite/signingkeyserver/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -35,6 +36,8 @@ func NewDatabase(
 	serverKeyID gomatrixserverlib.KeyID,
 ) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return cosmosdb.NewDatabase(dbProperties, serverName, serverKey, serverKeyID)
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties, serverName, serverKey, serverKeyID)
 	case dbProperties.ConnectionString.IsPostgres():

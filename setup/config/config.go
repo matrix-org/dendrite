@@ -139,6 +139,11 @@ func (d DataSource) IsPostgres() bool {
 	return !d.IsSQLite()
 }
 
+func (d DataSource) IsCosmosDB() bool {
+	// commented line may not always be true?
+	return strings.HasPrefix(string(d), "cosmosdb:")
+}
+
 // A Topic in kafka.
 type Topic string
 

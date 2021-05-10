@@ -25,6 +25,8 @@ import (
 // NewDatabase opens a new database
 func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationSenderCache) (Database, error) {
 	switch {
+	case dbProperties.ConnectionString.IsCosmosDB():
+		return nil, fmt.Errorf("can't use CosmosDB implementation")
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties, cache)
 	case dbProperties.ConnectionString.IsPostgres():
