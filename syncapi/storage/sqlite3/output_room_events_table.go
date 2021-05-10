@@ -303,7 +303,6 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		txnID,
 		excludeFromSync,
 		excludeFromSync,
-		excludeFromSync,
 	)
 	return streamPos, err
 }
