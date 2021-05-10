@@ -45,47 +45,37 @@ func (y *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return y.inner.RoundTrip(req)
 }
 
-func CreateClient(
-	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
-) *gomatrixserverlib.Client {
+func createTransport(s *pineconeSessions.Sessions) *http.Transport {
 	tr := &http.Transport{}
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
 			inner: &http.Transport{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 5,
-				Dial:                s.Dial,
-				DialContext:         s.DialContext,
-				DialTLS:             s.DialTLS,
-				DialTLSContext:      s.DialTLSContext,
+				DisableKeepAlives: false,
+				Dial:              s.Dial,
+				DialContext:       s.DialContext,
+				DialTLS:           s.DialTLS,
+				DialTLSContext:    s.DialTLSContext,
 			},
 		},
 	)
+	return tr
+}
+
+func CreateClient(
+	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
+) *gomatrixserverlib.Client {
 	return gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport(tr),
+		gomatrixserverlib.WithTransport(createTransport(s)),
 	)
 }
 
 func CreateFederationClient(
 	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
 ) *gomatrixserverlib.FederationClient {
-	tr := &http.Transport{}
-	tr.RegisterProtocol(
-		"matrix", &RoundTripper{
-			inner: &http.Transport{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 5,
-				Dial:                s.Dial,
-				DialContext:         s.DialContext,
-				DialTLS:             s.DialTLS,
-				DialTLSContext:      s.DialTLSContext,
-			},
-		},
-	)
 	return gomatrixserverlib.NewFederationClient(
 		base.Cfg.Global.ServerName,
 		base.Cfg.Global.KeyID,
 		base.Cfg.Global.PrivateKey,
-		gomatrixserverlib.WithTransport(tr),
+		gomatrixserverlib.WithTransport(createTransport(s)),
 	)
 }
