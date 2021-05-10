@@ -90,7 +90,7 @@ global:
 
     # Naffka database options. Not required when using Kafka.
     naffka_database:
-      connection_string: cosmosdb:naffka.db
+      connection_string: file:naffka.db
       max_open_conns: 10
       max_idle_conns: 2
       conn_max_lifetime: -1
@@ -122,7 +122,7 @@ app_service_api:
     listen: http://localhost:7777
     connect: http://localhost:7777
   database:
-    connection_string: cosmosdb:appservice.db
+    connection_string: file:appservice.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -202,7 +202,7 @@ federation_sender:
     listen: http://localhost:7775
     connect: http://localhost:7775
   database:
-    connection_string: cosmosdb:federationsender.db
+    connection_string: file:federationsender.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -228,7 +228,7 @@ key_server:
     listen: http://localhost:7779
     connect: http://localhost:7779
   database:
-    connection_string: cosmosdb:keyserver.db
+    connection_string: file:keyserver.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -241,7 +241,7 @@ media_api:
   external_api:
     listen: http://[::]:8074
   database:
-    connection_string: cosmosdb:mediaapi.db
+    connection_string: file:mediaapi.db
     max_open_conns: 5
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -280,7 +280,7 @@ mscs:
   # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
   mscs: []
   database:
-    connection_string: cosmosdb:mscs.db
+    connection_string: file:mscs.db
     max_open_conns: 5
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -291,7 +291,7 @@ room_server:
     listen: http://localhost:7770
     connect: http://localhost:7770
   database:
-    connection_string: cosmosdb:roomserver.db
+    connection_string: file:roomserver.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -302,7 +302,7 @@ signing_key_server:
     listen: http://localhost:7780
     connect: http://localhost:7780
   database:
-    connection_string: cosmosdb:signingkeyserver.db
+    connection_string: file:signingkeyserver.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -331,7 +331,7 @@ sync_api:
   external_api:
     listen: http://[::]:8073
   database:
-    connection_string: cosmosdb:syncapi.db
+    connection_string: file:syncapi.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -354,12 +354,12 @@ user_api:
     listen: http://localhost:7781
     connect: http://localhost:7781
   account_database:
-    connection_string: cosmosdb:userapi_accounts.db
+    connection_string: "cosmosdb:AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
   device_database:
-    connection_string: cosmosdb:userapi_devices.db
+    connection_string: file:userapi_devices.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1

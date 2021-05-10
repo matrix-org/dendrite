@@ -16,68 +16,94 @@ package cosmosdb
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
+	"fmt"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 )
 
-const accountDataSchema = `
--- Stores data about accounts data.
-CREATE TABLE IF NOT EXISTS account_data (
-    -- The Matrix user ID localpart for this account
-    localpart TEXT NOT NULL,
-    -- The room ID for this data (empty string if not specific to a room)
-    room_id TEXT,
-    -- The account data type
-    type TEXT NOT NULL,
-    -- The account data content
-    content TEXT NOT NULL,
+// const accountDataSchema = `
+// -- Stores data about accounts data.
+// CREATE TABLE IF NOT EXISTS account_data (
+//     -- The Matrix user ID localpart for this account
+//     localpart TEXT NOT NULL,
+//     -- The room ID for this data (empty string if not specific to a room)
+//     room_id TEXT,
+//     -- The account data type
+//     type TEXT NOT NULL,
+//     -- The account data content
+//     content TEXT NOT NULL,
 
-    PRIMARY KEY(localpart, room_id, type)
-);
-`
+//     PRIMARY KEY(localpart, room_id, type)
+// );
+// `
 
-const insertAccountDataSQL = `
-	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
-	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
-`
-
-const selectAccountDataSQL = "" +
-	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
-
-const selectAccountDataByTypeSQL = "" +
-	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
-
-type accountDataStatements struct {
-	db                          *sql.DB
-	insertAccountDataStmt       *sql.Stmt
-	selectAccountDataStmt       *sql.Stmt
-	selectAccountDataByTypeStmt *sql.Stmt
+type AccountCosmosAccountData struct {
+	Id        string      `json:"id"`
+	Pk        string      `json:"_pk"`
+	Cn        string      `json:"_cn"`
+	ETag      string      `json:"_etag"`
+	Timestamp int64       `json:"_ts"`
+	Object    AccountData `json:"_object"`
 }
 
-func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
+type AccountData struct {
+	LocalPart string `json:"local_part"`
+	RoomId    string `json:"room_id"`
+	Type      string `json:"type"`
+	Content   []byte `json:"content"`
+}
+
+type accountDataStatements struct {
+	db        *Database
+	tableName string
+}
+
+func (s *accountDataStatements) prepare(db *Database) (err error) {
 	s.db = db
-	_, err = db.Exec(accountDataSchema)
-	if err != nil {
-		return
-	}
-	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
-		return
-	}
-	if s.selectAccountDataStmt, err = db.Prepare(selectAccountDataSQL); err != nil {
-		return
-	}
-	if s.selectAccountDataByTypeStmt, err = db.Prepare(selectAccountDataByTypeSQL); err != nil {
-		return
-	}
+	s.tableName = "account_data"
 	return
 }
 
 func (s *accountDataStatements) insertAccountData(
-	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType string, content json.RawMessage,
+	ctx context.Context, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, localpart, roomID, dataType, content)
+
+	// 	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
+	// 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
+	var result = AccountData{
+		LocalPart: localpart,
+		RoomId:    roomID,
+		Type:      dataType,
+		Content:   content,
+	}
+
+	var config = cosmosdbapi.DefaultConfig()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
+	id := ""
+	if roomID == "" {
+		id = fmt.Sprintf("%s_%s", result.LocalPart, result.Type)
+	} else {
+		id = fmt.Sprintf("%s_%s_%s", result.LocalPart, result.RoomId, result.Type)
+	}
+
+	var dbData = AccountCosmosAccountData{
+		Id:        cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, id),
+		Cn:        dbCollectionName,
+		Pk:        cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
+		Timestamp: time.Now().Unix(),
+		Object:    result,
+	}
+
+	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		config.DatabaseName,
+		config.TenantName,
+		dbData,
+		options)
+
 	return err
 }
 
@@ -88,30 +114,43 @@ func (s *accountDataStatements) selectAccountData(
 	/* rooms */ map[string]map[string]json.RawMessage,
 	error,
 ) {
-	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart)
-	if err != nil {
-		return nil, nil, err
+	// 	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
+	var config = cosmosdbapi.DefaultConfig()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	response := []AccountCosmosAccountData{}
+	var selectAccountDataCosmos = "select * from c where c._cn = @x1 and c._object.local_part = @x2"
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": localpart,
+	}
+	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(selectAccountDataCosmos, params)
+	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		config.DatabaseName,
+		config.TenantName,
+		query,
+		&response,
+		options)
+
+	if ex != nil {
+		return nil, nil, ex
 	}
 
 	global := map[string]json.RawMessage{}
 	rooms := map[string]map[string]json.RawMessage{}
 
-	for rows.Next() {
-		var roomID string
-		var dataType string
-		var content []byte
-
-		if err = rows.Scan(&roomID, &dataType, &content); err != nil {
-			return nil, nil, err
-		}
-
+	for i := 0; i < len(response); i++ {
+		var row = response[i]
+		var roomID = row.Object.RoomId
 		if roomID != "" {
-			if _, ok := rooms[roomID]; !ok {
+			if _, ok := rooms[row.Object.RoomId]; !ok {
 				rooms[roomID] = map[string]json.RawMessage{}
 			}
-			rooms[roomID][dataType] = content
+			rooms[roomID][row.Object.Type] = row.Object.Content
 		} else {
-			global[dataType] = content
+			global[row.Object.Type] = row.Object.Content
 		}
 	}
 
@@ -122,13 +161,39 @@ func (s *accountDataStatements) selectAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
 ) (data json.RawMessage, err error) {
 	var bytes []byte
-	stmt := s.selectAccountDataByTypeStmt
-	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&bytes); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return
+
+	// 	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
+	var config = cosmosdbapi.DefaultConfig()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	response := []AccountCosmosAccountData{}
+	var selectAccountDataCosmos = "select * from c where c._cn = @x1 and c._object.local_part = @x2 and c._object.room_id = @x3 and c._object.type = @x4"
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": localpart,
+		"@x3": roomID,
+		"@x4": dataType,
 	}
+	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(selectAccountDataCosmos, params)
+	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		config.DatabaseName,
+		config.TenantName,
+		query,
+		&response,
+		options)
+
+	if ex != nil {
+		return nil, ex
+	}
+
+	if len(response) == 0 {
+		return data, nil
+	}
+
+	bytes = response[0].Object.Content
+
 	data = json.RawMessage(bytes)
 	return
 }

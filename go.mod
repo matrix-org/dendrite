@@ -37,6 +37,7 @@ require (
 	github.com/tidwall/sjson v1.1.5
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible
+	github.com/vippsas/go-cosmosdb v0.0.0-20200428065936-29dab535353d // indirect
 	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20210218094457-e77ca8019daa
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
