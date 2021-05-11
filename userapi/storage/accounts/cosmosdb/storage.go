@@ -15,29 +15,27 @@
 package cosmosdb
 
 import (
-	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"strconv"
-	"sync"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
+	// "sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // Database represents an account database
 type Database struct {
-	db     *sql.DB
-	writer sqlutil.Writer
-
 	sqlutil.PartitionOffsetStatements
 	accounts              accountsStatements
 	profiles              profilesStatements
@@ -48,55 +46,57 @@ type Database struct {
 	bcryptCost            int
 	openIDTokenLifetimeMS int64
 
-	accountsMu     sync.Mutex
-	profilesMu     sync.Mutex
-	accountDatasMu sync.Mutex
-	threepidsMu    sync.Mutex
+	databaseName string
+	connection   cosmosdbapi.CosmosConnection
 }
 
 // NewDatabase creates a new accounts and profiles database
 func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64) (*Database, error) {
-	dbProperties.ConnectionString = cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
-	db, err := sqlutil.Open(dbProperties)
-	if err != nil {
-		return nil, err
-	}
+	connString := cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
+	connMap := cosmosdbutil.GetConnectionProperties(string(connString))
+	accountEndpoint := connMap["AccountEndpoint"]
+	accountKey := connMap["AccountKey"]
+	conn := cosmosdbapi.GetCosmosConnection(accountEndpoint, accountKey)
+
 	d := &Database{
-		serverName:            serverName,
-		db:                    db,
-		writer:                sqlutil.NewExclusiveWriter(),
-		bcryptCost:            bcryptCost,
-		openIDTokenLifetimeMS: openIDTokenLifetimeMS,
+		serverName:   serverName,
+		databaseName: "userapi",
+		connection:   conn,
+		// db:                    db,
+		// writer:                sqlutil.NewExclusiveWriter(),
+		// bcryptCost:            bcryptCost,
+		// openIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
 	// and THEN prepare statements so we don't fail due to referencing new columns
-	if err = d.accounts.execSchema(db); err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadIsActive(m)
-	if err = m.RunDeltas(db, dbProperties); err != nil {
-		return nil, err
-	}
+	// if err = d.accounts.execSchema(db); err != nil {
+	// 	return nil, err
+	// }
+	// m := sqlutil.NewMigrations()
+	// deltas.LoadIsActive(m)
+	// if err = m.RunDeltas(db, dbProperties); err != nil {
+	// 	return nil, err
+	// }
 
-	partitions := sqlutil.PartitionOffsetStatements{}
-	if err = partitions.Prepare(db, d.writer, "account"); err != nil {
+	// partitions := sqlutil.PartitionOffsetStatements{}
+	// if err = partitions.Prepare(db, d.writer, "account"); err != nil {
+	// 	return nil, err
+	// }
+	var err error
+	if err = d.accounts.prepare(d, serverName); err != nil {
 		return nil, err
 	}
-	if err = d.accounts.prepare(db, serverName); err != nil {
+	if err = d.profiles.prepare(d); err != nil {
 		return nil, err
 	}
-	if err = d.profiles.prepare(db); err != nil {
+	if err = d.accountDatas.prepare(d); err != nil {
 		return nil, err
 	}
-	if err = d.accountDatas.prepare(db); err != nil {
+	if err = d.threepids.prepare(d); err != nil {
 		return nil, err
 	}
-	if err = d.threepids.prepare(db); err != nil {
-		return nil, err
-	}
-	if err = d.openIDTokens.prepare(db, serverName); err != nil {
+	if err = d.openIDTokens.prepare(d, serverName); err != nil {
 		return nil, err
 	}
 
@@ -131,11 +131,11 @@ func (d *Database) GetProfileByLocalpart(
 func (d *Database) SetAvatarURL(
 	ctx context.Context, localpart string, avatarURL string,
 ) error {
-	d.profilesMu.Lock()
-	defer d.profilesMu.Unlock()
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.profiles.setAvatarURL(ctx, txn, localpart, avatarURL)
-	})
+	// d.profilesMu.Lock()
+	// defer d.profilesMu.Unlock()
+	// return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+	// })
+	return d.profiles.setAvatarURL(ctx, localpart, avatarURL)
 }
 
 // SetDisplayName updates the display name of the profile associated with the given
@@ -143,11 +143,12 @@ func (d *Database) SetAvatarURL(
 func (d *Database) SetDisplayName(
 	ctx context.Context, localpart string, displayName string,
 ) error {
-	d.profilesMu.Lock()
-	defer d.profilesMu.Unlock()
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.profiles.setDisplayName(ctx, txn, localpart, displayName)
-	})
+	// d.profilesMu.Lock()
+	// defer d.profilesMu.Unlock()
+	// return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+	// 	return d.profiles.setDisplayName(ctx, txn, localpart, displayName)
+	// })
+	return d.profiles.setDisplayName(ctx, localpart, displayName)
 }
 
 // SetPassword sets the account password to the given hash.
@@ -170,22 +171,23 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, er
 	// when the first txn upgrades to a write txn. We also need to lock the account creation else we can
 	// race with CreateAccount
 	// We know we'll be the only process since this is sqlite ;) so a lock here will be all that is needed.
-	d.profilesMu.Lock()
-	d.accountDatasMu.Lock()
-	d.accountsMu.Lock()
-	defer d.profilesMu.Unlock()
-	defer d.accountDatasMu.Unlock()
-	defer d.accountsMu.Unlock()
-	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		var numLocalpart int64
-		numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
-		if err != nil {
-			return err
-		}
-		localpart := strconv.FormatInt(numLocalpart, 10)
-		acc, err = d.createAccount(ctx, txn, localpart, "", "")
-		return err
-	})
+
+	// d.profilesMu.Lock()
+	// d.accountDatasMu.Lock()
+	// d.accountsMu.Lock()
+	// defer d.profilesMu.Unlock()
+	// defer d.accountDatasMu.Unlock()
+	// defer d.accountsMu.Unlock()
+	// err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+	// })
+
+	var numLocalpart int64
+	numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx)
+	if err != nil {
+		return nil, err
+	}
+	localpart := strconv.FormatInt(numLocalpart, 10)
+	acc, err = d.createAccount(ctx, localpart, "", "")
 	return acc, err
 }
 
@@ -196,23 +198,25 @@ func (d *Database) CreateAccount(
 	ctx context.Context, localpart, plaintextPassword, appserviceID string,
 ) (acc *api.Account, err error) {
 	// Create one account at a time else we can get 'database is locked'.
-	d.profilesMu.Lock()
-	d.accountDatasMu.Lock()
-	d.accountsMu.Lock()
-	defer d.profilesMu.Unlock()
-	defer d.accountDatasMu.Unlock()
-	defer d.accountsMu.Unlock()
-	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
-		return err
-	})
-	return
+	// d.profilesMu.Lock()
+	// d.accountDatasMu.Lock()
+	// d.accountsMu.Lock()
+	// defer d.profilesMu.Unlock()
+	// defer d.accountDatasMu.Unlock()
+	// defer d.accountsMu.Unlock()
+	// err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+	// 	acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
+	// 	return err
+	// })
+
+	acc, err = d.createAccount(ctx, localpart, plaintextPassword, appserviceID)
+	return acc, err
 }
 
 // WARNING! This function assumes that the relevant mutexes have already
 // been taken out by the caller (e.g. CreateAccount or CreateGuestAccount).
 func (d *Database) createAccount(
-	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
+	ctx context.Context, localpart, plaintextPassword, appserviceID string,
 ) (*api.Account, error) {
 	var err error
 	var account *api.Account
@@ -224,13 +228,13 @@ func (d *Database) createAccount(
 			return nil, err
 		}
 	}
-	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID); err != nil {
+	if account, err = d.accounts.insertAccount(ctx, localpart, hash, appserviceID); err != nil {
 		return nil, sqlutil.ErrUserExists
 	}
-	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {
+	if err = d.profiles.insertProfile(ctx, localpart); err != nil {
 		return nil, err
 	}
-	if err = d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
+	if err = d.accountDatas.insertAccountData(ctx, localpart, "", "m.push_rules", json.RawMessage(`{
 		"global": {
 			"content": [],
 			"override": [],
@@ -252,11 +256,11 @@ func (d *Database) createAccount(
 func (d *Database) SaveAccountData(
 	ctx context.Context, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
-	d.accountDatasMu.Lock()
-	defer d.accountDatasMu.Unlock()
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.accountDatas.insertAccountData(ctx, txn, localpart, roomID, dataType, content)
-	})
+	// d.accountDatasMu.Lock()
+	// defer d.accountDatasMu.Unlock()
+	// return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+	// })
+	return d.accountDatas.insertAccountData(ctx, localpart, roomID, dataType, content)
 }
 
 // GetAccountData returns account data related to a given localpart
@@ -286,7 +290,7 @@ func (d *Database) GetAccountDataByType(
 func (d *Database) GetNewNumericLocalpart(
 	ctx context.Context,
 ) (int64, error) {
-	return d.accounts.selectNewNumericLocalpart(ctx, nil)
+	return d.accounts.selectNewNumericLocalpart(ctx)
 }
 
 func (d *Database) hashPassword(plaintext string) (hash string, err error) {
@@ -305,22 +309,23 @@ var Err3PIDInUse = errors.New("This third-party identifier is already in use")
 func (d *Database) SaveThreePIDAssociation(
 	ctx context.Context, threepid, localpart, medium string,
 ) (err error) {
-	d.threepidsMu.Lock()
-	defer d.threepidsMu.Unlock()
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		user, err := d.threepids.selectLocalpartForThreePID(
-			ctx, txn, threepid, medium,
-		)
-		if err != nil {
-			return err
-		}
+	// d.threepidsMu.Lock()
+	// defer d.threepidsMu.Unlock()
+	// return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+	// })
 
-		if len(user) > 0 {
-			return Err3PIDInUse
-		}
+	user, err := d.threepids.selectLocalpartForThreePID(
+		ctx, threepid, medium,
+	)
+	if err != nil {
+		return err
+	}
 
-		return d.threepids.insertThreePID(ctx, txn, threepid, medium, localpart)
-	})
+	if len(user) > 0 {
+		return Err3PIDInUse
+	}
+
+	return d.threepids.insertThreePID(ctx, threepid, medium, localpart)
 }
 
 // RemoveThreePIDAssociation removes the association involving a given third-party
@@ -330,11 +335,11 @@ func (d *Database) SaveThreePIDAssociation(
 func (d *Database) RemoveThreePIDAssociation(
 	ctx context.Context, threepid string, medium string,
 ) (err error) {
-	d.threepidsMu.Lock()
-	defer d.threepidsMu.Unlock()
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.threepids.deleteThreePID(ctx, txn, threepid, medium)
-	})
+	// d.threepidsMu.Lock()
+	// defer d.threepidsMu.Unlock()
+	// return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+	// })
+	return d.threepids.deleteThreePID(ctx, threepid, medium)
 }
 
 // GetLocalpartForThreePID looks up the localpart associated with a given third-party
@@ -345,7 +350,7 @@ func (d *Database) RemoveThreePIDAssociation(
 func (d *Database) GetLocalpartForThreePID(
 	ctx context.Context, threepid string, medium string,
 ) (localpart string, err error) {
-	return d.threepids.selectLocalpartForThreePID(ctx, nil, threepid, medium)
+	return d.threepids.selectLocalpartForThreePID(ctx, threepid, medium)
 }
 
 // GetThreePIDsForLocalpart looks up the third-party identifiers associated with
@@ -362,11 +367,11 @@ func (d *Database) GetThreePIDsForLocalpart(
 // in the database.
 // If the DB returns sql.ErrNoRows the Localpart isn't taken.
 func (d *Database) CheckAccountAvailability(ctx context.Context, localpart string) (bool, error) {
-	_, err := d.accounts.selectAccountByLocalpart(ctx, localpart)
-	if err == sql.ErrNoRows {
-		return true, nil
-	}
-	return false, err
+	response, err := d.accounts.selectAccountByLocalpart(ctx, localpart)
+	// if err == sql.ErrNoRows {
+	// 	return true, nil
+	// }
+	return response == nil, err
 }
 
 // GetAccountByLocalpart returns the account associated with the given localpart.
@@ -395,9 +400,9 @@ func (d *Database) CreateOpenIDToken(
 	token, localpart string,
 ) (int64, error) {
 	expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + d.openIDTokenLifetimeMS
-	err := d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.openIDTokens.insertToken(ctx, txn, token, localpart, expiresAtMS)
-	})
+	// err := d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+	// })
+	var err = d.openIDTokens.insertToken(ctx, token, localpart, expiresAtMS)
 	return expiresAtMS, err
 }
 

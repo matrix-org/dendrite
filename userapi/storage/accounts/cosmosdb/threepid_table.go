@@ -16,118 +16,190 @@ package cosmosdb
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
-const threepidSchema = `
--- Stores data about third party identifiers
-CREATE TABLE IF NOT EXISTS account_threepid (
-	-- The third party identifier
-	threepid TEXT NOT NULL,
-	-- The 3PID medium
-	medium TEXT NOT NULL DEFAULT 'email',
-	-- The localpart of the Matrix user ID associated to this 3PID
-	localpart TEXT NOT NULL,
+// const threepidSchema = `
+// -- Stores data about third party identifiers
+// CREATE TABLE IF NOT EXISTS account_threepid (
+// 	-- The third party identifier
+// 	threepid TEXT NOT NULL,
+// 	-- The 3PID medium
+// 	medium TEXT NOT NULL DEFAULT 'email',
+// 	-- The localpart of the Matrix user ID associated to this 3PID
+// 	localpart TEXT NOT NULL,
 
-	PRIMARY KEY(threepid, medium)
-);
+// 	PRIMARY KEY(threepid, medium)
+// );
 
-CREATE INDEX IF NOT EXISTS account_threepid_localpart ON account_threepid(localpart);
-`
-
-const selectLocalpartForThreePIDSQL = "" +
-	"SELECT localpart FROM account_threepid WHERE threepid = $1 AND medium = $2"
-
-const selectThreePIDsForLocalpartSQL = "" +
-	"SELECT threepid, medium FROM account_threepid WHERE localpart = $1"
-
-const insertThreePIDSQL = "" +
-	"INSERT INTO account_threepid (threepid, medium, localpart) VALUES ($1, $2, $3)"
-
-const deleteThreePIDSQL = "" +
-	"DELETE FROM account_threepid WHERE threepid = $1 AND medium = $2"
-
-type threepidStatements struct {
-	db                              *sql.DB
-	selectLocalpartForThreePIDStmt  *sql.Stmt
-	selectThreePIDsForLocalpartStmt *sql.Stmt
-	insertThreePIDStmt              *sql.Stmt
-	deleteThreePIDStmt              *sql.Stmt
+type ThreePIDCosmos struct {
+	Localpart string `json:"local_part"`
+	ThreePID  string `json:"three_pid"`
+	Medium    string `json:"medium"`
 }
 
-func (s *threepidStatements) prepare(db *sql.DB) (err error) {
-	s.db = db
-	_, err = db.Exec(threepidSchema)
-	if err != nil {
-		return
-	}
-	if s.selectLocalpartForThreePIDStmt, err = db.Prepare(selectLocalpartForThreePIDSQL); err != nil {
-		return
-	}
-	if s.selectThreePIDsForLocalpartStmt, err = db.Prepare(selectThreePIDsForLocalpartSQL); err != nil {
-		return
-	}
-	if s.insertThreePIDStmt, err = db.Prepare(insertThreePIDSQL); err != nil {
-		return
-	}
-	if s.deleteThreePIDStmt, err = db.Prepare(deleteThreePIDSQL); err != nil {
-		return
-	}
+type ThreePIDCosmosData struct {
+	Id        string         `json:"id"`
+	Pk        string         `json:"_pk"`
+	Cn        string         `json:"_cn"`
+	ETag      string         `json:"_etag"`
+	Timestamp int64          `json:"_ts"`
+	ThreePID  ThreePIDCosmos `json:"mx_userapi_threepid"`
+}
 
+type threepidStatements struct {
+	db                              *Database
+	selectLocalpartForThreePIDStmt  string
+	selectThreePIDsForLocalpartStmt string
+	// insertThreePIDStmt              *sql.Stmt
+	// deleteThreePIDStmt              *sql.Stmt
+	tableName string
+}
+
+func (s *threepidStatements) prepare(db *Database) (err error) {
+	s.db = db
+	s.selectLocalpartForThreePIDStmt = "select * from c where c._cn = @x1 and c.mx_userapi_threepid.three_pid = @x2 and c.mx_userapi_threepid.medium = @x3"
+	s.selectThreePIDsForLocalpartStmt = "select * from c where c._cn = @x1 and c.mx_userapi_threepid.local_part = @x2"
+	s.tableName = "account_threepid"
 	return
 }
 
 func (s *threepidStatements) selectLocalpartForThreePID(
-	ctx context.Context, txn *sql.Tx, threepid string, medium string,
+	ctx context.Context, threepid string, medium string,
 ) (localpart string, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectLocalpartForThreePIDStmt)
-	err = stmt.QueryRowContext(ctx, threepid, medium).Scan(&localpart)
-	if err == sql.ErrNoRows {
+
+	// "SELECT localpart FROM account_threepid WHERE threepid = $1 AND medium = $2"
+	var config = cosmosdbapi.DefaultConfig()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.threepids.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	response := []ThreePIDCosmosData{}
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": threepid,
+		"@x3": medium,
+	}
+	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(s.selectLocalpartForThreePIDStmt, params)
+	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		config.DatabaseName,
+		config.TenantName,
+		query,
+		&response,
+		options)
+
+	if ex != nil {
+		return "", ex
+	}
+
+	if len(response) == 0 {
 		return "", nil
 	}
-	return
+
+	return response[0].ThreePID.Localpart, nil
 }
 
 func (s *threepidStatements) selectThreePIDsForLocalpart(
 	ctx context.Context, localpart string,
 ) (threepids []authtypes.ThreePID, err error) {
-	rows, err := s.selectThreePIDsForLocalpartStmt.QueryContext(ctx, localpart)
-	if err != nil {
-		return
+
+	// "SELECT threepid, medium FROM account_threepid WHERE localpart = $1"
+	var config = cosmosdbapi.DefaultConfig()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.threepids.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	response := []ThreePIDCosmosData{}
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": localpart,
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectThreePIDsForLocalpart: rows.close() failed")
+	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(s.selectThreePIDsForLocalpartStmt, params)
+	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		config.DatabaseName,
+		config.TenantName,
+		query,
+		&response,
+		options)
+
+	if ex != nil {
+		return threepids, ex
+	}
+
+	if len(response) == 0 {
+		return threepids, nil
+	}
 
 	threepids = []authtypes.ThreePID{}
-	for rows.Next() {
-		var threepid string
-		var medium string
-		if err = rows.Scan(&threepid, &medium); err != nil {
-			return
-		}
+	for _, item := range response {
 		threepids = append(threepids, authtypes.ThreePID{
-			Address: threepid,
-			Medium:  medium,
+			Address: item.ThreePID.ThreePID,
+			Medium:  item.ThreePID.Medium,
 		})
 	}
-	return threepids, rows.Err()
+	return threepids, nil
 }
 
 func (s *threepidStatements) insertThreePID(
-	ctx context.Context, txn *sql.Tx, threepid, medium, localpart string,
+	ctx context.Context, threepid, medium, localpart string,
 ) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.insertThreePIDStmt)
-	_, err = stmt.ExecContext(ctx, threepid, medium, localpart)
-	return err
+
+	// "INSERT INTO account_threepid (threepid, medium, localpart) VALUES ($1, $2, $3)"
+	var result = ThreePIDCosmos{
+		Localpart: localpart,
+		Medium:    medium,
+		ThreePID:  threepid,
+	}
+
+	var config = cosmosdbapi.DefaultConfig()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
+
+	id := fmt.Sprintf("%s_%s", threepid, medium)
+	var dbData = ThreePIDCosmosData{
+		Id:        cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, id),
+		Cn:        dbCollectionName,
+		Pk:        cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
+		Timestamp: time.Now().Unix(),
+		ThreePID:  result,
+	}
+
+	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		config.DatabaseName,
+		config.TenantName,
+		dbData,
+		options)
+
+	if err != nil {
+		return err
+	}
+	return
 }
 
 func (s *threepidStatements) deleteThreePID(
-	ctx context.Context, txn *sql.Tx, threepid string, medium string) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.deleteThreePIDStmt)
-	_, err = stmt.ExecContext(ctx, threepid, medium)
-	return err
+	ctx context.Context, threepid string, medium string) (err error) {
+
+	// "DELETE FROM account_threepid WHERE threepid = $1 AND medium = $2"
+	var config = cosmosdbapi.DefaultConfig()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
+	id := fmt.Sprintf("%s_%s", threepid, medium)
+	pk := cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var options = cosmosdbapi.GetDeleteDocumentOptions(pk)
+	_, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
+		ctx,
+		config.DatabaseName,
+		config.TenantName,
+		id,
+		options)
+
+	if err != nil {
+		return err
+	}
+	return
 }
