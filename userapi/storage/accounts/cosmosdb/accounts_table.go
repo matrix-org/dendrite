@@ -45,20 +45,23 @@ import (
 // );
 // `
 
-type AccountExtended struct {
-	IsDeactivated bool   `json:"is_deactivated"`
-	PasswordHash  string `json:"password_hash"`
-	Created       int64  `json:"created_ts"`
+type AccountCosmos struct {
+	UserID        string                       `json:"user_id"`
+	Localpart     string                       `json:"local_part"`
+	ServerName    gomatrixserverlib.ServerName `json:"server_name"`
+	AppServiceID  string                       `json:"app_service_id"`
+	IsDeactivated bool                         `json:"is_deactivated"`
+	PasswordHash  string                       `json:"password_hash"`
+	Created       int64                        `json:"created_ts"`
 }
 
 type AccountCosmosData struct {
-	Id             string          `json:"id"`
-	Pk             string          `json:"_pk"`
-	Cn             string          `json:"_cn"`
-	ETag           string          `json:"_etag"`
-	Timestamp      int64           `json:"_ts"`
-	Object         api.Account     `json:"_object"`
-	ObjectExtended AccountExtended `json:"_object_extended"`
+	Id        string        `json:"id"`
+	Pk        string        `json:"_pk"`
+	Cn        string        `json:"_cn"`
+	ETag      string        `json:"_etag"`
+	Timestamp int64         `json:"_ts"`
+	Account   AccountCosmos `json:"mx_userapi_account"`
 }
 
 type AccountCosmosUserCount struct {
@@ -66,13 +69,19 @@ type AccountCosmosUserCount struct {
 }
 
 type accountsStatements struct {
-	db         *Database
-	tableName  string
-	serverName gomatrixserverlib.ServerName
+	db                            *Database
+	selectAccountByLocalpartStmt  string
+	selectPasswordHashStmt        string
+	selectNewNumericLocalpartStmt string
+	tableName                     string
+	serverName                    gomatrixserverlib.ServerName
 }
 
 func (s *accountsStatements) prepare(db *Database, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
+	s.selectPasswordHashStmt = "select * from c where c._cn = @x1 and c.mx_userapi_account.local_part = @x2 and c.mx_userapi_account.is_deactivated = false"
+	s.selectAccountByLocalpartStmt = "select * from c where c._cn = @x1 and c.mx_userapi_account.local_part = @x2"
+	s.selectNewNumericLocalpartStmt = "select count(c._ts) as usercount from c where c._cn = @x1"
 	s.tableName = "account_accounts"
 	s.serverName = server
 	return
@@ -104,6 +113,24 @@ func setAccount(s *accountsStatements, ctx context.Context, config cosmosdbapi.T
 	return &response, ex
 }
 
+func mapFromAccount(db AccountCosmos) api.Account {
+	return api.Account{
+		AppServiceID: db.AppServiceID,
+		Localpart:    db.Localpart,
+		ServerName:   db.ServerName,
+		UserID:       db.UserID,
+	}
+}
+
+func mapToAccount(api api.Account) AccountCosmos {
+	return AccountCosmos{
+		AppServiceID: api.AppServiceID,
+		Localpart:    api.Localpart,
+		ServerName:   api.ServerName,
+		UserID:       api.UserID,
+	}
+}
+
 // insertAccount creates a new account. 'hash' should be the password hash for this account. If it is missing,
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
@@ -120,22 +147,21 @@ func (s *accountsStatements) insertAccount(
 		AppServiceID: appserviceID,
 	}
 
-	var extended = AccountExtended{
-		IsDeactivated: false,
-		PasswordHash:  hash,
-		Created:       createdTimeMS,
-	}
+	//Add the extra properties not on the API
+	var data = mapToAccount(result)
+	data.Created = createdTimeMS
+	data.PasswordHash = hash
+	data.IsDeactivated = false
 
 	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 
 	var dbData = AccountCosmosData{
-		Id:             cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, result.Localpart),
-		Cn:             dbCollectionName,
-		Pk:             cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
-		Timestamp:      time.Now().Unix(),
-		Object:         result,
-		ObjectExtended: extended,
+		Id:        cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, result.Localpart),
+		Cn:        dbCollectionName,
+		Pk:        cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
+		Timestamp: time.Now().Unix(),
+		Account:   data,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
@@ -168,7 +194,7 @@ func (s *accountsStatements) updatePassword(
 		return exGet
 	}
 
-	response.ObjectExtended.PasswordHash = passwordHash
+	response.Account.PasswordHash = passwordHash
 
 	var _, exReplace = setAccount(s, ctx, config, pk, *response)
 	if exReplace != nil {
@@ -192,7 +218,7 @@ func (s *accountsStatements) deactivateAccount(
 		return exGet
 	}
 
-	response.ObjectExtended.IsDeactivated = true
+	response.Account.IsDeactivated = true
 
 	var _, exReplace = setAccount(s, ctx, config, pk, *response)
 	if exReplace != nil {
@@ -210,13 +236,12 @@ func (s *accountsStatements) selectPasswordHash(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
 	response := []AccountCosmosData{}
-	var selectPasswordHashCosmos = "select * from c where c._cn = @x1 and c._object.Localpart = @x2 and c._object_extended.is_deactivated = false"
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 	}
 	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectPasswordHashCosmos, params)
+	var query = cosmosdbapi.GetQuery(s.selectPasswordHashStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		config.DatabaseName,
@@ -237,7 +262,7 @@ func (s *accountsStatements) selectPasswordHash(
 		return "", errors.New(fmt.Sprintf("Localpart %s has multiple entries", localpart))
 	}
 
-	return response[0].ObjectExtended.PasswordHash, nil
+	return response[0].Account.PasswordHash, nil
 }
 
 func (s *accountsStatements) selectAccountByLocalpart(
@@ -250,13 +275,12 @@ func (s *accountsStatements) selectAccountByLocalpart(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
 	response := []AccountCosmosData{}
-	var selectPasswordHashCosmos = "select * from c where c._cn = @x1 and c._object.Localpart = @x2"
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 	}
 	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectPasswordHashCosmos, params)
+	var query = cosmosdbapi.GetQuery(s.selectAccountByLocalpartStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		config.DatabaseName,
@@ -273,7 +297,7 @@ func (s *accountsStatements) selectAccountByLocalpart(
 		return nil, nil
 	}
 
-	acc = response[0].Object
+	acc = mapFromAccount(response[0].Account)
 	acc.UserID = userutil.MakeUserID(localpart, s.serverName)
 	acc.ServerName = s.serverName
 
@@ -289,12 +313,11 @@ func (s *accountsStatements) selectNewNumericLocalpart(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
 	var response []AccountCosmosUserCount
-	var selectCountCosmos = "select count(c._ts) as usercount from c where c._cn = @x1"
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 	}
 	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectCountCosmos, params)
+	var query = cosmosdbapi.GetQuery(s.selectNewNumericLocalpartStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		config.DatabaseName,

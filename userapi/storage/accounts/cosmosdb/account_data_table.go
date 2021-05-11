@@ -39,16 +39,16 @@ import (
 // );
 // `
 
-type AccountCosmosAccountData struct {
-	Id        string      `json:"id"`
-	Pk        string      `json:"_pk"`
-	Cn        string      `json:"_cn"`
-	ETag      string      `json:"_etag"`
-	Timestamp int64       `json:"_ts"`
-	Object    AccountData `json:"_object"`
+type AccountDataCosmosData struct {
+	Id          string            `json:"id"`
+	Pk          string            `json:"_pk"`
+	Cn          string            `json:"_cn"`
+	ETag        string            `json:"_etag"`
+	Timestamp   int64             `json:"_ts"`
+	AccountData AccountDataCosmos `json:"mx_userapi_accountdata"`
 }
 
-type AccountData struct {
+type AccountDataCosmos struct {
 	LocalPart string `json:"local_part"`
 	RoomId    string `json:"room_id"`
 	Type      string `json:"type"`
@@ -56,12 +56,17 @@ type AccountData struct {
 }
 
 type accountDataStatements struct {
-	db        *Database
-	tableName string
+	db *Database
+	// insertAccountDataStmt       *sql.Stmt
+	selectAccountDataStmt       string
+	selectAccountDataByTypeStmt string
+	tableName                   string
 }
 
 func (s *accountDataStatements) prepare(db *Database) (err error) {
 	s.db = db
+	s.selectAccountDataStmt = "select * from c where c._cn = @x1 and c.mx_userapi_accountdata.local_part = @x2"
+	s.selectAccountDataByTypeStmt = "select * from c where c._cn = @x1 and c.mx_userapi_accountdata.local_part = @x2 and c.mx_userapi_accountdata.room_id = @x3 and c.mx_userapi_accountdata.type = @x4"
 	s.tableName = "account_data"
 	return
 }
@@ -72,7 +77,7 @@ func (s *accountDataStatements) insertAccountData(
 
 	// 	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
 	// 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
-	var result = AccountData{
+	var result = AccountDataCosmos{
 		LocalPart: localpart,
 		RoomId:    roomID,
 		Type:      dataType,
@@ -88,12 +93,12 @@ func (s *accountDataStatements) insertAccountData(
 		id = fmt.Sprintf("%s_%s_%s", result.LocalPart, result.RoomId, result.Type)
 	}
 
-	var dbData = AccountCosmosAccountData{
-		Id:        cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, id),
-		Cn:        dbCollectionName,
-		Pk:        cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
-		Timestamp: time.Now().Unix(),
-		Object:    result,
+	var dbData = AccountDataCosmosData{
+		Id:          cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, id),
+		Cn:          dbCollectionName,
+		Pk:          cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
+		Timestamp:   time.Now().Unix(),
+		AccountData: result,
 	}
 
 	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
@@ -118,14 +123,13 @@ func (s *accountDataStatements) selectAccountData(
 	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
 	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
-	response := []AccountCosmosAccountData{}
-	var selectAccountDataCosmos = "select * from c where c._cn = @x1 and c._object.local_part = @x2"
+	response := []AccountDataCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 	}
 	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectAccountDataCosmos, params)
+	var query = cosmosdbapi.GetQuery(s.selectAccountDataStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		config.DatabaseName,
@@ -143,14 +147,14 @@ func (s *accountDataStatements) selectAccountData(
 
 	for i := 0; i < len(response); i++ {
 		var row = response[i]
-		var roomID = row.Object.RoomId
+		var roomID = row.AccountData.RoomId
 		if roomID != "" {
-			if _, ok := rooms[row.Object.RoomId]; !ok {
+			if _, ok := rooms[row.AccountData.RoomId]; !ok {
 				rooms[roomID] = map[string]json.RawMessage{}
 			}
-			rooms[roomID][row.Object.Type] = row.Object.Content
+			rooms[roomID][row.AccountData.Type] = row.AccountData.Content
 		} else {
-			global[row.Object.Type] = row.Object.Content
+			global[row.AccountData.Type] = row.AccountData.Content
 		}
 	}
 
@@ -166,8 +170,7 @@ func (s *accountDataStatements) selectAccountDataByType(
 	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
 	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
-	response := []AccountCosmosAccountData{}
-	var selectAccountDataCosmos = "select * from c where c._cn = @x1 and c._object.local_part = @x2 and c._object.room_id = @x3 and c._object.type = @x4"
+	response := []AccountDataCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
@@ -175,7 +178,7 @@ func (s *accountDataStatements) selectAccountDataByType(
 		"@x4": dataType,
 	}
 	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectAccountDataCosmos, params)
+	var query = cosmosdbapi.GetQuery(s.selectAccountDataByTypeStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		config.DatabaseName,
@@ -192,7 +195,7 @@ func (s *accountDataStatements) selectAccountDataByType(
 		return data, nil
 	}
 
-	bytes = response[0].Object.Content
+	bytes = response[0].AccountData.Content
 
 	data = json.RawMessage(bytes)
 	return

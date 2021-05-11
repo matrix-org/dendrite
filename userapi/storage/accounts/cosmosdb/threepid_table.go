@@ -37,7 +37,7 @@ import (
 // 	PRIMARY KEY(threepid, medium)
 // );
 
-type ThreePIDObject struct {
+type ThreePIDCosmos struct {
 	Localpart string `json:"local_part"`
 	ThreePID  string `json:"three_pid"`
 	Medium    string `json:"medium"`
@@ -49,16 +49,22 @@ type ThreePIDCosmosData struct {
 	Cn        string         `json:"_cn"`
 	ETag      string         `json:"_etag"`
 	Timestamp int64          `json:"_ts"`
-	Object    ThreePIDObject `json:"_object"`
+	ThreePID  ThreePIDCosmos `json:"mx_userapi_threepid"`
 }
 
 type threepidStatements struct {
-	db        *Database
+	db                              *Database
+	selectLocalpartForThreePIDStmt  string
+	selectThreePIDsForLocalpartStmt string
+	// insertThreePIDStmt              *sql.Stmt
+	// deleteThreePIDStmt              *sql.Stmt
 	tableName string
 }
 
 func (s *threepidStatements) prepare(db *Database) (err error) {
 	s.db = db
+	s.selectLocalpartForThreePIDStmt = "select * from c where c._cn = @x1 and c.mx_userapi_threepid.three_pid = @x2 and c.mx_userapi_threepid.medium = @x3"
+	s.selectThreePIDsForLocalpartStmt = "select * from c where c._cn = @x1 and c.mx_userapi_threepid.local_part = @x2"
 	s.tableName = "account_threepid"
 	return
 }
@@ -72,14 +78,13 @@ func (s *threepidStatements) selectLocalpartForThreePID(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.threepids.tableName)
 	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
 	response := []ThreePIDCosmosData{}
-	var selectLocalPartThreePIDCosmos = "select * from c where c._cn = @x1 and c._object.three_pid = @x2 and c._object.medium = @x3"
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": threepid,
 		"@x3": medium,
 	}
 	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectLocalPartThreePIDCosmos, params)
+	var query = cosmosdbapi.GetQuery(s.selectLocalpartForThreePIDStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		config.DatabaseName,
@@ -96,7 +101,7 @@ func (s *threepidStatements) selectLocalpartForThreePID(
 		return "", nil
 	}
 
-	return response[0].Object.Localpart, nil
+	return response[0].ThreePID.Localpart, nil
 }
 
 func (s *threepidStatements) selectThreePIDsForLocalpart(
@@ -108,13 +113,12 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.threepids.tableName)
 	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
 	response := []ThreePIDCosmosData{}
-	var selectThreePIDLocalPartCosmos = "select * from c where c._cn = @x1 and c._object.local_part = @x2"
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 	}
 	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectThreePIDLocalPartCosmos, params)
+	var query = cosmosdbapi.GetQuery(s.selectThreePIDsForLocalpartStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		config.DatabaseName,
@@ -134,8 +138,8 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 	threepids = []authtypes.ThreePID{}
 	for _, item := range response {
 		threepids = append(threepids, authtypes.ThreePID{
-			Address: item.Object.ThreePID,
-			Medium:  item.Object.Medium,
+			Address: item.ThreePID.ThreePID,
+			Medium:  item.ThreePID.Medium,
 		})
 	}
 	return threepids, nil
@@ -146,7 +150,7 @@ func (s *threepidStatements) insertThreePID(
 ) (err error) {
 
 	// "INSERT INTO account_threepid (threepid, medium, localpart) VALUES ($1, $2, $3)"
-	var result = ThreePIDObject{
+	var result = ThreePIDCosmos{
 		Localpart: localpart,
 		Medium:    medium,
 		ThreePID:  threepid,
@@ -161,7 +165,7 @@ func (s *threepidStatements) insertThreePID(
 		Cn:        dbCollectionName,
 		Pk:        cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
 		Timestamp: time.Now().Unix(),
-		Object:    result,
+		ThreePID:  result,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
