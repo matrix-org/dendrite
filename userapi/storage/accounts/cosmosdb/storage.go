@@ -48,20 +48,19 @@ type Database struct {
 
 	databaseName string
 	connection   cosmosdbapi.CosmosConnection
+	cosmosConfig cosmosdbapi.CosmosConfig
 }
 
 // NewDatabase creates a new accounts and profiles database
 func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64) (*Database, error) {
-	connString := cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
-	connMap := cosmosdbutil.GetConnectionProperties(string(connString))
-	accountEndpoint := connMap["AccountEndpoint"]
-	accountKey := connMap["AccountKey"]
-	conn := cosmosdbapi.GetCosmosConnection(accountEndpoint, accountKey)
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	config := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
 
 	d := &Database{
 		serverName:   serverName,
 		databaseName: "userapi",
 		connection:   conn,
+		cosmosConfig: config,
 		// db:                    db,
 		// writer:                sqlutil.NewExclusiveWriter(),
 		// bcryptCost:            bcryptCost,

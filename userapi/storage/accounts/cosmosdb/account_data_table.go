@@ -84,7 +84,6 @@ func (s *accountDataStatements) insertAccountData(
 		Content:   content,
 	}
 
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
 	id := ""
 	if roomID == "" {
@@ -94,9 +93,9 @@ func (s *accountDataStatements) insertAccountData(
 	}
 
 	var dbData = AccountDataCosmosData{
-		Id:          cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, id),
+		Id:          cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, id),
 		Cn:          dbCollectionName,
-		Pk:          cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
+		Pk:          cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
 		Timestamp:   time.Now().Unix(),
 		AccountData: result,
 	}
@@ -104,8 +103,8 @@ func (s *accountDataStatements) insertAccountData(
 	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
 	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		dbData,
 		options)
 
@@ -120,9 +119,8 @@ func (s *accountDataStatements) selectAccountData(
 	error,
 ) {
 	// 	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	response := []AccountDataCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
@@ -132,8 +130,8 @@ func (s *accountDataStatements) selectAccountData(
 	var query = cosmosdbapi.GetQuery(s.selectAccountDataStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		query,
 		&response,
 		options)
@@ -167,9 +165,8 @@ func (s *accountDataStatements) selectAccountDataByType(
 	var bytes []byte
 
 	// 	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	response := []AccountDataCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
@@ -181,8 +178,8 @@ func (s *accountDataStatements) selectAccountDataByType(
 	var query = cosmosdbapi.GetQuery(s.selectAccountDataByTypeStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		query,
 		&response,
 		options)

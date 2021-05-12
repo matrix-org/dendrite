@@ -74,9 +74,8 @@ func (s *threepidStatements) selectLocalpartForThreePID(
 ) (localpart string, err error) {
 
 	// "SELECT localpart FROM account_threepid WHERE threepid = $1 AND medium = $2"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.threepids.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	response := []ThreePIDCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
@@ -87,8 +86,8 @@ func (s *threepidStatements) selectLocalpartForThreePID(
 	var query = cosmosdbapi.GetQuery(s.selectLocalpartForThreePIDStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		query,
 		&response,
 		options)
@@ -109,9 +108,8 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 ) (threepids []authtypes.ThreePID, err error) {
 
 	// "SELECT threepid, medium FROM account_threepid WHERE localpart = $1"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.threepids.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	response := []ThreePIDCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
@@ -121,8 +119,8 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 	var query = cosmosdbapi.GetQuery(s.selectThreePIDsForLocalpartStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		query,
 		&response,
 		options)
@@ -156,14 +154,14 @@ func (s *threepidStatements) insertThreePID(
 		ThreePID:  threepid,
 	}
 
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 
-	id := fmt.Sprintf("%s_%s", threepid, medium)
+	docId := fmt.Sprintf("%s_%s", threepid, medium)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
 	var dbData = ThreePIDCosmosData{
-		Id:        cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, id),
+		Id:        cosmosDocId,
 		Cn:        dbCollectionName,
-		Pk:        cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
+		Pk:        cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
 		Timestamp: time.Now().Unix(),
 		ThreePID:  result,
 	}
@@ -171,8 +169,8 @@ func (s *threepidStatements) insertThreePID(
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
 	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		dbData,
 		options)
 
@@ -186,16 +184,16 @@ func (s *threepidStatements) deleteThreePID(
 	ctx context.Context, threepid string, medium string) (err error) {
 
 	// "DELETE FROM account_threepid WHERE threepid = $1 AND medium = $2"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	id := fmt.Sprintf("%s_%s", threepid, medium)
-	pk := cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	docId := fmt.Sprintf("%s_%s", threepid, medium)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	var options = cosmosdbapi.GetDeleteDocumentOptions(pk)
 	_, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
-		id,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		cosmosDocId,
 		options)
 
 	if err != nil {

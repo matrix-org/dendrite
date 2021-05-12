@@ -16,7 +16,6 @@
 package cosmosdb
 
 import (
-	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"context"
 
 	"golang.org/x/crypto/ed25519"
@@ -45,7 +44,6 @@ func NewDatabase(
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (*Database, error) {
-	dbProperties.ConnectionString = cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err

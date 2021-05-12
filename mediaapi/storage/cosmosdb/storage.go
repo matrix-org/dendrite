@@ -16,7 +16,6 @@
 package cosmosdb
 
 import (
-	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"context"
 	"database/sql"
 
@@ -37,7 +36,6 @@ type Database struct {
 
 // Open opens a postgres database.
 func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
-	dbProperties.ConnectionString = cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
 	d := Database{
 		writer: sqlutil.NewExclusiveWriter(),
 	}

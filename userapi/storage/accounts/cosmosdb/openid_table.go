@@ -85,13 +85,12 @@ func (s *tokenStatements) insertToken(
 		ExpiresAtMS: expiresAtMS,
 	}
 
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
 
 	var dbData = OpenIdTokenCosmosData{
-		Id:          cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, result.Token),
+		Id:          cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, result.Token),
 		Cn:          dbCollectionName,
-		Pk:          cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
+		Pk:          cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
 		Timestamp:   time.Now().Unix(),
 		OpenIdToken: mapToToken(*result),
 	}
@@ -99,8 +98,8 @@ func (s *tokenStatements) insertToken(
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		dbData,
 		options)
 
@@ -120,9 +119,8 @@ func (s *tokenStatements) selectOpenIDTokenAtrributes(
 	var openIDTokenAttrs api.OpenIDTokenAttributes
 
 	// "SELECT localpart, token_expires_at_ms FROM open_id_tokens WHERE token = $1"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	response := []OpenIdTokenCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
@@ -132,8 +130,8 @@ func (s *tokenStatements) selectOpenIDTokenAtrributes(
 	var query = cosmosdbapi.GetQuery(s.selectTokenStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		query,
 		&response,
 		options)

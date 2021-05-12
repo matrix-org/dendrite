@@ -1,7 +1,6 @@
 package kafka
 
 import (
-	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/naffka"
@@ -47,8 +46,9 @@ func setupNaffka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 	if naffkaInstance != nil {
 		return naffkaInstance, naffkaInstance
 	}
-	if(cfg.Database.ConnectionString.IsCosmosDB()) {
-		cfg.Database.ConnectionString = cosmosdbutil.GetConnectionString(&cfg.Database.ConnectionString)
+	if cfg.Database.ConnectionString.IsCosmosDB() {
+		//TODO: What do we do for Nafka
+		// cfg.Database.ConnectionString = cosmosdbutil.GetConnectionString(&cfg.Database.ConnectionString)
 	}
 
 	naffkaDB, err := naffkaStorage.NewDatabase(string(cfg.Database.ConnectionString))

@@ -15,16 +15,18 @@
 package cosmosdb
 
 import (
-	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3/deltas"
+
 	"github.com/matrix-org/gomatrixserverlib"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -35,35 +37,32 @@ var deviceIDByteLength = 6
 
 // Database represents a device database.
 type Database struct {
-	db      *sql.DB
-	writer  sqlutil.Writer
-	devices devicesStatements
+	writer       sqlutil.Writer
+	devices      devicesStatements
+	connection   cosmosdbapi.CosmosConnection
+	databaseName string
+	cosmosConfig cosmosdbapi.CosmosConfig
+	serverName   gomatrixserverlib.ServerName
 }
 
 // NewDatabase creates a new device database
 func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (*Database, error) {
-	dbProperties.ConnectionString = cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
-	db, err := sqlutil.Open(dbProperties)
-	if err != nil {
-		return nil, err
-	}
-	writer := sqlutil.NewExclusiveWriter()
-	d := devicesStatements{}
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	config := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
+	devices := devicesStatements{}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
 	// and THEN prepare statements so we don't fail due to referencing new columns
-	if err = d.execSchema(db); err != nil {
-		return nil, err
+	d := &Database{
+		databaseName: "userapi",
+		devices:      devices,
+		serverName:   serverName,
+		connection:   conn,
+		cosmosConfig: config,
 	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadLastSeenTSIP(m)
-	if err = m.RunDeltas(db, dbProperties); err != nil {
-		return nil, err
-	}
-	if err = d.prepare(db, writer, serverName); err != nil {
-		return nil, err
-	}
-	return &Database{db, writer, d}, nil
+	err := d.devices.prepare(d, serverName)
+
+	return d, err
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.
@@ -86,7 +85,7 @@ func (d *Database) GetDeviceByID(
 func (d *Database) GetDevicesByLocalpart(
 	ctx context.Context, localpart string,
 ) ([]api.Device, error) {
-	return d.devices.selectDevicesByLocalpart(ctx, nil, localpart, "")
+	return d.devices.selectDevicesByLocalpart(ctx, localpart, "")
 }
 
 func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
@@ -104,16 +103,14 @@ func (d *Database) CreateDevice(
 	displayName *string, ipAddr, userAgent string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
-		returnErr = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-			var err error
-			// Revoke existing tokens for this device
-			if err = d.devices.deleteDevice(ctx, txn, *deviceID, localpart); err != nil {
-				return err
-			}
+		var err error
+		// Revoke existing tokens for this device
+		if err = d.devices.deleteDevice(ctx, *deviceID, localpart); err != nil {
+			return nil, err
+		}
 
-			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken, displayName, ipAddr, userAgent)
-			return err
-		})
+		dev, err = d.devices.insertDevice(ctx, *deviceID, localpart, accessToken, displayName, ipAddr, userAgent)
+		return dev, err
 	} else {
 		// We generate device IDs in a loop in case its already taken.
 		// We cap this at going round 5 times to ensure we don't spin forever
@@ -124,11 +121,9 @@ func (d *Database) CreateDevice(
 				return
 			}
 
-			returnErr = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-				var err error
-				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName, ipAddr, userAgent)
-				return err
-			})
+			var err error
+			dev, err = d.devices.insertDevice(ctx, newDeviceID, localpart, accessToken, displayName, ipAddr, userAgent)
+			return dev, err
 			if returnErr == nil {
 				return
 			}
@@ -154,9 +149,7 @@ func generateDeviceID() (string, error) {
 func (d *Database) UpdateDevice(
 	ctx context.Context, localpart, deviceID string, displayName *string,
 ) error {
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.devices.updateDeviceName(ctx, txn, localpart, deviceID, displayName)
-	})
+	return d.devices.updateDeviceName(ctx, localpart, deviceID, displayName)
 }
 
 // RemoveDevice revokes a device by deleting the entry in the database
@@ -166,12 +159,10 @@ func (d *Database) UpdateDevice(
 func (d *Database) RemoveDevice(
 	ctx context.Context, deviceID, localpart string,
 ) error {
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		if err := d.devices.deleteDevice(ctx, txn, deviceID, localpart); err != sql.ErrNoRows {
-			return err
-		}
-		return nil
-	})
+	if err := d.devices.deleteDevice(ctx, deviceID, localpart); err != nil {
+		return err
+	}
+	return nil
 }
 
 // RemoveDevices revokes one or more devices by deleting the entry in the database
@@ -181,12 +172,10 @@ func (d *Database) RemoveDevice(
 func (d *Database) RemoveDevices(
 	ctx context.Context, localpart string, devices []string,
 ) error {
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		if err := d.devices.deleteDevices(ctx, txn, localpart, devices); err != sql.ErrNoRows {
-			return err
-		}
-		return nil
-	})
+	if err := d.devices.deleteDevices(ctx, localpart, devices); err != nil {
+		return err
+	}
+	return nil
 }
 
 // RemoveAllDevices revokes devices by deleting the entry in the
@@ -195,22 +184,17 @@ func (d *Database) RemoveDevices(
 func (d *Database) RemoveAllDevices(
 	ctx context.Context, localpart, exceptDeviceID string,
 ) (devices []api.Device, err error) {
-	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		devices, err = d.devices.selectDevicesByLocalpart(ctx, txn, localpart, exceptDeviceID)
-		if err != nil {
-			return err
-		}
-		if err := d.devices.deleteDevicesByLocalpart(ctx, txn, localpart, exceptDeviceID); err != sql.ErrNoRows {
-			return err
-		}
-		return nil
-	})
-	return
+	devices, err = d.devices.selectDevicesByLocalpart(ctx, localpart, exceptDeviceID)
+	if err != nil {
+		return nil, err
+	}
+	if err := d.devices.deleteDevicesByLocalpart(ctx, localpart, exceptDeviceID); err != nil {
+		return nil, err
+	}
+	return devices, nil
 }
 
 // UpdateDeviceLastSeen updates a the last seen timestamp and the ip address
 func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error {
-	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		return d.devices.updateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr)
-	})
+	return d.devices.updateDeviceLastSeen(ctx, localpart, deviceID, ipAddr)
 }

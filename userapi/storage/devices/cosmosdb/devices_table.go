@@ -16,127 +16,145 @@ package cosmosdb
 
 import (
 	"context"
-	"database/sql"
-	"strings"
+	"errors"
+	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
 	"github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const devicesSchema = `
--- This sequence is used for automatic allocation of session_id.
--- CREATE SEQUENCE IF NOT EXISTS device_session_id_seq START 1;
+// const devicesSchema = `
+// -- This sequence is used for automatic allocation of session_id.
+// -- CREATE SEQUENCE IF NOT EXISTS device_session_id_seq START 1;
 
--- Stores data about devices.
-CREATE TABLE IF NOT EXISTS device_devices (
-    access_token TEXT PRIMARY KEY,
-    session_id INTEGER,
-    device_id TEXT ,
-    localpart TEXT ,
-    created_ts BIGINT,
-    display_name TEXT,
-    last_seen_ts BIGINT,
-    ip TEXT,
-    user_agent TEXT,
+// -- Stores data about devices.
+// CREATE TABLE IF NOT EXISTS device_devices (
+//     access_token TEXT PRIMARY KEY,
+//     session_id INTEGER,
+//     device_id TEXT ,
+//     localpart TEXT ,
+//     created_ts BIGINT,
+//     display_name TEXT,
+//     last_seen_ts BIGINT,
+//     ip TEXT,
+//     user_agent TEXT,
 
-		UNIQUE (localpart, device_id)
-);
-`
+// 		UNIQUE (localpart, device_id)
+// );
+// `
 
-const insertDeviceSQL = "" +
-	"INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_seen_ts, ip, user_agent)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+type DeviceCosmos struct {
+	ID     string `json:"device_id"`
+	UserID string `json:"user_id"`
+	// The access_token granted to this device.
+	// This uniquely identifies the device from all other devices and clients.
+	AccessToken string `json:"access_token"`
+	// The unique ID of the session identified by the access token.
+	// Can be used as a secure substitution in places where data needs to be
+	// associated with access tokens.
+	SessionID   int64  `json:"session_id"`
+	DisplayName string `json:"display_name"`
+	LastSeenTS  int64  `json:"last_seen_ts"`
+	LastSeenIP  string `json:"last_seen_ip"`
+	Localpart   string `json:"local_part"`
+	UserAgent   string `json:"user_agent"`
+	// If the device is for an appservice user,
+	// this is the appservice ID.
+	AppserviceID string `json:"app_service_id"`
+}
 
-const selectDevicesCountSQL = "" +
-	"SELECT COUNT(access_token) FROM device_devices"
+type DeviceCosmosData struct {
+	Id        string       `json:"id"`
+	Pk        string       `json:"_pk"`
+	Cn        string       `json:"_cn"`
+	ETag      string       `json:"_etag"`
+	Timestamp int64        `json:"_ts"`
+	Device    DeviceCosmos `json:"mx_userapi_device"`
+}
 
-const selectDeviceByTokenSQL = "" +
-	"SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"
-
-const selectDeviceByIDSQL = "" +
-	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
-
-const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2"
-
-const updateDeviceNameSQL = "" +
-	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
-
-const deleteDeviceSQL = "" +
-	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
-
-const deleteDevicesByLocalpartSQL = "" +
-	"DELETE FROM device_devices WHERE localpart = $1 AND device_id != $2"
-
-const deleteDevicesSQL = "" +
-	"DELETE FROM device_devices WHERE localpart = $1 AND device_id IN ($2)"
-
-const selectDevicesByIDSQL = "" +
-	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id IN ($1)"
-
-const updateDeviceLastSeen = "" +
-	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
+type DeviceCosmosSessionCount struct {
+	SessionCount int64 `json:"sessioncount"`
+}
 
 type devicesStatements struct {
-	db                           *sql.DB
-	writer                       sqlutil.Writer
-	insertDeviceStmt             *sql.Stmt
-	selectDevicesCountStmt       *sql.Stmt
-	selectDeviceByTokenStmt      *sql.Stmt
-	selectDeviceByIDStmt         *sql.Stmt
-	selectDevicesByIDStmt        *sql.Stmt
-	selectDevicesByLocalpartStmt *sql.Stmt
-	updateDeviceNameStmt         *sql.Stmt
-	updateDeviceLastSeenStmt     *sql.Stmt
-	deleteDeviceStmt             *sql.Stmt
-	deleteDevicesByLocalpartStmt *sql.Stmt
-	serverName                   gomatrixserverlib.ServerName
+	db *Database
+	selectDevicesCountStmt  string
+	selectDeviceByTokenStmt string
+	// selectDeviceByIDStmt         *sql.Stmt
+	selectDevicesByIDStmt                string
+	selectDevicesByLocalpartStmt         string
+	selectDevicesByLocalpartExceptIDStmt string
+	serverName gomatrixserverlib.ServerName
+	tableName  string
 }
 
-func (s *devicesStatements) execSchema(db *sql.DB) error {
-	_, err := db.Exec(devicesSchema)
-	return err
+func mapFromDevice(db DeviceCosmos) api.Device {
+	return api.Device{
+		AccessToken:  db.AccessToken,
+		AppserviceID: db.AppserviceID,
+		ID:           db.ID,
+		LastSeenIP:   db.LastSeenIP,
+		LastSeenTS:   db.LastSeenTS,
+		SessionID:    db.SessionID,
+		UserAgent:    db.UserAgent,
+		UserID:       db.UserID,
+	}
 }
 
-func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server gomatrixserverlib.ServerName) (err error) {
+func mapTodevice(api api.Device, s *devicesStatements) DeviceCosmos {
+	localPart, _ := userutil.ParseUsernameParam(api.UserID, &s.serverName)
+	return DeviceCosmos{
+		AccessToken:  api.AccessToken,
+		AppserviceID: api.AppserviceID,
+		ID:           api.ID,
+		LastSeenIP:   api.LastSeenIP,
+		LastSeenTS:   api.LastSeenTS,
+		Localpart:    localPart,
+		SessionID:    api.SessionID,
+		UserAgent:    api.UserAgent,
+		UserID:       api.UserID,
+	}
+}
+
+func getDevice(s *devicesStatements, ctx context.Context, pk string, docId string) (*DeviceCosmosData, error) {
+	response := DeviceCosmosData{}
+	var optionsGet = cosmosdbapi.GetGetDocumentOptions(pk)
+	var _, ex = cosmosdbapi.GetClient(s.db.connection).GetDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		docId,
+		optionsGet,
+		&response)
+	return &response, ex
+}
+
+func setDevice(s *devicesStatements, ctx context.Context, pk string, device DeviceCosmosData) (*DeviceCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, device.ETag)
+	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		device.Id,
+		&device,
+		optionsReplace)
+	return &device, ex
+}
+
+func (s *devicesStatements) prepare(db *Database, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
-	s.writer = writer
-	if s.insertDeviceStmt, err = db.Prepare(insertDeviceSQL); err != nil {
-		return
-	}
-	if s.selectDevicesCountStmt, err = db.Prepare(selectDevicesCountSQL); err != nil {
-		return
-	}
-	if s.selectDeviceByTokenStmt, err = db.Prepare(selectDeviceByTokenSQL); err != nil {
-		return
-	}
-	if s.selectDeviceByIDStmt, err = db.Prepare(selectDeviceByIDSQL); err != nil {
-		return
-	}
-	if s.selectDevicesByLocalpartStmt, err = db.Prepare(selectDevicesByLocalpartSQL); err != nil {
-		return
-	}
-	if s.updateDeviceNameStmt, err = db.Prepare(updateDeviceNameSQL); err != nil {
-		return
-	}
-	if s.deleteDeviceStmt, err = db.Prepare(deleteDeviceSQL); err != nil {
-		return
-	}
-	if s.deleteDevicesByLocalpartStmt, err = db.Prepare(deleteDevicesByLocalpartSQL); err != nil {
-		return
-	}
-	if s.selectDevicesByIDStmt, err = db.Prepare(selectDevicesByIDSQL); err != nil {
-		return
-	}
-	if s.updateDeviceLastSeenStmt, err = db.Prepare(updateDeviceLastSeen); err != nil {
-		return
-	}
+	s.selectDevicesCountStmt = "select count(c._ts) as sessioncount from c where c._cn = @x1"
+	s.selectDevicesByLocalpartStmt = "select * from c where c._cn = @x1 and c.mx_userapi_device.local_part = @x2 and ARRAY_CONTAINS(@x3, c.mx_userapi_device.device_id)"
+	s.selectDevicesByLocalpartExceptIDStmt = "select * from c where c._cn = @x1 and c.mx_userapi_device.local_part = @x2 and c.mx_userapi_device.device_id != @x3"
+	s.selectDeviceByTokenStmt = "select * from c where c._cn = @x1 and c.mx_userapi_device.access_token = @x2"
+	s.selectDevicesByIDStmt = "select * from c where c._cn = @x1 and ARRAY_CONTAINS(@x2, c.mx_userapi_device.device_id)"
 	s.serverName = server
+	s.tableName = "device_devices"
 	return
 }
 
@@ -144,85 +162,219 @@ func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server go
 // Returns an error if the user already has a device with the given device ID.
 // Returns the device on success.
 func (s *devicesStatements) insertDevice(
-	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
+	ctx context.Context, id, localpart, accessToken string,
 	displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
-	countStmt := sqlutil.TxStmt(txn, s.selectDevicesCountStmt)
-	insertStmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
-	if err := countStmt.QueryRowContext(ctx).Scan(&sessionID); err != nil {
+	// "SELECT COUNT(access_token) FROM device_devices"
+	// HACK: Do we need a Cosmos Table for the sequence?
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []DeviceCosmosSessionCount
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+	}
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(s.selectDevicesCountStmt, params)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+	if err != nil {
 		return nil, err
 	}
+	sessionID = response[0].SessionCount
 	sessionID++
-	if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr, userAgent); err != nil {
-		return nil, err
-	}
-	return &api.Device{
+	// "INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_seen_ts, ip, user_agent)" +
+	// 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+
+	data := DeviceCosmos{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
 		SessionID:   sessionID,
 		LastSeenTS:  createdTimeMS,
 		LastSeenIP:  ipAddr,
+		Localpart:   localpart,
 		UserAgent:   userAgent,
-	}, nil
+	}
+
+	//     access_token TEXT PRIMARY KEY,
+	// 		UNIQUE (localpart, device_id)
+	// HACK: check for duplicate PK as we are using the UNIQUE key for the DocId
+	docId := fmt.Sprintf("%s_%s", localpart, id)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	var dbData = DeviceCosmosData{
+		Id:        cosmosDocId,
+		Cn:        dbCollectionName,
+		Pk:        cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
+		Timestamp: time.Now().Unix(),
+		Device:    data,
+	}
+
+	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	var _, _, errCreate = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData,
+		optionsCreate)
+
+	if errCreate != nil {
+		return nil, errCreate
+	}
+
+	var result = mapFromDevice(dbData.Device)
+	return &result, nil
 }
 
 func (s *devicesStatements) deleteDevice(
-	ctx context.Context, txn *sql.Tx, id, localpart string,
+	ctx context.Context, id, localpart string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteDeviceStmt)
-	_, err := stmt.ExecContext(ctx, id, localpart)
+	// "DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	docId := fmt.Sprintf("%s_%s", localpart, id)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var options = cosmosdbapi.GetDeleteDocumentOptions(pk)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		cosmosDocId,
+		options)
+
+	if err != nil {
+		return err
+	}
 	return err
 }
 
 func (s *devicesStatements) deleteDevices(
-	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
+	ctx context.Context, localpart string, devices []string,
 ) error {
-	orig := strings.Replace(deleteDevicesSQL, "($2)", sqlutil.QueryVariadicOffset(len(devices), 1), 1)
-	prep, err := s.db.Prepare(orig)
+	// "DELETE FROM device_devices WHERE localpart = $1 AND device_id IN ($2)"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []DeviceCosmosData
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": localpart,
+		"@x3": devices,
+	}
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(s.selectDevicesByLocalpartStmt, params)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
 	if err != nil {
 		return err
 	}
-	stmt := sqlutil.TxStmt(txn, prep)
-	params := make([]interface{}, len(devices)+1)
-	params[0] = localpart
-	for i, v := range devices {
-		params[i+1] = v
+	for _, item := range response {
+		s.deleteDevice(ctx, item.Device.ID, item.Device.Localpart)
 	}
-	_, err = stmt.ExecContext(ctx, params...)
 	return err
 }
 
 func (s *devicesStatements) deleteDevicesByLocalpart(
-	ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string,
+	ctx context.Context, localpart, exceptDeviceID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
-	_, err := stmt.ExecContext(ctx, localpart, exceptDeviceID)
+	// "DELETE FROM device_devices WHERE localpart = $1 AND device_id != $2"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []DeviceCosmosData
+	exceptDevices := []string{
+		exceptDeviceID,
+	}
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": localpart,
+		"@x3": exceptDevices,
+	}
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(s.selectDevicesByLocalpartStmt, params)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+	if err != nil {
+		return err
+	}
+	for _, item := range response {
+		s.deleteDevice(ctx, item.Device.ID, item.Device.Localpart)
+	}
 	return err
 }
 
 func (s *devicesStatements) updateDeviceName(
-	ctx context.Context, txn *sql.Tx, localpart, deviceID string, displayName *string,
+	ctx context.Context, localpart, deviceID string, displayName *string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.updateDeviceNameStmt)
-	_, err := stmt.ExecContext(ctx, displayName, localpart, deviceID)
-	return err
+	// "UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	var response, exGet = getDevice(s, ctx, pk, cosmosDocId)
+	if exGet != nil {
+		return exGet
+	}
+
+	response.Device.DisplayName = *displayName
+
+	var _, exReplace = setDevice(s, ctx, pk, *response)
+	if exReplace != nil {
+		return exReplace
+	}
+	return exReplace
 }
 
 func (s *devicesStatements) selectDeviceByToken(
 	ctx context.Context, accessToken string,
 ) (*api.Device, error) {
-	var dev api.Device
-	var localpart string
-	stmt := s.selectDeviceByTokenStmt
-	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.SessionID, &dev.ID, &localpart)
-	if err == nil {
-		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
-		dev.AccessToken = accessToken
+	// "SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []DeviceCosmosData
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": accessToken,
 	}
-	return &dev, err
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(s.selectDeviceByTokenStmt, params)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+	if err != nil {
+		return nil, err
+	}
+	if len(response) == 0 {
+		return nil, errors.New(fmt.Sprintf("No Devices found with AccessToken %s", accessToken))
+	}
+
+	if err == nil {
+		result := mapFromDevice(response[0].Device)
+		return &result, nil
+	}
+	return nil, err
 }
 
 // selectDeviceByID retrieves a device from the database with the given user
@@ -230,54 +382,48 @@ func (s *devicesStatements) selectDeviceByToken(
 func (s *devicesStatements) selectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
 ) (*api.Device, error) {
-	var dev api.Device
-	var displayName sql.NullString
-	stmt := s.selectDeviceByIDStmt
-	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&displayName)
-	if err == nil {
-		dev.ID = deviceID
-		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
-		if displayName.Valid {
-			dev.DisplayName = displayName.String
-		}
+	// "SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	var response, exGet = getDevice(s, ctx, pk, cosmosDocId)
+	if exGet != nil {
+		return nil, exGet
 	}
-	return &dev, err
+	result := mapFromDevice(response.Device)
+	return &result, nil
 }
 
 func (s *devicesStatements) selectDevicesByLocalpart(
-	ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string,
+	ctx context.Context, localpart, exceptDeviceID string,
 ) ([]api.Device, error) {
 	devices := []api.Device{}
-	rows, err := sqlutil.TxStmt(txn, s.selectDevicesByLocalpartStmt).QueryContext(ctx, localpart, exceptDeviceID)
-
-	if err != nil {
-		return devices, err
+	// "SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []DeviceCosmosData
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": localpart,
+		"@x3": exceptDeviceID,
 	}
 
-	for rows.Next() {
-		var dev api.Device
-		var lastseents sql.NullInt64
-		var id, displayname, ip, useragent sql.NullString
-		err = rows.Scan(&id, &displayname, &lastseents, &ip, &useragent)
-		if err != nil {
-			return devices, err
-		}
-		if id.Valid {
-			dev.ID = id.String
-		}
-		if displayname.Valid {
-			dev.DisplayName = displayname.String
-		}
-		if lastseents.Valid {
-			dev.LastSeenTS = lastseents.Int64
-		}
-		if ip.Valid {
-			dev.LastSeenIP = ip.String
-		}
-		if useragent.Valid {
-			dev.UserAgent = useragent.String
-		}
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(s.selectDevicesByLocalpartExceptIDStmt, params)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+	if err != nil {
+		return nil, err
+	}
 
+	for _, item := range response {
+		dev := mapFromDevice(item.Device)
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		devices = append(devices, dev)
 	}
@@ -286,37 +432,53 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 }
 
 func (s *devicesStatements) selectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
-	sqlQuery := strings.Replace(selectDevicesByIDSQL, "($1)", sqlutil.QueryVariadic(len(deviceIDs)), 1)
-	iDeviceIDs := make([]interface{}, len(deviceIDs))
-	for i := range deviceIDs {
-		iDeviceIDs[i] = deviceIDs[i]
+	// "SELECT device_id, localpart, display_name FROM device_devices WHERE device_id IN ($1)"
+	var devices []api.Device
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []DeviceCosmosData
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": deviceIDs,
 	}
 
-	rows, err := s.db.QueryContext(ctx, sqlQuery, iDeviceIDs...)
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(s.selectDevicesByIDStmt, params)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByID: rows.close() failed")
-	var devices []api.Device
-	for rows.Next() {
-		var dev api.Device
-		var localpart string
-		var displayName sql.NullString
-		if err := rows.Scan(&dev.ID, &localpart, &displayName); err != nil {
-			return nil, err
-		}
-		if displayName.Valid {
-			dev.DisplayName = displayName.String
-		}
-		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
+	for _, item := range response {
+		dev := mapFromDevice(item.Device)
 		devices = append(devices, dev)
 	}
-	return devices, rows.Err()
+	return devices, nil
 }
 
-func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr string) error {
+func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error {
 	lastSeenTs := time.Now().UnixNano() / 1000000
-	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
-	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, localpart, deviceID)
-	return err
+
+	// "UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	var response, exGet = getDevice(s, ctx, pk, cosmosDocId)
+	if exGet != nil {
+		return exGet
+	}
+
+	response.Device.LastSeenTS = lastSeenTs
+
+	var _, exReplace = setDevice(s, ctx, pk, *response)
+	if exReplace != nil {
+		return exReplace
+	}
+	return exReplace
 }

@@ -87,26 +87,26 @@ func (s *accountsStatements) prepare(db *Database, server gomatrixserverlib.Serv
 	return
 }
 
-func getAccount(s *accountsStatements, ctx context.Context, config cosmosdbapi.Tenant, pk string, docId string) (*AccountCosmosData, error) {
+func getAccount(s *accountsStatements, ctx context.Context, pk string, docId string) (*AccountCosmosData, error) {
 	response := AccountCosmosData{}
 	var optionsGet = cosmosdbapi.GetGetDocumentOptions(pk)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).GetDocument(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		docId,
 		optionsGet,
 		&response)
 	return &response, ex
 }
 
-func setAccount(s *accountsStatements, ctx context.Context, config cosmosdbapi.Tenant, pk string, account AccountCosmosData) (*AccountCosmosData, error) {
+func setAccount(s *accountsStatements, ctx context.Context, pk string, account AccountCosmosData) (*AccountCosmosData, error) {
 	response := AccountCosmosData{}
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, account.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		account.Id,
 		&account,
 		optionsReplace)
@@ -153,13 +153,12 @@ func (s *accountsStatements) insertAccount(
 	data.PasswordHash = hash
 	data.IsDeactivated = false
 
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 
 	var dbData = AccountCosmosData{
-		Id:        cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, result.Localpart),
+		Id:        cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, result.Localpart),
 		Cn:        dbCollectionName,
-		Pk:        cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName),
+		Pk:        cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
 		Timestamp: time.Now().Unix(),
 		Account:   data,
 	}
@@ -167,8 +166,8 @@ func (s *accountsStatements) insertAccount(
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
 	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		dbData,
 		options)
 
@@ -184,19 +183,18 @@ func (s *accountsStatements) updatePassword(
 ) (err error) {
 
 	// "UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var docId = cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, localpart)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var docId = cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, localpart)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 
-	var response, exGet = getAccount(s, ctx, config, pk, docId)
+	var response, exGet = getAccount(s, ctx, pk, docId)
 	if exGet != nil {
 		return exGet
 	}
 
 	response.Account.PasswordHash = passwordHash
 
-	var _, exReplace = setAccount(s, ctx, config, pk, *response)
+	var _, exReplace = setAccount(s, ctx, pk, *response)
 	if exReplace != nil {
 		return exReplace
 	}
@@ -208,19 +206,18 @@ func (s *accountsStatements) deactivateAccount(
 ) (err error) {
 
 	// "UPDATE account_accounts SET is_deactivated = 1 WHERE localpart = $1"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var docId = cosmosdbapi.GetDocumentId(config.TenantName, dbCollectionName, localpart)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var docId = cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, localpart)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 
-	var response, exGet = getAccount(s, ctx, config, pk, docId)
+	var response, exGet = getAccount(s, ctx, pk, docId)
 	if exGet != nil {
 		return exGet
 	}
 
 	response.Account.IsDeactivated = true
 
-	var _, exReplace = setAccount(s, ctx, config, pk, *response)
+	var _, exReplace = setAccount(s, ctx, pk, *response)
 	if exReplace != nil {
 		return exReplace
 	}
@@ -232,9 +229,8 @@ func (s *accountsStatements) selectPasswordHash(
 ) (hash string, err error) {
 
 	// "SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	response := []AccountCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
@@ -244,8 +240,8 @@ func (s *accountsStatements) selectPasswordHash(
 	var query = cosmosdbapi.GetQuery(s.selectPasswordHashStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		query,
 		&response,
 		options)
@@ -271,9 +267,8 @@ func (s *accountsStatements) selectAccountByLocalpart(
 	var acc api.Account
 
 	// "SELECT localpart, appservice_id FROM account_accounts WHERE localpart = $1"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	response := []AccountCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
@@ -283,8 +278,8 @@ func (s *accountsStatements) selectAccountByLocalpart(
 	var query = cosmosdbapi.GetQuery(s.selectAccountByLocalpartStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		query,
 		&response,
 		options)
@@ -309,9 +304,8 @@ func (s *accountsStatements) selectNewNumericLocalpart(
 ) (id int64, err error) {
 
 	// 	"SELECT COUNT(localpart) FROM account_accounts"
-	var config = cosmosdbapi.DefaultConfig()
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(config.TenantName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 	var response []AccountCosmosUserCount
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
@@ -320,8 +314,8 @@ func (s *accountsStatements) selectNewNumericLocalpart(
 	var query = cosmosdbapi.GetQuery(s.selectNewNumericLocalpartStmt, params)
 	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
-		config.DatabaseName,
-		config.TenantName,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
 		query,
 		&response,
 		options)

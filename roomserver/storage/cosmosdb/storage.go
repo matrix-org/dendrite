@@ -16,7 +16,6 @@
 package cosmosdb
 
 import (
-	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"context"
 	"database/sql"
 
@@ -38,7 +37,6 @@ type Database struct {
 
 // Open a sqlite database.
 func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
-	dbProperties.ConnectionString = cosmosdbutil.GetConnectionString(&dbProperties.ConnectionString)
 	var d Database
 	var db *sql.DB
 	var err error
