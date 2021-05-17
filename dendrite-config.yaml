@@ -248,7 +248,8 @@ media_api:
   base_path: ./media_store
 
   # The maximum allowed file size (in bytes) for media uploads to this homeserver
-  # (0 = unlimited).
+  # (0 = unlimited). If using a reverse proxy, ensure it allows requests at
+  # least this large (e.g. client_max_body_size in nginx.)
   max_file_size_bytes: 10485760
 
   # Whether to dynamically generate thumbnails if needed.
@@ -360,6 +361,11 @@ user_api:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
+  # The length of time that a token issued for a relying party from 
+  # /_matrix/client/r0/user/{userId}/openid/request_token endpoint
+  # is considered to be valid in milliseconds. 
+  # The default lifetime is 3600000ms (60 minutes).
+  # openid_token_lifetime_ms: 3600000
 
 # Configuration for Opentracing.
 # See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on

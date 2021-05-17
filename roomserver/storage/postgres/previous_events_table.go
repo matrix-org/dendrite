@@ -65,12 +65,13 @@ type previousEventStatements struct {
 	selectPreviousEventExistsStmt *sql.Stmt
 }
 
-func NewPostgresPreviousEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
-	s := &previousEventStatements{}
+func createPrevEventsTable(db *sql.DB) error {
 	_, err := db.Exec(previousEventSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func preparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
+	s := &previousEventStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
