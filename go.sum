@@ -710,6 +710,8 @@ github.com/matrix-org/pinecone v0.0.0-20210518144623-e76e9ddb89bf h1:aM+gb13XAOz
 github.com/matrix-org/pinecone v0.0.0-20210518144623-e76e9ddb89bf/go.mod h1:UQzJS6UVyVwfkr+RLrdvBB1vLyECqe3fLYNcbRxv8SA=
 github.com/matrix-org/pinecone v0.0.0-20210518145819-76f42940e9b9 h1:foRhM2ZUQ46Cos6KiKLuIajiuw3db+KzMDRJvQRuHT8=
 github.com/matrix-org/pinecone v0.0.0-20210518145819-76f42940e9b9/go.mod h1:UQzJS6UVyVwfkr+RLrdvBB1vLyECqe3fLYNcbRxv8SA=
+github.com/matrix-org/pinecone v0.0.0-20210518151943-2556e2cf7820 h1:OflgibJOmt1WvP5TxEES0i1dHj40K+pwmtQ155hZQX8=
+github.com/matrix-org/pinecone v0.0.0-20210518151943-2556e2cf7820/go.mod h1:UQzJS6UVyVwfkr+RLrdvBB1vLyECqe3fLYNcbRxv8SA=
 github.com/matrix-org/util v0.0.0-20190711121626-527ce5ddefc7/go.mod h1:vVQlW/emklohkZnOPwD3LrZUBqdfsbiyO3p1lNV8F6U=
 github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4 h1:eCEHXWDv9Rm335MSuB49mFUK44bwZPFSDde3ORE3syk=
 github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4/go.mod h1:vVQlW/emklohkZnOPwD3LrZUBqdfsbiyO3p1lNV8F6U=
