@@ -272,6 +272,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
+	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 	if err := cfg.Derive(); err != nil {
 		panic(err)
 	}
