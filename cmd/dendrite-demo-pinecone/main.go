@@ -161,6 +161,7 @@ func main() {
 	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
+	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 	if err := cfg.Derive(); err != nil {
 		panic(err)
 	}
