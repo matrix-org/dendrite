@@ -16,78 +16,154 @@ package cosmosdb
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-var staleDeviceListsSchema = `
--- Stores whether a user's device lists are stale or not.
-CREATE TABLE IF NOT EXISTS keyserver_stale_device_lists (
-    user_id TEXT PRIMARY KEY NOT NULL,
-	domain TEXT NOT NULL,
-	is_stale BOOLEAN NOT NULL,
-	ts_added_secs BIGINT NOT NULL
-);
+// var staleDeviceListsSchema = `
+// -- Stores whether a user's device lists are stale or not.
+// CREATE TABLE IF NOT EXISTS keyserver_stale_device_lists (
+//     user_id TEXT PRIMARY KEY NOT NULL,
+// 	domain TEXT NOT NULL,
+// 	is_stale BOOLEAN NOT NULL,
+// 	ts_added_secs BIGINT NOT NULL
+// );
 
-CREATE INDEX IF NOT EXISTS keyserver_stale_device_lists_idx ON keyserver_stale_device_lists (domain, is_stale);
-`
+// CREATE INDEX IF NOT EXISTS keyserver_stale_device_lists_idx ON keyserver_stale_device_lists (domain, is_stale);
+// `
 
-const upsertStaleDeviceListSQL = "" +
-	"INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
-	" VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT (user_id)" +
-	" DO UPDATE SET is_stale = $3, ts_added_secs = $4"
-
-const selectStaleDeviceListsWithDomainsSQL = "" +
-	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2"
-
-const selectStaleDeviceListsSQL = "" +
-	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
-
-type staleDeviceListsStatements struct {
-	db                                    *sql.DB
-	upsertStaleDeviceListStmt             *sql.Stmt
-	selectStaleDeviceListsWithDomainsStmt *sql.Stmt
-	selectStaleDeviceListsStmt            *sql.Stmt
+type StaleDeviceListCosmos struct {
+	UserID  string `json:"user_id"`
+	Domain  string `json:"domain"`
+	IsStale bool   `json:"is_stale"`
+	// Use the CosmosDB.Timestamp for this one
+	// ts_added_secs    int64  `json:"ts_added_secs"`
 }
 
-func NewSqliteStaleDeviceListsTable(db *sql.DB) (tables.StaleDeviceLists, error) {
-	s := &staleDeviceListsStatements{
-		db: db,
-	}
-	_, err := db.Exec(staleDeviceListsSchema)
+type StaleDeviceListCosmosData struct {
+	Id              string                `json:"id"`
+	Pk              string                `json:"_pk"`
+	Cn              string                `json:"_cn"`
+	ETag            string                `json:"_etag"`
+	Timestamp       int64                 `json:"_ts"`
+	StaleDeviceList StaleDeviceListCosmos `json:"mx_keyserver_stale_device_list"`
+}
+
+// const upsertStaleDeviceListSQL = "" +
+// 	"INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
+// 	" VALUES ($1, $2, $3, $4)" +
+// 	" ON CONFLICT (user_id)" +
+// 	" DO UPDATE SET is_stale = $3, ts_added_secs = $4"
+
+// "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2"
+const selectStaleDeviceListsWithDomainsSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_keyserver_stale_device_list.is_stale = @x2 " +
+	"and c.mx_keyserver_stale_device_list.domain = @x3 "
+
+// "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
+const selectStaleDeviceListsSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_keyserver_stale_device_list.is_stale = @x2 "
+
+type staleDeviceListsStatements struct {
+	db *Database
+	// upsertStaleDeviceListStmt             *sql.Stmt
+	selectStaleDeviceListsWithDomainsStmt string
+	selectStaleDeviceListsStmt            string
+	tableName                             string
+}
+
+func queryStaleDeviceList(s *staleDeviceListsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]StaleDeviceListCosmosData, error) {
+	var response []StaleDeviceListCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
+	var query = cosmosdbapi.GetQuery(qry, params)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
-	if s.upsertStaleDeviceListStmt, err = db.Prepare(upsertStaleDeviceListSQL); err != nil {
-		return nil, err
+
+	return response, nil
+}
+
+func NewCosmosDBStaleDeviceListsTable(db *Database) (tables.StaleDeviceLists, error) {
+	s := &staleDeviceListsStatements{
+		db: db,
 	}
-	if s.selectStaleDeviceListsStmt, err = db.Prepare(selectStaleDeviceListsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectStaleDeviceListsWithDomainsStmt, err = db.Prepare(selectStaleDeviceListsWithDomainsSQL); err != nil {
-		return nil, err
-	}
+	s.selectStaleDeviceListsStmt = selectStaleDeviceListsSQL
+	s.selectStaleDeviceListsWithDomainsStmt = selectStaleDeviceListsWithDomainsSQL
+	s.tableName = "stale_device_lists"
 	return s, nil
 }
 
 func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error {
+
+	// "INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
+	// " VALUES ($1, $2, $3, $4)" +
+	// " ON CONFLICT (user_id)" +
+	// " DO UPDATE SET is_stale = $3, ts_added_secs = $4"
+
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return err
 	}
-	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, time.Now().Unix())
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	//     user_id TEXT PRIMARY KEY NOT NULL,
+	docId := userID
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+
+	data := StaleDeviceListCosmos{
+		Domain:  string(domain),
+		IsStale: isStale,
+		UserID:  userID,
+	}
+
+	dbData := StaleDeviceListCosmosData{
+		Id:              cosmosDocId,
+		Cn:              dbCollectionName,
+		Pk:              pk,
+		Timestamp:       time.Now().Unix(),
+		StaleDeviceList: data,
+	}
+
+	// _, err := s.upsertKeyChangeStmt.ExecContext(ctx, partition, offset, userID)
+	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData,
+		options)
+
 	return err
 }
 
 func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
 	// we only query for 1 domain or all domains so optimise for those use cases
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	if len(domains) == 0 {
-		rows, err := s.selectStaleDeviceListsStmt.QueryContext(ctx, true)
+
+		// "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
+		// rows, err := s.selectStaleDeviceListsStmt.QueryContext(ctx, true)
+		params := map[string]interface{}{
+			"@x1": dbCollectionName,
+			"@x2": true,
+		}
+		rows, err := queryStaleDeviceList(s, ctx, s.selectStaleDeviceListsWithDomainsStmt, params)
+
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +171,17 @@ func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx conte
 	}
 	var result []string
 	for _, domain := range domains {
-		rows, err := s.selectStaleDeviceListsWithDomainsStmt.QueryContext(ctx, true, string(domain))
+
+		// "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2"
+		// rows, err := s.selectStaleDeviceListsWithDomainsStmt.QueryContext(ctx, true, string(domain))
+		params := map[string]interface{}{
+			"@x1": dbCollectionName,
+			"@x2": true,
+			"@x3": string(domain),
+		}
+
+		rows, err := queryStaleDeviceList(s, ctx, s.selectStaleDeviceListsWithDomainsStmt, params)
+
 		if err != nil {
 			return nil, err
 		}
@@ -108,14 +194,11 @@ func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx conte
 	return result, nil
 }
 
-func rowsToUserIDs(ctx context.Context, rows *sql.Rows) (result []string, err error) {
-	defer internal.CloseAndLogIfError(ctx, rows, "closing rowsToUserIDs failed")
-	for rows.Next() {
+func rowsToUserIDs(ctx context.Context, rows []StaleDeviceListCosmosData) (result []string, err error) {
+	for _, item := range rows {
 		var userID string
-		if err := rows.Scan(&userID); err != nil {
-			return nil, err
-		}
+		userID = item.StaleDeviceList.UserID
 		result = append(result, userID)
 	}
-	return result, rows.Err()
+	return result, nil
 }

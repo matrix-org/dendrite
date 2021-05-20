@@ -15,35 +15,53 @@
 package cosmosdb
 
 import (
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// A Database is used to store room events and stream offsets.
+type Database struct {
+	shared.Database
+	connection   cosmosdbapi.CosmosConnection
+	databaseName string
+	cosmosConfig cosmosdbapi.CosmosConfig
+	serverName   gomatrixserverlib.ServerName
+}
+
 func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
-	db, err := sqlutil.Open(dbProperties)
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	config := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
+	d := &Database{
+		databaseName: "keyserver",
+		connection:   conn,
+		cosmosConfig: config,
+	}
+
+	// db, err := sqlutil.Open(dbProperties)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	otk, err := NewCosmosDBOneTimeKeysTable(d)
 	if err != nil {
 		return nil, err
 	}
-	otk, err := NewSqliteOneTimeKeysTable(db)
+	dk, err := NewCosmosDBDeviceKeysTable(d)
 	if err != nil {
 		return nil, err
 	}
-	dk, err := NewSqliteDeviceKeysTable(db)
+	kc, err := NewCosmosDBKeyChangesTable(d)
 	if err != nil {
 		return nil, err
 	}
-	kc, err := NewSqliteKeyChangesTable(db)
-	if err != nil {
-		return nil, err
-	}
-	sdl, err := NewSqliteStaleDeviceListsTable(db)
+	sdl, err := NewCosmosDBStaleDeviceListsTable(d)
 	if err != nil {
 		return nil, err
 	}
 	return &shared.Database{
-		DB:                    db,
-		Writer:                sqlutil.NewExclusiveWriter(),
+		Writer:                cosmosdbutil.NewExclusiveWriterFake(),
 		OneTimeKeysTable:      otk,
 		DeviceKeysTable:       dk,
 		KeyChangesTable:       kc,
