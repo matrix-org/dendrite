@@ -18,76 +18,152 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
-	"strings"
+	"fmt"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
-const eventJSONSchema = `
-  CREATE TABLE IF NOT EXISTS roomserver_event_json (
-    event_nid INTEGER NOT NULL PRIMARY KEY,
-    event_json TEXT NOT NULL
-  );
-`
+// const eventJSONSchema = `
+//   CREATE TABLE IF NOT EXISTS roomserver_event_json (
+//     event_nid INTEGER NOT NULL PRIMARY KEY,
+//     event_json TEXT NOT NULL
+//   );
+// `
 
-const insertEventJSONSQL = `
-	INSERT OR REPLACE INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)
-`
+type EventJSONCosmos struct {
+	EventNID  int64  `json:"event_nid"`
+	EventJSON []byte `json:"event_json"`
+}
+
+type EventJSONCosmosData struct {
+	Id        string          `json:"id"`
+	Pk        string          `json:"_pk"`
+	Cn        string          `json:"_cn"`
+	ETag      string          `json:"_etag"`
+	Timestamp int64           `json:"_ts"`
+	EventJSON EventJSONCosmos `json:"mx_roomserver_event_json"`
+}
+
+// const insertEventJSONSQL = `
+// 	INSERT OR REPLACE INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)
+// `
 
 // Bulk event JSON lookup by numeric event ID.
 // Sort by the numeric event ID.
 // This means that we can use binary search to lookup by numeric event ID.
-const bulkSelectEventJSONSQL = `
-	SELECT event_nid, event_json FROM roomserver_event_json
-	  WHERE event_nid IN ($1)
-	  ORDER BY event_nid ASC
-`
+// 	SELECT event_nid, event_json FROM roomserver_event_json
+// 	  WHERE event_nid IN ($1)
+// 	  ORDER BY event_nid ASC
+const bulkSelectEventJSONSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and ARRAY_CONTAINS(@x2, c.mx_roomserver_event_json.event_nid) " +
+	"order by c.mx_roomserver_event_json.event_nid asc"
 
 type eventJSONStatements struct {
-	db                      *sql.DB
-	insertEventJSONStmt     *sql.Stmt
-	bulkSelectEventJSONStmt *sql.Stmt
+	db *Database
+	// insertEventJSONStmt     *sql.Stmt
+	bulkSelectEventJSONStmt string
+	tableName               string
 }
 
-func NewSqliteEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
-	s := &eventJSONStatements{
-		db: db,
-	}
-	_, err := db.Exec(eventJSONSchema)
+func queryEventJSON(s *eventJSONStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventJSONCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []EventJSONCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
-	return s, shared.StatementList{
-		{&s.insertEventJSONStmt, insertEventJSONSQL},
-		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},
-	}.Prepare(db)
+	return response, nil
+}
+
+func NewCosmosDBEventJSONTable(db *Database) (tables.EventJSON, error) {
+	s := &eventJSONStatements{
+		db: db,
+	}
+	// _, err := db.Exec(eventJSONSchema)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// return s, shared.StatementList{
+	// 	{&s.insertEventJSONStmt, insertEventJSONSQL},
+	s.bulkSelectEventJSONStmt = bulkSelectEventJSONSQL
+	// }.Prepare(db)
+	s.tableName = "event_json"
+	return s, nil
 }
 
 func (s *eventJSONStatements) InsertEventJSON(
 	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, eventJSON []byte,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
+
+	// _, err := sqlutil.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
+	// INSERT OR REPLACE INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+
+	docId := fmt.Sprintf("%d", eventNID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	data := EventJSONCosmos{
+		EventNID:  int64(eventNID),
+		EventJSON: eventJSON,
+	}
+
+	var dbData = EventJSONCosmosData{
+		Id:        cosmosDocId,
+		Cn:        dbCollectionName,
+		Pk:        pk,
+		Timestamp: time.Now().Unix(),
+		EventJSON: data,
+	}
+
+	//Insert OR Replace
+	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		&dbData,
+		options)
+
 	return err
 }
 
 func (s *eventJSONStatements) BulkSelectEventJSON(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]tables.EventJSONPair, error) {
-	iEventNIDs := make([]interface{}, len(eventNIDs))
-	for k, v := range eventNIDs {
-		iEventNIDs[k] = v
-	}
-	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
 
-	rows, err := s.db.QueryContext(ctx, selectOrig, iEventNIDs...)
+	// SELECT event_nid, event_json FROM roomserver_event_json
+	//   WHERE event_nid IN ($1)
+	//   ORDER BY event_nid ASC
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": eventNIDs,
+	}
+
+	response, err := queryEventJSON(s, ctx, s.bulkSelectEventJSONStmt, params)
+
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
 
 	// We know that we will only get as many results as event NIDs
 	// because of the unique constraint on event NIDs.
@@ -95,13 +171,11 @@ func (s *eventJSONStatements) BulkSelectEventJSON(
 	// We might get fewer results than NIDs so we adjust the length of the slice before returning it.
 	results := make([]tables.EventJSONPair, len(eventNIDs))
 	i := 0
-	for ; rows.Next(); i++ {
+	for _, item := range response {
 		result := &results[i]
-		var eventNID int64
-		if err := rows.Scan(&eventNID, &result.EventJSON); err != nil {
-			return nil, err
-		}
-		result.EventNID = types.EventNID(eventNID)
+		result.EventNID = types.EventNID(item.EventJSON.EventNID)
+		result.EventJSON = item.EventJSON.EventJSON
+		i++
 	}
 	return results[:i], nil
 }

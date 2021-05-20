@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -87,17 +88,42 @@ func (s *accountsStatements) prepare(db *Database, server gomatrixserverlib.Serv
 	return
 }
 
-func getAccount(s *accountsStatements, ctx context.Context, pk string, docId string) (*AccountCosmosData, error) {
-	response := AccountCosmosData{}
-	var optionsGet = cosmosdbapi.GetGetDocumentOptions(pk)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).GetDocument(
+func queryAccount(s *accountsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []AccountCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func getAccount(s *accountsStatements, ctx context.Context, pk string, docId string) (*AccountCosmosData, error) {
+	response := AccountCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
 		docId,
-		optionsGet,
 		&response)
-	return &response, ex
+
+	if response.Id == "" {
+		return nil, cosmosdbutil.ErrNoRows
+	}
+
+	return &response, err
 }
 
 func setAccount(s *accountsStatements, ctx context.Context, pk string, account AccountCosmosData) (*AccountCosmosData, error) {
@@ -155,10 +181,14 @@ func (s *accountsStatements) insertAccount(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 
+	docId := result.Localpart
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
 	var dbData = AccountCosmosData{
-		Id:        cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, result.Localpart),
+		Id:        cosmosDocId,
 		Cn:        dbCollectionName,
-		Pk:        cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
+		Pk:        pk,
 		Timestamp: time.Now().Unix(),
 		Account:   data,
 	}
@@ -184,10 +214,11 @@ func (s *accountsStatements) updatePassword(
 
 	// "UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var docId = cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, localpart)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	docId := localpart
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 
-	var response, exGet = getAccount(s, ctx, pk, docId)
+	var response, exGet = getAccount(s, ctx, pk, cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
@@ -207,10 +238,12 @@ func (s *accountsStatements) deactivateAccount(
 
 	// "UPDATE account_accounts SET is_deactivated = 1 WHERE localpart = $1"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var docId = cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, localpart)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 
-	var response, exGet = getAccount(s, ctx, pk, docId)
+	docId := localpart
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	var response, exGet = getAccount(s, ctx, pk, cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
@@ -230,24 +263,15 @@ func (s *accountsStatements) selectPasswordHash(
 
 	// "SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	response := []AccountCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 	}
-	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.selectPasswordHashStmt, params)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		options)
 
-	if ex != nil {
-		return "", ex
+	response, err := queryAccount(s, ctx, s.selectPasswordHashStmt, params)
+
+	if err != nil {
+		return "", err
 	}
 
 	if len(response) == 0 {
@@ -268,24 +292,15 @@ func (s *accountsStatements) selectAccountByLocalpart(
 
 	// "SELECT localpart, appservice_id FROM account_accounts WHERE localpart = $1"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	response := []AccountCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 	}
-	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.selectAccountByLocalpartStmt, params)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		options)
 
-	if ex != nil {
-		return nil, ex
+	response, err := queryAccount(s, ctx, s.selectAccountByLocalpartStmt, params)
+
+	if err != nil {
+		return nil, err
 	}
 
 	if len(response) == 0 {

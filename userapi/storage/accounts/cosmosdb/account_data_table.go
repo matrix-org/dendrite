@@ -71,6 +71,27 @@ func (s *accountDataStatements) prepare(db *Database) (err error) {
 	return
 }
 
+func queryAccountData(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []AccountDataCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 func (s *accountDataStatements) insertAccountData(
 	ctx context.Context, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
@@ -92,10 +113,14 @@ func (s *accountDataStatements) insertAccountData(
 		id = fmt.Sprintf("%s_%s_%s", result.LocalPart, result.RoomId, result.Type)
 	}
 
+	docId := id
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
 	var dbData = AccountDataCosmosData{
-		Id:          cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, id),
+		Id:          cosmosDocId,
 		Cn:          dbCollectionName,
-		Pk:          cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
+		Pk:          pk,
 		Timestamp:   time.Now().Unix(),
 		AccountData: result,
 	}
@@ -120,24 +145,15 @@ func (s *accountDataStatements) selectAccountData(
 ) {
 	// 	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	response := []AccountDataCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 	}
-	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.selectAccountDataStmt, params)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		options)
 
-	if ex != nil {
-		return nil, nil, ex
+	response, err := queryAccountData(s, ctx, s.selectAccountDataStmt, params)
+
+	if err != nil {
+		return nil, nil, err
 	}
 
 	global := map[string]json.RawMessage{}
@@ -166,26 +182,17 @@ func (s *accountDataStatements) selectAccountDataByType(
 
 	// 	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	response := []AccountDataCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 		"@x3": roomID,
 		"@x4": dataType,
 	}
-	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.selectAccountDataByTypeStmt, params)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		options)
 
-	if ex != nil {
-		return nil, ex
+	response, err := queryAccountData(s, ctx, s.selectAccountDataByTypeStmt, params)
+
+	if err != nil {
+		return nil, err
 	}
 
 	if len(response) == 0 {

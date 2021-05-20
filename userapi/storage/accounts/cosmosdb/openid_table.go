@@ -62,6 +62,27 @@ func mapToToken(api api.OpenIDToken) OpenIDTokenCosmos {
 	}
 }
 
+func queryOpenIdToken(s *tokenStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OpenIdTokenCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []OpenIdTokenCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 func (s *tokenStatements) prepare(db *Database, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
 	s.selectTokenStmt = "select * from c where c._cn = @x1 and c.mx_userapi_openidtoken.token = @x2"
@@ -87,10 +108,14 @@ func (s *tokenStatements) insertToken(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
 
+	docId := result.Token
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
 	var dbData = OpenIdTokenCosmosData{
-		Id:          cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, result.Token),
+		Id:          cosmosDocId,
 		Cn:          dbCollectionName,
-		Pk:          cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
+		Pk:          pk,
 		Timestamp:   time.Now().Unix(),
 		OpenIdToken: mapToToken(*result),
 	}
@@ -120,24 +145,14 @@ func (s *tokenStatements) selectOpenIDTokenAtrributes(
 
 	// "SELECT localpart, token_expires_at_ms FROM open_id_tokens WHERE token = $1"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	response := []OpenIdTokenCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": token,
 	}
-	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.selectTokenStmt, params)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		options)
+	response, err := queryOpenIdToken(s, ctx, s.selectTokenStmt, params)
 
-	if ex != nil {
-		return nil, ex
+	if err != nil {
+		return nil, err
 	}
 
 	if len(response) == 0 {

@@ -18,73 +18,148 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
-const inviteSchema = `
-	CREATE TABLE IF NOT EXISTS roomserver_invites (
-		invite_event_id TEXT PRIMARY KEY,
-		room_nid INTEGER NOT NULL,
-		target_nid INTEGER NOT NULL,
-		sender_nid INTEGER NOT NULL DEFAULT 0,
-		retired BOOLEAN NOT NULL DEFAULT FALSE,
-		invite_event_json TEXT NOT NULL
-	);
+// const inviteSchema = `
+// 	CREATE TABLE IF NOT EXISTS roomserver_invites (
+// 		invite_event_id TEXT PRIMARY KEY,
+// 		room_nid INTEGER NOT NULL,
+// 		target_nid INTEGER NOT NULL,
+// 		sender_nid INTEGER NOT NULL DEFAULT 0,
+// 		retired BOOLEAN NOT NULL DEFAULT FALSE,
+// 		invite_event_json TEXT NOT NULL
+// 	);
 
-	CREATE INDEX IF NOT EXISTS roomserver_invites_active_idx ON roomserver_invites (target_nid, room_nid)
-		WHERE NOT retired;
-`
-const insertInviteEventSQL = "" +
-	"INSERT INTO roomserver_invites (invite_event_id, room_nid, target_nid," +
-	" sender_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
-	" ON CONFLICT DO NOTHING"
+// 	CREATE INDEX IF NOT EXISTS roomserver_invites_active_idx ON roomserver_invites (target_nid, room_nid)
+// 		WHERE NOT retired;
+// `
 
+type InviteCosmos struct {
+	InviteEventID   string `json:"invite_event_id"`
+	RoomNID         int64  `json:"room_nid"`
+	TargetNID       int64  `json:"target_nid"`
+	SenderNID       int64  `json:"sender_nid"`
+	Retired         bool   `json:"retired"`
+	InviteEventJSON []byte `json:"invite_event_json"`
+}
+
+type InviteCosmosData struct {
+	Id        string       `json:"id"`
+	Pk        string       `json:"_pk"`
+	Cn        string       `json:"_cn"`
+	ETag      string       `json:"_etag"`
+	Timestamp int64        `json:"_ts"`
+	Invite    InviteCosmos `json:"mx_roomserver_invite"`
+}
+
+// const insertInviteEventSQL = "" +
+// 	"INSERT INTO roomserver_invites (invite_event_id, room_nid, target_nid," +
+// 	" sender_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
+// 	" ON CONFLICT DO NOTHING"
+
+// "SELECT invite_event_id, sender_nid FROM roomserver_invites" +
+// " WHERE target_nid = $1 AND room_nid = $2" +
+// " AND NOT retired"
 const selectInviteActiveForUserInRoomSQL = "" +
-	"SELECT invite_event_id, sender_nid FROM roomserver_invites" +
-	" WHERE target_nid = $1 AND room_nid = $2" +
-	" AND NOT retired"
+	"select * from c where c._cn = @x1 " +
+	" and c.mx_roomserver_invite.target_nid = @x2" +
+	" and c.mx_roomserver_invite.room_nid = @x3" +
+	" and c.mx_roomserver_invite.retired = false"
 
 // Retire every active invite for a user in a room.
 // Ideally we'd know which invite events were retired by a given update so we
 // wouldn't need to remove every active invite.
 // However the matrix protocol doesn't give us a way to reliably identify the
 // invites that were retired, so we are forced to retire all of them.
-const updateInviteRetiredSQL = `
-	UPDATE roomserver_invites SET retired = TRUE WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
-`
+// const updateInviteRetiredSQL = `
+// 	UPDATE roomserver_invites SET retired = TRUE WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
+// `
 
-const selectInvitesAboutToRetireSQL = `
-SELECT invite_event_id FROM roomserver_invites WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
-`
+// SELECT invite_event_id FROM roomserver_invites WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
+const selectInvitesAboutToRetireSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	" and c.mx_roomserver_invite.room_nid = @x2" +
+	" and c.mx_roomserver_invite.target_nid = @x3" +
+	" and c.mx_roomserver_invite.retired = false"
 
 type inviteStatements struct {
-	db                                  *sql.DB
-	insertInviteEventStmt               *sql.Stmt
-	selectInviteActiveForUserInRoomStmt *sql.Stmt
-	updateInviteRetiredStmt             *sql.Stmt
-	selectInvitesAboutToRetireStmt      *sql.Stmt
+	db *Database
+	// insertInviteEventStmt               *sql.Stmt
+	selectInviteActiveForUserInRoomStmt string
+	// updateInviteRetiredStmt             *sql.Stmt
+	selectInvitesAboutToRetireStmt string
+	tableName                      string
 }
 
-func NewSqliteInvitesTable(db *sql.DB) (tables.Invites, error) {
-	s := &inviteStatements{
-		db: db,
-	}
-	_, err := db.Exec(inviteSchema)
+func queryInvite(s *inviteStatements, ctx context.Context, qry string, params map[string]interface{}) ([]InviteCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []InviteCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
+	return response, nil
+}
 
-	return s, shared.StatementList{
-		{&s.insertInviteEventStmt, insertInviteEventSQL},
-		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
-		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
-		{&s.selectInvitesAboutToRetireStmt, selectInvitesAboutToRetireSQL},
-	}.Prepare(db)
+func getInvite(s *inviteStatements, ctx context.Context, pk string, docId string) (*InviteCosmosData, error) {
+	response := InviteCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, cosmosdbutil.ErrNoRows
+	}
+
+	return &response, err
+}
+
+func setInvite(s *inviteStatements, ctx context.Context, invite InviteCosmosData) (*InviteCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(invite.Pk, invite.ETag)
+	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		invite.Id,
+		&invite,
+		optionsReplace)
+	return &invite, ex
+}
+
+func NewCosmosDBInvitesTable(db *Database) (tables.Invites, error) {
+	s := &inviteStatements{
+		db: db,
+	}
+	// return s, shared.StatementList{
+	// 	{&s.insertInviteEventStmt, insertInviteEventSQL},
+	s.selectInviteActiveForUserInRoomStmt = selectInviteActiveForUserInRoomSQL
+	// 	{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
+	s.selectInvitesAboutToRetireStmt = selectInvitesAboutToRetireSQL
+	// }.Prepare(db)
+	s.tableName = "invites"
+	return s, nil
 }
 
 func (s *inviteStatements) InsertInviteEvent(
@@ -93,42 +168,84 @@ func (s *inviteStatements) InsertInviteEvent(
 	targetUserNID, senderUserNID types.EventStateKeyNID,
 	inviteEventJSON []byte,
 ) (bool, error) {
-	var count int64
-	stmt := sqlutil.TxStmt(txn, s.insertInviteEventStmt)
-	result, err := stmt.ExecContext(
-		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
-	)
+
+	// "INSERT INTO roomserver_invites (invite_event_id, room_nid, target_nid," +
+	// " sender_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
+	// " ON CONFLICT DO NOTHING"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+
+	data := InviteCosmos{
+		InviteEventID:   inviteEventID,
+		InviteEventJSON: inviteEventJSON,
+		Retired:         false,
+		RoomNID:         int64(roomNID),
+		SenderNID:       int64(senderUserNID),
+		TargetNID:       int64(targetUserNID),
+	}
+
+	// 		invite_event_id TEXT PRIMARY KEY,
+	docId := inviteEventID
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	var dbData = InviteCosmosData{
+		Id:        cosmosDocId,
+		Cn:        dbCollectionName,
+		Pk:        pk,
+		Timestamp: time.Now().Unix(),
+		Invite:    data,
+	}
+
+	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		&dbData,
+		options)
+
 	if err != nil {
 		return false, err
 	}
-	count, err = result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	return count != 0, err
+	// TODO: Is this important?
+	// count, err = result.RowsAffected()
+	// return count != 0, err
+	return true, nil
 }
 
 func (s *inviteStatements) UpdateInviteRetired(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (eventIDs []string, err error) {
+
+	// "SELECT invite_event_id, sender_nid FROM roomserver_invites" +
+	// " WHERE target_nid = $1 AND room_nid = $2" +
+	// " AND NOT retired"
+
 	// gather all the event IDs we will retire
-	stmt := sqlutil.TxStmt(txn, s.selectInvitesAboutToRetireStmt)
-	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": targetUserNID,
+		"@x3": roomNID,
+	}
+
+	response, err := queryInvite(s, ctx, s.selectInvitesAboutToRetireStmt, params)
+
 	if err != nil {
 		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "UpdateInviteRetired: rows.close() failed")
-	for rows.Next() {
-		var inviteEventID string
-		if err = rows.Scan(&inviteEventID); err != nil {
-			return
-		}
-		eventIDs = append(eventIDs, inviteEventID)
+
+	for _, item := range response {
+		eventIDs = append(eventIDs, item.Invite.InviteEventID)
+		// 	UPDATE roomserver_invites SET retired = TRUE WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
+
+		// now retire the invites
+		item.Invite.Retired = true
+		_, err = setInvite(s, ctx, item)
 	}
-	// now retire the invites
-	stmt = sqlutil.TxStmt(txn, s.updateInviteRetiredStmt)
-	_, err = stmt.ExecContext(ctx, roomNID, targetUserNID)
+
 	return
 }
 
@@ -137,21 +254,27 @@ func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 	ctx context.Context,
 	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
 ) ([]types.EventStateKeyNID, []string, error) {
-	rows, err := s.selectInviteActiveForUserInRoomStmt.QueryContext(
-		ctx, targetUserNID, roomNID,
-	)
+
+	// SELECT invite_event_id FROM roomserver_invites WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomNID,
+		"@x3": targetUserNID,
+	}
+
+	response, err := queryInvite(s, ctx, s.selectInviteActiveForUserInRoomStmt, params)
+
 	if err != nil {
 		return nil, nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
+
 	var result []types.EventStateKeyNID
 	var eventIDs []string
-	for rows.Next() {
-		var eventID string
-		var senderUserNID int64
-		if err := rows.Scan(&eventID, &senderUserNID); err != nil {
-			return nil, nil, err
-		}
+	for _, item := range response {
+		var eventID = item.Invite.InviteEventID
+		var senderUserNID = item.Invite.SenderNID
 		result = append(result, types.EventStateKeyNID(senderUserNID))
 		eventIDs = append(eventIDs, eventID)
 	}

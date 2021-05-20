@@ -20,6 +20,8 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -27,7 +29,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -37,6 +38,7 @@ import (
 // Database represents an account database
 type Database struct {
 	sqlutil.PartitionOffsetStatements
+	writer                sqlutil.Writer
 	accounts              accountsStatements
 	profiles              profilesStatements
 	accountDatas          accountDataStatements
@@ -62,7 +64,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		connection:   conn,
 		cosmosConfig: config,
 		// db:                    db,
-		// writer:                sqlutil.NewExclusiveWriter(),
+		writer: sqlutil.NewExclusiveWriter(),
 		// bcryptCost:            bcryptCost,
 		// openIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
@@ -87,17 +88,42 @@ func (s *profilesStatements) prepare(db *Database) (err error) {
 	return
 }
 
-func getProfile(s *profilesStatements, ctx context.Context, pk string, docId string) (*ProfileCosmosData, error) {
-	response := ProfileCosmosData{}
-	var optionsGet = cosmosdbapi.GetGetDocumentOptions(pk)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).GetDocument(
+func queryProfile(s *profilesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ProfileCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []ProfileCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func getProfile(s *profilesStatements, ctx context.Context, pk string, docId string) (*ProfileCosmosData, error) {
+	response := ProfileCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
 		docId,
-		optionsGet,
 		&response)
-	return &response, ex
+
+	if response.Id == "" {
+		return nil, cosmosdbutil.ErrNoRows
+	}
+
+	return &response, err
 }
 
 func setProfile(s *profilesStatements, ctx context.Context, pk string, profile ProfileCosmosData) (*ProfileCosmosData, error) {
@@ -123,10 +149,14 @@ func (s *profilesStatements) insertProfile(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
 
+	docId := localpart
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
 	var dbData = ProfileCosmosData{
-		Id:        cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, result.Localpart),
+		Id:        cosmosDocId,
 		Cn:        dbCollectionName,
-		Pk:        cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName),
+		Pk:        pk,
 		Timestamp: time.Now().Unix(),
 		Profile:   mapToProfile(*result),
 	}
@@ -148,24 +178,15 @@ func (s *profilesStatements) selectProfileByLocalpart(
 
 	// "SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart = $1"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	response := []ProfileCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": localpart,
 	}
-	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.selectProfileByLocalpartStmt, params)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		options)
 
-	if ex != nil {
-		return nil, ex
+	response, err := queryProfile(s, ctx, s.selectProfileByLocalpartStmt, params)
+
+	if err != nil {
+		return nil, err
 	}
 
 	if len(response) == 0 {
@@ -186,10 +207,11 @@ func (s *profilesStatements) setAvatarURL(
 
 	// "UPDATE account_profiles SET avatar_url = $1 WHERE localpart = $2"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	var docId = cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, localpart)
+	docId := localpart
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
 
-	var response, exGet = getProfile(s, ctx, pk, docId)
+	var response, exGet = getProfile(s, ctx, pk, cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
@@ -209,9 +231,10 @@ func (s *profilesStatements) setDisplayName(
 
 	// "UPDATE account_profiles SET display_name = $1 WHERE localpart = $2"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	var docId = cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, localpart)
-	var response, exGet = getProfile(s, ctx, pk, docId)
+	docId := localpart
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response, exGet = getProfile(s, ctx, pk, cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
@@ -232,25 +255,16 @@ func (s *profilesStatements) selectProfilesBySearch(
 
 	// "SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
-	response := []ProfileCosmosData{}
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,
 		"@x2": searchString,
 		"@x3": limit,
 	}
-	var options = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.selectProfilesBySearchStmt, params)
-	var _, ex = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		options)
 
-	if ex != nil {
-		return nil, ex
+	response, err := queryProfile(s, ctx, s.selectProfilesBySearchStmt, params)
+
+	if err != nil {
+		return nil, err
 	}
 
 	for i := 0; i < len(response); i++ {

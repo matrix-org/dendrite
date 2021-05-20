@@ -20,33 +20,54 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
-	"strings"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 )
 
-const stateDataSchema = `
-  CREATE TABLE IF NOT EXISTS roomserver_state_block (
-    state_block_nid INTEGER NOT NULL,
-    event_type_nid INTEGER NOT NULL,
-    event_state_key_nid INTEGER NOT NULL,
-    event_nid INTEGER NOT NULL,
-    UNIQUE (state_block_nid, event_type_nid, event_state_key_nid)
-  );
-`
+// const stateDataSchema = `
+//   CREATE TABLE IF NOT EXISTS roomserver_state_block (
+//     state_block_nid INTEGER NOT NULL,
+//     event_type_nid INTEGER NOT NULL,
+//     event_state_key_nid INTEGER NOT NULL,
+//     event_nid INTEGER NOT NULL,
+//     UNIQUE (state_block_nid, event_type_nid, event_state_key_nid)
+//   );
+// `
 
-const insertStateDataSQL = "" +
-	"INSERT INTO roomserver_state_block (state_block_nid, event_type_nid, event_state_key_nid, event_nid)" +
-	" VALUES ($1, $2, $3, $4)"
+type StateBlockCosmos struct {
+	StateBlockNID    int64 `json:"state_block_nid"`
+	EventTypeNID     int64 `json:"event_type_nid"`
+	EventStateKeyNID int64 `json:"event_state_key_nid"`
+	EventNID         int64 `json:"event_nid"`
+}
 
-const selectNextStateBlockNIDSQL = `
-SELECT IFNULL(MAX(state_block_nid), 0) + 1 FROM roomserver_state_block
-`
+type StateBlockCosmosMaxNID struct {
+	Max int64 `json:"maxstateblocknid"`
+}
+
+type StateBlockCosmosData struct {
+	Id         string           `json:"id"`
+	Pk         string           `json:"_pk"`
+	Cn         string           `json:"_cn"`
+	ETag       string           `json:"_etag"`
+	Timestamp  int64            `json:"_ts"`
+	StateBlock StateBlockCosmos `json:"mx_roomserver_state_block"`
+}
+
+// const insertStateDataSQL = "" +
+// 	"INSERT INTO roomserver_state_block (state_block_nid, event_type_nid, event_state_key_nid, event_nid)" +
+// 	" VALUES ($1, $2, $3, $4)"
+
+// SELECT IFNULL(MAX(state_block_nid), 0) + 1 FROM roomserver_state_block
+const selectNextStateBlockNIDSQL = "" +
+	"select sub.maxinner != null ? sub.maxinner + 1 : 1 as maxstateblocknid " +
+	"from " +
+	"(select MAX(c.mx_roomserver_state_block.state_block_nid) maxinner from c where c._cn = @x1) as sub"
 
 // Bulk state lookup by numeric state block ID.
 // Sort by the state_block_nid, event_type_nid, event_state_key_nid
@@ -54,10 +75,17 @@ SELECT IFNULL(MAX(state_block_nid), 0) + 1 FROM roomserver_state_block
 // together in the list and those entries will sorted by event_type_nid
 // and event_state_key_nid. This property makes it easier to merge two
 // state data blocks together.
+// 	"SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
+// 	" FROM roomserver_state_block WHERE state_block_nid IN ($1)" +
+// 	" ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
 const bulkSelectStateBlockEntriesSQL = "" +
-	"SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
-	" FROM roomserver_state_block WHERE state_block_nid IN ($1)" +
-	" ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
+	"select * from c where c._cn = @x1 " +
+	"and ARRAY_CONTAINS(@x2, c.mx_roomserver_state_block.state_block_nid) " +
+	"order by c.mx_roomserver_state_block.state_block_nid " +
+	// Cant do multi field order by - The order by query does not have a corresponding composite index that it can be served from
+	// ", c.mx_roomserver_state_block.event_type_nid " +
+	// ", c.mx_roomserver_state_block.event_state_key_nid " +
+	" asc"
 
 // Bulk state lookup by numeric state block ID.
 // Filters the rows in each block to the requested types and state keys.
@@ -66,35 +94,126 @@ const bulkSelectStateBlockEntriesSQL = "" +
 // of types and a list state_keys. So we have to filter the result in the
 // application to restrict it to the list of event types and state keys we
 // actually wanted.
+// 	"SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
+// 	" FROM roomserver_state_block WHERE state_block_nid IN ($1)" +
+// 	" AND event_type_nid IN ($2) AND event_state_key_nid IN ($3)" +
+// 	" ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
 const bulkSelectFilteredStateBlockEntriesSQL = "" +
-	"SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
-	" FROM roomserver_state_block WHERE state_block_nid IN ($1)" +
-	" AND event_type_nid IN ($2) AND event_state_key_nid IN ($3)" +
-	" ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
+	"select * from c where c._cn = @x1 " +
+	"and ARRAY_CONTAINS(@x2, c.mx_roomserver_state_block.state_block_nid) " +
+	"and ARRAY_CONTAINS(@x3, c.mx_roomserver_state_block.event_type_nid) " +
+	"and ARRAY_CONTAINS(@x4, c.mx_roomserver_state_block.event_state_key_nid) " +
+	"order by c.mx_roomserver_state_block.state_block_nid " +
+	// Cant do multi field order by - The order by query does not have a corresponding composite index that it can be served from
+	// ", c.mx_roomserver_state_block.event_type_nid " +
+	// ", c.mx_roomserver_state_block.event_state_key_nid " +
+	"asc"
 
 type stateBlockStatements struct {
-	db                                      *sql.DB
-	insertStateDataStmt                     *sql.Stmt
-	selectNextStateBlockNIDStmt             *sql.Stmt
-	bulkSelectStateBlockEntriesStmt         *sql.Stmt
-	bulkSelectFilteredStateBlockEntriesStmt *sql.Stmt
+	db *Database
+	// insertStateDataStmt                     *sql.Stmt
+	selectNextStateBlockNIDStmt             string
+	bulkSelectStateBlockEntriesStmt         string
+	bulkSelectFilteredStateBlockEntriesStmt string
+	tableName                               string
 }
 
-func NewSqliteStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
-	s := &stateBlockStatements{
-		db: db,
-	}
-	_, err := db.Exec(stateDataSchema)
+func queryStateBlock(s *stateBlockStatements, ctx context.Context, qry string, params map[string]interface{}) ([]StateBlockCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []StateBlockCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
+	return response, nil
+}
 
-	return s, shared.StatementList{
-		{&s.insertStateDataStmt, insertStateDataSQL},
-		{&s.selectNextStateBlockNIDStmt, selectNextStateBlockNIDSQL},
-		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
-		{&s.bulkSelectFilteredStateBlockEntriesStmt, bulkSelectFilteredStateBlockEntriesSQL},
-	}.Prepare(db)
+func NewCosmosDBStateBlockTable(db *Database) (tables.StateBlock, error) {
+	s := &stateBlockStatements{
+		db: db,
+	}
+
+	// return s, shared.StatementList{
+	// 	{&s.insertStateDataStmt, insertStateDataSQL},
+	s.selectNextStateBlockNIDStmt = selectNextStateBlockNIDSQL
+	s.bulkSelectStateBlockEntriesStmt = bulkSelectStateBlockEntriesSQL
+	s.bulkSelectFilteredStateBlockEntriesStmt = bulkSelectFilteredStateBlockEntriesSQL
+	// }.Prepare(db)
+	s.tableName = "state_block"
+	return s, nil
+}
+
+func inertStateBlockCore(s *stateBlockStatements, ctx context.Context, stateBlockNID types.StateBlockNID, entry types.StateEntry) error {
+
+	// "INSERT INTO roomserver_state_block (state_block_nid, event_type_nid, event_state_key_nid, event_nid)" +
+	// " VALUES ($1, $2, $3, $4)"
+	data := StateBlockCosmos{
+		EventNID:         int64(entry.EventNID),
+		EventStateKeyNID: int64(entry.EventStateKeyNID),
+		EventTypeNID:     int64(entry.EventTypeNID),
+		StateBlockNID:    int64(stateBlockNID),
+	}
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+
+	//     UNIQUE (state_block_nid, event_type_nid, event_state_key_nid)
+	docId := fmt.Sprintf("%d_%d_%d", data.StateBlockNID, data.EventTypeNID, data.EventStateKeyNID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	var dbData = StateBlockCosmosData{
+		Id:         cosmosDocId,
+		Cn:         dbCollectionName,
+		Pk:         pk,
+		Timestamp:  time.Now().Unix(),
+		StateBlock: data,
+	}
+
+	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		&dbData,
+		options)
+
+	return err
+
+}
+
+func getNextStateBlockNID(s *stateBlockStatements, ctx context.Context) (int64, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var stateBlockNext []StateBlockCosmosMaxNID
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+	}
+
+	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
+	var query = cosmosdbapi.GetQuery(s.selectNextStateBlockNIDStmt, params)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&stateBlockNext,
+		optionsQry)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return stateBlockNext[0].Max, nil
 }
 
 func (s *stateBlockStatements) BulkInsertStateData(
@@ -104,75 +223,64 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	if len(entries) == 0 {
 		return 0, nil
 	}
-	var stateBlockNID types.StateBlockNID
-	err := sqlutil.TxStmt(txn, s.selectNextStateBlockNIDStmt).QueryRowContext(ctx).Scan(&stateBlockNID)
-	if err != nil {
-		return 0, err
+
+	nextID, errNextID := getNextStateBlockNID(s, ctx)
+	if errNextID != nil {
+		return 0, errNextID
 	}
+
+	stateBlockNID := types.StateBlockNID(nextID)
+
 	for _, entry := range entries {
-		_, err = sqlutil.TxStmt(txn, s.insertStateDataStmt).ExecContext(
-			ctx,
-			int64(stateBlockNID),
-			int64(entry.EventTypeNID),
-			int64(entry.EventStateKeyNID),
-			int64(entry.EventNID),
-		)
+		err := inertStateBlockCore(s, ctx, stateBlockNID, entry)
 		if err != nil {
 			return 0, err
 		}
 	}
-	return stateBlockNID, err
+	return stateBlockNID, nil
 }
 
 func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
-	nids := make([]interface{}, len(stateBlockNIDs))
-	for k, v := range stateBlockNIDs {
-		nids[k] = v
+
+	// "SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
+	// " FROM roomserver_state_block WHERE state_block_nid IN ($1)" +
+	// " ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var response []StateBlockCosmosData
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": stateBlockNIDs,
 	}
-	selectOrig := strings.Replace(bulkSelectStateBlockEntriesSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
-	selectStmt, err := s.db.Prepare(selectOrig)
+
+	response, err := queryStateBlock(s, ctx, s.bulkSelectStateBlockEntriesStmt, params)
+
 	if err != nil {
 		return nil, err
 	}
-	rows, err := selectStmt.QueryContext(ctx, nids...)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
 
 	results := make([]types.StateEntryList, len(stateBlockNIDs))
 	// current is a pointer to the StateEntryList to append the state entries to.
 	var current *types.StateEntryList
 	i := 0
-	for rows.Next() {
-		var (
-			stateBlockNID    int64
-			eventTypeNID     int64
-			eventStateKeyNID int64
-			eventNID         int64
-			entry            types.StateEntry
-		)
-		if err := rows.Scan(
-			&stateBlockNID, &eventTypeNID, &eventStateKeyNID, &eventNID,
-		); err != nil {
-			return nil, err
-		}
-		entry.EventTypeNID = types.EventTypeNID(eventTypeNID)
-		entry.EventStateKeyNID = types.EventStateKeyNID(eventStateKeyNID)
-		entry.EventNID = types.EventNID(eventNID)
-		if current == nil || types.StateBlockNID(stateBlockNID) != current.StateBlockNID {
+	for _, item := range response {
+		entry := types.StateEntry{}
+		entry.EventTypeNID = types.EventTypeNID(item.StateBlock.EventTypeNID)
+		entry.EventStateKeyNID = types.EventStateKeyNID(item.StateBlock.EventStateKeyNID)
+		entry.EventNID = types.EventNID(item.StateBlock.EventNID)
+
+		if current == nil || types.StateBlockNID(item.StateBlock.StateBlockNID) != current.StateBlockNID {
 			// The state entry row is for a different state data block to the current one.
 			// So we start appending to the next entry in the list.
 			current = &results[i]
-			current.StateBlockNID = types.StateBlockNID(stateBlockNID)
+			current.StateBlockNID = types.StateBlockNID(item.StateBlock.StateBlockNID)
 			i++
 		}
 		current.StateEntries = append(current.StateEntries, entry)
 	}
-	if i != len(nids) {
-		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(nids))
+	if i != len(stateBlockNIDs) {
+		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(stateBlockNIDs))
 	}
 	return results, nil
 }
@@ -187,34 +295,33 @@ func (s *stateBlockStatements) BulkSelectFilteredStateBlockEntries(
 	sort.Sort(tuples)
 
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
-	sqlStatement := strings.Replace(bulkSelectFilteredStateBlockEntriesSQL, "($1)", sqlutil.QueryVariadic(len(stateBlockNIDs)), 1)
-	sqlStatement = strings.Replace(sqlStatement, "($2)", sqlutil.QueryVariadicOffset(len(eventTypeNIDArray), len(stateBlockNIDs)), 1)
-	sqlStatement = strings.Replace(sqlStatement, "($3)", sqlutil.QueryVariadicOffset(len(eventStateKeyNIDArray), len(stateBlockNIDs)+len(eventTypeNIDArray)), 1)
+	// sqlStatement := strings.Replace(bulkSelectFilteredStateBlockEntriesSQL, "($1)", sqlutil.QueryVariadic(len(stateBlockNIDs)), 1)
+	// sqlStatement = strings.Replace(sqlStatement, "($2)", sqlutil.QueryVariadicOffset(len(eventTypeNIDArray), len(stateBlockNIDs)), 1)
+	// sqlStatement = strings.Replace(sqlStatement, "($3)", sqlutil.QueryVariadicOffset(len(eventStateKeyNIDArray), len(stateBlockNIDs)+len(eventTypeNIDArray)), 1)
 
-	var params []interface{}
-	for _, val := range stateBlockNIDs {
-		params = append(params, int64(val))
-	}
-	for _, val := range eventTypeNIDArray {
-		params = append(params, val)
-	}
-	for _, val := range eventStateKeyNIDArray {
-		params = append(params, val)
+	// "SELECT state_block_nid, event_type_nid, event_state_key_nid, event_nid" +
+	// " FROM roomserver_state_block WHERE state_block_nid IN ($1)" +
+	// " AND event_type_nid IN ($2) AND event_state_key_nid IN ($3)" +
+	// " ORDER BY state_block_nid, event_type_nid, event_state_key_nid"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var response []StateBlockCosmosData
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": stateBlockNIDs,
+		"@x3": eventTypeNIDArray,
+		"@x4": eventStateKeyNIDArray,
 	}
 
-	rows, err := s.db.QueryContext(
-		ctx,
-		sqlStatement,
-		params...,
-	)
+	response, err := queryStateBlock(s, ctx, s.bulkSelectFilteredStateBlockEntriesStmt, params)
+
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectFilteredStateBlockEntries: rows.close() failed")
 
 	var results []types.StateEntryList
 	var current types.StateEntryList
-	for rows.Next() {
+	for _, item := range response {
 		var (
 			stateBlockNID    int64
 			eventTypeNID     int64
@@ -222,11 +329,10 @@ func (s *stateBlockStatements) BulkSelectFilteredStateBlockEntries(
 			eventNID         int64
 			entry            types.StateEntry
 		)
-		if err := rows.Scan(
-			&stateBlockNID, &eventTypeNID, &eventStateKeyNID, &eventNID,
-		); err != nil {
-			return nil, err
-		}
+		stateBlockNID = item.StateBlock.StateBlockNID
+		eventTypeNID = item.StateBlock.EventTypeNID
+		eventStateKeyNID = item.StateBlock.EventStateKeyNID
+		eventNID = item.StateBlock.EventNID
 		entry.EventTypeNID = types.EventTypeNID(eventTypeNID)
 		entry.EventStateKeyNID = types.EventStateKeyNID(eventStateKeyNID)
 		entry.EventNID = types.EventNID(eventNID)

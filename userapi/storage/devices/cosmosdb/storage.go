@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 
@@ -37,7 +36,6 @@ var deviceIDByteLength = 6
 
 // Database represents a device database.
 type Database struct {
-	writer       sqlutil.Writer
 	devices      devicesStatements
 	connection   cosmosdbapi.CosmosConnection
 	databaseName string

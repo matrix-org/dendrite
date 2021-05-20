@@ -17,14 +17,15 @@ package cosmosdb
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
-	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,16 +34,26 @@ import (
 // A Database is used to store room events and stream offsets.
 type Database struct {
 	shared.Database
+	connection   cosmosdbapi.CosmosConnection
+	databaseName string
+	cosmosConfig cosmosdbapi.CosmosConfig
+	serverName   gomatrixserverlib.ServerName
 }
 
 // Open a sqlite database.
 func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
-	var d Database
-	var db *sql.DB
-	var err error
-	if db, err = sqlutil.Open(dbProperties); err != nil {
-		return nil, err
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	config := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
+	d := &Database{
+		databaseName: "roomserver",
+		connection:   conn,
+		cosmosConfig: config,
 	}
+	// var db *sql.DB
+	// var err error
+	// if db, err = sqlutil.Open(dbProperties); err != nil {
+	// 	return nil, err
+	// }
 
 	//db.Exec("PRAGMA journal_mode=WAL;")
 	//db.Exec("PRAGMA read_uncommitted = true;")
@@ -51,89 +62,91 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	// cause the roomserver to be unresponsive to new events because something will
 	// acquire the global mutex and never unlock it because it is waiting for a connection
 	// which it will never obtain.
-	db.SetMaxOpenConns(20)
+	// db.SetMaxOpenConns(20)
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
 	// and THEN prepare statements so we don't fail due to referencing new columns
-	ms := membershipStatements{}
-	if err := ms.execSchema(db); err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadAddForgottenColumn(m)
-	if err := m.RunDeltas(db, dbProperties); err != nil {
-		return nil, err
-	}
-	if err := d.prepare(db, cache); err != nil {
+	// ms := membershipStatements{}
+	// if err := ms.execSchema(db); err != nil {
+	// 	return nil, err
+	// }
+	// m := sqlutil.NewMigrations()
+	// deltas.LoadAddForgottenColumn(m)
+	// if err := m.RunDeltas(db, dbProperties); err != nil {
+	// 	return nil, err
+	// }
+	if err := d.prepare(cache); err != nil {
 		return nil, err
 	}
 
-	return &d, nil
+	return d, nil
 }
 
 // nolint: gocyclo
-func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
+func (d *Database) prepare(cache caching.RoomServerCaches) error {
 	var err error
-	eventStateKeys, err := NewSqliteEventStateKeysTable(db)
+	d.databaseName = "roomserver"
+	eventStateKeys, err := NewCosmosDBEventStateKeysTable(d)
 	if err != nil {
 		return err
 	}
-	eventTypes, err := NewSqliteEventTypesTable(db)
+	eventTypes, err := NewCosmosDBEventTypesTable(d)
 	if err != nil {
 		return err
 	}
-	eventJSON, err := NewSqliteEventJSONTable(db)
+	eventJSON, err := NewCosmosDBEventJSONTable(d)
 	if err != nil {
 		return err
 	}
-	events, err := NewSqliteEventsTable(db)
+	events, err := NewCosmosDBEventsTable(d)
 	if err != nil {
 		return err
 	}
-	rooms, err := NewSqliteRoomsTable(db)
+	rooms, err := NewCosmosDBRoomsTable(d)
 	if err != nil {
 		return err
 	}
-	transactions, err := NewSqliteTransactionsTable(db)
+	transactions, err := NewCosmosDBTransactionsTable(d)
 	if err != nil {
 		return err
 	}
-	stateBlock, err := NewSqliteStateBlockTable(db)
+	stateBlock, err := NewCosmosDBStateBlockTable(d)
 	if err != nil {
 		return err
 	}
-	stateSnapshot, err := NewSqliteStateSnapshotTable(db)
+	stateSnapshot, err := NewCosmosDBStateSnapshotTable(d)
 	if err != nil {
 		return err
 	}
-	prevEvents, err := NewSqlitePrevEventsTable(db)
+	prevEvents, err := NewCosmosDBPrevEventsTable(d)
 	if err != nil {
 		return err
 	}
-	roomAliases, err := NewSqliteRoomAliasesTable(db)
+	roomAliases, err := NewCosmosDBRoomAliasesTable(d)
 	if err != nil {
 		return err
 	}
-	invites, err := NewSqliteInvitesTable(db)
+	invites, err := NewCosmosDBInvitesTable(d)
 	if err != nil {
 		return err
 	}
-	membership, err := NewSqliteMembershipTable(db)
+	membership, err := NewCosmosDBMembershipTable(d)
 	if err != nil {
 		return err
 	}
-	published, err := NewSqlitePublishedTable(db)
+	published, err := NewCosmosDBPublishedTable(d)
 	if err != nil {
 		return err
 	}
-	redactions, err := NewSqliteRedactionsTable(db)
+	redactions, err := NewCosmosDBRedactionsTable(d)
 	if err != nil {
 		return err
 	}
 	d.Database = shared.Database{
-		DB:                         db,
-		Cache:                      cache,
-		Writer:                     sqlutil.NewExclusiveWriter(),
+		DB:    nil,
+		Cache: cache,
+		//Use the Fake SQL Writer here
+		Writer:                     cosmosdbutil.NewExclusiveWriterFake(),
 		EventsTable:                events,
 		EventTypesTable:            eventTypes,
 		EventStateKeysTable:        eventStateKeys,

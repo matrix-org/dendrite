@@ -17,84 +17,207 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
-const redactionsSchema = `
--- Stores information about the redacted state of events.
--- We need to track redactions rather than blindly updating the event JSON table on receipt of a redaction
--- because we might receive the redaction BEFORE we receive the event which it redacts (think backfill).
-CREATE TABLE IF NOT EXISTS roomserver_redactions (
-    redaction_event_id TEXT PRIMARY KEY,
-	redacts_event_id TEXT NOT NULL,
-	-- Initially FALSE, set to TRUE when the redaction has been validated according to rooms v3+ spec
-	-- https://matrix.org/docs/spec/rooms/v3#authorization-rules-for-events
-	validated BOOLEAN NOT NULL
-);
-`
+// const redactionsSchema = `
+// -- Stores information about the redacted state of events.
+// -- We need to track redactions rather than blindly updating the event JSON table on receipt of a redaction
+// -- because we might receive the redaction BEFORE we receive the event which it redacts (think backfill).
+// CREATE TABLE IF NOT EXISTS roomserver_redactions (
+//     redaction_event_id TEXT PRIMARY KEY,
+// 	redacts_event_id TEXT NOT NULL,
+// 	-- Initially FALSE, set to TRUE when the redaction has been validated according to rooms v3+ spec
+// 	-- https://matrix.org/docs/spec/rooms/v3#authorization-rules-for-events
+// 	validated BOOLEAN NOT NULL
+// );
+// `
 
-const insertRedactionSQL = "" +
-	"INSERT OR IGNORE INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
-	" VALUES ($1, $2, $3)"
-
-const selectRedactionInfoByRedactionEventIDSQL = "" +
-	"SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
-	" WHERE redaction_event_id = $1"
-
-const selectRedactionInfoByEventBeingRedactedSQL = "" +
-	"SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
-	" WHERE redacts_event_id = $1"
-
-const markRedactionValidatedSQL = "" +
-	" UPDATE roomserver_redactions SET validated = $2 WHERE redaction_event_id = $1"
-
-type redactionStatements struct {
-	db                                          *sql.DB
-	insertRedactionStmt                         *sql.Stmt
-	selectRedactionInfoByRedactionEventIDStmt   *sql.Stmt
-	selectRedactionInfoByEventBeingRedactedStmt *sql.Stmt
-	markRedactionValidatedStmt                  *sql.Stmt
+type RedactionCosmos struct {
+	RedactionEventID string `json:"redaction_event_id"`
+	RedactsEventID   string `json:"redacts_event_id"`
+	Validated        bool   `json:"validated"`
 }
 
-func NewSqliteRedactionsTable(db *sql.DB) (tables.Redactions, error) {
-	s := &redactionStatements{
-		db: db,
-	}
-	_, err := db.Exec(redactionsSchema)
+type RedactionCosmosData struct {
+	Id        string          `json:"id"`
+	Pk        string          `json:"_pk"`
+	Cn        string          `json:"_cn"`
+	ETag      string          `json:"_etag"`
+	Timestamp int64           `json:"_ts"`
+	Redaction RedactionCosmos `json:"mx_roomserver_redaction"`
+}
+
+// const insertRedactionSQL = "" +
+// 	"INSERT OR IGNORE INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
+// 	" VALUES ($1, $2, $3)"
+
+// const selectRedactionInfoByRedactionEventIDSQL = "" +
+// 	"SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
+// 	" WHERE redaction_event_id = $1"
+
+// "SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
+// " WHERE redacts_event_id = $1"
+const selectRedactionInfoByEventBeingRedactedSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	" and c.mx_roomserver_redaction.redacts_event_id = @x2"
+
+// const markRedactionValidatedSQL = "" +
+// 	" UPDATE roomserver_redactions SET validated = $2 WHERE redaction_event_id = $1"
+
+type redactionStatements struct {
+	db *Database
+	// insertRedactionStmt                         *sql.Stmt
+	// selectRedactionInfoByRedactionEventIDStmt   *sql.Stmt
+	selectRedactionInfoByEventBeingRedactedStmt string
+	// markRedactionValidatedStmt                  *sql.Stmt
+	tableName string
+}
+
+func queryRedaction(s *redactionStatements, ctx context.Context, qry string, params map[string]interface{}) ([]RedactionCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []RedactionCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
+	return response, nil
+}
 
-	return s, shared.StatementList{
-		{&s.insertRedactionStmt, insertRedactionSQL},
-		{&s.selectRedactionInfoByRedactionEventIDStmt, selectRedactionInfoByRedactionEventIDSQL},
-		{&s.selectRedactionInfoByEventBeingRedactedStmt, selectRedactionInfoByEventBeingRedactedSQL},
-		{&s.markRedactionValidatedStmt, markRedactionValidatedSQL},
-	}.Prepare(db)
+func getRedaction(s *redactionStatements, ctx context.Context, pk string, docId string) (*RedactionCosmosData, error) {
+	response := RedactionCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, cosmosdbutil.ErrNoRows
+	}
+
+	return &response, err
+}
+
+func setRedaction(s *redactionStatements, ctx context.Context, pk string, redaction RedactionCosmosData) (*RedactionCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, redaction.ETag)
+	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		redaction.Id,
+		&redaction,
+		optionsReplace)
+	return &redaction, ex
+}
+
+func NewCosmosDBRedactionsTable(db *Database) (tables.Redactions, error) {
+	s := &redactionStatements{
+		db: db,
+	}
+
+	// return s, shared.StatementList{
+	// 	{&s.insertRedactionStmt, insertRedactionSQL},
+	// 	{&s.selectRedactionInfoByRedactionEventIDStmt, selectRedactionInfoByRedactionEventIDSQL},
+	s.selectRedactionInfoByEventBeingRedactedStmt = selectRedactionInfoByEventBeingRedactedSQL
+	// 	{&s.markRedactionValidatedStmt, markRedactionValidatedSQL},
+	// }.Prepare(db)
+	s.tableName = "redactions"
+	return s, nil
 }
 
 func (s *redactionStatements) InsertRedaction(
 	ctx context.Context, txn *sql.Tx, info tables.RedactionInfo,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertRedactionStmt)
-	_, err := stmt.ExecContext(ctx, info.RedactionEventID, info.RedactsEventID, info.Validated)
-	return err
+
+	// "INSERT OR IGNORE INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
+	// " VALUES ($1, $2, $3)"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	//     redaction_event_id TEXT PRIMARY KEY,
+	docId := info.RedactionEventID
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	data := RedactionCosmos{
+		RedactionEventID: info.RedactionEventID,
+		RedactsEventID:   info.RedactsEventID,
+		Validated:        info.Validated,
+	}
+
+	var dbData = RedactionCosmosData{
+		Id:        cosmosDocId,
+		Cn:        dbCollectionName,
+		Pk:        pk,
+		Timestamp: time.Now().Unix(),
+		Redaction: data,
+	}
+
+	// "INSERT OR IGNORE INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
+	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		&dbData,
+		options)
+
+	// TODO: Just forDebug - Remove exception
+	if err != nil {
+		return err
+	}
+
+	//Ignore Error
+	return nil
 }
 
 func (s *redactionStatements) SelectRedactionInfoByRedactionEventID(
 	ctx context.Context, txn *sql.Tx, redactionEventID string,
 ) (info *tables.RedactionInfo, err error) {
 	info = &tables.RedactionInfo{}
-	stmt := sqlutil.TxStmt(txn, s.selectRedactionInfoByRedactionEventIDStmt)
-	err = stmt.QueryRowContext(ctx, redactionEventID).Scan(
-		&info.RedactionEventID, &info.RedactsEventID, &info.Validated,
-	)
-	if err == sql.ErrNoRows {
+
+	// "SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
+	// " WHERE redaction_event_id = $1"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	//     redaction_event_id TEXT PRIMARY KEY,
+	docId := redactionEventID
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	response, err := getRedaction(s, ctx, pk, cosmosDocId)
+	if err != nil {
+		info = nil
+		err = err
+		return
+	}
+
+	if response == nil {
 		info = nil
 		err = nil
+		return
+	}
+	info = &tables.RedactionInfo{
+		RedactionEventID: response.Redaction.RedactionEventID,
+		RedactsEventID:   response.Redaction.RedactsEventID,
+		Validated:        response.Redaction.Validated,
 	}
 	return
 }
@@ -102,14 +225,31 @@ func (s *redactionStatements) SelectRedactionInfoByRedactionEventID(
 func (s *redactionStatements) SelectRedactionInfoByEventBeingRedacted(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (info *tables.RedactionInfo, err error) {
-	info = &tables.RedactionInfo{}
-	stmt := sqlutil.TxStmt(txn, s.selectRedactionInfoByEventBeingRedactedStmt)
-	err = stmt.QueryRowContext(ctx, eventID).Scan(
-		&info.RedactionEventID, &info.RedactsEventID, &info.Validated,
-	)
-	if err == sql.ErrNoRows {
+
+	// "SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
+	// " WHERE redacts_event_id = $1"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": eventID,
+	}
+	response, err := queryRedaction(s, ctx, s.selectRedactionInfoByEventBeingRedactedStmt, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(response) == 0 {
 		info = nil
 		err = nil
+		return
+	}
+	// TODO: Check this is ok to return the 1st one
+	*info = tables.RedactionInfo{
+		RedactionEventID: response[0].Redaction.RedactionEventID,
+		RedactsEventID:   response[0].Redaction.RedactsEventID,
+		Validated:        response[0].Redaction.Validated,
 	}
 	return
 }
@@ -117,7 +257,22 @@ func (s *redactionStatements) SelectRedactionInfoByEventBeingRedacted(
 func (s *redactionStatements) MarkRedactionValidated(
 	ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.markRedactionValidatedStmt)
-	_, err := stmt.ExecContext(ctx, redactionEventID, validated)
+
+	// " UPDATE roomserver_redactions SET validated = $2 WHERE redaction_event_id = $1"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	//     redaction_event_id TEXT PRIMARY KEY,
+	docId := redactionEventID
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	response, err := getRedaction(s, ctx, pk, cosmosDocId)
+	if err != nil {
+		return err
+	}
+
+	response.Redaction.Validated = validated
+
+	_, err = setRedaction(s, ctx, pk, *response)
 	return err
 }
