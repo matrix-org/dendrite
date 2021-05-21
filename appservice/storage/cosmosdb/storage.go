@@ -17,7 +17,10 @@ package cosmosdb
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
 	// Import SQLite database driver
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -29,35 +32,38 @@ import (
 // Database stores events intended to be later sent to application services
 type Database struct {
 	sqlutil.PartitionOffsetStatements
-	events eventsStatements
-	txnID  txnStatements
-	db     *sql.DB
-	writer sqlutil.Writer
+	events       eventsStatements
+	txnID        txnStatements
+	writer       cosmosdbutil.Writer
+	connection   cosmosdbapi.CosmosConnection
+	databaseName string
+	cosmosConfig cosmosdbapi.CosmosConfig
+	serverName   gomatrixserverlib.ServerName
 }
 
 // NewDatabase opens a new database
 func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
-	var result Database
-	var err error
-	if result.db, err = sqlutil.Open(dbProperties); err != nil {
-		return nil, err
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	config := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
+	result := &Database{
+		databaseName: "appservice",
+		connection:   conn,
+		cosmosConfig: config,
 	}
-	result.writer = sqlutil.NewExclusiveWriter()
+	var err error
+	result.writer = cosmosdbutil.NewExclusiveWriterFake()
 	if err = result.prepare(); err != nil {
 		return nil, err
 	}
-	if err = result.PartitionOffsetStatements.Prepare(result.db, result.writer, "appservice"); err != nil {
-		return nil, err
-	}
-	return &result, nil
+	return result, nil
 }
 
 func (d *Database) prepare() error {
-	if err := d.events.prepare(d.db, d.writer); err != nil {
+	if err := d.events.prepare(nil, d.writer); err != nil {
 		return err
 	}
 
-	return d.txnID.prepare(d.db, d.writer)
+	return d.txnID.prepare(nil, d.writer)
 }
 
 // StoreEvent takes in a gomatrixserverlib.HeaderedEvent and stores it in the database

@@ -22,38 +22,32 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-const txnIDSchema = `
--- Keeps a count of the current transaction ID
-CREATE TABLE IF NOT EXISTS appservice_counters (
-  name TEXT PRIMARY KEY NOT NULL,
-  last_id INTEGER DEFAULT 1
-);
-INSERT OR IGNORE INTO appservice_counters (name, last_id) VALUES('txn_id', 1);
-`
+// const txnIDSchema = `
+// -- Keeps a count of the current transaction ID
+// CREATE TABLE IF NOT EXISTS appservice_counters (
+//   name TEXT PRIMARY KEY NOT NULL,
+//   last_id INTEGER DEFAULT 1
+// );
+// INSERT OR IGNORE INTO appservice_counters (name, last_id) VALUES('txn_id', 1);
+// `
 
-const selectTxnIDSQL = `
-  SELECT last_id FROM appservice_counters WHERE name='txn_id';
-  UPDATE appservice_counters SET last_id=last_id+1 WHERE name='txn_id';
-`
+// const selectTxnIDSQL = `
+//   SELECT last_id FROM appservice_counters WHERE name='txn_id';
+//   UPDATE appservice_counters SET last_id=last_id+1 WHERE name='txn_id';
+// `
 
 type txnStatements struct {
-	db              *sql.DB
+	db              *Database
 	writer          sqlutil.Writer
 	selectTxnIDStmt *sql.Stmt
+	tableName string
 }
 
-func (s *txnStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
+func (s *txnStatements) prepare(db *Database, writer sqlutil.Writer) (err error) {
 	s.db = db
 	s.writer = writer
-	_, err = db.Exec(txnIDSchema)
-	if err != nil {
-		return
-	}
-
-	if s.selectTxnIDStmt, err = db.Prepare(selectTxnIDSQL); err != nil {
-		return
-	}
-
+	//Only used for the seq generation
+	s.tableName = "counters"
 	return
 }
 
@@ -61,9 +55,5 @@ func (s *txnStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 func (s *txnStatements) selectTxnID(
 	ctx context.Context,
 ) (txnID int, err error) {
-	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
-		err := s.selectTxnIDStmt.QueryRowContext(ctx).Scan(&txnID)
-		return err
-	})
-	return
+	return GetNextCounterTXNID(s, ctx)
 }
