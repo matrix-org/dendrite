@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/matrix-org/dendrite/setup"
@@ -16,15 +17,24 @@ import (
 
 func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) error {
 	var parent net.Conn
+	dialer := net.Dialer{
+		Timeout:   time.Second * 5,
+		KeepAlive: time.Second * 5,
+	}
 	if strings.HasPrefix(peer, "ws://") || strings.HasPrefix(peer, "wss://") {
-		c, _, err := websocket.DefaultDialer.Dial(peer, nil)
+		wsdialer := websocket.Dialer{
+			NetDial:          dialer.Dial,
+			NetDialContext:   dialer.DialContext,
+			HandshakeTimeout: time.Second * 5,
+		}
+		c, _, err := wsdialer.Dial(peer, nil)
 		if err != nil {
 			return fmt.Errorf("websocket.DefaultDialer.Dial: %w", err)
 		}
 		parent = WrapWebSocketConn(c)
 	} else {
 		var err error
-		parent, err = net.Dial("tcp", peer)
+		parent, err = dialer.Dial("tcp", peer)
 		if err != nil {
 			return fmt.Errorf("net.Dial: %w", err)
 		}
