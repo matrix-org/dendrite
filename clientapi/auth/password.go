@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/util"
 )
 
@@ -29,13 +30,16 @@ type GetAccountByPassword func(ctx context.Context, localpart, password string) 
 
 type PasswordRequest struct {
 	Login
+	Address  string `json:"address"`
 	Password string `json:"password"`
+	Medium   string `json:"medium"`
 }
 
 // LoginTypePassword implements https://matrix.org/docs/spec/client_server/r0.6.1#password-based
 type LoginTypePassword struct {
 	GetAccountByPassword GetAccountByPassword
 	Config               *config.ClientAPI
+	AccountDB            accounts.Database
 }
 
 func (t *LoginTypePassword) Name() string {
@@ -48,14 +52,36 @@ func (t *LoginTypePassword) Request() interface{} {
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-	username := r.Username()
-	if username == "" {
-		return nil, &util.JSONResponse{
-			Code: http.StatusUnauthorized,
-			JSON: jsonerror.BadJSON("A username must be supplied."),
+	var username string
+	var localpart string
+	var err error
+	username = r.Username()
+	if username != "" {
+		localpart, err = userutil.ParseUsernameParam(username, &t.Config.Matrix.ServerName)
+	} else {
+		if r.Medium == "email" {
+			if r.Address != "" {
+				localpart, err = t.AccountDB.GetLocalpartForThreePID(ctx, r.Address, "email")
+				if localpart == "" {
+					return nil, &util.JSONResponse{
+						Code: http.StatusForbidden,
+						JSON: jsonerror.Forbidden("email or password was incorrect, or the account does not exist"),
+					}
+				}
+				r.Login.User = localpart
+			} else {
+				return nil, &util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.BadJSON("'address' must be supplied."),
+				}
+			}
+		} else {
+			return nil, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.BadJSON("'user' must be supplied."),
+			}
 		}
 	}
-	localpart, err := userutil.ParseUsernameParam(username, &t.Config.Matrix.ServerName)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,

@@ -12,6 +12,8 @@ type ClientAPI struct {
 	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
 
+	EmailLogin bool `yaml:"email_login"`
+
 	// If set disables new users from registering (except via shared
 	// secrets)
 	RegistrationDisabled bool `yaml:"registration_disabled"`

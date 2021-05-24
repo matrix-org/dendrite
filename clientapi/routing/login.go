@@ -68,6 +68,7 @@ func Login(
 		typePassword := auth.LoginTypePassword{
 			GetAccountByPassword: accountDB.GetAccountByPassword,
 			Config:               cfg,
+			AccountDB:            accountDB,
 		}
 		r := typePassword.Request()
 		resErr := httputil.UnmarshalJSONRequest(req, r)

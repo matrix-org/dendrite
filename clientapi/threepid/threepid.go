@@ -33,11 +33,12 @@ type EmailAssociationRequest struct {
 	Secret      string `json:"client_secret"`
 	Email       string `json:"email"`
 	SendAttempt int    `json:"send_attempt"`
+	NextLink    string `json:"next_link"`
 }
 
 // EmailAssociationCheckRequest represents the request defined at https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-account-3pid
 type EmailAssociationCheckRequest struct {
-	Creds Credentials `json:"threePidCreds"`
+	Creds Credentials `json:"three_pid_creds"`
 	Bind  bool        `json:"bind"`
 }
 
@@ -66,6 +67,7 @@ func CreateSession(
 	data.Add("client_secret", req.Secret)
 	data.Add("email", req.Email)
 	data.Add("send_attempt", strconv.Itoa(req.SendAttempt))
+	data.Add("next_link", req.NextLink)
 
 	request, err := http.NewRequest(http.MethodPost, postURL, strings.NewReader(data.Encode()))
 	if err != nil {
@@ -81,7 +83,7 @@ func CreateSession(
 
 	// Error if the status isn't OK
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("could not create a session on the server %s", req.IDServer)
+		return "", fmt.Errorf("Could not create a session on the server %s, got status code: %d", req.IDServer, resp.StatusCode)
 	}
 
 	// Extract the SID from the response and return it
