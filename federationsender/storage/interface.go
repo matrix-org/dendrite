@@ -54,6 +54,7 @@ type Database interface {
 	// these don't have contexts passed in as we want things to happen regardless of the request context
 	AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error
 	RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error
+	RemoveAllServersFromBlacklist() error
 	IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error)
 
 	AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error
