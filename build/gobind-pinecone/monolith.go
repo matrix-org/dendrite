@@ -97,7 +97,7 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.staticPeerMutex.Unlock()
 	m.DisconnectType(pineconeRouter.PeerTypeRemote)
 	if uri != "" {
-		m.staticPeerConnect()
+		go m.staticPeerConnect()
 	}
 }
 
