@@ -25,6 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
+
+	_ "golang.org/x/mobile/bind"
 )
 
 type DendriteMonolith struct {

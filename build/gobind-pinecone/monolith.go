@@ -46,6 +46,8 @@ import (
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 	"github.com/matrix-org/pinecone/types"
 	pineconeTypes "github.com/matrix-org/pinecone/types"
+
+	_ "golang.org/x/mobile/bind"
 )
 
 const (
