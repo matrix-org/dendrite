@@ -16,101 +16,104 @@
 package cosmosdb
 
 import (
-	"database/sql"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
 	// Import the sqlite3 package
-	_ "github.com/mattn/go-sqlite3"
+	// _ "github.com/mattn/go-sqlite3"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
-	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	shared.Database
-	db     *sql.DB
-	writer sqlutil.Writer
-	sqlutil.PartitionOffsetStatements
-	streamID streamIDStatements
+	// db     *sql.DB
+	writer   cosmosdbutil.Writer
+	database cosmosdbutil.Database
+	cosmosdbutil.PartitionOffsetStatements
+	streamID     streamIDStatements
+	connection   cosmosdbapi.CosmosConnection
+	databaseName string
+	cosmosConfig cosmosdbapi.CosmosConfig
 }
 
 // NewDatabase creates a new sync server database
 // nolint: gocyclo
 func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	configCosmos := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
 	var d SyncServerDatasource
-	var err error
-	if d.db, err = sqlutil.Open(dbProperties); err != nil {
+	d.writer = cosmosdbutil.NewExclusiveWriterFake()
+	if err := d.prepare(dbProperties); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewExclusiveWriter()
-	if err = d.prepare(dbProperties); err != nil {
-		return nil, err
+	d.connection = conn
+	d.cosmosConfig = configCosmos
+	d.databaseName = "syncapi"
+	d.database = cosmosdbutil.Database{
+		Connection:   conn,
+		CosmosConfig: configCosmos,
+		DatabaseName: d.databaseName,
 	}
 	return &d, nil
 }
 
 func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
-	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
+	if err = d.PartitionOffsetStatements.Prepare(&d.database, d.writer, "syncapi"); err != nil {
 		return err
 	}
-	if err = d.streamID.prepare(d.db); err != nil {
+	if err = d.streamID.prepare(d); err != nil {
 		return err
 	}
-	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
+	accountData, err := NewCosmosDBAccountDataTable(d, &d.streamID)
 	if err != nil {
 		return err
 	}
-	events, err := NewSqliteEventsTable(d.db, &d.streamID)
+	events, err := NewCosmosDBEventsTable(d, &d.streamID)
 	if err != nil {
 		return err
 	}
-	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
+	roomState, err := NewCosmosDBCurrentRoomStateTable(d, &d.streamID)
 	if err != nil {
 		return err
 	}
-	invites, err := NewSqliteInvitesTable(d.db, &d.streamID)
+	invites, err := NewCosmosDBInvitesTable(d, &d.streamID)
 	if err != nil {
 		return err
 	}
-	peeks, err := NewSqlitePeeksTable(d.db, &d.streamID)
+	peeks, err := NewCosmosDBPeeksTable(d, &d.streamID)
 	if err != nil {
 		return err
 	}
-	topology, err := NewSqliteTopologyTable(d.db)
+	topology, err := NewCosmosDBTopologyTable(d)
 	if err != nil {
 		return err
 	}
-	bwExtrem, err := NewSqliteBackwardsExtremitiesTable(d.db)
+	bwExtrem, err := NewCosmosDBBackwardsExtremitiesTable(d)
 	if err != nil {
 		return err
 	}
-	sendToDevice, err := NewSqliteSendToDeviceTable(d.db)
+	sendToDevice, err := NewCosmosDBSendToDeviceTable(d)
 	if err != nil {
 		return err
 	}
-	filter, err := NewSqliteFilterTable(d.db)
+	filter, err := NewCosmosDBFilterTable(d)
 	if err != nil {
 		return err
 	}
-	receipts, err := NewSqliteReceiptsTable(d.db, &d.streamID)
+	receipts, err := NewCosmosDBReceiptsTable(d, &d.streamID)
 	if err != nil {
 		return err
 	}
-	memberships, err := NewSqliteMembershipsTable(d.db)
+	memberships, err := NewCosmosDBMembershipsTable(d)
 	if err != nil {
-		return err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadFixSequences(m)
-	deltas.LoadRemoveSendToDeviceSentColumn(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return err
 	}
 	d.Database = shared.Database{
-		DB:                  d.db,
+		DB:                  nil,
 		Writer:              d.writer,
 		Invites:             invites,
 		Peeks:               peeks,

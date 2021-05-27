@@ -17,93 +17,167 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const outputRoomEventsTopologySchema = `
--- Stores output room events received from the roomserver.
-CREATE TABLE IF NOT EXISTS syncapi_output_room_events_topology (
-  event_id TEXT PRIMARY KEY,
-  topological_position BIGINT NOT NULL,
-  stream_position BIGINT NOT NULL,
-  room_id TEXT NOT NULL,
+// const outputRoomEventsTopologySchema = `
+// -- Stores output room events received from the roomserver.
+// CREATE TABLE IF NOT EXISTS syncapi_output_room_events_topology (
+//   event_id TEXT PRIMARY KEY,
+//   topological_position BIGINT NOT NULL,
+//   stream_position BIGINT NOT NULL,
+//   room_id TEXT NOT NULL,
 
-	UNIQUE(topological_position, room_id, stream_position)
-);
--- The topological order will be used in events selection and ordering
--- CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_topological_position_idx ON syncapi_output_room_events_topology(topological_position, stream_position, room_id);
-`
+// 	UNIQUE(topological_position, room_id, stream_position)
+// );
+// -- The topological order will be used in events selection and ordering
+// -- CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_topological_position_idx ON syncapi_output_room_events_topology(topological_position, stream_position, room_id);
+// `
 
-const insertEventInTopologySQL = "" +
-	"INSERT INTO syncapi_output_room_events_topology (event_id, topological_position, room_id, stream_position)" +
-	" VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT DO NOTHING"
-
-const selectEventIDsInRangeASCSQL = "" +
-	"SELECT event_id FROM syncapi_output_room_events_topology" +
-	" WHERE room_id = $1 AND (" +
-	"(topological_position > $2 AND topological_position < $3) OR" +
-	"(topological_position = $4 AND stream_position <= $5)" +
-	") ORDER BY topological_position ASC, stream_position ASC LIMIT $6"
-
-const selectEventIDsInRangeDESCSQL = "" +
-	"SELECT event_id  FROM syncapi_output_room_events_topology" +
-	" WHERE room_id = $1 AND (" +
-	"(topological_position > $2 AND topological_position < $3) OR" +
-	"(topological_position = $4 AND stream_position <= $5)" +
-	") ORDER BY topological_position DESC, stream_position DESC LIMIT $6"
-
-const selectPositionInTopologySQL = "" +
-	"SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
-	" WHERE event_id = $1"
-
-const selectMaxPositionInTopologySQL = "" +
-	"SELECT MAX(topological_position), stream_position FROM syncapi_output_room_events_topology" +
-	" WHERE room_id = $1 ORDER BY stream_position DESC"
-
-const deleteTopologyForRoomSQL = "" +
-	"DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
-
-type outputRoomEventsTopologyStatements struct {
-	db                              *sql.DB
-	insertEventInTopologyStmt       *sql.Stmt
-	selectEventIDsInRangeASCStmt    *sql.Stmt
-	selectEventIDsInRangeDESCStmt   *sql.Stmt
-	selectPositionInTopologyStmt    *sql.Stmt
-	selectMaxPositionInTopologyStmt *sql.Stmt
-	deleteTopologyForRoomStmt       *sql.Stmt
+type OutputRoomEventTopologyCosmos struct {
+	EventID             string `json:"event_id"`
+	TopologicalPosition int64  `json:"topological_position"`
+	StreamPosition      int64  `json:"stream_position"`
+	RoomID              string `json:"room_id"`
 }
 
-func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
-	s := &outputRoomEventsTopologyStatements{
-		db: db,
-	}
-	_, err := db.Exec(outputRoomEventsTopologySchema)
+type OutputRoomEventTopologyCosmosData struct {
+	Id                      string                        `json:"id"`
+	Pk                      string                        `json:"_pk"`
+	Cn                      string                        `json:"_cn"`
+	ETag                    string                        `json:"_etag"`
+	Timestamp               int64                         `json:"_ts"`
+	OutputRoomEventTopology OutputRoomEventTopologyCosmos `json:"mx_syncapi_output_room_event_topology"`
+}
+
+// const insertEventInTopologySQL = "" +
+// 	"INSERT INTO syncapi_output_room_events_topology (event_id, topological_position, room_id, stream_position)" +
+// 	" VALUES ($1, $2, $3, $4)" +
+// 	" ON CONFLICT DO NOTHING"
+
+// "SELECT event_id FROM syncapi_output_room_events_topology" +
+// " WHERE room_id = $1 AND (" +
+// "(topological_position > $2 AND topological_position < $3) OR" +
+// "(topological_position = $4 AND stream_position <= $5)" +
+// ") ORDER BY topological_position ASC, stream_position ASC LIMIT $6"
+const selectEventIDsInRangeASCSQL = "" +
+	"select top @x7 * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event_topology.room_id = @x2 " +
+	"and ( " +
+	"(c.mx_syncapi_output_room_event_topology.topological_position > @x3 and c.mx_syncapi_output_room_event_topology.topological_position < @x4) " +
+	"OR " +
+	"(c.mx_syncapi_output_room_event_topology.topological_position = @x5 and c.mx_syncapi_output_room_event_topology.stream_position < @x6) " +
+	") " +
+	"order by c.mx_syncapi_output_room_event_topology.topological_position asc "
+	// ", c.mx_syncapi_output_room_event_topology.stream_position asc "
+
+// "SELECT event_id  FROM syncapi_output_room_events_topology" +
+// " WHERE room_id = $1 AND (" +
+// "(topological_position > $2 AND topological_position < $3) OR" +
+// "(topological_position = $4 AND stream_position <= $5)" +
+// ") ORDER BY topological_position DESC, stream_position DESC LIMIT $6"
+const selectEventIDsInRangeDESCSQL = "" +
+	"select top @x7 * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event_topology.room_id = @x2 " +
+	"and ( " +
+	"(c.mx_syncapi_output_room_event_topology.topological_position > @x3 and c.mx_syncapi_output_room_event_topology.topological_position < @x4) " +
+	"OR " +
+	"(c.mx_syncapi_output_room_event_topology.topological_position = @x5 and c.mx_syncapi_output_room_event_topology.stream_position < @x6) " +
+	") " +
+	"order by c.mx_syncapi_output_room_event_topology.topological_position desc "
+	// ", c.mx_syncapi_output_room_event_topology.stream_position desc "
+
+// "SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
+// " WHERE event_id = $1"
+const selectPositionInTopologySQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event_topology.event_id = @x2 "
+
+// "SELECT MAX(topological_position), stream_position FROM syncapi_output_room_events_topology" +
+// " WHERE room_id = $1 ORDER BY stream_position DESC"
+
+// "SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
+// " WHERE topological_position=(" +
+// "SELECT MAX(topological_position) FROM syncapi_output_room_events_topology WHERE room_id=$1" +
+// ") ORDER BY stream_position DESC LIMIT 1"
+const selectMaxPositionInTopologySQL = "" +
+	"select top 1 * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event_topology.topological_position = " +
+	"( " +
+	"select max(c.mx_syncapi_output_room_event_topology.topological_position) from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event_topology.room_id = @x2" +
+	") " +
+	"order by c.mx_syncapi_output_room_event_topology.stream_position desc "
+
+// "DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
+const deleteTopologyForRoomSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event_topology.room_id = @x2 "
+
+type outputRoomEventsTopologyStatements struct {
+	db *SyncServerDatasource
+	// insertEventInTopologyStmt       *sql.Stmt
+	selectEventIDsInRangeASCStmt    string
+	selectEventIDsInRangeDESCStmt   string
+	selectPositionInTopologyStmt    string
+	selectMaxPositionInTopologyStmt string
+	deleteTopologyForRoomStmt       string
+	tableName                       string
+}
+
+func queryOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutputRoomEventTopologyCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []OutputRoomEventTopologyCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
-	if s.insertEventInTopologyStmt, err = db.Prepare(insertEventInTopologySQL); err != nil {
-		return nil, err
+	return response, nil
+}
+
+func deleteOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, dbData OutputRoomEventTopologyCosmosData) error {
+	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData.Id,
+		options)
+
+	if err != nil {
+		return err
 	}
-	if s.selectEventIDsInRangeASCStmt, err = db.Prepare(selectEventIDsInRangeASCSQL); err != nil {
-		return nil, err
+	return err
+}
+
+func NewCosmosDBTopologyTable(db *SyncServerDatasource) (tables.Topology, error) {
+	s := &outputRoomEventsTopologyStatements{
+		db: db,
 	}
-	if s.selectEventIDsInRangeDESCStmt, err = db.Prepare(selectEventIDsInRangeDESCSQL); err != nil {
-		return nil, err
-	}
-	if s.selectPositionInTopologyStmt, err = db.Prepare(selectPositionInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.deleteTopologyForRoomStmt, err = db.Prepare(deleteTopologyForRoomSQL); err != nil {
-		return nil, err
-	}
+
+	s.selectEventIDsInRangeASCStmt = selectEventIDsInRangeASCSQL
+	s.selectEventIDsInRangeDESCStmt = selectEventIDsInRangeDESCSQL
+	s.selectPositionInTopologyStmt = selectPositionInTopologySQL
+	s.selectMaxPositionInTopologyStmt = selectMaxPositionInTopologySQL
+	s.deleteTopologyForRoomStmt = deleteTopologyForRoomSQL
+	s.tableName = "output_room_events_topology"
 	return s, nil
 }
 
@@ -112,9 +186,44 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition,
 ) (types.StreamPosition, error) {
-	_, err := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).ExecContext(
-		ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
-	)
+
+	// "INSERT INTO syncapi_output_room_events_topology (event_id, topological_position, room_id, stream_position)" +
+	// 	" VALUES ($1, $2, $3, $4)" +
+	// 	" ON CONFLICT DO NOTHING"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	// 	UNIQUE(topological_position, room_id, stream_position)
+	docId := fmt.Sprintf("%d_%s_%d", event.Depth(), event.RoomID(), pos)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	data := OutputRoomEventTopologyCosmos{
+		EventID:             event.EventID(),
+		TopologicalPosition: event.Depth(),
+		RoomID:              event.RoomID(),
+		StreamPosition:      int64(pos),
+	}
+
+	dbData := &OutputRoomEventTopologyCosmosData{
+		Id:                      cosmosDocId,
+		Cn:                      dbCollectionName,
+		Pk:                      pk,
+		Timestamp:               time.Now().Unix(),
+		OutputRoomEventTopology: data,
+	}
+
+	// _, err := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).ExecContext(
+	// 	ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
+	// )
+
+	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		&dbData,
+		options)
+
 	return types.StreamPosition(event.Depth()), err
 }
 
@@ -125,15 +234,38 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 ) (eventIDs []string, err error) {
 	// Decide on the selection's order according to whether chronological order
 	// is requested or not.
-	var stmt *sql.Stmt
+	var stmt string
 	if chronologicalOrder {
-		stmt = sqlutil.TxStmt(txn, s.selectEventIDsInRangeASCStmt)
+		// "SELECT event_id FROM syncapi_output_room_events_topology" +
+		// " WHERE room_id = $1 AND (" +
+		// "(topological_position > $2 AND topological_position < $3) OR" +
+		// "(topological_position = $4 AND stream_position <= $5)" +
+		// ") ORDER BY topological_position ASC, stream_position ASC LIMIT $6"
+		stmt = s.selectEventIDsInRangeASCStmt
 	} else {
-		stmt = sqlutil.TxStmt(txn, s.selectEventIDsInRangeDESCStmt)
+		// "SELECT event_id  FROM syncapi_output_room_events_topology" +
+		// " WHERE room_id = $1 AND (" +
+		// "(topological_position > $2 AND topological_position < $3) OR" +
+		// "(topological_position = $4 AND stream_position <= $5)" +
+		// ") ORDER BY topological_position DESC, stream_position DESC LIMIT $6"
+		stmt = s.selectEventIDsInRangeDESCStmt
 	}
 
 	// Query the event IDs.
-	rows, err := stmt.QueryContext(ctx, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+		"@x3": minDepth,
+		"@x4": maxDepth,
+		"@x5": maxDepth,
+		"@x6": maxStreamPos,
+		"@x7": limit,
+	}
+
+	rows, err := queryOutputRoomEventTopology(s, ctx, stmt, params)
+	// rows, err := stmt.QueryContext(ctx, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit)
+
 	if err == sql.ErrNoRows {
 		// If no event matched the request, return an empty slice.
 		return []string{}, nil
@@ -143,10 +275,11 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 
 	// Return the IDs.
 	var eventID string
-	for rows.Next() {
-		if err = rows.Scan(&eventID); err != nil {
-			return
-		}
+	for _, item := range rows {
+		// if err = rows.Scan(&eventID); err != nil {
+		// 	return
+		// }
+		eventID = item.OutputRoomEventTopology.EventID
 		eventIDs = append(eventIDs, eventID)
 	}
 
@@ -158,22 +291,89 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectPositionInTopologyStmt)
-	err = stmt.QueryRowContext(ctx, eventID).Scan(&pos, &spos)
+
+	// "SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
+	// " WHERE event_id = $1"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": eventID,
+	}
+
+	rows, err := queryOutputRoomEventTopology(s, ctx, s.selectPositionInTopologyStmt, params)
+	// stmt := sqlutil.TxStmt(txn, s.selectPositionInTopologyStmt)
+
+	if err != nil {
+		return
+	}
+
+	if len(rows) == 0 {
+		return
+	}
+
+	// err = stmt.QueryRowContext(ctx, eventID).Scan(&pos, &spos)
+	pos = types.StreamPosition(rows[0].OutputRoomEventTopology.TopologicalPosition)
+	spos = types.StreamPosition(rows[0].OutputRoomEventTopology.StreamPosition)
+
 	return
 }
 
 func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
-	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
+
+	// "SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
+	// " WHERE topological_position=(" +
+	// "SELECT MAX(topological_position) FROM syncapi_output_room_events_topology WHERE room_id=$1" +
+	// ") ORDER BY stream_position DESC LIMIT 1"
+
+	// stmt := sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+	}
+
+	rows, err := queryOutputRoomEventTopology(s, ctx, s.selectMaxPositionInTopologyStmt, params)
+	// err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
+
+	if err != nil {
+		return
+	}
+
+	if len(rows) == 0 {
+		return
+	}
+
+	pos = types.StreamPosition(rows[0].OutputRoomEventTopology.TopologicalPosition)
+	spos = types.StreamPosition(rows[0].OutputRoomEventTopology.StreamPosition)
 	return
 }
 
 func (s *outputRoomEventsTopologyStatements) DeleteTopologyForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteTopologyForRoomStmt).ExecContext(ctx, roomID)
+
+	// "DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+	}
+
+	rows, err := queryOutputRoomEventTopology(s, ctx, s.deleteTopologyForRoomStmt, params)
+	// _, err = sqlutil.TxStmt(txn, s.deleteTopologyForRoomStmt).ExecContext(ctx, roomID)
+
+	if err != nil {
+		return
+	}
+
+	for _, item := range rows {
+		err = deleteOutputRoomEventTopology(s, ctx, item)
+		if err != nil {
+			return
+		}
+	}
 	return err
 }

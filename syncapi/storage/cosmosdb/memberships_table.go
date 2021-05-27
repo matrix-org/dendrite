@@ -18,9 +18,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -32,53 +33,92 @@ import (
 // a room, either by choice or otherwise. This is important for
 // building history visibility.
 
-const membershipsSchema = `
-CREATE TABLE IF NOT EXISTS syncapi_memberships (
-    -- The 'room_id' key for the state event.
-    room_id TEXT NOT NULL,
-    -- The state event ID
-	user_id TEXT NOT NULL,
-	-- The status of the membership
-	membership TEXT NOT NULL,
-	-- The event ID that last changed the membership
-	event_id TEXT NOT NULL,
-	-- The stream position of the change
-	stream_pos BIGINT NOT NULL,
-	-- The topological position of the change in the room
-	topological_pos BIGINT NOT NULL,
-	-- Unique index
-	UNIQUE (room_id, user_id, membership)
-);
-`
+// const membershipsSchema = `
+// CREATE TABLE IF NOT EXISTS syncapi_memberships (
+//     -- The 'room_id' key for the state event.
+//     room_id TEXT NOT NULL,
+//     -- The state event ID
+// 	user_id TEXT NOT NULL,
+// 	-- The status of the membership
+// 	membership TEXT NOT NULL,
+// 	-- The event ID that last changed the membership
+// 	event_id TEXT NOT NULL,
+// 	-- The stream position of the change
+// 	stream_pos BIGINT NOT NULL,
+// 	-- The topological position of the change in the room
+// 	topological_pos BIGINT NOT NULL,
+// 	-- Unique index
+// 	UNIQUE (room_id, user_id, membership)
+// );
+// `
 
-const upsertMembershipSQL = "" +
-	"INSERT INTO syncapi_memberships (room_id, user_id, membership, event_id, stream_pos, topological_pos)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)" +
-	" ON CONFLICT (room_id, user_id, membership)" +
-	" DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6"
-
-const selectMembershipSQL = "" +
-	"SELECT event_id, stream_pos, topological_pos FROM syncapi_memberships" +
-	" WHERE room_id = $1 AND user_id = $2 AND membership IN ($3)" +
-	" ORDER BY stream_pos DESC" +
-	" LIMIT 1"
-
-type membershipsStatements struct {
-	db                   *sql.DB
-	upsertMembershipStmt *sql.Stmt
+type MembershipCosmos struct {
+	RoomID         string `json:"room_id"`
+	UserID         string `json:"user_id"`
+	Membership     string `json:"membership"`
+	EventID        string `json:"event_id"`
+	StreamPos      int64  `json:"stream_pos"`
+	TopologicalPos int64  `json:"topological_pos"`
 }
 
-func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
-	s := &membershipsStatements{
-		db: db,
-	}
-	_, err := db.Exec(membershipsSchema)
+type MembershipCosmosData struct {
+	Id         string           `json:"id"`
+	Pk         string           `json:"_pk"`
+	Cn         string           `json:"_cn"`
+	ETag       string           `json:"_etag"`
+	Timestamp  int64            `json:"_ts"`
+	Membership MembershipCosmos `json:"mx_syncapi_membership"`
+}
+
+// const upsertMembershipSQL = "" +
+// 	"INSERT INTO syncapi_memberships (room_id, user_id, membership, event_id, stream_pos, topological_pos)" +
+// 	" VALUES ($1, $2, $3, $4, $5, $6)" +
+// 	" ON CONFLICT (room_id, user_id, membership)" +
+// 	" DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6"
+
+// "SELECT event_id, stream_pos, topological_pos FROM syncapi_memberships" +
+// " WHERE room_id = $1 AND user_id = $2 AND membership IN ($3)" +
+// " ORDER BY stream_pos DESC" +
+// " LIMIT 1"
+const selectMembershipSQL = "" +
+	"select top 1 * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_membership.room_id = @x2 " +
+	"and c.mx_syncapi_membership.user_id = @x3 " +
+	"and ARRAY_CONTAINS(@x4, c.mx_syncapi_membership.membership) " +
+	"order by c.mx_syncapi_membership.stream_pos desc "
+
+type membershipsStatements struct {
+	db *SyncServerDatasource
+	// upsertMembershipStmt *sql.Stmt
+	tableName string
+}
+
+func queryMembership(s *membershipsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]MembershipCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []MembershipCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
-	if s.upsertMembershipStmt, err = db.Prepare(upsertMembershipSQL); err != nil {
-		return nil, err
+	return response, nil
+}
+
+func NewCosmosDBMembershipsTable(db *SyncServerDatasource) (tables.Memberships, error) {
+	s := &membershipsStatements{
+		db: db,
 	}
+	s.tableName = "memberships"
 	return s, nil
 }
 
@@ -90,30 +130,86 @@ func (s *membershipsStatements) UpsertMembership(
 	if err != nil {
 		return fmt.Errorf("event.Membership: %w", err)
 	}
-	_, err = sqlutil.TxStmt(txn, s.upsertMembershipStmt).ExecContext(
+
+	// "INSERT INTO syncapi_memberships (room_id, user_id, membership, event_id, stream_pos, topological_pos)" +
+	// " VALUES ($1, $2, $3, $4, $5, $6)" +
+	// " ON CONFLICT (room_id, user_id, membership)" +
+	// " DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6"
+
+	// _, err = sqlutil.TxStmt(txn, s.upsertMembershipStmt).ExecContext(
+	// 	ctx,
+	// 	event.RoomID(),
+	// 	*event.StateKey(),
+	// 	membership,
+	// 	event.EventID(),
+	// 	streamPos,
+	// 	topologicalPos,
+	// )
+
+	data := MembershipCosmos{
+		RoomID:         event.RoomID(),
+		UserID:         *event.StateKey(),
+		Membership:     membership,
+		EventID:        event.EventID(),
+		StreamPos:      int64(streamPos),
+		TopologicalPos: int64(topologicalPos),
+	}
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	// 	UNIQUE (room_id, user_id, membership)
+	docId := fmt.Sprintf("%s_%s_%s", event.RoomID(), *event.StateKey(), membership)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+
+	var dbData = MembershipCosmosData{
+		Id:         cosmosDocId,
+		Cn:         dbCollectionName,
+		Pk:         pk,
+		Timestamp:  time.Now().Unix(),
+		Membership: data,
+	}
+
+	var optionsCreate = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
-		event.RoomID(),
-		*event.StateKey(),
-		membership,
-		event.EventID(),
-		streamPos,
-		topologicalPos,
-	)
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData,
+		optionsCreate)
+
 	return err
 }
 
 func (s *membershipsStatements) SelectMembership(
 	ctx context.Context, txn *sql.Tx, roomID, userID, memberships []string,
 ) (eventID string, streamPos, topologyPos types.StreamPosition, err error) {
-	params := []interface{}{roomID, userID}
-	for _, membership := range memberships {
-		params = append(params, membership)
+	// params := []interface{}{roomID, userID}
+	// for _, membership := range memberships {
+	// 	params = append(params, membership)
+	// }
+
+	// "SELECT event_id, stream_pos, topological_pos FROM syncapi_memberships" +
+	// " WHERE room_id = $1 AND user_id = $2 AND membership IN ($3)" +
+	// " ORDER BY stream_pos DESC" +
+	// " LIMIT 1"
+
+	// err = sqlutil.TxStmt(txn, stmt).QueryRowContext(ctx, params...).Scan(&eventID, &streamPos, &topologyPos)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+		"@x3": userID,
+		"@x4": memberships,
 	}
-	orig := strings.Replace(selectMembershipSQL, "($3)", sqlutil.QueryVariadicOffset(len(memberships), 2), 1)
-	stmt, err := s.db.Prepare(orig)
-	if err != nil {
+	// orig := strings.Replace(selectMembershipSQL, "@x4", cosmosdbutil.QueryVariadicOffset(len(memberships), 2), 1)
+	rows, err := queryMembership(s, ctx, selectMembershipSQL, params)
+
+	if err != nil || len(rows) == 0 {
 		return "", 0, 0, err
 	}
-	err = sqlutil.TxStmt(txn, stmt).QueryRowContext(ctx, params...).Scan(&eventID, &streamPos, &topologyPos)
+	// err = sqlutil.TxStmt(txn, stmt).QueryRowContext(ctx, params...).Scan(&eventID, &streamPos, &topologyPos)
+	eventID = rows[0].Membership.EventID
+	streamPos = types.StreamPosition(rows[0].Membership.StreamPos)
+	topologyPos = types.StreamPosition(rows[0].Membership.TopologicalPos)
 	return
 }

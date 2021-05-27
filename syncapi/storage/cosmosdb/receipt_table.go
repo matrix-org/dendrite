@@ -18,72 +18,129 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/eduserver/api"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const receiptsSchema = `
--- Stores data about receipts
-CREATE TABLE IF NOT EXISTS syncapi_receipts (
-	-- The ID
-	id BIGINT,
-	room_id TEXT NOT NULL,
-	receipt_type TEXT NOT NULL,
-	user_id TEXT NOT NULL,
-	event_id TEXT NOT NULL,
-	receipt_ts BIGINT NOT NULL,
-	CONSTRAINT syncapi_receipts_unique UNIQUE (room_id, receipt_type, user_id)
-);
-CREATE INDEX IF NOT EXISTS syncapi_receipts_room_id_idx ON syncapi_receipts(room_id);
-`
+// const receiptsSchema = `
+// -- Stores data about receipts
+// CREATE TABLE IF NOT EXISTS syncapi_receipts (
+// 	-- The ID
+// 	id BIGINT,
+// 	room_id TEXT NOT NULL,
+// 	receipt_type TEXT NOT NULL,
+// 	user_id TEXT NOT NULL,
+// 	event_id TEXT NOT NULL,
+// 	receipt_ts BIGINT NOT NULL,
+// 	CONSTRAINT syncapi_receipts_unique UNIQUE (room_id, receipt_type, user_id)
+// );
+// CREATE INDEX IF NOT EXISTS syncapi_receipts_room_id_idx ON syncapi_receipts(room_id);
+// `
 
-const upsertReceipt = "" +
-	"INSERT INTO syncapi_receipts" +
-	" (id, room_id, receipt_type, user_id, event_id, receipt_ts)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)" +
-	" ON CONFLICT (room_id, receipt_type, user_id)" +
-	" DO UPDATE SET id = $7, event_id = $8, receipt_ts = $9"
-
-const selectRoomReceipts = "" +
-	"SELECT id, room_id, receipt_type, user_id, event_id, receipt_ts" +
-	" FROM syncapi_receipts" +
-	" WHERE id > $1 and room_id in ($2)"
-
-const selectMaxReceiptIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_receipts"
-
-type receiptStatements struct {
-	db                 *sql.DB
-	streamIDStatements *streamIDStatements
-	upsertReceipt      *sql.Stmt
-	selectRoomReceipts *sql.Stmt
-	selectMaxReceiptID *sql.Stmt
+type ReceiptCosmos struct {
+	ID          int64  `json:"id"`
+	RoomID      string `json:"room_id"`
+	ReceiptType string `json:"receipt_type"`
+	UserID      string `json:"user_id"`
+	EventID     string `json:"event_id"`
+	ReceiptTS   int64  `json:"receipt_ts"`
 }
 
-func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Receipts, error) {
-	_, err := db.Exec(receiptsSchema)
+type ReceiptCosmosMaxNumber struct {
+	Max int64 `json:"number"`
+}
+
+type ReceiptCosmosData struct {
+	Id        string        `json:"id"`
+	Pk        string        `json:"_pk"`
+	Cn        string        `json:"_cn"`
+	ETag      string        `json:"_etag"`
+	Timestamp int64         `json:"_ts"`
+	Receipt   ReceiptCosmos `json:"mx_syncapi_receipt"`
+}
+
+// const upsertReceipt = "" +
+// 	"INSERT INTO syncapi_receipts" +
+// 	" (id, room_id, receipt_type, user_id, event_id, receipt_ts)" +
+// 	" VALUES ($1, $2, $3, $4, $5, $6)" +
+// 	" ON CONFLICT (room_id, receipt_type, user_id)" +
+// 	" DO UPDATE SET id = $7, event_id = $8, receipt_ts = $9"
+
+// "SELECT id, room_id, receipt_type, user_id, event_id, receipt_ts" +
+// " FROM syncapi_receipts" +
+// " WHERE id > $1 and room_id in ($2)"
+const selectRoomReceipts = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_receipt.id > @x2 " +
+	"and ARRAY_CONTAINS(@x3, c.mx_syncapi_receipt.room_id)"
+
+// "SELECT MAX(id) FROM syncapi_receipts"
+const selectMaxReceiptIDSQL = "" +
+	"select max(c.mx_syncapi_receipt.id) as number from c where c._cn = @x1 "
+
+type receiptStatements struct {
+	db                 *SyncServerDatasource
+	streamIDStatements *streamIDStatements
+	// upsertReceipt      *sql.Stmt
+	// selectRoomReceipts *sql.Stmt
+	selectMaxReceiptID string
+	tableName          string
+}
+
+func queryReceipt(s *receiptStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ReceiptCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []ReceiptCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
+	return response, nil
+}
+
+func queryReceiptNumber(s *receiptStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ReceiptCosmosMaxNumber, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []ReceiptCosmosMaxNumber
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, nil
+	}
+	return response, nil
+}
+
+func NewCosmosDBReceiptsTable(db *SyncServerDatasource, streamID *streamIDStatements) (tables.Receipts, error) {
 	r := &receiptStatements{
 		db:                 db,
 		streamIDStatements: streamID,
 	}
-	if r.upsertReceipt, err = db.Prepare(upsertReceipt); err != nil {
-		return nil, fmt.Errorf("unable to prepare upsertReceipt statement: %w", err)
-	}
-	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
-		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
-	}
-	if r.selectMaxReceiptID, err = db.Prepare(selectMaxReceiptIDSQL); err != nil {
-		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
-	}
+	r.selectMaxReceiptID = selectMaxReceiptIDSQL
+	r.tableName = "receipts"
 	return r, nil
 }
 
@@ -93,47 +150,115 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 	if err != nil {
 		return
 	}
-	stmt := sqlutil.TxStmt(txn, r.upsertReceipt)
-	_, err = stmt.ExecContext(ctx, pos, roomId, receiptType, userId, eventId, timestamp, pos, eventId, timestamp)
+
+	// "INSERT INTO syncapi_receipts" +
+	// " (id, room_id, receipt_type, user_id, event_id, receipt_ts)" +
+	// " VALUES ($1, $2, $3, $4, $5, $6)" +
+	// " ON CONFLICT (room_id, receipt_type, user_id)" +
+	// " DO UPDATE SET id = $7, event_id = $8, receipt_ts = $9"
+
+	data := ReceiptCosmos{
+		ID:          int64(pos),
+		RoomID:      roomId,
+		ReceiptType: receiptType,
+		UserID:      userId,
+		EventID:     eventId,
+		ReceiptTS:   int64(timestamp),
+	}
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(r.db.databaseName, r.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(r.db.cosmosConfig.ContainerName, dbCollectionName)
+	// 	CONSTRAINT syncapi_receipts_unique UNIQUE (room_id, receipt_type, user_id)
+	docId := fmt.Sprintf("%s_%s_%s", roomId, receiptType, userId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(r.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+
+	var dbData = ReceiptCosmosData{
+		Id:        cosmosDocId,
+		Cn:        dbCollectionName,
+		Pk:        pk,
+		Timestamp: time.Now().Unix(),
+		Receipt:   data,
+	}
+
+	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	_, _, err = cosmosdbapi.GetClient(r.db.connection).CreateDocument(
+		ctx,
+		r.db.cosmosConfig.DatabaseName,
+		r.db.cosmosConfig.ContainerName,
+		dbData,
+		optionsCreate)
+
+	// _, err = stmt.ExecContext(ctx, pos, roomId, receiptType, userId, eventId, timestamp, pos, eventId, timestamp)
 	return
 }
 
 // SelectRoomReceiptsAfter select all receipts for a given room after a specific timestamp
 func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []api.OutputReceiptEvent, error) {
-	selectSQL := strings.Replace(selectRoomReceipts, "($2)", sqlutil.QueryVariadicOffset(len(roomIDs), 1), 1)
+	// "SELECT id, room_id, receipt_type, user_id, event_id, receipt_ts" +
+	// " FROM syncapi_receipts" +
+	// " WHERE id > $1 and room_id in ($2)"
+
+	// selectSQL := strings.Replace(selectRoomReceipts, "($2)", sqlutil.QueryVariadicOffset(len(roomIDs), 1), 1)
 	lastPos := streamPos
-	params := make([]interface{}, len(roomIDs)+1)
-	params[0] = streamPos
-	for k, v := range roomIDs {
-		params[k+1] = v
+	// params := make([]interface{}, len(roomIDs)+1)
+	// params[0] = streamPos
+	// for k, v := range roomIDs {
+	// 	params[k+1] = v
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(r.db.databaseName, r.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": streamPos,
+		"@x3": roomIDs,
 	}
-	rows, err := r.db.QueryContext(ctx, selectSQL, params...)
+
+	rows, err := queryReceipt(r, ctx, selectRoomReceipts, params)
+	// rows, err := r.db.QueryContext(ctx, selectSQL, params...)
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomReceiptsAfter: rows.close() failed")
+
 	var res []api.OutputReceiptEvent
-	for rows.Next() {
+	for _, item := range rows {
 		r := api.OutputReceiptEvent{}
 		var id types.StreamPosition
-		err = rows.Scan(&id, &r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
-		if err != nil {
-			return 0, res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
-		}
+		// err = rows.Scan(&id, &r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
+		// if err != nil {
+		// 	return 0, res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
+		// }
+		id = types.StreamPosition(item.Receipt.ID)
+		r.RoomID = item.Receipt.RoomID
+		r.Type = item.Receipt.ReceiptType
+		r.UserID = item.Receipt.UserID
+		r.EventID = item.Receipt.EventID
+		r.Timestamp = gomatrixserverlib.Timestamp(item.Receipt.ReceiptTS)
 		res = append(res, r)
 		if id > lastPos {
 			lastPos = id
 		}
 	}
-	return lastPos, res, rows.Err()
+	return lastPos, res, nil
 }
 
 func (s *receiptStatements) SelectMaxReceiptID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+
+	// "SELECT MAX(id) FROM syncapi_receipts"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+	}
+
+	rows, err := queryReceiptNumber(s, ctx, s.selectMaxReceiptID, params)
+	// stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
+
+	if rows != nil {
+		nullableID.Int64 = rows[0].Max
+	}
+	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}

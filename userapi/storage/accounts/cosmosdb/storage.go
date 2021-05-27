@@ -37,8 +37,9 @@ import (
 
 // Database represents an account database
 type Database struct {
-	sqlutil.PartitionOffsetStatements
-	writer                sqlutil.Writer
+	database cosmosdbutil.Database
+	cosmosdbutil.PartitionOffsetStatements
+	writer                cosmosdbutil.Writer
 	accounts              accountsStatements
 	profiles              profilesStatements
 	accountDatas          accountDataStatements
@@ -56,17 +57,22 @@ type Database struct {
 // NewDatabase creates a new accounts and profiles database
 func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64) (*Database, error) {
 	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
-	config := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
+	configCosmos := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
 
 	d := &Database{
 		serverName:   serverName,
 		databaseName: "userapi",
 		connection:   conn,
-		cosmosConfig: config,
+		cosmosConfig: configCosmos,
 		// db:                    db,
 		writer: sqlutil.NewExclusiveWriter(),
 		// bcryptCost:            bcryptCost,
 		// openIDTokenLifetimeMS: openIDTokenLifetimeMS,
+	}
+	d.database = cosmosdbutil.Database{
+		Connection:   conn,
+		CosmosConfig: configCosmos,
+		DatabaseName: d.databaseName,
 	}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
@@ -80,10 +86,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	// 	return nil, err
 	// }
 
-	// partitions := sqlutil.PartitionOffsetStatements{}
-	// if err = partitions.Prepare(db, d.writer, "account"); err != nil {
-	// 	return nil, err
-	// }
+	if err := d.PartitionOffsetStatements.Prepare(&d.database, d.writer, "account"); err != nil {
+		return nil, err
+	}
 	var err error
 	if err = d.accounts.prepare(d, serverName); err != nil {
 		return nil, err

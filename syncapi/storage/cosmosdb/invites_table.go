@@ -19,80 +19,179 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const inviteEventsSchema = `
-CREATE TABLE IF NOT EXISTS syncapi_invite_events (
-	id INTEGER PRIMARY KEY,
-	event_id TEXT NOT NULL,
-	room_id TEXT NOT NULL,
-	target_user_id TEXT NOT NULL,
-	headered_event_json TEXT NOT NULL,
-	deleted BOOL NOT NULL
-);
+// const inviteEventsSchema = `
+// CREATE TABLE IF NOT EXISTS syncapi_invite_events (
+// 	id INTEGER PRIMARY KEY,
+// 	event_id TEXT NOT NULL,
+// 	room_id TEXT NOT NULL,
+// 	target_user_id TEXT NOT NULL,
+// 	headered_event_json TEXT NOT NULL,
+// 	deleted BOOL NOT NULL
+// );
 
-CREATE INDEX IF NOT EXISTS syncapi_invites_target_user_id_idx ON syncapi_invite_events (target_user_id, id);
-CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx ON syncapi_invite_events (event_id);
-`
+// CREATE INDEX IF NOT EXISTS syncapi_invites_target_user_id_idx ON syncapi_invite_events (target_user_id, id);
+// CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx ON syncapi_invite_events (event_id);
+// `
 
-const insertInviteEventSQL = "" +
-	"INSERT INTO syncapi_invite_events" +
-	" (id, room_id, event_id, target_user_id, headered_event_json, deleted)" +
-	" VALUES ($1, $2, $3, $4, $5, false)"
-
-const deleteInviteEventSQL = "" +
-	"UPDATE syncapi_invite_events SET deleted=true, id=$1 WHERE event_id = $2"
-
-const selectInviteEventsInRangeSQL = "" +
-	"SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +
-	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id DESC"
-
-const selectMaxInviteIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_invite_events"
-
-type inviteEventsStatements struct {
-	db                            *sql.DB
-	streamIDStatements            *streamIDStatements
-	insertInviteEventStmt         *sql.Stmt
-	selectInviteEventsInRangeStmt *sql.Stmt
-	deleteInviteEventStmt         *sql.Stmt
-	selectMaxInviteIDStmt         *sql.Stmt
+type InviteEventCosmos struct {
+	ID                int64  `json:"id"`
+	EventID           string `json:"event_id"`
+	RoomID            string `json:"room_id"`
+	TargetUserID      string `json:"target_user_id"`
+	HeaderedEventJSON []byte `json:"headered_event_json"`
+	Deleted           bool   `json:"deleted"`
 }
 
-func NewSqliteInvitesTable(db *sql.DB, streamID *streamIDStatements) (tables.Invites, error) {
+type InviteEventCosmosMaxNumber struct {
+	Max int64 `json:"number"`
+}
+
+type InviteEventCosmosData struct {
+	Id          string            `json:"id"`
+	Pk          string            `json:"_pk"`
+	Cn          string            `json:"_cn"`
+	ETag        string            `json:"_etag"`
+	Timestamp   int64             `json:"_ts"`
+	InviteEvent InviteEventCosmos `json:"mx_syncapi_invite_event"`
+}
+
+// const insertInviteEventSQL = "" +
+// 	"INSERT INTO syncapi_invite_events" +
+// 	" (id, room_id, event_id, target_user_id, headered_event_json, deleted)" +
+// 	" VALUES ($1, $2, $3, $4, $5, false)"
+
+// "UPDATE syncapi_invite_events SET deleted=true, id=$1 WHERE event_id = $2"
+const deleteInviteEventSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_invite_event.event_id = @x2 "
+
+// "SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +
+// " WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
+// " ORDER BY id DESC"
+const selectInviteEventsInRangeSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_invite_event.target_user_id = @x2 " +
+	"and c.mx_syncapi_invite_event.id > @x3 " +
+	"and c.mx_syncapi_invite_event.id <= @x4 " +
+	"order by c.mx_syncapi_invite_event.id desc "
+
+// "SELECT MAX(id) FROM syncapi_invite_events"
+const selectMaxInviteIDSQL = "" +
+	"select max(c.mx_syncapi_invite_event.id) from c where c._cn = @x1 "
+
+type inviteEventsStatements struct {
+	db                 *SyncServerDatasource
+	streamIDStatements *streamIDStatements
+	// insertInviteEventStmt         *sql.Stmt
+	selectInviteEventsInRangeStmt string
+	deleteInviteEventStmt         string
+	selectMaxInviteIDStmt         string
+	tableName                     string
+}
+
+func queryInviteEvent(s *inviteEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]InviteEventCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []InviteEventCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func queryInviteEventMaxNumber(s *inviteEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]InviteEventCosmosMaxNumber, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []InviteEventCosmosMaxNumber
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, nil
+	}
+
+	return response, nil
+}
+
+func getInviteEvent(s *inviteEventsStatements, ctx context.Context, pk string, docId string) (*InviteEventCosmosData, error) {
+	response := InviteEventCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, cosmosdbutil.ErrNoRows
+	}
+
+	return &response, err
+}
+
+func setInviteEvent(s *inviteEventsStatements, ctx context.Context, invite InviteEventCosmosData) (*InviteEventCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(invite.Pk, invite.ETag)
+	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		invite.Id,
+		&invite,
+		optionsReplace)
+	return &invite, ex
+}
+
+func NewCosmosDBInvitesTable(db *SyncServerDatasource, streamID *streamIDStatements) (tables.Invites, error) {
 	s := &inviteEventsStatements{
 		db:                 db,
 		streamIDStatements: streamID,
 	}
-	_, err := db.Exec(inviteEventsSchema)
-	if err != nil {
-		return nil, err
-	}
-	if s.insertInviteEventStmt, err = db.Prepare(insertInviteEventSQL); err != nil {
-		return nil, err
-	}
-	if s.selectInviteEventsInRangeStmt, err = db.Prepare(selectInviteEventsInRangeSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteInviteEventStmt, err = db.Prepare(deleteInviteEventSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxInviteIDStmt, err = db.Prepare(selectMaxInviteIDSQL); err != nil {
-		return nil, err
-	}
+	s.selectInviteEventsInRangeStmt = selectInviteEventsInRangeSQL
+	s.deleteInviteEventStmt = deleteInviteEventSQL
+	s.selectMaxInviteIDStmt = selectMaxInviteIDSQL
+	s.tableName = "invite_events"
 	return s, nil
 }
 
 func (s *inviteEventsStatements) InsertInviteEvent(
 	ctx context.Context, txn *sql.Tx, inviteEvent *gomatrixserverlib.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
+
+	// "INSERT INTO syncapi_invite_events" +
+	// " (id, room_id, event_id, target_user_id, headered_event_json, deleted)" +
+	// " VALUES ($1, $2, $3, $4, $5, false)"
+
 	streamPos, err = s.streamIDStatements.nextInviteID(ctx, txn)
 	if err != nil {
 		return
@@ -104,15 +203,45 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 		return
 	}
 
-	stmt := sqlutil.TxStmt(txn, s.insertInviteEventStmt)
-	_, err = stmt.ExecContext(
+	// stmt := sqlutil.TxStmt(txn, s.insertInviteEventStmt)
+	// _, err = stmt.ExecContext(
+	// 	ctx,
+	// 	streamPos,
+	// 	inviteEvent.RoomID(),
+	// 	inviteEvent.EventID(),
+	// 	*inviteEvent.StateKey(),
+	// 	headeredJSON,
+	// )
+	data := InviteEventCosmos{
+		ID:                int64(streamPos),
+		RoomID:            inviteEvent.RoomID(),
+		EventID:           inviteEvent.EventID(),
+		TargetUserID:      *inviteEvent.StateKey(),
+		HeaderedEventJSON: headeredJSON,
+	}
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	// id INTEGER PRIMARY KEY,
+	docId := fmt.Sprintf("%d", streamPos)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+
+	var dbData = InviteEventCosmosData{
+		Id:          cosmosDocId,
+		Cn:          dbCollectionName,
+		Pk:          pk,
+		Timestamp:   time.Now().Unix(),
+		InviteEvent: data,
+	}
+
+	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
-		streamPos,
-		inviteEvent.RoomID(),
-		inviteEvent.EventID(),
-		*inviteEvent.StateKey(),
-		headeredJSON,
-	)
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData,
+		optionsCreate)
+
 	return
 }
 
@@ -123,8 +252,23 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 	if err != nil {
 		return streamPos, err
 	}
-	stmt := sqlutil.TxStmt(txn, s.deleteInviteEventStmt)
-	_, err = stmt.ExecContext(ctx, streamPos, inviteEventID)
+
+	// "UPDATE syncapi_invite_events SET deleted=true, id=$1 WHERE event_id = $2"
+
+	// stmt := sqlutil.TxStmt(txn, s.deleteInviteEventStmt)
+	// _, err = stmt.ExecContext(ctx, streamPos, inviteEventID)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": inviteEventID,
+	}
+	response, err := queryInviteEvent(s, ctx, s.deleteInviteEventStmt, params)
+
+	for _, item := range response {
+		item.InviteEvent.Deleted = true
+		item.InviteEvent.ID = int64(streamPos)
+		setInviteEvent(s, ctx, item)
+	}
 	return streamPos, err
 }
 
@@ -133,23 +277,39 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
 ) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
-	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
+
+	// "SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +
+	// " WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
+	// " ORDER BY id DESC"
+
+	// stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
+	// rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": targetUserID,
+		"@x3": r.Low(),
+		"@x4": r.High(),
+	}
+	rows, err := queryInviteEvent(s, ctx, s.selectInviteEventsInRangeStmt, params)
+
 	if err != nil {
 		return nil, nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
 	result := map[string]*gomatrixserverlib.HeaderedEvent{}
 	retired := map[string]*gomatrixserverlib.HeaderedEvent{}
-	for rows.Next() {
+	for _, item := range rows {
 		var (
 			roomID    string
 			eventJSON []byte
 			deleted   bool
 		)
-		if err = rows.Scan(&roomID, &eventJSON, &deleted); err != nil {
-			return nil, nil, err
-		}
+		roomID = item.InviteEvent.RoomID
+		eventJSON = item.InviteEvent.HeaderedEventJSON
+		deleted = item.InviteEvent.Deleted
+		// if err = rows.Scan(&roomID, &eventJSON, &deleted); err != nil {
+		// 	return nil, nil, err
+		// }
 
 		// if we have seen this room before, it has a higher stream position and hence takes priority
 		// because the query is ORDER BY id DESC so drop them
@@ -176,8 +336,21 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxInviteIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+
+	// "SELECT MAX(id) FROM syncapi_invite_events"
+
+	// stmt := sqlutil.TxStmt(txn, s.selectMaxInviteIDStmt)
+	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+	}
+	response, err := queryInviteEventMaxNumber(s, ctx, s.selectMaxInviteIDStmt, params)
+
+	if response != nil {
+		nullableID.Int64 = response[0].Max
+	}
+
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}

@@ -49,6 +49,7 @@ func setupNaffka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 	if cfg.Database.ConnectionString.IsCosmosDB() {
 		//TODO: What do we do for Nafka
 		// cfg.Database.ConnectionString = cosmosdbutil.GetConnectionString(&cfg.Database.ConnectionString)
+		cfg.Database.ConnectionString = "file:naffka.db"
 	}
 
 	naffkaDB, err := naffkaStorage.NewDatabase(string(cfg.Database.ConnectionString))

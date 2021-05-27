@@ -16,80 +16,147 @@ package cosmosdb
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const filterSchema = `
--- Stores data about filters
-CREATE TABLE IF NOT EXISTS syncapi_filter (
-	-- The filter
-	filter TEXT NOT NULL,
-	-- The ID
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	-- The localpart of the Matrix user ID associated to this filter
-	localpart TEXT NOT NULL,
+// const filterSchema = `
+// -- Stores data about filters
+// CREATE TABLE IF NOT EXISTS syncapi_filter (
+// 	-- The filter
+// 	filter TEXT NOT NULL,
+// 	-- The ID
+// 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+// 	-- The localpart of the Matrix user ID associated to this filter
+// 	localpart TEXT NOT NULL,
 
-	UNIQUE (id, localpart)
-);
+// 	UNIQUE (id, localpart)
+// );
 
-CREATE INDEX IF NOT EXISTS syncapi_filter_localpart ON syncapi_filter(localpart);
-`
+// CREATE INDEX IF NOT EXISTS syncapi_filter_localpart ON syncapi_filter(localpart);
+// `
 
-const selectFilterSQL = "" +
-	"SELECT filter FROM syncapi_filter WHERE localpart = $1 AND id = $2"
-
-const selectFilterIDByContentSQL = "" +
-	"SELECT id FROM syncapi_filter WHERE localpart = $1 AND filter = $2"
-
-const insertFilterSQL = "" +
-	"INSERT INTO syncapi_filter (filter, localpart) VALUES ($1, $2)"
-
-type filterStatements struct {
-	db                          *sql.DB
-	selectFilterStmt            *sql.Stmt
-	selectFilterIDByContentStmt *sql.Stmt
-	insertFilterStmt            *sql.Stmt
+type FilterCosmos struct {
+	ID        int64  `json:"id"`
+	Filter    []byte `json:"filter"`
+	Localpart string `json:"localpart"`
 }
 
-func NewSqliteFilterTable(db *sql.DB) (tables.Filter, error) {
-	_, err := db.Exec(filterSchema)
+type FilterCosmosData struct {
+	Id        string       `json:"id"`
+	Pk        string       `json:"_pk"`
+	Cn        string       `json:"_cn"`
+	ETag      string       `json:"_etag"`
+	Timestamp int64        `json:"_ts"`
+	Filter    FilterCosmos `json:"mx_syncapi_filter"`
+}
+
+// const selectFilterSQL = "" +
+// 	"SELECT filter FROM syncapi_filter WHERE localpart = $1 AND id = $2"
+
+// "SELECT id FROM syncapi_filter WHERE localpart = $1 AND filter = $2"
+const selectFilterIDByContentSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_filter.localpart = @x2 " +
+	"and c.mx_syncapi_filter.filter = @x3 "
+
+// const insertFilterSQL = "" +
+// 	"INSERT INTO syncapi_filter (filter, localpart) VALUES ($1, $2)"
+
+type filterStatements struct {
+	db *SyncServerDatasource
+	// selectFilterStmt            *sql.Stmt
+	selectFilterIDByContentStmt string
+	// insertFilterStmt            *sql.Stmt
+	tableName string
+}
+
+func queryFilter(s *filterStatements, ctx context.Context, qry string, params map[string]interface{}) ([]FilterCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []FilterCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
 	if err != nil {
 		return nil, err
 	}
+
+	if len(response) == 0 {
+		return nil, cosmosdbutil.ErrNoRows
+	}
+
+	return response, nil
+}
+
+func getFilter(s *filterStatements, ctx context.Context, pk string, docId string) (*FilterCosmosData, error) {
+	response := FilterCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
+}
+
+func NewCosmosDBFilterTable(db *SyncServerDatasource) (tables.Filter, error) {
 	s := &filterStatements{
 		db: db,
 	}
-	if s.selectFilterStmt, err = db.Prepare(selectFilterSQL); err != nil {
-		return nil, err
-	}
-	if s.selectFilterIDByContentStmt, err = db.Prepare(selectFilterIDByContentSQL); err != nil {
-		return nil, err
-	}
-	if s.insertFilterStmt, err = db.Prepare(insertFilterSQL); err != nil {
-		return nil, err
-	}
+	s.selectFilterIDByContentStmt = selectFilterIDByContentSQL
+	s.tableName = "filters"
 	return s, nil
 }
 
 func (s *filterStatements) SelectFilter(
 	ctx context.Context, localpart string, filterID string,
 ) (*gomatrixserverlib.Filter, error) {
+
+	// "SELECT filter FROM syncapi_filter WHERE localpart = $1 AND id = $2"
+
 	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
-	err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
+	// err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	// 	UNIQUE (id, localpart)
+	docId := fmt.Sprintf("%s_%s", localpart, filterID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response, err = getFilter(s, ctx, pk, cosmosDocId)
+
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmarshal JSON into Filter struct
 	filter := gomatrixserverlib.DefaultFilter()
-	if err = json.Unmarshal(filterData, &filter); err != nil {
-		return nil, err
+	if response != nil {
+		filterData = response.Filter.Filter
+		if err = json.Unmarshal(filterData, &filter); err != nil {
+			return nil, err
+		}
 	}
 	return &filter, nil
 }
@@ -97,6 +164,9 @@ func (s *filterStatements) SelectFilter(
 func (s *filterStatements) InsertFilter(
 	ctx context.Context, filter *gomatrixserverlib.Filter, localpart string,
 ) (filterID string, err error) {
+
+	// "INSERT INTO syncapi_filter (filter, localpart) VALUES ($1, $2)"
+
 	var existingFilterID string
 
 	// Serialise json
@@ -116,10 +186,27 @@ func (s *filterStatements) InsertFilter(
 	// This can result in a race condition when two clients try to insert the
 	// same filter and localpart at the same time, however this is not a
 	// problem as both calls will result in the same filterID
-	err = s.selectFilterIDByContentStmt.QueryRowContext(ctx,
-		localpart, filterJSON).Scan(&existingFilterID)
-	if err != nil && err != sql.ErrNoRows {
+	// err = s.selectFilterIDByContentStmt.QueryRowContext(ctx,
+	// 	localpart, filterJSON).Scan(&existingFilterID)
+
+	// TODO: See if we can avoid the search by Content []byte
+	// "SELECT id FROM syncapi_filter WHERE localpart = $1 AND filter = $2"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": localpart,
+		"@x3": filterJSON,
+	}
+
+	response, err := queryFilter(s, ctx, s.selectFilterIDByContentStmt, params)
+
+	if err != nil && err != cosmosdbutil.ErrNoRows {
 		return "", err
+	}
+
+	if response != nil {
+		existingFilterID = fmt.Sprintf("%d", response[0].Filter.ID)
 	}
 	// If it does, return the existing ID
 	if existingFilterID != "" {
@@ -127,14 +214,45 @@ func (s *filterStatements) InsertFilter(
 	}
 
 	// Otherwise insert the filter and return the new ID
-	res, err := s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart)
+	// res, err := s.insertFilterStmt.ExecContext(ctx, filterJSON, localpart)
+
+	// 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	seqID, seqErr := GetNextFilterID(s, ctx)
+	if seqErr != nil {
+		return "", seqErr
+	}
+
+	data := FilterCosmos{
+		ID:        seqID,
+		Localpart: localpart,
+		Filter:    filterJSON,
+	}
+
+	// 	UNIQUE (id, localpart)
+	docId := fmt.Sprintf("%s_%d", localpart, seqID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	var dbData = FilterCosmosData{
+		Id:        cosmosDocId,
+		Cn:        dbCollectionName,
+		Pk:        pk,
+		Timestamp: time.Now().Unix(),
+		Filter:    data,
+	}
+
+	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData,
+		optionsCreate)
+
 	if err != nil {
 		return "", err
 	}
-	rowid, err := res.LastInsertId()
-	if err != nil {
-		return "", err
-	}
+	rowid := seqID
 	filterID = fmt.Sprintf("%d", rowid)
 	return
 }

@@ -3,10 +3,23 @@ package cosmosdbapi
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
+func removeSpecialChars(docId string) string {
+	// The following characters are restricted and cannot be used in the Id property: '/', '\', '?', '#'
+	invalidChars := [4]string{"/", "\\", "?", "#"}
+	replaceChar := ","
+	result := docId
+	for _, invalidChar := range invalidChars {
+		result = strings.ReplaceAll(result, invalidChar, replaceChar)
+	}
+	return result
+}
+
 func GetDocumentId(tenantName string, collectionName string, id string) string {
-	return fmt.Sprintf("%s,%s,%s", collectionName, tenantName, id)
+	safeId := removeSpecialChars(id)
+	return fmt.Sprintf("%s,%s,%s", collectionName, tenantName, safeId)
 }
 
 func GetPartitionKey(tenantName string, collectionName string) string {

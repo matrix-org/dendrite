@@ -674,12 +674,17 @@ func (d *Database) GetStateDeltas(
 	//     * Check if user is still CURRENTLY invited to the room. If so, add room to 'invited' block.
 	//     * Check if the user is CURRENTLY (TODO) left/banned. If so, add room to 'archived' block.
 	// - Get all CURRENTLY joined rooms, and add them to 'joined' block.
-	txn, err := d.readOnlySnapshot(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("d.readOnlySnapshot: %w", err)
+
+	// HACK: CosmosDB - Allow for DB nil
+	var txn *sql.Tx
+	succeeded := true
+	if d.DB != nil {
+		txn, err := d.readOnlySnapshot(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("d.readOnlySnapshot: %w", err)
+		}
+		defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 
 	var deltas []types.StateDelta
 

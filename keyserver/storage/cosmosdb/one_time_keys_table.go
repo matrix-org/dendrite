@@ -53,9 +53,9 @@ type OneTimeKeyCosmos struct {
 	KeyJSON []byte `json:"key_json"`
 }
 
-type OneTimeKeyAlgoCountCosmosData struct {
+type OneTimeKeyAlgoNumberCosmosData struct {
 	Algorithm string `json:"algorithm"`
-	Count     int    `json:"count"`
+	Number    int    `json:"number"`
 }
 
 type OneTimeKeyCosmosData struct {
@@ -81,7 +81,7 @@ const selectKeysSQL = "" +
 
 // "SELECT algorithm, COUNT(key_id) FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2 GROUP BY algorithm"
 const selectKeysCountSQL = "" +
-	"select c.mx_keyserver_one_time_key.algorithm as algorithm, count(c.mx_keyserver_one_time_key.key_id) as count " +
+	"select c.mx_keyserver_one_time_key.algorithm, count(c.mx_keyserver_one_time_key.key_id) as number " +
 	"from c where c._cn = @x1 " +
 	"and c.mx_keyserver_one_time_key.user_id = @x2 " +
 	"and c.mx_keyserver_one_time_key.device_id = @x3 " +
@@ -110,7 +110,9 @@ type oneTimeKeysStatements struct {
 func queryOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OneTimeKeyCosmosData, error) {
 	var response []OneTimeKeyCosmosData
 
-	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
 	var query = cosmosdbapi.GetQuery(qry, params)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
@@ -127,18 +129,20 @@ func queryOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, qry string, 
 	return response, nil
 }
 
-func queryOneTimeKeyAlgoCount(s *oneTimeKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OneTimeKeyAlgoCountCosmosData, error) {
-	var response []OneTimeKeyAlgoCountCosmosData
-	var test interface{}
+func queryOneTimeKeyAlgoCount(s *oneTimeKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OneTimeKeyAlgoNumberCosmosData, error) {
+	var response []OneTimeKeyAlgoNumberCosmosData
 
-	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	// var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
 	var query = cosmosdbapi.GetQuery(qry, params)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
 		query,
-		&test,
+		&response,
 		optionsQry)
 
 	// When there are no Rows we seem to get the generic Bad Req JSON error
@@ -252,7 +256,7 @@ func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, de
 		var algorithm string
 		var count int
 		algorithm = item.Algorithm
-		count = item.Count
+		count = item.Number
 		counts.KeyCount[algorithm] = count
 	}
 	return counts, nil
@@ -324,7 +328,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 		var algorithm string
 		var count int
 		algorithm = item.Algorithm
-		count = item.Count
+		count = item.Number
 		counts.KeyCount[algorithm] = count
 	}
 

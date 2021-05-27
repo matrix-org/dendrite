@@ -1,10 +1,7 @@
 package cosmosdb
 
 import (
-	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 type FilterOrder int
@@ -15,6 +12,10 @@ const (
 	FilterOrderDesc
 )
 
+func getParamName(offset int) string {
+	return fmt.Sprintf("@x%d", offset)
+}
+
 // prepareWithFilters returns a prepared statement with the
 // relevant filters included. It also includes an []interface{}
 // list of all the relevant parameters to pass straight to
@@ -24,59 +25,54 @@ const (
 // and it's easier just to have the caller extract the relevant
 // parts.
 func prepareWithFilters(
-	db *sql.DB, txn *sql.Tx, query string, params []interface{},
+	collectionName string, query string, params map[string]interface{},
 	senders, notsenders, types, nottypes []string, excludeEventIDs []string,
 	limit int, order FilterOrder,
-) (*sql.Stmt, []interface{}, error) {
+) (sql string, paramsResult map[string]interface{}) {
 	offset := len(params)
-	if count := len(senders); count > 0 {
-		query += " AND sender IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range senders {
-			params, offset = append(params, v), offset+1
-		}
+	sql = query
+	paramsResult = params
+	// "and (@x4 = null OR ARRAY_CONTAINS(@x4, c.mx_syncapi_current_room_state.sender)) " +
+	if len(senders) > 0 {
+		offset++
+		paramName := getParamName(offset)
+		sql += fmt.Sprintf("and ARRAY_CONTAINS(%s, c.%s.sender) ", paramName, collectionName)
+		paramsResult[paramName] = senders
 	}
-	if count := len(notsenders); count > 0 {
-		query += " AND sender NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range notsenders {
-			params, offset = append(params, v), offset+1
-		}
+	// "and (@x5 = null OR NOT ARRAY_CONTAINS(@x5, c.mx_syncapi_current_room_state.sender)) " +
+	if len(notsenders) > 0 {
+		offset++
+		paramName := getParamName(offset)
+		sql += fmt.Sprintf("and NOT ARRAY_CONTAINS(%s, c.%s.sender) ", paramName, collectionName)
+		paramsResult[getParamName(offset)] = notsenders
 	}
-	if count := len(types); count > 0 {
-		query += " AND type IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range types {
-			params, offset = append(params, v), offset+1
-		}
+	// "and (@x6 = null OR ARRAY_CONTAINS(@x6, c.mx_syncapi_current_room_state.type)) " +
+	if len(types) > 0 {
+		offset++
+		paramName := getParamName(offset)
+		sql += fmt.Sprintf("and ARRAY_CONTAINS(%s, c.%s.type) ", paramName, collectionName)
+		paramsResult[paramName] = types
 	}
-	if count := len(nottypes); count > 0 {
-		query += " AND type NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range nottypes {
-			params, offset = append(params, v), offset+1
-		}
+	// "and (@x7 = null OR NOT ARRAY_CONTAINS(@x7, c.mx_syncapi_current_room_state.type)) " +
+	if len(nottypes) > 0 {
+		offset++
+		paramName := getParamName(offset)
+		sql += fmt.Sprintf("and NOT ARRAY_CONTAINS(%s, c.%s.type) ", paramName, collectionName)
+		paramsResult[getParamName(offset)] = nottypes
 	}
-	if count := len(excludeEventIDs); count > 0 {
-		query += " AND event_id NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range excludeEventIDs {
-			params, offset = append(params, v), offset+1
-		}
+	// "and (NOT ARRAY_CONTAINS(@x9, c.mx_syncapi_current_room_state.event_id)) "
+	if len(excludeEventIDs) > 0 {
+		offset++
+		paramName := getParamName(offset)
+		sql += fmt.Sprintf("and NOT ARRAY_CONTAINS(%s, c.%s.event_id) ", paramName, collectionName)
+		paramsResult[getParamName(offset)] = excludeEventIDs
 	}
 	switch order {
 	case FilterOrderAsc:
-		query += " ORDER BY id ASC"
+		sql += fmt.Sprintf("order by c.%s.event_id asc ", collectionName)
 	case FilterOrderDesc:
-		query += " ORDER BY id DESC"
+		sql += fmt.Sprintf("order by c.%s.event_id desc ", collectionName)
 	}
-	query += fmt.Sprintf(" LIMIT $%d", offset+1)
-	params = append(params, limit)
-
-	var stmt *sql.Stmt
-	var err error
-	if txn != nil {
-		stmt, err = txn.Prepare(query)
-	} else {
-		stmt, err = db.Prepare(query)
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("s.db.Prepare: %w", err)
-	}
-	return stmt, params, nil
+	// query += fmt.Sprintf(" LIMIT $%d", offset+1)
+	return
 }

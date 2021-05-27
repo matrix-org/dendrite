@@ -21,109 +21,222 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
 
-const outputRoomEventsSchema = `
--- Stores output room events received from the roomserver.
-CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  event_id TEXT NOT NULL UNIQUE,
-  room_id TEXT NOT NULL,
-  headered_event_json TEXT NOT NULL,
-  type TEXT NOT NULL,
-  sender TEXT NOT NULL,
-  contains_url BOOL NOT NULL,
-  add_state_ids TEXT, -- JSON encoded string array
-  remove_state_ids TEXT, -- JSON encoded string array
-  session_id BIGINT,
-  transaction_id TEXT,
-  exclude_from_sync BOOL NOT NULL DEFAULT FALSE
-);
-`
+// const outputRoomEventsSchema = `
+// -- Stores output room events received from the roomserver.
+// CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
+//   id INTEGER PRIMARY KEY AUTOINCREMENT,
+//   event_id TEXT NOT NULL UNIQUE,
+//   room_id TEXT NOT NULL,
+//   headered_event_json TEXT NOT NULL,
+//   type TEXT NOT NULL,
+//   sender TEXT NOT NULL,
+//   contains_url BOOL NOT NULL,
+//   add_state_ids TEXT, -- JSON encoded string array
+//   remove_state_ids TEXT, -- JSON encoded string array
+//   session_id BIGINT,
+//   transaction_id TEXT,
+//   exclude_from_sync BOOL NOT NULL DEFAULT FALSE
+// );
+// `
 
-const insertEventSQL = "" +
-	"INSERT INTO syncapi_output_room_events (" +
-	"id, room_id, event_id, headered_event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
-	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
-	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = (excluded.exclude_from_sync AND $13)"
-
-const selectEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
-
-const selectRecentEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3"
-	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
-
-const selectRecentEventsForSyncSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE"
-	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
-
-const selectEarlyEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3"
-	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
-
-const selectMaxEventIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_output_room_events"
-
-const updateEventJSONSQL = "" +
-	"UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
-
-const selectStateInRangeSQL = "" +
-	"SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
-	" FROM syncapi_output_room_events" +
-	" WHERE (id > $1 AND id <= $2)" +
-	" AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))"
-	// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
-
-const deleteEventsForRoomSQL = "" +
-	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
-
-type outputRoomEventsStatements struct {
-	db                      *sql.DB
-	streamIDStatements      *streamIDStatements
-	insertEventStmt         *sql.Stmt
-	selectEventsStmt        *sql.Stmt
-	selectMaxEventIDStmt    *sql.Stmt
-	updateEventJSONStmt     *sql.Stmt
-	deleteEventsForRoomStmt *sql.Stmt
+type OutputRoomEventCosmos struct {
+	ID                int64  `json:"id"`
+	EventID           string `json:"event_id"`
+	RoomID            string `json:"room_id"`
+	HeaderedEventJSON []byte `json:"headered_event_json"`
+	Type              string `json:"type"`
+	Sender            string `json:"sender"`
+	ContainsUrl       bool   `json:"contains_url"`
+	AddStateIDs       string `json:"add_state_ids"`
+	RemoveStateIDs    string `json:"remove_state_ids"`
+	SessionID         int64  `json:"session_id"`
+	TransactionID     string `json:"transaction_id"`
+	ExcludeFromSync   bool   `json:"exclude_from_sync"`
 }
 
-func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
+type OutputRoomEventCosmosMaxNumber struct {
+	Max int64 `json:"number"`
+}
+
+type OutputRoomEventCosmosData struct {
+	Id              string                `json:"id"`
+	Pk              string                `json:"_pk"`
+	Cn              string                `json:"_cn"`
+	ETag            string                `json:"_etag"`
+	Timestamp       int64                 `json:"_ts"`
+	OutputRoomEvent OutputRoomEventCosmos `json:"mx_syncapi_output_room_event"`
+}
+
+// const insertEventSQL = "" +
+// 	"INSERT INTO syncapi_output_room_events (" +
+// 	"id, room_id, event_id, headered_event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
+// 	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
+// 	"ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = (excluded.exclude_from_sync AND $13)"
+
+// "SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
+const selectEventsSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event.event_id = @x2 "
+
+// "SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+// " WHERE room_id = $1 AND id > $2 AND id <= $3"
+// // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
+const selectRecentEventsSQL = "" +
+	"select top @x5 * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event.room_id = @x2 " +
+	"and c.mx_syncapi_output_room_event.id > @x3 " +
+	"and c.mx_syncapi_output_room_event.id <= @x4 "
+
+// "SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+// " WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE"
+// // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
+const selectRecentEventsForSyncSQL = "" +
+	"select top @x5 * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event.room_id = @x2 " +
+	"and c.mx_syncapi_output_room_event.id > @x3 " +
+	"and c.mx_syncapi_output_room_event.id <= @x4 " +
+	"and c.mx_syncapi_output_room_event.exclude_from_sync = false "
+
+// "SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+// " WHERE room_id = $1 AND id > $2 AND id <= $3"
+// // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
+const selectEarlyEventsSQL = "" +
+	"select top @x5 * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event.room_id = @x2 " +
+	"and c.mx_syncapi_output_room_event.id > @x3 " +
+	"and c.mx_syncapi_output_room_event.id <= @x4 "
+
+// "SELECT MAX(id) FROM syncapi_output_room_events"
+const selectMaxEventIDSQL = "" +
+	"select max(c.mx_syncapi_output_room_event.id) as number from c where c._cn = @x1 "
+
+// "UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
+const updateEventJSONSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event.event_id = @x2 "
+
+// "SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
+// " FROM syncapi_output_room_events" +
+// " WHERE (id > $1 AND id <= $2)" +
+// " AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))"
+// // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
+const selectStateInRangeSQL = "" +
+	"select top @x4 * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event.id > @x2 " +
+	"and c.mx_syncapi_output_room_event.id <= @x3 " +
+	"and (c.mx_syncapi_output_room_event.add_state_ids != null or c.mx_syncapi_output_room_event.remove_state_ids != null) "
+
+	// "DELETE FROM syncapi_output_room_events WHERE room_id = $1"
+const deleteEventsForRoomSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_output_room_event.room_id = @x2 "
+
+type outputRoomEventsStatements struct {
+	db                 *SyncServerDatasource
+	streamIDStatements *streamIDStatements
+	// insertEventStmt         *sql.Stmt
+	selectEventsStmt        string
+	selectMaxEventIDStmt    string
+	updateEventJSONStmt     string
+	deleteEventsForRoomStmt string
+	tableName               string
+	jsonPropertyName        string
+}
+
+func queryOutputRoomEvent(s *outputRoomEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutputRoomEventCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []OutputRoomEventCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func queryOutputRoomEventNumber(s *outputRoomEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutputRoomEventCosmosMaxNumber, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []OutputRoomEventCosmosMaxNumber
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, cosmosdbutil.ErrNoRows
+	}
+	return response, nil
+}
+
+func setOutputRoomEvent(s *outputRoomEventsStatements, ctx context.Context, outputRoomEvent OutputRoomEventCosmosData) (*OutputRoomEventCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(outputRoomEvent.Pk, outputRoomEvent.ETag)
+	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		outputRoomEvent.Id,
+		&outputRoomEvent,
+		optionsReplace)
+	return &outputRoomEvent, ex
+}
+
+func deleteOutputRoomEvent(s *outputRoomEventsStatements, ctx context.Context, dbData OutputRoomEventCosmosData) error {
+	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData.Id,
+		options)
+
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func NewCosmosDBEventsTable(db *SyncServerDatasource, streamID *streamIDStatements) (tables.Events, error) {
 	s := &outputRoomEventsStatements{
 		db:                 db,
 		streamIDStatements: streamID,
 	}
-	_, err := db.Exec(outputRoomEventsSchema)
-	if err != nil {
-		return nil, err
-	}
-	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
-		return nil, err
-	}
-	if s.selectEventsStmt, err = db.Prepare(selectEventsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxEventIDStmt, err = db.Prepare(selectMaxEventIDSQL); err != nil {
-		return nil, err
-	}
-	if s.updateEventJSONStmt, err = db.Prepare(updateEventJSONSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteEventsForRoomStmt, err = db.Prepare(deleteEventsForRoomSQL); err != nil {
-		return nil, err
-	}
+	s.selectEventsStmt = selectEventsSQL
+	s.selectMaxEventIDStmt = selectMaxEventIDSQL
+	s.updateEventJSONStmt = updateEventJSONSQL
+	s.deleteEventsForRoomStmt = deleteEventsForRoomSQL
+	s.tableName = "output_room_events"
+	s.jsonPropertyName = "mx_syncapi_output_room_event"
 	return s, nil
 }
 
@@ -132,7 +245,27 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 	if err != nil {
 		return err
 	}
-	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+
+	// "UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": event.EventID(),
+	}
+
+	// _, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+	rows, err := queryOutputRoomEvent(s, ctx, s.deleteEventsForRoomStmt, params)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range rows {
+		item.OutputRoomEvent.HeaderedEventJSON = headeredJSON
+		_, err = setOutputRoomEvent(s, ctx, item)
+	}
+
+	return err
 	return err
 }
 
@@ -143,24 +276,31 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
-	stmt, params, err := prepareWithFilters(
-		s.db, txn, selectStateInRangeSQL,
-		[]interface{}{
-			r.Low(), r.High(),
-		},
+	// "SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
+	// " FROM syncapi_output_room_events" +
+	// " WHERE (id > $1 AND id <= $2)" +
+	// " AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))"
+	// // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": r.Low(),
+		"@x3": r.High(),
+		"@x4": stateFilter.Limit,
+	}
+	query, params := prepareWithFilters(
+		s.jsonPropertyName, selectStateInRangeSQL, params,
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
 		nil, stateFilter.Limit, FilterOrderAsc,
 	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
-	}
 
-	rows, err := stmt.QueryContext(ctx, params...)
+	// rows, err := stmt.QueryContext(ctx, params...)
+	rows, err := queryOutputRoomEvent(s, ctx, query, params)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close() // nolint: errcheck
 	// Fetch all the state change events for all rooms between the two positions then loop each event and:
 	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
 	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
@@ -171,7 +311,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	// RoomID => A set (map[string]bool) of state event IDs which are between the two positions
 	stateNeeded := make(map[string]map[string]bool)
 
-	for rows.Next() {
+	for _, item := range rows {
 		var (
 			streamPos       types.StreamPosition
 			eventBytes      []byte
@@ -179,10 +319,15 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 			addIDsJSON      string
 			delIDsJSON      string
 		)
-		if err := rows.Scan(&streamPos, &eventBytes, &excludeFromSync, &addIDsJSON, &delIDsJSON); err != nil {
-			return nil, nil, err
-		}
-
+		// SELECT id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids
+		// if err := rows.Scan(&streamPos, &eventBytes, &excludeFromSync, &addIDsJSON, &delIDsJSON); err != nil {
+		// 	return nil, nil, err
+		// }
+		streamPos = types.StreamPosition(item.OutputRoomEvent.ID)
+		eventBytes = item.OutputRoomEvent.HeaderedEventJSON
+		excludeFromSync = item.OutputRoomEvent.ExcludeFromSync
+		addIDsJSON = item.OutputRoomEvent.AddStateIDs
+		delIDsJSON = item.OutputRoomEvent.RemoveStateIDs
 		addIDs, delIDs, err := unmarshalStateIDs(addIDsJSON, delIDsJSON)
 		if err != nil {
 			return nil, nil, err
@@ -233,8 +378,20 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxEventIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+	}
+	// stmt := sqlutil.TxStmt(txn, s.selectMaxEventIDStmt)
+
+	rows, err := queryOutputRoomEventNumber(s, ctx, s.selectMaxEventIDStmt, params)
+	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+
+	if rows != nil {
+		nullableID.Int64 = rows[0].Max
+	}
+
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}
@@ -248,6 +405,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	event *gomatrixserverlib.HeaderedEvent, addState, removeState []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
 ) (types.StreamPosition, error) {
+
 	var txnID *string
 	var sessionID *int64
 	if transactionID != nil {
@@ -283,27 +441,74 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, fmt.Errorf("json.Marshal(removeState): %w", err)
 	}
 
+	//   id INTEGER PRIMARY KEY AUTOINCREMENT,
 	streamPos, err := s.streamIDStatements.nextPDUID(ctx, txn)
 	if err != nil {
 		return 0, err
 	}
-	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
-	_, err = insertStmt.ExecContext(
+	// "INSERT INTO syncapi_output_room_events (" +
+	// "id, room_id, event_id, headered_event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
+	// ") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
+	// "ON CONFLICT (event_id) DO UPDATE SET exclude_from_sync = (excluded.exclude_from_sync AND $13)"
+
+	// insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
+	// _, err = insertStmt.ExecContext(
+	// 	ctx,
+	// 	streamPos,
+	// 	event.RoomID(),
+	// 	event.EventID(),
+	// 	headeredJSON,
+	// 	event.Type(),
+	// 	event.Sender(),
+	// 	containsURL,
+	// 	string(addStateJSON),
+	// 	string(removeStateJSON),
+	// 	sessionID,
+	// 	txnID,
+	// 	excludeFromSync,
+	// 	excludeFromSync,
+	// )
+
+	data := OutputRoomEventCosmos{
+		ID:                int64(streamPos),
+		RoomID:            event.RoomID(),
+		EventID:           event.EventID(),
+		HeaderedEventJSON: headeredJSON,
+		Type:              event.Type(),
+		Sender:            event.Sender(),
+		ContainsUrl:       containsURL,
+		AddStateIDs:       string(addStateJSON),
+		RemoveStateIDs:    string(removeStateJSON),
+		ExcludeFromSync:   excludeFromSync,
+	}
+
+	if transactionID != nil {
+		data.SessionID = *sessionID
+		data.TransactionID = *txnID
+	}
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	// id INTEGER PRIMARY KEY,
+	docId := fmt.Sprintf("%d", streamPos)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+
+	var dbData = OutputRoomEventCosmosData{
+		Id:              cosmosDocId,
+		Cn:              dbCollectionName,
+		Pk:              pk,
+		Timestamp:       time.Now().Unix(),
+		OutputRoomEvent: data,
+	}
+
+	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
+	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
-		streamPos,
-		event.RoomID(),
-		event.EventID(),
-		headeredJSON,
-		event.Type(),
-		event.Sender(),
-		containsURL,
-		string(addStateJSON),
-		string(removeStateJSON),
-		sessionID,
-		txnID,
-		excludeFromSync,
-		excludeFromSync,
-	)
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData,
+		optionsCreate)
+
 	return streamPos, err
 }
 
@@ -314,30 +519,39 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 ) ([]types.StreamEvent, bool, error) {
 	var query string
 	if onlySyncEvents {
+		// "SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+		// " WHERE room_id = $1 AND id > $2 AND id <= $3"
+		// // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 		query = selectRecentEventsForSyncSQL
 	} else {
+		// "SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+		// " WHERE room_id = $1 AND id > $2 AND id <= $3" +
 		query = selectRecentEventsSQL
 	}
 
-	stmt, params, err := prepareWithFilters(
-		s.db, txn, query,
-		[]interface{}{
-			roomID, r.Low(), r.High(),
-		},
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+		"@x3": r.Low(),
+		"@x4": r.High(),
+		"@x5": eventFilter.Limit + 1,
+	}
+
+	query, params = prepareWithFilters(
+		s.jsonPropertyName, query, params,
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
 		nil, eventFilter.Limit+1, FilterOrderDesc,
 	)
-	if err != nil {
-		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
-	}
 
-	rows, err := stmt.QueryContext(ctx, params...)
+	// rows, err := stmt.QueryContext(ctx, params...)
+	rows, err := queryOutputRoomEvent(s, ctx, query, params)
+
 	if err != nil {
 		return nil, false, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
-	events, err := rowsToStreamEvents(rows)
+	events, err := rowsToStreamEvents(&rows)
 	if err != nil {
 		return nil, false, err
 	}
@@ -367,24 +581,31 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 ) ([]types.StreamEvent, error) {
-	stmt, params, err := prepareWithFilters(
-		s.db, txn, selectEarlyEventsSQL,
-		[]interface{}{
-			roomID, r.Low(), r.High(),
-		},
+	// "SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	// " WHERE room_id = $1 AND id > $2 AND id <= $3"
+	// // WHEN, ORDER BY (and not LIMIT) are appended by prepareWithFilters
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+		"@x3": r.Low(),
+		"@x4": r.High(),
+		"@x5": eventFilter.Limit,
+	}
+	stmt, params := prepareWithFilters(
+		s.jsonPropertyName, selectEarlyEventsSQL, params,
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
 		nil, eventFilter.Limit, FilterOrderAsc,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
-	}
-	rows, err := stmt.QueryContext(ctx, params...)
+
+	// rows, err := stmt.QueryContext(ctx, params...)
+	rows, err := queryOutputRoomEvent(s, ctx, stmt, params)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectEarlyEvents: rows.close() failed")
-	events, err := rowsToStreamEvents(rows)
+	events, err := rowsToStreamEvents(&rows)
 	if err != nil {
 		return nil, err
 	}
@@ -402,17 +623,27 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 func (s *outputRoomEventsStatements) SelectEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StreamEvent, error) {
+	// "SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = $1"
+
 	var returnEvents []types.StreamEvent
-	stmt := sqlutil.TxStmt(txn, s.selectEventsStmt)
+
+	// stmt := sqlutil.TxStmt(txn, s.selectEventsStmt)
+
 	for _, eventID := range eventIDs {
-		rows, err := stmt.QueryContext(ctx, eventID)
+		var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+		params := map[string]interface{}{
+			"@x1": dbCollectionName,
+			"@x2": eventID,
+		}
+
+		// rows, err := stmt.QueryContext(ctx, eventID)
+		rows, err := queryOutputRoomEvent(s, ctx, s.selectEventsStmt, params)
 		if err != nil {
 			return nil, err
 		}
-		if streamEvents, err := rowsToStreamEvents(rows); err == nil {
+		if streamEvents, err := rowsToStreamEvents(&rows); err == nil {
 			returnEvents = append(returnEvents, streamEvents...)
 		}
-		internal.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
 	}
 	return returnEvents, nil
 }
@@ -420,13 +651,30 @@ func (s *outputRoomEventsStatements) SelectEvents(
 func (s *outputRoomEventsStatements) DeleteEventsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteEventsForRoomStmt).ExecContext(ctx, roomID)
+	// "DELETE FROM syncapi_output_room_events WHERE room_id = $1"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+	}
+
+	// _, err = sqlutil.TxStmt(txn, s.deleteEventsForRoomStmt).ExecContext(ctx, roomID)
+	rows, err := queryOutputRoomEvent(s, ctx, s.deleteEventsForRoomStmt, params)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range rows {
+		err = deleteOutputRoomEvent(s, ctx, item)
+	}
+
 	return err
 }
 
-func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
+func rowsToStreamEvents(rows *[]OutputRoomEventCosmosData) ([]types.StreamEvent, error) {
 	var result []types.StreamEvent
-	for rows.Next() {
+	for _, item := range *rows {
 		var (
 			eventID         string
 			streamPos       types.StreamPosition
@@ -436,9 +684,17 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			txnID           *string
 			transactionID   *api.TransactionID
 		)
-		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID); err != nil {
-			return nil, err
-		}
+		// SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id
+		// if err := rows.Scan(&eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID); err != nil {
+		// 	return nil, err
+		// }
+		eventID = item.OutputRoomEvent.EventID
+		streamPos = types.StreamPosition(item.OutputRoomEvent.ID)
+		eventBytes = item.OutputRoomEvent.HeaderedEventJSON
+		sessionID = &item.OutputRoomEvent.SessionID
+		excludeFromSync = item.OutputRoomEvent.ExcludeFromSync
+		txnID = &item.OutputRoomEvent.TransactionID
+
 		// TODO: Handle redacted events
 		var ev gomatrixserverlib.HeaderedEvent
 		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {

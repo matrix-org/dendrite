@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
 	// Import SQLite database driver
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	_ "github.com/mattn/go-sqlite3"
@@ -31,7 +31,8 @@ import (
 
 // Database stores events intended to be later sent to application services
 type Database struct {
-	sqlutil.PartitionOffsetStatements
+	database cosmosdbutil.Database
+	cosmosdbutil.PartitionOffsetStatements
 	events       eventsStatements
 	txnID        txnStatements
 	writer       cosmosdbutil.Writer
@@ -44,14 +45,23 @@ type Database struct {
 // NewDatabase opens a new database
 func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
-	config := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
+	configCosmos := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
 	result := &Database{
 		databaseName: "appservice",
 		connection:   conn,
-		cosmosConfig: config,
+		cosmosConfig: configCosmos,
 	}
+	result.database = cosmosdbutil.Database{
+		Connection:   conn,
+		CosmosConfig: configCosmos,
+		DatabaseName: result.databaseName,
+	}
+
 	var err error
 	result.writer = cosmosdbutil.NewExclusiveWriterFake()
+	if err = result.PartitionOffsetStatements.Prepare(&result.database, result.writer, "appservice"); err != nil {
+		return nil, err
+	}
 	if err = result.prepare(); err != nil {
 		return nil, err
 	}

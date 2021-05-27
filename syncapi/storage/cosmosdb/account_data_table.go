@@ -18,63 +18,127 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const accountDataSchema = `
-CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
-    id INTEGER PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    room_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    UNIQUE (user_id, room_id, type)
-);
-`
+// const accountDataSchema = `
+// CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
+//     id INTEGER PRIMARY KEY,
+//     user_id TEXT NOT NULL,
+//     room_id TEXT NOT NULL,
+//     type TEXT NOT NULL,
+//     UNIQUE (user_id, room_id, type)
+// );
+// `
 
-const insertAccountDataSQL = "" +
-	"INSERT INTO syncapi_account_data_type (id, user_id, room_id, type) VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT (user_id, room_id, type) DO UPDATE" +
-	" SET id = $5"
-
-const selectAccountDataInRangeSQL = "" +
-	"SELECT room_id, type FROM syncapi_account_data_type" +
-	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC"
-
-const selectMaxAccountDataIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_account_data_type"
-
-type accountDataStatements struct {
-	db                           *sql.DB
-	streamIDStatements           *streamIDStatements
-	insertAccountDataStmt        *sql.Stmt
-	selectMaxAccountDataIDStmt   *sql.Stmt
-	selectAccountDataInRangeStmt *sql.Stmt
+type AccountDataTypeCosmos struct {
+	ID       int64  `json:"id"`
+	UserID   string `json:"user_id"`
+	RoomID   string `json:"room_id"`
+	DataType string `json:"type"`
 }
 
-func NewSqliteAccountDataTable(db *sql.DB, streamID *streamIDStatements) (tables.AccountData, error) {
+type AccountDataTypeNumberCosmosData struct {
+	Number int64 `json:"number"`
+}
+
+type AccountDataTypeCosmosData struct {
+	Id              string                `json:"id"`
+	Pk              string                `json:"_pk"`
+	Cn              string                `json:"_cn"`
+	ETag            string                `json:"_etag"`
+	Timestamp       int64                 `json:"_ts"`
+	AccountDataType AccountDataTypeCosmos `json:"mx_syncapi_account_data_type"`
+}
+
+// const insertAccountDataSQL = "" +
+// 	"INSERT INTO syncapi_account_data_type (id, user_id, room_id, type) VALUES ($1, $2, $3, $4)" +
+// 	" ON CONFLICT (user_id, room_id, type) DO UPDATE" +
+// 	" SET id = $5"
+
+// "SELECT room_id, type FROM syncapi_account_data_type" +
+// " WHERE user_id = $1 AND id > $2 AND id <= $3" +
+// " ORDER BY id ASC"
+const selectAccountDataInRangeSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_account_data_type.user_id = @x2 " +
+	"and c.mx_syncapi_account_data_type.id > @x3 " +
+	"and c.mx_syncapi_account_data_type.id < @x4 " +
+	"order by c.mx_syncapi_account_data_type.id "
+
+// "SELECT MAX(id) FROM syncapi_account_data_type"
+const selectMaxAccountDataIDSQL = "" +
+	"select max(c.mx_syncapi_account_data_type.id) as number from c where c._cn = @x1 "
+
+type accountDataStatements struct {
+	db                           *SyncServerDatasource
+	streamIDStatements           *streamIDStatements
+	insertAccountDataStmt        *sql.Stmt
+	selectMaxAccountDataIDStmt   string
+	selectAccountDataInRangeStmt string
+	tableName                    string
+}
+
+func queryAccountDataType(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataTypeCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []AccountDataTypeCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func queryAccountDataTypeNumber(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataTypeNumberCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []AccountDataTypeNumberCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, cosmosdbutil.ErrNoRows
+	}
+	return response, nil
+}
+
+func NewCosmosDBAccountDataTable(db *SyncServerDatasource, streamID *streamIDStatements) (tables.AccountData, error) {
 	s := &accountDataStatements{
 		db:                 db,
 		streamIDStatements: streamID,
 	}
-	_, err := db.Exec(accountDataSchema)
-	if err != nil {
-		return nil, err
-	}
-	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxAccountDataIDStmt, err = db.Prepare(selectMaxAccountDataIDSQL); err != nil {
-		return nil, err
-	}
-	if s.selectAccountDataInRangeStmt, err = db.Prepare(selectAccountDataInRangeSQL); err != nil {
-		return nil, err
-	}
+
+	s.selectMaxAccountDataIDStmt = selectMaxAccountDataIDSQL
+	s.selectAccountDataInRangeStmt = selectAccountDataInRangeSQL
+	s.tableName = "account_data_types"
 	return s, nil
 }
 
@@ -82,11 +146,46 @@ func (s *accountDataStatements) InsertAccountData(
 	ctx context.Context, txn *sql.Tx,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
+
+	// "INSERT INTO syncapi_account_data_type (id, user_id, room_id, type) VALUES ($1, $2, $3, $4)" +
+	// " ON CONFLICT (user_id, room_id, type) DO UPDATE" +
+	// " SET id = $5"
+
 	pos, err = s.streamIDStatements.nextAccountDataID(ctx, txn)
 	if err != nil {
 		return
 	}
-	_, err = sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, pos, userID, roomID, dataType, pos)
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	//     UNIQUE (user_id, room_id, type)
+	docId := fmt.Sprintf("%s_%s_%s", userID, roomID, dataType)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	data := AccountDataTypeCosmos{
+		ID:       int64(pos),
+		UserID:   userID,
+		RoomID:   roomID,
+		DataType: dataType,
+	}
+
+	dbData := &AccountDataTypeCosmosData{
+		Id:              cosmosDocId,
+		Cn:              dbCollectionName,
+		Pk:              pk,
+		Timestamp:       time.Now().Unix(),
+		AccountDataType: data,
+	}
+
+	// _, err = sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, pos, userID, roomID, dataType, pos)
+	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		&dbData,
+		options)
+
 	return
 }
 
@@ -98,21 +197,32 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
 
-	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High())
+	// "SELECT room_id, type FROM syncapi_account_data_type" +
+	// " WHERE user_id = $1 AND id > $2 AND id <= $3" +
+	// " ORDER BY id ASC"
+
+	// rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High())
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": userID,
+		"@x3": r.Low(),
+		"@x4": r.High(),
+	}
+
+	rows, err := queryAccountDataType(s, ctx, s.selectAccountDataInRangeStmt, params)
+
 	if err != nil {
 		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
 
 	var entries int
 
-	for rows.Next() {
+	for _, item := range rows {
 		var dataType string
 		var roomID string
-
-		if err = rows.Scan(&roomID, &dataType); err != nil {
-			return
-		}
+		roomID = item.AccountDataType.RoomID
+		dataType = item.AccountDataType.DataType
 
 		// check if we should add this by looking at the filter.
 		// It would be nice if we could do this in SQL-land, but the mix of variadic
@@ -147,8 +257,22 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 func (s *accountDataStatements) SelectMaxAccountDataID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
+
+	// "SELECT MAX(id) FROM syncapi_account_data_type"
+
 	var nullableID sql.NullInt64
-	err = sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt).QueryRowContext(ctx).Scan(&nullableID)
+	// err = sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt).QueryRowContext(ctx).Scan(&nullableID)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+	}
+
+	rows, err := queryAccountDataTypeNumber(s, ctx, s.selectMaxAccountDataIDStmt, params)
+
+	if err != cosmosdbutil.ErrNoRows && len(rows) == 1 {
+		nullableID.Int64 = rows[0].Number
+	}
+
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}

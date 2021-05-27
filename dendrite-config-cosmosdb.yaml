@@ -6,7 +6,7 @@
 #
 # At a minimum, to get started, you will need to update the settings in the
 # "global" section for your deployment, and you will need to check that the
-# database "connection_string" line in each component section is correct. 
+# database "connection_string" line in each component section is correct.
 #
 # Each component with a "database" section can accept the following formats
 # for "connection_string":
@@ -23,13 +23,13 @@
 # small number of users and likely will perform worse still with a higher volume
 # of users.
 #
-# The "max_open_conns" and "max_idle_conns" settings configure the maximum 
+# The "max_open_conns" and "max_idle_conns" settings configure the maximum
 # number of open/idle database connections. The value 0 will use the database
 # engine default, and a negative value will use unlimited connections. The
 # "conn_max_lifetime" option controls the maximum length of time a database
 # connection can be idle in seconds - a negative value is unlimited.
 
-# The version of the configuration file. 
+# The version of the configuration file.
 version: 1
 
 # Global Matrix configuration. This configuration applies to all components.
@@ -154,13 +154,13 @@ client_api:
   # Whether to require reCAPTCHA for registration.
   enable_registration_captcha: false
 
-  # Settings for ReCAPTCHA. 
+  # Settings for ReCAPTCHA.
   recaptcha_public_key: ""
   recaptcha_private_key: ""
   recaptcha_bypass_secret: ""
   recaptcha_siteverify_api: ""
 
-  # TURN server information that this homeserver should send to clients. 
+  # TURN server information that this homeserver should send to clients.
   turn:
     turn_user_lifetime: ""
     turn_uris: []
@@ -169,7 +169,7 @@ client_api:
     turn_password: ""
 
   # Settings for rate-limited endpoints. Rate limiting will kick in after the
-  # threshold number of "slots" have been taken by requests from a specific 
+  # threshold number of "slots" have been taken by requests from a specific
   # host. Each "slot" will be released after the cooloff time in milliseconds.
   rate_limiting:
     enabled: true
@@ -331,7 +331,7 @@ sync_api:
   external_api:
     listen: http://[::]:8073
   database:
-    connection_string: file:syncapi.db
+    connection_string: "cosmosdb:AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==;DatabaseName=safezone_local;ContainerName=test.criticalarc.com;"
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -363,9 +363,9 @@ user_api:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
-  # The length of time that a token issued for a relying party from 
+  # The length of time that a token issued for a relying party from
   # /_matrix/client/r0/user/{userId}/openid/request_token endpoint
-  # is considered to be valid in milliseconds. 
+  # is considered to be valid in milliseconds.
   # The default lifetime is 3600000ms (60 minutes).
   # openid_token_lifetime_ms: 3600000
 

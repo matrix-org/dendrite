@@ -160,8 +160,8 @@ func getDevice(s *devicesStatements, ctx context.Context, pk string, docId strin
 	return &response, err
 }
 
-func setDevice(s *devicesStatements, ctx context.Context, pk string, device DeviceCosmosData) (*DeviceCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, device.ETag)
+func setDevice(s *devicesStatements, ctx context.Context, device DeviceCosmosData) (*DeviceCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(device.Pk, device.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
@@ -345,7 +345,7 @@ func (s *devicesStatements) updateDeviceName(
 
 	response.Device.DisplayName = *displayName
 
-	var _, exReplace = setDevice(s, ctx, pk, *response)
+	var _, exReplace = setDevice(s, ctx, *response)
 	if exReplace != nil {
 		return exReplace
 	}
@@ -460,8 +460,9 @@ func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, localpart,
 	}
 
 	response.Device.LastSeenTS = lastSeenTs
+	response.Device.LastSeenIP = ipAddr
 
-	var _, exReplace = setDevice(s, ctx, pk, *response)
+	var _, exReplace = setDevice(s, ctx, *response)
 	if exReplace != nil {
 		return exReplace
 	}
