@@ -16,68 +16,74 @@
 package cosmosdb
 
 import (
-	"database/sql"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
-	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
-	sqlutil.PartitionOffsetStatements
-	db     *sql.DB
-	writer sqlutil.Writer
+	cosmosdbutil.PartitionOffsetStatements
+	database     cosmosdbutil.Database
+	writer       cosmosdbutil.Writer
+	connection   cosmosdbapi.CosmosConnection
+	databaseName string
+	cosmosConfig cosmosdbapi.CosmosConfig
 }
 
 // NewDatabase opens a new database
 func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationSenderCache) (*Database, error) {
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	configCosmos := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
 	var d Database
+	d.connection = conn
+	d.cosmosConfig = configCosmos
+	d.databaseName = "federationsender"
+	d.database = cosmosdbutil.Database{
+		Connection:   conn,
+		CosmosConfig: configCosmos,
+		DatabaseName: d.databaseName,
+	}
+
 	var err error
-	if d.db, err = sqlutil.Open(dbProperties); err != nil {
-		return nil, err
-	}
-	d.writer = sqlutil.NewExclusiveWriter()
-	joinedHosts, err := NewSQLiteJoinedHostsTable(d.db)
+
+	d.writer = cosmosdbutil.NewExclusiveWriterFake()
+	joinedHosts, err := NewCosmosDBJoinedHostsTable(&d)
 	if err != nil {
 		return nil, err
 	}
-	queuePDUs, err := NewSQLiteQueuePDUsTable(d.db)
+	queuePDUs, err := NewCosmosDBQueuePDUsTable(&d)
 	if err != nil {
 		return nil, err
 	}
-	queueEDUs, err := NewSQLiteQueueEDUsTable(d.db)
+	queueEDUs, err := NewCosmosDBQueueEDUsTable(&d)
 	if err != nil {
 		return nil, err
 	}
-	queueJSON, err := NewSQLiteQueueJSONTable(d.db)
+	queueJSON, err := NewCosmosDBQueueJSONTable(&d)
 	if err != nil {
 		return nil, err
 	}
-	blacklist, err := NewSQLiteBlacklistTable(d.db)
+	blacklist, err := NewCosmosDBBlacklistTable(&d)
 	if err != nil {
 		return nil, err
 	}
-	outboundPeeks, err := NewSQLiteOutboundPeeksTable(d.db)
+	outboundPeeks, err := NewCosmosDBOutboundPeeksTable(&d)
 	if err != nil {
 		return nil, err
 	}
-	inboundPeeks, err := NewSQLiteInboundPeeksTable(d.db)
+	inboundPeeks, err := NewCosmosDBInboundPeeksTable(&d)
 	if err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadRemoveRoomsTable(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{
-		DB:                            d.db,
+		DB:                            nil,
 		Cache:                         cache,
 		Writer:                        d.writer,
 		FederationSenderJoinedHosts:   joinedHosts,
@@ -88,7 +94,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 		FederationSenderOutboundPeeks: outboundPeeks,
 		FederationSenderInboundPeeks:  inboundPeeks,
 	}
-	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
+	if err = d.PartitionOffsetStatements.Prepare(&d.database, d.writer, "federationsender"); err != nil {
 		return nil, err
 	}
 	return &d, nil

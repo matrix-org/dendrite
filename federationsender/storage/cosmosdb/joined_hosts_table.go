@@ -18,87 +18,155 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
-	"strings"
+	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/types"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const joinedHostsSchema = `
--- The joined_hosts table stores a list of m.room.member event ids in the
--- current state for each room where the membership is "join".
--- There will be an entry for every user that is joined to the room.
-CREATE TABLE IF NOT EXISTS federationsender_joined_hosts (
-    -- The string ID of the room.
-    room_id TEXT NOT NULL,
-    -- The event ID of the m.room.member join event.
-    event_id TEXT NOT NULL,
-    -- The domain part of the user ID the m.room.member event is for.
-    server_name TEXT NOT NULL
-);
+// const joinedHostsSchema = `
+// -- The joined_hosts table stores a list of m.room.member event ids in the
+// -- current state for each room where the membership is "join".
+// -- There will be an entry for every user that is joined to the room.
+// CREATE TABLE IF NOT EXISTS federationsender_joined_hosts (
+//     -- The string ID of the room.
+//     room_id TEXT NOT NULL,
+//     -- The event ID of the m.room.member join event.
+//     event_id TEXT NOT NULL,
+//     -- The domain part of the user ID the m.room.member event is for.
+//     server_name TEXT NOT NULL
+// );
 
-CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
-    ON federationsender_joined_hosts (event_id);
+// CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
+//     ON federationsender_joined_hosts (event_id);
 
-CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
-    ON federationsender_joined_hosts (room_id)
-`
+// CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
+//     ON federationsender_joined_hosts (room_id)
+// `
 
-const insertJoinedHostsSQL = "" +
-	"INSERT OR IGNORE INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
-	" VALUES ($1, $2, $3)"
-
-const deleteJoinedHostsSQL = "" +
-	"DELETE FROM federationsender_joined_hosts WHERE event_id = $1"
-
-const deleteJoinedHostsForRoomSQL = "" +
-	"DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
-
-const selectJoinedHostsSQL = "" +
-	"SELECT event_id, server_name FROM federationsender_joined_hosts" +
-	" WHERE room_id = $1"
-
-const selectAllJoinedHostsSQL = "" +
-	"SELECT DISTINCT server_name FROM federationsender_joined_hosts"
-
-const selectJoinedHostsForRoomsSQL = "" +
-	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
-
-type joinedHostsStatements struct {
-	db                           *sql.DB
-	insertJoinedHostsStmt        *sql.Stmt
-	deleteJoinedHostsStmt        *sql.Stmt
-	deleteJoinedHostsForRoomStmt *sql.Stmt
-	selectJoinedHostsStmt        *sql.Stmt
-	selectAllJoinedHostsStmt     *sql.Stmt
-	// selectJoinedHostsForRoomsStmt *sql.Stmt - prepared at runtime due to variadic
+type JoinedHostCosmos struct {
+	RoomID     string `json:"room_id"`
+	EventID    string `json:"event_id"`
+	ServerName string `json:"server_name"`
 }
 
-func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
+type JoinedHostCosmosData struct {
+	Id         string           `json:"id"`
+	Pk         string           `json:"_pk"`
+	Cn         string           `json:"_cn"`
+	ETag       string           `json:"_etag"`
+	Timestamp  int64            `json:"_ts"`
+	JoinedHost JoinedHostCosmos `json:"mx_federationsender_joined_host"`
+}
+
+// const insertJoinedHostsSQL = "" +
+// 	"INSERT OR IGNORE INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
+// 	" VALUES ($1, $2, $3)"
+
+// "DELETE FROM federationsender_joined_hosts WHERE event_id = $1"
+const deleteJoinedHostsSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_federationsender_joined_host.event_id = @x2 "
+
+// "DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
+const deleteJoinedHostsForRoomSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_federationsender_joined_host.room_id = @x2 "
+
+// "SELECT event_id, server_name FROM federationsender_joined_hosts" +
+// " WHERE room_id = $1"
+const selectJoinedHostsSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_federationsender_joined_host.room_id = @x2 "
+
+// "SELECT DISTINCT server_name FROM federationsender_joined_hosts"
+const selectAllJoinedHostsSQL = "" +
+	"select distinct c.mx_federationsender_joined_host.server_name from c where c._cn = @x1 "
+
+// "SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
+const selectJoinedHostsForRoomsSQL = "" +
+	"select distinct c.mx_federationsender_joined_host.server_name from c where c._cn = @x1 " +
+	"and ARRAY_CONTAINS(@x2, c.mx_federationsender_joined_host.room_id) "
+
+type joinedHostsStatements struct {
+	db *Database
+	// insertJoinedHostsStmt        *sql.Stmt
+	deleteJoinedHostsStmt        string
+	deleteJoinedHostsForRoomStmt string
+	selectJoinedHostsStmt        string
+	selectAllJoinedHostsStmt     string
+	// selectJoinedHostsForRoomsStmt *sql.Stmt - prepared at runtime due to variadic
+	tableName string
+}
+
+func queryJoinedHostDistinct(s *joinedHostsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]JoinedHostCosmos, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []JoinedHostCosmos
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func queryJoinedHost(s *joinedHostsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]JoinedHostCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var response []JoinedHostCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func deleteJoinedHost(s *joinedHostsStatements, ctx context.Context, dbData JoinedHostCosmosData) error {
+	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData.Id,
+		options)
+
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func NewCosmosDBJoinedHostsTable(db *Database) (s *joinedHostsStatements, err error) {
 	s = &joinedHostsStatements{
 		db: db,
 	}
-	_, err = db.Exec(joinedHostsSchema)
-	if err != nil {
-		return
-	}
-	if s.insertJoinedHostsStmt, err = db.Prepare(insertJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.deleteJoinedHostsStmt, err = db.Prepare(deleteJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.deleteJoinedHostsForRoomStmt, err = s.db.Prepare(deleteJoinedHostsForRoomSQL); err != nil {
-		return
-	}
-	if s.selectJoinedHostsStmt, err = db.Prepare(selectJoinedHostsSQL); err != nil {
-		return
-	}
-	if s.selectAllJoinedHostsStmt, err = db.Prepare(selectAllJoinedHostsSQL); err != nil {
-		return
-	}
+	s.deleteJoinedHostsStmt = deleteJoinedHostsSQL
+	s.deleteJoinedHostsForRoomStmt = deleteJoinedHostsForRoomSQL
+	s.selectJoinedHostsStmt = selectJoinedHostsSQL
+	s.selectAllJoinedHostsStmt = selectAllJoinedHostsSQL
+	s.tableName = "joined_hosts"
 	return
 }
 
@@ -108,8 +176,43 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 	roomID, eventID string,
 	serverName gomatrixserverlib.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
-	_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
+
+	// 	"INSERT OR IGNORE INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
+	// 	" VALUES ($1, $2, $3)"
+
+	// stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	// CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
+	//     ON federationsender_joined_hosts (event_id);
+	docId := fmt.Sprintf("%s", eventID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	data := JoinedHostCosmos{
+		EventID:    eventID,
+		RoomID:     roomID,
+		ServerName: string(serverName),
+	}
+
+	dbData := &JoinedHostCosmosData{
+		Id: cosmosDocId,
+		Cn: dbCollectionName,
+		Pk: pk,
+		Timestamp:  time.Now().Unix(),
+		JoinedHost: data,
+	}
+
+	// _, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
+
+	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		&dbData,
+		options)
+
 	return err
 }
 
@@ -117,9 +220,21 @@ func (s *joinedHostsStatements) DeleteJoinedHosts(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) error {
 	for _, eventID := range eventIDs {
-		stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsStmt)
-		if _, err := stmt.ExecContext(ctx, eventID); err != nil {
-			return err
+		// "DELETE FROM federationsender_joined_hosts WHERE event_id = $1"
+
+		var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+		params := map[string]interface{}{
+			"@x1": dbCollectionName,
+			"@x2": eventID,
+		}
+		// stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsStmt)
+
+		rows, err := queryJoinedHost(s, ctx, s.deleteJoinedHostsStmt, params)
+
+		for _, item := range rows {
+			if err = deleteJoinedHost(s, ctx, item); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -128,92 +243,123 @@ func (s *joinedHostsStatements) DeleteJoinedHosts(
 func (s *joinedHostsStatements) DeleteJoinedHostsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsForRoomStmt)
-	_, err := stmt.ExecContext(ctx, roomID)
+	// "DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+	}
+
+	// stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsForRoomStmt)
+	rows, err := queryJoinedHost(s, ctx, s.deleteJoinedHostsStmt, params)
+
+	// _, err := stmt.ExecContext(ctx, roomID)
+	for _, item := range rows {
+		if err = deleteJoinedHost(s, ctx, item); err != nil {
+			return err
+		}
+	}
 	return err
 }
 
 func (s *joinedHostsStatements) SelectJoinedHostsWithTx(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) ([]types.JoinedHost, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectJoinedHostsStmt)
-	return joinedHostsFromStmt(ctx, stmt, roomID)
+	// "SELECT event_id, server_name FROM federationsender_joined_hosts" +
+	// " WHERE room_id = $1"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomID,
+	}
+
+	// stmt := sqlutil.TxStmt(txn, s.selectJoinedHostsStmt)
+	rows, err := queryJoinedHost(s, ctx, s.deleteJoinedHostsStmt, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rowsToJoinedHosts(&rows), nil
 }
 
 func (s *joinedHostsStatements) SelectJoinedHosts(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
-	return joinedHostsFromStmt(ctx, s.selectJoinedHostsStmt, roomID)
+	return s.SelectJoinedHostsWithTx(ctx, nil, roomID)
 }
 
 func (s *joinedHostsStatements) SelectAllJoinedHosts(
 	ctx context.Context,
 ) ([]gomatrixserverlib.ServerName, error) {
-	rows, err := s.selectAllJoinedHostsStmt.QueryContext(ctx)
+	// "SELECT DISTINCT server_name FROM federationsender_joined_hosts"
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+	}
+
+	// rows, err := s.selectAllJoinedHostsStmt.QueryContext(ctx)
+	rows, err := queryJoinedHostDistinct(s, ctx, s.selectAllJoinedHostsStmt, params)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectAllJoinedHosts: rows.close() failed")
 
 	var result []gomatrixserverlib.ServerName
-	for rows.Next() {
+	for _, item := range rows {
 		var serverName string
-		if err = rows.Scan(&serverName); err != nil {
-			return nil, err
-		}
+		serverName = item.ServerName
 		result = append(result, gomatrixserverlib.ServerName(serverName))
 	}
 
-	return result, rows.Err()
+	return result, err
 }
 
 func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
 	ctx context.Context, roomIDs []string,
 ) ([]gomatrixserverlib.ServerName, error) {
-	iRoomIDs := make([]interface{}, len(roomIDs))
-	for i := range roomIDs {
-		iRoomIDs[i] = roomIDs[i]
+	// iRoomIDs := make([]interface{}, len(roomIDs))
+	// for i := range roomIDs {
+	// 	iRoomIDs[i] = roomIDs[i]
+	// }
+
+	// "SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
+
+	// sql := strings.Replace(selectJoinedHostsForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": roomIDs,
 	}
 
-	sql := strings.Replace(selectJoinedHostsForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
-	rows, err := s.db.QueryContext(ctx, sql, iRoomIDs...)
+	// rows, err := s.db.QueryContext(ctx, sql, iRoomIDs...)
+	rows, err := queryJoinedHostDistinct(s, ctx, s.selectAllJoinedHostsStmt, params)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedHostsForRoomsStmt: rows.close() failed")
 
 	var result []gomatrixserverlib.ServerName
-	for rows.Next() {
+	for _, item := range rows {
 		var serverName string
-		if err = rows.Scan(&serverName); err != nil {
-			return nil, err
-		}
+		serverName = item.ServerName
 		result = append(result, gomatrixserverlib.ServerName(serverName))
 	}
 
-	return result, rows.Err()
+	return result, nil
 }
 
-func joinedHostsFromStmt(
-	ctx context.Context, stmt *sql.Stmt, roomID string,
-) ([]types.JoinedHost, error) {
-	rows, err := stmt.QueryContext(ctx, roomID)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "joinedHostsFromStmt: rows.close() failed")
-
+func rowsToJoinedHosts(rows *[]JoinedHostCosmosData) []types.JoinedHost {
 	var result []types.JoinedHost
-	for rows.Next() {
-		var eventID, serverName string
-		if err = rows.Scan(&eventID, &serverName); err != nil {
-			return nil, err
-		}
+	if rows == nil {
+		return result
+	}
+	for _, item := range *rows {
 		result = append(result, types.JoinedHost{
-			MemberEventID: eventID,
-			ServerName:    gomatrixserverlib.ServerName(serverName),
+			MemberEventID: item.JoinedHost.EventID,
+			ServerName:    gomatrixserverlib.ServerName(item.JoinedHost.ServerName),
 		})
 	}
-
-	return result, nil
+	return result
 }

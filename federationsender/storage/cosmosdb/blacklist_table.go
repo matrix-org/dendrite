@@ -17,54 +17,90 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const blacklistSchema = `
-CREATE TABLE IF NOT EXISTS federationsender_blacklist (
-    -- The blacklisted server name
-	server_name TEXT NOT NULL,
-	UNIQUE (server_name)
-);
-`
+// const blacklistSchema = `
+// CREATE TABLE IF NOT EXISTS federationsender_blacklist (
+//     -- The blacklisted server name
+// 	server_name TEXT NOT NULL,
+// 	UNIQUE (server_name)
+// );
+// `
 
-const insertBlacklistSQL = "" +
-	"INSERT INTO federationsender_blacklist (server_name) VALUES ($1)" +
-	" ON CONFLICT DO NOTHING"
-
-const selectBlacklistSQL = "" +
-	"SELECT server_name FROM federationsender_blacklist WHERE server_name = $1"
-
-const deleteBlacklistSQL = "" +
-	"DELETE FROM federationsender_blacklist WHERE server_name = $1"
-
-type blacklistStatements struct {
-	db                  *sql.DB
-	insertBlacklistStmt *sql.Stmt
-	selectBlacklistStmt *sql.Stmt
-	deleteBlacklistStmt *sql.Stmt
+type BlacklistCosmos struct {
+	ServerName string `json:"server_name"`
 }
 
-func NewSQLiteBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
+type BlacklistCosmosData struct {
+	Id        string          `json:"id"`
+	Pk        string          `json:"_pk"`
+	Cn        string          `json:"_cn"`
+	ETag      string          `json:"_etag"`
+	Timestamp int64           `json:"_ts"`
+	Blacklist BlacklistCosmos `json:"mx_federationsender_blacklist"`
+}
+
+// const insertBlacklistSQL = "" +
+// 	"INSERT INTO federationsender_blacklist (server_name) VALUES ($1)" +
+// 	" ON CONFLICT DO NOTHING"
+
+// const selectBlacklistSQL = "" +
+// 	"SELECT server_name FROM federationsender_blacklist WHERE server_name = $1"
+
+// const deleteBlacklistSQL = "" +
+// 	"DELETE FROM federationsender_blacklist WHERE server_name = $1"
+
+type blacklistStatements struct {
+	db *Database
+	// insertBlacklistStmt *sql.Stmt
+	// selectBlacklistStmt *sql.Stmt
+	// deleteBlacklistStmt *sql.Stmt
+	tableName string
+}
+
+func getBlacklist(s *blacklistStatements, ctx context.Context, pk string, docId string) (*BlacklistCosmosData, error) {
+	response := BlacklistCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
+}
+
+func deleteBlacklist(s *blacklistStatements, ctx context.Context, dbData BlacklistCosmosData) error {
+	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData.Id,
+		options)
+
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func NewCosmosDBBlacklistTable(db *Database) (s *blacklistStatements, err error) {
 	s = &blacklistStatements{
 		db: db,
 	}
-	_, err = db.Exec(blacklistSchema)
-	if err != nil {
-		return
-	}
-
-	if s.insertBlacklistStmt, err = db.Prepare(insertBlacklistSQL); err != nil {
-		return
-	}
-	if s.selectBlacklistStmt, err = db.Prepare(selectBlacklistSQL); err != nil {
-		return
-	}
-	if s.deleteBlacklistStmt, err = db.Prepare(deleteBlacklistSQL); err != nil {
-		return
-	}
+	s.tableName = "blacklists"
 	return
 }
 
@@ -73,8 +109,40 @@ func NewSQLiteBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
 func (s *blacklistStatements) InsertBlacklist(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertBlacklistStmt)
-	_, err := stmt.ExecContext(ctx, serverName)
+
+	// 	"INSERT INTO federationsender_blacklist (server_name) VALUES ($1)" +
+	// 	" ON CONFLICT DO NOTHING"
+
+	// stmt := sqlutil.TxStmt(txn, s.insertBlacklistStmt)
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	// 	UNIQUE (server_name)
+	docId := fmt.Sprintf("%s", serverName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+
+	data := BlacklistCosmos{
+		ServerName: string(serverName),
+	}
+
+	dbData := &BlacklistCosmosData{
+		Id:        cosmosDocId,
+		Cn:        dbCollectionName,
+		Pk:        pk,
+		Timestamp: time.Now().Unix(),
+		Blacklist: data,
+	}
+
+	// _, err := stmt.ExecContext(ctx, serverName)
+
+	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		&dbData,
+		options)
+
 	return err
 }
 
@@ -84,16 +152,24 @@ func (s *blacklistStatements) InsertBlacklist(
 func (s *blacklistStatements) SelectBlacklist(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) (bool, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectBlacklistStmt)
-	res, err := stmt.QueryContext(ctx, serverName)
+	// 	"SELECT server_name FROM federationsender_blacklist WHERE server_name = $1"
+
+	// stmt := sqlutil.TxStmt(txn, s.selectBlacklistStmt)
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	// 	UNIQUE (server_name)
+	docId := fmt.Sprintf("%s", serverName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	// res, err := stmt.QueryContext(ctx, serverName)
+	res, err := getBlacklist(s, ctx, pk, cosmosDocId)
 	if err != nil {
 		return false, err
 	}
-	defer res.Close() // nolint:errcheck
 	// The query will return the server name if the server is blacklisted, and
 	// will return no rows if not. By calling Next, we find out if a row was
 	// returned or not - we don't care about the value itself.
-	return res.Next(), nil
+	return res != nil, nil
 }
 
 // updateRoom updates the last_event_id for the room. selectRoomForUpdate should
@@ -101,7 +177,18 @@ func (s *blacklistStatements) SelectBlacklist(
 func (s *blacklistStatements) DeleteBlacklist(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteBlacklistStmt)
-	_, err := stmt.ExecContext(ctx, serverName)
+	// 	"DELETE FROM federationsender_blacklist WHERE server_name = $1"
+
+	// stmt := sqlutil.TxStmt(txn, s.deleteBlacklistStmt)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	// 	UNIQUE (server_name)
+	docId := fmt.Sprintf("%s", serverName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	// _, err := stmt.ExecContext(ctx, serverName)
+	res, err := getBlacklist(s, ctx, pk, cosmosDocId)
+	if(res != nil) {
+		_ = deleteBlacklist(s, ctx, *res)
+	}
 	return err
 }
