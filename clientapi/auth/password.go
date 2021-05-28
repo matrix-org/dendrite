@@ -16,16 +16,23 @@ package auth
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"net/http"
+
+	"github.com/go-ldap/ldap/v3"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
 type GetAccountByPassword func(ctx context.Context, localpart, password string) (*api.Account, error)
+
+type GetAccountByLocalpart func(ctx context.Context, localpart string) (*api.Account, error)
 
 type PasswordRequest struct {
 	Login
@@ -34,8 +41,10 @@ type PasswordRequest struct {
 
 // LoginTypePassword implements https://matrix.org/docs/spec/client_server/r0.6.1#password-based
 type LoginTypePassword struct {
-	GetAccountByPassword GetAccountByPassword
-	Config               *config.ClientAPI
+	GetAccountByPassword  GetAccountByPassword
+	GetAccountByLocalpart GetAccountByLocalpart
+	Config                *config.ClientAPI
+	UserAPI               userapi.UserInternalAPI
 }
 
 func (t *LoginTypePassword) Name() string {
@@ -61,6 +70,100 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			Code: http.StatusUnauthorized,
 			JSON: jsonerror.InvalidUsername(err.Error()),
 		}
+	}
+	if len(t.Config.LDAP.Host) > 0 {
+		addr := ""
+		if t.Config.LDAP.TLS {
+			addr = "ldaps://" + t.Config.LDAP.Host + ":" + t.Config.LDAP.Port
+		} else {
+			addr = "ldap://" + t.Config.LDAP.Host + ":" + t.Config.LDAP.Port
+		}
+
+		conn, err := ldap.DialURL(addr)
+		if err != nil {
+			return nil, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.InvalidUsername(err.Error()),
+			}
+		}
+		defer conn.Close()
+
+		e1 := conn.Bind(t.Config.LDAP.BindDN, t.Config.LDAP.BindPSWD)
+		if e1 != nil {
+			return nil, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.InvalidUsername(err.Error()),
+			}
+		}
+		filter := fmt.Sprintf("(&%s(%s=%s))", t.Config.LDAP.Filter, "uid", localpart)
+		searchRequest := ldap.NewSearchRequest(t.Config.LDAP.BaseDN, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false, filter, []string{"uid"}, nil)
+		sr, err := conn.Search(searchRequest)
+		if err != nil {
+			return nil, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.InvalidUsername(err.Error()),
+			}
+		}
+		if len(sr.Entries) >= 1 {
+			return nil, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.BadJSON("'user' must be duplicated."),
+			}
+		}
+		if len(sr.Entries) == 0 {
+			_, err = t.GetAccountByPassword(ctx, localpart, r.Password)
+			if err != nil {
+				return nil, &util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+				}
+			}
+			return &r.Login, nil
+		}
+
+		userDN := sr.Entries[0].DN
+		err = conn.Bind(userDN, r.Password)
+		if err != nil {
+			return nil, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.InvalidUsername(err.Error()),
+			}
+		}
+
+		_, err = t.GetAccountByLocalpart(ctx, localpart)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				util.GetLogger(ctx).Debugf("registing user, %+v %+v", localpart, r.Password)
+				var accRes userapi.PerformAccountCreationResponse
+				err := t.UserAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
+					AppServiceID: "",
+					Localpart:    localpart,
+					Password:     r.Password,
+					AccountType:  userapi.AccountTypeUser,
+					OnConflict:   userapi.ConflictAbort,
+				}, &accRes)
+				if err != nil {
+					if _, ok := err.(*userapi.ErrorConflict); ok {
+						return nil, &util.JSONResponse{
+							Code: http.StatusBadRequest,
+							JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+						}
+					}
+					return nil, &util.JSONResponse{
+						Code: http.StatusInternalServerError,
+						JSON: jsonerror.Unknown("failed to create account: " + err.Error()),
+					}
+				}
+
+				return &r.Login, nil
+			}
+
+			return nil, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.InvalidUsername(err.Error()),
+			}
+		}
+		return &r.Login, nil
 	}
 	_, err = t.GetAccountByPassword(ctx, localpart, r.Password)
 	if err != nil {

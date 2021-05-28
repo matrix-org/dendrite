@@ -66,8 +66,10 @@ func Login(
 		}
 	} else if req.Method == http.MethodPost {
 		typePassword := auth.LoginTypePassword{
-			GetAccountByPassword: accountDB.GetAccountByPassword,
-			Config:               cfg,
+			GetAccountByPassword:  accountDB.GetAccountByPassword,
+			GetAccountByLocalpart: accountDB.GetAccountByLocalpart,
+			Config:                cfg,
+			UserAPI:               userAPI,
 		}
 		r := typePassword.Request()
 		resErr := httputil.UnmarshalJSONRequest(req, r)

@@ -39,6 +39,8 @@ type ClientAPI struct {
 	RateLimiting RateLimiting `yaml:"rate_limiting"`
 
 	MSCs *MSCs `yaml:"mscs"`
+
+	LDAP LDAP `yaml:"ldap"`
 }
 
 func (c *ClientAPI) Defaults() {
@@ -122,4 +124,14 @@ func (r *RateLimiting) Defaults() {
 	r.Enabled = true
 	r.Threshold = 5
 	r.CooloffMS = 500
+}
+
+type LDAP struct {
+	TLS      bool   `yaml:"tls"`
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	BaseDN   string `yaml:"basedn"`
+	Filter   string `yaml:"filter"`
+	BindDN   string `yaml:"bind_dn"`
+	BindPSWD string `yaml:"bind_pswd"`
 }
