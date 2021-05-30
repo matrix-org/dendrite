@@ -1,16 +1,23 @@
 package kafka
 
 import (
+	"time"
+
+	js "github.com/S7evinK/saramajetstream"
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/naffka"
 	naffkaStorage "github.com/matrix-org/naffka/storage"
+	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
 func SetupConsumerProducer(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 	if cfg.UseNaffka {
 		return setupNaffka(cfg)
+	}
+	if cfg.UseNATS {
+		return setupNATS(cfg)
 	}
 	return setupKafka(cfg)
 }
@@ -55,4 +62,49 @@ func setupNaffka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 		logrus.WithError(err).Panic("Failed to setup naffka")
 	}
 	return naffkaInstance, naffkaInstance
+}
+
+func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
+	logrus.WithField("servers", cfg.Addresses).Debug("connecting to nats")
+	nc, err := nats.Connect(cfg.Addresses[0])
+	if err != nil {
+		logrus.WithError(err).Panic("failed to connect to nats")
+		return nil, nil
+	}
+
+	s, err := nc.JetStream()
+	if err != nil {
+		logrus.WithError(err).Panic("unable to get jetstream context")
+		return nil, nil
+	}
+
+	// create a stream for every topic
+	for _, topic := range config.KafkaTopics {
+		sn := cfg.TopicFor(topic)
+		stream, err := s.StreamInfo(sn)
+		if err != nil {
+			logrus.WithError(err).Warn("unable to get stream info")
+		}
+
+		if stream == nil {
+			maxLifeTime := time.Second * 0
+
+			// Typing events can be removed from the stream, as they are only relevant for a short time
+			if topic == config.TopicOutputTypingEvent {
+				maxLifeTime = time.Second * 30
+			}
+			_, _ = s.AddStream(&nats.StreamConfig{
+				Name:       sn,
+				Subjects:   []string{topic},
+				MaxBytes:   int64(*cfg.MaxMessageBytes),
+				MaxMsgSize: int32(*cfg.MaxMessageBytes),
+				MaxAge:     maxLifeTime,
+				Duplicates: maxLifeTime / 2,
+			})
+		}
+	}
+
+	consumer := js.NewJetStreamConsumer(s, cfg.TopicPrefix)
+	producer := js.NewJetStreamProducer(s, cfg.TopicPrefix)
+	return consumer, producer
 }

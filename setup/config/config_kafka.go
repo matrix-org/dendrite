@@ -12,8 +12,18 @@ const (
 	TopicOutputReceiptEvent      = "OutputReceiptEvent"
 )
 
+// KafkaTopics is a convenience slice to access all defined Kafka topics.
+var KafkaTopics = []string{
+	TopicOutputTypingEvent,
+	TopicOutputSendToDeviceEvent,
+	TopicOutputKeyChangeEvent,
+	TopicOutputRoomEvent,
+	TopicOutputClientData,
+	TopicOutputReceiptEvent,
+}
+
 type Kafka struct {
-	// A list of kafka addresses to connect to.
+	// A list of kafka/NATS addresses to connect to.
 	Addresses []string `yaml:"addresses"`
 	// The prefix to use for Kafka topic names for this homeserver - really only
 	// useful if running more than one Dendrite on the same Kafka deployment.
@@ -28,6 +38,8 @@ type Kafka struct {
 	// The max size a Kafka message passed between consumer/producer can have
 	// Equals roughly max.message.bytes / fetch.message.max.bytes in Kafka
 	MaxMessageBytes *int `yaml:"max_message_bytes"`
+	// Whether to use NATS instead of kafka/naffka
+	UseNATS bool `yaml:"use_nats"`
 }
 
 func (k *Kafka) TopicFor(name string) string {
@@ -37,7 +49,12 @@ func (k *Kafka) TopicFor(name string) string {
 func (c *Kafka) Defaults() {
 	c.UseNaffka = true
 	c.Database.Defaults()
-	c.Addresses = []string{"localhost:2181"}
+	if c.UseNATS {
+		c.UseNaffka = false
+		c.Addresses = []string{"localhost:2181"}
+	} else {
+		c.Addresses = []string{"nats://127.0.0.1:4222"}
+	}
 	c.Database.ConnectionString = DataSource("file:naffka.db")
 	c.TopicPrefix = "Dendrite"
 
@@ -52,7 +69,7 @@ func (c *Kafka) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		}
 		checkNotEmpty(configErrs, "global.kafka.database.connection_string", string(c.Database.ConnectionString))
 	} else {
-		// If we aren't using naffka then we need to have at least one kafka
+		// If we aren't using naffka then we need to have at least one kafka/nats
 		// server to talk to.
 		checkNotZero(configErrs, "global.kafka.addresses", int64(len(c.Addresses)))
 	}
