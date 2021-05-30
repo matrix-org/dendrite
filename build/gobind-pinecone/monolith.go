@@ -46,6 +46,8 @@ import (
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 	"github.com/matrix-org/pinecone/types"
 	pineconeTypes "github.com/matrix-org/pinecone/types"
+
+	_ "golang.org/x/mobile/bind"
 )
 
 const (
@@ -97,7 +99,7 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.staticPeerMutex.Unlock()
 	m.DisconnectType(pineconeRouter.PeerTypeRemote)
 	if uri != "" {
-		m.staticPeerConnect()
+		go m.staticPeerConnect()
 	}
 }
 
@@ -291,7 +293,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+		base, federation, rsAPI, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)

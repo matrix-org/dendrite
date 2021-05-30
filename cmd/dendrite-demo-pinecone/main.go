@@ -180,7 +180,7 @@ func main() {
 	)
 	rsAPI := rsComponent
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+		base, federation, rsAPI, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
