@@ -51,9 +51,9 @@ func (c *Kafka) Defaults() {
 	c.Database.Defaults()
 	if c.UseNATS {
 		c.UseNaffka = false
-		c.Addresses = []string{"localhost:2181"}
-	} else {
 		c.Addresses = []string{"nats://127.0.0.1:4222"}
+	} else {
+		c.Addresses = []string{"localhost:2181"}
 	}
 	c.Database.ConnectionString = DataSource("file:naffka.db")
 	c.TopicPrefix = "Dendrite"
