@@ -19,8 +19,11 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
 	// Import the postgres database driver.
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -29,21 +32,26 @@ import (
 
 // Database is used to store metadata about a repository of media files.
 type Database struct {
-	statements statements
-	db         *sql.DB
-	writer     sqlutil.Writer
+	statements   statements
+	db           *sql.DB
+	writer       cosmosdbutil.Writer
+	connection   cosmosdbapi.CosmosConnection
+	databaseName string
+	cosmosConfig cosmosdbapi.CosmosConfig
 }
 
 // Open opens a postgres database.
 func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	configCosmos := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
 	d := Database{
-		writer: sqlutil.NewExclusiveWriter(),
+		connection:   conn,
+		cosmosConfig: configCosmos,
+		writer:       cosmosdbutil.NewExclusiveWriterFake(),
+		databaseName: "mediaapi",
 	}
 	var err error
-	if d.db, err = sqlutil.Open(dbProperties); err != nil {
-		return nil, err
-	}
-	if err = d.statements.prepare(d.db, d.writer); err != nil {
+	if err = d.statements.prepare(&d, d.writer); err != nil {
 		return nil, err
 	}
 	return &d, nil

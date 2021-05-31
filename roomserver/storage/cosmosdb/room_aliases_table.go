@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
-	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -113,7 +112,7 @@ func getRoomAlias(s *roomAliasesStatements, ctx context.Context, pk string, docI
 		&response)
 
 	if response.Id == "" {
-		return nil, cosmosdbutil.ErrNoRows
+		return nil, nil
 	}
 
 	return &response, err

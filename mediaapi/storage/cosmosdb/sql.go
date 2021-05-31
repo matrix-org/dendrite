@@ -15,18 +15,14 @@
 
 package cosmosdb
 
-import (
-	"database/sql"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-)
+import "github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
 type statements struct {
 	media     mediaStatements
 	thumbnail thumbnailStatements
 }
 
-func (s *statements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
+func (s *statements) prepare(db *Database, writer cosmosdbutil.Writer) (err error) {
 	if err = s.media.prepare(db, writer); err != nil {
 		return
 	}
