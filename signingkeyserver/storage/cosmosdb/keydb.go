@@ -18,9 +18,12 @@ package cosmosdb
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
+
+	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+
 	"golang.org/x/crypto/ed25519"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -30,8 +33,11 @@ import (
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store
 // the public keys for other matrix servers.
 type Database struct {
-	writer     sqlutil.Writer
-	statements serverKeyStatements
+	writer       cosmosdbutil.Writer
+	statements   serverKeyStatements
+	connection   cosmosdbapi.CosmosConnection
+	databaseName string
+	cosmosConfig cosmosdbapi.CosmosConfig
 }
 
 // NewDatabase prepares a new key database.
@@ -44,14 +50,16 @@ func NewDatabase(
 	serverKey ed25519.PublicKey,
 	serverKeyID gomatrixserverlib.KeyID,
 ) (*Database, error) {
-	db, err := sqlutil.Open(dbProperties)
-	if err != nil {
-		return nil, err
-	}
+	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
+	configCosmos := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
+
 	d := &Database{
-		writer: sqlutil.NewExclusiveWriter(),
+		databaseName: "keydb",
+		writer:       cosmosdbutil.NewExclusiveWriterFake(),
+		connection:   conn,
+		cosmosConfig: configCosmos,
 	}
-	err = d.statements.prepare(db, d.writer)
+	err := d.statements.prepare(d, d.writer)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +71,7 @@ func NewDatabase(
 
 // FetcherName implements KeyFetcher
 func (d Database) FetcherName() string {
-	return "SqliteKeyDatabase"
+	return "CosmosDBKeyDatabase"
 }
 
 // FetchKeys implements gomatrixserverlib.KeyDatabase
