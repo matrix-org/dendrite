@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"github.com/Shopify/sarama"
+	"github.com/matrix-org/dendrite/internal/naffka/naffkacosmosdb"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/naffka"
 	naffkaStorage "github.com/matrix-org/naffka/storage"
@@ -48,17 +49,24 @@ func setupNaffka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 	}
 	if cfg.Database.ConnectionString.IsCosmosDB() {
 		//TODO: What do we do for Nafka
-		// cfg.Database.ConnectionString = cosmosdbutil.GetConnectionString(&cfg.Database.ConnectionString)
-		cfg.Database.ConnectionString = "file:naffka.db"
+		naffkaDB, err := naffkacosmosdb.NewDatabase(string(cfg.Database.ConnectionString))
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to setup naffka database for Cosmos")
+		}
+		naffkaInstance, err = naffka.New(naffkaDB)
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to setup naffka for Cosmos")
+		}
+	} else {
+		naffkaDB, err := naffkaStorage.NewDatabase(string(cfg.Database.ConnectionString))
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to setup naffka database")
+		}
+		naffkaInstance, err = naffka.New(naffkaDB)
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to setup naffka")
+		}
 	}
 
-	naffkaDB, err := naffkaStorage.NewDatabase(string(cfg.Database.ConnectionString))
-	if err != nil {
-		logrus.WithError(err).Panic("Failed to setup naffka database")
-	}
-	naffkaInstance, err = naffka.New(naffkaDB)
-	if err != nil {
-		logrus.WithError(err).Panic("Failed to setup naffka")
-	}
 	return naffkaInstance, naffkaInstance
 }

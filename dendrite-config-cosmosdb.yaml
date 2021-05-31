@@ -90,7 +90,7 @@ global:
 
     # Naffka database options. Not required when using Kafka.
     naffka_database:
-      connection_string: file:naffka.db
+      connection_string: "cosmosdb:AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==;DatabaseName=safezone_local;ContainerName=test.criticalarc.com;"
       max_open_conns: 10
       max_idle_conns: 2
       conn_max_lifetime: -1

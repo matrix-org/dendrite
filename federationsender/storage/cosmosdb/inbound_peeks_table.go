@@ -65,7 +65,7 @@ type InboundPeekCosmosData struct {
 // "SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1"
 const selectInboundPeeksSQL = "" +
 	"select * from c where c._cn = @x1 " +
-	"and c.mx_federationsender_inbound_peek.room_id = @x2"
+	"and c.mx_federationsender_inbound_peek.room_id = @x2 "
 
 // const renewInboundPeekSQL = "" +
 // 	"UPDATE federationsender_inbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
@@ -73,13 +73,13 @@ const selectInboundPeeksSQL = "" +
 // "DELETE FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2"
 const deleteInboundPeekSQL = "" +
 	"select * from c where c._cn = @x1 " +
-	"and c.mx_federationsender_inbound_peek.room_id = @x2" +
-	"and c.mx_federationsender_inbound_peek.server_name = @x3"
+	"and c.mx_federationsender_inbound_peek.room_id = @x2 " +
+	"and c.mx_federationsender_inbound_peek.server_name = @x3 "
 
 // "DELETE FROM federationsender_inbound_peeks WHERE room_id = $1"
 const deleteInboundPeeksSQL = "" +
 	"select * from c where c._cn = @x1 " +
-	"and c.mx_federationsender_inbound_peek.room_id = @x2"
+	"and c.mx_federationsender_inbound_peek.room_id = @x2 "
 
 type inboundPeeksStatements struct {
 	db *Database
