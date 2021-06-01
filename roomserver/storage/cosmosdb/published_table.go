@@ -107,18 +107,6 @@ func getPublish(s *publishedStatements, ctx context.Context, pk string, docId st
 	return &response, err
 }
 
-func setPublish(s *publishedStatements, ctx context.Context, pk string, publish PublishCosmosData) (*PublishCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, publish.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		publish.Id,
-		&publish,
-		optionsReplace)
-	return &publish, ex
-}
-
 func NewCosmosDBPublishedTable(db *Database) (tables.Published, error) {
 	s := &publishedStatements{
 		db: db,

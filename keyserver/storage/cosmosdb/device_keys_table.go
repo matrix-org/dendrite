@@ -158,18 +158,6 @@ func getDeviceKey(s *deviceKeysStatements, ctx context.Context, pk string, docId
 	return &response, err
 }
 
-func setDeviceKey(s *deviceKeysStatements, ctx context.Context, pk string, event DeviceKeyCosmosData) (*DeviceKeyCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, event.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		event.Id,
-		&event,
-		optionsReplace)
-	return &event, ex
-}
-
 func insertDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData DeviceKeyCosmosData) error {
 	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
 	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(

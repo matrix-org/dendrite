@@ -213,8 +213,8 @@ func getMembership(s *membershipStatements, ctx context.Context, pk string, docI
 	return &response, err
 }
 
-func setMembership(s *membershipStatements, ctx context.Context, pk string, membership MembershipCosmosData) (*MembershipCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, membership.ETag)
+func setMembership(s *membershipStatements, ctx context.Context, membership MembershipCosmosData) (*MembershipCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(membership.Pk, membership.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
@@ -425,7 +425,7 @@ func (s *membershipStatements) UpdateMembership(
 	dbData.Membership.EventNID = int64(eventNID)
 	dbData.Membership.Forgotten = forgotten
 
-	_, err = setMembership(s, ctx, pk, *dbData)
+	_, err = setMembership(s, ctx, *dbData)
 	return err
 }
 
@@ -610,6 +610,6 @@ func (s *membershipStatements) UpdateForgetMembership(
 
 	dbData.Membership.Forgotten = forget
 
-	_, err = setMembership(s, ctx, pk, *dbData)
+	_, err = setMembership(s, ctx, *dbData)
 	return err
 }

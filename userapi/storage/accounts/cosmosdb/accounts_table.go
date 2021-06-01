@@ -126,9 +126,9 @@ func getAccount(s *accountsStatements, ctx context.Context, pk string, docId str
 	return &response, err
 }
 
-func setAccount(s *accountsStatements, ctx context.Context, pk string, account AccountCosmosData) (*AccountCosmosData, error) {
+func setAccount(s *accountsStatements, ctx context.Context, account AccountCosmosData) (*AccountCosmosData, error) {
 	response := AccountCosmosData{}
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, account.ETag)
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(account.Pk, account.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
@@ -225,7 +225,7 @@ func (s *accountsStatements) updatePassword(
 
 	response.Account.PasswordHash = passwordHash
 
-	var _, exReplace = setAccount(s, ctx, pk, *response)
+	var _, exReplace = setAccount(s, ctx, *response)
 	if exReplace != nil {
 		return exReplace
 	}
@@ -250,7 +250,7 @@ func (s *accountsStatements) deactivateAccount(
 
 	response.Account.IsDeactivated = true
 
-	var _, exReplace = setAccount(s, ctx, pk, *response)
+	var _, exReplace = setAccount(s, ctx, *response)
 	if exReplace != nil {
 		return exReplace
 	}

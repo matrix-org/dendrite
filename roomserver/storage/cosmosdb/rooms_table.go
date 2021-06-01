@@ -182,8 +182,8 @@ func getRoom(s *roomStatements, ctx context.Context, pk string, docId string) (*
 	return &response, err
 }
 
-func setRoom(s *roomStatements, ctx context.Context, pk string, room RoomCosmosData) (*RoomCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, room.ETag)
+func setRoom(s *roomStatements, ctx context.Context, room RoomCosmosData) (*RoomCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(room.Pk, room.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
@@ -412,7 +412,7 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 	room.Room.LastEventSentNID = int64(lastEventSentNID)
 	room.Room.StateSnapshotNID = int64(stateSnapshotNID)
 
-	_, err = setRoom(s, ctx, room.Pk, room)
+	_, err = setRoom(s, ctx, room)
 	return err
 }
 

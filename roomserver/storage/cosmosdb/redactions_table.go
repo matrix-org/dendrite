@@ -117,8 +117,8 @@ func getRedaction(s *redactionStatements, ctx context.Context, pk string, docId 
 	return &response, err
 }
 
-func setRedaction(s *redactionStatements, ctx context.Context, pk string, redaction RedactionCosmosData) (*RedactionCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, redaction.ETag)
+func setRedaction(s *redactionStatements, ctx context.Context, redaction RedactionCosmosData) (*RedactionCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(redaction.Pk, redaction.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
@@ -273,6 +273,6 @@ func (s *redactionStatements) MarkRedactionValidated(
 
 	response.Redaction.Validated = validated
 
-	_, err = setRedaction(s, ctx, pk, *response)
+	_, err = setRedaction(s, ctx, *response)
 	return err
 }

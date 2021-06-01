@@ -126,8 +126,8 @@ func getProfile(s *profilesStatements, ctx context.Context, pk string, docId str
 	return &response, err
 }
 
-func setProfile(s *profilesStatements, ctx context.Context, pk string, profile ProfileCosmosData) (*ProfileCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(pk, profile.ETag)
+func setProfile(s *profilesStatements, ctx context.Context, profile ProfileCosmosData) (*ProfileCosmosData, error) {
+	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(profile.Pk, profile.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
@@ -218,7 +218,7 @@ func (s *profilesStatements) setAvatarURL(
 
 	response.Profile.AvatarURL = avatarURL
 
-	var _, exReplace = setProfile(s, ctx, pk, *response)
+	var _, exReplace = setProfile(s, ctx, *response)
 	if exReplace != nil {
 		return exReplace
 	}
@@ -241,7 +241,7 @@ func (s *profilesStatements) setDisplayName(
 
 	response.Profile.DisplayName = displayName
 
-	var _, exReplace = setProfile(s, ctx, pk, *response)
+	var _, exReplace = setProfile(s, ctx, *response)
 	if exReplace != nil {
 		return exReplace
 	}
