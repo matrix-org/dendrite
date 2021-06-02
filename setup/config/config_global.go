@@ -1,11 +1,13 @@
 package config
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/ed25519"
+	"golang.org/x/net/idna"
 )
 
 type Global struct {
@@ -72,6 +74,16 @@ func (c *Global) Defaults() {
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
+
+	validator := idna.New(
+		idna.StrictDomainName(true),
+		idna.ValidateForRegistration(),
+		idna.ValidateLabels(true),
+		idna.VerifyDNSLength(true),
+	)
+	if _, err := validator.ToUnicode(string(c.ServerName)); err != nil {
+		configErrs.Add(fmt.Sprintf("server_name %q is not a valid domain name", c.ServerName))
+	}
 
 	c.Kafka.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
