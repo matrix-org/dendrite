@@ -37,6 +37,7 @@ const membershipSchema = `
 		event_nid INTEGER NOT NULL DEFAULT 0,
 		target_local BOOLEAN NOT NULL DEFAULT false,
 		forgotten BOOLEAN NOT NULL DEFAULT false,
+		displayname TEXT NOT NULL DEFAULT '',
 		UNIQUE (room_nid, target_nid)
 	);
 `
@@ -80,8 +81,8 @@ const selectMembershipForUpdateSQL = "" +
 	" WHERE room_nid = $1 AND target_nid = $2"
 
 const updateMembershipSQL = "" +
-	"UPDATE roomserver_membership SET sender_nid = $1, membership_nid = $2, event_nid = $3, forgotten = $4" +
-	" WHERE room_nid = $5 AND target_nid = $6"
+	"UPDATE roomserver_membership SET sender_nid = $1, membership_nid = $2, event_nid = $3, forgotten = $4, displayname = $5" +
+	" WHERE room_nid = $6 AND target_nid = $7"
 
 const updateMembershipForgetRoom = "" +
 	"UPDATE roomserver_membership SET forgotten = $1" +
@@ -94,11 +95,16 @@ const selectRoomsWithMembershipSQL = "" +
 // joined to. Since this information is used to populate the user directory, we will
 // only return users that the user would ordinarily be able to see anyway.
 var selectKnownUsersSQL = "" +
-	"SELECT DISTINCT event_state_key FROM roomserver_membership INNER JOIN roomserver_event_state_keys ON " +
-	"roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
-	" WHERE room_nid IN (" +
-	"  SELECT DISTINCT room_nid FROM roomserver_membership WHERE target_nid=$1 AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
-	") AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " AND event_state_key LIKE $2 LIMIT $3"
+	"SELECT DISTINCT event_state_key, displayname FROM roomserver_membership INNER JOIN roomserver_event_state_keys ON " +
+	"roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid " +
+	"WHERE room_nid IN (" +
+	"   SELECT DISTINCT room_nid FROM roomserver_membership WHERE target_nid = $1 AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	" UNION " +
+	"   SELECT DISTINCT room_nid from roomserver_rooms INNER JOIN roomserver_published ON  " +
+	"   roomserver_rooms.room_id = roomserver_published.room_id WHERE published = true " +
+	") AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " AND ( " +
+	" event_state_key LIKE $2 OR displayname LIKE $2" +
+	") LIMIT $3"
 
 // selectLocalServerInRoomSQL is an optimised case for checking if we, the local server,
 // are in the room by using the target_local column of the membership table. Normally when
@@ -248,11 +254,11 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 func (s *membershipStatements) UpdateMembership(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
-	eventNID types.EventNID, forgotten bool,
+	eventNID types.EventNID, forgotten bool, displayname string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.updateMembershipStmt)
 	_, err := stmt.ExecContext(
-		ctx, senderUserNID, membership, eventNID, forgotten, roomNID, targetUserNID,
+		ctx, senderUserNID, membership, eventNID, forgotten, displayname, roomNID, targetUserNID,
 	)
 	return err
 }
@@ -308,7 +314,8 @@ func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID type
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownUsers: rows.close() failed")
 	for rows.Next() {
 		var userID string
-		if err := rows.Scan(&userID); err != nil {
+		var displayname string
+		if err := rows.Scan(&userID, &displayname); err != nil {
 			return nil, err
 		}
 		result = append(result, userID)

@@ -1080,7 +1080,13 @@ func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, s
 func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
 	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
 	if err != nil {
-		return nil, err
+		if err == sql.ErrNoRows {
+			// Happens if a search is performed before user joins any rooms
+			// NID is never -1, so SelectKnownUsers will only pull users in public rooms
+			stateKeyNID = -1
+		} else {
+			return nil, err
+		}
 	}
 	return d.MembershipTable.SelectKnownUsers(ctx, stateKeyNID, searchString, limit)
 }

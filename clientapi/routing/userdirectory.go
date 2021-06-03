@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/roomserver/api"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -34,7 +34,7 @@ func SearchUserDirectory(
 	ctx context.Context,
 	device *userapi.Device,
 	userAPI userapi.UserInternalAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI rsapi.RoomserverInternalAPI,
 	serverName gomatrixserverlib.ServerName,
 	searchString string,
 	limit int,
@@ -49,58 +49,25 @@ func SearchUserDirectory(
 		Limited: false,
 	}
 
-	// First start searching local users.
-
-	userReq := &userapi.QuerySearchProfilesRequest{
+	stateReq := &rsapi.QueryKnownUsersRequest{
+		UserID:       device.UserID,
 		SearchString: searchString,
 		Limit:        limit,
 	}
-	userRes := &userapi.QuerySearchProfilesResponse{}
-	if err := userAPI.QuerySearchProfiles(ctx, userReq, userRes); err != nil {
-		errRes := util.ErrorResponse(fmt.Errorf("userAPI.QuerySearchProfiles: %w", err))
+	stateRes := &rsapi.QueryKnownUsersResponse{}
+	if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil {
+		errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 		return &errRes
 	}
 
-	for _, user := range userRes.Profiles {
+	for _, user := range stateRes.Users {
 		if len(results) == limit {
 			response.Limited = true
 			break
 		}
 
-		userID := fmt.Sprintf("@%s:%s", user.Localpart, serverName)
-		if _, ok := results[userID]; !ok {
-			results[userID] = authtypes.FullyQualifiedProfile{
-				UserID:      userID,
-				DisplayName: user.DisplayName,
-				AvatarURL:   user.AvatarURL,
-			}
-		}
-	}
-
-	// Then, if we have enough room left in the response,
-	// start searching for known users from joined rooms.
-
-	if len(results) <= limit {
-		stateReq := &api.QueryKnownUsersRequest{
-			UserID:       device.UserID,
-			SearchString: searchString,
-			Limit:        limit - len(results),
-		}
-		stateRes := &api.QueryKnownUsersResponse{}
-		if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil {
-			errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
-			return &errRes
-		}
-
-		for _, user := range stateRes.Users {
-			if len(results) == limit {
-				response.Limited = true
-				break
-			}
-
-			if _, ok := results[user.UserID]; !ok {
-				results[user.UserID] = user
-			}
+		if _, ok := results[user.UserID]; !ok {
+			results[user.UserID] = user
 		}
 	}
 

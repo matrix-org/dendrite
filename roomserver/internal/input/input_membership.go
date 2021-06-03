@@ -157,11 +157,22 @@ func (r *Inputer) isLocalTarget(event *gomatrixserverlib.Event) bool {
 func updateToJoinMembership(
 	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
+	// Extract the displayname, if there is one, from the membership event
+	// so that we can add it as a queryable field to the membership table
+	memberEvent, err := gomatrixserverlib.NewMemberContentFromEvent(add)
+	if err != nil {
+		return nil, err
+	}
+	var displayname string
+	if memberEvent.DisplayName != "" {
+		displayname = memberEvent.DisplayName
+	}
+
 	// If the user is already marked as being joined, we call SetToJoin to update
 	// the event ID then we can return immediately. Retired is ignored as there
 	// is no invite event to retire.
 	if mu.IsJoin() {
-		_, err := mu.SetToJoin(add.Sender(), add.EventID(), true)
+		_, err := mu.SetToJoin(add.Sender(), add.EventID(), displayname, true)
 		if err != nil {
 			return nil, err
 		}
@@ -171,7 +182,7 @@ func updateToJoinMembership(
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	retired, err := mu.SetToJoin(add.Sender(), add.EventID(), false)
+	retired, err := mu.SetToJoin(add.Sender(), add.EventID(), displayname, false)
 	if err != nil {
 		return nil, err
 	}

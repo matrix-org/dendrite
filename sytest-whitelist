@@ -554,3 +554,7 @@ Can upload self-signing keys
 Fails to upload self-signing keys with no auth
 Fails to upload self-signing key without master key
 can fetch self-signing keys over federation
+User in private room doesn't appear in user directory
+User joining then leaving public room appears and dissappears from directory
+User in remote room doesn't appear in user directory after server left room
+User in shared private room does appear in user directory until leave
