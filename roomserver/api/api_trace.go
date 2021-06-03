@@ -332,6 +332,13 @@ func (t *RoomserverInternalAPITrace) QueryKnownUsers(ctx context.Context, req *Q
 	return err
 }
 
+// QueryPublicUsers returns a list of users that are in at least one public room.
+func (t *RoomserverInternalAPITrace) QueryPublicUsers(ctx context.Context, req *QueryPublicUsersRequest, res *QueryPublicUsersResponse) error {
+	err := t.Impl.QueryPublicUsers(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryPublicUsers req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 // QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 func (t *RoomserverInternalAPITrace) QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error {
 	err := t.Impl.QueryServerBannedFromRoom(ctx, req, res)

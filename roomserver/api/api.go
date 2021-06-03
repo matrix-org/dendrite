@@ -160,6 +160,8 @@ type RoomserverInternalAPI interface {
 	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
 	// QueryKnownUsers returns a list of users that we know about from our joined rooms.
 	QueryKnownUsers(ctx context.Context, req *QueryKnownUsersRequest, res *QueryKnownUsersResponse) error
+	// QueryPublicUsers returns a list of users in at least 1 public room.
+	QueryPublicUsers(ctx context.Context, req *QueryPublicUsersRequest, res *QueryPublicUsersResponse) error
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
 

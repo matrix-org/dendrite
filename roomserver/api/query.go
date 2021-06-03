@@ -348,6 +348,15 @@ type QueryKnownUsersResponse struct {
 	Users []authtypes.FullyQualifiedProfile `json:"profiles"`
 }
 
+type QueryPublicUsersRequest struct {
+	SearchString string `json:"search_string"`
+	Limit        int    `json:"limit"`
+}
+
+type QueryPublicUsersResponse struct {
+	Users []authtypes.FullyQualifiedProfile `json:"profiles"`
+}
+
 type QueryServerBannedFromRoomRequest struct {
 	ServerName gomatrixserverlib.ServerName `json:"server_name"`
 	RoomID     string                       `json:"room_id"`

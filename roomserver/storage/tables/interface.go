@@ -134,6 +134,7 @@ type Membership interface {
 	// counts of how many rooms they are joined.
 	SelectJoinedUsersSetForRooms(ctx context.Context, roomNIDs []types.RoomNID) (map[types.EventStateKeyNID]int, error)
 	SelectKnownUsers(ctx context.Context, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error)
+ 	SelectPublicUsers(ctx context.Context, searchString string, limit int) ([]string, error)
 	UpdateForgetMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, forget bool) error
 }
 

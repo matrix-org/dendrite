@@ -156,6 +156,8 @@ type Database interface {
 	JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
 	// GetKnownUsers searches all users that userID knows about.
 	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
+	// GetPublicUsers searches all users that are in a public room.
+	GetPublicUsers(ctx context.Context, searchString string, limit int) ([]string, error)
 	// GetKnownRooms returns a list of all rooms we know about.
 	GetKnownRooms(ctx context.Context) ([]string, error)
 	// ForgetRoom sets a flag in the membership table, that the user wishes to forget a specific room

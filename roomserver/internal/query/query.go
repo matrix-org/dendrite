@@ -683,6 +683,19 @@ func (r *Queryer) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersR
 	return nil
 }
 
+func (r *Queryer) QueryPublicUsers(ctx context.Context, req *api.QueryPublicUsersRequest, res *api.QueryPublicUsersResponse) error {
+	users, err := r.DB.GetPublicUsers(ctx, req.SearchString, req.Limit)
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		res.Users = append(res.Users, authtypes.FullyQualifiedProfile{
+			UserID: user,
+		})
+	}
+	return nil
+}
+
 func (r *Queryer) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
 	events, err := r.DB.GetBulkStateContent(ctx, req.RoomIDs, req.StateTuples, req.AllowWildcards)
 	if err != nil {
