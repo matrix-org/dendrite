@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -78,6 +79,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("client API server output log: message parse failure")
+		sentry.CaptureException(err)
 		return nil
 	}
 
@@ -90,6 +92,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		context.TODO(), string(msg.Key), output.RoomID, output.Type,
 	)
 	if err != nil {
+		sentry.CaptureException(err)
 		log.WithFields(log.Fields{
 			"type":       output.Type,
 			"room_id":    output.RoomID,

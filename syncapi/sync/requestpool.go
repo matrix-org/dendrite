@@ -156,7 +156,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	currentPos := rp.Notifier.CurrentPosition()
 
-	if !rp.shouldReturnImmediately(syncReq) {
+	if !rp.shouldReturnImmediately(syncReq, currentPos) {
 		timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
 		defer timer.Stop()
 
@@ -303,8 +303,8 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 // shouldReturnImmediately returns whether the /sync request is an initial sync,
 // or timeout=0, or full_state=true, in any of the cases the request should
 // return immediately.
-func (rp *RequestPool) shouldReturnImmediately(syncReq *types.SyncRequest) bool {
-	if syncReq.Since.IsEmpty() || syncReq.Timeout == 0 || syncReq.WantFullState {
+func (rp *RequestPool) shouldReturnImmediately(syncReq *types.SyncRequest, currentPos types.StreamingToken) bool {
+	if currentPos.IsAfter(syncReq.Since) || syncReq.Timeout == 0 || syncReq.WantFullState {
 		return true
 	}
 	return false

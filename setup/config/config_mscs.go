@@ -14,7 +14,7 @@ type MSCs struct {
 }
 
 func (c *MSCs) Defaults() {
-	c.Database.Defaults()
+	c.Database.Defaults(5)
 	c.Database.ConnectionString = "file:mscs.db"
 }
 

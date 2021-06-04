@@ -15,6 +15,7 @@ services:
     command: mediaapi
     volumes:
       - ./config:/etc/dendrite
+      - ./media:/var/dendrite/media
     networks:
       - internal
 

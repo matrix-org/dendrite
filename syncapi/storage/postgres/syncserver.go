@@ -36,7 +36,6 @@ type SyncServerDatasource struct {
 }
 
 // NewDatabase creates a new sync server database
-// nolint:gocyclo
 func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error

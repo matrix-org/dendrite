@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -64,6 +65,8 @@ func (w *inputWorker) start() {
 			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
 			if task.err == nil {
 				hooks.Run(hooks.KindNewEventPersisted, task.event.Event)
+			} else {
+				sentry.CaptureException(task.err)
 			}
 			task.wg.Done()
 		case <-time.After(time.Second * 5):

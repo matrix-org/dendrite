@@ -139,12 +139,13 @@ type membershipStatements struct {
 	updateMembershipForgetRoomStmt                  *sql.Stmt
 }
 
-func NewPostgresMembershipTable(db *sql.DB) (tables.Membership, error) {
-	s := &membershipStatements{}
+func createMembershipTable(db *sql.DB) error {
 	_, err := db.Exec(membershipSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
+	s := &membershipStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertMembershipStmt, insertMembershipSQL},
@@ -160,11 +161,6 @@ func NewPostgresMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectKnownUsersStmt, selectKnownUsersSQL},
 		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 	}.Prepare(db)
-}
-
-func (s *membershipStatements) execSchema(db *sql.DB) error {
-	_, err := db.Exec(membershipSchema)
-	return err
 }
 
 func (s *membershipStatements) InsertMembership(

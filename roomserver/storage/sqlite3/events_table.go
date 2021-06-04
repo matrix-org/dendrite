@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -62,6 +63,11 @@ const bulkSelectStateEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
 	" WHERE event_id IN ($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
+
+const bulkSelectStateEventByNIDSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
+	" WHERE event_nid IN ($1)"
+	// Rest of query is built by BulkSelectStateEventByNID
 
 const bulkSelectStateAtEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, is_rejected FROM roomserver_events" +
@@ -115,13 +121,14 @@ type eventStatements struct {
 	//selectRoomNIDsForEventNIDsStmt           *sql.Stmt
 }
 
-func NewSqliteEventsTable(db *sql.DB) (tables.Events, error) {
+func createEventsTable(db *sql.DB) error {
+	_, err := db.Exec(eventsSchema)
+	return err
+}
+
+func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 	s := &eventStatements{
 		db: db,
-	}
-	_, err := db.Exec(eventsSchema)
-	if err != nil {
-		return nil, err
 	}
 
 	return s, shared.StatementList{
@@ -230,6 +237,61 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		)
 	}
 	return results, err
+}
+
+// bulkSelectStateEventByID lookups a list of state events by event ID.
+// If any of the requested events are missing from the database it returns a types.MissingEventError
+func (s *eventStatements) BulkSelectStateEventByNID(
+	ctx context.Context, eventNIDs []types.EventNID,
+	stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntry, error) {
+	tuples := stateKeyTupleSorter(stateKeyTuples)
+	sort.Sort(tuples)
+	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
+	params := make([]interface{}, 0, len(eventNIDs)+len(eventTypeNIDArray)+len(eventStateKeyNIDArray))
+	selectOrig := strings.Replace(bulkSelectStateEventByNIDSQL, "($1)", sqlutil.QueryVariadic(len(eventNIDs)), 1)
+	for _, v := range eventNIDs {
+		params = append(params, v)
+	}
+	if len(eventTypeNIDArray) > 0 {
+		selectOrig += " AND event_type_nid IN " + sqlutil.QueryVariadicOffset(len(eventTypeNIDArray), len(params))
+		for _, v := range eventTypeNIDArray {
+			params = append(params, v)
+		}
+	}
+	if len(eventStateKeyNIDArray) > 0 {
+		selectOrig += " AND event_state_key_nid IN " + sqlutil.QueryVariadicOffset(len(eventStateKeyNIDArray), len(params))
+		for _, v := range eventStateKeyNIDArray {
+			params = append(params, v)
+		}
+	}
+	selectOrig += " ORDER BY event_type_nid, event_state_key_nid ASC"
+	selectStmt, err := s.db.Prepare(selectOrig)
+	if err != nil {
+		return nil, fmt.Errorf("s.db.Prepare: %w", err)
+	}
+	rows, err := selectStmt.QueryContext(ctx, params...)
+	if err != nil {
+		return nil, fmt.Errorf("selectStmt.QueryContext: %w", err)
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
+	// We know that we will only get as many results as event IDs
+	// because of the unique constraint on event IDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
+	results := make([]types.StateEntry, len(eventNIDs))
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		if err = rows.Scan(
+			&result.EventTypeNID,
+			&result.EventStateKeyNID,
+			&result.EventNID,
+		); err != nil {
+			return nil, err
+		}
+	}
+	return results[:i], err
 }
 
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.

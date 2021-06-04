@@ -173,7 +173,6 @@ func (oq *destinationQueue) wakeQueueIfNeeded() {
 // getPendingFromDatabase will look at the database and see if
 // there are any persisted events that haven't been sent to this
 // destination yet. If so, they will be queued up.
-// nolint:gocyclo
 func (oq *destinationQueue) getPendingFromDatabase() {
 	// Check to see if there's anything to do for this server
 	// in the database.
@@ -238,7 +237,6 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 }
 
 // backgroundSend is the worker goroutine for sending events.
-// nolint:gocyclo
 func (oq *destinationQueue) backgroundSend() {
 	// Check if a worker is already running, and if it isn't, then
 	// mark it as started.
@@ -353,7 +351,6 @@ func (oq *destinationQueue) backgroundSend() {
 // nextTransaction creates a new transaction from the pending event
 // queue and sends it. Returns true if a transaction was sent or
 // false otherwise.
-// nolint:gocyclo
 func (oq *destinationQueue) nextTransaction(
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
