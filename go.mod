@@ -3,13 +3,14 @@ module github.com/matrix-org/dendrite
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
-	github.com/S7evinK/saramajetstream v0.0.0-20210530124157-ff2a02c95ca7
+	github.com/S7evinK/saramajetstream v0.0.0-20210604172822-4f305c9f1537
 	github.com/Shopify/sarama v1.29.0
 	github.com/getsentry/sentry-go v0.10.0
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/klauspost/compress v1.13.0 // indirect
 	github.com/lib/pq v1.9.0
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
@@ -33,6 +34,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.2.0
+	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.9.0
