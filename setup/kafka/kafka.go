@@ -91,9 +91,9 @@ func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 
 			// Typing events can be removed from the stream, as they are only relevant for a short time
 			if topic == config.TopicOutputTypingEvent {
-				maxLifeTime = time.Second * 30
+				maxLifeTime = time.Second * 60
 			}
-			_, _ = s.AddStream(&nats.StreamConfig{
+			_, err = s.AddStream(&nats.StreamConfig{
 				Name:       sn,
 				Subjects:   []string{topic},
 				MaxBytes:   int64(*cfg.MaxMessageBytes),
@@ -101,6 +101,9 @@ func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 				MaxAge:     maxLifeTime,
 				Duplicates: maxLifeTime / 2,
 			})
+			if err != nil {
+				logrus.WithError(err).WithField("stream", sn).Fatal("unable to add nats stream")
+			}
 		}
 	}
 
