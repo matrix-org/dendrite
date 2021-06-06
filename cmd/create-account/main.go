@@ -56,7 +56,7 @@ var (
 	password = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
 	pwdFile  = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
 	pwdStdin = flag.Bool("passwordstdin", false, "Reads the password from stdin")
-	askPAss  = flag.Bool("ask-pass", false, "Ask for the password to use.")
+	askPass  = flag.Bool("ask-pass", false, "Ask for the password to use")
 )
 
 func main() {
@@ -72,7 +72,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	pass := getPassword(password, pwdFile, pwdStdin, askPAss, os.Stdin)
+	pass := getPassword(password, pwdFile, pwdStdin, askPass, os.Stdin)
 
 	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
 		ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
