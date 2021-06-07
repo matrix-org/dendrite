@@ -1,7 +1,7 @@
 # Dendrite [![Build Status](https://badge.buildkite.com/4be40938ab19f2bbc4a6c6724517353ee3ec1422e279faf374.svg?branch=master)](https://buildkite.com/matrix-dot-org/dendrite) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
 Dendrite is a second-generation Matrix homeserver written in Go.
-It intends to provide an **efficient**, **reliable** and **scalable** alternative to Synapse:
+It intends to provide an **efficient**, **reliable** and **scalable** alternative to [Synapse](https://github.com/matrix-org/synapse):
  - Efficient: A small memory footprint with better baseline performance than an out-of-the-box Synapse.
  - Reliable: Implements the Matrix specification as written, using the
    [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as

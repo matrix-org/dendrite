@@ -9,6 +9,7 @@ import (
 	"time"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -370,6 +371,7 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 		federation: fedClient,
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
 		newEvents:  make(map[string]bool),
+		roomsMu:    internal.NewMutexByRoom(),
 	}
 	t.PDUs = pdus
 	t.Origin = testOrigin

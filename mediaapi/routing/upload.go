@@ -147,7 +147,8 @@ func (r *uploadRequest) doUpload(
 	//   r.storeFileAndMetadata(ctx, tmpDir, ...)
 	// before you return from doUpload else we will leak a temp file. We could make this nicer with a `WithTransaction` style of
 	// nested function to guarantee either storage or cleanup.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, cfg.AbsBasePath)
+	lr := io.LimitReader(reqReader, int64(*cfg.MaxFileSizeBytes)+1)
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, lr, cfg.AbsBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": *cfg.MaxFileSizeBytes,
@@ -156,6 +157,12 @@ func (r *uploadRequest) doUpload(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("Failed to upload"),
 		}
+	}
+
+	// Check if temp file size exceeds max file size configuration
+	if bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
+		fileutils.RemoveDir(tmpDir, r.Logger) // delete temp file
+		return requestEntityTooLargeJSONResponse(*cfg.MaxFileSizeBytes)
 	}
 
 	// Look up the media by the file hash. If we already have the file but under a
@@ -219,26 +226,17 @@ func (r *uploadRequest) doUpload(
 	)
 }
 
+func requestEntityTooLargeJSONResponse(maxFileSizeBytes config.FileSizeBytes) *util.JSONResponse {
+	return &util.JSONResponse{
+		Code: http.StatusRequestEntityTooLarge,
+		JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
+	}
+}
+
 // Validate validates the uploadRequest fields
 func (r *uploadRequest) Validate(maxFileSizeBytes config.FileSizeBytes) *util.JSONResponse {
-	if r.MediaMetadata.FileSizeBytes < 1 {
-		return &util.JSONResponse{
-			Code: http.StatusLengthRequired,
-			JSON: jsonerror.Unknown("HTTP Content-Length request header must be greater than zero."),
-		}
-	}
 	if maxFileSizeBytes > 0 && r.MediaMetadata.FileSizeBytes > types.FileSizeBytes(maxFileSizeBytes) {
-		return &util.JSONResponse{
-			Code: http.StatusRequestEntityTooLarge,
-			JSON: jsonerror.Unknown(fmt.Sprintf("HTTP Content-Length is greater than the maximum allowed upload size (%v).", maxFileSizeBytes)),
-		}
-	}
-	// TODO: Check if the Content-Type is a valid type?
-	if r.MediaMetadata.ContentType == "" {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("HTTP Content-Type request header must be set."),
-		}
+		return requestEntityTooLargeJSONResponse(maxFileSizeBytes)
 	}
 	if strings.HasPrefix(string(r.MediaMetadata.UploadName), "~") {
 		return &util.JSONResponse{

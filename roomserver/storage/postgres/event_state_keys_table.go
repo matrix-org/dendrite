@@ -77,12 +77,14 @@ type eventStateKeyStatements struct {
 	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
-func NewPostgresEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
-	s := &eventStateKeyStatements{}
+func createEventStateKeysTable(db *sql.DB) error {
 	_, err := db.Exec(eventStateKeysSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
+	s := &eventStateKeyStatements{}
+
 	return s, shared.StatementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},

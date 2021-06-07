@@ -49,13 +49,14 @@ type transactionStatements struct {
 	selectTransactionEventIDStmt *sql.Stmt
 }
 
-func NewSqliteTransactionsTable(db *sql.DB) (tables.Transactions, error) {
+func createTransactionsTable(db *sql.DB) error {
+	_, err := db.Exec(transactionsSchema)
+	return err
+}
+
+func prepareTransactionsTable(db *sql.DB) (tables.Transactions, error) {
 	s := &transactionStatements{
 		db: db,
-	}
-	_, err := db.Exec(transactionsSchema)
-	if err != nil {
-		return nil, err
 	}
 
 	return s, shared.StatementList{
