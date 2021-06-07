@@ -572,6 +572,7 @@ func (r *FederationSenderInternalAPI) PerformServersAlive(
 	response *api.PerformServersAliveResponse,
 ) (err error) {
 	for _, srv := range request.Servers {
+		_ = r.db.RemoveServerFromBlacklist(srv)
 		r.queues.RetryServer(srv)
 	}
 
