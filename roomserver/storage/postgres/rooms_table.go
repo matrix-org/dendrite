@@ -96,12 +96,14 @@ type roomStatements struct {
 	bulkSelectRoomNIDsStmt             *sql.Stmt
 }
 
-func NewPostgresRoomsTable(db *sql.DB) (tables.Rooms, error) {
-	s := &roomStatements{}
+func createRoomsTable(db *sql.DB) error {
 	_, err := db.Exec(roomsSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareRoomsTable(db *sql.DB) (tables.Rooms, error) {
+	s := &roomStatements{}
+
 	return s, shared.StatementList{
 		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
 		{&s.selectRoomNIDStmt, selectRoomNIDSQL},

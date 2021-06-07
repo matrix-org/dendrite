@@ -43,12 +43,17 @@ func NewInternalAPI(
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
+	resetBlacklist bool,
 ) api.FederationSenderInternalAPI {
 	cfg := &base.Cfg.FederationSender
 
 	federationSenderDB, err := storage.NewDatabase(&cfg.Database, base.Caches)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
+	}
+
+	if resetBlacklist {
+		_ = federationSenderDB.RemoveAllServersFromBlacklist()
 	}
 
 	stats := &statistics.Statistics{

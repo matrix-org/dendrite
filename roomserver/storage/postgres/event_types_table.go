@@ -100,12 +100,13 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
-func NewPostgresEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
-	s := &eventTypeStatements{}
+func createEventTypesTable(db *sql.DB) error {
 	_, err := db.Exec(eventTypesSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+	s := &eventTypeStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
