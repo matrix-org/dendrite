@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 	"syscall"
@@ -101,7 +102,7 @@ func getPassword(password, pwdFile *string, pwdStdin, askPass *bool, r io.Reader
 
 	// read password from file
 	if pwdFile != nil && *pwdFile != "" {
-		pw, err := os.ReadFile(*pwdFile)
+		pw, err := ioutil.ReadFile(*pwdFile)
 		if err != nil {
 			logrus.Fatalln("Unable to read password from file:", err)
 		}
@@ -110,7 +111,7 @@ func getPassword(password, pwdFile *string, pwdStdin, askPass *bool, r io.Reader
 
 	// read password from stdin
 	if pwdStdin != nil && *pwdStdin {
-		data, err := io.ReadAll(r)
+		data, err := ioutil.ReadAll(r)
 		if err != nil {
 			logrus.Fatalln("Unable to read password from stdin:", err)
 		}
