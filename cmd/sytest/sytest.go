@@ -16,16 +16,16 @@ import (
 func main() {
 	err := exec.Command("git", "pull").Run()
 	if err != nil {
-		logrus.WithError(err).Fatalln("Run git pull failed")
+		logrus.WithError(err).Fatal("Run git pull failed")
 	}
-	logrus.Infoln("Git update done")
+	logrus.Info("Git update done")
 	err = os.RemoveAll("./cmd/sytest/result")
 	if err != nil && !os.IsNotExist(err) {
-		logrus.WithError(err).Fatalln("Remove old result failed")
+		logrus.WithError(err).Fatal("Remove old result failed")
 	}
 	file, err := ioutil.ReadFile("./cmd/sytest/config.json")
 	if err != nil {
-		logrus.WithError(err).Fatalln("Read config file failed")
+		logrus.WithError(err).Fatal("Read config file failed")
 	}
 	var cfg struct {
 		Src      string `json:"src"`
@@ -37,20 +37,20 @@ func main() {
 	}
 	err = json.Unmarshal(file, &cfg)
 	if err != nil {
-		logrus.WithError(err).Fatalln("Unmarshal config file failed")
+		logrus.WithError(err).Fatal("Unmarshal config file failed")
 	}
 	err = exec.Command("docker", "run", "--rm",
 		"-v", cfg.Src+":/src/",
-		"-v", cfg.Src+"cmd/sytest/result:/logs/",
+		"-v", cfg.Src+"cmd/sytest/result/:/logs/",
 		"matrixdotorg/sytest-dendrite").Run()
 	if err != nil {
-		logrus.WithError(err).Fatalln("Run sytest docker image failed")
+		logrus.WithError(err).Fatal("Run sytest docker image failed")
 	}
-	logrus.Infoln("Sytest done")
+	logrus.Info("Sytest done")
 	out, err := exec.Command("./are-we-synapse-yet.py",
 		"-v", "./cmd/sytest/result/results.tap").Output()
 	if err != nil {
-		logrus.WithError(err).Fatalln("Run are-we-synapse-yet failed")
+		logrus.WithError(err).Fatal("Run are-we-synapse-yet failed")
 	}
 	if cfg.SendMail {
 		auth := smtp.PlainAuth("",
@@ -61,10 +61,10 @@ func main() {
 		content := []byte(fmt.Sprintf("From:%s\r\nTo:all@workly.ai\r\nSubject:Are We Synapse Yet?\r\nContent-Type:text/plain;charset=utf-8\r\n\r\n%s", cfg.Username, out))
 		err = sendMail(cfg.Host+":"+cfg.Port, auth, cfg.Username, to, content)
 		if err != nil {
-			logrus.WithError(err).Fatalln("Send mail failed")
+			logrus.WithError(err).Fatal("Send mail failed")
 		}
 	} else {
-		logrus.Infoln("\n" + string(out))
+		logrus.Info("\n" + string(out))
 	}
 }
 
