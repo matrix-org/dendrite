@@ -40,6 +40,11 @@ type UserInternalAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
+	CreateSession(context.Context, *CreateSessionRequest, *Session) error
+	ValidateSession(context.Context, *ValidateSessionRequest, struct{}) error
+	GetThreePidForSession(context.Context, *SessionOwnership, *GetThreePidForSessionResponse) error
+	DeleteSession(context.Context, *SessionOwnership, struct{}) error
+	IsSessionValidated(context.Context, *SessionOwnership, *IsSessionValidatedResponse) error
 }
 
 // InputAccountDataRequest is the request for InputAccountData
@@ -332,3 +337,31 @@ const (
 	// AccountTypeGuest indicates this is a guest account
 	AccountTypeGuest AccountType = 2
 )
+
+type CreateSessionRequest struct {
+	ClientSecret, NextLink, ThreePid string
+}
+
+type ValidateSessionRequest struct {
+	SessionOwnership
+	Token string
+}
+
+type GetThreePidForSessionResponse struct {
+	ThreePid string
+}
+
+type SessionOwnership struct {
+	Sid, ClientSecret string
+}
+
+type Session struct {
+	Sid, ClientSecret, ThreePid, Token, NextLink string
+	SendAttempt, ValidatedAt                     int
+	Validated                                    bool
+}
+
+type IsSessionValidatedResponse struct {
+	Validated   bool
+	ValidatedAt int
+}
