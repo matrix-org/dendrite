@@ -49,7 +49,7 @@ func (p *dummyProducer) SendMessage(msg *sarama.ProducerMessage) (partition int3
 		return 0, 0, nil
 	}
 	be := msg.Value.(sarama.ByteEncoder)
-	b := json.RawMessage(be)
+	b := []byte(be)
 	fmt.Println("SENDING >>>>>>>> ", string(b))
 	var out api.OutputEvent
 	err = json.Unmarshal(b, &out)
@@ -143,7 +143,7 @@ func mustCreateEvents(t *testing.T, roomVer gomatrixserverlib.RoomVersion, event
 	return
 }
 
-func mustLoadRawEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) []*gomatrixserverlib.HeaderedEvent {
+func mustLoadRawEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events [][]byte) []*gomatrixserverlib.HeaderedEvent {
 	t.Helper()
 	hs := make([]*gomatrixserverlib.HeaderedEvent, len(events))
 	for i := range events {
@@ -186,7 +186,7 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	), dp
 }
 
-func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []json.RawMessage) (api.RoomserverInternalAPI, *dummyProducer, []*gomatrixserverlib.HeaderedEvent) {
+func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events [][]byte) (api.RoomserverInternalAPI, *dummyProducer, []*gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
 	rsAPI, dp := mustCreateRoomserverAPI(t)
 	hevents := mustLoadRawEvents(t, ver, events)
@@ -197,7 +197,7 @@ func mustSendEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events []js
 }
 
 func TestOutputRedactedEvent(t *testing.T) {
-	redactionEvents := []json.RawMessage{
+	redactionEvents := [][]byte{
 		// create event
 		[]byte(`{"auth_events":[],"content":{"creator":"@userid:kaer.morhen"},"depth":0,"event_id":"$N4us6vqqq3RjvpKd:kaer.morhen","hashes":{"sha256":"WTdrCn/YsiounXcJPsLP8xT0ZjHiO5Ov0NvXYmK2onE"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[],"prev_state":[],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"9+5JcpaN5b5KlHYHGp6r+GoNDH98lbfzGYwjfxensa5C5D/bDACaYnMDLnhwsHOE5nxgI+jT/GV271pz6PMSBQ"}},"state_key":"","type":"m.room.create"}`),
 		// join event

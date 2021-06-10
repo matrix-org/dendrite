@@ -62,7 +62,7 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 		UserID:     fmt.Sprintf("@alice:%s", serverName),
 	}
 	// valid password requests
-	testCases := []json.RawMessage{
+	testCases := [][]byte{
 		// deprecated form
 		[]byte(`{
 			"auth": {
@@ -101,7 +101,7 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 	}
 	// invalid password requests
 	testCases := []struct {
-		body    json.RawMessage
+		body    []byte
 		wantRes util.JSONResponse
 	}{
 		{

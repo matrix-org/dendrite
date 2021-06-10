@@ -205,7 +205,7 @@ func saveTagData(
 		UserID:      userID,
 		RoomID:      roomID,
 		DataType:    "m.tag",
-		AccountData: json.RawMessage(newTagData),
+		AccountData: []byte(newTagData),
 	}
 	dataRes := api.InputAccountDataResponse{}
 	return userAPI.InputAccountData(req.Context(), &dataReq, &dataRes)

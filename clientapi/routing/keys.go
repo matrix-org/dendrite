@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -27,8 +26,8 @@ import (
 )
 
 type uploadKeysRequest struct {
-	DeviceKeys  json.RawMessage            `json:"device_keys"`
-	OneTimeKeys map[string]json.RawMessage `json:"one_time_keys"`
+	DeviceKeys  []byte            `json:"device_keys"`
+	OneTimeKeys map[string][]byte `json:"one_time_keys"`
 }
 
 func UploadKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {

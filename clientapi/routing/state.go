@@ -30,8 +30,8 @@ import (
 
 type stateEventInStateResp struct {
 	gomatrixserverlib.ClientEvent
-	PrevContent   json.RawMessage `json:"prev_content,omitempty"`
-	ReplacesState string          `json:"replaces_state,omitempty"`
+	PrevContent   []byte `json:"prev_content,omitempty"`
+	ReplacesState string `json:"replaces_state,omitempty"`
 }
 
 // OnIncomingStateRequest is called when a client makes a /rooms/{roomID}/state

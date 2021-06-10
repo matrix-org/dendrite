@@ -17,7 +17,6 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
@@ -34,7 +33,7 @@ type Database struct {
 	StaleDeviceListsTable tables.StaleDeviceLists
 }
 
-func (d *Database) ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
+func (d *Database) ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string][]byte, error) {
 	return d.OneTimeKeysTable.SelectOneTimeKeys(ctx, userID, deviceID, keyIDsWithAlgorithms)
 }
 

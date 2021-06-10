@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"strconv"
 	"sync"
@@ -228,7 +227,7 @@ func (d *Database) createAccount(
 	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		return nil, err
 	}
-	if err = d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
+	if err = d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", []byte(`{
 		"global": {
 			"content": [],
 			"override": [],
@@ -248,7 +247,7 @@ func (d *Database) createAccount(
 // update the corresponding row with the new content
 // Returns a SQL error if there was an issue with the insertion/update
 func (d *Database) SaveAccountData(
-	ctx context.Context, localpart, roomID, dataType string, content json.RawMessage,
+	ctx context.Context, localpart, roomID, dataType string, content []byte,
 ) error {
 	d.accountDatasMu.Lock()
 	defer d.accountDatasMu.Unlock()
@@ -261,8 +260,8 @@ func (d *Database) SaveAccountData(
 // If no account data could be found, returns an empty arrays
 // Returns an error if there was an issue with the retrieval
 func (d *Database) GetAccountData(ctx context.Context, localpart string) (
-	global map[string]json.RawMessage,
-	rooms map[string]map[string]json.RawMessage,
+	global map[string][]byte,
+	rooms map[string]map[string][]byte,
 	err error,
 ) {
 	return d.accountDatas.selectAccountData(ctx, localpart)
@@ -274,7 +273,7 @@ func (d *Database) GetAccountData(ctx context.Context, localpart string) (
 // Returns an error if there was an issue with the retrieval
 func (d *Database) GetAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
-) (data json.RawMessage, err error) {
+) (data []byte, err error) {
 	return d.accountDatas.selectAccountDataByType(
 		ctx, localpart, roomID, dataType,
 	)

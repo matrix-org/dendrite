@@ -391,7 +391,7 @@ func (oq *destinationQueue) nextTransaction(
 		if pdu == nil || pdu.pdu == nil {
 			continue
 		}
-		// Append the JSON of the event, since this is a json.RawMessage type in the
+		// Append the JSON of the event, since this is a []byte type in the
 		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, pdu.pdu.JSON())
 		pduReceipts = append(pduReceipts, pdu.receipt)

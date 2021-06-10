@@ -53,7 +53,7 @@ func GetAccountData(
 		return util.ErrorResponse(fmt.Errorf("userAPI.QueryAccountData: %w", err))
 	}
 
-	var data json.RawMessage
+	var data []byte
 	var ok bool
 	if roomID != "" {
 		data, ok = dataRes.RoomAccountData[roomID][dataType]
@@ -118,7 +118,7 @@ func SaveAccountData(
 		UserID:      userID,
 		DataType:    dataType,
 		RoomID:      roomID,
-		AccountData: json.RawMessage(body),
+		AccountData: []byte(body),
 	}
 	dataRes := api.InputAccountDataResponse{}
 	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {

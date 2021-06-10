@@ -48,7 +48,7 @@ type createRoomRequest struct {
 	RoomAliasName             string                        `json:"room_alias_name"`
 	GuestCanJoin              bool                          `json:"guest_can_join"`
 	RoomVersion               gomatrixserverlib.RoomVersion `json:"room_version"`
-	PowerLevelContentOverride json.RawMessage               `json:"power_level_content_override"`
+	PowerLevelContentOverride []byte                        `json:"power_level_content_override"`
 }
 
 const (

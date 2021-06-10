@@ -17,7 +17,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/lib/pq"
@@ -94,14 +93,14 @@ func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
 	return s, nil
 }
 
-func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
+func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string][]byte, error) {
 	rows, err := s.selectKeysStmt.QueryContext(ctx, userID, deviceID, pq.Array(keyIDsWithAlgorithms))
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectKeysStmt: rows.close() failed")
 
-	result := make(map[string]json.RawMessage)
+	result := make(map[string][]byte)
 	var (
 		algorithmWithID string
 		keyJSONStr      string
@@ -110,7 +109,7 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 		if err := rows.Scan(&algorithmWithID, &keyJSONStr); err != nil {
 			return nil, err
 		}
-		result[algorithmWithID] = json.RawMessage(keyJSONStr)
+		result[algorithmWithID] = []byte(keyJSONStr)
 	}
 	return result, rows.Err()
 }
@@ -172,7 +171,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, txn *sql.
 
 func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, algorithm string,
-) (map[string]json.RawMessage, error) {
+) (map[string][]byte, error) {
 	var keyID string
 	var keyJSON string
 	err := sqlutil.TxStmtContext(ctx, txn, s.selectKeyByAlgorithmStmt).QueryRowContext(ctx, userID, deviceID, algorithm).Scan(&keyID, &keyJSON)
@@ -183,7 +182,7 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 		return nil, err
 	}
 	_, err = sqlutil.TxStmtContext(ctx, txn, s.deleteOneTimeKeyStmt).ExecContext(ctx, userID, deviceID, algorithm, keyID)
-	return map[string]json.RawMessage{
-		algorithm + ":" + keyID: json.RawMessage(keyJSON),
+	return map[string][]byte{
+		algorithm + ":" + keyID: []byte(keyJSON),
 	}, err
 }

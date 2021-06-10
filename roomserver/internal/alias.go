@@ -204,7 +204,7 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	if err != nil {
 		return err
 	}
-	err = builder.SetContent(json.RawMessage(rawContent))
+	err = builder.SetContent([]byte(rawContent))
 	if err != nil {
 		return err
 	}
