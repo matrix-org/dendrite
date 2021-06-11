@@ -27,6 +27,7 @@ require (
 	github.com/matrix-org/naffka v0.0.0-20201009174903-d26a3b9cb161
 	github.com/matrix-org/pinecone v0.0.0-20210602111459-5cb0e6aa1a6a
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
+	github.com/matryer/is v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.7-0.20210414154423-1157a4212dcb
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
