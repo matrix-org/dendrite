@@ -44,6 +44,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/mobile v0.0.0-20210220033013-bdb1ca9a1e08
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
 )
