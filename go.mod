@@ -25,7 +25,7 @@ require (
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20210525110027-8cb7699aa64a
 	github.com/matrix-org/naffka v0.0.0-20201009174903-d26a3b9cb161
-	github.com/matrix-org/pinecone v0.0.0-20210602111459-5cb0e6aa1a6a
+	github.com/matrix-org/pinecone v0.0.0-20210614112651-5da1fab608c6
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.7-0.20210414154423-1157a4212dcb
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
