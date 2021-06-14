@@ -147,7 +147,20 @@ func (r *uploadRequest) doUpload(
 	//   r.storeFileAndMetadata(ctx, tmpDir, ...)
 	// before you return from doUpload else we will leak a temp file. We could make this nicer with a `WithTransaction` style of
 	// nested function to guarantee either storage or cleanup.
-	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, cfg.AbsBasePath)
+
+	// should not happen, but prevents any int overflows
+	if cfg.MaxFileSizeBytes != nil && *cfg.MaxFileSizeBytes+1 <= 0 {
+		r.Logger.WithFields(log.Fields{
+			"MaxFileSizeBytes": *cfg.MaxFileSizeBytes + 1,
+		}).Error("Error while transferring file, configured max_file_size_bytes overflows int64")
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("Failed to upload"),
+		}
+	}
+
+	lr := io.LimitReader(reqReader, int64(*cfg.MaxFileSizeBytes)+1)
+	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, lr, cfg.AbsBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": *cfg.MaxFileSizeBytes,
