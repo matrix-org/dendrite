@@ -1,0 +1,8 @@
+{
+    "src": "path of dendrite's source code on your computer, ends with '/'",
+    "send_mail": false,
+    "username": "your email account",
+    "password": "your email password",
+    "host": "your email smtp host",
+    "port": "your email port"
+}
