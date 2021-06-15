@@ -148,6 +148,12 @@ func (d *Database) RemoveServerFromBlacklist(serverName gomatrixserverlib.Server
 	})
 }
 
+func (d *Database) RemoveAllServersFromBlacklist() error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationSenderBlacklist.DeleteAllBlacklist(context.TODO(), txn)
+	})
+}
+
 func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
 	return d.FederationSenderBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
 }
