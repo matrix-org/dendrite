@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
@@ -44,7 +43,7 @@ type LoginTypePassword struct {
 	GetAccountByPassword  GetAccountByPassword
 	GetAccountByLocalpart GetAccountByLocalpart
 	Config                *config.ClientAPI
-	UserAPI               userapi.UserInternalAPI
+	UserAPI               api.UserInternalAPI
 }
 
 func (t *LoginTypePassword) Name() string {
@@ -79,7 +78,8 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			addr = "ldap://" + t.Config.LDAP.Host + ":" + t.Config.LDAP.Port
 		}
 
-		conn, err := ldap.DialURL(addr)
+		var conn *ldap.Conn
+		conn, err = ldap.DialURL(addr)
 		if err != nil {
 			return nil, &util.JSONResponse{
 				Code: http.StatusUnauthorized,
@@ -97,7 +97,8 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}
 		filter := fmt.Sprintf("(&%s(%s=%s))", t.Config.LDAP.Filter, "uid", localpart)
 		searchRequest := ldap.NewSearchRequest(t.Config.LDAP.BaseDN, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false, filter, []string{"uid"}, nil)
-		sr, err := conn.Search(searchRequest)
+		var sr *ldap.SearchResult
+		sr, err = conn.Search(searchRequest)
 		if err != nil {
 			return nil, &util.JSONResponse{
 				Code: http.StatusUnauthorized,
@@ -134,16 +135,16 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		if err != nil {
 			if err == sql.ErrNoRows {
 				util.GetLogger(ctx).Debugf("registing user, %+v %+v", localpart, r.Password)
-				var accRes userapi.PerformAccountCreationResponse
-				err := t.UserAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
+				var accRes api.PerformAccountCreationResponse
+				err = t.UserAPI.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{
 					AppServiceID: "",
 					Localpart:    localpart,
 					Password:     r.Password,
-					AccountType:  userapi.AccountTypeUser,
-					OnConflict:   userapi.ConflictAbort,
+					AccountType:  api.AccountTypeUser,
+					OnConflict:   api.ConflictAbort,
 				}, &accRes)
 				if err != nil {
-					if _, ok := err.(*userapi.ErrorConflict); ok {
+					if _, ok := err.(*api.ErrorConflict); ok {
 						return nil, &util.JSONResponse{
 							Code: http.StatusBadRequest,
 							JSON: jsonerror.UserInUse("Desired user ID is already taken."),
