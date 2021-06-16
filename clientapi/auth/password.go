@@ -105,7 +105,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 				JSON: jsonerror.InvalidUsername(err.Error()),
 			}
 		}
-		if len(sr.Entries) >= 1 {
+		if len(sr.Entries) > 1 {
 			return nil, &util.JSONResponse{
 				Code: http.StatusUnauthorized,
 				JSON: jsonerror.BadJSON("'user' must be duplicated."),
@@ -134,7 +134,6 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		_, err = t.GetAccountByLocalpart(ctx, localpart)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				util.GetLogger(ctx).Debugf("registing user, %+v %+v", localpart, r.Password)
 				var accRes api.PerformAccountCreationResponse
 				err = t.UserAPI.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{
 					AppServiceID: "",
