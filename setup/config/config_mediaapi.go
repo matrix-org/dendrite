@@ -35,6 +35,9 @@ type MediaAPI struct {
 	ThumbnailSizes []ThumbnailSize `yaml:"thumbnail_sizes"`
 }
 
+// DefaultMaxFileSizeBytes defines the default file size allowed in transfers
+var DefaultMaxFileSizeBytes = FileSizeBytes(10485760)
+
 func (c *MediaAPI) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7774"
 	c.InternalAPI.Connect = "http://localhost:7774"
@@ -42,8 +45,7 @@ func (c *MediaAPI) Defaults() {
 	c.Database.Defaults(5)
 	c.Database.ConnectionString = "file:mediaapi.db"
 
-	defaultMaxFileSizeBytes := FileSizeBytes(10485760)
-	c.MaxFileSizeBytes = &defaultMaxFileSizeBytes
+	c.MaxFileSizeBytes = &DefaultMaxFileSizeBytes
 	c.MaxThumbnailGenerators = 10
 	c.BasePath = "./media_store"
 }
