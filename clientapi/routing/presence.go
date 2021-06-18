@@ -41,11 +41,10 @@ var allowedPresence = map[string]bool{
 	"offline":     true,
 	"unavailable": true,
 }
-var allowedStrings []string
+var allowedStrings = make([]string, len(allowedPresence))
 
 // we only need to do this once
 func init() {
-	allowedStrings = make([]string, len(allowedPresence))
 	i := 0
 	for k := range allowedPresence {
 		allowedStrings[i] = k
