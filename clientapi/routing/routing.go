@@ -895,4 +895,22 @@ func Setup(
 			return SetReceipt(req, eduAPI, device, vars["roomId"], vars["receiptType"], vars["eventId"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/presence/{userId}/status",
+		httputil.MakeAuthAPI("set_presence", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			return SetPresence(req, eduAPI, device)
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
+	r0mux.Handle("/presence/{userId}/status",
+		httputil.MakeAuthAPI("get_presence", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return GetPresence(req, eduAPI, vars["userId"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
