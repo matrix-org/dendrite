@@ -75,6 +75,17 @@ type InputReceiptEventRequest struct {
 // InputReceiptEventResponse is a response to InputReceiptEventRequest
 type InputReceiptEventResponse struct{}
 
+// InputPresenceRequest is a request to EDUServerInputAPI
+type InputPresenceRequest struct {
+	UserID    string                      `json:"user_id"`
+	Status    string                      `json:"status"`
+	StatusMsg string                      `json:"status_msg"`
+	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+}
+
+// InputPresenceResponse is a response to InputPresenceRequest
+type InputPresenceResponse struct{}
+
 // EDUServerInputAPI is used to write events to the typing server.
 type EDUServerInputAPI interface {
 	InputTypingEvent(
@@ -93,5 +104,11 @@ type EDUServerInputAPI interface {
 		ctx context.Context,
 		request *InputReceiptEventRequest,
 		response *InputReceiptEventResponse,
+	) error
+
+	InputPresence(
+		ctx context.Context,
+		request *InputPresenceRequest,
+		response *InputPresenceResponse,
 	) error
 }

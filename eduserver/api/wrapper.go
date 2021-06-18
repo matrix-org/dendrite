@@ -86,3 +86,20 @@ func SendReceipt(
 	response := InputReceiptEventResponse{}
 	return eduAPI.InputReceiptEvent(ctx, &request, &response)
 }
+
+// SetPresence sends a presence change to the EDU Server
+func SetPresence(
+	ctx context.Context,
+	eduAPI EDUServerInputAPI,
+	userID, status, statusMsg string,
+	timestamp gomatrixserverlib.Timestamp,
+) error {
+	request := InputPresenceRequest{
+		UserID:    userID,
+		Status:    status,
+		StatusMsg: statusMsg,
+		Timestamp: timestamp,
+	}
+	response := InputPresenceResponse{}
+	return eduAPI.InputPresence(ctx, &request, &response)
+}

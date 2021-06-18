@@ -85,3 +85,11 @@ type FederationReceiptData struct {
 	Data     ReceiptTS `json:"data"`
 	EventIDs []string  `json:"event_ids"`
 }
+
+// OutputPresence is an entry in the presence output kafka log
+type OutputPresence struct {
+	UserID    string                      `json:"user_id"`
+	Status    string                      `json:"status"`
+	StatusMsg string                      `json:"status_msg"`
+	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+}
