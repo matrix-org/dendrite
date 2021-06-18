@@ -883,7 +883,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomId}/receipt/{receiptType}/{eventId}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("set_receipt", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
