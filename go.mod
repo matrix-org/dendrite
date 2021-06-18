@@ -23,7 +23,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20210615141822-8ebcb0fb7903
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20210525110027-8cb7699aa64a
 	github.com/matrix-org/naffka v0.0.0-20201009174903-d26a3b9cb161
 	github.com/matrix-org/pinecone v0.0.0-20210614122540-33ce3bd0f3ac
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
@@ -44,7 +44,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/mobile v0.0.0-20210220033013-bdb1ca9a1e08
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
 )
