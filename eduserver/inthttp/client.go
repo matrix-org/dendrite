@@ -15,6 +15,7 @@ const (
 	EDUServerInputTypingEventPath       = "/eduserver/input"
 	EDUServerInputSendToDeviceEventPath = "/eduserver/sendToDevice"
 	EDUServerInputReceiptEventPath      = "/eduserver/receipt"
+	EDUServerInputPresencePath          = "/eduserver/presence"
 )
 
 // NewEDUServerClient creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
@@ -66,5 +67,18 @@ func (h *httpEDUServerInputAPI) InputReceiptEvent(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputReceiptEventPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// InputPresence implements EDUServerInputAPI
+func (h *httpEDUServerInputAPI) InputPresence(
+	ctx context.Context,
+	request *api.InputPresenceRequest,
+	response *api.InputPresenceResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputPresencePath")
+	defer span.Finish()
+
+	apiURL := h.eduServerURL + EDUServerInputPresencePath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
