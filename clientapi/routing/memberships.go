@@ -51,16 +51,47 @@ type databaseJoinedMember struct {
 	AvatarURL   string `json:"avatar_url"`
 }
 
+// // MembershipFilter is an enum representing kinds of membership to a room
+// type MembershipFilter string
+
+// const (
+// 	MembershipDefault MembershipFilter = "none"
+// 	MembershipJoin    MembershipFilter = "join"
+// 	MembershipInvite  MembershipFilter = "invite"
+// 	MembershipLeave   MembershipFilter = "leave"
+// 	MembershipBan     MembershipFilter = "ban"
+// )
+
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
 	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
 	_ *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
+	// how would i unpack this nicely into
+	// type queryParams struct {
+	// 	membership string
+	// 	notMembership string
+	// }
+	membership := req.URL.Query().Get("membership")
+	notMembership := req.URL.Query().Get("not_membership")
+	membershipStatusFilter := []string{"join", "invite", "leave", "ban"}
+	if len(notMembership) > 0 {
+		for i, v := range membershipStatusFilter {
+			if v == notMembership {
+				membershipStatusFilter = append(membershipStatusFilter[:i], membershipStatusFilter[i+1:]...)
+			}
+		}
+	} else if len(membership) > 0 {
+		membershipStatusFilter = []string{membership}
+	} else {
+		membershipStatusFilter = []string{}
+	}
 	queryReq := api.QueryMembershipsForRoomRequest{
-		JoinedOnly: joinedOnly,
-		RoomID:     roomID,
-		Sender:     device.UserID,
+		JoinedOnly:             joinedOnly,
+		MembershipStatusFilter: membershipStatusFilter,
+		RoomID:                 roomID,
+		Sender:                 device.UserID,
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
 	if err := rsAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
