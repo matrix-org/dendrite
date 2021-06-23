@@ -124,13 +124,6 @@ var selectKnownUsersSQL = "" +
 	"  SELECT DISTINCT room_nid FROM roomserver_membership WHERE target_nid=$1 AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
 	") AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " AND event_state_key LIKE $2 LIMIT $3"
 
-// Select users in public rooms
-const selectPublicUsersSQL = "" +
-	"SELECT DISTINCT event_state_key FROM roomserver_event_state_keys INNER JOIN roomserver_membership ON " +
-	"roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid INNER JOIN roomserver_rooms ON " +
-	"roomserver_rooms.room_nid = roomserver_membership.room_nid INNER JOIN roomserver_published ON roomserver_published.room_id = roomserver_rooms.room_id " +
-	"AND event_state_key LIKE $1 LIMIT $2"
-
 type membershipStatements struct {
 	insertMembershipStmt                            *sql.Stmt
 	selectMembershipForUpdateStmt                   *sql.Stmt
@@ -143,7 +136,6 @@ type membershipStatements struct {
 	selectRoomsWithMembershipStmt                   *sql.Stmt
 	selectJoinedUsersSetForRoomsStmt                *sql.Stmt
 	selectKnownUsersStmt                            *sql.Stmt
-	selectPublicUsersStmt                           *sql.Stmt
 	updateMembershipForgetRoomStmt                  *sql.Stmt
 }
 
@@ -167,7 +159,6 @@ func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectRoomsWithMembershipStmt, selectRoomsWithMembershipSQL},
 		{&s.selectJoinedUsersSetForRoomsStmt, selectJoinedUsersSetForRoomsSQL},
 		{&s.selectKnownUsersStmt, selectKnownUsersSQL},
-		{&s.selectPublicUsersStmt, selectPublicUsersSQL},
 		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 	}.Prepare(db)
 }
@@ -257,7 +248,7 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 func (s *membershipStatements) UpdateMembership(
 	ctx context.Context,
 	txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
-	eventNID types.EventNID, forgotten bool,
+	eventNID types.EventNID, forgotten bool, displayname *string,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.updateMembershipStmt).ExecContext(
 		ctx, roomNID, targetUserNID, senderUserNID, membership, eventNID, forgotten,
@@ -313,23 +304,6 @@ func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID type
 	}
 	result := []string{}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownUsers: rows.close() failed")
-	for rows.Next() {
-		var userID string
-		if err := rows.Scan(&userID); err != nil {
-			return nil, err
-		}
-		result = append(result, userID)
-	}
-	return result, rows.Err()
-}
-
-func (s *membershipStatements) SelectPublicUsers(ctx context.Context, searchString string, limit int) ([]string, error) {
-	rows, err := s.selectPublicUsersStmt.QueryContext(ctx, fmt.Sprintf("%%%s%%", searchString), limit)
-	if err != nil {
-		return nil, err
-	}
-	result := []string{}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectPublicUsers: rows.close() failed")
 	for rows.Next() {
 		var userID string
 		if err := rows.Scan(&userID); err != nil {

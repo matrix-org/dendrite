@@ -49,18 +49,18 @@ func SearchUserDirectory(
 		Limited: false,
 	}
 
-	// First start searching users in public rooms
-	userReq := &rsapi.QueryPublicUsersRequest{
+	stateReq := &rsapi.QueryKnownUsersRequest{
+		UserID:       device.UserID,
 		SearchString: searchString,
 		Limit:        limit,
 	}
-	userRes := &rsapi.QueryPublicUsersResponse{}
-	if err := rsAPI.QueryPublicUsers(ctx, userReq, userRes); err != nil {
-		errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryPublicUsers: %w", err))
+	stateRes := &rsapi.QueryKnownUsersResponse{}
+	if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil {
+		errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 		return &errRes
 	}
 
-	for _, user := range userRes.Users {
+	for _, user := range stateRes.Users {
 		if len(results) == limit {
 			response.Limited = true
 			break
@@ -68,33 +68,6 @@ func SearchUserDirectory(
 
 		if _, ok := results[user.UserID]; !ok {
 			results[user.UserID] = user
-		}
-	}
-
-	// Then, if we have enough room left in the response,
-	// start searching for known users from joined rooms.
-
-	if len(results) <= limit {
-		stateReq := &rsapi.QueryKnownUsersRequest{
-			UserID:       device.UserID,
-			SearchString: searchString,
-			Limit:        limit - len(results),
-		}
-		stateRes := &rsapi.QueryKnownUsersResponse{}
-		if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil {
-			errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
-			return &errRes
-		}
-
-		for _, user := range stateRes.Users {
-			if len(results) == limit {
-				response.Limited = true
-				break
-			}
-
-			if _, ok := results[user.UserID]; !ok {
-				results[user.UserID] = user
-			}
 		}
 	}
 

@@ -55,7 +55,6 @@ const (
 	RoomserverQueryBulkStateContentPath        = "/roomserver/queryBulkStateContent"
 	RoomserverQuerySharedUsersPath             = "/roomserver/querySharedUsers"
 	RoomserverQueryKnownUsersPath              = "/roomserver/queryKnownUsers"
-	RoomserverQueryPublicUsersPath             = "/roomserver/queryPublicUsers"
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
 )
@@ -519,16 +518,6 @@ func (h *httpRoomserverInternalAPI) QueryKnownUsers(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryKnownUsersPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
-}
-
-func (h *httpRoomserverInternalAPI) QueryPublicUsers(
-	ctx context.Context, req *api.QueryPublicUsersRequest, res *api.QueryPublicUsersResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPublicUsers")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryPublicUsersPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
