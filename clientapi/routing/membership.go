@@ -55,7 +55,7 @@ func SendBan(
 
 	plEvent := roomserverAPI.GetStateEvent(req.Context(), rsAPI, roomID, gomatrixserverlib.StateKeyTuple{
 		EventType: gomatrixserverlib.MRoomPowerLevels,
-		StateKey: "",
+		StateKey:  "",
 	})
 	if plEvent == nil {
 		return util.JSONResponse{
@@ -63,7 +63,7 @@ func SendBan(
 			JSON: jsonerror.Forbidden("You don't have permission to ban this user, no power_levels event in this room."),
 		}
 	}
-	pl, err :=  plEvent.PowerLevels()
+	pl, err := plEvent.PowerLevels()
 	if err != nil {
 		return util.JSONResponse{
 			Code: 403,
