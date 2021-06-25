@@ -18,6 +18,7 @@ package main
 
 import (
 	"crypto/ed25519"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -166,7 +167,7 @@ func main() {
 	cfg.Global.TrustedIDServers = []string{}
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.PrivateKey = sk
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(pk)
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)

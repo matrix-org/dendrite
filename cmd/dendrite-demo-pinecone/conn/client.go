@@ -21,7 +21,7 @@ func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) error {
 		ctx := context.Background()
 		c, _, err := websocket.Dial(ctx, peer, nil)
 		if err != nil {
-			return fmt.Errorf("websocket.Dial: %w", err)
+			return fmt.Errorf("websocket.DefaultDialer.Dial: %w", err)
 		}
 		parent = websocket.NetConn(ctx, c, websocket.MessageBinary)
 	} else {
@@ -43,7 +43,7 @@ type RoundTripper struct {
 }
 
 func (y *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.URL.Scheme = "https"
+	req.URL.Scheme = "http"
 	return y.inner.RoundTrip(req)
 }
 
@@ -57,7 +57,13 @@ func createTransport(s *pineconeSessions.Sessions) *http.Transport {
 	}
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
-			inner: tr,
+			inner: &http.Transport{
+				DisableKeepAlives: false,
+				Dial:              s.Dial,
+				DialContext:       s.DialContext,
+				DialTLS:           s.DialTLS,
+				DialTLSContext:    s.DialTLSContext,
+			},
 		},
 	)
 	return tr
