@@ -1,5 +1,7 @@
 module github.com/matrix-org/dendrite
 
+replace github.com/matrix-org/go-sqlite3-js => /Volumes/Workspace/go-sqlite3-js
+
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
@@ -24,8 +26,8 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20200522092705-bc8506ccbcf3
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20210525110027-8cb7699aa64a
-	github.com/matrix-org/naffka v0.0.0-20201009174903-d26a3b9cb161
-	github.com/matrix-org/pinecone v0.0.0-20210622111727-6e630fb016ac
+	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
+	github.com/matrix-org/pinecone v0.0.0-20210623102758-74f885644c1b
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.7-0.20210414154423-1157a4212dcb
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
@@ -47,6 +49,7 @@ require (
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
+	nhooyr.io/websocket v1.8.7 // indirect
 )
 
 go 1.14
