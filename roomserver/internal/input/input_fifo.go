@@ -29,6 +29,9 @@ func (q *fifoQueue) push(frame *inputTask) {
 	}
 }
 
+// pop returns the first item of the queue, if there is one.
+// The second return value will indicate if a task was returned.
+// You must check this value, even after calling wait().
 func (q *fifoQueue) pop() (*inputTask, bool) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
@@ -47,6 +50,8 @@ func (q *fifoQueue) pop() (*inputTask, bool) {
 	return frame, true
 }
 
+// wait returns a channel which can be used to detect when an
+// item is waiting in the queue.
 func (q *fifoQueue) wait() <-chan struct{} {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
