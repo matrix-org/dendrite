@@ -13,7 +13,7 @@ type fifoQueue struct {
 
 func newFIFOQueue() *fifoQueue {
 	q := &fifoQueue{
-		notifs: make(chan struct{}),
+		notifs: make(chan struct{}, 1),
 	}
 	return q
 }
