@@ -38,8 +38,7 @@ type Inputer struct {
 	ServerName           gomatrixserverlib.ServerName
 	ACLs                 *acls.ServerACLs
 	OutputRoomEventTopic string
-
-	workers sync.Map // room ID -> *inputWorker
+	workers              sync.Map // room ID -> *inputWorker
 }
 
 type inputTask struct {
@@ -52,7 +51,7 @@ type inputTask struct {
 type inputWorker struct {
 	r       *Inputer
 	running atomic.Bool
-	input   chan *inputTask
+	input   *fifoQueue
 }
 
 // Guarded by a CAS on w.running
@@ -60,7 +59,11 @@ func (w *inputWorker) start() {
 	defer w.running.Store(false)
 	for {
 		select {
-		case task := <-w.input:
+		case <-w.input.wait():
+			task, ok := w.input.pop()
+			if !ok {
+				continue
+			}
 			hooks.Run(hooks.KindNewEventReceived, task.event.Event)
 			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
 			if task.err == nil {
@@ -143,7 +146,7 @@ func (r *Inputer) InputRoomEvents(
 		// room - the channel will be quite small as it's just pointer types.
 		w, _ := r.workers.LoadOrStore(roomID, &inputWorker{
 			r:     r,
-			input: make(chan *inputTask, 32),
+			input: newFIFOQueue(),
 		})
 		worker := w.(*inputWorker)
 
@@ -160,7 +163,7 @@ func (r *Inputer) InputRoomEvents(
 		if worker.running.CAS(false, true) {
 			go worker.start()
 		}
-		worker.input <- tasks[i]
+		worker.input.push(tasks[i])
 	}
 
 	// Wait for all of the workers to return results about our tasks.
