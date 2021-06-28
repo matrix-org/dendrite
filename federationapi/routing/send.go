@@ -486,14 +486,16 @@ func (t *txnReq) getServers(ctx context.Context, roomID string) []gomatrixserver
 		return t.servers
 	}
 	t.servers = []gomatrixserverlib.ServerName{t.Origin}
-	serverReq := &api.QueryServerJoinedToRoomRequest{
-		RoomID: roomID,
-	}
-	serverRes := &api.QueryServerJoinedToRoomResponse{}
-	if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
-		t.servers = append(t.servers, serverRes.ServerNames...)
-		util.GetLogger(ctx).Infof("Found %d server(s) to query for missing events in %q", len(t.servers), roomID)
-	}
+	/*
+		serverReq := &api.QueryServerJoinedToRoomRequest{
+			RoomID: roomID,
+		}
+		serverRes := &api.QueryServerJoinedToRoomResponse{}
+		if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
+			t.servers = append(t.servers, serverRes.ServerNames...)
+			util.GetLogger(ctx).Infof("Found %d server(s) to query for missing events in %q", len(t.servers), roomID)
+		}
+	*/
 	return t.servers
 }
 
@@ -618,13 +620,18 @@ func checkAllowedByState(e *gomatrixserverlib.Event, stateEvents []*gomatrixserv
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
+var processEventWithMissingStateMutexes = internal.NewMutexByRoom()
+
 func (t *txnReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
 ) error {
+	processEventWithMissingStateMutexes.Lock(e.RoomID())
+	defer processEventWithMissingStateMutexes.Unlock(e.RoomID())
+
 	// Do this with a fresh context, so that we keep working even if the
 	// original request times out. With any luck, by the time the remote
 	// side retries, we'll have fetched the missing state.
-	gmectx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	gmectx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
