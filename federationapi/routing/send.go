@@ -591,6 +591,8 @@ withNextEvent:
 			); err != nil {
 				return fmt.Errorf("api.SendEvents: %w", err)
 			}
+			t.hadEvents[ev.EventID()] = true // if the roomserver didn't know about the event before, it does now
+			t.cacheAndReturn(ev.Headered(stateResp.RoomVersion))
 			delete(missingAuthEvents, missingAuthEventID)
 			continue withNextEvent
 		}
@@ -828,6 +830,7 @@ func (t *txnReq) lookupStateAfterEventLocally(ctx context.Context, roomID, event
 		// set the event from the haveEvents cache - this means we will share pointers with other prev_event branches for this
 		// processEvent request, which is better for memory.
 		stateEvents[i] = t.cacheAndReturn(ev)
+		t.hadEvents[ev.EventID()] = true
 	}
 	// we should never access res.StateEvents again so we delete it here to make GC faster
 	res.StateEvents = nil
@@ -858,8 +861,9 @@ func (t *txnReq) lookupStateAfterEventLocally(ctx context.Context, roomID, event
 		if err = t.rsAPI.QueryEventsByID(ctx, &queryReq, &queryRes); err != nil {
 			return nil
 		}
-		for i := range queryRes.Events {
+		for i, ev := range queryRes.Events {
 			authEvents = append(authEvents, t.cacheAndReturn(queryRes.Events[i]).Unwrap())
+			t.hadEvents[ev.EventID()] = true
 		}
 		queryRes.Events = nil
 	}
@@ -934,8 +938,9 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Even
 		return nil, err
 	}
 	latestEvents := make([]string, len(res.LatestEvents))
-	for i := range res.LatestEvents {
+	for i, ev := range res.LatestEvents {
 		latestEvents[i] = res.LatestEvents[i].EventID
+		t.hadEvents[ev.EventID] = true
 	}
 
 	var missingResp *gomatrixserverlib.RespMissingEvents
@@ -1064,8 +1069,9 @@ func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, even
 	if err = t.rsAPI.QueryEventsByID(ctx, &queryReq, &queryRes); err != nil {
 		return nil, err
 	}
-	for i := range queryRes.Events {
+	for i, ev := range queryRes.Events {
 		queryRes.Events[i] = t.cacheAndReturn(queryRes.Events[i])
+		t.hadEvents[ev.EventID()] = true
 		evID := queryRes.Events[i].EventID()
 		if missing[evID] {
 			delete(missing, evID)
