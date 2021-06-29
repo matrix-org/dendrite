@@ -1029,12 +1029,13 @@ func (t *txnReq) lookupMissingStateViaState(ctx context.Context, roomID, eventID
 	if err := state.Check(ctx, t.keys, nil); err != nil {
 		return nil, err
 	}
-	// Cache the results of this state lookup.
-	for _, ev := range state.AuthEvents {
-		t.cacheAndReturn(ev.Headered(roomVersion))
+	// Cache the results of this state lookup and deduplicate anything we already
+	// have in the cache, freeing up memory.
+	for i, ev := range state.AuthEvents {
+		state.AuthEvents[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
 	}
-	for _, ev := range state.StateEvents {
-		t.cacheAndReturn(ev.Headered(roomVersion))
+	for i, ev := range state.StateEvents {
+		state.StateEvents[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
 	}
 	return &state, nil
 }
