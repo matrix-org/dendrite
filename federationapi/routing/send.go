@@ -629,7 +629,7 @@ func (t *txnReq) processEventWithMissingState(
 	// Do this with a fresh context, so that we keep working even if the
 	// original request times out. With any luck, by the time the remote
 	// side retries, we'll have fetched the missing state.
-	gmectx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	gmectx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
