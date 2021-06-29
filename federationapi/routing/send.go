@@ -486,16 +486,14 @@ func (t *txnReq) getServers(ctx context.Context, roomID string) []gomatrixserver
 		return t.servers
 	}
 	t.servers = []gomatrixserverlib.ServerName{t.Origin}
-	/*
-		serverReq := &api.QueryServerJoinedToRoomRequest{
-			RoomID: roomID,
-		}
-		serverRes := &api.QueryServerJoinedToRoomResponse{}
-		if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
-			t.servers = append(t.servers, serverRes.ServerNames...)
-			util.GetLogger(ctx).Infof("Found %d server(s) to query for missing events in %q", len(t.servers), roomID)
-		}
-	*/
+	serverReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID: roomID,
+	}
+	serverRes := &api.QueryServerJoinedToRoomResponse{}
+	if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
+		t.servers = append(t.servers, serverRes.ServerNames...)
+		util.GetLogger(ctx).Infof("Found %d server(s) to query for missing events in %q", len(t.servers), roomID)
+	}
 	return t.servers
 }
 
