@@ -503,15 +503,6 @@ func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) e
 		return fmt.Errorf("t.rsAPI.QueryMissingAuthPrevEvents: %w", err)
 	}
 
-	// Prepare a map of all the events we already had before this point, so
-	// that we don't send them to the roomserver again.
-	for _, eventID := range append(e.AuthEventIDs(), e.PrevEventIDs()...) {
-		t.hadEvents[eventID] = true
-	}
-	for _, eventID := range append(stateResp.MissingAuthEventIDs, stateResp.MissingPrevEventIDs...) {
-		t.hadEvents[eventID] = false
-	}
-
 	if !stateResp.RoomExists {
 		// TODO: When synapse receives a message for a room it is not in it
 		// asks the remote server for the state of the room so that it can
@@ -520,6 +511,15 @@ func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) e
 		// However generally speaking we should reject events for rooms we
 		// aren't a member of.
 		return roomNotFoundError{e.RoomID()}
+	}
+
+	// Prepare a map of all the events we already had before this point, so
+	// that we don't send them to the roomserver again.
+	for _, eventID := range append(e.AuthEventIDs(), e.PrevEventIDs()...) {
+		t.hadEvents[eventID] = true
+	}
+	for _, eventID := range append(stateResp.MissingAuthEventIDs, stateResp.MissingPrevEventIDs...) {
+		t.hadEvents[eventID] = false
 	}
 
 	if len(stateResp.MissingAuthEventIDs) > 0 {
