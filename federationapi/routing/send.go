@@ -985,6 +985,12 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Even
 	// For now, we do not allow Case B, so reject the event.
 	logger.Infof("get_missing_events returned %d events", len(missingResp.Events))
 
+	// Make sure events from the missingResp are using the cache - missing events
+	// will be added and duplicates will be removed.
+	for i, ev := range missingResp.Events {
+		missingResp.Events[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
+	}
+
 	// topologically sort and sanity check that we are making forward progress
 	newEvents = gomatrixserverlib.ReverseTopologicalOrdering(missingResp.Events, gomatrixserverlib.TopologicalOrderByPrevEvents)
 	shouldHaveSomeEventIDs := e.PrevEventIDs()
@@ -1022,6 +1028,13 @@ func (t *txnReq) lookupMissingStateViaState(ctx context.Context, roomID, eventID
 	// Check that the returned state is valid.
 	if err := state.Check(ctx, t.keys, nil); err != nil {
 		return nil, err
+	}
+	// Cache the results of this state lookup.
+	for _, ev := range state.AuthEvents {
+		t.cacheAndReturn(ev.Headered(roomVersion))
+	}
+	for _, ev := range state.StateEvents {
+		t.cacheAndReturn(ev.Headered(roomVersion))
 	}
 	return &state, nil
 }
@@ -1222,6 +1235,7 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 		return nil, verifySigError{event.EventID(), err}
 	}
 	h := event.Headered(roomVersion)
+	t.cacheAndReturn(h)
 	t.newEventsMutex.Lock()
 	t.newEvents[h.EventID()] = true
 	t.newEventsMutex.Unlock()
