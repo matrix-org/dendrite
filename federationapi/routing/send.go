@@ -791,7 +791,7 @@ func (t *txnReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrix
 	default:
 		return nil, false, fmt.Errorf("t.lookupEvent: %w", err)
 	}
-	t.cacheAndReturn(h)
+	h = t.cacheAndReturn(h)
 	if h.StateKey() != nil {
 		addedToState := false
 		for i := range respState.StateEvents {
@@ -1070,8 +1070,8 @@ func (t *txnReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, even
 		return nil, err
 	}
 	for i := range queryRes.Events {
+		queryRes.Events[i] = t.cacheAndReturn(queryRes.Events[i])
 		evID := queryRes.Events[i].EventID()
-		t.cacheAndReturn(queryRes.Events[i])
 		if missing[evID] {
 			delete(missing, evID)
 		}
@@ -1235,8 +1235,7 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}
-	h := event.Headered(roomVersion)
-	t.cacheAndReturn(h)
+	h := t.cacheAndReturn(event.Headered(roomVersion))
 	t.newEventsMutex.Lock()
 	t.newEvents[h.EventID()] = true
 	t.newEventsMutex.Unlock()
