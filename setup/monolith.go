@@ -68,7 +68,7 @@ func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ss
 	federationapi.AddPublicRoutes(
 		ssMux, keyMux, &m.Config.FederationAPI, m.UserAPI, m.FedClient,
 		m.KeyRing, m.RoomserverAPI, m.FederationSenderAPI,
-		m.EDUInternalAPI, m.KeyAPI, &m.Config.MSCs,
+		m.EDUInternalAPI, m.KeyAPI, &m.Config.MSCs, nil,
 	)
 	mediaapi.AddPublicRoutes(mediaMux, &m.Config.MediaAPI, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(
