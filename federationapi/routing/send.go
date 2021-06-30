@@ -476,11 +476,6 @@ func (t *txnReq) getServers(ctx context.Context, roomID string, event *gomatrixs
 	// The server that sent us the event should be sufficient to tell us about missing
 	// prev and auth events.
 	servers := []gomatrixserverlib.ServerName{t.Origin}
-	// If a specific room-to-server provider exists then use that. This will primarily
-	// be used for the P2P demos.
-	if t.servers != nil {
-		return append(servers, t.servers.GetServersForRoom(ctx, roomID, event)...)
-	}
 	// If the event origin is different to the transaction origin then we can use
 	// this as a last resort. The origin server that created the event would have
 	// had to know the auth and prev events.
@@ -488,6 +483,11 @@ func (t *txnReq) getServers(ctx context.Context, roomID string, event *gomatrixs
 		if origin := event.Origin(); origin != t.Origin {
 			servers = append(servers, origin)
 		}
+	}
+	// If a specific room-to-server provider exists then use that. This will primarily
+	// be used for the P2P demos.
+	if t.servers != nil {
+		servers = append(servers, t.servers.GetServersForRoom(ctx, roomID, event)...)
 	}
 	return servers
 }
