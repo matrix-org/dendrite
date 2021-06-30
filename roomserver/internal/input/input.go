@@ -166,17 +166,19 @@ func (r *Inputer) InputRoomEvents(
 		worker.input.push(tasks[i])
 	}
 
-	// Wait for all of the workers to return results about our tasks.
-	wg.Wait()
+	if !request.Asynchronous {
+		// Wait for all of the workers to return results about our tasks.
+		wg.Wait()
 
-	// If any of the tasks returned an error, we should probably report
-	// that back to the caller.
-	for _, task := range tasks {
-		if task.err != nil {
-			response.ErrMsg = task.err.Error()
-			_, rejected := task.err.(*gomatrixserverlib.NotAllowed)
-			response.NotAllowed = rejected
-			return
+		// If any of the tasks returned an error, we should probably report
+		// that back to the caller.
+		for _, task := range tasks {
+			if task.err != nil {
+				response.ErrMsg = task.err.Error()
+				_, rejected := task.err.(*gomatrixserverlib.NotAllowed)
+				response.NotAllowed = rejected
+				return
+			}
 		}
 	}
 }
