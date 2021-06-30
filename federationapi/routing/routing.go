@@ -50,6 +50,7 @@ func Setup(
 	userAPI userapi.UserInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	mscCfg *config.MSCs,
+	servers ServersInRoomProvider,
 ) {
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
@@ -99,7 +100,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, rsAPI, eduAPI, keyAPI, keys, federation, mu,
+				cfg, rsAPI, eduAPI, keyAPI, keys, federation, mu, servers,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)

@@ -39,10 +39,12 @@ func AddPublicRoutes(
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	mscCfg *config.MSCs,
+	servers routing.ServersInRoomProvider,
 ) {
 	routing.Setup(
 		fedRouter, keyRouter, cfg, rsAPI,
 		eduAPI, federationSenderAPI, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
+		servers,
 	)
 }
