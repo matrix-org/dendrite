@@ -27,6 +27,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -101,6 +102,7 @@ func Send(
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	mu *internal.MutexByRoom,
+	servers federationAPI.ServersInRoomProvider,
 ) util.JSONResponse {
 	t := txnReq{
 		rsAPI:      rsAPI,
@@ -109,6 +111,7 @@ func Send(
 		federation: federation,
 		hadEvents:  make(map[string]bool),
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
+		servers:    servers,
 		keyAPI:     keyAPI,
 		roomsMu:    mu,
 	}
@@ -160,14 +163,14 @@ func Send(
 
 type txnReq struct {
 	gomatrixserverlib.Transaction
-	rsAPI        api.RoomserverInternalAPI
-	eduAPI       eduserverAPI.EDUServerInputAPI
-	keyAPI       keyapi.KeyInternalAPI
-	keys         gomatrixserverlib.JSONVerifier
-	federation   txnFederationClient
-	servers      []gomatrixserverlib.ServerName
-	serversMutex sync.RWMutex
-	roomsMu      *internal.MutexByRoom
+	rsAPI      api.RoomserverInternalAPI
+	eduAPI     eduserverAPI.EDUServerInputAPI
+	keyAPI     keyapi.KeyInternalAPI
+	keys       gomatrixserverlib.JSONVerifier
+	federation txnFederationClient
+	roomsMu    *internal.MutexByRoom
+	// something that can tell us about which servers are in a room right now
+	servers federationAPI.ServersInRoomProvider
 	// a list of events from the auth and prev events which we already had
 	hadEvents map[string]bool
 	// local cache of events for auth checks, etc - this may include events
@@ -466,22 +469,24 @@ func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverli
 	}
 }
 
-func (t *txnReq) getServers(ctx context.Context, roomID string) []gomatrixserverlib.ServerName {
-	t.serversMutex.Lock()
-	defer t.serversMutex.Unlock()
+func (t *txnReq) getServers(ctx context.Context, roomID string, event *gomatrixserverlib.Event) []gomatrixserverlib.ServerName {
+	// The server that sent us the event should be sufficient to tell us about missing
+	// prev and auth events.
+	servers := []gomatrixserverlib.ServerName{t.Origin}
+	// If the event origin is different to the transaction origin then we can use
+	// this as a last resort. The origin server that created the event would have
+	// had to know the auth and prev events.
+	if event != nil {
+		if origin := event.Origin(); origin != t.Origin {
+			servers = append(servers, origin)
+		}
+	}
+	// If a specific room-to-server provider exists then use that. This will primarily
+	// be used for the P2P demos.
 	if t.servers != nil {
-		return t.servers
+		servers = append(servers, t.servers.GetServersForRoom(ctx, roomID, event)...)
 	}
-	t.servers = []gomatrixserverlib.ServerName{t.Origin}
-	serverReq := &api.QueryServerJoinedToRoomRequest{
-		RoomID: roomID,
-	}
-	serverRes := &api.QueryServerJoinedToRoomResponse{}
-	if err := t.rsAPI.QueryServerJoinedToRoom(ctx, serverReq, serverRes); err == nil {
-		t.servers = append(t.servers, serverRes.ServerNames...)
-		util.GetLogger(ctx).Infof("Found %d server(s) to query for missing events in %q", len(t.servers), roomID)
-	}
-	return t.servers
+	return servers
 }
 
 func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) error {
@@ -566,7 +571,7 @@ func (t *txnReq) retrieveMissingAuthEvents(
 withNextEvent:
 	for missingAuthEventID := range missingAuthEvents {
 	withNextServer:
-		for _, server := range t.getServers(ctx, e.RoomID()) {
+		for _, server := range t.getServers(ctx, e.RoomID(), e) {
 			logger.Infof("Retrieving missing auth event %q from %q", missingAuthEventID, server)
 			tx, err := t.federation.GetEvent(ctx, server, missingAuthEventID)
 			if err != nil {
@@ -948,7 +953,7 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Even
 	}
 
 	var missingResp *gomatrixserverlib.RespMissingEvents
-	servers := t.getServers(ctx, e.RoomID())
+	servers := t.getServers(ctx, e.RoomID(), e)
 	for _, server := range servers {
 		var m gomatrixserverlib.RespMissingEvents
 		if m, err = t.federation.LookupMissingEvents(ctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
@@ -1220,7 +1225,7 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 	}
 	var event *gomatrixserverlib.Event
 	found := false
-	servers := t.getServers(ctx, roomID)
+	servers := t.getServers(ctx, roomID, nil)
 	for _, serverName := range servers {
 		txn, err := t.federation.GetEvent(ctx, serverName, missingEventID)
 		if err != nil || len(txn.PDUs) == 0 {
