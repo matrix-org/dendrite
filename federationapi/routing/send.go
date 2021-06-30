@@ -260,6 +260,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	for _, e := range pdus {
 		perRoom[e.RoomID()] <- e.Unwrap()
 	}
+	pdus = nil // nolint:ineffassign
 
 	var wg sync.WaitGroup
 	wg.Add(len(perRoom))
