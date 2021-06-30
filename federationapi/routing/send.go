@@ -27,6 +27,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -101,7 +102,7 @@ func Send(
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	mu *internal.MutexByRoom,
-	servers ServersInRoomProvider,
+	servers federationAPI.ServersInRoomProvider,
 ) util.JSONResponse {
 	t := txnReq{
 		rsAPI:      rsAPI,
@@ -160,10 +161,6 @@ func Send(
 	}
 }
 
-type ServersInRoomProvider interface {
-	GetServersForRoom(ctx context.Context, roomID string, event *gomatrixserverlib.Event) []gomatrixserverlib.ServerName
-}
-
 type txnReq struct {
 	gomatrixserverlib.Transaction
 	rsAPI      api.RoomserverInternalAPI
@@ -173,7 +170,7 @@ type txnReq struct {
 	federation txnFederationClient
 	roomsMu    *internal.MutexByRoom
 	// something that can tell us about which servers are in a room right now
-	servers ServersInRoomProvider
+	servers federationAPI.ServersInRoomProvider
 	// a list of events from the auth and prev events which we already had
 	hadEvents map[string]bool
 	// local cache of events for auth checks, etc - this may include events

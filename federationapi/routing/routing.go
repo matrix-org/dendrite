@@ -20,6 +20,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -50,7 +51,7 @@ func Setup(
 	userAPI userapi.UserInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	mscCfg *config.MSCs,
-	servers ServersInRoomProvider,
+	servers federationAPI.ServersInRoomProvider,
 ) {
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
