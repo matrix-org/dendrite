@@ -662,11 +662,6 @@ func (t *txnReq) processEventWithMissingState(
 	processEventWithMissingStateMutexes.Lock(e.RoomID())
 	defer processEventWithMissingStateMutexes.Unlock(e.RoomID())
 
-	// Do this with a fresh context, so that we keep working even if the
-	// original request times out. With any luck, by the time the remote
-	// side retries, we'll have fetched the missing state.
-	gmectx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-	defer cancel()
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
@@ -687,7 +682,7 @@ func (t *txnReq) processEventWithMissingState(
 	// - fill in the gap completely then process event `e` returning no backwards extremity
 	// - fail to fill in the gap and tell us to terminate the transaction err=not nil
 	// - fail to fill in the gap and tell us to fetch state at the new backwards extremity, and to not terminate the transaction
-	newEvents, err := t.getMissingEvents(gmectx, e, roomVersion)
+	newEvents, err := t.getMissingEvents(ctx, e, roomVersion)
 	if err != nil {
 		return err
 	}
@@ -714,7 +709,7 @@ func (t *txnReq) processEventWithMissingState(
 		// Look up what the state is after the backward extremity. This will either
 		// come from the roomserver, if we know all the required events, or it will
 		// come from a remote server via /state_ids if not.
-		prevState, trustworthy, lerr := t.lookupStateAfterEvent(gmectx, roomVersion, backwardsExtremity.RoomID(), prevEventID)
+		prevState, trustworthy, lerr := t.lookupStateAfterEvent(ctx, roomVersion, backwardsExtremity.RoomID(), prevEventID)
 		if lerr != nil {
 			util.GetLogger(ctx).WithError(lerr).Errorf("Failed to lookup state after prev_event: %s", prevEventID)
 			return lerr
@@ -758,7 +753,7 @@ func (t *txnReq) processEventWithMissingState(
 		}
 		// There's more than one previous state - run them all through state res
 		t.roomsMu.Lock(e.RoomID())
-		resolvedState, err = t.resolveStatesAndCheck(gmectx, roomVersion, respStates, backwardsExtremity)
+		resolvedState, err = t.resolveStatesAndCheck(ctx, roomVersion, respStates, backwardsExtremity)
 		t.roomsMu.Unlock(e.RoomID())
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("Failed to resolve state conflicts for event %s", backwardsExtremity.EventID())
