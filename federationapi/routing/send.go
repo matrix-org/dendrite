@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -570,6 +571,9 @@ withNextEvent:
 			tx, err := t.federation.GetEvent(ctx, server, missingAuthEventID)
 			if err != nil {
 				logger.WithError(err).Warnf("Failed to retrieve auth event %q", missingAuthEventID)
+				if errors.Is(err, context.DeadlineExceeded) {
+					return err
+				}
 				continue withNextServer
 			}
 			ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(tx.PDUs[0], stateResp.RoomVersion)
@@ -958,6 +962,9 @@ func (t *txnReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Even
 			break
 		} else {
 			logger.WithError(err).Errorf("%s pushed us an event but %q did not respond to /get_missing_events", t.Origin, server)
+			if errors.Is(err, context.DeadlineExceeded) {
+				break
+			}
 		}
 	}
 
@@ -1218,6 +1225,9 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 		txn, err := t.federation.GetEvent(ctx, serverName, missingEventID)
 		if err != nil || len(txn.PDUs) == 0 {
 			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warn("Failed to get missing /event for event ID")
+			if errors.Is(err, context.DeadlineExceeded) {
+				break
+			}
 			continue
 		}
 		event, err = gomatrixserverlib.NewEventFromUntrustedJSON(txn.PDUs[0], roomVersion)
