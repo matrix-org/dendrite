@@ -263,7 +263,12 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	pdus = nil // nolint:ineffassign
 
 	var wg sync.WaitGroup
-	wg.Add(len(perRoom))
+	wg.Add(len(perRoom) + 1)
+
+	go func() {
+		defer wg.Done()
+		t.processEDUs(ctx)
+	}()
 
 	for _, q := range perRoom {
 		go func(q chan *gomatrixserverlib.Event) {
@@ -335,7 +340,6 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		perRoom[k] = nil
 	}
 
-	t.processEDUs(ctx)
 	if c := len(results); c > 0 {
 		util.GetLogger(ctx).Infof("Processed %d PDUs from transaction %q", c, t.TransactionID)
 	}
