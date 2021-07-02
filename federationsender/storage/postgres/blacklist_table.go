@@ -40,11 +40,15 @@ const selectBlacklistSQL = "" +
 const deleteBlacklistSQL = "" +
 	"DELETE FROM federationsender_blacklist WHERE server_name = $1"
 
+const deleteAllBlacklistSQL = "" +
+	"TRUNCATE federationsender_blacklist"
+
 type blacklistStatements struct {
-	db                  *sql.DB
-	insertBlacklistStmt *sql.Stmt
-	selectBlacklistStmt *sql.Stmt
-	deleteBlacklistStmt *sql.Stmt
+	db                     *sql.DB
+	insertBlacklistStmt    *sql.Stmt
+	selectBlacklistStmt    *sql.Stmt
+	deleteBlacklistStmt    *sql.Stmt
+	deleteAllBlacklistStmt *sql.Stmt
 }
 
 func NewPostgresBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
@@ -65,11 +69,12 @@ func NewPostgresBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
 	if s.deleteBlacklistStmt, err = db.Prepare(deleteBlacklistSQL); err != nil {
 		return
 	}
+	if s.deleteAllBlacklistStmt, err = db.Prepare(deleteAllBlacklistSQL); err != nil {
+		return
+	}
 	return
 }
 
-// insertRoom inserts the room if it didn't already exist.
-// If the room didn't exist then last_event_id is set to the empty string.
 func (s *blacklistStatements) InsertBlacklist(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) error {
@@ -78,9 +83,6 @@ func (s *blacklistStatements) InsertBlacklist(
 	return err
 }
 
-// selectRoomForUpdate locks the row for the room and returns the last_event_id.
-// The row must already exist in the table. Callers can ensure that the row
-// exists by calling insertRoom first.
 func (s *blacklistStatements) SelectBlacklist(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) (bool, error) {
@@ -96,12 +98,18 @@ func (s *blacklistStatements) SelectBlacklist(
 	return res.Next(), nil
 }
 
-// updateRoom updates the last_event_id for the room. selectRoomForUpdate should
-// have already been called earlier within the transaction.
 func (s *blacklistStatements) DeleteBlacklist(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteBlacklistStmt)
 	_, err := stmt.ExecContext(ctx, serverName)
+	return err
+}
+
+func (s *blacklistStatements) DeleteAllBlacklist(
+	ctx context.Context, txn *sql.Tx,
+) error {
+	stmt := sqlutil.TxStmt(txn, s.deleteAllBlacklistStmt)
+	_, err := stmt.ExecContext(ctx)
 	return err
 }

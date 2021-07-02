@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 )
 
 type MediaAPI struct {
@@ -57,6 +58,11 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
+	// allow "unlimited" file size
+	if c.MaxFileSizeBytes != nil && *c.MaxFileSizeBytes <= 0 {
+		unlimitedSize := FileSizeBytes(math.MaxInt64 - 1)
+		c.MaxFileSizeBytes = &unlimitedSize
+	}
 	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(*c.MaxFileSizeBytes))
 	checkPositive(configErrs, "media_api.max_thumbnail_generators", int64(c.MaxThumbnailGenerators))
 

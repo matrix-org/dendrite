@@ -10,7 +10,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"net"
 	"net/http"
 	"os"
@@ -37,15 +36,16 @@ import (
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
+	"github.com/matrix-org/pinecone/router"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 	"github.com/matrix-org/pinecone/types"
-	pineconeTypes "github.com/matrix-org/pinecone/types"
+
+	_ "golang.org/x/mobile/bind"
 )
 
 const (
@@ -55,19 +55,19 @@ const (
 )
 
 type DendriteMonolith struct {
-	logger             logrus.Logger
-	PineconeRouter     *pineconeRouter.Router
-	PineconeMulticast  *pineconeMulticast.Multicast
-	PineconeQUIC       *pineconeSessions.Sessions
-	StorageDirectory   string
-	CacheDirectory     string
-	staticPeerURI      string
-	staticPeerMutex    sync.RWMutex
-	staticPeerAttempts atomic.Uint32
-	listener           net.Listener
-	httpServer         *http.Server
-	processContext     *process.ProcessContext
-	userAPI            userapiAPI.UserInternalAPI
+	logger            logrus.Logger
+	PineconeRouter    *pineconeRouter.Router
+	PineconeMulticast *pineconeMulticast.Multicast
+	PineconeQUIC      *pineconeSessions.Sessions
+	StorageDirectory  string
+	CacheDirectory    string
+	staticPeerURI     string
+	staticPeerMutex   sync.RWMutex
+	staticPeerAttempt chan struct{}
+	listener          net.Listener
+	httpServer        *http.Server
+	processContext    *process.ProcessContext
+	userAPI           userapiAPI.UserInternalAPI
 }
 
 func (m *DendriteMonolith) BaseURL() string {
@@ -97,7 +97,9 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.staticPeerMutex.Unlock()
 	m.DisconnectType(pineconeRouter.PeerTypeRemote)
 	if uri != "" {
-		m.staticPeerConnect()
+		go func() {
+			m.staticPeerAttempt <- struct{}{}
+		}()
 	}
 }
 
@@ -193,17 +195,27 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 }
 
 func (m *DendriteMonolith) staticPeerConnect() {
-	m.staticPeerMutex.RLock()
-	uri := m.staticPeerURI
-	m.staticPeerMutex.RUnlock()
-	if uri == "" {
-		return
+	attempt := func() {
+		if m.PineconeRouter.PeerCount(router.PeerTypeRemote) == 0 {
+			m.staticPeerMutex.RLock()
+			uri := m.staticPeerURI
+			m.staticPeerMutex.RUnlock()
+			if uri == "" {
+				return
+			}
+			if err := conn.ConnectToPeer(m.PineconeRouter, uri); err != nil {
+				logrus.WithError(err).Error("Failed to connect to static peer")
+			}
+		}
 	}
-	if err := conn.ConnectToPeer(m.PineconeRouter, uri); err != nil {
-		exp := time.Second * time.Duration(math.Exp2(float64(m.staticPeerAttempts.Inc())))
-		time.AfterFunc(exp, m.staticPeerConnect)
-	} else {
-		m.staticPeerAttempts.Store(0)
+	for {
+		select {
+		case <-m.processContext.Context().Done():
+		case <-m.staticPeerAttempt:
+			attempt()
+		case <-time.After(time.Second * 5):
+			attempt()
+		}
 	}
 }
 
@@ -246,13 +258,6 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeQUIC = pineconeSessions.NewSessions(logger, m.PineconeRouter)
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
 
-	m.PineconeRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
-		if peertype == pineconeRouter.PeerTypeRemote {
-			m.staticPeerAttempts.Store(0)
-			time.AfterFunc(time.Second, m.staticPeerConnect)
-		}
-	})
-
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
@@ -272,6 +277,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
+	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 	if err := cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -290,7 +296,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+		base, federation, rsAPI, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
@@ -356,7 +362,11 @@ func (m *DendriteMonolith) Start() {
 		},
 		Handler: h2c.NewHandler(pMux, h2s),
 	}
+
 	m.processContext = base.ProcessContext
+
+	m.staticPeerAttempt = make(chan struct{}, 1)
+	go m.staticPeerConnect()
 
 	go func() {
 		m.logger.Info("Listening on ", cfg.Global.ServerName)

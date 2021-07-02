@@ -37,19 +37,21 @@ runtime config should come from. The mounted folder must contain:
 To generate keys:
 
 ```
-go run github.com/matrix-org/dendrite/cmd/generate-keys \
-  --private-key=matrix_key.pem \
-  --tls-cert=server.crt \
-  --tls-key=server.key
+docker run --rm --entrypoint="" \
+  -v $(pwd):/mnt \
+  matrixdotorg/dendrite-monolith:latest \
+  /usr/bin/generate-keys \
+  -private-key /mnt/matrix_key.pem \
+  -tls-cert /mnt/server.crt \
+  -tls-key /mnt/server.key
 ```
+
+The key files will now exist in your current working directory, and can be mounted into place.
 
 ## Starting Dendrite as a monolith deployment
 
 Create your config based on the `dendrite.yaml` configuration file in the `docker/config`
-folder in the [Dendrite repository](https://github.com/matrix-org/dendrite). Additionally,
-make the following changes to the configuration:
-
-- Enable Naffka: `use_naffka: true`
+folder in the [Dendrite repository](https://github.com/matrix-org/dendrite).
 
 Once in place, start the PostgreSQL dependency:
 
