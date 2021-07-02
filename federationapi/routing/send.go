@@ -210,6 +210,8 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	//var resultsMutex sync.Mutex
 
 	var wg sync.WaitGroup
+	wg.Add(1) // for processEDUs
+
 	for _, pdu := range t.PDUs {
 		pduCountTotal.WithLabelValues("total").Inc()
 		var header struct {
@@ -275,8 +277,6 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			wg:    &wg,
 		})
 	}
-
-	wg.Wait()
 
 	go func() {
 		defer wg.Done()
