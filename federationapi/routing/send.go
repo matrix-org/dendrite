@@ -294,6 +294,8 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			results[task.event.EventID()] = gomatrixserverlib.PDUResult{
 				Error: task.err.Error(),
 			}
+		} else {
+			results[task.event.EventID()] = gomatrixserverlib.PDUResult{}
 		}
 	}
 
@@ -309,6 +311,7 @@ func (t *inputWorker) run() {
 	}
 	defer t.running.Store(false)
 	for {
+		<-t.input.wait()
 		task, ok := t.input.pop()
 		if !ok {
 			return
