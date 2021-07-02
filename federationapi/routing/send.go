@@ -311,7 +311,6 @@ func (t *inputWorker) run() {
 	}
 	defer t.running.Store(false)
 	for {
-		<-t.input.wait()
 		task, ok := t.input.pop()
 		if !ok {
 			return
