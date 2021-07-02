@@ -304,8 +304,17 @@ func (t *inputWorker) run() {
 		if task == nil {
 			continue
 		}
+		func() {
+			defer task.wg.Done()
+			select {
+			case <-task.ctx.Done():
+				task.err = context.DeadlineExceeded
+				return
+			default:
+				task.err = task.t.processEvent(task.ctx, task.event)
+			}
+		}()
 		//evStart := time.Now()
-		task.err = task.t.processEvent(task.ctx, task.event)
 		/*
 			if task.err = task.t.processEvent(task.ctx, task.event); task.err != nil {
 				err := task.err
