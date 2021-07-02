@@ -119,11 +119,15 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 					_roomserver_state_snapshots
 					JOIN _roomserver_state_block ON _roomserver_state_block.state_block_nid = ANY (_roomserver_state_snapshots.state_block_nids)
 				WHERE
-					_roomserver_state_snapshots.state_snapshot_nid = ANY ( SELECT DISTINCT
+					_roomserver_state_snapshots.state_snapshot_nid = ANY (
+						SELECT
 							_roomserver_state_snapshots.state_snapshot_nid
 						FROM
 							_roomserver_state_snapshots
-						LIMIT $1 OFFSET $2)) AS _roomserver_state_block
+						ORDER BY _roomserver_state_snapshots.state_snapshot_nid ASC
+						LIMIT $1 OFFSET $2
+					)
+			) AS _roomserver_state_block
 			GROUP BY
 				state_snapshot_nid,
 				room_nid,
@@ -200,6 +204,23 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 				return fmt.Errorf("tx.Exec (update rooms): %w", err)
 			}
 		}
+	}
+
+	// By this point we should have no more state_snapshot_nids below maxsnapshotid in either roomserver_rooms or roomserver_events
+	// If we do, this is a problem if Dendrite tries to load the snapshot as it will not exist
+	// in roomserver_state_snapshots
+	var count int64
+	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_events WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
+		return fmt.Errorf("assertion query failed: %s", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("%d events exist in roomserver_events which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
+	}
+	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
+		return fmt.Errorf("assertion query failed: %s", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("%d rooms exist in roomserver_rooms which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
 	}
 
 	if _, err = tx.Exec(`
