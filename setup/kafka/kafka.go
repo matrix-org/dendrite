@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"strings"
 	"time"
 
 	js "github.com/S7evinK/saramajetstream"
@@ -66,7 +67,7 @@ func setupNaffka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 
 func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 	logrus.WithField("servers", cfg.Addresses).Debug("connecting to nats")
-	nc, err := nats.Connect(cfg.Addresses[0])
+	nc, err := nats.Connect(strings.Join(cfg.Addresses, ","))
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to nats")
 		return nil, nil
