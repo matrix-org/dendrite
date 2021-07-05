@@ -313,9 +313,6 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			input: newSendFIFOQueue(),
 		})
 		worker := v.(*inputWorker)
-		if !worker.running.Load() {
-			go worker.run()
-		}
 		wg.Add(1)
 		task := &inputTask{
 			ctx:   ctx,
@@ -325,6 +322,9 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		}
 		tasks = append(tasks, task)
 		worker.input.push(task)
+		if !worker.running.CAS(false, true) {
+			go worker.run()
+		}
 	}
 
 	go func() {
@@ -351,9 +351,6 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 }
 
 func (t *inputWorker) run() {
-	if !t.running.CAS(false, true) {
-		return
-	}
 	defer t.running.Store(false)
 	for {
 		task, ok := t.input.pop()
