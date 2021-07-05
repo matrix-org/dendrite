@@ -3,11 +3,13 @@ module github.com/matrix-org/dendrite
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Shopify/sarama v1.28.0
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.2 // indirect
+	github.com/coreos/go-semver v0.3.0
 	github.com/docker/docker v20.10.7+incompatible
-	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.10.0
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0

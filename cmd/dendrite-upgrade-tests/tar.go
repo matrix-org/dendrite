@@ -3,7 +3,6 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -28,7 +27,6 @@ func compress(src string, buf io.Writer) error {
 		// must provide real name
 		// (see https://golang.org/src/archive/tar/common.go?#L626)
 		header.Name = strings.TrimPrefix(filepath.ToSlash(file), src+"/")
-		fmt.Println(header.Name)
 		// write header
 		if err := tw.WriteHeader(header); err != nil {
 			return err
