@@ -368,7 +368,10 @@ func (t *inputWorker) run() {
 				return
 			default:
 				evStart := time.Now()
-				task.err = task.t.processEvent(task.ctx, task.event)
+				// TODO: Is 5 minutes too long?
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+				task.err = task.t.processEvent(ctx, task.event)
+				cancel()
 				task.duration = time.Since(evStart)
 				if err := task.err; err != nil {
 					switch err.(type) {
