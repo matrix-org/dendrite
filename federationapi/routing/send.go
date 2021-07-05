@@ -358,6 +358,7 @@ func (t *inputWorker) run() {
 			select {
 			case <-task.ctx.Done():
 				task.err = context.DeadlineExceeded
+				pduCountTotal.WithLabelValues("expired").Inc()
 				return
 			default:
 				evStart := time.Now()
