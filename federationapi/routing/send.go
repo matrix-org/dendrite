@@ -703,14 +703,9 @@ func checkAllowedByState(e *gomatrixserverlib.Event, stateEvents []*gomatrixserv
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
-var processEventWithMissingStateMutexes = internal.NewMutexByRoom()
-
 func (t *txnReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
 ) error {
-	processEventWithMissingStateMutexes.Lock(e.RoomID())
-	defer processEventWithMissingStateMutexes.Unlock(e.RoomID())
-
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
