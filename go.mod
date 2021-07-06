@@ -7,7 +7,6 @@ require (
 	github.com/Shopify/sarama v1.28.0
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.2 // indirect
-	github.com/coreos/go-semver v0.3.0
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.10.0
