@@ -21,7 +21,7 @@ require (
 	github.com/lucas-clemente/quic-go v0.19.3
 	github.com/matrix-org/dugong v0.0.0-20180820122854-51a565b5666b
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
-	github.com/matrix-org/go-sqlite3-js v0.0.0-20210625141222-bd2b7124cee8
+	github.com/matrix-org/go-sqlite3-js v0.0.0-20210706131707-e537baaa5859
 	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20210702152949-0cac5159e7d6
 	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
