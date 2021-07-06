@@ -86,6 +86,9 @@ type TransactionID struct {
 // InputRoomEventsRequest is a request to InputRoomEvents
 type InputRoomEventsRequest struct {
 	InputRoomEvents []InputRoomEvent `json:"input_room_events"`
+	// Asynchronous requests will queue up work into the roomserver and
+	// return straight away, rather than waiting for the results.
+	Asynchronous bool `json:"async"`
 }
 
 // InputRoomEventsResponse is a response to InputRoomEvents
