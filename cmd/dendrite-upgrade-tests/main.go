@@ -273,7 +273,7 @@ func buildDendriteImages(httpClient *http.Client, dockerClient *client.Client, b
 
 func runImage(dockerClient *client.Client, volumeName, version, imageID string) (csAPIURL, containerID string, err error) {
 	log.Printf("%s: running image %s\n", version, imageID)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	body, err := dockerClient.ContainerCreate(ctx, &container.Config{
 		Image: imageID,
@@ -284,7 +284,7 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 			{
 				Type:   mount.TypeVolume,
 				Source: volumeName,
-				Target: "/usr/local/pgsql/data",
+				Target: "/var/lib/postgresql/9.6/main",
 			},
 		},
 	}, nil, nil, "dendrite_upgrade_test_"+version)
@@ -346,6 +346,16 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 	return nil
 }
 
+func verifyTests(dockerClient *client.Client, volumeName string, versions []string, branchToImageID map[string]string) error {
+	lastVer := versions[len(versions)-1]
+	csAPIURL, containerID, err := runImage(dockerClient, volumeName, lastVer, branchToImageID[lastVer])
+	if err != nil {
+		return fmt.Errorf("failed to run container for branch %v: %v", lastVer, err)
+	}
+	defer destroyContainer(dockerClient, containerID)
+	return verifyTestsRan(csAPIURL, versions)
+}
+
 func main() {
 	flag.Parse()
 	httpClient := &http.Client{
@@ -375,10 +385,32 @@ func main() {
 		log.Fatalf("failed to make docker volume: %s", err)
 	}
 
+	failed := false
+	defer func() {
+		perr := recover()
+		log.Println("removing postgres volume")
+		verr := dockerClient.VolumeRemove(context.Background(), volume.Name, true)
+		if perr == nil {
+			perr = verr
+		}
+		if perr != nil {
+			panic(perr)
+		}
+		if failed {
+			os.Exit(1)
+		}
+	}()
+
 	// run through images sequentially
 	for _, v := range versions {
 		if err = loadAndRunTests(dockerClient, volume.Name, v, branchToImageID); err != nil {
-			log.Fatalf("failed to run tests for %v: %s", v, err)
+			log.Printf("failed to run tests for %v: %s\n", v, err)
+			failed = true
+			break
 		}
+	}
+	if err := verifyTests(dockerClient, volume.Name, versions, branchToImageID); err != nil {
+		log.Printf("failed to verify test results: %s", err)
+		failed = true
 	}
 }
