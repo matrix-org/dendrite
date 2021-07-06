@@ -343,12 +343,40 @@ func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, req
 }
 
 func (d *Database) GetMembershipEventNIDsForRoom(
-	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
+	ctx context.Context, roomNID types.RoomNID, membershipStatusFilter []string, localOnly bool,
 ) ([]types.EventNID, error) {
-	if joinOnly {
-		return d.MembershipTable.SelectMembershipsFromRoomAndMembership(
-			ctx, roomNID, tables.MembershipStateJoin, localOnly,
-		)
+	var eventNIDs []types.EventNID
+	var filteredEventNIDs []types.EventNID
+	var err error
+	if len(membershipStatusFilter) > 0 {
+		for _, filter := range membershipStatusFilter {
+			if filter == "join" {
+				filteredEventNIDs, err = d.MembershipTable.SelectMembershipsFromRoomAndMembership(
+					ctx, roomNID, tables.MembershipStateJoin, localOnly,
+				)
+				if err != nil {
+					return eventNIDs, err
+				}
+				eventNIDs = append(eventNIDs, filteredEventNIDs...)
+			} else if filter == "invite" {
+				filteredEventNIDs, err = d.MembershipTable.SelectMembershipsFromRoomAndMembership(
+					ctx, roomNID, tables.MembershipStateInvite, localOnly,
+				)
+				if err != nil {
+					return eventNIDs, err
+				}
+				eventNIDs = append(eventNIDs, filteredEventNIDs...)
+			} else {
+				filteredEventNIDs, err = d.MembershipTable.SelectMembershipsFromRoomAndMembership(
+					ctx, roomNID, tables.MembershipStateLeaveOrBan, localOnly,
+				)
+				if err != nil {
+					return eventNIDs, err
+				}
+				eventNIDs = append(eventNIDs, filteredEventNIDs...)
+			}
+		}
+		return eventNIDs, err
 	}
 
 	return d.MembershipTable.SelectMembershipsFromRoom(ctx, roomNID, localOnly)
