@@ -96,13 +96,13 @@ func runTests(baseURL, branchName string) error {
 	})
 	if err != nil { // this is okay and expected if the room already exists and the aliases clash
 		// try to join it
-		_, domain, err := gomatrixserverlib.SplitID('@', users[0].userID)
-		if err != nil {
-			return fmt.Errorf("failed to split user ID: %s, %s", users[0].userID, err)
+		_, domain, err2 := gomatrixserverlib.SplitID('@', users[0].userID)
+		if err2 != nil {
+			return fmt.Errorf("failed to split user ID: %s, %s", users[0].userID, err2)
 		}
-		joinRoomResp, err := users[0].client.JoinRoom(fmt.Sprintf("#global:%s", domain), "", nil)
-		if err != nil {
-			return fmt.Errorf("alice failed to join public room: %s", err)
+		joinRoomResp, err2 := users[0].client.JoinRoom(fmt.Sprintf("#global:%s", domain), "", nil)
+		if err2 != nil {
+			return fmt.Errorf("alice failed to join public room: %s", err2)
 		}
 		publicRoomID = joinRoomResp.RoomID
 	} else {

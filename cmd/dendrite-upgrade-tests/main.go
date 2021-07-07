@@ -84,10 +84,6 @@ ENV SERVER_NAME=localhost
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh `
 
-func ptr(in string) *string {
-	return &in
-}
-
 // downloadArchive downloads an arbitrary github archive of the form:
 //   https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
 // and re-tarballs it without the top-level directory which contains branch information. It inserts
@@ -99,6 +95,7 @@ func downloadArchive(cli *http.Client, tmpDir, archiveURL string, dockerfile []b
 	if err != nil {
 		return nil, err
 	}
+	// nolint:errcheck
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("got HTTP %d", resp.StatusCode)
@@ -106,6 +103,7 @@ func downloadArchive(cli *http.Client, tmpDir, archiveURL string, dockerfile []b
 	if err = os.Mkdir(tmpDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("failed to make temporary directory: %s", err)
 	}
+	// nolint:errcheck
 	defer os.RemoveAll(tmpDir)
 	// dump the tarball temporarily, stripping the top-level directory
 	err = extract.Archive(context.Background(), resp.Body, tmpDir, func(inPath string) string {
@@ -148,6 +146,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 	if err != nil {
 		return "", fmt.Errorf("failed to start building image: %s", err)
 	}
+	// nolint:errcheck
 	defer res.Body.Close()
 	decoder := json.NewDecoder(res.Body)
 	// {"aux":{"ID":"sha256:247082c717963bc2639fc2daed08838d67811ea12356cd4fda43e1ffef94f2eb"}}
@@ -197,7 +196,7 @@ func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Ve
 	return semVers, nil
 }
 
-func calculateVersions(cli *http.Client, from, to string) ([]string, error) {
+func calculateVersions(cli *http.Client, from, to string) []string {
 	semvers, err := getAndSortVersionsFromGithub(cli)
 	if err != nil {
 		log.Fatalf("failed to collect semvers from github: %s", err)
@@ -222,7 +221,7 @@ func calculateVersions(cli *http.Client, from, to string) ([]string, error) {
 		if err != nil {
 			log.Fatalf("invalid --to: %s", err)
 		}
-		i := len(semvers) - 1
+		var i int
 		for i = len(semvers) - 1; i >= 0; i-- {
 			if semvers[i].GreaterThan(toVer) {
 				continue
@@ -238,7 +237,7 @@ func calculateVersions(cli *http.Client, from, to string) ([]string, error) {
 	if to == "HEAD" {
 		versions = append(versions, "HEAD")
 	}
-	return versions, nil
+	return versions
 }
 
 func buildDendriteImages(httpClient *http.Client, dockerClient *client.Client, baseTempDir string, concurrency int, branchOrTagNames []string) map[string]string {
@@ -342,10 +341,13 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 	return baseURL, containerID, lastErr
 }
 
-func destroyContainer(dockerClient *client.Client, containerID string) error {
-	return dockerClient.ContainerRemove(context.TODO(), containerID, types.ContainerRemoveOptions{
+func destroyContainer(dockerClient *client.Client, containerID string) {
+	err := dockerClient.ContainerRemove(context.TODO(), containerID, types.ContainerRemoveOptions{
 		Force: true,
 	})
+	if err != nil {
+		log.Printf("failed to remove container %s : %s", containerID, err)
+	}
 }
 
 func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchToImageID map[string]string) error {
@@ -376,7 +378,7 @@ func main() {
 	httpClient := &http.Client{
 		Timeout: 60 * time.Second,
 	}
-	dockerClient, err := client.NewEnvClient()
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		log.Fatalf("failed to make docker client: %s", err)
 	}
@@ -384,10 +386,7 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	versions, err := calculateVersions(httpClient, *flagFrom, *flagTo)
-	if err != nil {
-		log.Fatalf("failed to calculate versions to build: %s", err)
-	}
+	versions := calculateVersions(httpClient, *flagFrom, *flagTo)
 	log.Printf("Testing dendrite versions: %v\n", versions)
 
 	branchToImageID := buildDendriteImages(httpClient, dockerClient, *flagTempDir, *flagBuildConcurrency, versions)
