@@ -103,7 +103,9 @@ func downloadArchive(cli *http.Client, tmpDir, archiveURL string, dockerfile []b
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("got HTTP %d", resp.StatusCode)
 	}
-	os.Mkdir(tmpDir, os.ModePerm)
+	if err = os.Mkdir(tmpDir, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("failed to make temporary directory: %s", err)
+	}
 	defer os.RemoveAll(tmpDir)
 	// dump the tarball temporarily, stripping the top-level directory
 	err = extract.Archive(context.Background(), resp.Body, tmpDir, func(inPath string) string {
@@ -233,7 +235,7 @@ func calculateVersions(cli *http.Client, from, to string) ([]string, error) {
 	for _, sv := range semvers {
 		versions = append(versions, sv.Original())
 	}
-	if *flagTo == "HEAD" {
+	if to == "HEAD" {
 		versions = append(versions, "HEAD")
 	}
 	return versions, nil
@@ -309,7 +311,7 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 	versionsURL := fmt.Sprintf("%s/_matrix/client/versions", baseURL)
 	// hit /versions to check it is up
 	var lastErr error
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 500; i++ {
 		res, err := http.Get(versionsURL)
 		if err != nil {
 			lastErr = fmt.Errorf("GET %s => error: %s", versionsURL, err)
@@ -323,6 +325,19 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 		}
 		lastErr = nil
 		break
+	}
+	if lastErr != nil {
+		logs, err := dockerClient.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+		})
+		// ignore errors when cannot get logs, it's just for debugging anyways
+		if err == nil {
+			logbody, err := ioutil.ReadAll(logs)
+			if err == nil {
+				log.Printf("Container logs:\n\n%s\n\n", string(logbody))
+			}
+		}
 	}
 	return baseURL, containerID, lastErr
 }

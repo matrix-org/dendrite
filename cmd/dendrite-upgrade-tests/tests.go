@@ -167,6 +167,9 @@ func verifyTestsRan(baseURL string, branchNames []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to /directory: %s", err)
 	}
+	if r.RoomID == "" {
+		return fmt.Errorf("/directory lookup returned no room ID")
+	}
 	log.Println("    public room exists: OK")
 
 	history, err := client.Messages(r.RoomID, client.Store.LoadNextBatch(client.UserID), "", 'b', 100)
