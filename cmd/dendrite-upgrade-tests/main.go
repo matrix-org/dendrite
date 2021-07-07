@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/codeclysm/extract"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
@@ -30,7 +32,7 @@ import (
 
 var (
 	flagTempDir          = flag.String("tmp", "tmp", "Path to temporary directory to dump tarballs to")
-	flagFrom             = flag.String("from", "0.1.0", "The version to start from e.g '0.3.1'.")
+	flagFrom             = flag.String("from", "HEAD-1", "The version to start from e.g '0.3.1'. If 'HEAD-N' then starts N versions behind HEAD.")
 	flagTo               = flag.String("to", "HEAD", "The version to end on e.g '0.3.3'.")
 	flagBuildConcurrency = flag.Int("build-concurrency", runtime.NumCPU(), "The amount of build concurrency when building images")
 	alphaNumerics        = regexp.MustCompile("[^a-zA-Z0-9]+")
@@ -83,6 +85,8 @@ sed -i "s/server_name: localhost/server_name: ${SERVER_NAME}/g" dendrite.yaml \n
 ENV SERVER_NAME=localhost
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh `
+
+const dendriteUpgradeTestLabel = "dendrite_upgrade_test"
 
 // downloadArchive downloads an arbitrary github archive of the form:
 //   https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
@@ -203,18 +207,32 @@ func calculateVersions(cli *http.Client, from, to string) []string {
 	}
 	// snip the lower bound depending on --from
 	if from != "" {
-		fromVer, err := semver.NewVersion(from)
-		if err != nil {
-			log.Fatalf("invalid --from: %s", err)
-		}
-		i := 0
-		for i = 0; i < len(semvers); i++ {
-			if semvers[i].LessThan(fromVer) {
-				continue
+		if strings.HasPrefix(from, "HEAD-") {
+			var headN int
+			headN, err = strconv.Atoi(strings.TrimPrefix(from, "HEAD-"))
+			if err != nil {
+				log.Fatalf("invalid --from, try 'HEAD-1'")
 			}
-			break
+			if headN >= len(semvers) {
+				log.Fatalf("only have %d versions, but asked to go to HEAD-%d", len(semvers), headN)
+			}
+			if headN > 0 {
+				semvers = semvers[len(semvers)-headN:]
+			}
+		} else {
+			fromVer, err := semver.NewVersion(from)
+			if err != nil {
+				log.Fatalf("invalid --from: %s", err)
+			}
+			i := 0
+			for i = 0; i < len(semvers); i++ {
+				if semvers[i].LessThan(fromVer) {
+					continue
+				}
+				break
+			}
+			semvers = semvers[i:]
 		}
-		semvers = semvers[i:]
 	}
 	if to != "" && to != "HEAD" {
 		toVer, err := semver.NewVersion(to)
@@ -279,6 +297,9 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 	body, err := dockerClient.ContainerCreate(ctx, &container.Config{
 		Image: imageID,
 		Env:   []string{"SERVER_NAME=hs1"},
+		Labels: map[string]string{
+			dendriteUpgradeTestLabel: "yes",
+		},
 	}, &container.HostConfig{
 		PublishAllPorts: true,
 		Mounts: []mount.Mount{
@@ -373,6 +394,28 @@ func verifyTests(dockerClient *client.Client, volumeName string, versions []stri
 	return verifyTestsRan(csAPIURL, versions)
 }
 
+// cleanup old containers/volumes from a previous run
+func cleanup(dockerClient *client.Client) {
+	// ignore all errors, we are just cleaning up and don't want to fail just because we fail to cleanup
+	containers, _ := dockerClient.ContainerList(context.Background(), types.ContainerListOptions{
+		Filters: label(dendriteUpgradeTestLabel),
+	})
+	for _, c := range containers {
+		s := time.Second
+		_ = dockerClient.ContainerStop(context.Background(), c.ID, &s)
+		_ = dockerClient.ContainerRemove(context.Background(), c.ID, types.ContainerRemoveOptions{
+			Force: true,
+		})
+	}
+	_ = dockerClient.VolumeRemove(context.Background(), "dendrite_upgrade_test", true)
+}
+
+func label(in string) filters.Args {
+	f := filters.NewArgs()
+	f.Add("label", in)
+	return f
+}
+
 func main() {
 	flag.Parse()
 	httpClient := &http.Client{
@@ -386,6 +429,7 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	cleanup(dockerClient)
 	versions := calculateVersions(httpClient, *flagFrom, *flagTo)
 	log.Printf("Testing dendrite versions: %v\n", versions)
 
@@ -394,6 +438,9 @@ func main() {
 	// make a shared postgres volume
 	volume, err := dockerClient.VolumeCreate(context.Background(), volume.VolumeCreateBody{
 		Name: "dendrite_upgrade_test",
+		Labels: map[string]string{
+			dendriteUpgradeTestLabel: "yes",
+		},
 	})
 	if err != nil {
 		log.Fatalf("failed to make docker volume: %s", err)
