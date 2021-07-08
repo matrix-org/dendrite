@@ -104,6 +104,7 @@ func downloadArchive(cli *http.Client, tmpDir, archiveURL string, dockerfile []b
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("got HTTP %d", resp.StatusCode)
 	}
+	_ = os.RemoveAll(tmpDir)
 	if err = os.Mkdir(tmpDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("failed to make temporary directory: %s", err)
 	}

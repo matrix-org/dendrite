@@ -17,7 +17,7 @@ func compress(src string, buf io.Writer) error {
 	tw := tar.NewWriter(zr)
 
 	// walk through every file in the folder
-	_ = filepath.Walk(src, func(file string, fi os.FileInfo, e error) error {
+	err := filepath.Walk(src, func(file string, fi os.FileInfo, e error) error {
 		// generate tar header
 		header, err := tar.FileInfoHeader(fi, file)
 		if err != nil {
@@ -40,9 +40,15 @@ func compress(src string, buf io.Writer) error {
 			if _, err := io.Copy(tw, data); err != nil {
 				return err
 			}
+			if err = data.Close(); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	// produce tar
 	if err := tw.Close(); err != nil {
