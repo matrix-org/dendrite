@@ -244,6 +244,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			),
 		}
 	}
+	syncReq.Log.Infof("%s->%s : %+v", syncReq.Since, syncReq.Response.NextBatch, syncReq.Response)
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
