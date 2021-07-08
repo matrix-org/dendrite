@@ -40,6 +40,8 @@ var (
 	alphaNumerics        = regexp.MustCompile("[^a-zA-Z0-9]+")
 )
 
+const HEAD = "HEAD"
+
 // Embed the Dockerfile to use when building dendrite versions.
 // We cannot use the dockerfile associated with the repo with each version sadly due to changes in
 // Docker versions. Specifically, earlier Dendrite versions are incompatible with newer Docker clients
@@ -141,7 +143,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 	var err error
 	// If a custom HEAD location is given, use that, else pull from github. Mostly useful for CI
 	// where we want to use the working directory.
-	if branchOrTagName == "HEAD" && *flagHead != "" {
+	if branchOrTagName == HEAD && *flagHead != "" {
 		log.Printf("%s: Using %s as HEAD", branchOrTagName, *flagHead)
 		// add top level Dockerfile
 		err = ioutil.WriteFile(path.Join(*flagHead, "Dockerfile"), []byte(Dockerfile), os.ModePerm)
@@ -258,7 +260,7 @@ func calculateVersions(cli *http.Client, from, to string) []string {
 			semvers = semvers[i:]
 		}
 	}
-	if to != "" && to != "HEAD" {
+	if to != "" && to != HEAD {
 		toVer, err := semver.NewVersion(to)
 		if err != nil {
 			log.Fatalf("invalid --to: %s", err)
@@ -276,8 +278,8 @@ func calculateVersions(cli *http.Client, from, to string) []string {
 	for _, sv := range semvers {
 		versions = append(versions, sv.Original())
 	}
-	if to == "HEAD" {
-		versions = append(versions, "HEAD")
+	if to == HEAD {
+		versions = append(versions, HEAD)
 	}
 	return versions
 }
