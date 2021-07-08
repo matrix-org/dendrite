@@ -35,8 +35,12 @@ var (
 	flagFrom             = flag.String("from", "HEAD-1", "The version to start from e.g '0.3.1'. If 'HEAD-N' then starts N versions behind HEAD.")
 	flagTo               = flag.String("to", "HEAD", "The version to end on e.g '0.3.3'.")
 	flagBuildConcurrency = flag.Int("build-concurrency", runtime.NumCPU(), "The amount of build concurrency when building images")
+	flagHead             = flag.String("head", "", "Location to a dendrite repository to treat as HEAD instead of Github")
+	flagDockerHost       = flag.String("docker-host", "localhost", "The hostname of the docker client. 'localhost' if running locally, 'host.docker.internal' if running in Docker.")
 	alphaNumerics        = regexp.MustCompile("[^a-zA-Z0-9]+")
 )
+
+const HEAD = "HEAD"
 
 // Embed the Dockerfile to use when building dendrite versions.
 // We cannot use the dockerfile associated with the repo with each version sadly due to changes in
@@ -135,15 +139,36 @@ func downloadArchive(cli *http.Client, tmpDir, archiveURL string, dockerfile []b
 
 // buildDendrite builds Dendrite on the branchOrTagName given. Returns the image ID or an error
 func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir, branchOrTagName string) (string, error) {
-	log.Printf("%s: Downloading version %s to %s\n", branchOrTagName, branchOrTagName, tmpDir)
-	// pull an archive, this contains a top-level directory which screws with the build context
-	// which we need to fix up post download
-	u := fmt.Sprintf("https://github.com/matrix-org/dendrite/archive/%s.tar.gz", branchOrTagName)
-	tarball, err := downloadArchive(httpClient, tmpDir, u, []byte(Dockerfile))
-	if err != nil {
-		return "", fmt.Errorf("failed to download archive %s: %w", u, err)
+	var tarball *bytes.Buffer
+	var err error
+	// If a custom HEAD location is given, use that, else pull from github. Mostly useful for CI
+	// where we want to use the working directory.
+	if branchOrTagName == HEAD && *flagHead != "" {
+		log.Printf("%s: Using %s as HEAD", branchOrTagName, *flagHead)
+		// add top level Dockerfile
+		err = ioutil.WriteFile(path.Join(*flagHead, "Dockerfile"), []byte(Dockerfile), os.ModePerm)
+		if err != nil {
+			return "", fmt.Errorf("Custom HEAD: failed to inject /Dockerfile: %w", err)
+		}
+		// now tarball it
+		var buffer bytes.Buffer
+		err = compress(*flagHead, &buffer)
+		if err != nil {
+			return "", fmt.Errorf("failed to tarball custom HEAD %s : %s", *flagHead, err)
+		}
+		tarball = &buffer
+	} else {
+		log.Printf("%s: Downloading version %s to %s\n", branchOrTagName, branchOrTagName, tmpDir)
+		// pull an archive, this contains a top-level directory which screws with the build context
+		// which we need to fix up post download
+		u := fmt.Sprintf("https://github.com/matrix-org/dendrite/archive/%s.tar.gz", branchOrTagName)
+		tarball, err = downloadArchive(httpClient, tmpDir, u, []byte(Dockerfile))
+		if err != nil {
+			return "", fmt.Errorf("failed to download archive %s: %w", u, err)
+		}
+		log.Printf("%s: %s => %d bytes\n", branchOrTagName, u, tarball.Len())
 	}
-	log.Printf("%s: %s => %d bytes\n", branchOrTagName, u, tarball.Len())
+
 	log.Printf("%s: Building version %s\n", branchOrTagName, branchOrTagName)
 	res, err := dockerClient.ImageBuild(context.Background(), tarball, types.ImageBuildOptions{
 		Tags: []string{"dendrite-upgrade"},
@@ -235,7 +260,7 @@ func calculateVersions(cli *http.Client, from, to string) []string {
 			semvers = semvers[i:]
 		}
 	}
-	if to != "" && to != "HEAD" {
+	if to != "" && to != HEAD {
 		toVer, err := semver.NewVersion(to)
 		if err != nil {
 			log.Fatalf("invalid --to: %s", err)
@@ -253,8 +278,8 @@ func calculateVersions(cli *http.Client, from, to string) []string {
 	for _, sv := range semvers {
 		versions = append(versions, sv.Original())
 	}
-	if to == "HEAD" {
-		versions = append(versions, "HEAD")
+	if to == HEAD {
+		versions = append(versions, HEAD)
 	}
 	return versions
 }
@@ -328,7 +353,7 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 	if !ok {
 		return "", "", fmt.Errorf("port 8008 not exposed - exposed ports: %v", inspect.NetworkSettings.Ports)
 	}
-	baseURL := fmt.Sprintf("http://localhost:%s", csapiPortInfo[0].HostPort)
+	baseURL := fmt.Sprintf("http://%s:%s", *flagDockerHost, csapiPortInfo[0].HostPort)
 	versionsURL := fmt.Sprintf("%s/_matrix/client/versions", baseURL)
 	// hit /versions to check it is up
 	var lastErr error
