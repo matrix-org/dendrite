@@ -156,7 +156,7 @@ func (d *Database) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
-	if len(stateBlockNIDs) > 0 {
+	if len(stateBlockNIDs) > 0 && len(state) > 0 {
 		// Check to see if the event already appears in any of the existing state
 		// blocks. If it does then we should not add it again, as this will just
 		// result in excess state blocks and snapshots.
