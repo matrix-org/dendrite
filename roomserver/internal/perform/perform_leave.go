@@ -102,8 +102,6 @@ func (r *Leaver) performLeaveRoomByID(
 		return nil, fmt.Errorf("Error getting membership: %w", err)
 	}
 	if membership != gomatrixserverlib.Join && membership != gomatrixserverlib.Invite {
-		// TODO: should be able to handle "invite" in this case too, if
-		// it's a case of kicking or banning or such
 		return nil, fmt.Errorf("User %q is not joined to the room (membership is %q)", req.UserID, membership)
 	}
 
