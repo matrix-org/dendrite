@@ -37,7 +37,7 @@ func compress(src string, buf io.Writer) error {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(tw, data); err != nil {
+			if _, err = io.Copy(tw, data); err != nil {
 				return err
 			}
 			if err = data.Close(); err != nil {
