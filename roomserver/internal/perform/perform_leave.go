@@ -64,7 +64,14 @@ func (r *Leaver) performLeaveRoomByID(
 	// that.
 	isInvitePending, senderUser, eventID, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
-		return r.performRejectInvite(ctx, req, res, senderUser, eventID)
+		var host gomatrixserverlib.ServerName
+		_, host, err = gomatrixserverlib.SplitID('@', senderUser)
+		if err != nil {
+			return nil, fmt.Errorf("Sender %q is invalid", senderUser)
+		}
+		if host != r.Cfg.Matrix.ServerName {
+			return r.performRejectInvite(ctx, req, res, senderUser, eventID)
+		}
 	}
 
 	// There's no invite pending, so first of all we want to find out
@@ -94,7 +101,7 @@ func (r *Leaver) performLeaveRoomByID(
 	if err != nil {
 		return nil, fmt.Errorf("Error getting membership: %w", err)
 	}
-	if membership != gomatrixserverlib.Join {
+	if membership != gomatrixserverlib.Join && membership != gomatrixserverlib.Invite {
 		// TODO: should be able to handle "invite" in this case too, if
 		// it's a case of kicking or banning or such
 		return nil, fmt.Errorf("User %q is not joined to the room (membership is %q)", req.UserID, membership)
