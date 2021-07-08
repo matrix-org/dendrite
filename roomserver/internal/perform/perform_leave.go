@@ -70,7 +70,7 @@ func (r *Leaver) performLeaveRoomByID(
 			return nil, fmt.Errorf("Sender %q is invalid", senderUser)
 		}
 		if host != r.Cfg.Matrix.ServerName {
-			return r.performRejectInvite(ctx, req, res, senderUser, eventID)
+			return r.performFederatedRejectInvite(ctx, req, res, senderUser, eventID)
 		}
 	}
 
@@ -152,7 +152,7 @@ func (r *Leaver) performLeaveRoomByID(
 	return nil, nil
 }
 
-func (r *Leaver) performRejectInvite(
+func (r *Leaver) performFederatedRejectInvite(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse, // nolint:unparam
