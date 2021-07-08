@@ -117,13 +117,17 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 					_roomserver_state_block.event_nid
 				FROM
 					_roomserver_state_snapshots
-					JOIN _roomserver_state_block ON _roomserver_state_block.state_block_nid = ANY (_roomserver_state_snapshots.state_block_nids)
+					LEFT JOIN _roomserver_state_block ON _roomserver_state_block.state_block_nid = ANY (_roomserver_state_snapshots.state_block_nids)
 				WHERE
-					_roomserver_state_snapshots.state_snapshot_nid = ANY ( SELECT DISTINCT
+					_roomserver_state_snapshots.state_snapshot_nid = ANY (
+						SELECT
 							_roomserver_state_snapshots.state_snapshot_nid
 						FROM
 							_roomserver_state_snapshots
-						LIMIT $1 OFFSET $2)) AS _roomserver_state_block
+						ORDER BY _roomserver_state_snapshots.state_snapshot_nid ASC
+						LIMIT $1 OFFSET $2
+					)
+			) AS _roomserver_state_block
 			GROUP BY
 				state_snapshot_nid,
 				room_nid,
@@ -136,21 +140,48 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 		logrus.Warnf("Rewriting snapshots %d-%d of %d...", batchoffset, batchoffset+batchsize, snapshotcount)
 		var snapshots []stateBlockData
 
+		var badCreateSnapshots []stateBlockData
 		for snapshotrows.Next() {
 			var snapshot stateBlockData
-			var eventsarray pq.Int64Array
-			if err = snapshotrows.Scan(&snapshot.StateSnapshotNID, &snapshot.RoomNID, &snapshot.StateBlockNID, &eventsarray); err != nil {
+			var eventsarray []sql.NullInt64
+			var nulStateBlockNID sql.NullInt64
+			if err = snapshotrows.Scan(&snapshot.StateSnapshotNID, &snapshot.RoomNID, &nulStateBlockNID, pq.Array(&eventsarray)); err != nil {
 				return fmt.Errorf("rows.Scan: %w", err)
 			}
+			if nulStateBlockNID.Valid {
+				snapshot.StateBlockNID = types.StateBlockNID(nulStateBlockNID.Int64)
+			}
+			// Dendrite v0.1.0 would not make a state block for the create event, resulting in [NULL] from the query above.
+			// Remember the snapshot and we'll fill it in after we close this cursor as we can't have 2 queries running at the same time
+			if len(eventsarray) == 1 && !eventsarray[0].Valid {
+				badCreateSnapshots = append(badCreateSnapshots, snapshot)
+				continue
+			}
 			for _, e := range eventsarray {
-				snapshot.EventNIDs = append(snapshot.EventNIDs, types.EventNID(e))
+				if e.Valid {
+					snapshot.EventNIDs = append(snapshot.EventNIDs, types.EventNID(e.Int64))
+				}
 			}
 			snapshot.EventNIDs = snapshot.EventNIDs[:util.SortAndUnique(snapshot.EventNIDs)]
 			snapshots = append(snapshots, snapshot)
 		}
-
 		if err = snapshotrows.Close(); err != nil {
 			return fmt.Errorf("snapshots.Close: %w", err)
+		}
+		// fill in bad create snapshots
+		for _, s := range badCreateSnapshots {
+			var createEventNID types.EventNID
+			err = tx.QueryRow(
+				`SELECT event_nid FROM roomserver_events WHERE state_snapshot_nid = $1 AND event_type_nid = 1`, s.StateSnapshotNID,
+			).Scan(&createEventNID)
+			if err != nil {
+				return fmt.Errorf("cannot xref null state block with snapshot %d: %s", s.StateSnapshotNID, err)
+			}
+			if createEventNID == 0 {
+				return fmt.Errorf("cannot xref null state block with snapshot %d, no create event", s.StateSnapshotNID)
+			}
+			s.EventNIDs = append(s.EventNIDs, createEventNID)
+			snapshots = append(snapshots, s)
 		}
 
 		newsnapshots := map[stateSnapshotData]types.StateBlockNIDs{}
@@ -200,6 +231,23 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 				return fmt.Errorf("tx.Exec (update rooms): %w", err)
 			}
 		}
+	}
+
+	// By this point we should have no more state_snapshot_nids below maxsnapshotid in either roomserver_rooms or roomserver_events
+	// If we do, this is a problem if Dendrite tries to load the snapshot as it will not exist
+	// in roomserver_state_snapshots
+	var count int64
+	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_events WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
+		return fmt.Errorf("assertion query failed: %s", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("%d events exist in roomserver_events which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
+	}
+	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
+		return fmt.Errorf("assertion query failed: %s", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("%d rooms exist in roomserver_rooms which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
 	}
 
 	if _, err = tx.Exec(`

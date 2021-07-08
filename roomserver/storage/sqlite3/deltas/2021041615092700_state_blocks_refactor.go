@@ -31,6 +31,7 @@ func LoadStateBlocksRefactor(m *sqlutil.Migrations) {
 	m.AddMigration(UpStateBlocksRefactor, DownStateBlocksRefactor)
 }
 
+// nolint:gocyclo
 func UpStateBlocksRefactor(tx *sql.Tx) error {
 	logrus.Warn("Performing state storage upgrade. Please wait, this may take some time!")
 	defer logrus.Warn("State storage upgrade complete")
@@ -45,6 +46,7 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	}
 	maxsnapshotid++
 	maxblockid++
+	oldMaxSnapshotID := maxsnapshotid
 
 	if _, err := tx.Exec(`ALTER TABLE roomserver_state_block RENAME TO _roomserver_state_block;`); err != nil {
 		return fmt.Errorf("tx.Exec: %w", err)
@@ -133,6 +135,7 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 			if jerr != nil {
 				return fmt.Errorf("json.Marshal (new blocks): %w", jerr)
 			}
+
 			var newsnapshot types.StateSnapshotNID
 			err = tx.QueryRow(`
 				INSERT INTO roomserver_state_snapshots (state_snapshot_nid, state_snapshot_hash, room_nid, state_block_nids)
@@ -144,13 +147,31 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 				return fmt.Errorf("tx.QueryRow.Scan (insert new snapshot): %w", err)
 			}
 			maxsnapshotid++
-			if _, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newsnapshot, snapshot, maxsnapshotid); err != nil {
+			_, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newsnapshot, snapshot, maxsnapshotid)
+			if err != nil {
 				return fmt.Errorf("tx.Exec (update events): %w", err)
 			}
 			if _, err = tx.Exec(`UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newsnapshot, snapshot, maxsnapshotid); err != nil {
 				return fmt.Errorf("tx.Exec (update rooms): %w", err)
 			}
 		}
+	}
+
+	// By this point we should have no more state_snapshot_nids below oldMaxSnapshotID in either roomserver_rooms or roomserver_events
+	// If we do, this is a problem if Dendrite tries to load the snapshot as it will not exist
+	// in roomserver_state_snapshots
+	var count int64
+	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_events WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, oldMaxSnapshotID).Scan(&count); err != nil {
+		return fmt.Errorf("assertion query failed: %s", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("%d events exist in roomserver_events which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
+	}
+	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, oldMaxSnapshotID).Scan(&count); err != nil {
+		return fmt.Errorf("assertion query failed: %s", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("%d rooms exist in roomserver_rooms which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
 	}
 
 	if _, err = tx.Exec(`DROP TABLE _roomserver_state_snapshots;`); err != nil {

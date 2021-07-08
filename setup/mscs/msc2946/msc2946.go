@@ -39,9 +39,9 @@ import (
 )
 
 const (
-	ConstCreateEventContentKey = "org.matrix.msc1772.type"
-	ConstSpaceChildEventType   = "org.matrix.msc1772.space.child"
-	ConstSpaceParentEventType  = "org.matrix.msc1772.space.parent"
+	ConstCreateEventContentKey = "type"
+	ConstSpaceChildEventType   = "m.space.child"
+	ConstSpaceParentEventType  = "m.space.parent"
 )
 
 // Defaults sets the request defaults
