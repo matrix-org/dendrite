@@ -3,7 +3,7 @@ module github.com/matrix-org/dendrite
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
-	github.com/S7evinK/saramajetstream v0.0.0-20210604172822-4f305c9f1537
+	github.com/S7evinK/saramajetstream v0.0.0-20210709060522-786e3e6abe86
 	github.com/Shopify/sarama v1.29.0
 	github.com/getsentry/sentry-go v0.10.0
 	github.com/gologme/log v1.2.0

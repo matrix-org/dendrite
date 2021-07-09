@@ -108,7 +108,7 @@ func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 		}
 	}
 
-	consumer := js.NewJetStreamConsumer(s, cfg.TopicPrefix)
-	producer := js.NewJetStreamProducer(s, cfg.TopicPrefix)
+	consumer := js.NewJetStreamConsumer(nc, s, cfg.TopicPrefix)
+	producer := js.NewJetStreamProducer(nc, s, cfg.TopicPrefix)
 	return consumer, producer
 }
