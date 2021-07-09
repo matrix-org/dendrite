@@ -142,7 +142,6 @@ func (t *testRoomserverAPI) QueryMissingAuthPrevEvents(
 	response.RoomVersion = testRoomVersion
 	res := t.queryMissingAuthPrevEvents(request)
 	response.RoomExists = res.RoomExists
-	response.RoomJoined = true
 	response.MissingAuthEventIDs = res.MissingAuthEventIDs
 	response.MissingPrevEventIDs = res.MissingPrevEventIDs
 	return nil
@@ -191,7 +190,9 @@ func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 	request *api.QueryServerJoinedToRoomRequest,
 	response *api.QueryServerJoinedToRoomResponse,
 ) error {
-	return fmt.Errorf("not implemented")
+	response.RoomExists = true
+	response.IsInRoom = true
+	return nil
 }
 
 // Query whether a server is allowed to see an event

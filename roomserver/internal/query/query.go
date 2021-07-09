@@ -142,14 +142,6 @@ func (r *Queryer) QueryMissingAuthPrevEvents(
 	response.RoomExists = !info.IsStub
 	response.RoomVersion = info.RoomVersion
 
-	if response.RoomExists {
-		joined, err := r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
-		if err != nil {
-			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
-		}
-		response.RoomJoined = joined
-	}
-
 	for _, authEventID := range request.AuthEventIDs {
 		if nids, err := r.DB.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
 			response.MissingAuthEventIDs = append(response.MissingAuthEventIDs, authEventID)
@@ -337,7 +329,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	}
 	response.RoomExists = true
 
-	if request.ServerName == r.ServerName {
+	if request.ServerName == r.ServerName || request.ServerName == "" {
 		var joined bool
 		joined, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
 		if err != nil {
