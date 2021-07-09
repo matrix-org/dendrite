@@ -194,7 +194,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		sentry.CaptureException(err)
 		return err
 	}
-	log.Infof("onNewRoomEvent -> %d: %+v", pduPos, msg)
 
 	s.pduStream.Advance(pduPos)
 	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
