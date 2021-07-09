@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "sql.js": "github:neilalexander/sql.js#252a72bf57b0538cbd49bbd6f70af71e516966ae"
+  }
+}

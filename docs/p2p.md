@@ -2,14 +2,23 @@
 
 These are the instructions for setting up P2P Dendrite, current as of May 2020. There's both Go stuff and JS stuff to do to set this up.
 
-
 ### Dendrite
+
+#### Build
 
 - The `master` branch has a WASM-only binary for dendrite: `./cmd/dendritejs`.
 - Build it and copy assets to riot-web.
 ```
-$ GOOS=js GOARCH=wasm go build -o main.wasm ./cmd/dendritejs
-$ cp main.wasm ../riot-web/src/vector/dendrite.wasm
+$ ./build-dendritejs.sh
+$ cp bin/main.wasm ../riot-web/src/vector/dendrite.wasm
+```
+
+#### Test
+
+To check that the Dendrite side is working well as Wasm, you can run the
+Wasm-specific tests:
+```
+$ ./test-dendritejs.sh
 ```
 
 ### Rendezvous

@@ -1,0 +1,40 @@
+name: WebAssembly
+
+on:
+    push:
+        branches: [master]
+    pull_request:
+        branches: [master]
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+
+            - name: Install Go
+              uses: actions/setup-go@v2
+              with:
+                  go-version: 1.16.5
+
+            - uses: actions/cache@v2
+              with:
+                  path: |
+                      ~/.cache/go-build
+                      ~/go/pkg/mod
+                  key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+                  restore-keys: |
+                      ${{ runner.os }}-go-
+
+            - name: Install Node
+              uses: actions/setup-node@v2
+              with:
+                  node-version: 14
+                  cache: npm
+
+            - name: Install test dependencies
+              working-directory: ./test/wasm
+              run: npm install
+
+            - name: Test
+              run: ./test-dendritejs.sh
