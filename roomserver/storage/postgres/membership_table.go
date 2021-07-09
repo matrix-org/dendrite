@@ -344,7 +344,7 @@ func (s *membershipStatements) SelectLocalServerInRoom(ctx context.Context, room
 		}
 		return false, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownUsers: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectLocalServerInRoom: rows.close() failed")
 	found := false
 	for rows.Next() {
 		found = true
