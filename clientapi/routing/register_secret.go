@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/hex"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/util"
 	cache "github.com/patrickmn/go-cache"
 )
@@ -25,7 +27,7 @@ type SharedSecretRegistrationRequest struct {
 }
 
 func NewSharedSecretRegistrationRequest(reader io.ReadCloser) (*SharedSecretRegistrationRequest, error) {
-	defer reader.Close()
+	defer internal.CloseAndLogIfError(context.Background(), reader, "NewSharedSecretRegistrationRequest: failed to close request body")
 	var ssrr SharedSecretRegistrationRequest
 	err := json.NewDecoder(reader).Decode(&ssrr)
 	if err != nil {

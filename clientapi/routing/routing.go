@@ -94,7 +94,7 @@ func Setup(
 		sr := NewSharedSecretRegistration(cfg.RegistrationSharedSecret)
 		synapseAdminRouter.Handle("/admin/v1/register",
 			httputil.MakeExternalAPI("shared_secret_registration", func(req *http.Request) util.JSONResponse {
-				if req.Method == "GET" {
+				if req.Method == http.MethodGet {
 					return util.JSONResponse{
 						Code: 200,
 						JSON: struct {
@@ -104,7 +104,7 @@ func Setup(
 						},
 					}
 				}
-				if req.Method == "POST" {
+				if req.Method == http.MethodPost {
 					return handleSharedSecretRegistration(userAPI, sr, req)
 				}
 				return util.JSONResponse{
