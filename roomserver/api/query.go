@@ -96,6 +96,8 @@ type QueryMissingAuthPrevEventsResponse struct {
 	// Does the room exist on this roomserver?
 	// If the room doesn't exist all other fields will be empty.
 	RoomExists bool `json:"room_exists"`
+	// Are we joined to this room locally?
+	RoomJoined bool `json:"room_joined"`
 	// The room version of the room.
 	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
 	// The event IDs of the auth events that we don't know locally.
@@ -182,7 +184,8 @@ type QueryServerJoinedToRoomResponse struct {
 	RoomExists bool `json:"room_exists"`
 	// True if we still believe that we are participating in the room
 	IsInRoom bool `json:"is_in_room"`
-	// List of servers that are also in the room
+	// List of servers that are also in the room. This will not be populated
+	// if the queried ServerName is the local server name.
 	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
 }
 

@@ -59,6 +59,7 @@ func NewRoomserverAPI(
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
+			ServerName: cfg.Matrix.ServerName,
 			ServerACLs: serverACLs,
 		},
 		Inputer: &input.Inputer{

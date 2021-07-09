@@ -599,6 +599,13 @@ func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) e
 		return roomNotFoundError{e.RoomID()}
 	}
 
+	if !stateResp.RoomJoined {
+		// We don't believe we're a member of this room anymore, therefore
+		// there's no point in wasting work trying to figure out what to do
+		// with missing auth or prev events. Silently drop the event.
+		return nil
+	}
+
 	// Prepare a map of all the events we already had before this point, so
 	// that we don't send them to the roomserver again.
 	for _, eventID := range append(e.AuthEventIDs(), e.PrevEventIDs()...) {

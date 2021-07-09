@@ -36,6 +36,7 @@ import (
 type Queryer struct {
 	DB         storage.Database
 	Cache      caching.RoomServerCaches
+	ServerName gomatrixserverlib.ServerName
 	ServerACLs *acls.ServerACLs
 }
 
@@ -140,6 +141,18 @@ func (r *Queryer) QueryMissingAuthPrevEvents(
 
 	response.RoomExists = !info.IsStub
 	response.RoomVersion = info.RoomVersion
+
+	joined, err := r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
+	if err != nil {
+		return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+	}
+	response.RoomJoined = joined
+
+	// If we're not joined to the room then there's no point in hitting
+	// the database further to work out which events we're missing.
+	if !joined {
+		return nil
+	}
 
 	for _, authEventID := range request.AuthEventIDs {
 		if nids, err := r.DB.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
@@ -327,6 +340,16 @@ func (r *Queryer) QueryServerJoinedToRoom(
 		return nil
 	}
 	response.RoomExists = true
+
+	if request.ServerName == r.ServerName {
+		var joined bool
+		joined, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+		}
+		response.IsInRoom = joined
+		return nil
+	}
 
 	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {

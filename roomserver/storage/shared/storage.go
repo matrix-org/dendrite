@@ -1059,6 +1059,11 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) 
 	return result, nil
 }
 
+// GetLocalServerInRoom returns true if we think we're in a given room or false otherwise.
+func (d *Database) GetLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error) {
+	return d.MembershipTable.SelectLocalServerInRoom(ctx, roomNID)
+}
+
 // GetKnownUsers searches all users that userID knows about.
 func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
 	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
