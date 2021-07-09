@@ -388,10 +388,16 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 		return
 	}
 	roomID := events[0].RoomID()
-	isServerInRoom, err := helpers.IsServerCurrentlyInRoom(ctx, r.DB, request.ServerName, roomID)
-	if err != nil {
-		return
+
+	inRoomReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID:     roomID,
+		ServerName: request.ServerName,
 	}
+	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
+	if err = r.QueryServerJoinedToRoom(ctx, inRoomReq, inRoomRes); err != nil {
+		return fmt.Errorf("r.Queryer.QueryServerJoinedToRoom: %w", err)
+	}
+
 	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
 		return err
@@ -400,7 +406,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 		return fmt.Errorf("QueryServerAllowedToSeeEvent: no room info for room %s", roomID)
 	}
 	response.AllowedToSeeEvent, err = helpers.CheckServerAllowedToSeeEvent(
-		ctx, r.DB, *info, request.EventID, request.ServerName, isServerInRoom,
+		ctx, r.DB, *info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
 	)
 	return
 }
