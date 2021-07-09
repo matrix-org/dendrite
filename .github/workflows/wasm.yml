@@ -36,6 +36,11 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-node-
 
+            - name: Reconfigure Git to use HTTPS auth for repo packages
+              run: >
+                  git config --global url."https://github.com/".insteadOf
+                  ssh://git@github.com/
+
             - name: Install test dependencies
               working-directory: ./test/wasm
               run: npm ci
