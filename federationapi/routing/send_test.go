@@ -142,6 +142,7 @@ func (t *testRoomserverAPI) QueryMissingAuthPrevEvents(
 	response.RoomVersion = testRoomVersion
 	res := t.queryMissingAuthPrevEvents(request)
 	response.RoomExists = res.RoomExists
+	response.RoomJoined = true
 	response.MissingAuthEventIDs = res.MissingAuthEventIDs
 	response.MissingPrevEventIDs = res.MissingPrevEventIDs
 	return nil
