@@ -38,7 +38,7 @@ jobs:
 
             - name: Install test dependencies
               working-directory: ./test/wasm
-              run: npm install
+              run: npm ci
 
             - name: Test
               run: ./test-dendritejs.sh
