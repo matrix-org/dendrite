@@ -130,7 +130,8 @@ var selectKnownUsersSQL = "" +
 // is expensive. The presence of a single row from this query suggests we're still in the
 // room, no rows returned suggests we aren't.
 const selectLocalServerInRoomSQL = "" +
-	"SELECT TOP 1 room_nid FROM roomserver_membership WHERE target_local = true AND membership_nid = 3 AND room_nid = $1"
+	"SELECT room_nid FROM roomserver_membership WHERE target_local = true AND membership_nid = 3 AND room_nid = $1 " +
+	"FETCH FIRST 1 ROWS ONLY"
 
 type membershipStatements struct {
 	insertMembershipStmt                            *sql.Stmt

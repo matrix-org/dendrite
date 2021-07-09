@@ -106,7 +106,7 @@ var selectKnownUsersSQL = "" +
 // is expensive. The presence of a single row from this query suggests we're still in the
 // room, no rows returned suggests we aren't.
 const selectLocalServerInRoomSQL = "" +
-	"SELECT room_nid FROM roomserver_membership WHERE target_local = true AND membership_nid = 3 AND room_nid = $1 LIMIT 1"
+	"SELECT room_nid FROM roomserver_membership WHERE target_local = 1 AND membership_nid = 3 AND room_nid = $1 LIMIT 1"
 
 type membershipStatements struct {
 	db                                              *sql.DB
