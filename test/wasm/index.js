@@ -31,6 +31,10 @@ const childProcess = require('child_process');
     // Since this is testing only, we use the default in-memory FS
     global._go_sqlite.FS.mkdir("/idb");
 
+    // WebSocket
+    const WebSocket = require('isomorphic-ws');
+    global.WebSocket = WebSocket;
+
     // Load the generic Go Wasm exec helper inline to trigger built-in run call
     // This approach avoids copying `wasm_exec.js` into the repo, which is nice
     // to aim for since it can differ between Go versions.
