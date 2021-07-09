@@ -36,6 +36,7 @@ import (
 type Queryer struct {
 	DB         storage.Database
 	Cache      caching.RoomServerCaches
+	ServerName gomatrixserverlib.ServerName
 	ServerACLs *acls.ServerACLs
 }
 
@@ -327,6 +328,16 @@ func (r *Queryer) QueryServerJoinedToRoom(
 		return nil
 	}
 	response.RoomExists = true
+
+	if request.ServerName == r.ServerName || request.ServerName == "" {
+		var joined bool
+		joined, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+		}
+		response.IsInRoom = joined
+		return nil
+	}
 
 	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {
