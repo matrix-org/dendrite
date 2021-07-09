@@ -130,8 +130,7 @@ var selectKnownUsersSQL = "" +
 // is expensive. The presence of a single row from this query suggests we're still in the
 // room, no rows returned suggests we aren't.
 const selectLocalServerInRoomSQL = "" +
-	"SELECT room_nid FROM roomserver_membership WHERE target_local = true AND membership_nid = 3 AND room_nid = $1 " +
-	"FETCH FIRST 1 ROWS ONLY"
+	"SELECT room_nid FROM roomserver_membership WHERE target_local = true AND membership_nid = $1 AND room_nid = $2 LIMIT 1"
 
 type membershipStatements struct {
 	insertMembershipStmt                            *sql.Stmt
@@ -337,17 +336,14 @@ func (s *membershipStatements) UpdateForgetMembership(
 }
 
 func (s *membershipStatements) SelectLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error) {
-	rows, err := s.selectLocalServerInRoomStmt.QueryContext(ctx, roomNID)
+	var nid types.RoomNID
+	err := s.selectLocalServerInRoomStmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID).Scan(&nid)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
 		}
 		return false, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectLocalServerInRoom: rows.close() failed")
-	found := false
-	for rows.Next() {
-		found = true
-	}
-	return found, rows.Err()
+	found := nid > 0
+	return found, nil
 }
