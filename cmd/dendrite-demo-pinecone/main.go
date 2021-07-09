@@ -212,7 +212,11 @@ func main() {
 		base.PublicMediaAPIMux,
 	)
 
-	wsUpgrader := websocket.Upgrader{}
+	wsUpgrader := websocket.Upgrader{
+		CheckOrigin: func(_ *http.Request) bool {
+			return true
+		},
+	}
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
