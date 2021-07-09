@@ -64,7 +64,7 @@ const insertStateDataSQL = "" +
 
 const bulkSelectStateBlockEntriesSQL = "" +
 	"SELECT state_block_nid, event_nids" +
-	" FROM roomserver_state_block WHERE state_block_nid = ANY($1)"
+	" FROM roomserver_state_block WHERE state_block_nid = ANY($1) ORDER BY state_block_nid ASC"
 
 type stateBlockStatements struct {
 	insertStateDataStmt             *sql.Stmt
