@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"strings"
 	"time"
 
 	js "github.com/S7evinK/saramajetstream"
@@ -66,7 +67,7 @@ func setupNaffka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 
 func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 	logrus.WithField("servers", cfg.Addresses).Debug("connecting to nats")
-	nc, err := nats.Connect(cfg.Addresses[0])
+	nc, err := nats.Connect(strings.Join(cfg.Addresses, ","))
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to nats")
 		return nil, nil
@@ -91,9 +92,9 @@ func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 
 			// Typing events can be removed from the stream, as they are only relevant for a short time
 			if topic == config.TopicOutputTypingEvent {
-				maxLifeTime = time.Second * 30
+				maxLifeTime = time.Second * 60
 			}
-			_, _ = s.AddStream(&nats.StreamConfig{
+			_, err = s.AddStream(&nats.StreamConfig{
 				Name:       sn,
 				Subjects:   []string{topic},
 				MaxBytes:   int64(*cfg.MaxMessageBytes),
@@ -101,10 +102,13 @@ func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 				MaxAge:     maxLifeTime,
 				Duplicates: maxLifeTime / 2,
 			})
+			if err != nil {
+				logrus.WithError(err).WithField("stream", sn).Fatal("unable to add nats stream")
+			}
 		}
 	}
 
-	consumer := js.NewJetStreamConsumer(s, cfg.TopicPrefix)
-	producer := js.NewJetStreamProducer(s, cfg.TopicPrefix)
+	consumer := js.NewJetStreamConsumer(nc, s, cfg.TopicPrefix)
+	producer := js.NewJetStreamProducer(nc, s, cfg.TopicPrefix)
 	return consumer, producer
 }

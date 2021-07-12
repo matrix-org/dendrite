@@ -4,7 +4,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
-	github.com/S7evinK/saramajetstream v0.0.0-20210604172822-4f305c9f1537
+	github.com/S7evinK/saramajetstream v0.0.0-20210709060522-786e3e6abe86
 	github.com/Shopify/sarama v1.29.0
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.2 // indirect
