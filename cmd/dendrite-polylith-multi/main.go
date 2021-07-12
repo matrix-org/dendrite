@@ -23,6 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type entrypoint func(base *setup.BaseDendrite, cfg *config.Dendrite)

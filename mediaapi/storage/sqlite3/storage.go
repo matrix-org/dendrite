@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // Database is used to store metadata about a repository of media files.
