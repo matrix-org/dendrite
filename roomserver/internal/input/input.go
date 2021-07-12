@@ -22,11 +22,13 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 )
@@ -37,8 +39,7 @@ type Inputer struct {
 	ServerName           gomatrixserverlib.ServerName
 	ACLs                 *acls.ServerACLs
 	OutputRoomEventTopic string
-
-	workers sync.Map // room ID -> *inputWorker
+	workers              sync.Map // room ID -> *inputWorker
 }
 
 type inputTask struct {
@@ -51,7 +52,7 @@ type inputTask struct {
 type inputWorker struct {
 	r       *Inputer
 	running atomic.Bool
-	input   chan *inputTask
+	input   *fifoQueue
 }
 
 // Guarded by a CAS on w.running
@@ -59,11 +60,20 @@ func (w *inputWorker) start() {
 	defer w.running.Store(false)
 	for {
 		select {
-		case task := <-w.input:
+		case <-w.input.wait():
+			task, ok := w.input.pop()
+			if !ok {
+				continue
+			}
+			roomserverInputBackpressure.With(prometheus.Labels{
+				"room_id": task.event.Event.RoomID(),
+			}).Dec()
 			hooks.Run(hooks.KindNewEventReceived, task.event.Event)
 			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
 			if task.err == nil {
 				hooks.Run(hooks.KindNewEventPersisted, task.event.Event)
+			} else {
+				sentry.CaptureException(task.err)
 			}
 			task.wg.Done()
 		case <-time.After(time.Second * 5):
@@ -114,6 +124,20 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 	return errs
 }
 
+func init() {
+	prometheus.MustRegister(roomserverInputBackpressure)
+}
+
+var roomserverInputBackpressure = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "roomserver",
+		Name:      "input_backpressure",
+		Help:      "How many events are queued for input for a given room",
+	},
+	[]string{"room_id"},
+)
+
 // InputRoomEvents implements api.RoomserverInternalAPI
 func (r *Inputer) InputRoomEvents(
 	_ context.Context,
@@ -140,7 +164,7 @@ func (r *Inputer) InputRoomEvents(
 		// room - the channel will be quite small as it's just pointer types.
 		w, _ := r.workers.LoadOrStore(roomID, &inputWorker{
 			r:     r,
-			input: make(chan *inputTask, 32),
+			input: newFIFOQueue(),
 		})
 		worker := w.(*inputWorker)
 
@@ -157,7 +181,10 @@ func (r *Inputer) InputRoomEvents(
 		if worker.running.CAS(false, true) {
 			go worker.start()
 		}
-		worker.input <- tasks[i]
+		worker.input.push(tasks[i])
+		roomserverInputBackpressure.With(prometheus.Labels{
+			"room_id": roomID,
+		}).Inc()
 	}
 
 	// Wait for all of the workers to return results about our tasks.

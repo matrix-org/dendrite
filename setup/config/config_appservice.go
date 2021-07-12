@@ -33,13 +33,17 @@ type AppServiceAPI struct {
 
 	Database DatabaseOptions `yaml:"database"`
 
+	// DisableTLSValidation disables the validation of X.509 TLS certs
+	// on appservice endpoints. This is not recommended in production!
+	DisableTLSValidation bool `yaml:"disable_tls_validation"`
+
 	ConfigFiles []string `yaml:"config_files"`
 }
 
 func (c *AppServiceAPI) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7777"
 	c.InternalAPI.Connect = "http://localhost:7777"
-	c.Database.Defaults()
+	c.Database.Defaults(5)
 	c.Database.ConnectionString = "file:appservice.db"
 }
 
@@ -97,7 +101,7 @@ func (a *ApplicationService) IsInterestedInRoomID(
 ) bool {
 	if namespaceSlice, ok := a.NamespaceMap["rooms"]; ok {
 		for _, namespace := range namespaceSlice {
-			if namespace.RegexpObject.MatchString(roomID) {
+			if namespace.RegexpObject != nil && namespace.RegexpObject.MatchString(roomID) {
 				return true
 			}
 		}
@@ -193,7 +197,7 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 // setupRegexps will create regex objects for exclusive and non-exclusive
 // usernames, aliases and rooms of all application services, so that other
 // methods can quickly check if a particular string matches any of them.
-func setupRegexps(_ *AppServiceAPI, derived *Derived) (err error) {
+func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 	// Combine all exclusive namespaces for later string checking
 	var exclusiveUsernameStrings, exclusiveAliasStrings []string
 
@@ -201,12 +205,26 @@ func setupRegexps(_ *AppServiceAPI, derived *Derived) (err error) {
 	// its contents to the overall exlusive regex string. Room regex
 	// not necessary as we aren't denying exclusive room ID creation
 	for _, appservice := range derived.ApplicationServices {
+		// The sender_localpart can be considered an exclusive regex for a single user, so let's do that
+		// to simplify the code
+		var senderUserIDSlice = []string{fmt.Sprintf("@%s:%s", appservice.SenderLocalpart, asAPI.Matrix.ServerName)}
+		usersSlice, found := appservice.NamespaceMap["users"]
+		if !found {
+			usersSlice = []ApplicationServiceNamespace{}
+			appservice.NamespaceMap["users"] = usersSlice
+		}
+		appendExclusiveNamespaceRegexs(&senderUserIDSlice, usersSlice)
+
 		for key, namespaceSlice := range appservice.NamespaceMap {
 			switch key {
 			case "users":
 				appendExclusiveNamespaceRegexs(&exclusiveUsernameStrings, namespaceSlice)
 			case "aliases":
 				appendExclusiveNamespaceRegexs(&exclusiveAliasStrings, namespaceSlice)
+			}
+
+			if err = compileNamespaceRegexes(namespaceSlice); err != nil {
+				return fmt.Errorf("invalid regex in appservice %q, namespace %q: %w", appservice.ID, key, err)
 			}
 		}
 	}
@@ -244,16 +262,29 @@ func setupRegexps(_ *AppServiceAPI, derived *Derived) (err error) {
 func appendExclusiveNamespaceRegexs(
 	exclusiveStrings *[]string, namespaces []ApplicationServiceNamespace,
 ) {
-	for index, namespace := range namespaces {
+	for _, namespace := range namespaces {
 		if namespace.Exclusive {
 			// We append parenthesis to later separate each regex when we compile
 			// i.e. "app1.*", "app2.*" -> "(app1.*)|(app2.*)"
 			*exclusiveStrings = append(*exclusiveStrings, "("+namespace.Regex+")")
 		}
-
-		// Compile this regex into a Regexp object for later use
-		namespaces[index].RegexpObject, _ = regexp.Compile(namespace.Regex)
 	}
+}
+
+// compileNamespaceRegexes turns strings into regex objects and complains
+// if some of there are bad
+func compileNamespaceRegexes(namespaces []ApplicationServiceNamespace) (err error) {
+	for index, namespace := range namespaces {
+		// Compile this regex into a Regexp object for later use
+		r, err := regexp.Compile(namespace.Regex)
+		if err != nil {
+			return fmt.Errorf("regex at namespace %d: %w", index, err)
+		}
+
+		namespaces[index].RegexpObject = r
+	}
+
+	return nil
 }
 
 // checkErrors checks for any configuration errors amongst the loaded

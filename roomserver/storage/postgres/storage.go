@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -39,20 +40,25 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	var db *sql.DB
 	var err error
 	if db, err = sqlutil.Open(dbProperties); err != nil {
+		return nil, fmt.Errorf("sqlutil.Open: %w", err)
+	}
+
+	// Create the tables.
+	if err := d.create(db); err != nil {
 		return nil, err
 	}
 
-	// Create tables before executing migrations so we don't fail if the table is missing,
-	// and THEN prepare statements so we don't fail due to referencing new columns
-	ms := membershipStatements{}
-	if err := ms.execSchema(db); err != nil {
-		return nil, err
-	}
+	// Then execute the migrations. By this point the tables are created with the latest
+	// schemas.
 	m := sqlutil.NewMigrations()
 	deltas.LoadAddForgottenColumn(m)
+	deltas.LoadStateBlocksRefactor(m)
 	if err := m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
+
+	// Then prepare the statements. Now that the migrations have run, any columns referred
+	// to in the database code should now exist.
 	if err := d.prepare(db, cache); err != nil {
 		return nil, err
 	}
@@ -60,61 +66,107 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	return &d, nil
 }
 
-// nolint: gocyclo
-func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) (err error) {
-	eventStateKeys, err := NewPostgresEventStateKeysTable(db)
+func (d *Database) create(db *sql.DB) error {
+	if err := createEventStateKeysTable(db); err != nil {
+		return err
+	}
+	if err := createEventTypesTable(db); err != nil {
+		return err
+	}
+	if err := createEventJSONTable(db); err != nil {
+		return err
+	}
+	if err := createEventsTable(db); err != nil {
+		return err
+	}
+	if err := createRoomsTable(db); err != nil {
+		return err
+	}
+	if err := createTransactionsTable(db); err != nil {
+		return err
+	}
+	if err := createStateBlockTable(db); err != nil {
+		return err
+	}
+	if err := createStateSnapshotTable(db); err != nil {
+		return err
+	}
+	if err := createPrevEventsTable(db); err != nil {
+		return err
+	}
+	if err := createRoomAliasesTable(db); err != nil {
+		return err
+	}
+	if err := createInvitesTable(db); err != nil {
+		return err
+	}
+	if err := createMembershipTable(db); err != nil {
+		return err
+	}
+	if err := createPublishedTable(db); err != nil {
+		return err
+	}
+	if err := createRedactionsTable(db); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
+	eventStateKeys, err := prepareEventStateKeysTable(db)
 	if err != nil {
 		return err
 	}
-	eventTypes, err := NewPostgresEventTypesTable(db)
+	eventTypes, err := prepareEventTypesTable(db)
 	if err != nil {
 		return err
 	}
-	eventJSON, err := NewPostgresEventJSONTable(db)
+	eventJSON, err := prepareEventJSONTable(db)
 	if err != nil {
 		return err
 	}
-	events, err := NewPostgresEventsTable(db)
+	events, err := prepareEventsTable(db)
 	if err != nil {
 		return err
 	}
-	rooms, err := NewPostgresRoomsTable(db)
+	rooms, err := prepareRoomsTable(db)
 	if err != nil {
 		return err
 	}
-	transactions, err := NewPostgresTransactionsTable(db)
+	transactions, err := prepareTransactionsTable(db)
 	if err != nil {
 		return err
 	}
-	stateBlock, err := NewPostgresStateBlockTable(db)
+	stateBlock, err := prepareStateBlockTable(db)
 	if err != nil {
 		return err
 	}
-	stateSnapshot, err := NewPostgresStateSnapshotTable(db)
+	stateSnapshot, err := prepareStateSnapshotTable(db)
 	if err != nil {
 		return err
 	}
-	roomAliases, err := NewPostgresRoomAliasesTable(db)
+	prevEvents, err := preparePrevEventsTable(db)
 	if err != nil {
 		return err
 	}
-	prevEvents, err := NewPostgresPreviousEventsTable(db)
+	roomAliases, err := prepareRoomAliasesTable(db)
 	if err != nil {
 		return err
 	}
-	invites, err := NewPostgresInvitesTable(db)
+	invites, err := prepareInvitesTable(db)
 	if err != nil {
 		return err
 	}
-	membership, err := NewPostgresMembershipTable(db)
+	membership, err := prepareMembershipTable(db)
 	if err != nil {
 		return err
 	}
-	published, err := NewPostgresPublishedTable(db)
+	published, err := preparePublishedTable(db)
 	if err != nil {
 		return err
 	}
-	redactions, err := NewPostgresRedactionsTable(db)
+	redactions, err := prepareRedactionsTable(db)
 	if err != nil {
 		return err
 	}

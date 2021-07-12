@@ -21,6 +21,7 @@ import (
 	"errors"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -37,11 +38,14 @@ type Database struct {
 	writer sqlutil.Writer
 
 	sqlutil.PartitionOffsetStatements
-	accounts     accountsStatements
-	profiles     profilesStatements
-	accountDatas accountDataStatements
-	threepids    threepidStatements
-	serverName   gomatrixserverlib.ServerName
+	accounts              accountsStatements
+	profiles              profilesStatements
+	accountDatas          accountDataStatements
+	threepids             threepidStatements
+	openIDTokens          tokenStatements
+	serverName            gomatrixserverlib.ServerName
+	bcryptCost            int
+	openIDTokenLifetimeMS int64
 
 	accountsMu     sync.Mutex
 	profilesMu     sync.Mutex
@@ -50,15 +54,17 @@ type Database struct {
 }
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64) (*Database, error) {
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
 	}
 	d := &Database{
-		serverName: serverName,
-		db:         db,
-		writer:     sqlutil.NewExclusiveWriter(),
+		serverName:            serverName,
+		db:                    db,
+		writer:                sqlutil.NewExclusiveWriter(),
+		bcryptCost:            bcryptCost,
+		openIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
@@ -86,6 +92,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, err
 	}
 	if err = d.threepids.prepare(db); err != nil {
+		return nil, err
+	}
+	if err = d.openIDTokens.prepare(db, serverName); err != nil {
 		return nil, err
 	}
 
@@ -143,7 +152,7 @@ func (d *Database) SetDisplayName(
 func (d *Database) SetPassword(
 	ctx context.Context, localpart, plaintextPassword string,
 ) error {
-	hash, err := hashPassword(plaintextPassword)
+	hash, err := d.hashPassword(plaintextPassword)
 	if err != nil {
 		return err
 	}
@@ -204,22 +213,22 @@ func (d *Database) createAccount(
 	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
 ) (*api.Account, error) {
 	var err error
+	var account *api.Account
 	// Generate a password hash if this is not a password-less user
 	hash := ""
 	if plaintextPassword != "" {
-		hash, err = hashPassword(plaintextPassword)
+		hash, err = d.hashPassword(plaintextPassword)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if err := d.profiles.insertProfile(ctx, txn, localpart); err != nil {
-		if isConstraintError(err) {
-			return nil, sqlutil.ErrUserExists
-		}
+	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID); err != nil {
+		return nil, sqlutil.ErrUserExists
+	}
+	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		return nil, err
 	}
-
-	if err := d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
+	if err = d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
 		"global": {
 			"content": [],
 			"override": [],
@@ -230,7 +239,7 @@ func (d *Database) createAccount(
 	}`)); err != nil {
 		return nil, err
 	}
-	return d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID)
+	return account, nil
 }
 
 // SaveAccountData saves new account data for a given user and a given room.
@@ -278,8 +287,8 @@ func (d *Database) GetNewNumericLocalpart(
 	return d.accounts.selectNewNumericLocalpart(ctx, nil)
 }
 
-func hashPassword(plaintext string) (hash string, err error) {
-	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcrypt.DefaultCost)
+func (d *Database) hashPassword(plaintext string) (hash string, err error) {
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), d.bcryptCost)
 	return string(hashBytes), err
 }
 
@@ -376,4 +385,24 @@ func (d *Database) SearchProfiles(ctx context.Context, searchString string, limi
 // DeactivateAccount deactivates the user's account, removing all ability for the user to login again.
 func (d *Database) DeactivateAccount(ctx context.Context, localpart string) (err error) {
 	return d.accounts.deactivateAccount(ctx, localpart)
+}
+
+// CreateOpenIDToken persists a new token that was issued for OpenID Connect
+func (d *Database) CreateOpenIDToken(
+	ctx context.Context,
+	token, localpart string,
+) (int64, error) {
+	expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + d.openIDTokenLifetimeMS
+	err := d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		return d.openIDTokens.insertToken(ctx, txn, token, localpart, expiresAtMS)
+	})
+	return expiresAtMS, err
+}
+
+// GetOpenIDTokenAttributes gets the attributes of issued an OIDC auth token
+func (d *Database) GetOpenIDTokenAttributes(
+	ctx context.Context,
+	token string,
+) (*api.OpenIDTokenAttributes, error) {
+	return d.openIDTokens.selectOpenIDTokenAtrributes(ctx, token)
 }

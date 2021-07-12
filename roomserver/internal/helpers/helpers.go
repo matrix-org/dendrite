@@ -50,6 +50,10 @@ func UpdateToInviteMembership(
 	return updates, nil
 }
 
+// IsServerCurrentlyInRoom checks if a server is in a given room, based on the room
+// memberships. If the servername is not supplied then the local server will be
+// checked instead using a faster code path.
+// TODO: This should probably be replaced by an API call.
 func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverName gomatrixserverlib.ServerName, roomID string) (bool, error) {
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
@@ -57,6 +61,10 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 	}
 	if info == nil {
 		return false, fmt.Errorf("unknown room %s", roomID)
+	}
+
+	if serverName == "" {
+		return db.GetLocalServerInRoom(ctx, info.RoomNID)
 	}
 
 	eventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
@@ -270,7 +278,6 @@ func CheckServerAllowedToSeeEvent(
 }
 
 // TODO: Remove this when we have tests to assert correctness of this function
-// nolint:gocyclo
 func ScanEventTree(
 	ctx context.Context, db storage.Database, info types.RoomInfo, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,

@@ -17,10 +17,7 @@ package routing
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha1"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -159,15 +156,6 @@ type userInteractiveResponse struct {
 	Completed []authtypes.LoginType  `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
 	Session   string                 `json:"session"`
-}
-
-// legacyRegisterRequest represents the submitted registration request for v1 API.
-type legacyRegisterRequest struct {
-	Password string                      `json:"password"`
-	Username string                      `json:"user"`
-	Admin    bool                        `json:"admin"`
-	Type     authtypes.LoginType         `json:"type"`
-	Mac      gomatrixserverlib.HexString `json:"mac"`
 }
 
 // newUserInteractiveResponse will return a struct to be sent back to the client
@@ -496,11 +484,32 @@ func Register(
 		r.Username = strconv.FormatInt(id, 10)
 	}
 
+	// Is this an appservice registration? It will be if the access
+	// token is supplied
+	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
+
 	// Squash username to all lowercase letters
 	r.Username = strings.ToLower(r.Username)
-
-	if resErr = validateUsername(r.Username); resErr != nil {
-		return *resErr
+	switch {
+	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
+		// Spec-compliant case (the access_token is specified and the login type
+		// is correctly set, so it's an appservice registration)
+		if resErr = validateApplicationServiceUsername(r.Username); resErr != nil {
+			return *resErr
+		}
+	case accessTokenErr == nil:
+		// Non-spec-compliant case (the access_token is specified but the login
+		// type is not known or specified)
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
+		}
+	default:
+		// Spec-compliant case (neither the access_token nor the login type are
+		// specified, so it's a normal user registration)
+		if resErr = validateUsername(r.Username); resErr != nil {
+			return *resErr
+		}
 	}
 	if resErr = validatePassword(r.Password); resErr != nil {
 		return *resErr
@@ -513,7 +522,7 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI)
+	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
 }
 
 func handleGuestRegistration(
@@ -579,8 +588,9 @@ func handleRegistrationFlow(
 	sessionID string,
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
+	accessToken string,
+	accessTokenErr error,
 ) util.JSONResponse {
-	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
 	// TODO: Guest account upgrading
 
@@ -588,19 +598,22 @@ func handleRegistrationFlow(
 	// TODO: Handle mapping registrationRequest parameters into session parameters
 
 	// TODO: email / msisdn auth types.
-	accessToken, accessTokenErr := auth.ExtractAccessToken(req)
 
 	// Appservices are special and are not affected by disabled
-	// registration or user exclusivity.
-	if r.Auth.Type == authtypes.LoginTypeApplicationService ||
-		(r.Auth.Type == "" && accessTokenErr == nil) {
+	// registration or user exclusivity. We'll go onto the appservice
+	// registration flow if a valid access token was provided or if
+	// the login type specifically requests it.
+	if r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil {
 		return handleApplicationServiceRegistration(
 			accessToken, accessTokenErr, req, r, cfg, userAPI,
 		)
 	}
 
 	if cfg.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
-		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Registration is disabled"),
+		}
 	}
 
 	// Make sure normal user isn't registering under an exclusive application
@@ -625,20 +638,6 @@ func handleRegistrationFlow(
 
 		// Add Recaptcha to the list of completed registration stages
 		AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
-
-	case authtypes.LoginTypeSharedSecret:
-		// Check shared secret against config
-		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Auth.Mac)
-
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
-			return jsonerror.InternalServerError()
-		} else if !valid {
-			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
-		}
-
-		// Add SharedSecret to the list of completed registration stages
-		AddCompletedSessionStage(sessionID, authtypes.LoginTypeSharedSecret)
 
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
@@ -732,85 +731,6 @@ func checkAndCompleteFlow(
 		JSON: newUserInteractiveResponse(sessionID,
 			cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 	}
-}
-
-// LegacyRegister process register requests from the legacy v1 API
-func LegacyRegister(
-	req *http.Request,
-	userAPI userapi.UserInternalAPI,
-	cfg *config.ClientAPI,
-) util.JSONResponse {
-	var r legacyRegisterRequest
-	resErr := parseAndValidateLegacyLogin(req, &r)
-	if resErr != nil {
-		return *resErr
-	}
-
-	logger := util.GetLogger(req.Context())
-	logger.WithFields(log.Fields{
-		"username":  r.Username,
-		"auth.type": r.Type,
-	}).Info("Processing registration request")
-
-	if cfg.RegistrationDisabled && r.Type != authtypes.LoginTypeSharedSecret {
-		return util.MessageResponse(http.StatusForbidden, "Registration has been disabled")
-	}
-
-	switch r.Type {
-	case authtypes.LoginTypeSharedSecret:
-		if cfg.RegistrationSharedSecret == "" {
-			return util.MessageResponse(http.StatusBadRequest, "Shared secret registration is disabled")
-		}
-
-		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Mac)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
-			return jsonerror.InternalServerError()
-		}
-
-		if !valid {
-			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
-		}
-
-		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), false, nil, nil)
-	case authtypes.LoginTypeDummy:
-		// there is nothing to do
-		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), false, nil, nil)
-	default:
-		return util.JSONResponse{
-			Code: http.StatusNotImplemented,
-			JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
-		}
-	}
-}
-
-// parseAndValidateLegacyLogin parses the request into r and checks that the
-// request is valid (e.g. valid user names, etc)
-func parseAndValidateLegacyLogin(req *http.Request, r *legacyRegisterRequest) *util.JSONResponse {
-	resErr := httputil.UnmarshalJSONRequest(req, &r)
-	if resErr != nil {
-		return resErr
-	}
-
-	// Squash username to all lowercase letters
-	r.Username = strings.ToLower(r.Username)
-
-	if resErr = validateUsername(r.Username); resErr != nil {
-		return resErr
-	}
-	if resErr = validatePassword(r.Password); resErr != nil {
-		return resErr
-	}
-
-	// All registration requests must specify what auth they are using to perform this request
-	if r.Type == "" {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("invalid type"),
-		}
-	}
-
-	return nil
 }
 
 // completeRegistration runs some rudimentary checks against the submitted
@@ -909,49 +829,6 @@ func completeRegistration(
 			DeviceID:    devRes.Device.ID,
 		},
 	}
-}
-
-// Used for shared secret registration.
-// Checks if the username, password and isAdmin flag matches the given mac.
-func isValidMacLogin(
-	cfg *config.ClientAPI,
-	username, password string,
-	isAdmin bool,
-	givenMac []byte,
-) (bool, error) {
-	sharedSecret := cfg.RegistrationSharedSecret
-
-	// Check that shared secret registration isn't disabled.
-	if cfg.RegistrationSharedSecret == "" {
-		return false, errors.New("Shared secret registration is disabled")
-	}
-
-	// Double check that username/password don't contain the HMAC delimiters. We should have
-	// already checked this.
-	if strings.Contains(username, "\x00") {
-		return false, errors.New("Username contains invalid character")
-	}
-	if strings.Contains(password, "\x00") {
-		return false, errors.New("Password contains invalid character")
-	}
-	if sharedSecret == "" {
-		return false, errors.New("Shared secret registration is disabled")
-	}
-
-	adminString := "notadmin"
-	if isAdmin {
-		adminString = "admin"
-	}
-	joined := strings.Join([]string{username, password, adminString}, "\x00")
-
-	mac := hmac.New(sha1.New, []byte(sharedSecret))
-	_, err := mac.Write([]byte(joined))
-	if err != nil {
-		return false, err
-	}
-	expectedMAC := mac.Sum(nil)
-
-	return hmac.Equal(givenMac, expectedMAC), nil
 }
 
 // checkFlows checks a single completed flow against another required one. If
@@ -1056,4 +933,35 @@ func RegisterAvailable(
 			Available: true,
 		},
 	}
+}
+
+func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
+	ssrr, err := NewSharedSecretRegistrationRequest(req.Body)
+	if err != nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("malformed json: %s", err)),
+		}
+	}
+	valid, err := sr.IsValidMacLogin(ssrr.Nonce, ssrr.User, ssrr.Password, ssrr.Admin, ssrr.MacBytes)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	if !valid {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("bad mac"),
+		}
+	}
+	// downcase capitals
+	ssrr.User = strings.ToLower(ssrr.User)
+
+	if resErr := validateUsername(ssrr.User); resErr != nil {
+		return *resErr
+	}
+	if resErr := validatePassword(ssrr.Password); resErr != nil {
+		return *resErr
+	}
+	deviceID := "shared_secret_registration"
+	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID)
 }

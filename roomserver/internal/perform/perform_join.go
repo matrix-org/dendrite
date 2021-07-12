@@ -21,11 +21,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
+	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -36,9 +39,11 @@ type Joiner struct {
 	ServerName gomatrixserverlib.ServerName
 	Cfg        *config.RoomServer
 	FSAPI      fsAPI.FederationSenderInternalAPI
+	RSAPI      rsAPI.RoomserverInternalAPI
 	DB         storage.Database
 
 	Inputer *input.Inputer
+	Queryer *query.Queryer
 }
 
 // PerformJoin handles joining matrix rooms, including over federation by talking to the federationsender.
@@ -49,6 +54,7 @@ func (r *Joiner) PerformJoin(
 ) {
 	roomID, joinedVia, err := r.performJoin(ctx, req)
 	if err != nil {
+		sentry.CaptureException(err)
 		perr, ok := err.(*api.PerformError)
 		if ok {
 			res.Error = perr
@@ -121,11 +127,17 @@ func (r *Joiner) performJoinRoomByAlias(
 		roomID = dirRes.RoomID
 		req.ServerNames = append(req.ServerNames, dirRes.ServerNames...)
 	} else {
+		var getRoomReq = rsAPI.GetRoomIDForAliasRequest{
+			Alias:              req.RoomIDOrAlias,
+			IncludeAppservices: true,
+		}
+		var getRoomRes = rsAPI.GetRoomIDForAliasResponse{}
 		// Otherwise, look up if we know this room alias locally.
-		roomID, err = r.DB.GetRoomIDForAlias(ctx, req.RoomIDOrAlias)
+		err = r.RSAPI.GetRoomIDForAlias(ctx, &getRoomReq, &getRoomRes)
 		if err != nil {
 			return "", "", fmt.Errorf("Lookup room alias %q failed: %w", req.RoomIDOrAlias, err)
 		}
+		roomID = getRoomRes.RoomID
 	}
 
 	// If the room ID is empty then we failed to look up the alias.
@@ -139,11 +151,20 @@ func (r *Joiner) performJoinRoomByAlias(
 }
 
 // TODO: Break this function up a bit
-// nolint:gocyclo
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *api.PerformJoinRequest,
 ) (string, gomatrixserverlib.ServerName, error) {
+	// The original client request ?server_name=... may include this HS so filter that out so we
+	// don't attempt to make_join with ourselves
+	for i := 0; i < len(req.ServerNames); i++ {
+		if req.ServerNames[i] == r.Cfg.Matrix.ServerName {
+			// delete this entry
+			req.ServerNames = append(req.ServerNames[:i], req.ServerNames[i+1:]...)
+			i--
+		}
+	}
+
 	// Get the domain part of the room ID.
 	_, domain, err := gomatrixserverlib.SplitID('!', req.RoomIDOrAlias)
 	if err != nil {
@@ -186,7 +207,14 @@ func (r *Joiner) performJoinRoomByID(
 
 	// Force a federated join if we aren't in the room and we've been
 	// given some server names to try joining by.
-	serverInRoom, _ := helpers.IsServerCurrentlyInRoom(ctx, r.DB, r.ServerName, req.RoomIDOrAlias)
+	inRoomReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID: req.RoomIDOrAlias,
+	}
+	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
+	if err = r.Queryer.QueryServerJoinedToRoom(ctx, inRoomReq, inRoomRes); err != nil {
+		return "", "", fmt.Errorf("r.Queryer.QueryServerJoinedToRoom: %w", err)
+	}
+	serverInRoom := inRoomRes.IsInRoom
 	forceFederatedJoin := len(req.ServerNames) > 0 && !serverInRoom
 
 	// Force a federated join if we're dealing with a pending invite

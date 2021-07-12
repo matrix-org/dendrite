@@ -9,6 +9,7 @@ import (
 	"time"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -189,7 +190,9 @@ func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 	request *api.QueryServerJoinedToRoomRequest,
 	response *api.QueryServerJoinedToRoomResponse,
 ) error {
-	return fmt.Errorf("not implemented")
+	response.RoomExists = true
+	response.IsInRoom = true
+	return nil
 }
 
 // Query whether a server is allowed to see an event
@@ -369,7 +372,8 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 		keys:       &test.NopJSONVerifier{},
 		federation: fedClient,
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
-		newEvents:  make(map[string]bool),
+		hadEvents:  make(map[string]bool),
+		roomsMu:    internal.NewMutexByRoom(),
 	}
 	t.PDUs = pdus
 	t.Origin = testOrigin

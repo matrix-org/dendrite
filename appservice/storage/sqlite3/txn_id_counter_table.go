@@ -32,14 +32,18 @@ INSERT OR IGNORE INTO appservice_counters (name, last_id) VALUES('txn_id', 1);
 `
 
 const selectTxnIDSQL = `
-  SELECT last_id FROM appservice_counters WHERE name='txn_id';
-  UPDATE appservice_counters SET last_id=last_id+1 WHERE name='txn_id';
+  SELECT last_id FROM appservice_counters WHERE name='txn_id'
+`
+
+const updateTxnIDSQL = `
+  UPDATE appservice_counters SET last_id=last_id+1 WHERE name='txn_id'
 `
 
 type txnStatements struct {
 	db              *sql.DB
 	writer          sqlutil.Writer
 	selectTxnIDStmt *sql.Stmt
+	updateTxnIDStmt *sql.Stmt
 }
 
 func (s *txnStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
@@ -54,6 +58,10 @@ func (s *txnStatements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
 		return
 	}
 
+	if s.updateTxnIDStmt, err = db.Prepare(updateTxnIDSQL); err != nil {
+		return
+	}
+
 	return
 }
 
@@ -63,6 +71,11 @@ func (s *txnStatements) selectTxnID(
 ) (txnID int, err error) {
 	err = s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
 		err := s.selectTxnIDStmt.QueryRowContext(ctx).Scan(&txnID)
+		if err != nil {
+			return err
+		}
+
+		_, err = s.updateTxnIDStmt.ExecContext(ctx)
 		return err
 	})
 	return

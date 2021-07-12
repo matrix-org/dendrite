@@ -27,12 +27,12 @@ import (
 
 // NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
 // and sets postgres connection parameters
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName)
+		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(dbProperties, serverName)
+		return postgres.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

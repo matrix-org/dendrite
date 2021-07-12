@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Shopify/sarama"
+	"github.com/getsentry/sentry-go"
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -58,6 +59,7 @@ func NewRoomserverAPI(
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
+			ServerName: cfg.Matrix.ServerName,
 			ServerACLs: serverACLs,
 		},
 		Inputer: &input.Inputer{
@@ -89,7 +91,9 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		Cfg:        r.Cfg,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
+		RSAPI:      r,
 		Inputer:    r.Inputer,
+		Queryer:    r.Queryer,
 	}
 	r.Peeker = &perform.Peeker{
 		ServerName: r.Cfg.Matrix.ServerName,
@@ -144,6 +148,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 ) error {
 	outputEvents, err := r.Inviter.PerformInvite(ctx, req, res)
 	if err != nil {
+		sentry.CaptureException(err)
 		return err
 	}
 	if len(outputEvents) == 0 {
@@ -159,6 +164,7 @@ func (r *RoomserverInternalAPI) PerformLeave(
 ) error {
 	outputEvents, err := r.Leaver.PerformLeave(ctx, req, res)
 	if err != nil {
+		sentry.CaptureException(err)
 		return err
 	}
 	if len(outputEvents) == 0 {

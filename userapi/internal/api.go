@@ -161,6 +161,7 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 
 	var uploadRes keyapi.PerformUploadKeysResponse
 	a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+		UserID:     userID,
 		DeviceKeys: deviceKeys,
 	}, &uploadRes)
 	if uploadRes.Error != nil {
@@ -217,6 +218,7 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		// display name has changed: update the device key
 		var uploadRes keyapi.PerformUploadKeysResponse
 		a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+			UserID: req.RequestingUserID,
 			DeviceKeys: []keyapi.DeviceKeys{
 				{
 					DeviceID:    dev.ID,
@@ -379,7 +381,8 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		// Use AS dummy device ID
 		ID: types.AppServiceDeviceID,
 		// AS dummy device has AS's token.
-		AccessToken: token,
+		AccessToken:  token,
+		AppserviceID: appService.ID,
 	}
 
 	localpart, err := userutil.ParseUsernameParam(appServiceUserID, &a.ServerName)
@@ -410,4 +413,32 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	err := a.AccountDB.DeactivateAccount(ctx, req.Localpart)
 	res.AccountDeactivated = err == nil
 	return err
+}
+
+// PerformOpenIDTokenCreation creates a new token that a relying party uses to authenticate a user
+func (a *UserInternalAPI) PerformOpenIDTokenCreation(ctx context.Context, req *api.PerformOpenIDTokenCreationRequest, res *api.PerformOpenIDTokenCreationResponse) error {
+	token := util.RandomString(24)
+
+	exp, err := a.AccountDB.CreateOpenIDToken(ctx, token, req.UserID)
+
+	res.Token = api.OpenIDToken{
+		Token:       token,
+		UserID:      req.UserID,
+		ExpiresAtMS: exp,
+	}
+
+	return err
+}
+
+// QueryOpenIDToken validates that the OpenID token was issued for the user, the replying party uses this for validation
+func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOpenIDTokenRequest, res *api.QueryOpenIDTokenResponse) error {
+	openIDTokenAttrs, err := a.AccountDB.GetOpenIDTokenAttributes(ctx, req.Token)
+	if err != nil {
+		return err
+	}
+
+	res.Sub = openIDTokenAttrs.UserID
+	res.ExpiresAtMS = openIDTokenAttrs.ExpiresAtMS
+
+	return nil
 }

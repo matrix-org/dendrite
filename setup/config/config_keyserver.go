@@ -11,7 +11,7 @@ type KeyServer struct {
 func (c *KeyServer) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7779"
 	c.InternalAPI.Connect = "http://localhost:7779"
-	c.Database.Defaults()
+	c.Database.Defaults(10)
 	c.Database.ConnectionString = "file:keyserver.db"
 }
 

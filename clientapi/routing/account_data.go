@@ -69,7 +69,7 @@ func GetAccountData(
 
 	return util.JSONResponse{
 		Code: http.StatusNotFound,
-		JSON: jsonerror.Forbidden("data not found"),
+		JSON: jsonerror.NotFound("data not found"),
 	}
 }
 

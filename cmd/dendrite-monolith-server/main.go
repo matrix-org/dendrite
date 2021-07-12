@@ -99,7 +99,7 @@ func main() {
 	}
 
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+		base, federation, rsAPI, keyRing, false,
 	)
 	if base.UseHTTPAPIs {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
@@ -149,6 +149,7 @@ func main() {
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
+		base.SynapseAdminMux,
 	)
 
 	if len(base.Cfg.MSCs.MSCs) > 0 {

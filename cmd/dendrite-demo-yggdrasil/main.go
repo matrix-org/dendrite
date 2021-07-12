@@ -52,7 +52,6 @@ var (
 	instancePeer = flag.String("peer", "", "an internet Yggdrasil peer to connect to")
 )
 
-// nolint:gocyclo
 func main() {
 	flag.Parse()
 	internal.SetupPprof()
@@ -115,7 +114,7 @@ func main() {
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+		base, federation, rsAPI, keyRing, true,
 	)
 
 	ygg.SetSessionFunc(func(address string) {
@@ -155,6 +154,7 @@ func main() {
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
+		base.SynapseAdminMux,
 	)
 	if err := mscs.Enable(base, &monolith); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")

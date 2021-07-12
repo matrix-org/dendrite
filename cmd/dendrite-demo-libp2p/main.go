@@ -166,7 +166,7 @@ func main() {
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationsender.NewInternalAPI(
-		&base.Base, federation, rsAPI, keyRing,
+		&base.Base, federation, rsAPI, keyRing, true,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI)
@@ -197,6 +197,7 @@ func main() {
 		base.Base.PublicFederationAPIMux,
 		base.Base.PublicKeyAPIMux,
 		base.Base.PublicMediaAPIMux,
+		base.Base.SynapseAdminMux,
 	)
 	if err := mscs.Enable(&base.Base, &monolith); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")

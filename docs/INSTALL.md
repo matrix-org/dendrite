@@ -25,7 +25,7 @@ use in production environments just yet!
 
 Dendrite requires:
 
-* Go 1.13 or higher
+* Go 1.14 or higher
 * Postgres 9.6 or higher (if using Postgres databases, not needed for SQLite)
 
 If you want to run a polylith deployment, you also need:
@@ -109,7 +109,7 @@ On macOS, omit `sudo -u postgres` from the below commands.
 * If you want to run each Dendrite component with its own database:
 
   ```bash
-  for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_account userapi_device naffka; do
+  for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_accounts userapi_devices naffka; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```

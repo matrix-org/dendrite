@@ -14,14 +14,10 @@
 
 // +build !wasm
 
-package sqlite3
+package main
 
-import (
-	"errors"
+import "fmt"
 
-	"github.com/mattn/go-sqlite3"
-)
-
-func isConstraintError(err error) bool {
-	return errors.Is(err, sqlite3.ErrConstraint)
+func main() {
+	fmt.Println("dendritejs: no-op when not compiling for WebAssembly")
 }

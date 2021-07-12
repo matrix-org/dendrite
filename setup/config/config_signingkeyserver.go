@@ -22,7 +22,7 @@ type SigningKeyServer struct {
 func (c *SigningKeyServer) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7780"
 	c.InternalAPI.Connect = "http://localhost:7780"
-	c.Database.Defaults()
+	c.Database.Defaults(10)
 	c.Database.ConnectionString = "file:signingkeyserver.db"
 }
 

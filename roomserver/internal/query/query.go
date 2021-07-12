@@ -36,6 +36,7 @@ import (
 type Queryer struct {
 	DB         storage.Database
 	Cache      caching.RoomServerCaches
+	ServerName gomatrixserverlib.ServerName
 	ServerACLs *acls.ServerACLs
 }
 
@@ -49,7 +50,6 @@ func (r *Queryer) QueryLatestEventsAndState(
 }
 
 // QueryStateAfterEvents implements api.RoomserverInternalAPI
-// nolint:gocyclo
 func (r *Queryer) QueryStateAfterEvents(
 	ctx context.Context,
 	request *api.QueryStateAfterEventsRequest,
@@ -112,7 +112,7 @@ func (r *Queryer) QueryStateAfterEvents(
 			return fmt.Errorf("getAuthChain: %w", err)
 		}
 
-		stateEvents, err = state.ResolveConflictsAdhoc(info.RoomVersion, stateEvents, authEvents)
+		stateEvents, err = gomatrixserverlib.ResolveConflicts(info.RoomVersion, stateEvents, authEvents)
 		if err != nil {
 			return fmt.Errorf("state.ResolveConflictsAdhoc: %w", err)
 		}
@@ -242,6 +242,30 @@ func (r *Queryer) QueryMembershipsForRoom(
 	if err != nil {
 		return err
 	}
+	if info == nil {
+		return nil
+	}
+
+	// If no sender is specified then we will just return the entire
+	// set of memberships for the room, regardless of whether a specific
+	// user is allowed to see them or not.
+	if request.Sender == "" {
+		var events []types.Event
+		var eventNIDs []types.EventNID
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
+		}
+		events, err = r.DB.Events(ctx, eventNIDs)
+		if err != nil {
+			return fmt.Errorf("r.DB.Events: %w", err)
+		}
+		for _, event := range events {
+			clientEvent := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
+			response.JoinEvents = append(response.JoinEvents, clientEvent)
+		}
+		return nil
+	}
 
 	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.Sender)
 	if err != nil {
@@ -305,6 +329,16 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	}
 	response.RoomExists = true
 
+	if request.ServerName == r.ServerName || request.ServerName == "" {
+		var joined bool
+		joined, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+		}
+		response.IsInRoom = joined
+		return nil
+	}
+
 	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
@@ -354,10 +388,16 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 		return
 	}
 	roomID := events[0].RoomID()
-	isServerInRoom, err := helpers.IsServerCurrentlyInRoom(ctx, r.DB, request.ServerName, roomID)
-	if err != nil {
-		return
+
+	inRoomReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID:     roomID,
+		ServerName: request.ServerName,
 	}
+	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
+	if err = r.QueryServerJoinedToRoom(ctx, inRoomReq, inRoomRes); err != nil {
+		return fmt.Errorf("r.Queryer.QueryServerJoinedToRoom: %w", err)
+	}
+
 	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
 		return err
@@ -366,13 +406,12 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 		return fmt.Errorf("QueryServerAllowedToSeeEvent: no room info for room %s", roomID)
 	}
 	response.AllowedToSeeEvent, err = helpers.CheckServerAllowedToSeeEvent(
-		ctx, r.DB, *info, request.EventID, request.ServerName, isServerInRoom,
+		ctx, r.DB, *info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
 	)
 	return
 }
 
 // QueryMissingEvents implements api.RoomserverInternalAPI
-// nolint:gocyclo
 func (r *Queryer) QueryMissingEvents(
 	ctx context.Context,
 	request *api.QueryMissingEventsRequest,
@@ -469,7 +508,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	if request.ResolveState {
-		if stateEvents, err = state.ResolveConflictsAdhoc(
+		if stateEvents, err = gomatrixserverlib.ResolveConflicts(
 			info.RoomVersion, stateEvents, authEvents,
 		); err != nil {
 			return err

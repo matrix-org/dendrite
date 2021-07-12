@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"
 )
 
@@ -61,12 +62,14 @@ func main() {
 	}
 
 	if *defaultsForCI {
+		cfg.AppServiceAPI.DisableTLSValidation = true
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		cfg.FederationSender.DisableTLSValidation = true
 		cfg.MSCs.MSCs = []string{"msc2836", "msc2946", "msc2444", "msc2753"}
 		cfg.Logging[0].Level = "trace"
 		// don't hit matrix.org when running tests!!!
 		cfg.SigningKeyServer.KeyPerspectives = config.KeyPerspectives{}
+		cfg.UserAPI.BCryptCost = bcrypt.MinCost
 	}
 
 	j, err := yaml.Marshal(cfg)

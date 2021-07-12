@@ -37,6 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
@@ -46,7 +47,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux *mux.Router, cfg *config.ClientAPI,
+	publicAPIMux, synapseAdminRouter *mux.Router, cfg *config.ClientAPI,
 	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -88,8 +89,33 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	if cfg.RegistrationSharedSecret != "" {
+		logrus.Info("Enabling shared secret registration at /_synapse/admin/v1/register")
+		sr := NewSharedSecretRegistration(cfg.RegistrationSharedSecret)
+		synapseAdminRouter.Handle("/admin/v1/register",
+			httputil.MakeExternalAPI("shared_secret_registration", func(req *http.Request) util.JSONResponse {
+				if req.Method == http.MethodGet {
+					return util.JSONResponse{
+						Code: 200,
+						JSON: struct {
+							Nonce string `json:"nonce"`
+						}{
+							Nonce: sr.GenerateNonce(),
+						},
+					}
+				}
+				if req.Method == http.MethodPost {
+					return handleSharedSecretRegistration(userAPI, sr, req)
+				}
+				return util.JSONResponse{
+					Code: http.StatusMethodNotAllowed,
+					JSON: jsonerror.NotFound("unknown method"),
+				}
+			}),
+		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
+	}
+
 	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
-	v1mux := publicAPIMux.PathPrefix("/api/v1").Subrouter()
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
 
 	r0mux.Handle("/createRoom",
@@ -306,13 +332,6 @@ func Setup(
 		return Register(req, userAPI, accountDB, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
-	v1mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		if r := rateLimits.rateLimit(req); r != nil {
-			return *r
-		}
-		return LegacyRegister(req, userAPI, cfg)
-	})).Methods(http.MethodPost, http.MethodOptions)
-
 	r0mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
 		if r := rateLimits.rateLimit(req); r != nil {
 			return *r
@@ -469,7 +488,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	// Stub endpoints required by Riot
+	// Stub endpoints required by Element
 
 	r0mux.Handle("/login",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
@@ -506,7 +525,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	// Riot user settings
+	// Element user settings
 
 	r0mux.Handle("/profile/{userID}",
 		httputil.MakeExternalAPI("profile", func(req *http.Request) util.JSONResponse {
@@ -592,7 +611,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	// Riot logs get flooded unless this is handled
+	// Element logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",
 		httputil.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
 			if r := rateLimits.rateLimit(req); r != nil {
@@ -684,6 +703,19 @@ func Setup(
 			return GetAdminWhois(req, userAPI, device, vars["userID"])
 		}),
 	).Methods(http.MethodGet)
+
+	r0mux.Handle("/user/{userID}/openid/request_token",
+		httputil.MakeAuthAPI("openid_request_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return CreateOpenIDToken(req, userAPI, device, vars["userID"], cfg)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/user_directory/search",
 		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

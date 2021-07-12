@@ -54,12 +54,13 @@ type transactionStatements struct {
 	selectTransactionEventIDStmt *sql.Stmt
 }
 
-func NewPostgresTransactionsTable(db *sql.DB) (tables.Transactions, error) {
-	s := &transactionStatements{}
+func createTransactionsTable(db *sql.DB) error {
 	_, err := db.Exec(transactionsSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+func prepareTransactionsTable(db *sql.DB) (tables.Transactions, error) {
+	s := &transactionStatements{}
 
 	return s, shared.StatementList{
 		{&s.insertTransactionStmt, insertTransactionSQL},

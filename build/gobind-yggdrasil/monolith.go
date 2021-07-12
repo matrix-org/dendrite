@@ -25,6 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
+
+	_ "golang.org/x/mobile/bind"
 )
 
 type DendriteMonolith struct {
@@ -118,7 +120,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing,
+		base, federation, rsAPI, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
@@ -171,6 +173,7 @@ func (m *DendriteMonolith) Start() {
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
+		base.SynapseAdminMux,
 	)
 
 	httpRouter := mux.NewRouter()
