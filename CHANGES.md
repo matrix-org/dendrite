@@ -37,7 +37,7 @@
 * Dendrite will no longer attempt to use `/make_leave` over federation when rejecting a local invite
 * A panic has been fixed in `QueryMembershipsForRoom`
 * A panic on duplicate membership events has been fixed in the federation sender
-* A panic has been fixed in in `IsInterestedInRoomID` (contributed by [S7evinK](https://github.com/S7evinK))
+* A panic has been fixed in in `IsInterestedInRoomID` (contributed by [bodqhrohro](https://github.com/bodqhrohro))
 * A panic in the roomserver has been fixed when handling empty state sets
 * A panic in the federation API has been fixed when handling cached events
 
