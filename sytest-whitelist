@@ -520,3 +520,7 @@ Inviting an AS-hosted user asks the AS server
 Can generate a openid access_token that can be exchanged for information about a user
 Invalid openid access tokens are rejected
 Requests to userinfo without access tokens are rejected
+POST /_synapse/admin/v1/register with shared secret
+POST /_synapse/admin/v1/register admin with shared secret
+POST /_synapse/admin/v1/register with shared secret downcases capitals
+POST /_synapse/admin/v1/register with shared secret disallows symbols
