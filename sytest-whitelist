@@ -527,3 +527,6 @@ POST /_synapse/admin/v1/register with shared secret disallows symbols
 Membership event with an invalid displayname in the send_join response should not cause room join to fail
 Inbound federation rejects incorrectly-signed invite rejections
 Inbound federation can receive invite rejections
+Inbound federation can receive invite and reject when remote replies with a 403
+Inbound federation can receive invite and reject when remote replies with a 500
+Inbound federation can receive invite and reject when remote is unreachable

@@ -2,8 +2,11 @@ package streams
 
 import (
 	"context"
+	"strconv"
+	"time"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type InviteStreamProvider struct {
@@ -56,6 +59,16 @@ func (p *InviteStreamProvider) IncrementalSync(
 	for roomID := range retiredInvites {
 		if _, ok := req.Response.Rooms.Join[roomID]; !ok {
 			lr := types.NewLeaveResponse()
+			lr.Timeline.Events = append(lr.Timeline.Events, gomatrixserverlib.ClientEvent{
+				// fake event ID which muxes in the to position
+				EventID:        "$stub-retired-invite-" + roomID + "-" + strconv.FormatInt(int64(to), 10),
+				OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+				RoomID:         roomID,
+				Sender:         req.Device.UserID,
+				StateKey:       &req.Device.UserID,
+				Type:           "m.room.member",
+				Content:        gomatrixserverlib.RawJSON(`{"membership":"leave"}`),
+			})
 			req.Response.Rooms.Leave[roomID] = *lr
 		}
 	}
