@@ -271,14 +271,24 @@ func SendJoin(
 
 	// Check if the user is already in the room. If they're already in then
 	// there isn't much point in sending another join event into the room.
+	// Also check to see if they are banned: if they are then we reject them.
 	alreadyJoined := false
+	isBanned := false
 	for _, se := range stateAndAuthChainResponse.StateEvents {
 		if !se.StateKeyEquals(*event.StateKey()) {
 			continue
 		}
 		if membership, merr := se.Membership(); merr == nil {
 			alreadyJoined = (membership == gomatrixserverlib.Join)
+			isBanned = (membership == gomatrixserverlib.Ban)
 			break
+		}
+	}
+
+	if isBanned {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("user is banned"),
 		}
 	}
 
