@@ -35,9 +35,9 @@ import (
 )
 
 var keyContentFields = map[string]string{
-	"m.room.join_rules":         "content.join_rule",
-	"m.room.history_visibility": "content.history_visibility",
-	"m.room.member":             "content.membership",
+	"m.room.join_rules":         "join_rule",
+	"m.room.history_visibility": "history_visibility",
+	"m.room.member":             "membership",
 }
 
 type Inputer struct {
