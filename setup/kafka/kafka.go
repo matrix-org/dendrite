@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	js "github.com/S7evinK/saramajetstream"
@@ -9,16 +10,57 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/naffka"
 	naffkaStorage "github.com/matrix-org/naffka/storage"
+	"github.com/nats-io/nats-server/v2/server"
+	natsserver "github.com/nats-io/nats-server/v2/server"
+	natsclient "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
+var natsServer *natsserver.Server
+var natsServerMutex sync.Mutex
+
 func SetupConsumerProducer(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
+	/*
 	if cfg.UseNaffka {
 		return setupNaffka(cfg)
 	}
-	if cfg.UseNATS {
-		return setupNATS(cfg)
+	*/
+	if true || cfg.UseNATS {
+		if true {
+			natsServerMutex.Lock()
+			s := natsServer
+			if s == nil {
+				logrus.Infof("Starting NATS")
+				var err error
+				natsServer, err = natsserver.NewServer(&server.Options{
+					ServerName: "monolith",
+					DontListen: true,
+					JetStream: true,
+					LogFile: "nats.log",
+					Debug: true,
+				})
+				if err != nil {
+					panic(err)
+				}
+				natsServer.ConfigureLogger()
+				go natsServer.Start()
+				s = natsServer
+			}
+			natsServerMutex.Unlock()
+			natsServer.WaitForStartup()
+			conn, err := s.InProcessConn()
+			if err != nil {
+				logrus.Fatalln("Failed to get a NATS in-process conn")
+			}
+			nc, err := natsclient.Connect("", natsclient.InProcessConn(conn))
+			if err != nil {
+				logrus.Fatalln("Failed to create NATS client")
+			}
+			return setupNATS(cfg, nc)
+		} else {
+			return setupNATS(cfg, nil)
+		}
 	}
 	return setupKafka(cfg)
 }
@@ -65,12 +107,16 @@ func setupNaffka(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
 	return naffkaInstance, naffkaInstance
 }
 
-func setupNATS(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProducer) {
+func setupNATS(cfg *config.Kafka, nc *natsclient.Conn) (sarama.Consumer, sarama.SyncProducer) {
 	logrus.WithField("servers", cfg.Addresses).Debug("connecting to nats")
-	nc, err := nats.Connect(strings.Join(cfg.Addresses, ","))
-	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to nats")
-		return nil, nil
+
+	if nc == nil {
+		var err error
+		nc, err = nats.Connect(strings.Join(cfg.Addresses, ","))
+		if err != nil {
+			logrus.WithError(err).Panic("unable to connect to NATS")
+			return nil, nil
+		}
 	}
 
 	s, err := nc.JetStream()
