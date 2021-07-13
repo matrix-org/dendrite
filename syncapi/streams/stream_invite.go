@@ -2,6 +2,8 @@ package streams
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strconv"
 	"time"
 
@@ -59,9 +61,10 @@ func (p *InviteStreamProvider) IncrementalSync(
 	for roomID := range retiredInvites {
 		if _, ok := req.Response.Rooms.Join[roomID]; !ok {
 			lr := types.NewLeaveResponse()
+			h := sha256.Sum256(append([]byte(roomID), []byte(strconv.FormatInt(int64(to), 10))...))
 			lr.Timeline.Events = append(lr.Timeline.Events, gomatrixserverlib.ClientEvent{
 				// fake event ID which muxes in the to position
-				EventID:        "$stub-retired-invite-" + roomID + "-" + strconv.FormatInt(int64(to), 10),
+				EventID:        "$" + hex.EncodeToString(h[:]),
 				OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 				RoomID:         roomID,
 				Sender:         req.Device.UserID,
