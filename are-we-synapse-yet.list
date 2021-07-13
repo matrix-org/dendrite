@@ -17,6 +17,13 @@ reg POST /register rejects registration of usernames with '£'
 reg POST /register rejects registration of usernames with 'é'
 reg POST /register rejects registration of usernames with '\n'
 reg POST /register rejects registration of usernames with '''
+reg POST /register allows registration of usernames with 'q'
+reg POST /register allows registration of usernames with '3'
+reg POST /register allows registration of usernames with '.'
+reg POST /register allows registration of usernames with '_'
+reg POST /register allows registration of usernames with '='
+reg POST /register allows registration of usernames with '-'
+reg POST /register allows registration of usernames with '/'
 reg POST /r0/admin/register with shared secret 
 reg POST /r0/admin/register admin with shared secret 
 reg POST /r0/admin/register with shared secret downcases capitals 
@@ -95,6 +102,7 @@ typ Typing notifications don't leak (3 subtests)
 rst GET /rooms/:room_id/state/m.room.power_levels can fetch levels
 rst PUT /rooms/:room_id/state/m.room.power_levels can set levels
 rst PUT power_levels should not explode if the old power levels were empty
+rst Users cannot set notifications powerlevel higher than their own (2 subtests)
 rst Both GET and PUT work
 rct POST /rooms/:room_id/receipt can create receipts 
 red POST /rooms/:room_id/read_markers can create read marker
@@ -353,6 +361,7 @@ syn Syncing a new room with a large timeline limit isn't limited
 syn A full_state incremental update returns only recent timeline 
 syn A prev_batch token can be used in the v1 messages API 
 syn A next_batch token can be used in the v1 messages API 
+syn A prev_batch token from incremental sync can be used in the v1 messages API
 syn User sees their own presence in a sync 
 syn User is offline if they set_presence=offline in their sync
 syn User sees updates to presence from other users in the incremental sync. 
@@ -574,6 +583,7 @@ fqu Outbound federation can query profile data
 fqu Inbound federation can query profile data
 fqu Outbound federation can query room alias directory
 fqu Inbound federation can query room alias directory
+fsj Membership event with an invalid displayname in the send_join response should not cause room join to fail
 fsj Outbound federation can query v1 /send_join 
 fsj Outbound federation can query v2 /send_join
 fmj Outbound federation passes make_join failures through to the client 
@@ -743,6 +753,10 @@ nsp Set group joinable and join it
 nsp Group is not joinable by default 
 nsp Group is joinable over federation 
 nsp Room is transitioned on local and remote groups upon room upgrade 
+nsp POST /_synapse/admin/v1/register with shared secret
+nsp POST /_synapse/admin/v1/register admin with shared secret
+nsp POST /_synapse/admin/v1/register with shared secret downcases capitals
+nsp POST /_synapse/admin/v1/register with shared secret disallows symbols
 3pd Can bind 3PID via home server 
 3pd Can bind and unbind 3PID via homeserver 
 3pd Can unbind 3PID via homeserver when bound out of band 
