@@ -532,3 +532,4 @@ Inbound federation can receive invite and reject when remote replies with a 500
 Inbound federation can receive invite and reject when remote is unreachable
 Remote servers cannot set power levels in rooms without existing powerlevels
 Remote servers should reject attempts by non-creators to set the power levels
+Federation handles empty auth_events in state_ids sanely
