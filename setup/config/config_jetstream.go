@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
-	"regexp"
 )
 
 type JetStream struct {
@@ -18,7 +16,7 @@ type JetStream struct {
 	// useful if running more than one Dendrite on the same NATS deployment.
 	TopicPrefix string `yaml:"topic_prefix"`
 	// Keep all storage in memory. This is mostly useful for unit tests.
-	InMemory bool `yaml:"-"`
+	InMemory bool `yaml:"in_memory"`
 }
 
 func (c *JetStream) TopicFor(name string) string {
@@ -28,11 +26,7 @@ func (c *JetStream) TopicFor(name string) string {
 func (c *JetStream) Defaults() {
 	c.Addresses = []string{}
 	c.TopicPrefix = "Dendrite"
-	reg, err := regexp.Compile(`[^a-zA-Z0-9\.]+`)
-	if err != nil {
-		log.Fatal(err)
-	}
-	c.StoragePath = Path("./" + reg.ReplaceAllString(string(c.Matrix.ServerName), ""))
+	c.StoragePath = Path("./")
 }
 
 func (c *JetStream) Verify(configErrs *ConfigErrors, isMonolith bool) {

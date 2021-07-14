@@ -70,6 +70,7 @@ func main() {
 		// don't hit matrix.org when running tests!!!
 		cfg.SigningKeyServer.KeyPerspectives = config.KeyPerspectives{}
 		cfg.UserAPI.BCryptCost = bcrypt.MinCost
+		cfg.Global.JetStream.InMemory = true
 	}
 
 	j, err := yaml.Marshal(cfg)
