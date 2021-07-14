@@ -1,8 +1,14 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	"regexp"
+)
 
 type JetStream struct {
+	Matrix *Global `yaml:"-"`
+
 	// Persistent directory to store JetStream streams in.
 	StoragePath Path `yaml:"storage_path"`
 	// A list of NATS addresses to connect to. If none are specified, an
@@ -22,7 +28,11 @@ func (c *JetStream) TopicFor(name string) string {
 func (c *JetStream) Defaults() {
 	c.Addresses = []string{}
 	c.TopicPrefix = "Dendrite"
-	c.StoragePath = Path("./")
+	reg, err := regexp.Compile(`[^a-zA-Z0-9\.]+`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	c.StoragePath = Path("./" + reg.ReplaceAllString(string(c.Matrix.ServerName), ""))
 }
 
 func (c *JetStream) Verify(configErrs *ConfigErrors, isMonolith bool) {

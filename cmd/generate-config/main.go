@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"flag"
 	"fmt"
 
@@ -72,9 +70,6 @@ func main() {
 		// don't hit matrix.org when running tests!!!
 		cfg.SigningKeyServer.KeyPerspectives = config.KeyPerspectives{}
 		cfg.UserAPI.BCryptCost = bcrypt.MinCost
-		var id [8]byte
-		_, _ = rand.Read(id[:])
-		cfg.Global.JetStream.StoragePath = config.Path(hex.EncodeToString(id[:]))
 	}
 
 	j, err := yaml.Marshal(cfg)
