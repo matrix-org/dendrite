@@ -162,7 +162,7 @@ func main() {
 	cfg.SigningKeyServer.Database.ConnectionString = "file:/idb/dendritejs_signingkeyserver.db"
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
-	cfg.Global.Kafka.Database.StorageDirectory = "file:/idb/dendritejs/"
+	cfg.Global.JetStream.StoragePath = "file:/idb/dendritejs/"
 	cfg.Global.TrustedIDServers = []string{}
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.PrivateKey = sk
