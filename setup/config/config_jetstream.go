@@ -3,8 +3,6 @@ package config
 import "fmt"
 
 type JetStream struct {
-	Matrix *Global `yaml:"-"`
-
 	// Persistent directory to store JetStream streams in.
 	StoragePath Path `yaml:"storage_path"`
 	// A list of NATS addresses to connect to. If none are specified, an
@@ -24,7 +22,7 @@ func (c *JetStream) TopicFor(name string) string {
 func (c *JetStream) Defaults() {
 	c.Addresses = []string{}
 	c.TopicPrefix = "Dendrite"
-	c.StoragePath = Path(fmt.Sprintf("./%s", c.Matrix.ServerName))
+	c.StoragePath = Path("./")
 }
 
 func (c *JetStream) Verify(configErrs *ConfigErrors, isMonolith bool) {

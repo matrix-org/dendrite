@@ -24,10 +24,12 @@ func SetupConsumerProducer(cfg *config.JetStream) (sarama.Consumer, sarama.SyncP
 	if s == nil {
 		var err error
 		natsServer, err = natsserver.NewServer(&natsserver.Options{
-			ServerName: "monolith",
-			DontListen: true,
-			JetStream:  true,
-			StoreDir:   string(cfg.Matrix.JetStream.StoragePath),
+			ServerName:       "monolith",
+			DontListen:       true,
+			JetStream:        true,
+			StoreDir:         string(cfg.StoragePath),
+			NoSystemAccount:  true,
+			AllowNewAccounts: false,
 		})
 		if err != nil {
 			panic(err)

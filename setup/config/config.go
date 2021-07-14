@@ -329,7 +329,6 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 func (c *Dendrite) Wiring() {
-	c.Global.JetStream.Matrix = &c.Global
 	c.ClientAPI.Matrix = &c.Global
 	c.EDUServer.Matrix = &c.Global
 	c.FederationAPI.Matrix = &c.Global
