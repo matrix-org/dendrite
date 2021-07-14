@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -53,7 +54,7 @@ func NewKeyChangeConsumer(
 		consumer: &internal.ContinualConsumer{
 			Process:        process,
 			ComponentName:  "federationsender/keychange",
-			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
+			Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},

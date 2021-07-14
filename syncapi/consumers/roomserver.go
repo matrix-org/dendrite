@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -58,7 +59,7 @@ func NewOutputRoomEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/roomserver",
-		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
+		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
