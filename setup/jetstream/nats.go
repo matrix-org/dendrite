@@ -27,7 +27,7 @@ func SetupConsumerProducer(cfg *config.JetStream) (sarama.Consumer, sarama.SyncP
 			ServerName: "monolith",
 			DontListen: true,
 			JetStream:  true,
-			StoreDir:   string(cfg.Matrix.ServerName),
+			StoreDir:   string(cfg.Matrix.JetStream.StoragePath),
 		})
 		if err != nil {
 			panic(err)
@@ -75,6 +75,12 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (sarama.Consumer, sar
 		if info == nil {
 			stream.Name = cfg.TopicFor(stream.Name)
 			stream.Subjects = []string{stream.Name}
+
+			// If we're trying to keep everything in memory (e.g. unit tests)
+			// then overwrite the storage policy.
+			if cfg.InMemory {
+				stream.Storage = nats.MemoryStorage
+			}
 
 			if _, err = s.AddStream(stream); err != nil {
 				logrus.WithError(err).WithField("stream", stream.Name).Fatal("Unable to add stream")

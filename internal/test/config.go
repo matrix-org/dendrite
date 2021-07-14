@@ -81,7 +81,7 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 
 	cfg.MediaAPI.BasePath = config.Path(mediaBasePath)
 
-	cfg.Global.Kafka.Addresses = []string{kafkaURI}
+	cfg.Global.JetStream.Addresses = []string{kafkaURI}
 
 	// TODO: Use different databases for the different schemas.
 	// Using the same database for every schema currently works because
