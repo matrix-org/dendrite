@@ -37,6 +37,7 @@ func SetupConsumerProducer(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProdu
 					ServerName: "monolith",
 					DontListen: true,
 					JetStream: true,
+					StoreDir: string(cfg.Matrix.ServerName),
 					LogFile: "nats.log",
 					Debug: true,
 				})
@@ -48,7 +49,9 @@ func SetupConsumerProducer(cfg *config.Kafka) (sarama.Consumer, sarama.SyncProdu
 				s = natsServer
 			}
 			natsServerMutex.Unlock()
-			natsServer.WaitForStartup()
+			if !natsServer.ReadyForConnections(time.Second * 10) {
+				logrus.Fatalln("NATS did not start in time")
+			}
 			conn, err := s.InProcessConn()
 			if err != nil {
 				logrus.Fatalln("Failed to get a NATS in-process conn")

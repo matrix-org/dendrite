@@ -1125,8 +1125,8 @@ github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32/go.mod h1:9wM+0iRr9ahx58uY
 github.com/ncw/swift v1.0.47/go.mod h1:23YIA4yWVnGwv2dQlN4bB7egfYX6YLn0Yo/S6zZO/ZM=
 github.com/neelance/astrewrite v0.0.0-20160511093645-99348263ae86/go.mod h1:kHJEU3ofeGjhHklVoIGuVj85JJwZ6kWPaJwCIxgnFmo=
 github.com/neelance/sourcemap v0.0.0-20151028013722-8c68805598ab/go.mod h1:Qr6/a/Q4r9LP1IltGz7tA7iOK1WonHEYhu1HRBA7ZiM=
-github.com/neilalexander/nats-server/v2 v2.3.3-0.20210713120756-c663f55fedeb h1:fhQF1iw+4BbVlNDtJj202IJk0A2JeRfkqJ1OyJsGMIU=
-github.com/neilalexander/nats-server/v2 v2.3.3-0.20210713120756-c663f55fedeb/go.mod h1:dUf7Cm5z5LbciFVwWx54owyCKm8x4/hL6p7rrljhLFY=
+github.com/neilalexander/nats-server/v2 v2.3.3-0.20210714083537-9e5eeca686a2 h1:hy3Y+7o4B7U3lFrrjw0JMO2ayepMWkSVEZmu4d3cxUY=
+github.com/neilalexander/nats-server/v2 v2.3.3-0.20210714083537-9e5eeca686a2/go.mod h1:dUf7Cm5z5LbciFVwWx54owyCKm8x4/hL6p7rrljhLFY=
 github.com/neilalexander/nats.go v1.11.1-0.20210713114907-f78197deadf1 h1:bI5JbW/nR/3klqVi9UBFjLimzyw8XqkgwuFEG7ROMh4=
 github.com/neilalexander/nats.go v1.11.1-0.20210713114907-f78197deadf1/go.mod h1:BPko4oXsySz4aSWeFgOHLZs3G4Jq4ZAyE6/zMCxRT6w=
 github.com/neilalexander/utp v0.1.1-0.20210622132614-ee9a34a30488 h1:xZk82i6JK2d0SqRIXwaxj7J/NQB6ngq0PuMx3wXBaRQ=

@@ -23,6 +23,8 @@ var KafkaTopics = []string{
 }
 
 type Kafka struct {
+	Matrix *Global `yaml:"-"`
+	
 	// A list of kafka/NATS addresses to connect to.
 	Addresses []string `yaml:"addresses"`
 	// The prefix to use for Kafka topic names for this homeserver - really only

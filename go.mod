@@ -1,6 +1,6 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/nats-io/nats-server/v2 => github.com/neilalexander/nats-server/v2 v2.3.3-0.20210713120756-c663f55fedeb
+replace github.com/nats-io/nats-server/v2 => github.com/neilalexander/nats-server/v2 v2.3.3-0.20210714083537-9e5eeca686a2
 
 replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.11.1-0.20210713114907-f78197deadf1
 
