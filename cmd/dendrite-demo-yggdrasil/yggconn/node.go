@@ -60,7 +60,7 @@ func (n *Node) DialerContext(ctx context.Context, _, address string) (net.Conn, 
 	return n.utpSocket.DialAddrContext(ctx, pk)
 }
 
-func Setup(instanceName, storageDirectory string) (*Node, error) {
+func Setup(instanceName, storageDirectory, peerURI string) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasilcore.Core{},
 		config:    yggdrasildefaults.GenerateConfig(),
@@ -81,6 +81,9 @@ func Setup(instanceName, storageDirectory string) (*Node, error) {
 	}
 
 	n.config.Peers = []string{}
+	if peerURI != "" {
+		n.config.Peers = append(n.config.Peers, peerURI)
+	}
 	n.config.AdminListen = "none"
 
 	j, err := json.MarshalIndent(n.config, "", "  ")
@@ -157,17 +160,22 @@ func (n *Node) KnownNodes() []gomatrixserverlib.ServerName {
 }
 
 func (n *Node) SetMulticastEnabled(enabled bool) {
-
+	// TODO: There's no dynamic reconfiguration in Yggdrasil v0.4
+	// so we need a solution for this.
 }
 
 func (n *Node) DisconnectMulticastPeers() {
-
+	// TODO: There's no dynamic reconfiguration in Yggdrasil v0.4
+	// so we need a solution for this.
 }
 
 func (n *Node) DisconnectNonMulticastPeers() {
-
+	// TODO: There's no dynamic reconfiguration in Yggdrasil v0.4
+	// so we need a solution for this.
 }
 
 func (n *Node) SetStaticPeer(uri string) error {
+	// TODO: There's no dynamic reconfiguration in Yggdrasil v0.4
+	// so we need a solution for this.
 	return nil
 }
