@@ -23,7 +23,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
@@ -597,11 +596,15 @@ func (s *eventStatements) SelectEventAuthEventNIDs(
 	result := make(map[types.EventNID][]types.EventNID)
 	for rows.Next() {
 		var eventNID types.EventNID
-		var authEventNIDs pq.Int64Array
+		var authEventNIDs string
 		if err = rows.Scan(&authEventNIDs); err != nil {
 			return nil, err
 		}
-		for _, a := range authEventNIDs {
+		var authEventNIDsArray []int64
+		if err := json.Unmarshal([]byte(authEventNIDs), &authEventNIDsArray); err != nil {
+			return nil, err
+		}
+		for _, a := range authEventNIDsArray {
 			result[eventNID] = append(result[eventNID], types.EventNID(a))
 		}
 	}
