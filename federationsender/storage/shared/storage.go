@@ -229,7 +229,9 @@ func (d *Database) UpdateNotaryKeys(ctx context.Context, serverName gomatrixserv
 				return err
 			}
 		}
-		return nil
+
+		// clean up old responses
+		return d.NotaryServerKeysMetadata.DeleteOldJSONResponses(ctx, txn)
 	})
 }
 

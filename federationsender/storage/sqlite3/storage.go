@@ -71,6 +71,14 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	if err != nil {
 		return nil, err
 	}
+	notaryKeys, err := NewSQLiteNotaryServerKeysTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	notaryKeysMetadata, err := NewSQLiteNotaryServerKeysMetadataTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadRemoveRoomsTable(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
@@ -87,6 +95,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 		FederationSenderBlacklist:     blacklist,
 		FederationSenderOutboundPeeks: outboundPeeks,
 		FederationSenderInboundPeeks:  inboundPeeks,
+		NotaryServerKeysJSON:          notaryKeys,
+		NotaryServerKeysMetadata:      notaryKeysMetadata,
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
 		return nil, err
