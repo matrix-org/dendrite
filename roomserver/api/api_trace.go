@@ -208,6 +208,16 @@ func (t *RoomserverInternalAPITrace) QueryStateAndAuthChain(
 	return err
 }
 
+func (t *RoomserverInternalAPITrace) QueryStateAndAuthChainIDs(
+	ctx context.Context,
+	req *QueryStateAndAuthChainIDsRequest,
+	res *QueryStateAndAuthChainIDsResponse,
+) error {
+	err := t.Impl.QueryStateAndAuthChainIDs(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("QueryStateAndAuthChainIDs req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func (t *RoomserverInternalAPITrace) PerformBackfill(
 	ctx context.Context,
 	req *PerformBackfillRequest,
