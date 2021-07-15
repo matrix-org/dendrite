@@ -45,10 +45,6 @@ func (m *DendriteMonolith) PeerCount() int {
 	return m.YggdrasilNode.PeerCount()
 }
 
-func (m *DendriteMonolith) SessionCount() int {
-	return m.YggdrasilNode.SessionCount()
-}
-
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 	m.YggdrasilNode.SetMulticastEnabled(enabled)
 }
@@ -78,7 +74,7 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	ygg, err := yggconn.Setup("dendrite", m.StorageDirectory)
+	ygg, err := yggconn.Setup("dendrite", m.StorageDirectory, "")
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +83,7 @@ func (m *DendriteMonolith) Start() {
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
-	cfg.Global.PrivateKey = ygg.SigningPrivateKey()
+	cfg.Global.PrivateKey = ygg.PrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-naffka.db", m.StorageDirectory))
@@ -133,18 +129,6 @@ func (m *DendriteMonolith) Start() {
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
-
-	ygg.SetSessionFunc(func(address string) {
-		req := &api.PerformServersAliveRequest{
-			Servers: []gomatrixserverlib.ServerName{
-				gomatrixserverlib.ServerName(address),
-			},
-		}
-		res := &api.PerformServersAliveResponse{}
-		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Error("Failed to send wake-up message to newly connected node")
-		}
-	})
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
