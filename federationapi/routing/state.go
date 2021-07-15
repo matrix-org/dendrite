@@ -176,12 +176,3 @@ func getStateIDs(
 		AuthEventIDs:  response.AuthChainEvents,
 	}, nil
 }
-
-func getIDsFromEvent(events []*gomatrixserverlib.Event) []string {
-	IDs := make([]string, len(events))
-	for i := range events {
-		IDs[i] = events[i].EventID()
-	}
-
-	return IDs
-}
