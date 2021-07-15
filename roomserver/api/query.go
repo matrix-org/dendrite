@@ -250,6 +250,28 @@ type QueryStateAndAuthChainResponse struct {
 	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
 }
 
+// QueryStateAndAuthChainIDsRequest is a request to QueryStateAndAuthChainIDs
+type QueryStateAndAuthChainIDsRequest struct {
+	// The room ID to query the state in.
+	RoomID string `json:"room_id"`
+	// The list of prev events for the event. Used to calculate the state at
+	// the event.
+	PrevEventIDs []string `json:"prev_event_ids"`
+}
+
+// QueryStateAndAuthChainIDsResponse is a response to QueryStateAndAuthChainIDs
+type QueryStateAndAuthChainIDsResponse struct {
+	// Does the room exist on this roomserver?
+	// If the room doesn't exist this will be false and StateEvents will be empty.
+	RoomExists bool `json:"room_exists"`
+	// The room version of the room.
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
+	// The state and auth chain event IDs that were requested.
+	// The lists will be in an arbitrary order.
+	StateEvents     []string `json:"state_event_ids"`
+	AuthChainEvents []string `json:"auth_chain_event_ids"`
+}
+
 // QueryRoomVersionCapabilitiesRequest asks for the default room version
 type QueryRoomVersionCapabilitiesRequest struct{}
 

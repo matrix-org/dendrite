@@ -526,6 +526,70 @@ func (r *Queryer) QueryStateAndAuthChain(
 	return err
 }
 
+// QueryStateAndAuthChain implements api.RoomserverInternalAPI
+func (r *Queryer) QueryStateAndAuthChainIDs(
+	ctx context.Context,
+	request *api.QueryStateAndAuthChainIDsRequest,
+	response *api.QueryStateAndAuthChainIDsResponse,
+) error {
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return err
+	}
+	if info == nil || info.IsStub {
+		return nil
+	}
+	response.RoomExists = true
+	response.RoomVersion = info.RoomVersion
+
+	roomState := state.NewStateResolution(r.DB, *info)
+	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
+	if err != nil {
+		return fmt.Errorf("r.DB.StateAtEventIDs: %w", err)
+	}
+
+	eventNIDs := map[types.EventNID]struct{}{}
+	for _, prevState := range prevStates {
+		var entries []types.StateEntry
+		entries, err = roomState.LoadStateAtSnapshot(ctx, prevState.BeforeStateSnapshotNID)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			eventNIDs[entry.EventNID] = struct{}{}
+		}
+	}
+	var eventNIDsArray types.EventNIDs
+	for nid := range eventNIDs {
+		eventNIDsArray = append(eventNIDsArray, nid)
+	}
+
+	authEventNIDsArray, err := r.DB.AuthEventNIDs(ctx, eventNIDsArray)
+	if err != nil {
+		return fmt.Errorf("r.DB.AuthEventNIDs: %w", err)
+	}
+
+	stateEventIDs, err := r.DB.EventIDs(ctx, eventNIDsArray)
+	if err != nil {
+		return fmt.Errorf("r.DB.EventIDs: %w", err)
+	}
+
+	authEventIDs, err := r.DB.EventIDs(ctx, authEventNIDsArray)
+	if err != nil {
+		return fmt.Errorf("r.DB.EventIDs: %w", err)
+	}
+
+	for _, eventID := range stateEventIDs {
+		response.StateEvents = append(response.StateEvents, eventID)
+	}
+
+	for _, eventID := range authEventIDs {
+		response.AuthChainEvents = append(response.AuthChainEvents, eventID)
+	}
+
+	return err
+}
+
 func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
