@@ -20,8 +20,7 @@ var natsServerMutex sync.Mutex
 
 func SetupConsumerProducer(cfg *config.JetStream) (sarama.Consumer, sarama.SyncProducer) {
 	natsServerMutex.Lock()
-	s := natsServer
-	if s == nil {
+	if natsServer == nil {
 		var err error
 		natsServer, err = natsserver.NewServer(&natsserver.Options{
 			ServerName:       "monolith",
@@ -36,17 +35,12 @@ func SetupConsumerProducer(cfg *config.JetStream) (sarama.Consumer, sarama.SyncP
 		}
 		natsServer.ConfigureLogger()
 		go natsServer.Start()
-		s = natsServer
 	}
 	natsServerMutex.Unlock()
 	if !natsServer.ReadyForConnections(time.Second * 10) {
 		logrus.Fatalln("NATS did not start in time")
 	}
-	conn, err := s.InProcessConn()
-	if err != nil {
-		logrus.Fatalln("Failed to get a NATS in-process conn")
-	}
-	nc, err := natsclient.Connect("", natsclient.InProcessConn(conn))
+	nc, err := natsclient.Connect("", natsclient.InProcessServer(natsServer))
 	if err != nil {
 		logrus.Fatalln("Failed to create NATS client")
 	}
