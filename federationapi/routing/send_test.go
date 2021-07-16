@@ -84,6 +84,14 @@ func (o *testEDUProducer) InputReceiptEvent(
 	return nil
 }
 
+func (t *testEDUProducer) InputPresence(
+	ctx context.Context,
+	request *eduAPI.InputPresenceRequest,
+	response *eduAPI.InputPresenceResponse,
+) error {
+	return nil
+}
+
 type testRoomserverAPI struct {
 	api.RoomserverInternalAPITrace
 	inputRoomEvents            []api.InputRoomEvent
