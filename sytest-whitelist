@@ -534,3 +534,4 @@ Remote servers cannot set power levels in rooms without existing powerlevels
 Remote servers should reject attempts by non-creators to set the power levels
 Federation handles empty auth_events in state_ids sanely
 Key notary server should return an expired key if it can't find any others
+Key notary server must not overwrite a valid key with a spurious result from the origin server

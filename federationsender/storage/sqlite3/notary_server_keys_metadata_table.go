@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -150,7 +151,11 @@ func (s *notaryServerKeysMetadataStatements) SelectKeys(ctx context.Context, txn
 	var results []gomatrixserverlib.ServerKeys
 	for rows.Next() {
 		var sk gomatrixserverlib.ServerKeys
-		if err := rows.Scan(&sk.Raw); err != nil {
+		var raw string
+		if err = rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal([]byte(raw), &sk); err != nil {
 			return nil, err
 		}
 		results = append(results, sk)

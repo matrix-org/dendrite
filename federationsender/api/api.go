@@ -96,8 +96,18 @@ type FederationSenderInternalAPI interface {
 }
 
 type QueryServerKeysRequest struct {
-	ServerName     gomatrixserverlib.ServerName
-	OptionalKeyIDs []gomatrixserverlib.KeyID
+	ServerName      gomatrixserverlib.ServerName
+	KeyIDToCriteria map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyNotaryQueryCriteria
+}
+
+func (q *QueryServerKeysRequest) KeyIDs() []gomatrixserverlib.KeyID {
+	kids := make([]gomatrixserverlib.KeyID, len(q.KeyIDToCriteria))
+	i := 0
+	for keyID := range q.KeyIDToCriteria {
+		kids[i] = keyID
+		i++
+	}
+	return kids
 }
 
 type QueryServerKeysResponse struct {

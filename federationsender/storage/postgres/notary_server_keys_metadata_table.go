@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/federationsender/storage/tables"
@@ -148,7 +149,11 @@ func (s *notaryServerKeysMetadataStatements) SelectKeys(ctx context.Context, txn
 	var results []gomatrixserverlib.ServerKeys
 	for rows.Next() {
 		var sk gomatrixserverlib.ServerKeys
-		if err := rows.Scan(&sk.Raw); err != nil {
+		var raw string
+		if err = rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal([]byte(raw), &sk); err != nil {
 			return nil, err
 		}
 		results = append(results, sk)

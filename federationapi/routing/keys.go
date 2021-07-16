@@ -197,16 +197,10 @@ func NotaryKeys(
 				return util.ErrorResponse(err)
 			}
 		} else {
-			kids := make([]gomatrixserverlib.KeyID, len(kidToCriteria))
-			i := 0
-			for kid := range kidToCriteria {
-				kids[i] = kid
-				i++
-			}
 			var resp federationSenderAPI.QueryServerKeysResponse
 			err := fsAPI.QueryServerKeys(httpReq.Context(), &federationSenderAPI.QueryServerKeysRequest{
-				ServerName:     serverName,
-				OptionalKeyIDs: kids,
+				ServerName:      serverName,
+				KeyIDToCriteria: kidToCriteria,
 			}, &resp)
 			if err != nil {
 				return util.ErrorResponse(err)
