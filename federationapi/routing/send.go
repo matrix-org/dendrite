@@ -573,6 +573,23 @@ func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) e
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
 	t.work = "" // reset from previous event
 
+	// Ask the roomserver if we know about the room and/or if we're joined
+	// to it. If we aren't then we won't bother processing the event.
+	joinedReq := api.QueryServerJoinedToRoomRequest{
+		RoomID: e.RoomID(),
+	}
+	var joinedRes api.QueryServerJoinedToRoomResponse
+	if err := t.rsAPI.QueryServerJoinedToRoom(ctx, &joinedReq, &joinedRes); err != nil {
+		return fmt.Errorf("t.rsAPI.QueryServerJoinedToRoom: %w", err)
+	}
+
+	if !joinedRes.RoomExists || !joinedRes.IsInRoom {
+		// We don't believe we're a member of this room, therefore there's
+		// no point in wasting work trying to figure out what to do with
+		// missing auth or prev events. Drop the event.
+		return roomNotFoundError{e.RoomID()}
+	}
+
 	// Work out if the roomserver knows everything it needs to know to auth
 	// the event. This includes the prev_events and auth_events.
 	// NOTE! This is going to include prev_events that have an empty state
@@ -587,16 +604,6 @@ func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) e
 	var stateResp api.QueryMissingAuthPrevEventsResponse
 	if err := t.rsAPI.QueryMissingAuthPrevEvents(ctx, &stateReq, &stateResp); err != nil {
 		return fmt.Errorf("t.rsAPI.QueryMissingAuthPrevEvents: %w", err)
-	}
-
-	if !stateResp.RoomExists {
-		// TODO: When synapse receives a message for a room it is not in it
-		// asks the remote server for the state of the room so that it can
-		// check if the remote server knows of a join "m.room.member" event
-		// that this server is unaware of.
-		// However generally speaking we should reject events for rooms we
-		// aren't a member of.
-		return roomNotFoundError{e.RoomID()}
 	}
 
 	// Prepare a map of all the events we already had before this point, so

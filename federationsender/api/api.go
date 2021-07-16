@@ -20,7 +20,6 @@ type FederationClient interface {
 	ClaimKeys(ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (res gomatrixserverlib.RespClaimKeys, err error)
 	QueryKeys(ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string) (res gomatrixserverlib.RespQueryKeys, err error)
 	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
-	GetServerKeys(ctx context.Context, matrixServer gomatrixserverlib.ServerName) (gomatrixserverlib.ServerKeys, error)
 	MSC2836EventRelationships(ctx context.Context, dst gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error)
 	MSC2946Spaces(ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, r gomatrixserverlib.MSC2946SpacesRequest) (res gomatrixserverlib.MSC2946SpacesResponse, err error)
 	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
@@ -40,6 +39,8 @@ func (e *FederationClientError) Error() string {
 // FederationSenderInternalAPI is used to query information from the federation sender.
 type FederationSenderInternalAPI interface {
 	FederationClient
+
+	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
 
 	// PerformDirectoryLookup looks up a remote room ID from a room alias.
 	PerformDirectoryLookup(
@@ -92,6 +93,25 @@ type FederationSenderInternalAPI interface {
 		request *PerformBroadcastEDURequest,
 		response *PerformBroadcastEDUResponse,
 	) error
+}
+
+type QueryServerKeysRequest struct {
+	ServerName      gomatrixserverlib.ServerName
+	KeyIDToCriteria map[gomatrixserverlib.KeyID]gomatrixserverlib.PublicKeyNotaryQueryCriteria
+}
+
+func (q *QueryServerKeysRequest) KeyIDs() []gomatrixserverlib.KeyID {
+	kids := make([]gomatrixserverlib.KeyID, len(q.KeyIDToCriteria))
+	i := 0
+	for keyID := range q.KeyIDToCriteria {
+		kids[i] = keyID
+		i++
+	}
+	return kids
+}
+
+type QueryServerKeysResponse struct {
+	ServerKeys []gomatrixserverlib.ServerKeys
 }
 
 type PerformDirectoryLookupRequest struct {
