@@ -152,7 +152,7 @@ func (s *notaryServerKeysMetadataStatements) SelectKeys(ctx context.Context, txn
 	for rows.Next() {
 		var sk gomatrixserverlib.ServerKeys
 		var raw string
-		if err := rows.Scan(&raw); err != nil {
+		if err = rows.Scan(&raw); err != nil {
 			return nil, err
 		}
 		if err = json.Unmarshal([]byte(raw), &sk); err != nil {
