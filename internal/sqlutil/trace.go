@@ -125,9 +125,9 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 	}
 	if driverName != SQLiteDriverName() {
 		logrus.WithFields(logrus.Fields{
-			"MaxOpenConns":    dbProperties.MaxOpenConns,
-			"MaxIdleConns":    dbProperties.MaxIdleConns,
-			"ConnMaxLifetime": dbProperties.ConnMaxLifetime,
+			"MaxOpenConns":    dbProperties.MaxOpenConns(),
+			"MaxIdleConns":    dbProperties.MaxIdleConns(),
+			"ConnMaxLifetime": dbProperties.ConnMaxLifetime(),
 			"dataSourceName":  regexp.MustCompile(`://[^@]*@`).ReplaceAllLiteralString(dsn, "://"),
 		}).Debug("Setting DB connection limits")
 		db.SetMaxOpenConns(dbProperties.MaxOpenConns())
