@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 type Leaver struct {
@@ -171,7 +172,9 @@ func (r *Leaver) performFederatedRejectInvite(
 	}
 	leaveRes := fsAPI.PerformLeaveResponse{}
 	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
-		return nil, err
+		// failures in PerformLeave should NEVER stop us from telling other components like the
+		// sync API that the invite was withdrawn. Otherwise we can end up with stuck invites.
+		util.GetLogger(ctx).WithError(err).Errorf("failed to PerformLeave, still retiring invite event")
 	}
 
 	// Withdraw the invite, so that the sync API etc are

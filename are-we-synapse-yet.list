@@ -17,6 +17,13 @@ reg POST /register rejects registration of usernames with '£'
 reg POST /register rejects registration of usernames with 'é'
 reg POST /register rejects registration of usernames with '\n'
 reg POST /register rejects registration of usernames with '''
+reg POST /register allows registration of usernames with 'q'
+reg POST /register allows registration of usernames with '3'
+reg POST /register allows registration of usernames with '.'
+reg POST /register allows registration of usernames with '_'
+reg POST /register allows registration of usernames with '='
+reg POST /register allows registration of usernames with '-'
+reg POST /register allows registration of usernames with '/'
 reg POST /r0/admin/register with shared secret 
 reg POST /r0/admin/register admin with shared secret 
 reg POST /r0/admin/register with shared secret downcases capitals 
@@ -76,7 +83,7 @@ rst GET /rooms/:room_id/state/m.room.topic gets topic
 rst GET /rooms/:room_id/state fetches entire room state 
 crm POST /createRoom with creation content
 ali PUT /directory/room/:room_alias creates alias
-nsp GET /rooms/:room_id/aliases lists aliases 
+ali GET /rooms/:room_id/aliases lists aliases 
 jon POST /rooms/:room_id/join can join a room
 jon POST /join/:room_alias can join a room
 jon POST /join/:room_id can join a room
@@ -95,6 +102,7 @@ typ Typing notifications don't leak (3 subtests)
 rst GET /rooms/:room_id/state/m.room.power_levels can fetch levels
 rst PUT /rooms/:room_id/state/m.room.power_levels can set levels
 rst PUT power_levels should not explode if the old power levels were empty
+rst Users cannot set notifications powerlevel higher than their own (2 subtests)
 rst Both GET and PUT work
 rct POST /rooms/:room_id/receipt can create receipts 
 red POST /rooms/:room_id/read_markers can create read marker
@@ -175,7 +183,7 @@ ali Users with sufficient power-level can delete other's aliases
 ali Can delete canonical alias 
 ali Alias creators can delete alias with no ops 
 ali Alias creators can delete canonical alias with no ops 
-ali Only room members can list aliases of a room 
+msc Only room members can list aliases of a room 
 inv Can invite users to invite-only rooms 
 inv Uninvited users cannot join the room 
 inv Invited user can reject invite 
@@ -353,6 +361,7 @@ syn Syncing a new room with a large timeline limit isn't limited
 syn A full_state incremental update returns only recent timeline 
 syn A prev_batch token can be used in the v1 messages API 
 syn A next_batch token can be used in the v1 messages API 
+syn A prev_batch token from incremental sync can be used in the v1 messages API
 syn User sees their own presence in a sync 
 syn User is offline if they set_presence=offline in their sync
 syn User sees updates to presence from other users in the incremental sync. 
@@ -574,6 +583,7 @@ fqu Outbound federation can query profile data
 fqu Inbound federation can query profile data
 fqu Outbound federation can query room alias directory
 fqu Inbound federation can query room alias directory
+fsj Membership event with an invalid displayname in the send_join response should not cause room join to fail
 fsj Outbound federation can query v1 /send_join 
 fsj Outbound federation can query v2 /send_join
 fmj Outbound federation passes make_join failures through to the client 
@@ -596,7 +606,7 @@ fsj Inbound: send_join rejects invalid JSON for room version 6
 fed Outbound federation can send events
 fed Inbound federation can receive events 
 fed Inbound federation can receive redacted events 
-fed Ephemeral messages received from servers are correctly expired 
+msc Ephemeral messages received from servers are correctly expired 
 fed Events whose auth_events are in the wrong room do not mess up the room state 
 fed Inbound federation can return events 
 fed Inbound federation redacts events from erased users 
@@ -743,6 +753,10 @@ nsp Set group joinable and join it
 nsp Group is not joinable by default 
 nsp Group is joinable over federation 
 nsp Room is transitioned on local and remote groups upon room upgrade 
+nsp POST /_synapse/admin/v1/register with shared secret
+nsp POST /_synapse/admin/v1/register admin with shared secret
+nsp POST /_synapse/admin/v1/register with shared secret downcases capitals
+nsp POST /_synapse/admin/v1/register with shared secret disallows symbols
 3pd Can bind 3PID via home server 
 3pd Can bind and unbind 3PID via homeserver 
 3pd Can unbind 3PID via homeserver when bound out of band 
@@ -859,8 +873,14 @@ jso Invalid JSON special values
 inv Can invite users to invite-only rooms (2 subtests)
 plv setting 'm.room.name' respects room powerlevel (2 subtests)
 psh Messages that notify from another user increment notification_count
-psh Messages that org.matrix.msc2625.mark_unread from another user increment org.matrix.msc2625.unread_count
+msc Messages that org.matrix.msc2625.mark_unread from another user increment org.matrix.msc2625.unread_count
 dvk Can claim one time key using POST (2 subtests)
 fdk Can query remote device keys using POST (1 subtests)
 fdk Can claim remote one time key using POST (2 subtests)
 fmj Inbound /make_join rejects attempts to join rooms where all users have left
+msc Local users can peek into world_readable rooms by room ID
+msc We can't peek into rooms with shared history_visibility
+msc We can't peek into rooms with invited history_visibility
+msc We can't peek into rooms with joined history_visibility
+msc Local users can peek by room alias
+msc Peeked rooms only turn up in the sync for the device who peeked them
