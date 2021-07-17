@@ -1,4 +1,4 @@
-// +build !riotweb
+// +build !elementweb
 
 package embed
 
