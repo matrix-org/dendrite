@@ -1,11 +1,16 @@
 package config
 
 import (
+	"fmt"
 	"math/rand"
+	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/ed25519"
+	"golang.org/x/net/idna"
 )
 
 type Global struct {
@@ -72,6 +77,36 @@ func (c *Global) Defaults() {
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
+
+	validator := idna.New(
+		idna.StrictDomainName(true),
+		idna.ValidateForRegistration(),
+		idna.ValidateLabels(true),
+		idna.VerifyDNSLength(true),
+	)
+	sn := string(c.ServerName)
+	if n, p, err := net.SplitHostPort(sn); err == nil {
+		// A valid port was specified but we don't care about it.
+		// If it's an IPv6 literal at this point then the [] will
+		// already have been stripped by net.SplitHostPort.
+		sn = n
+		// Check that the port number also makes sense.
+		if sp, err := strconv.Atoi(p); err != nil || sp <= 0 || sp > 65535 {
+			configErrs.Add(fmt.Sprintf("server_name %q contains an invalid port number", c.ServerName))
+		}
+	} else {
+		// If we didn't have a port then the net.SplitHostPort
+		// call will fail, leaving us with a possible []-wrapped
+		// IPv6 literal. Strip those before checking if it's valid.
+		sn = strings.Trim(sn, "[]")
+	}
+	if _, err := validator.ToUnicode(sn); err != nil {
+		// Check if it's a valid IP address. If the server name is a
+		// valid IPv4 or IPv6 literal then this won't return nil.
+		if net.ParseIP(sn) == nil {
+			configErrs.Add(fmt.Sprintf("server_name %q contains an invalid domain name or IP address", c.ServerName))
+		}
+	}
 
 	c.Kafka.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
