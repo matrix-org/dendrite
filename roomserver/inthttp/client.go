@@ -47,6 +47,7 @@ const (
 	RoomserverQueryServerAllowedToSeeEventPath = "/roomserver/queryServerAllowedToSeeEvent"
 	RoomserverQueryMissingEventsPath           = "/roomserver/queryMissingEvents"
 	RoomserverQueryStateAndAuthChainPath       = "/roomserver/queryStateAndAuthChain"
+	RoomserverQueryStateAndAuthChainIDsPath    = "/roomserver/queryStateAndAuthChainIDs"
 	RoomserverQueryRoomVersionCapabilitiesPath = "/roomserver/queryRoomVersionCapabilities"
 	RoomserverQueryRoomVersionForRoomPath      = "/roomserver/queryRoomVersionForRoom"
 	RoomserverQueryPublishedRoomsPath          = "/roomserver/queryPublishedRooms"
@@ -414,6 +415,19 @@ func (h *httpRoomserverInternalAPI) QueryStateAndAuthChain(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryStateAndAuthChainPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// QueryStateAndAuthChainIDs implements RoomserverQueryAPI
+func (h *httpRoomserverInternalAPI) QueryStateAndAuthChainIDs(
+	ctx context.Context,
+	request *api.QueryStateAndAuthChainIDsRequest,
+	response *api.QueryStateAndAuthChainIDsResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryStateAndAuthChainIDs")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryStateAndAuthChainIDsPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

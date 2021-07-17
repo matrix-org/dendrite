@@ -262,6 +262,20 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
+		RoomserverQueryStateAndAuthChainIDsPath,
+		httputil.MakeInternalAPI("queryStateAndAuthChainIDs", func(req *http.Request) util.JSONResponse {
+			var request api.QueryStateAndAuthChainIDsRequest
+			var response api.QueryStateAndAuthChainIDsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.ErrorResponse(err)
+			}
+			if err := r.QueryStateAndAuthChainIDs(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(
 		RoomserverPerformBackfillPath,
 		httputil.MakeInternalAPI("PerformBackfill", func(req *http.Request) util.JSONResponse {
 			var request api.PerformBackfillRequest

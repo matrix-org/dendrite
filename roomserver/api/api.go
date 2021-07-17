@@ -75,6 +75,12 @@ type RoomserverInternalAPI interface {
 		response *QueryLatestEventsAndStateResponse,
 	) error
 
+	QueryStateAndAuthChainIDs(
+		ctx context.Context,
+		request *QueryStateAndAuthChainIDsRequest,
+		response *QueryStateAndAuthChainIDsResponse,
+	) error
+
 	// Query the state after a list of events in a room from the room server.
 	QueryStateAfterEvents(
 		ctx context.Context,

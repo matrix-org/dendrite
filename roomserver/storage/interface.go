@@ -87,6 +87,8 @@ type Database interface {
 	// Lookup the event IDs for a batch of event numeric IDs.
 	// Returns an error if the retrieval went wrong.
 	EventIDs(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error)
+	// AuthEventNIDs returns the auth event NIDs for the given events.
+	AuthEventNIDs(ctx context.Context, events []types.EventNID) (types.EventNIDs, error)
 	// Look up the latest events in a room in preparation for an update.
 	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// Returns the latest events in the room and the last eventID sent to the log along with an updater.

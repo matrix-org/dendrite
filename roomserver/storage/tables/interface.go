@@ -61,6 +61,7 @@ type Events interface {
 	BulkSelectEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error)
 	SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error)
 	SelectRoomNIDsForEventNIDs(ctx context.Context, eventNIDs []types.EventNID) (roomNIDs map[types.EventNID]types.RoomNID, err error)
+	SelectEventAuthEventNIDs(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID][]types.EventNID, error)
 }
 
 type Rooms interface {

@@ -104,6 +104,9 @@ const selectMaxEventDepthSQL = "" +
 const selectRoomNIDsForEventNIDsSQL = "" +
 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid IN ($1)"
 
+const bulkSelectEventAuthEventNIDsSQL = "" +
+	"SELECT auth_event_nids FROM roomserver_events WHERE event_nid IN ($1)"
+
 type eventStatements struct {
 	db                                     *sql.DB
 	insertEventStmt                        *sql.Stmt
@@ -119,6 +122,7 @@ type eventStatements struct {
 	bulkSelectEventIDStmt                  *sql.Stmt
 	bulkSelectEventNIDStmt                 *sql.Stmt
 	//selectRoomNIDsForEventNIDsStmt           *sql.Stmt
+	//bulkSelectEventAuthEventNIDsStmt         *sql.Stmt
 }
 
 func createEventsTable(db *sql.DB) error {
@@ -145,6 +149,7 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		//{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
+		//{&s.bulkSelectEventAuthEventNIDsStmt, bulkSelectEventAuthEventNIDsSQL},
 	}.Prepare(db)
 }
 
@@ -567,6 +572,41 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 			return nil, err
 		}
 		result[eventNID] = roomNID
+	}
+	return result, nil
+}
+
+func (s *eventStatements) SelectEventAuthEventNIDs(
+	ctx context.Context, eventNIDs []types.EventNID,
+) (map[types.EventNID][]types.EventNID, error) {
+	sqlStr := strings.Replace(bulkSelectEventAuthEventNIDsSQL, "($1)", sqlutil.QueryVariadic(len(eventNIDs)), 1)
+	sqlPrep, err := s.db.Prepare(sqlStr)
+	if err != nil {
+		return nil, err
+	}
+	iEventNIDs := make([]interface{}, len(eventNIDs))
+	for i, v := range eventNIDs {
+		iEventNIDs[i] = v
+	}
+	rows, err := sqlPrep.QueryContext(ctx, iEventNIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventAuthEventNIDsStmt: rows.close() failed")
+	result := make(map[types.EventNID][]types.EventNID)
+	for rows.Next() {
+		var eventNID types.EventNID
+		var authEventNIDs string
+		if err = rows.Scan(&authEventNIDs); err != nil {
+			return nil, err
+		}
+		var authEventNIDsArray []int64
+		if err := json.Unmarshal([]byte(authEventNIDs), &authEventNIDsArray); err != nil {
+			return nil, err
+		}
+		for _, a := range authEventNIDsArray {
+			result[eventNID] = append(result[eventNID], types.EventNID(a))
+		}
 	}
 	return result, nil
 }

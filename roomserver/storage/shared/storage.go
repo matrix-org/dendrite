@@ -292,6 +292,22 @@ func (d *Database) StateEntries(
 	return lists, nil
 }
 
+func (d *Database) AuthEventNIDs(
+	ctx context.Context, events []types.EventNID,
+) (types.EventNIDs, error) {
+	entries, err := d.EventsTable.SelectEventAuthEventNIDs(
+		ctx, events,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("d.EventsTable.SelectEventAuthEventNIDs: %w", err)
+	}
+	var lists types.EventNIDs
+	for _, nids := range entries {
+		lists = append(lists, nids...)
+	}
+	return lists[:util.SortAndUnique(lists)], nil
+}
+
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.RoomAliasesTable.InsertRoomAlias(ctx, txn, alias, roomID, creatorUserID)
