@@ -38,7 +38,7 @@ func InviteV2(
 	rsAPI api.RoomserverInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
-	
+
 	inviteReq := gomatrixserverlib.InviteV2Request{}
 	// Check to see if the room_version is supported
 	if _, err := roomserverVersion.SupportedRoomVersion(inviteReq.RoomVersion()); err != nil {
