@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	version    = flag.Bool("version", false, "Shows the current version and exits immediately.")
+	version = flag.Bool("version", false, "Shows the current version and exits immediately.")
 )
 
 // ParseFlags parses the commandline flags and uses them to create a config.
