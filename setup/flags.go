@@ -25,7 +25,6 @@ import (
 )
 
 var (
-	configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 	version    = flag.Bool("version", false, "Shows the current version and exits immediately.")
 )
 
@@ -38,11 +37,7 @@ func ParseFlags(monolith bool) *config.Dendrite {
 		os.Exit(0)
 	}
 
-	if *configPath == "" {
-		logrus.Fatal("--config must be supplied")
-	}
-
-	cfg, err := config.Load(*configPath, monolith)
+	cfg, err := config.Load("dendrite.yaml", monolith)
 
 	if err != nil {
 		logrus.Fatalf("Invalid config file: %s", err)

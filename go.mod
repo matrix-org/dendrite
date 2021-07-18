@@ -1,7 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
-	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031 // indirect
+	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
