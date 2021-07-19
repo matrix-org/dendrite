@@ -424,8 +424,8 @@ func (v *StateResolution) loadStateAfterEventsForNumericTuples(
 	return result, nil
 }
 
-var calculateStateDurations = prometheus.NewSummaryVec(
-	prometheus.SummaryOpts{
+var calculateStateDurations = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
 		Namespace: "dendrite",
 		Subsystem: "roomserver",
 		Name:      "calculate_state_duration_microseconds",
