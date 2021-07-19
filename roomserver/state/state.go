@@ -428,12 +428,12 @@ var calculateStateDurations = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "dendrite",
 		Subsystem: "roomserver",
-		Name:      "calculate_state_duration_microseconds",
+		Name:      "calculate_state_duration_milliseconds",
 		Help:      "How long it takes to calculate the state after a list of events",
 		Buckets: []float64{ // milliseconds
-			5, 10, 25, 50, 75, 100, 250, 500,
+			5, 10, 25, 50, 75, 100, 200, 300, 400, 500,
 			1000, 2000, 3000, 4000, 5000, 6000,
-			7000, 8000, 9000, 10000, 15000, 20000,
+			7000, 8000, 9000, 10000, 15000, 20000, 30000,
 		},
 	},
 	// Takes two labels:
@@ -501,9 +501,8 @@ func (c *calculateStateMetrics) stop(stateNID types.StateSnapshotNID, err error)
 	} else {
 		outcome = "failure"
 	}
-	endTime := time.Now()
 	calculateStateDurations.WithLabelValues(c.algorithm, outcome).Observe(
-		float64(endTime.Sub(c.startTime).Nanoseconds()) / 1000.,
+		float64(time.Since(c.startTime).Milliseconds()),
 	)
 	calculateStatePrevEventLength.WithLabelValues(c.algorithm, outcome).Observe(
 		float64(c.prevEventLength),
