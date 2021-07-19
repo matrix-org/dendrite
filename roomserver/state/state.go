@@ -430,6 +430,11 @@ var calculateStateDurations = prometheus.NewHistogramVec(
 		Subsystem: "roomserver",
 		Name:      "calculate_state_duration_microseconds",
 		Help:      "How long it takes to calculate the state after a list of events",
+		Buckets: []float64{ // milliseconds
+			5, 10, 25, 50, 75, 100, 250, 500,
+			1000, 2000, 3000, 4000, 5000, 6000,
+			7000, 8000, 9000, 10000, 15000, 20000,
+		},
 	},
 	// Takes two labels:
 	//   algorithm:
