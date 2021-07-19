@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 // CheckForSoftFail returns true if the event should be soft-failed
@@ -115,8 +114,6 @@ func CheckAuthEvents(
 
 	// Check if the event is allowed.
 	if err = gomatrixserverlib.Allowed(event.Event, &authEvents); err != nil {
-		_, na := err.(*gomatrixserverlib.NotAllowed)
-		logrus.Warnf("CheckAuthEvents failed Allowed check, NotAllowed=%v", na)
 		return nil, err
 	}
 
