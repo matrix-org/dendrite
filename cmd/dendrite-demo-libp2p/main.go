@@ -197,6 +197,7 @@ func main() {
 		base.Base.PublicFederationAPIMux,
 		base.Base.PublicKeyAPIMux,
 		base.Base.PublicMediaAPIMux,
+		base.Base.SynapseAdminMux,
 	)
 	if err := mscs.Enable(&base.Base, &monolith); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")

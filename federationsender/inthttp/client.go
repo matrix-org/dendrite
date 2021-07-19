@@ -15,6 +15,7 @@ import (
 // HTTP paths for the internal HTTP API
 const (
 	FederationSenderQueryJoinedHostServerNamesInRoomPath = "/federationsender/queryJoinedHostServerNamesInRoom"
+	FederationSenderQueryServerKeysPath                  = "/federationsender/queryServerKeys"
 
 	FederationSenderPerformDirectoryLookupRequestPath = "/federationsender/performDirectoryLookup"
 	FederationSenderPerformJoinRequestPath            = "/federationsender/performJoinRequest"
@@ -31,7 +32,6 @@ const (
 	FederationSenderLookupStatePath        = "/federationsender/client/lookupState"
 	FederationSenderLookupStateIDsPath     = "/federationsender/client/lookupStateIDs"
 	FederationSenderGetEventPath           = "/federationsender/client/getEvent"
-	FederationSenderGetServerKeysPath      = "/federationsender/client/getServerKeys"
 	FederationSenderLookupServerKeysPath   = "/federationsender/client/lookupServerKeys"
 	FederationSenderEventRelationshipsPath = "/federationsender/client/msc2836eventRelationships"
 	FederationSenderSpacesSummaryPath      = "/federationsender/client/msc2946spacesSummary"
@@ -377,31 +377,14 @@ func (h *httpFederationSenderInternalAPI) GetEvent(
 	return *response.Res, nil
 }
 
-type getServerKeys struct {
-	S          gomatrixserverlib.ServerName
-	ServerKeys gomatrixserverlib.ServerKeys
-	Err        *api.FederationClientError
-}
-
-func (h *httpFederationSenderInternalAPI) GetServerKeys(
-	ctx context.Context, s gomatrixserverlib.ServerName,
-) (gomatrixserverlib.ServerKeys, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetServerKeys")
+func (h *httpFederationSenderInternalAPI) QueryServerKeys(
+	ctx context.Context, req *api.QueryServerKeysRequest, res *api.QueryServerKeysResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerKeys")
 	defer span.Finish()
 
-	request := getServerKeys{
-		S: s,
-	}
-	var response getServerKeys
-	apiURL := h.federationSenderURL + FederationSenderGetServerKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
-	if err != nil {
-		return gomatrixserverlib.ServerKeys{}, err
-	}
-	if response.Err != nil {
-		return gomatrixserverlib.ServerKeys{}, response.Err
-	}
-	return response.ServerKeys, nil
+	apiURL := h.federationSenderURL + FederationSenderQueryServerKeysPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
 type lookupServerKeys struct {

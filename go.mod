@@ -1,6 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
+	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
@@ -29,29 +30,33 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20180820122854-51a565b5666b
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20210625141222-bd2b7124cee8
-	github.com/matrix-org/gomatrix v0.0.0-20200827122206-7dd5e2a05bcd
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20210702152949-0cac5159e7d6
+	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20210719140634-f44a103bb12e
 	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
 	github.com/matrix-org/pinecone v0.0.0-20210623102758-74f885644c1b
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.7-0.20210414154423-1157a4212dcb
 	github.com/morikuni/aec v1.0.0 // indirect
+	github.com/neilalexander/utp v0.1.1-0.20210705212447-691f29ad692b
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.2.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.9.0
-	github.com/sirupsen/logrus v1.8.0
-	github.com/tidwall/gjson v1.6.8
-	github.com/tidwall/sjson v1.1.5
+	github.com/sirupsen/logrus v1.8.1
+	github.com/tidwall/gjson v1.8.1
+	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/tidwall/sjson v1.1.7
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible
-	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20210218094457-e77ca8019daa
+	github.com/yggdrasil-network/yggdrasil-go v0.4.1-0.20210715083903-52309d094c00
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
+	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	golang.org/x/mobile v0.0.0-20210220033013-bdb1ca9a1e08
-	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+	golang.org/x/net v0.0.0-20210610132358-84b48f89b13b
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
