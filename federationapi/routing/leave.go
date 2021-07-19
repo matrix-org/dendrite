@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // MakeLeave implements the /make_leave API
@@ -174,6 +175,13 @@ func SendLeave(
 		}
 	}
 
+	if event.StateKey() == nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue("missing state_key"),
+		}
+	}
+
 	// Check if the user has already left. If so, no-op!
 	queryReq := &api.QueryLatestEventsAndStateRequest{
 		RoomID: roomID,
@@ -240,7 +248,10 @@ func SendLeave(
 	mem, err := event.Membership()
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("event.Membership failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("missing content.membership key"),
+		}
 	}
 	if mem != gomatrixserverlib.Leave {
 		return util.JSONResponse{
@@ -252,16 +263,27 @@ func SendLeave(
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
-	if err = api.SendEvents(
-		httpReq.Context(), rsAPI,
-		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			event.Headered(verRes.RoomVersion),
+	var response api.InputRoomEventsResponse
+	rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
+		InputRoomEvents: []api.InputRoomEvent{
+			{
+				Kind:          api.KindNew,
+				Event:         event.Headered(verRes.RoomVersion),
+				AuthEventIDs:  event.AuthEventIDs(),
+				SendAsServer:  string(cfg.Matrix.ServerName),
+				TransactionID: nil,
+			},
 		},
-		cfg.Matrix.ServerName,
-		nil,
-	); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("producer.SendEvents failed")
+	}, &response)
+
+	if response.ErrMsg != "" {
+		util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).WithField("not_allowed", response.NotAllowed).Error("producer.SendEvents failed")
+		if response.NotAllowed {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.Forbidden(response.ErrMsg),
+			}
+		}
 		return jsonerror.InternalServerError()
 	}
 
