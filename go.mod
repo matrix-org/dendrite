@@ -1,7 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
-	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031 // indirect
+	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
@@ -31,7 +31,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20210625141222-bd2b7124cee8
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20210714141824-52d282133140
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20210719140634-f44a103bb12e
 	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
 	github.com/matrix-org/pinecone v0.0.0-20210623102758-74f885644c1b
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4

@@ -1029,8 +1029,8 @@ github.com/matrix-org/go-sqlite3-js v0.0.0-20210625141222-bd2b7124cee8/go.mod h1
 github.com/matrix-org/gomatrix v0.0.0-20190528120928-7df988a63f26/go.mod h1:3fxX6gUjWyI/2Bt7J1OLhpCzOfO/bB3AiX0cJtEKud0=
 github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16 h1:ZtO5uywdd5dLDCud4r0r55eP4j9FuUNpl60Gmntcop4=
 github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16/go.mod h1:/gBX06Kw0exX1HrwmoBibFA98yBk/jxKpGVeyQbff+s=
-github.com/matrix-org/gomatrixserverlib v0.0.0-20210714141824-52d282133140 h1:EWOcw9M3zoXz45aLgaOCay31Xa2QzzMX6vRLh0xNbzY=
-github.com/matrix-org/gomatrixserverlib v0.0.0-20210714141824-52d282133140/go.mod h1:JsAzE1Ll3+gDWS9JSUHPJiiyAksvOOnGWF2nXdg4ZzU=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20210719140634-f44a103bb12e h1:dYPsAU1363AEbcohNzBJHV0CkbfVa8QiMNFib/i5pS8=
+github.com/matrix-org/gomatrixserverlib v0.0.0-20210719140634-f44a103bb12e/go.mod h1:JsAzE1Ll3+gDWS9JSUHPJiiyAksvOOnGWF2nXdg4ZzU=
 github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0 h1:HZCzy4oVzz55e+cOMiX/JtSF2UOY1evBl2raaE7ACcU=
 github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0/go.mod h1:sjyPyRxKM5uw1nD2cJ6O2OxI6GOqyVBfNXqKjBZTBZE=
 github.com/matrix-org/pinecone v0.0.0-20210623102758-74f885644c1b h1:5X5vdWQ13xrNkJVqaJHPsrt7rKkMJH5iac0EtfOuxSg=
@@ -1185,7 +1185,6 @@ github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32/go.mod h1:9wM+0iRr9ahx58uY
 github.com/ncw/swift v1.0.47/go.mod h1:23YIA4yWVnGwv2dQlN4bB7egfYX6YLn0Yo/S6zZO/ZM=
 github.com/neelance/astrewrite v0.0.0-20160511093645-99348263ae86/go.mod h1:kHJEU3ofeGjhHklVoIGuVj85JJwZ6kWPaJwCIxgnFmo=
 github.com/neelance/sourcemap v0.0.0-20151028013722-8c68805598ab/go.mod h1:Qr6/a/Q4r9LP1IltGz7tA7iOK1WonHEYhu1HRBA7ZiM=
-github.com/neilalexander/utp v0.1.1-0.20210622132614-ee9a34a30488 h1:xZk82i6JK2d0SqRIXwaxj7J/NQB6ngq0PuMx3wXBaRQ=
 github.com/neilalexander/utp v0.1.1-0.20210622132614-ee9a34a30488/go.mod h1:NPHGhPc0/wudcaCqL/H5AOddkRf8GPRhzOujuUKGQu8=
 github.com/neilalexander/utp v0.1.1-0.20210705212447-691f29ad692b h1:XNm+Ks3bVziRJxcMaIbzumWEw7l52z9Rek6cMHgln1g=
 github.com/neilalexander/utp v0.1.1-0.20210705212447-691f29ad692b/go.mod h1:ylsx0342RjGHjOoVKhR/wz/7Lhiusonihfj4QLxEMcU=
