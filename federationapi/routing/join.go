@@ -237,7 +237,7 @@ func SendJoin(
 			JSON: jsonerror.BadJSON("missing content.membership key"),
 		}
 	}
-	if membership != "join" {
+	if membership != gomatrixserverlib.Join {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("membership must be 'join'"),
