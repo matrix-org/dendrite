@@ -28,8 +28,8 @@ There are three sample `docker-compose` files:
 The `docker-compose` files refer to the `/etc/dendrite` volume as where the
 runtime config should come from. The mounted folder must contain:
 
-- `dendrite.yaml` configuration file (based on the sample `dendrite-config.yaml`
-   in the `docker/config` folder in the [Dendrite repository](https://github.com/matrix-org/dendrite)
+- `dendrite.yaml` configuration file (based on the [`dendrite-config.yaml`](https://raw.githubusercontent.com/matrix-org/dendrite/master/dendrite-config.yaml)
+   sample in the `build/docker/config` folder of this repository.)
 - `matrix_key.pem` server key, as generated using `cmd/generate-keys`
 - `server.crt` certificate file
 - `server.key` private key file for the above certificate
@@ -50,8 +50,7 @@ The key files will now exist in your current working directory, and can be mount
 
 ## Starting Dendrite as a monolith deployment
 
-Create your config based on the `dendrite.yaml` configuration file in the `docker/config`
-folder in the [Dendrite repository](https://github.com/matrix-org/dendrite).
+Create your config based on the [`dendrite-config.yaml`](https://raw.githubusercontent.com/matrix-org/dendrite/master/dendrite-config.yaml) configuration file in the `build/docker/config` folder of this repository. And rename the config file to `dendrite.yml` (and put it in your `config` directory).
 
 Once in place, start the PostgreSQL dependency:
 
@@ -67,8 +66,7 @@ docker-compose -f docker-compose.monolith.yml up
 
 ## Starting Dendrite as a polylith deployment
 
-Create your config based on the `dendrite.yaml` configuration file in the `docker/config`
-folder in the [Dendrite repository](https://github.com/matrix-org/dendrite).
+Create your config based on the [`dendrite-config.yaml`](https://raw.githubusercontent.com/matrix-org/dendrite/master/dendrite-config.yaml) configuration file in the `build/docker/config` folder of this repository. And rename the config file to `dendrite.yml` (and put it in your `config` directory).
 
 Once in place, start all the dependencies:
 
@@ -84,10 +82,10 @@ docker-compose -f docker-compose.polylith.yml up
 
 ## Building the images
 
-The `docker/images-build.sh` script will build the base image, followed by
+The `build/docker/images-build.sh` script will build the base image, followed by
 all of the component images.
 
-The `docker/images-push.sh` script will push them to Docker Hub (subject
+The `build/docker/images-push.sh` script will push them to Docker Hub (subject
 to permissions).
 
 If you wish to build and push your own images, rename `matrixdotorg/dendrite` to

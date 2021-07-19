@@ -28,6 +28,7 @@ import (
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
+	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -42,6 +43,7 @@ type Joiner struct {
 	DB         storage.Database
 
 	Inputer *input.Inputer
+	Queryer *query.Queryer
 }
 
 // PerformJoin handles joining matrix rooms, including over federation by talking to the federationsender.
@@ -205,7 +207,14 @@ func (r *Joiner) performJoinRoomByID(
 
 	// Force a federated join if we aren't in the room and we've been
 	// given some server names to try joining by.
-	serverInRoom, _ := helpers.IsServerCurrentlyInRoom(ctx, r.DB, r.ServerName, req.RoomIDOrAlias)
+	inRoomReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID: req.RoomIDOrAlias,
+	}
+	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
+	if err = r.Queryer.QueryServerJoinedToRoom(ctx, inRoomReq, inRoomRes); err != nil {
+		return "", "", fmt.Errorf("r.Queryer.QueryServerJoinedToRoom: %w", err)
+	}
+	serverInRoom := inRoomRes.IsInRoom
 	forceFederatedJoin := len(req.ServerNames) > 0 && !serverInRoom
 
 	// Force a federated join if we're dealing with a pending invite

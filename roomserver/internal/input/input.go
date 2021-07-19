@@ -28,9 +28,17 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 	"go.uber.org/atomic"
 )
+
+var keyContentFields = map[string]string{
+	"m.room.join_rules":         "join_rule",
+	"m.room.history_visibility": "history_visibility",
+	"m.room.member":             "membership",
+}
 
 type Inputer struct {
 	DB                   storage.Database
@@ -64,6 +72,9 @@ func (w *inputWorker) start() {
 			if !ok {
 				continue
 			}
+			roomserverInputBackpressure.With(prometheus.Labels{
+				"room_id": task.event.Event.RoomID(),
+			}).Dec()
 			hooks.Run(hooks.KindNewEventReceived, task.event.Event)
 			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
 			if task.err == nil {
@@ -91,15 +102,27 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 			"type":    updates[i].Type,
 		})
 		if updates[i].NewRoomEvent != nil {
+			eventType := updates[i].NewRoomEvent.Event.Type()
 			logger = logger.WithFields(log.Fields{
-				"event_type":     updates[i].NewRoomEvent.Event.Type(),
+				"event_type":     eventType,
 				"event_id":       updates[i].NewRoomEvent.Event.EventID(),
 				"adds_state":     len(updates[i].NewRoomEvent.AddsStateEventIDs),
 				"removes_state":  len(updates[i].NewRoomEvent.RemovesStateEventIDs),
 				"send_as_server": updates[i].NewRoomEvent.SendAsServer,
 				"sender":         updates[i].NewRoomEvent.Event.Sender(),
 			})
-			if updates[i].NewRoomEvent.Event.Type() == "m.room.server_acl" && updates[i].NewRoomEvent.Event.StateKeyEquals("") {
+			if updates[i].NewRoomEvent.Event.StateKey() != nil {
+				logger = logger.WithField("state_key", *updates[i].NewRoomEvent.Event.StateKey())
+			}
+			contentKey := keyContentFields[eventType]
+			if contentKey != "" {
+				value := gjson.GetBytes(updates[i].NewRoomEvent.Event.Content(), contentKey)
+				if value.Exists() {
+					logger = logger.WithField("content_value", value.String())
+				}
+			}
+
+			if eventType == "m.room.server_acl" && updates[i].NewRoomEvent.Event.StateKeyEquals("") {
 				ev := updates[i].NewRoomEvent.Event.Unwrap()
 				defer r.ACLs.OnServerACLUpdate(ev)
 			}
@@ -119,6 +142,20 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 	}
 	return errs
 }
+
+func init() {
+	prometheus.MustRegister(roomserverInputBackpressure)
+}
+
+var roomserverInputBackpressure = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "roomserver",
+		Name:      "input_backpressure",
+		Help:      "How many events are queued for input for a given room",
+	},
+	[]string{"room_id"},
+)
 
 // InputRoomEvents implements api.RoomserverInternalAPI
 func (r *Inputer) InputRoomEvents(
@@ -164,6 +201,9 @@ func (r *Inputer) InputRoomEvents(
 			go worker.start()
 		}
 		worker.input.push(tasks[i])
+		roomserverInputBackpressure.With(prometheus.Labels{
+			"room_id": roomID,
+		}).Inc()
 	}
 
 	// Wait for all of the workers to return results about our tasks.

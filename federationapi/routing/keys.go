@@ -188,40 +188,46 @@ func NotaryKeys(
 	}
 	response.ServerKeys = []json.RawMessage{}
 
-	for serverName := range req.ServerKeys {
-		var keys *gomatrixserverlib.ServerKeys
+	for serverName, kidToCriteria := range req.ServerKeys {
+		var keyList []gomatrixserverlib.ServerKeys
 		if serverName == cfg.Matrix.ServerName {
 			if k, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod)); err == nil {
-				keys = k
+				keyList = append(keyList, *k)
 			} else {
 				return util.ErrorResponse(err)
 			}
 		} else {
-			if k, err := fsAPI.GetServerKeys(httpReq.Context(), serverName); err == nil {
-				keys = &k
-			} else {
+			var resp federationSenderAPI.QueryServerKeysResponse
+			err := fsAPI.QueryServerKeys(httpReq.Context(), &federationSenderAPI.QueryServerKeysRequest{
+				ServerName:      serverName,
+				KeyIDToCriteria: kidToCriteria,
+			}, &resp)
+			if err != nil {
 				return util.ErrorResponse(err)
 			}
+			keyList = append(keyList, resp.ServerKeys...)
 		}
-		if keys == nil {
+		if len(keyList) == 0 {
 			continue
 		}
 
-		j, err := json.Marshal(keys)
-		if err != nil {
-			logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
-			return jsonerror.InternalServerError()
-		}
+		for _, keys := range keyList {
+			j, err := json.Marshal(keys)
+			if err != nil {
+				logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
+				return jsonerror.InternalServerError()
+			}
 
-		js, err := gomatrixserverlib.SignJSON(
-			string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, j,
-		)
-		if err != nil {
-			logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
-			return jsonerror.InternalServerError()
-		}
+			js, err := gomatrixserverlib.SignJSON(
+				string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, j,
+			)
+			if err != nil {
+				logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
+				return jsonerror.InternalServerError()
+			}
 
-		response.ServerKeys = append(response.ServerKeys, js)
+			response.ServerKeys = append(response.ServerKeys, js)
+		}
 	}
 
 	return util.JSONResponse{

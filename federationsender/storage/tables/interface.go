@@ -22,6 +22,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+type NotaryID int64
+
 type FederationSenderQueuePDUs interface {
 	InsertQueuePDU(ctx context.Context, txn *sql.Tx, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, nid int64) error
 	DeleteQueuePDUs(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, jsonNIDs []int64) error
@@ -79,4 +81,26 @@ type FederationSenderInboundPeeks interface {
 	SelectInboundPeeks(ctx context.Context, txn *sql.Tx, roomID string) (inboundPeeks []types.InboundPeek, err error)
 	DeleteInboundPeek(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, roomID, peekID string) (err error)
 	DeleteInboundPeeks(ctx context.Context, txn *sql.Tx, roomID string) (err error)
+}
+
+// FederationSenderNotaryServerKeysJSON contains the byte-for-byte responses from servers which contain their keys and is signed by them.
+type FederationSenderNotaryServerKeysJSON interface {
+	// InsertJSONResponse inserts a new response JSON. Useless on its own, needs querying via FederationSenderNotaryServerKeysMetadata
+	// `validUntil` should be the value of `valid_until_ts` with the 7-day check applied from:
+	//   "Servers MUST use the lesser of this field and 7 days into the future when determining if a key is valid.
+	//    This is to avoid a situation where an attacker publishes a key which is valid for a significant amount of time
+	//    without a way for the homeserver owner to revoke it.""
+	InsertJSONResponse(ctx context.Context, txn *sql.Tx, keyQueryResponseJSON gomatrixserverlib.ServerKeys, serverName gomatrixserverlib.ServerName, validUntil gomatrixserverlib.Timestamp) (NotaryID, error)
+}
+
+// FederationSenderNotaryServerKeysMetadata persists the metadata for FederationSenderNotaryServerKeysJSON
+type FederationSenderNotaryServerKeysMetadata interface {
+	// UpsertKey updates or inserts a (server_name, key_id) tuple, pointing it via NotaryID at the the response which has the longest valid_until_ts
+	// `newNotaryID` and `newValidUntil` should be the notary ID / valid_until  which has this (server_name, key_id) tuple already, e.g one you just inserted.
+	UpsertKey(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, keyID gomatrixserverlib.KeyID, newNotaryID NotaryID, newValidUntil gomatrixserverlib.Timestamp) (NotaryID, error)
+	// SelectKeys returns the signed JSON objects which contain the given key IDs. This will be at most the length of `keyIDs` and at least 1 (assuming
+	// the keys exist in the first place). If `keyIDs` is empty, the signed JSON object with the longest valid_until_ts will be returned.
+	SelectKeys(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, keyIDs []gomatrixserverlib.KeyID) ([]gomatrixserverlib.ServerKeys, error)
+	// DeleteOldJSONResponses removes all responses which are not referenced in FederationSenderNotaryServerKeysMetadata
+	DeleteOldJSONResponses(ctx context.Context, txn *sql.Tx) error
 }
