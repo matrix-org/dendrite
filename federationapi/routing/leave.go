@@ -274,7 +274,7 @@ func SendLeave(
 	}, &response)
 
 	if response.ErrMsg != "" {
-		util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).Error("producer.SendEvents failed")
+		util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).WithField("not_allowed", response.NotAllowed).Error("producer.SendEvents failed")
 		if response.NotAllowed {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,

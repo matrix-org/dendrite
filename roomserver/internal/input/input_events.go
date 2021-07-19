@@ -187,6 +187,8 @@ func (r *Inputer) processRoomEvent(
 			"soft_fail": softfail,
 			"sender":    event.Sender(),
 		}).Debug("Stored rejected event")
+		_, na := rejectionErr.(*gomatrixserverlib.NotAllowed)
+		logrus.Warnf("NotAllowed=%v", na)
 		return event.EventID(), rejectionErr
 	}
 
