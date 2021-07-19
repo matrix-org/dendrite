@@ -867,7 +867,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	}
 	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, stateKey)
 	if err == sql.ErrNoRows {
-		// No rooms a state event with this state key, otherwise we'd have an state key NID
+		// No rooms have a state event with this state key, otherwise we'd have an state key NID
 		return nil, nil
 	}
 	if err != nil {
