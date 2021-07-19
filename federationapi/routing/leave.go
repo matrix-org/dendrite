@@ -174,6 +174,13 @@ func SendLeave(
 		}
 	}
 
+	if event.StateKey() == nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue("missing state_key"),
+		}
+	}
+
 	// Check if the user has already left. If so, no-op!
 	queryReq := &api.QueryLatestEventsAndStateRequest{
 		RoomID: roomID,
