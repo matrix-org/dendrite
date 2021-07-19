@@ -248,7 +248,10 @@ func SendLeave(
 	mem, err := event.Membership()
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("event.Membership failed")
-		return jsonerror.InternalServerError()
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("missing content.membership key"),
+		}
 	}
 	if mem != gomatrixserverlib.Leave {
 		return util.JSONResponse{

@@ -229,6 +229,21 @@ func SendJoin(
 		}
 	}
 
+	// Check that this is in fact a join event
+	membership, err := event.Membership()
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("missing content.membership key"),
+		}
+	}
+	if membership != "join" {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("membership must be 'join'"),
+		}
+	}
+
 	// Check that the event is signed by the server sending the request.
 	redacted := event.Redact()
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
