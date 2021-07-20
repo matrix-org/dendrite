@@ -1,4 +1,4 @@
-// +build riotweb
+// +build elementweb
 
 package embed
 
@@ -12,8 +12,8 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// From within the Riot Web directory:
-// go run github.com/mjibson/esc -o /path/to/dendrite/internal/embed/fs_riotweb.go -private -pkg embed .
+// From within the Element Web directory:
+// go run github.com/mjibson/esc -o /path/to/dendrite/internal/embed/fs_elementweb.go -private -pkg embed .
 
 var cssFile = regexp.MustCompile("\\.css$")
 var jsFile = regexp.MustCompile("\\.js$")
@@ -36,12 +36,12 @@ func (h mimeFixingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func Embed(rootMux *mux.Router, listenPort int, serverName string) {
+	url := fmt.Sprintf("http://localhost:%d", listenPort)
 	embeddedFS := _escFS(false)
 	embeddedServ := mimeFixingHandler{http.FileServer(embeddedFS)}
 
 	rootMux.NotFoundHandler = embeddedServ
-	rootMux.HandleFunc("/config.json", func(w http.ResponseWriter, r *http.Request) {
-		url := fmt.Sprintf("http://%s:%d", r.Header("Host"), listenPort)
+	rootMux.HandleFunc("/config.json", func(w http.ResponseWriter, _ *http.Request) {
 		configFile, err := embeddedFS.Open("/config.sample.json")
 		if err != nil {
 			w.WriteHeader(500)
@@ -68,16 +68,16 @@ func Embed(rootMux *mux.Router, listenPort int, serverName string) {
 		}
 		js, _ := sjson.SetBytes(buf, "default_server_config.m\\.homeserver.base_url", url)
 		js, _ = sjson.SetBytes(js, "default_server_config.m\\.homeserver.server_name", serverName)
-		js, _ = sjson.SetBytes(js, "brand", fmt.Sprintf("Riot %s", serverName))
+		js, _ = sjson.SetBytes(js, "brand", fmt.Sprintf("Element %s", serverName))
 		js, _ = sjson.SetBytes(js, "disable_guests", true)
 		js, _ = sjson.SetBytes(js, "disable_3pid_login", true)
 		js, _ = sjson.DeleteBytes(js, "welcomeUserId")
 		_, _ = w.Write(js)
 	})
 
-	fmt.Println("*-------------------------------*")
-	fmt.Println("| This build includes Riot Web! |")
-	fmt.Println("*-------------------------------*")
+	fmt.Println("*----------------------------------*")
+	fmt.Println("| This build includes Element Web! |")
+	fmt.Println("*----------------------------------*")
 	fmt.Println("Point your browser to:", url)
 	fmt.Println()
 }
