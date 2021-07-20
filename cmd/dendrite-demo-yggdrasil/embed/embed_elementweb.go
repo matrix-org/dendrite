@@ -75,9 +75,9 @@ func Embed(rootMux *mux.Router, listenPort int, serverName string) {
 		_, _ = w.Write(js)
 	})
 
-	fmt.Println("*-------------------------------*")
+	fmt.Println("*----------------------------------*")
 	fmt.Println("| This build includes Element Web! |")
-	fmt.Println("*-------------------------------*")
+	fmt.Println("*----------------------------------*")
 	fmt.Println("Point your browser to:", url)
 	fmt.Println()
 }
