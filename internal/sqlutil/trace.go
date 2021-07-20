@@ -104,7 +104,7 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 	var driverName, dsn string
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		driverName = SQLiteDriverName()
+		driverName = "sqlite3"
 		dsn, err = ParseFileURI(dbProperties.ConnectionString)
 		if err != nil {
 			return nil, fmt.Errorf("ParseFileURI: %w", err)
@@ -123,7 +123,7 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if driverName != SQLiteDriverName() {
+	if driverName != "sqlite3" {
 		logrus.WithFields(logrus.Fields{
 			"MaxOpenConns":    dbProperties.MaxOpenConns(),
 			"MaxIdleConns":    dbProperties.MaxIdleConns(),

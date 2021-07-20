@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 
 	"github.com/matrix-org/util"
@@ -111,13 +110,6 @@ func QueryVariadicOffset(count, offset int) string {
 	}
 	str += ")"
 	return str
-}
-
-func SQLiteDriverName() string {
-	if runtime.GOOS == "js" {
-		return "sqlite3_js"
-	}
-	return "sqlite3"
 }
 
 func minOfInts(a, b int) int {
