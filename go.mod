@@ -37,7 +37,7 @@ require (
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.7-0.20210414154423-1157a4212dcb
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/neilalexander/utp v0.1.1-0.20210705212447-691f29ad692b
+	github.com/neilalexander/utp v0.1.1-0.20210720104546-52626cdf31b2
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.2.0
