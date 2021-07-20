@@ -35,6 +35,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
 	router *mux.Router,
+	synapseAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
 	accountsDB accounts.Database,
 	federation *gomatrixserverlib.FederationClient,
@@ -56,7 +57,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		router, cfg, eduInputAPI, rsAPI, asAPI,
+		router, synapseAdminRouter, cfg, eduInputAPI, rsAPI, asAPI,
 		accountsDB, userAPI, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI, extRoomsProvider, mscCfg,
 	)

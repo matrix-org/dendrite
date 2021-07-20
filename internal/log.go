@@ -73,9 +73,9 @@ func callerPrettyfier(f *runtime.Frame) (string, string) {
 	// Append a newline + tab to it to move the actual log content to its own line
 	funcname += "\n\t"
 
-	// Surround the filepath in brackets and append line number so IDEs can quickly
-	// navigate
-	filename := fmt.Sprintf(" [%s:%d]", f.File, f.Line)
+	// Use a shortened file path which just has the filename to avoid having lots of redundant
+	// directories which contribute significantly to overall log sizes!
+	filename := fmt.Sprintf(" [%s:%d]", path.Base(f.File), f.Line)
 
 	return funcname, filename
 }

@@ -151,6 +151,7 @@ func main() {
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
+		base.SynapseAdminMux,
 	)
 
 	if len(base.Cfg.MSCs.MSCs) > 0 {

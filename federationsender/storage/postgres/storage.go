@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
@@ -69,6 +70,14 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 	if err != nil {
 		return nil, err
 	}
+	notaryJSON, err := NewPostgresNotaryServerKeysTable(d.db)
+	if err != nil {
+		return nil, fmt.Errorf("NewPostgresNotaryServerKeysTable: %s", err)
+	}
+	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(d.db)
+	if err != nil {
+		return nil, fmt.Errorf("NewPostgresNotaryServerKeysMetadataTable: %s", err)
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadRemoveRoomsTable(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
@@ -85,6 +94,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 		FederationSenderBlacklist:     blacklist,
 		FederationSenderInboundPeeks:  inboundPeeks,
 		FederationSenderOutboundPeeks: outboundPeeks,
+		NotaryServerKeysJSON:          notaryJSON,
+		NotaryServerKeysMetadata:      notaryMetadata,
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
 		return nil, err
