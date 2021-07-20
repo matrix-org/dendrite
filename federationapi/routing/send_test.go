@@ -190,7 +190,9 @@ func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 	request *api.QueryServerJoinedToRoomRequest,
 	response *api.QueryServerJoinedToRoomResponse,
 ) error {
-	return fmt.Errorf("not implemented")
+	response.RoomExists = true
+	response.IsInRoom = true
+	return nil
 }
 
 // Query whether a server is allowed to see an event

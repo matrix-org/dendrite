@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 type Leaver struct {
@@ -64,7 +65,14 @@ func (r *Leaver) performLeaveRoomByID(
 	// that.
 	isInvitePending, senderUser, eventID, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
-		return r.performRejectInvite(ctx, req, res, senderUser, eventID)
+		var host gomatrixserverlib.ServerName
+		_, host, err = gomatrixserverlib.SplitID('@', senderUser)
+		if err != nil {
+			return nil, fmt.Errorf("Sender %q is invalid", senderUser)
+		}
+		if host != r.Cfg.Matrix.ServerName {
+			return r.performFederatedRejectInvite(ctx, req, res, senderUser, eventID)
+		}
 	}
 
 	// There's no invite pending, so first of all we want to find out
@@ -94,9 +102,7 @@ func (r *Leaver) performLeaveRoomByID(
 	if err != nil {
 		return nil, fmt.Errorf("Error getting membership: %w", err)
 	}
-	if membership != gomatrixserverlib.Join {
-		// TODO: should be able to handle "invite" in this case too, if
-		// it's a case of kicking or banning or such
+	if membership != gomatrixserverlib.Join && membership != gomatrixserverlib.Invite {
 		return nil, fmt.Errorf("User %q is not joined to the room (membership is %q)", req.UserID, membership)
 	}
 
@@ -147,7 +153,7 @@ func (r *Leaver) performLeaveRoomByID(
 	return nil, nil
 }
 
-func (r *Leaver) performRejectInvite(
+func (r *Leaver) performFederatedRejectInvite(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse, // nolint:unparam
@@ -166,7 +172,9 @@ func (r *Leaver) performRejectInvite(
 	}
 	leaveRes := fsAPI.PerformLeaveResponse{}
 	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
-		return nil, err
+		// failures in PerformLeave should NEVER stop us from telling other components like the
+		// sync API that the invite was withdrawn. Otherwise we can end up with stuck invites.
+		util.GetLogger(ctx).WithError(err).Errorf("failed to PerformLeave, still retiring invite event")
 	}
 
 	// Withdraw the invite, so that the sync API etc are

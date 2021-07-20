@@ -154,6 +154,8 @@ type Database interface {
 	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
 	// JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
 	JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
+	// GetLocalServerInRoom returns true if we think we're in a given room or false otherwise.
+	GetLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error)
 	// GetKnownUsers searches all users that userID knows about.
 	GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error)
 	// GetKnownRooms returns a list of all rooms we know about.
