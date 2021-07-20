@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/storage/tables"
 	"github.com/matrix-org/dendrite/federationsender/types"
@@ -37,6 +38,8 @@ type Database struct {
 	FederationSenderBlacklist     tables.FederationSenderBlacklist
 	FederationSenderOutboundPeeks tables.FederationSenderOutboundPeeks
 	FederationSenderInboundPeeks  tables.FederationSenderInboundPeeks
+	NotaryServerKeysJSON          tables.FederationSenderNotaryServerKeysJSON
+	NotaryServerKeysMetadata      tables.FederationSenderNotaryServerKeysMetadata
 }
 
 // An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
@@ -196,4 +199,48 @@ func (d *Database) GetInboundPeek(ctx context.Context, serverName gomatrixserver
 
 func (d *Database) GetInboundPeeks(ctx context.Context, roomID string) ([]types.InboundPeek, error) {
 	return d.FederationSenderInboundPeeks.SelectInboundPeeks(ctx, nil, roomID)
+}
+
+func (d *Database) UpdateNotaryKeys(ctx context.Context, serverName gomatrixserverlib.ServerName, serverKeys gomatrixserverlib.ServerKeys) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		validUntil := serverKeys.ValidUntilTS
+		// Servers MUST use the lesser of this field and 7 days into the future when determining if a key is valid.
+		// This is to avoid a situation where an attacker publishes a key which is valid for a significant amount of
+		// time without a way for the homeserver owner to revoke it.
+		// https://spec.matrix.org/unstable/server-server-api/#querying-keys-through-another-server
+		weekIntoFuture := time.Now().Add(7 * 24 * time.Hour)
+		if weekIntoFuture.Before(validUntil.Time()) {
+			validUntil = gomatrixserverlib.AsTimestamp(weekIntoFuture)
+		}
+		notaryID, err := d.NotaryServerKeysJSON.InsertJSONResponse(ctx, txn, serverKeys, serverName, validUntil)
+		if err != nil {
+			return err
+		}
+		// update the metadata for the keys
+		for keyID := range serverKeys.OldVerifyKeys {
+			_, err = d.NotaryServerKeysMetadata.UpsertKey(ctx, txn, serverName, keyID, notaryID, validUntil)
+			if err != nil {
+				return err
+			}
+		}
+		for keyID := range serverKeys.VerifyKeys {
+			_, err = d.NotaryServerKeysMetadata.UpsertKey(ctx, txn, serverName, keyID, notaryID, validUntil)
+			if err != nil {
+				return err
+			}
+		}
+
+		// clean up old responses
+		return d.NotaryServerKeysMetadata.DeleteOldJSONResponses(ctx, txn)
+	})
+}
+
+func (d *Database) GetNotaryKeys(
+	ctx context.Context, serverName gomatrixserverlib.ServerName, optKeyIDs []gomatrixserverlib.KeyID,
+) (sks []gomatrixserverlib.ServerKeys, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		sks, err = d.NotaryServerKeysMetadata.SelectKeys(ctx, txn, serverName, optKeyIDs)
+		return err
+	})
+	return sks, err
 }

@@ -520,6 +520,8 @@ Inviting an AS-hosted user asks the AS server
 Can generate a openid access_token that can be exchanged for information about a user
 Invalid openid access tokens are rejected
 Requests to userinfo without access tokens are rejected
+'ban' event respects room powerlevel
+Non-present room members cannot ban others
 POST /_synapse/admin/v1/register with shared secret
 POST /_synapse/admin/v1/register admin with shared secret
 POST /_synapse/admin/v1/register with shared secret downcases capitals
@@ -530,3 +532,8 @@ Inbound federation can receive invite rejections
 Inbound federation can receive invite and reject when remote replies with a 403
 Inbound federation can receive invite and reject when remote replies with a 500
 Inbound federation can receive invite and reject when remote is unreachable
+Remote servers cannot set power levels in rooms without existing powerlevels
+Remote servers should reject attempts by non-creators to set the power levels
+Federation handles empty auth_events in state_ids sanely
+Key notary server should return an expired key if it can't find any others
+Key notary server must not overwrite a valid key with a spurious result from the origin server
