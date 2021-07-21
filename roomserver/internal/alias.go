@@ -176,8 +176,8 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 }
 
 type roomAliasesContent struct {
-	Alias   string   `json:"alias"`
-	Aliases []string `json:"alt_aliases"`
+	Alias   string   `json:"alias,omitempty"`
+	Aliases []string `json:"alt_aliases,omitempty"`
 }
 
 // Build the updated m.room.aliases event to send to the room after addition or
