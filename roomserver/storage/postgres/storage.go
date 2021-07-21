@@ -53,6 +53,7 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	m := sqlutil.NewMigrations()
 	deltas.LoadAddForgottenColumn(m)
 	deltas.LoadStateBlocksRefactor(m)
+	deltas.LoadAddDisplaynameColumn(m)
 	if err := m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
@@ -60,7 +61,7 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
 	if err := d.prepare(db, cache); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error preparing statements: %v", err)
 	}
 
 	return &d, nil

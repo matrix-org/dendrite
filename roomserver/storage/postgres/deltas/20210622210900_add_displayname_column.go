@@ -1,3 +1,4 @@
+
 // Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +23,7 @@ import (
 )
 
 func LoadAddDisplaynameColumn(m *sqlutil.Migrations) {
-	m.AddMigration(UpAddDisplaynameColumn, DownAddDisplaynameColumn)
+	m.AddMigration(UpAddForgottenColumn, DownAddForgottenColumn)
 }
 
 func UpAddDisplaynameColumn(tx *sql.Tx) error {
