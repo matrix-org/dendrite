@@ -61,7 +61,7 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
 	if err := d.prepare(db, cache); err != nil {
-		return nil, fmt.Errorf("Error preparing statements: %v", err)
+		return nil, err
 	}
 
 	return &d, nil
