@@ -206,10 +206,15 @@ func createRoom(
 		return jsonerror.InternalServerError()
 	}
 
-	createContent := gomatrixserverlib.CreateContent{
-		Creator:     userID,
-		RoomVersion: &roomVersion,
+	createContent := map[string]interface{}{}
+	if err = json.Unmarshal(r.CreationContent, &createContent); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("invalid create content"),
+		}
 	}
+	createContent["creator"] = userID
+	createContent["room_version"] = roomVersion
 	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
 		JoinRule: gomatrixserverlib.Invite,
@@ -331,7 +336,7 @@ func createRoom(
 	for i := range r.InitialState {
 		switch r.InitialState[i].Type {
 		case gomatrixserverlib.MRoomCreate:
-			createEvent = r.InitialState[i]
+			continue
 
 		case gomatrixserverlib.MRoomPowerLevels:
 			powerLevelEvent = r.InitialState[i]
