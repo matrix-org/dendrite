@@ -315,10 +315,6 @@ func (t *testRoomserverAPI) QueryKnownUsers(ctx context.Context, req *api.QueryK
 	return fmt.Errorf("not implemented")
 }
 
-func (t *testRoomserverAPI) QueryPublicUsers(ctx context.Context, req *api.QueryPublicUsersRequest, res *api.QueryPublicUsersResponse) error {
-	return fmt.Errorf("not implemented")
-}
-
 func (t *testRoomserverAPI) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse) error {
 	return nil
 }
