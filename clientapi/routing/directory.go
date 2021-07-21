@@ -113,13 +113,12 @@ func DirectoryRoom(
 }
 
 // SetLocalAlias implements PUT /directory/room/{roomAlias}
-// TODO: Check if the user has the power level to set an alias
 func SetLocalAlias(
 	req *http.Request,
 	device *api.Device,
 	alias string,
 	cfg *config.ClientAPI,
-	aliasAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', alias)
 	if err != nil {
@@ -166,13 +165,42 @@ func SetLocalAlias(
 		return *resErr
 	}
 
+	// Check if the user has the power to update the aliases.
+	stateTuple := gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomPowerLevels,
+		StateKey:  "",
+	}
+	stateReq := &roomserverAPI.QueryCurrentStateRequest{
+		RoomID:      r.RoomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{stateTuple},
+	}
+	stateRes := &roomserverAPI.QueryCurrentStateResponse{}
+	if err := rsAPI.QueryCurrentState(req.Context(), stateReq, stateRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryCurrentState failed")
+		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryCurrentState: %w", err))
+	}
+	if plEvent, ok := stateRes.StateEvents[stateTuple]; ok {
+		pls, err := plEvent.PowerLevels()
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("plEvent.PowerLevels failed")
+			return util.ErrorResponse(fmt.Errorf("plEvent.PowerLevels: %w", err))
+		}
+
+		if pls.UserLevel(device.UserID) < pls.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("You do not have permission to set aliases."),
+			}
+		}
+	}
+
 	queryReq := roomserverAPI.SetRoomAliasRequest{
 		UserID: device.UserID,
 		RoomID: r.RoomID,
 		Alias:  alias,
 	}
 	var queryRes roomserverAPI.SetRoomAliasResponse
-	if err := aliasAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
+	if err := rsAPI.SetRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
 		return jsonerror.InternalServerError()
 	}
