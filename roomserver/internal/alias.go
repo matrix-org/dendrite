@@ -150,13 +150,37 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
+	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
+	if err != nil {
+		return fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
+	}
+	if roomID == "" {
+		response.Found = false
+		response.Removed = false
+		return nil
+	}
+
+	response.Found = true
 	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
 	if err != nil {
-		return err
+		return fmt.Errorf("r.DB.GetCreatorIDForAlias: %w", err)
 	}
 
 	if creatorID != request.UserID {
-		return fmt.Errorf("not allowed to delete this alias")
+		plEvent, err := r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomPowerLevels, "")
+		if err != nil {
+			return fmt.Errorf("r.DB.GetStateEvent: %w", err)
+		}
+
+		pls, err := plEvent.PowerLevels()
+		if err != nil {
+			return fmt.Errorf("plEvent.PowerLevels: %w", err)
+		}
+
+		if pls.UserLevel(request.UserID) < pls.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
+			response.Removed = false
+			return nil
+		}
 	}
 
 	// Remove the alias from the database
@@ -164,5 +188,6 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		return err
 	}
 
+	response.Removed = true
 	return nil
 }
