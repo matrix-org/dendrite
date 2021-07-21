@@ -209,6 +209,7 @@ func createRoom(
 	createContent := map[string]interface{}{}
 	if len(r.CreationContent) > 0 {
 		if err = json.Unmarshal(r.CreationContent, &createContent); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal for creation_content failed")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.BadJSON("invalid create content"),
@@ -229,6 +230,7 @@ func createRoom(
 		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
 		err = json.Unmarshal(r.PowerLevelContentOverride, &powerLevelContent)
 		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.BadJSON("malformed power_level_content_override"),
@@ -336,6 +338,11 @@ func createRoom(
 
 	var initialStateEvents []fledglingEvent
 	for i := range r.InitialState {
+		if r.InitialState[i].StateKey != "" {
+			initialStateEvents = append(initialStateEvents, r.InitialState[i])
+			continue
+		}
+
 		switch r.InitialState[i].Type {
 		case gomatrixserverlib.MRoomCreate:
 			continue
