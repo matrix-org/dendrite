@@ -165,35 +165,6 @@ func SetLocalAlias(
 		return *resErr
 	}
 
-	// Check if the user has the power to update the aliases.
-	stateTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomPowerLevels,
-		StateKey:  "",
-	}
-	stateReq := &roomserverAPI.QueryCurrentStateRequest{
-		RoomID:      r.RoomID,
-		StateTuples: []gomatrixserverlib.StateKeyTuple{stateTuple},
-	}
-	stateRes := &roomserverAPI.QueryCurrentStateResponse{}
-	if err := rsAPI.QueryCurrentState(req.Context(), stateReq, stateRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryCurrentState failed")
-		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryCurrentState: %w", err))
-	}
-	if plEvent, ok := stateRes.StateEvents[stateTuple]; ok {
-		pls, err := plEvent.PowerLevels()
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("plEvent.PowerLevels failed")
-			return util.ErrorResponse(fmt.Errorf("plEvent.PowerLevels: %w", err))
-		}
-
-		if pls.UserLevel(device.UserID) < pls.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("You do not have permission to set aliases."),
-			}
-		}
-	}
-
 	queryReq := roomserverAPI.SetRoomAliasRequest{
 		UserID: device.UserID,
 		RoomID: r.RoomID,
