@@ -282,7 +282,7 @@ func createRoom(
 
 	if r.Topic != "" {
 		topicEvent = &fledglingEvent{
-			Type: "m.room.topic",
+			Type: gomatrixserverlib.MRoomTopic,
 			Content: eventutil.TopicContent{
 				Topic: r.Topic,
 			},
@@ -291,7 +291,7 @@ func createRoom(
 
 	if r.GuestCanJoin {
 		guestAccessEvent = &fledglingEvent{
-			Type: "m.room.guest_access",
+			Type: gomatrixserverlib.MRoomGuestAccess,
 			Content: eventutil.GuestAccessContent{
 				GuestAccess: "can_join",
 			},
@@ -333,13 +333,13 @@ func createRoom(
 		case gomatrixserverlib.MRoomHistoryVisibility:
 			historyVisibilityEvent = r.InitialState[i]
 
-		case "m.room.guest_access":
+		case gomatrixserverlib.MRoomGuestAccess:
 			guestAccessEvent = &r.InitialState[i]
 
 		case gomatrixserverlib.MRoomName:
 			nameEvent = &r.InitialState[i]
 
-		case "m.room.topic":
+		case gomatrixserverlib.MRoomTopic:
 			topicEvent = &r.InitialState[i]
 
 		default:
@@ -381,7 +381,7 @@ func createRoom(
 		// TODO: bit of a chicken and egg problem here as the alias doesn't exist and cannot until we have made the room.
 		// This means we might fail creating the alias but say the canonical alias is something that doesn't exist.
 		// m.room.aliases is handled when we call roomserver.SetRoomAlias
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.canonical_alias", "", eventutil.CanonicalAlias{Alias: roomAlias}})
+		eventsToMake = append(eventsToMake, fledglingEvent{gomatrixserverlib.MRoomCanonicalAlias, "", eventutil.CanonicalAlias{Alias: roomAlias}})
 	}
 	eventsToMake = append(eventsToMake, initialStateEvents...)
 
@@ -477,7 +477,7 @@ func createRoom(
 				fallthrough
 			case gomatrixserverlib.MRoomCanonicalAlias:
 				fallthrough
-			case "m.room.encryption": // TODO: move this to gmsl
+			case gomatrixserverlib.MRoomEncryption:
 				fallthrough
 			case gomatrixserverlib.MRoomMember:
 				fallthrough
