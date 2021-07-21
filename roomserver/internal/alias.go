@@ -77,7 +77,15 @@ func (r *RoomserverInternalAPI) SetRoomAlias(
 	// At this point we've already committed the alias to the database so we
 	// shouldn't cancel this request.
 	// TODO: Ensure that we send unsent events when if server restarts.
-	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID)
+	//
+	// From: https://spec.matrix.org/unstable/client-server-api/#delete_matrixclientr0directoryroomroomalias
+	// Note: Servers may choose to update the alt_aliases for the m.room.canonical_alias
+	// state event in the room when an alias is removed. Servers which choose to update
+	// the canonical alias event are recommended to, in addition to their other relevant
+	// permission checks, delete the alias and return a successful response even if the
+	// user does not have permission to update the m.room.canonical_alias event.
+	_ = r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID)
+	return nil
 }
 
 // GetRoomIDForAlias implements alias.RoomserverInternalAPI
@@ -172,7 +180,15 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	// At this point we've already committed the alias to the database so we
 	// shouldn't cancel this request.
 	// TODO: Ensure that we send unsent events when if server restarts.
-	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID)
+	//
+	// From: https://spec.matrix.org/unstable/client-server-api/#delete_matrixclientr0directoryroomroomalias
+	// Note: Servers may choose to update the alt_aliases for the m.room.canonical_alias
+	// state event in the room when an alias is removed. Servers which choose to update
+	// the canonical alias event are recommended to, in addition to their other relevant
+	// permission checks, delete the alias and return a successful response even if the
+	// user does not have permission to update the m.room.canonical_alias event.
+	_ = r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID)
+	return nil
 }
 
 type roomAliasesContent struct {
