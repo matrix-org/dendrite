@@ -37,7 +37,7 @@ const membershipSchema = `
 		event_nid INTEGER NOT NULL DEFAULT 0,
 		target_local BOOLEAN NOT NULL DEFAULT false,
 		forgotten BOOLEAN NOT NULL DEFAULT false,
-		displayname TEXT,
+		displayname TEXT NOT NULL DEFAULT "",
 		UNIQUE (room_nid, target_nid)
 	);
 `

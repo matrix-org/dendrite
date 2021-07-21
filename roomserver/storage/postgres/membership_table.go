@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 	-- room joins.
 	target_local BOOLEAN NOT NULL DEFAULT false,
 	forgotten BOOLEAN NOT NULL DEFAULT FALSE,
-	displayname TEXT,
+	displayname TEXT NOT NULL DEFAULT "",
 	UNIQUE (room_nid, target_nid)
 );
 `
