@@ -330,44 +330,15 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	response.RoomExists = true
 
 	if request.ServerName == r.ServerName || request.ServerName == "" {
-		var joined bool
-		joined, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
+		response.IsInRoom, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
 		if err != nil {
 			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
 		}
-		response.IsInRoom = joined
-		return nil
-	}
-
-	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
-	if err != nil {
-		return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
-	}
-	if len(eventNIDs) == 0 {
-		return nil
-	}
-
-	events, err := r.DB.Events(ctx, eventNIDs)
-	if err != nil {
-		return fmt.Errorf("r.DB.Events: %w", err)
-	}
-
-	servers := map[gomatrixserverlib.ServerName]struct{}{}
-	for _, e := range events {
-		if e.Type() == gomatrixserverlib.MRoomMember && e.StateKey() != nil {
-			_, serverName, err := gomatrixserverlib.SplitID('@', *e.StateKey())
-			if err != nil {
-				continue
-			}
-			servers[serverName] = struct{}{}
-			if serverName == request.ServerName {
-				response.IsInRoom = true
-			}
+	} else {
+		response.IsInRoom, err = r.DB.GetServerInRoom(ctx, info.RoomNID, request.ServerName)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetServerInRoom: %w", err)
 		}
-	}
-
-	for server := range servers {
-		response.ServerNames = append(response.ServerNames, server)
 	}
 
 	return nil

@@ -1068,6 +1068,11 @@ func (d *Database) GetLocalServerInRoom(ctx context.Context, roomNID types.RoomN
 	return d.MembershipTable.SelectLocalServerInRoom(ctx, roomNID)
 }
 
+// GetServerInRoom returns true if we think a server is in a given room or false otherwise.
+func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error) {
+	return d.MembershipTable.SelectServerInRoom(ctx, roomNID, serverName)
+}
+
 // GetKnownUsers searches all users that userID knows about.
 func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString string, limit int) ([]string, error) {
 	stateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
