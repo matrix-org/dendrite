@@ -73,7 +73,7 @@ func (r *RoomserverInternalAPI) SetRoomAlias(
 		return err
 	}
 
-	// Send a m.room.aliases event with the updated list of aliases for this room
+	// Send a m.room.canonical_alias event with the updated list of aliases for this room
 	// At this point we've already committed the alias to the database so we
 	// shouldn't cancel this request.
 	// TODO: Ensure that we send unsent events when if server restarts.
@@ -176,7 +176,8 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 }
 
 type roomAliasesContent struct {
-	Aliases []string `json:"aliases"`
+	Alias   string   `json:"alias"`
+	Aliases []string `json:"alt_aliases"`
 }
 
 // Build the updated m.room.aliases event to send to the room after addition or
@@ -189,7 +190,7 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:   userID,
 		RoomID:   roomID,
-		Type:     "m.room.aliases",
+		Type:     gomatrixserverlib.MRoomCanonicalAlias,
 		StateKey: &serverName,
 	}
 
@@ -199,7 +200,9 @@ func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
 	if err != nil {
 		return err
 	}
-	content := roomAliasesContent{Aliases: aliases}
+	content := roomAliasesContent{
+		Aliases: aliases,
+	}
 	rawContent, err := json.Marshal(content)
 	if err != nil {
 		return err
