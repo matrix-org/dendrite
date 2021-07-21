@@ -857,6 +857,9 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
+	if roomInfo == nil || roomInfo.IsStub {
+		return nil, fmt.Errorf("room %s doesn't exist", roomID)
+	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
 	if err == sql.ErrNoRows {
 		// No rooms have an event of this type, otherwise we'd have an event type NID

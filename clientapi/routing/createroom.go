@@ -383,7 +383,6 @@ func createRoom(
 	//  10- m.room.topic (opt)
 	//  11- invite events (opt) - with is_direct flag if applicable TODO
 	//  12- 3pid invite events (opt) TODO
-	//  13- m.room.aliases event for HS (if alias specified) TODO
 	// This differs from Synapse slightly. Synapse would vary the ordering of 3-7
 	// depending on if those events were in "initial_state" or not. This made it
 	// harder to reason about, hence sticking to a strict static ordering.
@@ -404,7 +403,6 @@ func createRoom(
 	if aliasEvent != nil {
 		// TODO: bit of a chicken and egg problem here as the alias doesn't exist and cannot until we have made the room.
 		// This means we might fail creating the alias but say the canonical alias is something that doesn't exist.
-		// m.room.aliases is handled when we call roomserver.SetRoomAlias
 		eventsToMake = append(eventsToMake, *aliasEvent)
 	}
 
