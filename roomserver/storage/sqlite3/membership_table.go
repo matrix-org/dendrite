@@ -117,7 +117,7 @@ const selectLocalServerInRoomSQL = "" +
 const selectServerInRoomSQL = "" +
 	"SELECT room_nid FROM roomserver_membership" +
 	" JOIN roomserver_event_state_keys ON roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
-	" WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:$3' LIMIT 1"
+	" WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
 
 type membershipStatements struct {
 	db                                              *sql.DB
