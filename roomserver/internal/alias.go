@@ -16,10 +16,7 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -73,18 +70,6 @@ func (r *RoomserverInternalAPI) SetRoomAlias(
 		return err
 	}
 
-	// Send a m.room.canonical_alias event with the updated list of aliases for this room
-	// At this point we've already committed the alias to the database so we
-	// shouldn't cancel this request.
-	// TODO: Ensure that we send unsent events when if server restarts.
-	//
-	// From: https://spec.matrix.org/unstable/client-server-api/#delete_matrixclientr0directoryroomroomalias
-	// Note: Servers may choose to update the alt_aliases for the m.room.canonical_alias
-	// state event in the room when an alias is removed. Servers which choose to update
-	// the canonical alias event are recommended to, in addition to their other relevant
-	// permission checks, delete the alias and return a successful response even if the
-	// user does not have permission to update the m.room.canonical_alias event.
-	_ = r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID)
 	return nil
 }
 
@@ -165,10 +150,13 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	// Look up the room ID in the database
-	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
+	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.UserID)
 	if err != nil {
 		return err
+	}
+
+	if creatorID != request.UserID {
+		return fmt.Errorf("not allowed to delete this alias")
 	}
 
 	// Remove the dalias from the database
@@ -176,122 +164,5 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		return err
 	}
 
-	// Send an updated m.room.aliases event
-	// At this point we've already committed the alias to the database so we
-	// shouldn't cancel this request.
-	// TODO: Ensure that we send unsent events when if server restarts.
-	//
-	// From: https://spec.matrix.org/unstable/client-server-api/#delete_matrixclientr0directoryroomroomalias
-	// Note: Servers may choose to update the alt_aliases for the m.room.canonical_alias
-	// state event in the room when an alias is removed. Servers which choose to update
-	// the canonical alias event are recommended to, in addition to their other relevant
-	// permission checks, delete the alias and return a successful response even if the
-	// user does not have permission to update the m.room.canonical_alias event.
-	_ = r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID)
 	return nil
-}
-
-type roomAliasesContent struct {
-	Alias   string   `json:"alias,omitempty"`
-	Aliases []string `json:"alt_aliases,omitempty"`
-}
-
-// Build the updated m.room.aliases event to send to the room after addition or
-// removal of an alias
-func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
-	ctx context.Context, userID string, roomID string,
-) error {
-	serverName := string(r.Cfg.Matrix.ServerName)
-
-	builder := gomatrixserverlib.EventBuilder{
-		Sender:   userID,
-		RoomID:   roomID,
-		Type:     gomatrixserverlib.MRoomCanonicalAlias,
-		StateKey: &serverName,
-	}
-
-	// Retrieve the updated list of aliases, marhal it and set it as the
-	// event's content
-	aliases, err := r.DB.GetAliasesForRoomID(ctx, roomID)
-	if err != nil {
-		return err
-	}
-	content := roomAliasesContent{
-		Aliases: aliases,
-	}
-	rawContent, err := json.Marshal(content)
-	if err != nil {
-		return err
-	}
-	err = builder.SetContent(json.RawMessage(rawContent))
-	if err != nil {
-		return err
-	}
-
-	// Get needed state events and depth
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
-	if err != nil {
-		return err
-	}
-	if len(eventsNeeded.Tuples()) == 0 {
-		return errors.New("expecting state tuples for event builder, got none")
-	}
-	req := api.QueryLatestEventsAndStateRequest{
-		RoomID:       roomID,
-		StateToFetch: eventsNeeded.Tuples(),
-	}
-	var res api.QueryLatestEventsAndStateResponse
-	if err = r.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
-		return err
-	}
-	builder.Depth = res.Depth
-	builder.PrevEvents = res.LatestEvents
-
-	// Add auth events
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
-	for i := range res.StateEvents {
-		err = authEvents.AddEvent(res.StateEvents[i].Event)
-		if err != nil {
-			return err
-		}
-	}
-	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
-	if err != nil {
-		return err
-	}
-	builder.AuthEvents = refs
-
-	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
-	if err != nil {
-		return err
-	}
-	if roomInfo == nil {
-		return fmt.Errorf("room %s does not exist", roomID)
-	}
-
-	// Build the event
-	now := time.Now()
-	event, err := builder.Build(
-		now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID,
-		r.Cfg.Matrix.PrivateKey, roomInfo.RoomVersion,
-	)
-	if err != nil {
-		return err
-	}
-
-	// Create the request
-	ire := api.InputRoomEvent{
-		Kind:         api.KindNew,
-		Event:        event.Headered(roomInfo.RoomVersion),
-		AuthEventIDs: event.AuthEventIDs(),
-		SendAsServer: serverName,
-	}
-	inputReq := api.InputRoomEventsRequest{
-		InputRoomEvents: []api.InputRoomEvent{ire},
-	}
-	var inputRes api.InputRoomEventsResponse
-
-	// Send the request
-	r.InputRoomEvents(ctx, &inputReq, &inputRes)
-	return inputRes.Err()
 }
