@@ -44,27 +44,29 @@ func GetAliases(
 		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryCurrentState: %w", err))
 	}
 
+	visibility := "invite"
 	if historyVisEvent, ok := stateRes.StateEvents[stateTuple]; ok {
-		visibility, err := historyVisEvent.HistoryVisibility()
+		var err error
+		visibility, err = historyVisEvent.HistoryVisibility()
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("historyVisEvent.HistoryVisibility failed")
 			return util.ErrorResponse(fmt.Errorf("historyVisEvent.HistoryVisibility: %w", err))
 		}
-		if visibility != gomatrixserverlib.WorldReadable {
-			queryReq := api.QueryMembershipForUserRequest{
-				RoomID: roomID,
-				UserID: device.UserID,
-			}
-			var queryRes api.QueryMembershipForUserResponse
-			if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
-				return jsonerror.InternalServerError()
-			}
-			if !queryRes.IsInRoom {
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("You aren't a member of this room."),
-				}
+	}
+	if visibility != gomatrixserverlib.WorldReadable {
+		queryReq := api.QueryMembershipForUserRequest{
+			RoomID: roomID,
+			UserID: device.UserID,
+		}
+		var queryRes api.QueryMembershipForUserResponse
+		if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
+			return jsonerror.InternalServerError()
+		}
+		if !queryRes.IsInRoom {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("You aren't a member of this room."),
 			}
 		}
 	}
