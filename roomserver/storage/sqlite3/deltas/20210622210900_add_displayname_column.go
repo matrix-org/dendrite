@@ -26,7 +26,26 @@ func LoadAddDisplaynameColumn(m *sqlutil.Migrations) {
 }
 
 func UpAddDisplaynameColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`ALTER TABLE roomserver_membership ADD COLUMN IF NOT EXISTS displayname TEXT DEFAULT '';`)
+	_, err := tx.Exec(`	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
+CREATE TABLE IF NOT EXISTS roomserver_membership (
+	room_nid INTEGER NOT NULL,
+	target_nid INTEGER NOT NULL,
+	sender_nid INTEGER NOT NULL DEFAULT 0,
+	membership_nid INTEGER NOT NULL DEFAULT 1,
+	event_nid INTEGER NOT NULL DEFAULT 0,
+	target_local BOOLEAN NOT NULL DEFAULT false,
+	forgotten BOOLEAN NOT NULL DEFAULT false,
+	displayname TEXT NOT NULL DEFAULT '',
+	UNIQUE (room_nid, target_nid)
+);
+INSERT
+    INTO roomserver_membership (
+      room_nid, target_nid, sender_nid, membership_nid, event_nid, target_local, forgotten
+    ) SELECT
+        room_nid, target_nid, sender_nid, membership_nid, event_nid, target_local, forgotten
+    FROM roomserver_membership_tmp
+;
+DROP TABLE roomserver_membership_tmp;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
@@ -34,7 +53,25 @@ func UpAddDisplaynameColumn(tx *sql.Tx) error {
 }
 
 func DownAddDisplaynameColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`ALTER TABLE roomserver_membership DROP COLUMN IF EXISTS displayname;`)
+	_, err := tx.Exec(`	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
+CREATE TABLE IF NOT EXISTS roomserver_membership (
+	room_nid INTEGER NOT NULL,
+	target_nid INTEGER NOT NULL,
+	sender_nid INTEGER NOT NULL DEFAULT 0,
+	membership_nid INTEGER NOT NULL DEFAULT 1,
+	event_nid INTEGER NOT NULL DEFAULT 0,
+	target_local BOOLEAN NOT NULL DEFAULT false,
+	forgotten BOOLEAN NOT NULL DEFAULT false,
+	UNIQUE (room_nid, target_nid)
+);
+INSERT
+    INTO roomserver_membership (
+      room_nid, target_nid, sender_nid, membership_nid, event_nid, target_local, forgotten
+    ) SELECT
+        room_nid, target_nid, sender_nid, membership_nid, event_nid, target_local, forgotten
+    FROM roomserver_membership_tmp
+;
+DROP TABLE roomserver_membership_tmp;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
 	}

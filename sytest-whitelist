@@ -521,3 +521,6 @@ Can generate a openid access_token that can be exchanged for information about a
 Invalid openid access tokens are rejected
 Requests to userinfo without access tokens are rejected
 User in private room doesn't appear in user directory
+User joining then leaving public room appears and dissappears from directory
+User in remote room doesn't appear in user directory after server left room
+User in shared private room does appear in user directory until leave
