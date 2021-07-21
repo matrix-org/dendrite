@@ -150,7 +150,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.UserID)
+	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		return fmt.Errorf("not allowed to delete this alias")
 	}
 
-	// Remove the dalias from the database
+	// Remove the alias from the database
 	if err := r.DB.RemoveRoomAlias(ctx, request.Alias); err != nil {
 		return err
 	}
