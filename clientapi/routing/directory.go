@@ -194,14 +194,14 @@ func RemoveLocalAlias(
 	req *http.Request,
 	device *api.Device,
 	alias string,
-	aliasAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 
 	creatorQueryReq := roomserverAPI.GetCreatorIDForAliasRequest{
 		Alias: alias,
 	}
 	var creatorQueryRes roomserverAPI.GetCreatorIDForAliasResponse
-	if err := aliasAPI.GetCreatorIDForAlias(req.Context(), &creatorQueryReq, &creatorQueryRes); err != nil {
+	if err := rsAPI.GetCreatorIDForAlias(req.Context(), &creatorQueryReq, &creatorQueryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.GetCreatorIDForAlias failed")
 		return jsonerror.InternalServerError()
 	}
@@ -214,10 +214,39 @@ func RemoveLocalAlias(
 	}
 
 	if creatorQueryRes.UserID != device.UserID {
-		// TODO: Still allow deletion if user is admin
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("You do not have permission to delete this alias"),
+		// Query the roomserver API to check if the alias exists locally.
+		roomReq := &roomserverAPI.GetRoomIDForAliasRequest{
+			Alias: alias,
+		}
+		roomRes := &roomserverAPI.GetRoomIDForAliasResponse{}
+		if err := rsAPI.GetRoomIDForAlias(req.Context(), roomReq, roomRes); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("rsAPI.GetRoomIDForAlias failed")
+			return jsonerror.InternalServerError()
+		}
+
+		// Now request the power levels so that we can see if we have enough power to remove it.
+		queryEventsReq := roomserverAPI.QueryLatestEventsAndStateRequest{
+			RoomID: roomRes.RoomID,
+			StateToFetch: []gomatrixserverlib.StateKeyTuple{{
+				EventType: gomatrixserverlib.MRoomPowerLevels,
+				StateKey:  "",
+			}},
+		}
+		var queryEventsRes roomserverAPI.QueryLatestEventsAndStateResponse
+		err := rsAPI.QueryLatestEventsAndState(req.Context(), &queryEventsReq, &queryEventsRes)
+		if err != nil || len(queryEventsRes.StateEvents) == 0 {
+			util.GetLogger(req.Context()).WithError(err).Error("could not query events from room")
+			return jsonerror.InternalServerError()
+		}
+
+		// NOTSPEC: Check if the user's power is greater than power required to change m.room.canonical_alias event.
+		// Despite being NOTSPEC, there seems to be a sytest for this?
+		power, _ := gomatrixserverlib.NewPowerLevelContentFromEvent(queryEventsRes.StateEvents[0].Event)
+		if power.UserLevel(device.UserID) < power.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("You do not have permission to delete this alias."),
+			}
 		}
 	}
 
@@ -226,7 +255,7 @@ func RemoveLocalAlias(
 		UserID: device.UserID,
 	}
 	var queryRes roomserverAPI.RemoveRoomAliasResponse
-	if err := aliasAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
+	if err := rsAPI.RemoveRoomAlias(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.RemoveRoomAlias failed")
 		return jsonerror.InternalServerError()
 	}
