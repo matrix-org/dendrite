@@ -161,9 +161,9 @@ func updateToJoinMembership(
 	if err != nil {
 		return nil, err
 	}
-	var displayname *string
+	var displayname string
 	if memberEvent.DisplayName != "" {
-		displayname = &memberEvent.DisplayName
+		displayname = memberEvent.DisplayName
 	}
 
 	// If the user is already marked as being joined, we call SetToJoin to update

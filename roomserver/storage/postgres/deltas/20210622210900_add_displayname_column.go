@@ -27,7 +27,7 @@ func LoadAddDisplaynameColumn(m *sqlutil.Migrations) {
 }
 
 func UpAddDisplaynameColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`ALTER TABLE roomserver_membership ADD COLUMN IF NOT EXISTS displayname TEXT DEFAULT "";`)
+	_, err := tx.Exec(`ALTER TABLE roomserver_membership ADD COLUMN IF NOT EXISTS displayname TEXT DEFAULT '';`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}

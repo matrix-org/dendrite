@@ -37,7 +37,7 @@ const membershipSchema = `
 		event_nid INTEGER NOT NULL DEFAULT 0,
 		target_local BOOLEAN NOT NULL DEFAULT false,
 		forgotten BOOLEAN NOT NULL DEFAULT false,
-		displayname TEXT NOT NULL DEFAULT "",
+		displayname TEXT NOT NULL DEFAULT '',
 		UNIQUE (room_nid, target_nid)
 	);
 `
@@ -232,7 +232,7 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 func (s *membershipStatements) UpdateMembership(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
-	eventNID types.EventNID, forgotten bool, displayname *string,
+	eventNID types.EventNID, forgotten bool, displayname string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.updateMembershipStmt)
 	_, err := stmt.ExecContext(
