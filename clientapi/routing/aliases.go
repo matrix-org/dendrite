@@ -78,12 +78,17 @@ func GetAliases(
 		return util.ErrorResponse(fmt.Errorf("rsAPI.GetAliasesForRoomID: %w", err))
 	}
 
+	response := struct {
+		Aliases []string `json:"aliases"`
+	}{
+		Aliases: aliasesRes.Aliases,
+	}
+	if response.Aliases == nil {
+		response.Aliases = []string{} // pleases sytest
+	}
+
 	return util.JSONResponse{
 		Code: 200,
-		JSON: struct {
-			Aliases []string `json:"aliases"`
-		}{
-			Aliases: aliasesRes.Aliases,
-		},
+		JSON: response,
 	}
 }
