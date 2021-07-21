@@ -270,6 +270,7 @@ func createRoom(
 	var nameEvent *fledglingEvent
 	var topicEvent *fledglingEvent
 	var guestAccessEvent *fledglingEvent
+	var aliasEvent *fledglingEvent
 
 	if r.Name != "" {
 		nameEvent = &fledglingEvent{
@@ -315,6 +316,13 @@ func createRoom(
 		}
 		if aliasResp.RoomID != "" {
 			return util.MessageResponse(400, "Alias already exists")
+		}
+
+		aliasEvent = &fledglingEvent{
+			Type: gomatrixserverlib.MRoomCanonicalAlias,
+			Content: eventutil.CanonicalAlias{
+				Alias: roomAlias,
+			},
 		}
 	}
 
@@ -377,11 +385,11 @@ func createRoom(
 	if topicEvent != nil {
 		eventsToMake = append(eventsToMake, *topicEvent)
 	}
-	if roomAlias != "" {
+	if aliasEvent != nil {
 		// TODO: bit of a chicken and egg problem here as the alias doesn't exist and cannot until we have made the room.
 		// This means we might fail creating the alias but say the canonical alias is something that doesn't exist.
 		// m.room.aliases is handled when we call roomserver.SetRoomAlias
-		eventsToMake = append(eventsToMake, fledglingEvent{gomatrixserverlib.MRoomCanonicalAlias, "", eventutil.CanonicalAlias{Alias: roomAlias}})
+		eventsToMake = append(eventsToMake, *aliasEvent)
 	}
 	eventsToMake = append(eventsToMake, initialStateEvents...)
 
