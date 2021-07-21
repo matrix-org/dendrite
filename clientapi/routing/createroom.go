@@ -43,7 +43,7 @@ type createRoomRequest struct {
 	Visibility                string                        `json:"visibility"`
 	Topic                     string                        `json:"topic"`
 	Preset                    string                        `json:"preset"`
-	CreationContent           map[string]interface{}        `json:"creation_content"`
+	CreationContent           json.RawMessage               `json:"creation_content"`
 	InitialState              []fledglingEvent              `json:"initial_state"`
 	RoomAliasName             string                        `json:"room_alias_name"`
 	GuestCanJoin              bool                          `json:"guest_can_join"`
@@ -177,11 +177,6 @@ func createRoom(
 
 	// Clobber keys: creator, room_version
 
-	if r.CreationContent == nil {
-		r.CreationContent = make(map[string]interface{}, 2)
-	}
-
-	r.CreationContent["creator"] = userID
 	roomVersion := roomserverVersion.DefaultRoomVersion()
 	if r.RoomVersion != "" {
 		candidateVersion := gomatrixserverlib.RoomVersion(r.RoomVersion)
@@ -194,7 +189,6 @@ func createRoom(
 		}
 		roomVersion = candidateVersion
 	}
-	r.CreationContent["room_version"] = roomVersion
 
 	// TODO: visibility/presets/raw initial state
 	// TODO: Create room alias association
@@ -203,13 +197,116 @@ func createRoom(
 	logger.WithFields(log.Fields{
 		"userID":      userID,
 		"roomID":      roomID,
-		"roomVersion": r.CreationContent["room_version"],
+		"roomVersion": roomVersion,
 	}).Info("Creating new room")
 
 	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
 		return jsonerror.InternalServerError()
+	}
+
+	createContent := map[string]interface{}{}
+	if len(r.CreationContent) > 0 {
+		if err = json.Unmarshal(r.CreationContent, &createContent); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal for creation_content failed")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("invalid create content"),
+			}
+		}
+	}
+	createContent["creator"] = userID
+	createContent["room_version"] = roomVersion
+	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
+	joinRuleContent := gomatrixserverlib.JoinRuleContent{
+		JoinRule: gomatrixserverlib.Invite,
+	}
+	historyVisibilityContent := gomatrixserverlib.HistoryVisibilityContent{
+		HistoryVisibility: historyVisibilityShared,
+	}
+
+	if r.PowerLevelContentOverride != nil {
+		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
+		err = json.Unmarshal(r.PowerLevelContentOverride, &powerLevelContent)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("malformed power_level_content_override"),
+			}
+		}
+	}
+
+	switch r.Preset {
+	case presetPrivateChat:
+		joinRuleContent.JoinRule = gomatrixserverlib.Invite
+		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
+	case presetTrustedPrivateChat:
+		joinRuleContent.JoinRule = gomatrixserverlib.Invite
+		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
+		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
+	case presetPublicChat:
+		joinRuleContent.JoinRule = gomatrixserverlib.Public
+		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
+	}
+
+	createEvent := fledglingEvent{
+		Type:    gomatrixserverlib.MRoomCreate,
+		Content: createContent,
+	}
+	powerLevelEvent := fledglingEvent{
+		Type:    gomatrixserverlib.MRoomPowerLevels,
+		Content: powerLevelContent,
+	}
+	joinRuleEvent := fledglingEvent{
+		Type:    gomatrixserverlib.MRoomJoinRules,
+		Content: joinRuleContent,
+	}
+	historyVisibilityEvent := fledglingEvent{
+		Type:    gomatrixserverlib.MRoomHistoryVisibility,
+		Content: historyVisibilityContent,
+	}
+	membershipEvent := fledglingEvent{
+		Type:     gomatrixserverlib.MRoomMember,
+		StateKey: userID,
+		Content: gomatrixserverlib.MemberContent{
+			Membership:  gomatrixserverlib.Join,
+			DisplayName: profile.DisplayName,
+			AvatarURL:   profile.AvatarURL,
+		},
+	}
+
+	var nameEvent *fledglingEvent
+	var topicEvent *fledglingEvent
+	var guestAccessEvent *fledglingEvent
+	var aliasEvent *fledglingEvent
+
+	if r.Name != "" {
+		nameEvent = &fledglingEvent{
+			Type: gomatrixserverlib.MRoomName,
+			Content: eventutil.NameContent{
+				Name: r.Name,
+			},
+		}
+	}
+
+	if r.Topic != "" {
+		topicEvent = &fledglingEvent{
+			Type: gomatrixserverlib.MRoomTopic,
+			Content: eventutil.TopicContent{
+				Topic: r.Topic,
+			},
+		}
+	}
+
+	if r.GuestCanJoin {
+		guestAccessEvent = &fledglingEvent{
+			Type: gomatrixserverlib.MRoomGuestAccess,
+			Content: eventutil.GuestAccessContent{
+				GuestAccess: "can_join",
+			},
+		}
 	}
 
 	var roomAlias string
@@ -230,44 +327,46 @@ func createRoom(
 		if aliasResp.RoomID != "" {
 			return util.MessageResponse(400, "Alias already exists")
 		}
+
+		aliasEvent = &fledglingEvent{
+			Type: gomatrixserverlib.MRoomCanonicalAlias,
+			Content: eventutil.CanonicalAlias{
+				Alias: roomAlias,
+			},
+		}
 	}
 
-	membershipContent := gomatrixserverlib.MemberContent{
-		Membership:  gomatrixserverlib.Join,
-		DisplayName: profile.DisplayName,
-		AvatarURL:   profile.AvatarURL,
-	}
+	var initialStateEvents []fledglingEvent
+	for i := range r.InitialState {
+		if r.InitialState[i].StateKey != "" {
+			initialStateEvents = append(initialStateEvents, r.InitialState[i])
+			continue
+		}
 
-	var joinRules, historyVisibility string
-	switch r.Preset {
-	case presetPrivateChat:
-		joinRules = gomatrixserverlib.Invite
-		historyVisibility = historyVisibilityShared
-	case presetTrustedPrivateChat:
-		joinRules = gomatrixserverlib.Invite
-		historyVisibility = historyVisibilityShared
-		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
-	case presetPublicChat:
-		joinRules = gomatrixserverlib.Public
-		historyVisibility = historyVisibilityShared
-	default:
-		// Default room rules, r.Preset was previously checked for valid values so
-		// only a request with no preset should end up here.
-		joinRules = gomatrixserverlib.Invite
-		historyVisibility = historyVisibilityShared
-	}
+		switch r.InitialState[i].Type {
+		case gomatrixserverlib.MRoomCreate:
+			continue
 
-	var builtEvents []*gomatrixserverlib.HeaderedEvent
+		case gomatrixserverlib.MRoomPowerLevels:
+			powerLevelEvent = r.InitialState[i]
 
-	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
-	if r.PowerLevelContentOverride != nil {
-		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
-		err = json.Unmarshal(r.PowerLevelContentOverride, &powerLevelContent)
-		if err != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("malformed power_level_content_override"),
-			}
+		case gomatrixserverlib.MRoomJoinRules:
+			joinRuleEvent = r.InitialState[i]
+
+		case gomatrixserverlib.MRoomHistoryVisibility:
+			historyVisibilityEvent = r.InitialState[i]
+
+		case gomatrixserverlib.MRoomGuestAccess:
+			guestAccessEvent = &r.InitialState[i]
+
+		case gomatrixserverlib.MRoomName:
+			nameEvent = &r.InitialState[i]
+
+		case gomatrixserverlib.MRoomTopic:
+			topicEvent = &r.InitialState[i]
+
+		default:
+			initialStateEvents = append(initialStateEvents, r.InitialState[i])
 		}
 	}
 
@@ -290,31 +389,29 @@ func createRoom(
 	// harder to reason about, hence sticking to a strict static ordering.
 	// TODO: Synapse has txn/token ID on each event. Do we need to do this here?
 	eventsToMake := []fledglingEvent{
-		{"m.room.create", "", r.CreationContent},
-		{"m.room.member", userID, membershipContent},
-		{"m.room.power_levels", "", powerLevelContent},
-		{"m.room.join_rules", "", gomatrixserverlib.JoinRuleContent{JoinRule: joinRules}},
-		{"m.room.history_visibility", "", eventutil.HistoryVisibilityContent{HistoryVisibility: historyVisibility}},
+		createEvent, membershipEvent, powerLevelEvent, joinRuleEvent, historyVisibilityEvent,
 	}
-	if roomAlias != "" {
+	if guestAccessEvent != nil {
+		eventsToMake = append(eventsToMake, *guestAccessEvent)
+	}
+	eventsToMake = append(eventsToMake, initialStateEvents...)
+	if nameEvent != nil {
+		eventsToMake = append(eventsToMake, *nameEvent)
+	}
+	if topicEvent != nil {
+		eventsToMake = append(eventsToMake, *topicEvent)
+	}
+	if aliasEvent != nil {
 		// TODO: bit of a chicken and egg problem here as the alias doesn't exist and cannot until we have made the room.
 		// This means we might fail creating the alias but say the canonical alias is something that doesn't exist.
 		// m.room.aliases is handled when we call roomserver.SetRoomAlias
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.canonical_alias", "", eventutil.CanonicalAlias{Alias: roomAlias}})
+		eventsToMake = append(eventsToMake, *aliasEvent)
 	}
-	if r.GuestCanJoin {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.guest_access", "", eventutil.GuestAccessContent{GuestAccess: "can_join"}})
-	}
-	eventsToMake = append(eventsToMake, r.InitialState...)
-	if r.Name != "" {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.name", "", eventutil.NameContent{Name: r.Name}})
-	}
-	if r.Topic != "" {
-		eventsToMake = append(eventsToMake, fledglingEvent{"m.room.topic", "", eventutil.TopicContent{Topic: r.Topic}})
-	}
+
 	// TODO: invite events
 	// TODO: 3pid invite events
 
+	var builtEvents []*gomatrixserverlib.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
@@ -403,7 +500,7 @@ func createRoom(
 				fallthrough
 			case gomatrixserverlib.MRoomCanonicalAlias:
 				fallthrough
-			case "m.room.encryption": // TODO: move this to gmsl
+			case gomatrixserverlib.MRoomEncryption:
 				fallthrough
 			case gomatrixserverlib.MRoomMember:
 				fallthrough
