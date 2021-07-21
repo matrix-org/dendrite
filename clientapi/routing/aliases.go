@@ -50,7 +50,7 @@ func GetAliases(
 			util.GetLogger(req.Context()).WithError(err).Error("historyVisEvent.HistoryVisibility failed")
 			return util.ErrorResponse(fmt.Errorf("historyVisEvent.HistoryVisibility: %w", err))
 		}
-		if visibility != "world_readable" {
+		if visibility != gomatrixserverlib.WorldReadable {
 			queryReq := api.QueryMembershipForUserRequest{
 				RoomID: roomID,
 				UserID: device.UserID,
