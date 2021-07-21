@@ -379,6 +379,7 @@ func createRoom(
 	if guestAccessEvent != nil {
 		eventsToMake = append(eventsToMake, *guestAccessEvent)
 	}
+	eventsToMake = append(eventsToMake, initialStateEvents...)
 	if nameEvent != nil {
 		eventsToMake = append(eventsToMake, *nameEvent)
 	}
@@ -391,7 +392,6 @@ func createRoom(
 		// m.room.aliases is handled when we call roomserver.SetRoomAlias
 		eventsToMake = append(eventsToMake, *aliasEvent)
 	}
-	eventsToMake = append(eventsToMake, initialStateEvents...)
 
 	// TODO: invite events
 	// TODO: 3pid invite events
