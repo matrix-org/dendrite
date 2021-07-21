@@ -207,10 +207,12 @@ func createRoom(
 	}
 
 	createContent := map[string]interface{}{}
-	if err = json.Unmarshal(r.CreationContent, &createContent); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("invalid create content"),
+	if len(r.CreationContent) > 0 {
+		if err = json.Unmarshal(r.CreationContent, &createContent); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("invalid create content"),
+			}
 		}
 	}
 	createContent["creator"] = userID
