@@ -206,6 +206,10 @@ func createRoom(
 		return jsonerror.InternalServerError()
 	}
 
+	createContent := gomatrixserverlib.CreateContent{
+		Creator:     userID,
+		RoomVersion: &roomVersion,
+	}
 	powerLevelContent := eventutil.InitialPowerLevelsContent(userID)
 	joinRuleContent := gomatrixserverlib.JoinRuleContent{
 		JoinRule: gomatrixserverlib.Invite,
@@ -239,11 +243,8 @@ func createRoom(
 	}
 
 	createEvent := fledglingEvent{
-		Type: gomatrixserverlib.MRoomCreate,
-		Content: gomatrixserverlib.CreateContent{
-			Creator:     userID,
-			RoomVersion: &roomVersion,
-		},
+		Type:    gomatrixserverlib.MRoomCreate,
+		Content: createContent,
 	}
 	powerLevelEvent := fledglingEvent{
 		Type:    gomatrixserverlib.MRoomPowerLevels,
@@ -258,7 +259,7 @@ func createRoom(
 		Content: historyVisibilityContent,
 	}
 	membershipEvent := fledglingEvent{
-		Type:     gomatrixserverlib.MRoomHistoryVisibility,
+		Type:     gomatrixserverlib.MRoomMember,
 		StateKey: userID,
 		Content: gomatrixserverlib.MemberContent{
 			Membership:  gomatrixserverlib.Join,
