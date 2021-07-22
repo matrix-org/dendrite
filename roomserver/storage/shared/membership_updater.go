@@ -195,7 +195,13 @@ func (u *MembershipUpdater) SetToKnock(event *gomatrixserverlib.Event) (bool, er
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
 		if u.membership != tables.MembershipStateKnock {
-			if err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateKnock, 0, false); err != nil {
+			// Look up the NID of the new knock event
+			nIDs, err := u.d.EventNIDs(u.ctx, []string{event.EventID()})
+			if err != nil {
+				return fmt.Errorf("u.d.EventNIDs: %w", err)
+			}
+
+			if err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateKnock, nIDs[event.EventID()], false); err != nil {
 				return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 			}
 		}
