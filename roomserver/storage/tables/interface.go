@@ -120,6 +120,7 @@ const (
 	MembershipStateLeaveOrBan MembershipState = 1
 	MembershipStateInvite     MembershipState = 2
 	MembershipStateJoin       MembershipState = 3
+	MembershipStateKnock      MembershipState = 4
 )
 
 type Membership interface {
