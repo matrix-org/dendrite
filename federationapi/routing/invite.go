@@ -40,6 +40,7 @@ func InviteV2(
 ) util.JSONResponse {
 
 	inviteReq := gomatrixserverlib.InviteV2Request{}
+	err := json.Unmarshal(request.Content(), &inviteReq)
 	// Check to see if the room_version is supported
 	if _, err := roomserverVersion.SupportedRoomVersion(inviteReq.RoomVersion()); err != nil {
 		return util.JSONResponse{
@@ -49,7 +50,6 @@ func InviteV2(
 			),
 		}
 	}
-	err := json.Unmarshal(request.Content(), &inviteReq)
 	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
