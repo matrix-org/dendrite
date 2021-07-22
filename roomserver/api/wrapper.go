@@ -54,13 +54,6 @@ func SendEventWithState(
 		return err
 	}
 
-	// The roomserver processes events strictly in the order they are given,
-	// so we need to make sure that events don't refer to auth events that
-	// the roomserver doesn't know about yet.
-	outliers = gomatrixserverlib.ReverseTopologicalOrdering(
-		outliers, gomatrixserverlib.TopologicalOrderByAuthEvents,
-	)
-
 	var ires []InputRoomEvent
 	for _, outlier := range outliers {
 		if haveEventIDs[outlier.EventID()] {
