@@ -1,7 +1,7 @@
 module github.com/matrix-org/dendrite
 
 require (
-	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031 // indirect
+	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
@@ -29,15 +29,15 @@ require (
 	github.com/lucas-clemente/quic-go v0.19.3
 	github.com/matrix-org/dugong v0.0.0-20180820122854-51a565b5666b
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
-	github.com/matrix-org/go-sqlite3-js v0.0.0-20210625141222-bd2b7124cee8
+	github.com/matrix-org/go-sqlite3-js v0.0.0-20210709140738-b0d1ba599a6d
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20210714141824-52d282133140
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20210722110442-5061d6986876
 	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
 	github.com/matrix-org/pinecone v0.0.0-20210623102758-74f885644c1b
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.7-0.20210414154423-1157a4212dcb
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/neilalexander/utp v0.1.1-0.20210705212447-691f29ad692b
+	github.com/neilalexander/utp v0.1.1-0.20210720104546-52626cdf31b2
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.2.0

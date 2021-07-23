@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"math"
 )
 
 type MediaAPI struct {
@@ -36,6 +35,9 @@ type MediaAPI struct {
 	ThumbnailSizes []ThumbnailSize `yaml:"thumbnail_sizes"`
 }
 
+// DefaultMaxFileSizeBytes defines the default file size allowed in transfers
+var DefaultMaxFileSizeBytes = FileSizeBytes(10485760)
+
 func (c *MediaAPI) Defaults() {
 	c.InternalAPI.Listen = "http://localhost:7774"
 	c.InternalAPI.Connect = "http://localhost:7774"
@@ -43,8 +45,7 @@ func (c *MediaAPI) Defaults() {
 	c.Database.Defaults(5)
 	c.Database.ConnectionString = "file:mediaapi.db"
 
-	defaultMaxFileSizeBytes := FileSizeBytes(10485760)
-	c.MaxFileSizeBytes = &defaultMaxFileSizeBytes
+	c.MaxFileSizeBytes = &DefaultMaxFileSizeBytes
 	c.MaxThumbnailGenerators = 10
 	c.BasePath = "./media_store"
 }
@@ -58,11 +59,6 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
-	// allow "unlimited" file size
-	if c.MaxFileSizeBytes != nil && *c.MaxFileSizeBytes <= 0 {
-		unlimitedSize := FileSizeBytes(math.MaxInt64 - 1)
-		c.MaxFileSizeBytes = &unlimitedSize
-	}
 	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(*c.MaxFileSizeBytes))
 	checkPositive(configErrs, "media_api.max_thumbnail_generators", int64(c.MaxThumbnailGenerators))
 

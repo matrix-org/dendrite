@@ -181,11 +181,8 @@ type QueryServerJoinedToRoomRequest struct {
 type QueryServerJoinedToRoomResponse struct {
 	// True if the room exists on the server
 	RoomExists bool `json:"room_exists"`
-	// True if we still believe that we are participating in the room
+	// True if we still believe that the server is participating in the room
 	IsInRoom bool `json:"is_in_room"`
-	// List of servers that are also in the room. This will not be populated
-	// if the queried ServerName is the local server name.
-	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
 }
 
 // QueryServerAllowedToSeeEventRequest is a request to QueryServerAllowedToSeeEvent
