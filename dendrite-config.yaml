@@ -64,34 +64,22 @@ global:
   # to other servers and the federation API will not be exposed.
   disable_federation: false
 
-  # Configuration for Kafka/Naffka.
-  kafka:
-    # List of Kafka broker addresses to connect to. This is not needed if using
-    # Naffka in monolith mode.
+  # Configuration for NATS JetStream
+  jetstream:
+    # A list of NATS addresses to connect to. If none are specified, an
+    # internal NATS server will be used when running in monolith mode only.
     addresses:
-      - localhost:2181
+      # - localhost:4222
 
-    # The prefix to use for Kafka topic names for this homeserver. Change this only if
-    # you are running more than one Dendrite homeserver on the same Kafka deployment.
+    # Keep all storage in memory. This is mostly useful for unit tests.
+    in_memory: false
+
+    # Persistent directory to store JetStream streams in.
+    storage_path:
+
+    # The prefix to use for stream names for this homeserver - really only
+    # useful if running more than one Dendrite on the same NATS deployment.
     topic_prefix: Dendrite
-
-    # Whether to use Naffka instead of Kafka. This is only available in monolith
-    # mode, but means that you can run a single-process server without requiring
-    # Kafka.
-    use_naffka: true
-
-    # The max size a Kafka message is allowed to use.
-    # You only need to change this value, if you encounter issues with too large messages.
-    # Must be less than/equal to "max.message.bytes" configured in Kafka.
-    # Defaults to 8388608 bytes.
-    # max_message_bytes: 8388608
-
-    # Naffka database options. Not required when using Kafka.
-    naffka_database:
-      connection_string: file:naffka.db
-      max_open_conns: 10
-      max_idle_conns: 2
-      conn_max_lifetime: -1
 
   # Configuration for Prometheus metric collection.
   metrics:
