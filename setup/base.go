@@ -84,8 +84,6 @@ type BaseDendrite struct {
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
 	DNSCache               *gomatrixserverlib.DNSCache
-	//	KafkaConsumer          sarama.Consumer
-	//	KafkaProducer          sarama.SyncProducer
 }
 
 const HTTPServerTimeout = time.Minute * 5

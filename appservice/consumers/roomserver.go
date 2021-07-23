@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -52,7 +53,7 @@ func NewOutputRoomEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "appservice/roomserver",
-		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
+		Topic:          cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: appserviceDB,
 	}

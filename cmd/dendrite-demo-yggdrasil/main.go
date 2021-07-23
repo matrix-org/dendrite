@@ -74,7 +74,7 @@ func main() {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Global.PrivateKey = ygg.PrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Global.Kafka.UseNaffka = true
+	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
@@ -84,7 +84,6 @@ func main() {
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
 	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.MSCs.MSCs = []string{"msc2836"}
 	cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
 	if err = cfg.Derive(); err != nil {

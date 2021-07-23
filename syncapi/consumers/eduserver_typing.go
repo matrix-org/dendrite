@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -53,7 +54,7 @@ func NewOutputTypingEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/eduserver/typing",
-		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent)),
+		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

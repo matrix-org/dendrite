@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/kafka"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -61,7 +61,7 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
-	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	consumer, _ := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationSenderDB, base.ProcessContext,

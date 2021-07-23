@@ -19,6 +19,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -161,12 +162,11 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
 	cfg.Global.ServerName = testOrigin
-	cfg.Global.Kafka.UseNaffka = true
 	cfg.RoomServer.Database = config.DatabaseOptions{
 		ConnectionString: roomserverDBFileURI,
 	}
 	dp := &dummyProducer{
-		topic: cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent),
+		topic: cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent),
 	}
 	cache, err := caching.NewInMemoryLRUCache(false)
 	if err != nil {
@@ -181,7 +181,7 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 	return internal.NewRoomserverAPI(
-		&cfg.RoomServer, roomserverDB, dp, string(cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent)),
+		&cfg.RoomServer, roomserverDB, dp, string(cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent)),
 		base.Caches, &test.NopJSONVerifier{}, nil,
 	), dp
 }

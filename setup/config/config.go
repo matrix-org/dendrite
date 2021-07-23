@@ -296,6 +296,8 @@ func (config *Dendrite) Derive() error {
 func (c *Dendrite) Defaults() {
 	c.Version = 1
 
+	c.Wiring()
+
 	c.Global.Defaults()
 	c.ClientAPI.Defaults()
 	c.EDUServer.Defaults()
@@ -309,8 +311,6 @@ func (c *Dendrite) Defaults() {
 	c.UserAPI.Defaults()
 	c.AppServiceAPI.Defaults()
 	c.MSCs.Defaults()
-
-	c.Wiring()
 }
 
 func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -329,6 +329,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 func (c *Dendrite) Wiring() {
+	c.Global.JetStream.Matrix = &c.Global
 	c.ClientAPI.Matrix = &c.Global
 	c.EDUServer.Matrix = &c.Global
 	c.FederationAPI.Matrix = &c.Global

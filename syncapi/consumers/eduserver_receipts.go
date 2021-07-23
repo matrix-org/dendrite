@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -52,7 +53,7 @@ func NewOutputReceiptEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/eduserver/receipt",
-		Topic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
+		Topic:          cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

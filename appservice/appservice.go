@@ -32,7 +32,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/kafka"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 )
@@ -58,7 +58,7 @@ func NewInternalAPI(
 			},
 		},
 	}
-	consumer, _ := kafka.SetupConsumerProducer(&base.Cfg.Global.Kafka)
+	consumer, _ := jetstream.SetupConsumerProducer(&base.Cfg.Global.JetStream)
 
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(&base.Cfg.AppServiceAPI.Database)

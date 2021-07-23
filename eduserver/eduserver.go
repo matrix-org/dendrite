@@ -23,8 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/input"
 	"github.com/matrix-org/dendrite/eduserver/inthttp"
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/kafka"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -43,15 +42,15 @@ func NewInternalAPI(
 ) api.EDUServerInputAPI {
 	cfg := &base.Cfg.EDUServer
 
-	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	_, producer := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
 
 	return &input.EDUServerInputAPI{
 		Cache:                        eduCache,
 		UserAPI:                      userAPI,
 		Producer:                     producer,
-		OutputTypingEventTopic:       cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent),
-		OutputSendToDeviceEventTopic: cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent),
-		OutputReceiptEventTopic:      cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
+		OutputTypingEventTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
+		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
+		OutputReceiptEventTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 		ServerName:                   cfg.Matrix.ServerName,
 	}
 }

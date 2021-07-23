@@ -23,8 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/kafka"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -42,7 +41,7 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
-	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	_, producer := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
 
 	var perspectiveServerNames []gomatrixserverlib.ServerName
 	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {
@@ -55,7 +54,7 @@ func NewInternalAPI(
 	}
 
 	return internal.NewRoomserverAPI(
-		cfg, roomserverDB, producer, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
+		cfg, roomserverDB, producer, string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent)),
 		base.Caches, keyRing, perspectiveServerNames,
 	)
 }

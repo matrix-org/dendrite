@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -50,7 +51,7 @@ func NewOutputClientDataConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/clientapi",
-		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData)),
+		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

@@ -24,7 +24,7 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/kafka"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -48,7 +48,7 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
-	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	consumer, _ := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
@@ -65,7 +65,7 @@ func AddPublicRoutes(
 	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		process, cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
+		process, cfg.Matrix.ServerName, string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent)),
 		consumer, keyAPI, rsAPI, syncDB, notifier, streams.DeviceListStreamProvider,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
