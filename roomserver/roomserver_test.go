@@ -166,7 +166,7 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 		ConnectionString: roomserverDBFileURI,
 	}
 	dp := &dummyProducer{
-		topic: cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent),
+		topic: jetstream.OutputRoomEvent,
 	}
 	cache, err := caching.NewInMemoryLRUCache(false)
 	if err != nil {
@@ -181,7 +181,7 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 	return internal.NewRoomserverAPI(
-		&cfg.RoomServer, roomserverDB, dp, string(cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent)),
+		&cfg.RoomServer, roomserverDB, dp, jetstream.OutputRoomEvent,
 		base.Caches, &test.NopJSONVerifier{}, nil,
 	), dp
 }

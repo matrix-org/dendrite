@@ -53,7 +53,7 @@ func NewOutputReceiptEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/eduserver/receipt",
-		Topic:          cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		Topic:          jetstream.OutputReceiptEvent,
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

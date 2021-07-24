@@ -54,7 +54,7 @@ func NewInternalAPI(
 	}
 
 	return internal.NewRoomserverAPI(
-		cfg, roomserverDB, producer, string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent)),
+		cfg, roomserverDB, producer, jetstream.OutputRoomEvent,
 		base.Caches, keyRing, perspectiveServerNames,
 	)
 }

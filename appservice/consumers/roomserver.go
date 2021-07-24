@@ -53,7 +53,7 @@ func NewOutputRoomEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "appservice/roomserver",
-		Topic:          cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent),
+		Topic:          jetstream.OutputRoomEvent,
 		Consumer:       kafkaConsumer,
 		PartitionStore: appserviceDB,
 	}

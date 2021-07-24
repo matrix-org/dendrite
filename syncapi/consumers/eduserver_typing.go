@@ -54,7 +54,7 @@ func NewOutputTypingEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/eduserver/typing",
-		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent)),
+		Topic:          jetstream.OutputTypingEvent,
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
