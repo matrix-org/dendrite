@@ -44,6 +44,8 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/cache"
 
 	"github.com/sirupsen/logrus"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func createKeyDB(

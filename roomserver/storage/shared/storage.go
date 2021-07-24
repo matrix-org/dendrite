@@ -857,6 +857,9 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
+	if roomInfo == nil || roomInfo.IsStub {
+		return nil, fmt.Errorf("room %s doesn't exist", roomID)
+	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
 	if err == sql.ErrNoRows {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
@@ -1066,6 +1069,11 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) 
 // GetLocalServerInRoom returns true if we think we're in a given room or false otherwise.
 func (d *Database) GetLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error) {
 	return d.MembershipTable.SelectLocalServerInRoom(ctx, roomNID)
+}
+
+// GetServerInRoom returns true if we think a server is in a given room or false otherwise.
+func (d *Database) GetServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error) {
+	return d.MembershipTable.SelectServerInRoom(ctx, roomNID, serverName)
 }
 
 // GetKnownUsers searches all users that userID knows about.

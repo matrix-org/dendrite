@@ -19,6 +19,10 @@ var natsServer *natsserver.Server
 var natsServerMutex sync.Mutex
 
 func SetupConsumerProducer(cfg *config.JetStream) (sarama.Consumer, sarama.SyncProducer) {
+	// check if we need an in-process NATS Server
+	if len(cfg.Addresses) != 0 {
+		return setupNATS(cfg, nil)
+	}
 	natsServerMutex.Lock()
 	if natsServer == nil {
 		var err error
@@ -64,14 +68,12 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (sarama.Consumer, sar
 	}
 
 	for _, stream := range streams {
+		stream.Name = cfg.TopicFor(stream.Name)
 		info, err := s.StreamInfo(stream.Name)
 		if err != nil && err != natsclient.ErrStreamNotFound {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
 		if info == nil {
-			stream.Name = cfg.TopicFor(stream.Name)
-			stream.Subjects = []string{stream.Name}
-
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
 			if cfg.InMemory {

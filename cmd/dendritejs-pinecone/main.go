@@ -144,6 +144,13 @@ func generateKey() ed25519.PrivateKey {
 }
 
 func main() {
+	startup()
+
+	// We want to block forever to let the fetch and libp2p handler serve the APIs
+	select {}
+}
+
+func startup() {
 	sk := generateKey()
 	pk := sk.Public().(ed25519.PublicKey)
 
@@ -250,7 +257,4 @@ func main() {
 			}
 		}
 	}()
-
-	// We want to block forever to let the fetch and libp2p handler serve the APIs
-	select {}
 }

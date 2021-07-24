@@ -78,4 +78,9 @@ type RemoveRoomAliasRequest struct {
 }
 
 // RemoveRoomAliasResponse is a response to RemoveRoomAlias
-type RemoveRoomAliasResponse struct{}
+type RemoveRoomAliasResponse struct {
+	// Did the alias exist before?
+	Found bool `json:"found"`
+	// Did we remove it?
+	Removed bool `json:"removed"`
+}
