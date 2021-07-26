@@ -38,34 +38,31 @@ func InviteV2(
 	rsAPI api.RoomserverInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
-
 	inviteReq := gomatrixserverlib.InviteV2Request{}
 	err := json.Unmarshal(request.Content(), &inviteReq)
-	// Check to see if the room_version is supported
-	if _, err := roomserverVersion.SupportedRoomVersion(inviteReq.RoomVersion()); err != nil {
+	switch e := err.(type) {
+	case gomatrixserverlib.UnsupportedRoomVersionError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion(
-				fmt.Sprintf("Room version %q is not supported by this server.", inviteReq.RoomVersion()),
+				fmt.Sprintf("Room version %q is not supported by this server.", e.Version),
 			),
 		}
-	}
-	switch err.(type) {
 	case gomatrixserverlib.BadJSONError:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(err.Error()),
 		}
 	case nil:
+		return processInvite(
+			httpReq.Context(), true, inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
+		)
 	default:
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into an invite request. " + err.Error()),
 		}
 	}
-	return processInvite(
-		httpReq.Context(), true, inviteReq.Event(), inviteReq.RoomVersion(), inviteReq.InviteRoomState(), roomID, eventID, cfg, rsAPI, keys,
-	)
 }
 
 // InviteV1 implements /_matrix/federation/v1/invite/{roomID}/{eventID}
