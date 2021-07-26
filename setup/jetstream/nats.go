@@ -74,6 +74,7 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (sarama.Consumer, sar
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
 		if info == nil {
+			stream.Subjects = []string{stream.Name}
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
 			if cfg.InMemory {
