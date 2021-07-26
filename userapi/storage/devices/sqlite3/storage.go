@@ -25,8 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3/deltas"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // The length of generated device IDs

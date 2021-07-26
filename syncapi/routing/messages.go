@@ -393,7 +393,7 @@ func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (st
 		start = *r.from
 		if events[len(events)-1].Type() == gomatrixserverlib.MRoomCreate {
 			// NOTSPEC: We've hit the beginning of the room so there's really nowhere
-			// else to go. This seems to fix Riot iOS from looping on /messages endlessly.
+			// else to go. This seems to fix Element iOS from looping on /messages endlessly.
 			end = types.TopologyToken{}
 		} else {
 			end, err = r.db.EventPositionInTopology(

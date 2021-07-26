@@ -120,6 +120,7 @@ const (
 	MembershipStateLeaveOrBan MembershipState = 1
 	MembershipStateInvite     MembershipState = 2
 	MembershipStateJoin       MembershipState = 3
+	MembershipStateKnock      MembershipState = 4
 )
 
 type Membership interface {
@@ -136,6 +137,7 @@ type Membership interface {
 	SelectKnownUsers(ctx context.Context, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error)
 	UpdateForgetMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, forget bool) error
 	SelectLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error)
+	SelectServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error)
 }
 
 type Published interface {

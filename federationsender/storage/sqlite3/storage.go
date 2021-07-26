@@ -18,8 +18,6 @@ package sqlite3
 import (
 	"database/sql"
 
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/matrix-org/dendrite/federationsender/storage/shared"
 	"github.com/matrix-org/dendrite/federationsender/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/internal/caching"

@@ -86,6 +86,11 @@ func (u *MembershipUpdater) IsLeave() bool {
 	return u.membership == tables.MembershipStateLeaveOrBan
 }
 
+// IsKnock implements types.MembershipUpdater
+func (u *MembershipUpdater) IsKnock() bool {
+	return u.membership == tables.MembershipStateKnock
+}
+
 // SetToInvite implements types.MembershipUpdater
 func (u *MembershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
 	var inserted bool
@@ -179,4 +184,28 @@ func (u *MembershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 		return nil
 	})
 	return inviteEventIDs, err
+}
+
+// SetToKnock implements types.MembershipUpdater
+func (u *MembershipUpdater) SetToKnock(event *gomatrixserverlib.Event) (bool, error) {
+	var inserted bool
+	err := u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, event.Sender())
+		if err != nil {
+			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
+		}
+		if u.membership != tables.MembershipStateKnock {
+			// Look up the NID of the new knock event
+			nIDs, err := u.d.EventNIDs(u.ctx, []string{event.EventID()})
+			if err != nil {
+				return fmt.Errorf("u.d.EventNIDs: %w", err)
+			}
+
+			if err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateKnock, nIDs[event.EventID()], false); err != nil {
+				return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
+			}
+		}
+		return nil
+	})
+	return inserted, err
 }

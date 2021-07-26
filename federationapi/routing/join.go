@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // MakeJoin implements the /make_join API
@@ -228,6 +229,21 @@ func SendJoin(
 		}
 	}
 
+	// Check that this is in fact a join event
+	membership, err := event.Membership()
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("missing content.membership key"),
+		}
+	}
+	if membership != gomatrixserverlib.Join {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("membership must be 'join'"),
+		}
+	}
+
 	// Check that the event is signed by the server sending the request.
 	redacted := event.Redact()
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
@@ -296,16 +312,26 @@ func SendJoin(
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if !alreadyJoined {
-		if err = api.SendEvents(
-			httpReq.Context(), rsAPI,
-			api.KindNew,
-			[]*gomatrixserverlib.HeaderedEvent{
-				event.Headered(stateAndAuthChainResponse.RoomVersion),
+		var response api.InputRoomEventsResponse
+		rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
+			InputRoomEvents: []api.InputRoomEvent{
+				{
+					Kind:          api.KindNew,
+					Event:         event.Headered(stateAndAuthChainResponse.RoomVersion),
+					AuthEventIDs:  event.AuthEventIDs(),
+					SendAsServer:  string(cfg.Matrix.ServerName),
+					TransactionID: nil,
+				},
 			},
-			cfg.Matrix.ServerName,
-			nil,
-		); err != nil {
-			util.GetLogger(httpReq.Context()).WithError(err).Error("SendEvents failed")
+		}, &response)
+		if response.ErrMsg != "" {
+			util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).Error("SendEvents failed")
+			if response.NotAllowed {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.Forbidden(response.ErrMsg),
+				}
+			}
 			return jsonerror.InternalServerError()
 		}
 	}

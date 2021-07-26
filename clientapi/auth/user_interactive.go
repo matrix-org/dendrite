@@ -78,7 +78,7 @@ func (r *Login) Username() string {
 	if r.Identifier.Type == "m.id.user" {
 		return r.Identifier.User
 	}
-	// deprecated but without it Riot iOS won't log in
+	// deprecated but without it Element iOS won't log in
 	return r.User
 }
 

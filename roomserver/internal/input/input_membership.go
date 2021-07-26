@@ -136,6 +136,8 @@ func (r *Inputer) updateMembership(
 		return updateToJoinMembership(mu, add, updates)
 	case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
 		return updateToLeaveMembership(mu, add, newMembership, updates)
+	case gomatrixserverlib.Knock:
+		return updateToKnockMembership(mu, add, updates)
 	default:
 		panic(fmt.Errorf(
 			"input: membership %q is not one of the allowed values", newMembership,
@@ -216,6 +218,18 @@ func updateToLeaveMembership(
 			Type:              api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &orie,
 		})
+	}
+	return updates, nil
+}
+
+func updateToKnockMembership(
+	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+) ([]api.OutputEvent, error) {
+	if mu.IsLeave() {
+		_, err := mu.SetToKnock(add)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return updates, nil
 }
