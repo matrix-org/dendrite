@@ -896,6 +896,48 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	// Key Backup Versions
+	r0mux.Handle("/room_keys/version/{versionID}",
+		httputil.MakeAuthAPI("get_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			version := req.URL.Query().Get("version")
+			return KeyBackupVersion(req, userAPI, device, version)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+	r0mux.Handle("/room_keys/version",
+		httputil.MakeAuthAPI("get_latest_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return KeyBackupVersion(req, userAPI, device, "")
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+	r0mux.Handle("/room_keys/version/{versionID}",
+		httputil.MakeAuthAPI("put_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			version := req.URL.Query().Get("version")
+			if version == "" {
+				return util.JSONResponse{
+					Code: 400,
+					JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				}
+			}
+			return ModifyKeyBackupVersionAuthData(req, userAPI, device, version)
+		}),
+	).Methods(http.MethodPut)
+	r0mux.Handle("/room_keys/version/{versionID}",
+		httputil.MakeAuthAPI("delete_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			version := req.URL.Query().Get("version")
+			if version == "" {
+				return util.JSONResponse{
+					Code: 400,
+					JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				}
+			}
+			return DeleteKeyBackupVersion(req, userAPI, device, version)
+		}),
+	).Methods(http.MethodDelete)
+	r0mux.Handle("/room_keys/version",
+		httputil.MakeAuthAPI("post_new_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return CreateKeyBackupVersion(req, userAPI, device)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	// Supplying a device ID is deprecated.
 	r0mux.Handle("/keys/upload/{deviceID}",
 		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
