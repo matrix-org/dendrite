@@ -174,6 +174,9 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 			err = tx.QueryRow(
 				`SELECT event_nid FROM roomserver_events WHERE state_snapshot_nid = $1 AND event_type_nid = 1`, s.StateSnapshotNID,
 			).Scan(&createEventNID)
+			if err == sql.ErrNoRows {
+				continue
+			}
 			if err != nil {
 				return fmt.Errorf("cannot xref null state block with snapshot %d: %s", s.StateSnapshotNID, err)
 			}
