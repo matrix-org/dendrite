@@ -56,29 +56,29 @@ func NewOutputEDUConsumer(
 		typingConsumer: &internal.ContinualConsumer{
 			Process:        process,
 			ComponentName:  "eduserver/typing",
-			Topic:          jetstream.OutputTypingEvent,
+			Topic:          cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		sendToDeviceConsumer: &internal.ContinualConsumer{
 			Process:        process,
 			ComponentName:  "eduserver/sendtodevice",
-			Topic:          jetstream.OutputSendToDeviceEvent,
+			Topic:          cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		receiptConsumer: &internal.ContinualConsumer{
 			Process:        process,
 			ComponentName:  "eduserver/receipt",
-			Topic:          jetstream.OutputReceiptEvent,
+			Topic:          cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
 		queues:            queues,
 		db:                store,
 		ServerName:        cfg.Matrix.ServerName,
-		TypingTopic:       jetstream.OutputTypingEvent,
-		SendToDeviceTopic: jetstream.OutputSendToDeviceEvent,
+		TypingTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
+		SendToDeviceTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
 	}
 	c.typingConsumer.ProcessMessage = c.onTypingEvent
 	c.sendToDeviceConsumer.ProcessMessage = c.onSendToDeviceEvent

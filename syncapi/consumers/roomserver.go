@@ -59,7 +59,7 @@ func NewOutputRoomEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/roomserver",
-		Topic:          jetstream.OutputRoomEvent,
+		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

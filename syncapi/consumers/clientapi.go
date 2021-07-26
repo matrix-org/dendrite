@@ -51,7 +51,7 @@ func NewOutputClientDataConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/clientapi",
-		Topic:          jetstream.OutputClientData,
+		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}

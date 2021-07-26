@@ -45,7 +45,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
 	keyChangeProducer := &producers.KeyChange{
-		Topic:    jetstream.OutputKeyChangeEvent,
+		Topic:    string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent)),
 		Producer: producer,
 		DB:       db,
 	}

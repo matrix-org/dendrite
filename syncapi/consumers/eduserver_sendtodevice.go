@@ -56,7 +56,7 @@ func NewOutputSendToDeviceEventConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "syncapi/eduserver/sendtodevice",
-		Topic:          jetstream.OutputSendToDeviceEvent,
+		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent)),
 		Consumer:       kafkaConsumer,
 		PartitionStore: store,
 	}
