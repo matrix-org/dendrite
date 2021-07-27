@@ -540,4 +540,3 @@ Key notary server must not overwrite a valid key with a spurious result from the
 GET /rooms/:room_id/aliases lists aliases
 Only room members can list aliases of a room
 Users with sufficient power-level can delete other's aliases
-Can create more than 10 backup versions

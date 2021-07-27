@@ -100,12 +100,13 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = d.openIDTokens.prepare(db, serverName); err != nil {
 		return nil, err
 	}
-	if err = d.keyBackupVersions.prepare(db); err != nil {
-		return nil, err
-	}
-	if err = d.keyBackups.prepare(db); err != nil {
-		return nil, err
-	}
+	/*
+		if err = d.keyBackupVersions.prepare(db); err != nil {
+			return nil, err
+		}
+		if err = d.keyBackups.prepare(db); err != nil {
+			return nil, err
+		} */
 
 	return d, nil
 }
