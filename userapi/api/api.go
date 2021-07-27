@@ -59,11 +59,19 @@ type PerformKeyBackupRequest struct {
 	}
 }
 
+// KeyBackupData in https://spec.matrix.org/unstable/client-server-api/#get_matrixclientr0room_keyskeysroomidsessionid
 type KeyBackupSession struct {
 	FirstMessageIndex int             `json:"first_message_index"`
 	ForwardedCount    int             `json:"forwarded_count"`
 	IsVerified        bool            `json:"is_verified"`
 	SessionData       json.RawMessage `json:"session_data"`
+}
+
+// Internal KeyBackupData for passing to/from the storage layer
+type InternalKeyBackupSession struct {
+	KeyBackupSession
+	RoomID    string
+	SessionID string
 }
 
 type PerformKeyBackupResponse struct {
@@ -73,7 +81,7 @@ type PerformKeyBackupResponse struct {
 	Exists  bool   // set to true if the Version exists
 	Version string // the newly created version
 
-	KeyCount int    // only set if Keys were given in the request
+	KeyCount int64  // only set if Keys were given in the request
 	KeyETag  string // only set if Keys were given in the request
 }
 

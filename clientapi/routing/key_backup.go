@@ -49,7 +49,7 @@ type keyBackupSessionRequest struct {
 }
 
 type keyBackupSessionResponse struct {
-	Count int    `json:"count"`
+	Count int64  `json:"count"`
 	ETag  string `json:"etag"`
 }
 
