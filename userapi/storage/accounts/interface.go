@@ -59,7 +59,8 @@ type Database interface {
 	CreateKeyBackup(ctx context.Context, userID, algorithm string, authData json.RawMessage) (version string, err error)
 	UpdateKeyBackupAuthData(ctx context.Context, userID, version string, authData json.RawMessage) (err error)
 	DeleteKeyBackup(ctx context.Context, userID, version string) (exists bool, err error)
-	GetKeyBackup(ctx context.Context, userID, version string) (versionResult, algorithm string, authData json.RawMessage, deleted bool, err error)
+	GetKeyBackup(ctx context.Context, userID, version string) (versionResult, algorithm string, authData json.RawMessage, etag string, deleted bool, err error)
+	UpsertBackupKeys(ctx context.Context, version, userID string, uploads []api.InternalKeyBackupSession) (count int64, etag string, err error)
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

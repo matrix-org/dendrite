@@ -938,6 +938,85 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
+	// E2E Backup Keys
+	// Bulk room and session
+	r0mux.Handle("/room_keys/keys",
+		httputil.MakeAuthAPI("put_backup_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			version := req.URL.Query().Get("version")
+			if version == "" {
+				return util.JSONResponse{
+					Code: 400,
+					JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				}
+			}
+			var reqBody keyBackupSessionRequest
+			resErr := clientutil.UnmarshalJSONRequest(req, &reqBody)
+			if resErr != nil {
+				return *resErr
+			}
+			return UploadBackupKeys(req, userAPI, device, version, &reqBody)
+		}),
+	).Methods(http.MethodPut)
+	// Single room bulk session
+	r0mux.Handle("/room_keys/keys/{roomID}",
+		httputil.MakeAuthAPI("put_backup_keys_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			version := req.URL.Query().Get("version")
+			if version == "" {
+				return util.JSONResponse{
+					Code: 400,
+					JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				}
+			}
+			roomID := vars["roomID"]
+			var reqBody keyBackupSessionRequest
+			reqBody.Rooms[roomID] = struct {
+				Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+			}{
+				Sessions: map[string]userapi.KeyBackupSession{},
+			}
+			body := reqBody.Rooms[roomID]
+			resErr := clientutil.UnmarshalJSONRequest(req, &body)
+			if resErr != nil {
+				return *resErr
+			}
+			reqBody.Rooms[roomID] = body
+			return UploadBackupKeys(req, userAPI, device, version, &reqBody)
+		}),
+	).Methods(http.MethodPut)
+	// Single room, single session
+	r0mux.Handle("/room_keys/keys/{roomID}/{sessionID}",
+		httputil.MakeAuthAPI("put_backup_keys_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			version := req.URL.Query().Get("version")
+			if version == "" {
+				return util.JSONResponse{
+					Code: 400,
+					JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+				}
+			}
+			var reqBody userapi.KeyBackupSession
+			resErr := clientutil.UnmarshalJSONRequest(req, &reqBody)
+			if resErr != nil {
+				return *resErr
+			}
+			roomID := vars["roomID"]
+			sessionID := vars["sessionID"]
+			var keyReq keyBackupSessionRequest
+			keyReq.Rooms[roomID] = struct {
+				Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+			}{}
+			keyReq.Rooms[roomID].Sessions[sessionID] = reqBody
+			return UploadBackupKeys(req, userAPI, device, version, &keyReq)
+		}),
+	).Methods(http.MethodPut)
+
 	// Supplying a device ID is deprecated.
 	r0mux.Handle("/keys/upload/{deviceID}",
 		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

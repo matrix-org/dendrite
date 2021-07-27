@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS account_e2e_room_keys_versions (
     version INTEGER PRIMARY KEY AUTOINCREMENT,
     algorithm TEXT NOT NULL,
     auth_data TEXT NOT NULL,
+	etag TEXT NOT NULL,
     deleted INTEGER DEFAULT 0 NOT NULL
 );
 
@@ -38,16 +39,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_
 `
 
 const insertKeyBackupSQL = "" +
-	"INSERT INTO account_e2e_room_keys_versions(user_id, algorithm, auth_data) VALUES ($1, $2, $3) RETURNING version"
+	"INSERT INTO account_e2e_room_keys_versions(user_id, algorithm, auth_data, etag) VALUES ($1, $2, $3, $4) RETURNING version"
 
-const updateKeyBackupAuthDataSQL = "" + // TODO: do we need to WHERE algorithm = $3 as well?
+const updateKeyBackupAuthDataSQL = "" +
 	"UPDATE account_e2e_room_keys_versions SET auth_data = $1 WHERE user_id = $2 AND version = $3"
+
+const updateKeyBackupETagSQL = "" +
+	"UPDATE account_e2e_room_keys_versions SET etag = $1 WHERE user_id = $2 AND version = $3"
 
 const deleteKeyBackupSQL = "" +
 	"UPDATE account_e2e_room_keys_versions SET deleted=1 WHERE user_id = $1 AND version = $2"
 
 const selectKeyBackupSQL = "" +
-	"SELECT algorithm, auth_data, deleted FROM account_e2e_room_keys_versions WHERE user_id = $1 AND version = $2"
+	"SELECT algorithm, auth_data, etag, deleted FROM account_e2e_room_keys_versions WHERE user_id = $1 AND version = $2"
 
 const selectLatestVersionSQL = "" +
 	"SELECT MAX(version) FROM account_e2e_room_keys_versions WHERE user_id = $1"
@@ -58,8 +62,10 @@ type keyBackupVersionStatements struct {
 	deleteKeyBackupStmt         *sql.Stmt
 	selectKeyBackupStmt         *sql.Stmt
 	selectLatestVersionStmt     *sql.Stmt
+	updateKeyBackupETagStmt     *sql.Stmt
 }
 
+// nolint:unused
 func (s *keyBackupVersionStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(keyBackupVersionTableSchema)
 	if err != nil {
@@ -80,14 +86,17 @@ func (s *keyBackupVersionStatements) prepare(db *sql.DB) (err error) {
 	if s.selectLatestVersionStmt, err = db.Prepare(selectLatestVersionSQL); err != nil {
 		return
 	}
+	if s.updateKeyBackupETagStmt, err = db.Prepare(updateKeyBackupETagSQL); err != nil {
+		return
+	}
 	return
 }
 
 func (s *keyBackupVersionStatements) insertKeyBackup(
-	ctx context.Context, txn *sql.Tx, userID, algorithm string, authData json.RawMessage,
+	ctx context.Context, txn *sql.Tx, userID, algorithm string, authData json.RawMessage, etag string,
 ) (version string, err error) {
 	var versionInt int64
-	err = txn.Stmt(s.insertKeyBackupStmt).QueryRowContext(ctx, userID, algorithm, string(authData)).Scan(&versionInt)
+	err = txn.Stmt(s.insertKeyBackupStmt).QueryRowContext(ctx, userID, algorithm, string(authData), etag).Scan(&versionInt)
 	return strconv.FormatInt(versionInt, 10), err
 }
 
@@ -99,6 +108,17 @@ func (s *keyBackupVersionStatements) updateKeyBackupAuthData(
 		return fmt.Errorf("invalid version")
 	}
 	_, err = txn.Stmt(s.updateKeyBackupAuthDataStmt).ExecContext(ctx, string(authData), userID, versionInt)
+	return err
+}
+
+func (s *keyBackupVersionStatements) updateKeyBackupETag(
+	ctx context.Context, txn *sql.Tx, userID, version, etag string,
+) error {
+	versionInt, err := strconv.ParseInt(version, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid version")
+	}
+	_, err = txn.Stmt(s.updateKeyBackupETagStmt).ExecContext(ctx, etag, userID, versionInt)
 	return err
 }
 
@@ -122,7 +142,7 @@ func (s *keyBackupVersionStatements) deleteKeyBackup(
 
 func (s *keyBackupVersionStatements) selectKeyBackup(
 	ctx context.Context, txn *sql.Tx, userID, version string,
-) (versionResult, algorithm string, authData json.RawMessage, deleted bool, err error) {
+) (versionResult, algorithm string, authData json.RawMessage, etag string, deleted bool, err error) {
 	var versionInt int64
 	if version == "" {
 		err = txn.Stmt(s.selectLatestVersionStmt).QueryRowContext(ctx, userID).Scan(&versionInt)
@@ -135,7 +155,7 @@ func (s *keyBackupVersionStatements) selectKeyBackup(
 	versionResult = strconv.FormatInt(versionInt, 10)
 	var deletedInt int
 	var authDataStr string
-	err = txn.Stmt(s.selectKeyBackupStmt).QueryRowContext(ctx, userID, versionInt).Scan(&algorithm, &authDataStr, &deletedInt)
+	err = txn.Stmt(s.selectKeyBackupStmt).QueryRowContext(ctx, userID, versionInt).Scan(&algorithm, &authDataStr, &etag, &deletedInt)
 	deleted = deletedInt == 1
 	authData = json.RawMessage(authDataStr)
 	return

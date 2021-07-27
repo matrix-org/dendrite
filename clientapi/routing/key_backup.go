@@ -42,6 +42,17 @@ type keyBackupVersionResponse struct {
 	Version   string          `json:"version"`
 }
 
+type keyBackupSessionRequest struct {
+	Rooms map[string]struct {
+		Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+	} `json:"rooms"`
+}
+
+type keyBackupSessionResponse struct {
+	Count int64  `json:"count"`
+	ETag  string `json:"etag"`
+}
+
 // Create a new key backup. Request must contain a `keyBackupVersion`. Returns a `keyBackupVersionCreateResponse`.
 // Implements  POST /_matrix/client/r0/room_keys/version
 func CreateKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device) util.JSONResponse {
@@ -168,6 +179,40 @@ func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, 
 		Code: 200,
 		JSON: keyBackupVersionCreateResponse{
 			Version: performKeyBackupResp.Version,
+		},
+	}
+}
+
+// Upload a bunch of session keys for a given `version`.
+func UploadBackupKeys(
+	req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version string, keys *keyBackupSessionRequest,
+) util.JSONResponse {
+	var performKeyBackupResp userapi.PerformKeyBackupResponse
+	userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
+		UserID:  device.UserID,
+		Version: version,
+		Keys:    *keys,
+	}, &performKeyBackupResp)
+	if performKeyBackupResp.Error != "" {
+		if performKeyBackupResp.BadInput {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.InvalidArgumentValue(performKeyBackupResp.Error),
+			}
+		}
+		return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %s", performKeyBackupResp.Error))
+	}
+	if !performKeyBackupResp.Exists {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("backup version not found"),
+		}
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: keyBackupSessionResponse{
+			Count: performKeyBackupResp.KeyCount,
+			ETag:  performKeyBackupResp.KeyETag,
 		},
 	}
 }
