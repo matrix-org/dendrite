@@ -46,7 +46,7 @@ const updateKeyBackupAuthDataSQL = "" + // TODO: do we need to WHERE algorithm =
 	"UPDATE account_e2e_room_keys_versions SET auth_data = $1 WHERE user_id = $2 AND version = $3"
 
 const deleteKeyBackupSQL = "" +
-	"UPDATE account_e2e_room_keys_versions SET deleted=1 WHERE user_id = $1 AND version = $2 AND deleted=0"
+	"UPDATE account_e2e_room_keys_versions SET deleted=1 WHERE user_id = $1 AND version = $2"
 
 const selectKeyBackupSQL = "" +
 	"SELECT algorithm, auth_data, deleted FROM account_e2e_room_keys_versions WHERE user_id = $1 AND version = $2"

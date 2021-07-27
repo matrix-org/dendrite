@@ -60,6 +60,7 @@ type PerformKeyBackupResponse struct {
 }
 
 type QueryKeyBackupRequest struct {
+	UserID  string
 	Version string // the version to query, if blank it means the latest
 }
 

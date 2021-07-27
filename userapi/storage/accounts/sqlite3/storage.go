@@ -432,9 +432,9 @@ func (d *Database) UpdateKeyBackupAuthData(
 
 func (d *Database) DeleteKeyBackup(
 	ctx context.Context, userID, version string,
-) (deleted bool, err error) {
+) (exists bool, err error) {
 	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
-		deleted, err = d.keyBackups.deleteKeyBackup(ctx, txn, userID, version)
+		exists, err = d.keyBackups.deleteKeyBackup(ctx, txn, userID, version)
 		return err
 	})
 	return

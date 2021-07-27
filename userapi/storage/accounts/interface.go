@@ -58,7 +58,7 @@ type Database interface {
 	// Key backups
 	CreateKeyBackup(ctx context.Context, userID, algorithm string, authData json.RawMessage) (version string, err error)
 	UpdateKeyBackupAuthData(ctx context.Context, userID, version string, authData json.RawMessage) (err error)
-	DeleteKeyBackup(ctx context.Context, userID, version string) (deleted bool, err error)
+	DeleteKeyBackup(ctx context.Context, userID, version string) (exists bool, err error)
 	GetKeyBackup(ctx context.Context, userID, version string) (versionResult, algorithm string, authData json.RawMessage, deleted bool, err error)
 }
 
