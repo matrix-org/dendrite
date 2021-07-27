@@ -29,6 +29,13 @@ import (
 	"github.com/matrix-org/util"
 )
 
+func unstableDefaultMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = strings.Replace(r.URL.Path, "/unstable/", "/r0/", 1)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // Setup configures the given mux with sync-server listeners
 //
 // Due to Setup being used to call many other functions, a gocyclo nolint is
@@ -42,10 +49,8 @@ func Setup(
 ) {
 	r0mux := csMux.PathPrefix("/r0").Subrouter()
 	unstableMux := csMux.PathPrefix("/unstable").Subrouter()
-	defer unstableMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		r.URL.Path = strings.Replace(r.URL.Path, "/unstable/", "/r0/", 1)
-		r0mux.ServeHTTP(w, r)
-	}) // serve r0 endpoints by default unless overridden
+	unstableMux.NotFoundHandler = r0mux
+	unstableMux.Use(unstableDefaultMiddleware)
 
 	// TODO: Add AS support for all handlers below.
 	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
