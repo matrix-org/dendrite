@@ -423,7 +423,7 @@ func (d *Database) GetOpenIDTokenAttributes(
 func (d *Database) CreateKeyBackup(
 	ctx context.Context, userID, algorithm string, authData json.RawMessage,
 ) (version string, err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		version, err = d.keyBackupVersions.insertKeyBackup(ctx, txn, userID, algorithm, authData, "")
 		return err
 	})
@@ -433,7 +433,7 @@ func (d *Database) CreateKeyBackup(
 func (d *Database) UpdateKeyBackupAuthData(
 	ctx context.Context, userID, version string, authData json.RawMessage,
 ) (err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		return d.keyBackupVersions.updateKeyBackupAuthData(ctx, txn, userID, version, authData)
 	})
 	return
@@ -442,7 +442,7 @@ func (d *Database) UpdateKeyBackupAuthData(
 func (d *Database) DeleteKeyBackup(
 	ctx context.Context, userID, version string,
 ) (exists bool, err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		exists, err = d.keyBackupVersions.deleteKeyBackup(ctx, txn, userID, version)
 		return err
 	})
@@ -452,7 +452,7 @@ func (d *Database) DeleteKeyBackup(
 func (d *Database) GetKeyBackup(
 	ctx context.Context, userID, version string,
 ) (versionResult, algorithm string, authData json.RawMessage, etag string, deleted bool, err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		versionResult, algorithm, authData, etag, deleted, err = d.keyBackupVersions.selectKeyBackup(ctx, txn, userID, version)
 		return err
 	})
@@ -463,7 +463,7 @@ func (d *Database) UpsertBackupKeys(
 	ctx context.Context, version, userID string, uploads []api.InternalKeyBackupSession,
 ) (count int64, etag string, err error) {
 	// wrap the following logic in a txn to ensure we atomically upload keys
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		_, _, _, oldETag, deleted, err := d.keyBackupVersions.selectKeyBackup(ctx, txn, userID, version)
 		if err != nil {
 			return err
