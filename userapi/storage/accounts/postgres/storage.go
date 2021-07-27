@@ -45,6 +45,7 @@ type Database struct {
 	accountDatas          accountDataStatements
 	threepids             threepidStatements
 	openIDTokens          tokenStatements
+	keyBackups            keyBackupVersionStatements
 	serverName            gomatrixserverlib.ServerName
 	bcryptCost            int
 	openIDTokenLifetimeMS int64
@@ -91,6 +92,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, err
 	}
 	if err = d.openIDTokens.prepare(db, serverName); err != nil {
+		return nil, err
+	}
+	if err = d.keyBackups.prepare(db); err != nil {
 		return nil, err
 	}
 
@@ -367,4 +371,43 @@ func (d *Database) GetOpenIDTokenAttributes(
 	token string,
 ) (*api.OpenIDTokenAttributes, error) {
 	return d.openIDTokens.selectOpenIDTokenAtrributes(ctx, token)
+}
+
+func (d *Database) CreateKeyBackup(
+	ctx context.Context, userID, algorithm string, authData json.RawMessage,
+) (version string, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		version, err = d.keyBackups.insertKeyBackup(ctx, txn, userID, algorithm, authData)
+		return err
+	})
+	return
+}
+
+func (d *Database) UpdateKeyBackupAuthData(
+	ctx context.Context, userID, version string, authData json.RawMessage,
+) (err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.keyBackups.updateKeyBackupAuthData(ctx, txn, userID, version, authData)
+	})
+	return
+}
+
+func (d *Database) DeleteKeyBackup(
+	ctx context.Context, userID, version string,
+) (exists bool, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		exists, err = d.keyBackups.deleteKeyBackup(ctx, txn, userID, version)
+		return err
+	})
+	return
+}
+
+func (d *Database) GetKeyBackup(
+	ctx context.Context, userID, version string,
+) (versionResult, algorithm string, authData json.RawMessage, deleted bool, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		versionResult, algorithm, authData, deleted, err = d.keyBackups.selectKeyBackup(ctx, txn, userID, version)
+		return err
+	})
+	return
 }

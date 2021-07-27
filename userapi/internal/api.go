@@ -442,3 +442,57 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 
 	return nil
 }
+
+func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+	// Delete
+	if req.DeleteBackup {
+		if req.Version == "" {
+			res.BadInput = true
+			res.Error = "must specify a version to delete"
+			return
+		}
+		exists, err := a.AccountDB.DeleteKeyBackup(ctx, req.UserID, req.Version)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to delete backup: %s", err)
+		}
+		res.Exists = exists
+		res.Version = req.Version
+		return
+	}
+	// Create
+	if req.Version == "" {
+		version, err := a.AccountDB.CreateKeyBackup(ctx, req.UserID, req.Algorithm, req.AuthData)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to create backup: %s", err)
+		}
+		res.Exists = err == nil
+		res.Version = version
+		return
+	}
+	// Update
+	err := a.AccountDB.UpdateKeyBackupAuthData(ctx, req.UserID, req.Version, req.AuthData)
+	if err != nil {
+		res.Error = fmt.Sprintf("failed to update backup: %s", err)
+	}
+	res.Version = req.Version
+}
+
+func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
+	version, algorithm, authData, deleted, err := a.AccountDB.GetKeyBackup(ctx, req.UserID, req.Version)
+	res.Version = version
+	if err != nil {
+		if err == sql.ErrNoRows {
+			res.Exists = false
+			return
+		}
+		res.Error = fmt.Sprintf("failed to query key backup: %s", err)
+		return
+	}
+	res.Algorithm = algorithm
+	res.AuthData = authData
+	res.Exists = !deleted
+
+	// TODO:
+	res.Count = 0
+	res.ETag = ""
+}
