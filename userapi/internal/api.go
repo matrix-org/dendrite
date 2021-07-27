@@ -444,8 +444,18 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 }
 
 func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+	if req.DeleteBackup {
+		if req.Version == "" {
+			res.BadInput = true
+			res.Error = "must specify a version to delete"
+			return
+		}
+		return
+	}
+	if req.Version != "" {
+		// modifying a backup, check the algorithm matches
+	}
 
 }
 func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
-
 }
