@@ -160,8 +160,9 @@ func (d *Database) SetPassword(
 	if err != nil {
 		return err
 	}
-	err = d.accounts.updatePassword(ctx, localpart, hash)
-	return err
+	return d.writer.Do(nil, nil, func(txn *sql.Tx) error {
+		return d.accounts.updatePassword(ctx, localpart, hash)
+	})
 }
 
 // CreateGuestAccount makes a new guest account and creates an empty profile
@@ -388,7 +389,9 @@ func (d *Database) SearchProfiles(ctx context.Context, searchString string, limi
 
 // DeactivateAccount deactivates the user's account, removing all ability for the user to login again.
 func (d *Database) DeactivateAccount(ctx context.Context, localpart string) (err error) {
-	return d.accounts.deactivateAccount(ctx, localpart)
+	return d.writer.Do(nil, nil, func(txn *sql.Tx) error {
+		return d.accounts.deactivateAccount(ctx, localpart)
+	})
 }
 
 // CreateOpenIDToken persists a new token that was issued for OpenID Connect
