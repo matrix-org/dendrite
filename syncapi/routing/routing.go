@@ -40,6 +40,8 @@ func Setup(
 	cfg *config.SyncAPI,
 ) {
 	r0mux := csMux.PathPrefix("/r0").Subrouter()
+	unstableMux := csMux.PathPrefix("/unstable").Subrouter()
+	unstableMux.NotFoundHandler = r0mux // serve r0 endpoints by default unless overridden
 
 	// TODO: Add AS support for all handlers below.
 	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
