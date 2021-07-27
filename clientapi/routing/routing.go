@@ -896,7 +896,8 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	// Key Backup Versions
+	// Key Backup Versions (Metadata)
+
 	r0mux.Handle("/room_keys/version/{version}",
 		httputil.MakeAuthAPI("get_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -935,7 +936,8 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	// E2E Backup Keys
+	// Inserting E2E Backup Keys
+
 	// Bulk room and session
 	r0mux.Handle("/room_keys/keys",
 		httputil.MakeAuthAPI("put_backup_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -1022,6 +1024,8 @@ func Setup(
 		}),
 	).Methods(http.MethodPut)
 
+	// Querying E2E Backup Keys
+
 	r0mux.Handle("/room_keys/keys",
 		httputil.MakeAuthAPI("get_backup_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetBackupKeys(req, userAPI, device, req.URL.Query().Get("version"), "", "")
@@ -1045,6 +1049,8 @@ func Setup(
 			return GetBackupKeys(req, userAPI, device, req.URL.Query().Get("version"), vars["roomID"], vars["sessionID"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	// Deleting E2E Backup Keys
 
 	// Supplying a device ID is deprecated.
 	r0mux.Handle("/keys/upload/{deviceID}",

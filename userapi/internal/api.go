@@ -539,8 +539,10 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	res.Exists = !deleted
 
 	if !req.ReturnKeys {
-		// TODO return the counts
 		res.Count, err = a.AccountDB.CountBackupKeys(ctx, version, req.UserID)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to count keys: %s", err)
+		}
 		return
 	}
 
