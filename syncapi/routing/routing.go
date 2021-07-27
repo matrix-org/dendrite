@@ -16,7 +16,6 @@ package routing
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -28,13 +27,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
-
-func unstableDefaultMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.URL.Path = strings.Replace(r.URL.Path, "/unstable/", "/r0/", 1)
-		next.ServeHTTP(w, r)
-	})
-}
 
 // Setup configures the given mux with sync-server listeners
 //
@@ -48,9 +40,6 @@ func Setup(
 	cfg *config.SyncAPI,
 ) {
 	r0mux := csMux.PathPrefix("/r0").Subrouter()
-	unstableMux := csMux.PathPrefix("/unstable").Subrouter()
-	unstableMux.NotFoundHandler = r0mux
-	unstableMux.Use(unstableDefaultMiddleware)
 
 	// TODO: Add AS support for all handlers below.
 	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
