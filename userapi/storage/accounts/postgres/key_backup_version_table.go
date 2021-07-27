@@ -56,7 +56,7 @@ const selectKeyBackupSQL = "" +
 	"SELECT algorithm, auth_data, etag, deleted FROM account_e2e_room_keys_versions WHERE user_id = $1 AND version = $2"
 
 const selectLatestVersionSQL = "" +
-	"SELECT MAX(version) FROM account_e2e_room_keys_versions WHERE user_id = $1"
+	"SELECT COALESCE(MAX(version),0) FROM account_e2e_room_keys_versions WHERE user_id = $1"
 
 type keyBackupVersionStatements struct {
 	insertKeyBackupStmt         *sql.Stmt
