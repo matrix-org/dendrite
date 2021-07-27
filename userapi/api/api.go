@@ -33,6 +33,8 @@ type UserInternalAPI interface {
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
+	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse)
+	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
@@ -40,6 +42,37 @@ type UserInternalAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
+}
+
+type PerformKeyBackupRequest struct {
+	UserID       string
+	Version      string // optional if modifying a key backup
+	AuthData     json.RawMessage
+	Algorithm    string
+	DeleteBackup bool // if true will delete the backup based on 'Version'.
+}
+
+type PerformKeyBackupResponse struct {
+	Error    string // set if there was a problem performing the request
+	BadInput bool   // if set, the Error was due to bad input (HTTP 400)
+	Exists   bool   // set to true if the Version exists
+	Version  string
+}
+
+type QueryKeyBackupRequest struct {
+	UserID  string
+	Version string // the version to query, if blank it means the latest
+}
+
+type QueryKeyBackupResponse struct {
+	Error  string
+	Exists bool
+
+	Algorithm string          `json:"algorithm"`
+	AuthData  json.RawMessage `json:"auth_data"`
+	Count     int             `json:"count"`
+	ETag      string          `json:"etag"`
+	Version   string          `json:"version"`
 }
 
 // InputAccountDataRequest is the request for InputAccountData
