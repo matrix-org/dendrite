@@ -546,6 +546,7 @@ Responds correctly when backup is empty
 Can backup keys
 Can update keys with better versions
 Will not update keys with worse versions
+Will not back up to an old backup version
 Can create more than 10 backup versions
 Can delete backup
 Deleted & recreated backups are empty

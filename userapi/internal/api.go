@@ -444,10 +444,6 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 }
 
 func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
-	logrus.Infof("PerformKeyBackup REQ= %+v", *req)
-	defer func() {
-		logrus.Infof("PerformKeyBackup RESP= %+v", *res)
-	}()
 	// Delete metadata
 	if req.DeleteBackup {
 		if req.Version == "" {
@@ -488,14 +484,19 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 }
 
 func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
-	// ensure the version metadata exists
-	version, _, _, _, deleted, err := a.AccountDB.GetKeyBackup(ctx, req.UserID, req.Version)
+	// you can only upload keys for the CURRENT version
+	version, _, _, _, deleted, err := a.AccountDB.GetKeyBackup(ctx, req.UserID, "")
 	if err != nil {
 		res.Error = fmt.Sprintf("failed to query version: %s", err)
 		return
 	}
 	if deleted {
 		res.Error = "backup was deleted"
+		return
+	}
+	if version != req.Version {
+		res.BadInput = true
+		res.Error = fmt.Sprintf("%s isn't the current version, %s is.", req.Version, version)
 		return
 	}
 	res.Exists = true
