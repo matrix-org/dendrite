@@ -414,7 +414,7 @@ func (d *Database) GetOpenIDTokenAttributes(
 func (d *Database) CreateKeyBackup(
 	ctx context.Context, userID, algorithm string, authData json.RawMessage,
 ) (version string, err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		version, err = d.keyBackups.insertKeyBackup(ctx, txn, userID, algorithm, authData)
 		return err
 	})
@@ -424,7 +424,7 @@ func (d *Database) CreateKeyBackup(
 func (d *Database) UpdateKeyBackupAuthData(
 	ctx context.Context, userID, version string, authData json.RawMessage,
 ) (err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		return d.keyBackups.updateKeyBackupAuthData(ctx, txn, userID, version, authData)
 	})
 	return
@@ -433,7 +433,7 @@ func (d *Database) UpdateKeyBackupAuthData(
 func (d *Database) DeleteKeyBackup(
 	ctx context.Context, userID, version string,
 ) (exists bool, err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		exists, err = d.keyBackups.deleteKeyBackup(ctx, txn, userID, version)
 		return err
 	})
@@ -443,7 +443,7 @@ func (d *Database) DeleteKeyBackup(
 func (d *Database) GetKeyBackup(
 	ctx context.Context, userID, version string,
 ) (versionResult, algorithm string, authData json.RawMessage, deleted bool, err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		versionResult, algorithm, authData, deleted, err = d.keyBackups.selectKeyBackup(ctx, txn, userID, version)
 		return err
 	})
