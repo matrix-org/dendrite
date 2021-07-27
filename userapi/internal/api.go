@@ -475,7 +475,6 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		res.Error = fmt.Sprintf("failed to update backup: %s", err)
 	}
 	res.Version = req.Version
-	return
 }
 
 func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
@@ -496,6 +495,4 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	// TODO:
 	res.Count = 0
 	res.ETag = ""
-
-	return
 }
