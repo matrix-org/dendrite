@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS account_e2e_room_keys (
     is_verified BOOLEAN NOT NULL,
     session_data TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON account_e2e_room_keys(user_id, room_id, session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON account_e2e_room_keys(user_id, room_id, session_id, version);
+CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_versions_idx ON account_e2e_room_keys(user_id, version);
 `
 
 const insertBackupKeySQL = "" +
@@ -53,14 +54,23 @@ const selectKeysSQL = "" +
 	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
 	"WHERE user_id = $1 AND version = $2"
 
+const selectKeysByRoomIDSQL = "" +
+	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
+	"WHERE user_id = $1 AND version = $2 AND room_id = $3"
+
+const selectKeysByRoomIDAndSessionIDSQL = "" +
+	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
+	"WHERE user_id = $1 AND version = $2 AND room_id = $3 AND session_id = $4"
+
 type keyBackupStatements struct {
-	insertBackupKeyStmt *sql.Stmt
-	updateBackupKeyStmt *sql.Stmt
-	countKeysStmt       *sql.Stmt
-	selectKeysStmt      *sql.Stmt
+	insertBackupKeyStmt                *sql.Stmt
+	updateBackupKeyStmt                *sql.Stmt
+	countKeysStmt                      *sql.Stmt
+	selectKeysStmt                     *sql.Stmt
+	selectKeysByRoomIDStmt             *sql.Stmt
+	selectKeysByRoomIDAndSessionIDStmt *sql.Stmt
 }
 
-// nolint:unused
 func (s *keyBackupStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(keyBackupTableSchema)
 	if err != nil {
@@ -76,6 +86,12 @@ func (s *keyBackupStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if s.selectKeysStmt, err = db.Prepare(selectKeysSQL); err != nil {
+		return
+	}
+	if s.selectKeysByRoomIDStmt, err = db.Prepare(selectKeysByRoomIDSQL); err != nil {
+		return
+	}
+	if s.selectKeysByRoomIDAndSessionIDStmt, err = db.Prepare(selectKeysByRoomIDAndSessionIDSQL); err != nil {
 		return
 	}
 	return
@@ -109,11 +125,35 @@ func (s *keyBackupStatements) updateBackupKey(
 func (s *keyBackupStatements) selectKeys(
 	ctx context.Context, txn *sql.Tx, userID, version string,
 ) (map[string]map[string]api.KeyBackupSession, error) {
-	result := make(map[string]map[string]api.KeyBackupSession)
 	rows, err := txn.Stmt(s.selectKeysStmt).QueryContext(ctx, userID, version)
 	if err != nil {
 		return nil, err
 	}
+	return unpackKeys(ctx, rows)
+}
+
+func (s *keyBackupStatements) selectKeysByRoomID(
+	ctx context.Context, txn *sql.Tx, userID, version, roomID string,
+) (map[string]map[string]api.KeyBackupSession, error) {
+	rows, err := txn.Stmt(s.selectKeysByRoomIDStmt).QueryContext(ctx, userID, version, roomID)
+	if err != nil {
+		return nil, err
+	}
+	return unpackKeys(ctx, rows)
+}
+
+func (s *keyBackupStatements) selectKeysByRoomIDAndSessionID(
+	ctx context.Context, txn *sql.Tx, userID, version, roomID, sessionID string,
+) (map[string]map[string]api.KeyBackupSession, error) {
+	rows, err := txn.Stmt(s.selectKeysByRoomIDAndSessionIDStmt).QueryContext(ctx, userID, version, roomID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return unpackKeys(ctx, rows)
+}
+
+func unpackKeys(ctx context.Context, rows *sql.Rows) (map[string]map[string]api.KeyBackupSession, error) {
+	result := make(map[string]map[string]api.KeyBackupSession)
 	defer internal.CloseAndLogIfError(ctx, rows, "selectKeysStmt.Close failed")
 	for rows.Next() {
 		var key api.InternalKeyBackupSession

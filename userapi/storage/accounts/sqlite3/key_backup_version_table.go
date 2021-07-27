@@ -65,7 +65,6 @@ type keyBackupVersionStatements struct {
 	updateKeyBackupETagStmt     *sql.Stmt
 }
 
-// nolint:unused
 func (s *keyBackupVersionStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(keyBackupVersionTableSchema)
 	if err != nil {

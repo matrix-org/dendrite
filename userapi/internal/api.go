@@ -444,6 +444,10 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 }
 
 func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+	logrus.Infof("PerformKeyBackup REQ= %+v", *req)
+	defer func() {
+		logrus.Infof("PerformKeyBackup RESP= %+v", *res)
+	}()
 	// Delete metadata
 	if req.DeleteBackup {
 		if req.Version == "" {
@@ -475,6 +479,7 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		if err != nil {
 			res.Error = fmt.Sprintf("failed to update backup: %s", err)
 		}
+		res.Exists = err == nil
 		res.Version = req.Version
 		return
 	}
@@ -529,9 +534,19 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	}
 	res.Algorithm = algorithm
 	res.AuthData = authData
+	res.ETag = etag
 	res.Exists = !deleted
 
-	// TODO:
-	res.Count = 0
-	res.ETag = etag
+	if !req.ReturnKeys {
+		// TODO return the counts
+		res.Count, err = a.AccountDB.CountBackupKeys(ctx, version, req.UserID)
+		return
+	}
+
+	result, err := a.AccountDB.GetBackupKeys(ctx, version, req.UserID, req.KeysForRoomID, req.KeysForSessionID)
+	if err != nil {
+		res.Error = fmt.Sprintf("failed to query keys: %s", err)
+		return
+	}
+	res.Keys = result
 }
