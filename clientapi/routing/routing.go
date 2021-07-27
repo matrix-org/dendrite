@@ -117,7 +117,10 @@ func Setup(
 
 	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
-	unstableMux.NotFoundHandler = r0mux // serve r0 endpoints by default unless overridden
+	defer unstableMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = strings.Replace(r.URL.Path, "/unstable/", "/r0/", 1)
+		r0mux.ServeHTTP(w, r)
+	}) // serve r0 endpoints by default unless overridden
 
 	r0mux.Handle("/createRoom",
 		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

@@ -57,12 +57,6 @@ func Setup(
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
 	v2fedmux := fedMux.PathPrefix("/v2").Subrouter()
 
-	unstableFedMux := fedMux.PathPrefix("/unstable").Subrouter()
-	unstableFedMux.NotFoundHandler = v2fedmux // serve v2 endpoints by default unless overridden
-
-	unstableKeysMux := keyMux.PathPrefix("/unstable").Subrouter()
-	unstableKeysMux.NotFoundHandler = v2keysmux // serve v2 endpoints by default unless overridden
-
 	wakeup := &httputil.FederationWakeups{
 		FsAPI: fsAPI,
 	}
