@@ -50,13 +50,31 @@ type PerformKeyBackupRequest struct {
 	AuthData     json.RawMessage
 	Algorithm    string
 	DeleteBackup bool // if true will delete the backup based on 'Version'.
+
+	// The keys to upload, if any. If blank, creates/updates/deletes key version metadata only.
+	Keys struct {
+		Rooms map[string]struct {
+			Sessions map[string]KeyBackupSession `json:"sessions"`
+		} `json:"rooms"`
+	}
+}
+
+type KeyBackupSession struct {
+	FirstMessageIndex int             `json:"first_message_index"`
+	ForwardedCount    int             `json:"forwarded_count"`
+	IsVerified        bool            `json:"is_verified"`
+	SessionData       json.RawMessage `json:"session_data"`
 }
 
 type PerformKeyBackupResponse struct {
 	Error    string // set if there was a problem performing the request
 	BadInput bool   // if set, the Error was due to bad input (HTTP 400)
-	Exists   bool   // set to true if the Version exists
-	Version  string
+
+	Exists  bool   // set to true if the Version exists
+	Version string // the newly created version
+
+	KeyCount int    // only set if Keys were given in the request
+	KeyETag  string // only set if Keys were given in the request
 }
 
 type QueryKeyBackupRequest struct {
