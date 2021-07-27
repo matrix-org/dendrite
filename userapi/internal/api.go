@@ -475,6 +475,7 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		if err != nil {
 			res.Error = fmt.Sprintf("failed to update backup: %s", err)
 		}
+		res.Exists = err == nil
 		res.Version = req.Version
 		return
 	}
@@ -483,14 +484,19 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 }
 
 func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
-	// ensure the version metadata exists
-	version, _, _, _, deleted, err := a.AccountDB.GetKeyBackup(ctx, req.UserID, req.Version)
+	// you can only upload keys for the CURRENT version
+	version, _, _, _, deleted, err := a.AccountDB.GetKeyBackup(ctx, req.UserID, "")
 	if err != nil {
 		res.Error = fmt.Sprintf("failed to query version: %s", err)
 		return
 	}
 	if deleted {
 		res.Error = "backup was deleted"
+		return
+	}
+	if version != req.Version {
+		res.BadInput = true
+		res.Error = fmt.Sprintf("%s isn't the current version, %s is.", req.Version, version)
 		return
 	}
 	res.Exists = true
@@ -529,9 +535,21 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	}
 	res.Algorithm = algorithm
 	res.AuthData = authData
+	res.ETag = etag
 	res.Exists = !deleted
 
-	// TODO:
-	res.Count = 0
-	res.ETag = etag
+	if !req.ReturnKeys {
+		res.Count, err = a.AccountDB.CountBackupKeys(ctx, version, req.UserID)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to count keys: %s", err)
+		}
+		return
+	}
+
+	result, err := a.AccountDB.GetBackupKeys(ctx, version, req.UserID, req.KeysForRoomID, req.KeysForSessionID)
+	if err != nil {
+		res.Error = fmt.Sprintf("failed to query keys: %s", err)
+		return
+	}
+	res.Keys = result
 }

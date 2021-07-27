@@ -37,7 +37,7 @@ type keyBackupVersionCreateResponse struct {
 type keyBackupVersionResponse struct {
 	Algorithm string          `json:"algorithm"`
 	AuthData  json.RawMessage `json:"auth_data"`
-	Count     int             `json:"count"`
+	Count     int64           `json:"count"`
 	ETag      string          `json:"etag"`
 	Version   string          `json:"version"`
 }
@@ -89,7 +89,10 @@ func CreateKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, 
 // Implements GET  /_matrix/client/r0/room_keys/version and GET /_matrix/client/r0/room_keys/version/{version}
 func KeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version string) util.JSONResponse {
 	var queryResp userapi.QueryKeyBackupResponse
-	userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{}, &queryResp)
+	userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
+		UserID:  device.UserID,
+		Version: version,
+	}, &queryResp)
 	if queryResp.Error != "" {
 		return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", queryResp.Error))
 	}
@@ -214,5 +217,75 @@ func UploadBackupKeys(
 			Count: performKeyBackupResp.KeyCount,
 			ETag:  performKeyBackupResp.KeyETag,
 		},
+	}
+}
+
+// Get keys from a given backup version. Response returned varies depending on if roomID and sessionID are set.
+func GetBackupKeys(
+	req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version, roomID, sessionID string,
+) util.JSONResponse {
+	var queryResp userapi.QueryKeyBackupResponse
+	userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
+		UserID:           device.UserID,
+		Version:          version,
+		ReturnKeys:       true,
+		KeysForRoomID:    roomID,
+		KeysForSessionID: sessionID,
+	}, &queryResp)
+	if queryResp.Error != "" {
+		return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", queryResp.Error))
+	}
+	if !queryResp.Exists {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("version not found"),
+		}
+	}
+	if sessionID != "" {
+		// return the key itself if it was found
+		roomData, ok := queryResp.Keys[roomID]
+		if ok {
+			key, ok := roomData[sessionID]
+			if ok {
+				return util.JSONResponse{
+					Code: 200,
+					JSON: key,
+				}
+			}
+		}
+	} else if roomID != "" {
+		roomData, ok := queryResp.Keys[roomID]
+		if ok {
+			// wrap response in "sessions"
+			return util.JSONResponse{
+				Code: 200,
+				JSON: struct {
+					Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+				}{
+					Sessions: roomData,
+				},
+			}
+		}
+	} else {
+		// response is the same as the upload request
+		var resp keyBackupSessionRequest
+		resp.Rooms = make(map[string]struct {
+			Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+		})
+		for roomID, roomData := range queryResp.Keys {
+			resp.Rooms[roomID] = struct {
+				Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+			}{
+				Sessions: roomData,
+			}
+		}
+		return util.JSONResponse{
+			Code: 200,
+			JSON: resp,
+		}
+	}
+	return util.JSONResponse{
+		Code: 404,
+		JSON: jsonerror.NotFound("keys not found"),
 	}
 }

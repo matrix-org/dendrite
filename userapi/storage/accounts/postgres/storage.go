@@ -96,13 +96,12 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = d.openIDTokens.prepare(db, serverName); err != nil {
 		return nil, err
 	}
-	/*
-		if err = d.keyBackupVersions.prepare(db); err != nil {
-			return nil, err
-		}
-		if err = d.keyBackups.prepare(db); err != nil {
-			return nil, err
-		} */
+	if err = d.keyBackupVersions.prepare(db); err != nil {
+		return nil, err
+	}
+	if err = d.keyBackups.prepare(db); err != nil {
+		return nil, err
+	}
 
 	return d, nil
 }
@@ -418,6 +417,37 @@ func (d *Database) GetKeyBackup(
 	return
 }
 
+func (d *Database) GetBackupKeys(
+	ctx context.Context, version, userID, filterRoomID, filterSessionID string,
+) (result map[string]map[string]api.KeyBackupSession, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if filterSessionID != "" {
+			result, err = d.keyBackups.selectKeysByRoomIDAndSessionID(ctx, txn, userID, version, filterRoomID, filterSessionID)
+			return err
+		}
+		if filterRoomID != "" {
+			result, err = d.keyBackups.selectKeysByRoomID(ctx, txn, userID, version, filterRoomID)
+			return err
+		}
+		result, err = d.keyBackups.selectKeys(ctx, txn, userID, version)
+		return err
+	})
+	return
+}
+
+func (d *Database) CountBackupKeys(
+	ctx context.Context, version, userID string,
+) (count int64, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		count, err = d.keyBackups.countKeys(ctx, txn, userID, version)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return
+}
+
 // nolint:nakedret
 func (d *Database) UpsertBackupKeys(
 	ctx context.Context, version, userID string, uploads []api.InternalKeyBackupSession,
@@ -445,7 +475,7 @@ func (d *Database) UpsertBackupKeys(
 			if existingRoom != nil {
 				existingSession, ok := existingRoom[newKey.SessionID]
 				if ok {
-					if shouldReplaceRoomKey(existingSession, newKey.KeyBackupSession) {
+					if existingSession.ShouldReplaceRoomKey(&newKey.KeyBackupSession) {
 						err = d.keyBackups.updateBackupKey(ctx, txn, userID, version, newKey)
 						changed = true
 						if err != nil {
@@ -488,23 +518,4 @@ func (d *Database) UpsertBackupKeys(
 		return nil
 	})
 	return
-}
-
-// TODO FIXME XXX : This logic really shouldn't live in the storage layer, but I don't know where else is sensible which won't
-// create circular import loops
-func shouldReplaceRoomKey(existing, uploaded api.KeyBackupSession) bool {
-	// https://spec.matrix.org/unstable/client-server-api/#backup-algorithm-mmegolm_backupv1curve25519-aes-sha2
-	// "if the keys have different values for is_verified, then it will keep the key that has is_verified set to true"
-	if uploaded.IsVerified && !existing.IsVerified {
-		return true
-	}
-	// "if they have the same values for is_verified, then it will keep the key with a lower first_message_index"
-	if uploaded.FirstMessageIndex < existing.FirstMessageIndex {
-		return true
-	}
-	// "and finally, is is_verified and first_message_index are equal, then it will keep the key with a lower forwarded_count"
-	if uploaded.ForwardedCount < existing.ForwardedCount {
-		return true
-	}
-	return false
 }

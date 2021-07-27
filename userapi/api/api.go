@@ -67,6 +67,23 @@ type KeyBackupSession struct {
 	SessionData       json.RawMessage `json:"session_data"`
 }
 
+func (a *KeyBackupSession) ShouldReplaceRoomKey(newKey *KeyBackupSession) bool {
+	// https://spec.matrix.org/unstable/client-server-api/#backup-algorithm-mmegolm_backupv1curve25519-aes-sha2
+	// "if the keys have different values for is_verified, then it will keep the key that has is_verified set to true"
+	if newKey.IsVerified && !a.IsVerified {
+		return true
+	}
+	// "if they have the same values for is_verified, then it will keep the key with a lower first_message_index"
+	if newKey.FirstMessageIndex < a.FirstMessageIndex {
+		return true
+	}
+	// "and finally, is is_verified and first_message_index are equal, then it will keep the key with a lower forwarded_count"
+	if newKey.ForwardedCount < a.ForwardedCount {
+		return true
+	}
+	return false
+}
+
 // Internal KeyBackupData for passing to/from the storage layer
 type InternalKeyBackupSession struct {
 	KeyBackupSession
@@ -88,6 +105,10 @@ type PerformKeyBackupResponse struct {
 type QueryKeyBackupRequest struct {
 	UserID  string
 	Version string // the version to query, if blank it means the latest
+
+	ReturnKeys       bool   // whether to return keys in the backup response or just the metadata
+	KeysForRoomID    string // optional string to return keys which belong to this room
+	KeysForSessionID string // optional string to return keys which belong to this (room, session)
 }
 
 type QueryKeyBackupResponse struct {
@@ -96,9 +117,11 @@ type QueryKeyBackupResponse struct {
 
 	Algorithm string          `json:"algorithm"`
 	AuthData  json.RawMessage `json:"auth_data"`
-	Count     int             `json:"count"`
+	Count     int64           `json:"count"`
 	ETag      string          `json:"etag"`
 	Version   string          `json:"version"`
+
+	Keys map[string]map[string]KeyBackupSession // the keys if ReturnKeys=true
 }
 
 // InputAccountDataRequest is the request for InputAccountData
