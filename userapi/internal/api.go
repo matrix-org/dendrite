@@ -490,7 +490,7 @@ func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.Perform
 		return
 	}
 	if deleted {
-		res.Error = fmt.Sprintf("backup was deleted")
+		res.Error = "backup was deleted"
 		return
 	}
 	res.Exists = true

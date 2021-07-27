@@ -44,7 +44,7 @@ const insertBackupKeySQL = "" +
 
 const updateBackupKeySQL = "" +
 	"UPDATE account_e2e_room_keys SET first_message_index=$1, forwarded_count=$2, is_verified=$3, session_data=$4 " +
-	"WHERE user_id=$5 AND room_id=$6 AND session_id=$7"
+	"WHERE user_id=$5 AND room_id=$6 AND session_id=$7 AND version=$8"
 
 const countKeysSQL = "" +
 	"SELECT COUNT(*) FROM account_e2e_room_keys WHERE user_id = $1 AND version = $2"
@@ -60,6 +60,7 @@ type keyBackupStatements struct {
 	selectKeysStmt      *sql.Stmt
 }
 
+// nolint:unused
 func (s *keyBackupStatements) prepare(db *sql.DB) (err error) {
 	_, err = db.Exec(keyBackupTableSchema)
 	if err != nil {
@@ -100,7 +101,7 @@ func (s *keyBackupStatements) updateBackupKey(
 	ctx context.Context, txn *sql.Tx, userID, version string, key api.InternalKeyBackupSession,
 ) (err error) {
 	_, err = txn.Stmt(s.updateBackupKeyStmt).ExecContext(
-		ctx, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData), userID, key.RoomID, key.SessionID,
+		ctx, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData), userID, key.RoomID, key.SessionID, version,
 	)
 	return
 }

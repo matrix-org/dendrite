@@ -459,6 +459,7 @@ func (d *Database) GetKeyBackup(
 	return
 }
 
+// nolint:nakedret
 func (d *Database) UpsertBackupKeys(
 	ctx context.Context, version, userID string, uploads []api.InternalKeyBackupSession,
 ) (count int64, etag string, err error) {
