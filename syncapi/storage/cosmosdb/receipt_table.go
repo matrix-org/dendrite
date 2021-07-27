@@ -58,6 +58,7 @@ type ReceiptCosmosMaxNumber struct {
 type ReceiptCosmosData struct {
 	Id        string        `json:"id"`
 	Pk        string        `json:"_pk"`
+	Tn        string        `json:"_sid"`
 	Cn        string        `json:"_cn"`
 	ETag      string        `json:"_etag"`
 	Timestamp int64         `json:"_ts"`
@@ -94,7 +95,7 @@ type receiptStatements struct {
 
 func queryReceipt(s *receiptStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ReceiptCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []ReceiptCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -115,7 +116,7 @@ func queryReceipt(s *receiptStatements, ctx context.Context, qry string, params 
 
 func queryReceiptNumber(s *receiptStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ReceiptCosmosMaxNumber, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []ReceiptCosmosMaxNumber
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -174,6 +175,7 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 
 	var dbData = ReceiptCosmosData{
 		Id:        cosmosDocId,
+		Tn:        r.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),

@@ -46,6 +46,7 @@ import (
 type EventTypeCosmosData struct {
 	Id        string          `json:"id"`
 	Pk        string          `json:"_pk"`
+	Tn        string          `json:"_sid"`
 	Cn        string          `json:"_cn"`
 	ETag      string          `json:"_etag"`
 	Timestamp int64           `json:"_ts"`
@@ -119,7 +120,7 @@ func NewCosmosDBEventTypesTable(db *Database) (tables.EventTypes, error) {
 
 func queryEventTypes(s *eventTypeStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventTypeCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []EventTypeCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -167,11 +168,12 @@ func insertEventTypeCore(s *eventTypeStatements, ctx context.Context, eventType 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 
 	//Unique on eventType
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, eventType.EventType)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, eventType.EventType)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = EventTypeCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -248,8 +250,8 @@ func ensureEventTypes(s *eventTypeStatements, ctx context.Context) error {
 func selectEventTypeCore(s *eventTypeStatements, ctx context.Context, eventType string) (*EventTypeCosmos, error) {
 	var response EventTypeCosmosData
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, eventType)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, eventType)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,

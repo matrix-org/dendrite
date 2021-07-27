@@ -44,6 +44,7 @@ import (
 type RoomCosmosData struct {
 	Id        string     `json:"id"`
 	Pk        string     `json:"_pk"`
+	Tn        string     `json:"_sid"`
 	Cn        string     `json:"_cn"`
 	ETag      string     `json:"_etag"`
 	Timestamp int64      `json:"_ts"`
@@ -146,7 +147,7 @@ func mapToRoomEventNIDArray(eventNIDs []int64) []types.EventNID {
 
 func queryRoom(s *roomStatements, ctx context.Context, qry string, params map[string]interface{}) ([]RoomCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []RoomCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -224,8 +225,8 @@ func (s *roomStatements) SelectRoomInfo(ctx context.Context, roomID string) (*ty
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     room_id TEXT NOT NULL UNIQUE,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	room, err := getRoom(s, ctx, pk, cosmosDocId)
 
 	if err != nil {
@@ -253,8 +254,8 @@ func (s *roomStatements) InsertRoomNID(
 	//   ON CONFLICT DO NOTHING;
 	//     room_id TEXT NOT NULL UNIQUE,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	dbData, errGet := getRoom(s, ctx, pk, cosmosDocId)
 
@@ -273,6 +274,7 @@ func (s *roomStatements) InsertRoomNID(
 
 		dbData = &RoomCosmosData{
 			Id:        cosmosDocId,
+			Tn:        s.db.cosmosConfig.TenantName,
 			Cn:        dbCollectionName,
 			Pk:        pk,
 			Timestamp: time.Now().Unix(),
@@ -307,8 +309,8 @@ func (s *roomStatements) SelectRoomNID(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     room_id TEXT NOT NULL UNIQUE,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	room, err := getRoom(s, ctx, pk, cosmosDocId)
 
 	if err != nil {

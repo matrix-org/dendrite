@@ -51,6 +51,7 @@ type FilterCosmos struct {
 type FilterCosmosData struct {
 	Id        string       `json:"id"`
 	Pk        string       `json:"_pk"`
+	Tn        string       `json:"_sid"`
 	Cn        string       `json:"_cn"`
 	ETag      string       `json:"_etag"`
 	Timestamp int64        `json:"_ts"`
@@ -79,7 +80,7 @@ type filterStatements struct {
 
 func queryFilter(s *filterStatements, ctx context.Context, qry string, params map[string]interface{}) ([]FilterCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []FilterCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -142,8 +143,8 @@ func (s *filterStatements) SelectFilter(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (id, localpart)
 	docId := fmt.Sprintf("%s_%s", localpart, filterID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response, err = getFilter(s, ctx, pk, cosmosDocId)
 
 	if err != nil {
@@ -230,11 +231,12 @@ func (s *filterStatements) InsertFilter(
 
 	// 	UNIQUE (id, localpart)
 	docId := fmt.Sprintf("%s_%d", localpart, seqID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = FilterCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),

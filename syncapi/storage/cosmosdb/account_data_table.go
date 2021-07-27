@@ -54,6 +54,7 @@ type AccountDataTypeNumberCosmosData struct {
 type AccountDataTypeCosmosData struct {
 	Id              string                `json:"id"`
 	Pk              string                `json:"_pk"`
+	Tn              string                `json:"_sid"`
 	Cn              string                `json:"_cn"`
 	ETag            string                `json:"_etag"`
 	Timestamp       int64                 `json:"_ts"`
@@ -90,7 +91,7 @@ type accountDataStatements struct {
 
 func queryAccountDataType(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataTypeCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []AccountDataTypeCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -111,7 +112,7 @@ func queryAccountDataType(s *accountDataStatements, ctx context.Context, qry str
 
 func queryAccountDataTypeNumber(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataTypeNumberCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []AccountDataTypeNumberCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -159,8 +160,8 @@ func (s *accountDataStatements) InsertAccountData(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     UNIQUE (user_id, room_id, type)
 	docId := fmt.Sprintf("%s_%s_%s", userID, roomID, dataType)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := AccountDataTypeCosmos{
 		ID:       int64(pos),
@@ -171,6 +172,7 @@ func (s *accountDataStatements) InsertAccountData(
 
 	dbData := &AccountDataTypeCosmosData{
 		Id:              cosmosDocId,
+		Tn:              s.db.cosmosConfig.TenantName,
 		Cn:              dbCollectionName,
 		Pk:              pk,
 		Timestamp:       time.Now().Unix(),

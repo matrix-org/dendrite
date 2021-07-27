@@ -64,6 +64,7 @@ type MembershipCosmos struct {
 type MembershipCosmosData struct {
 	Id         string           `json:"id"`
 	Pk         string           `json:"_pk"`
+	Tn         string           `json:"_sid"`
 	Cn         string           `json:"_cn"`
 	ETag       string           `json:"_etag"`
 	Timestamp  int64            `json:"_ts"`
@@ -95,7 +96,7 @@ type membershipsStatements struct {
 
 func queryMembership(s *membershipsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]MembershipCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []MembershipCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -156,13 +157,14 @@ func (s *membershipsStatements) UpsertMembership(
 	}
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// 	UNIQUE (room_id, user_id, membership)
 	docId := fmt.Sprintf("%s_%s_%s", event.RoomID(), *event.StateKey(), membership)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	var dbData = MembershipCosmosData{
 		Id:         cosmosDocId,
+		Tn:         s.db.cosmosConfig.TenantName,
 		Cn:         dbCollectionName,
 		Pk:         pk,
 		Timestamp:  time.Now().Unix(),

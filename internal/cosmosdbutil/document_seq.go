@@ -10,6 +10,7 @@ import (
 type SequenceCosmosData struct {
 	Id        string `json:"id"`
 	Pk        string `json:"_pk"`
+	Tn        string `json:"_sid"`
 	Cn        string `json:"_cn"`
 	ETag      string `json:"_etag"`
 	Timestamp int64  `json:"_ts"`
@@ -44,6 +45,7 @@ func GetNextSequence(
 		dbData = SequenceCosmosData{}
 		dbData.Id = cosmosDocId
 		dbData.Pk = pk
+		dbData.Tn = config.TenantName
 		dbData.Cn = dbCollectionName
 		dbData.Value = initial
 		var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

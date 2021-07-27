@@ -11,6 +11,7 @@ const accountEndpointName = "AccountEndpoint"
 const accountKeyName = "AccountKey"
 const databaseName = "DatabaseName"
 const containerName = "ContainerName"
+const tenantName = "TenantName"
 
 func getConnectionString(d *config.DataSource) config.DataSource {
 	var connString string
@@ -43,8 +44,10 @@ func GetCosmosConfig(d *config.DataSource) cosmosdbapi.CosmosConfig {
 	connMap := getConnectionProperties(string(connString))
 	database := connMap[databaseName]
 	container := connMap[containerName]
+	tenant := connMap[tenantName]
 	return cosmosdbapi.CosmosConfig{
 		DatabaseName:  database,
 		ContainerName: container,
+		TenantName:    tenant,
 	}
 }

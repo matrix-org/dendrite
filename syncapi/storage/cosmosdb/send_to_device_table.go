@@ -56,6 +56,7 @@ type SendToDeviceCosmosMaxNumber struct {
 type SendToDeviceCosmosData struct {
 	Id           string             `json:"id"`
 	Pk           string             `json:"_pk"`
+	Tn           string             `json:"_sid"`
 	Cn           string             `json:"_cn"`
 	ETag         string             `json:"_etag"`
 	Timestamp    int64              `json:"_ts"`
@@ -99,7 +100,7 @@ type sendToDeviceStatements struct {
 
 func querySendToDevice(s *sendToDeviceStatements, ctx context.Context, qry string, params map[string]interface{}) ([]SendToDeviceCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []SendToDeviceCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -120,7 +121,7 @@ func querySendToDevice(s *sendToDeviceStatements, ctx context.Context, qry strin
 
 func querySendToDeviceNumber(s *sendToDeviceStatements, ctx context.Context, qry string, params map[string]interface{}) ([]SendToDeviceCosmosMaxNumber, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []SendToDeviceCosmosMaxNumber
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -178,13 +179,14 @@ func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	}
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// 	NO CONSTRAINT
 	docId := fmt.Sprintf("%d", pos)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	var dbData = SendToDeviceCosmosData{
 		Id:           cosmosDocId,
+		Tn:           s.db.cosmosConfig.TenantName,
 		Cn:           dbCollectionName,
 		Pk:           pk,
 		Timestamp:    time.Now().Unix(),

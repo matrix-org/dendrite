@@ -59,6 +59,7 @@ type AccountCosmos struct {
 type AccountCosmosData struct {
 	Id        string        `json:"id"`
 	Pk        string        `json:"_pk"`
+	Tn        string        `json:"_sid"`
 	Cn        string        `json:"_cn"`
 	ETag      string        `json:"_etag"`
 	Timestamp int64         `json:"_ts"`
@@ -90,7 +91,7 @@ func (s *accountsStatements) prepare(db *Database, server gomatrixserverlib.Serv
 
 func queryAccount(s *accountsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []AccountCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -182,11 +183,12 @@ func (s *accountsStatements) insertAccount(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 
 	docId := result.Localpart
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = AccountCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -215,8 +217,8 @@ func (s *accountsStatements) updatePassword(
 	// "UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 	docId := localpart
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var response, exGet = getAccount(s, ctx, pk, cosmosDocId)
 	if exGet != nil {
@@ -240,8 +242,8 @@ func (s *accountsStatements) deactivateAccount(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 
 	docId := localpart
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var response, exGet = getAccount(s, ctx, pk, cosmosDocId)
 	if exGet != nil {
@@ -320,7 +322,7 @@ func (s *accountsStatements) selectNewNumericLocalpart(
 
 	// 	"SELECT COUNT(localpart) FROM account_accounts"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []AccountCosmosUserCount
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,

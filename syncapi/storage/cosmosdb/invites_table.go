@@ -60,6 +60,7 @@ type InviteEventCosmosMaxNumber struct {
 type InviteEventCosmosData struct {
 	Id          string            `json:"id"`
 	Pk          string            `json:"_pk"`
+	Tn          string            `json:"_sid"`
 	Cn          string            `json:"_cn"`
 	ETag        string            `json:"_etag"`
 	Timestamp   int64             `json:"_ts"`
@@ -102,7 +103,7 @@ type inviteEventsStatements struct {
 
 func queryInviteEvent(s *inviteEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]InviteEventCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []InviteEventCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -123,7 +124,7 @@ func queryInviteEvent(s *inviteEventsStatements, ctx context.Context, qry string
 
 func queryInviteEventMaxNumber(s *inviteEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]InviteEventCosmosMaxNumber, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []InviteEventCosmosMaxNumber
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -221,13 +222,14 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 	}
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// id INTEGER PRIMARY KEY,
 	docId := fmt.Sprintf("%d", streamPos)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	var dbData = InviteEventCosmosData{
 		Id:          cosmosDocId,
+		Tn:          s.db.cosmosConfig.TenantName,
 		Cn:          dbCollectionName,
 		Pk:          pk,
 		Timestamp:   time.Now().Unix(),

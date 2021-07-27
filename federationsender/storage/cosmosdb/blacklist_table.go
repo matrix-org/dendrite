@@ -40,6 +40,7 @@ type BlacklistCosmos struct {
 type BlacklistCosmosData struct {
 	Id        string          `json:"id"`
 	Pk        string          `json:"_pk"`
+	Tn        string          `json:"_sid"`
 	Cn        string          `json:"_cn"`
 	ETag      string          `json:"_etag"`
 	Timestamp int64           `json:"_ts"`
@@ -118,8 +119,8 @@ func (s *blacklistStatements) InsertBlacklist(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (server_name)
 	docId := fmt.Sprintf("%s", serverName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := BlacklistCosmos{
 		ServerName: string(serverName),
@@ -127,6 +128,7 @@ func (s *blacklistStatements) InsertBlacklist(
 
 	dbData := &BlacklistCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -159,8 +161,8 @@ func (s *blacklistStatements) SelectBlacklist(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (server_name)
 	docId := fmt.Sprintf("%s", serverName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// res, err := stmt.QueryContext(ctx, serverName)
 	res, err := getBlacklist(s, ctx, pk, cosmosDocId)
 	if err != nil {
@@ -183,8 +185,8 @@ func (s *blacklistStatements) DeleteBlacklist(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (server_name)
 	docId := fmt.Sprintf("%s", serverName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// _, err := stmt.ExecContext(ctx, serverName)
 	res, err := getBlacklist(s, ctx, pk, cosmosDocId)
 	if(res != nil) {

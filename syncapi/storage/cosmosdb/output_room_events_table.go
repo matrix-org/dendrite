@@ -75,6 +75,7 @@ type OutputRoomEventCosmosMaxNumber struct {
 type OutputRoomEventCosmosData struct {
 	Id              string                `json:"id"`
 	Pk              string                `json:"_pk"`
+	Tn              string                `json:"_sid"`
 	Cn              string                `json:"_cn"`
 	ETag            string                `json:"_etag"`
 	Timestamp       int64                 `json:"_ts"`
@@ -159,7 +160,7 @@ type outputRoomEventsStatements struct {
 
 func queryOutputRoomEvent(s *outputRoomEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutputRoomEventCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []OutputRoomEventCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -180,7 +181,7 @@ func queryOutputRoomEvent(s *outputRoomEventsStatements, ctx context.Context, qr
 
 func queryOutputRoomEventNumber(s *outputRoomEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutputRoomEventCosmosMaxNumber, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []OutputRoomEventCosmosMaxNumber
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -488,13 +489,14 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	}
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// id INTEGER PRIMARY KEY,
 	docId := fmt.Sprintf("%d", streamPos)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	var dbData = OutputRoomEventCosmosData{
 		Id:              cosmosDocId,
+		Tn:              s.db.cosmosConfig.TenantName,
 		Cn:              dbCollectionName,
 		Pk:              pk,
 		Timestamp:       time.Now().Unix(),

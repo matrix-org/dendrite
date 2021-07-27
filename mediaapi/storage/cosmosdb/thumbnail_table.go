@@ -57,6 +57,7 @@ type ThumbnailCosmos struct {
 type ThumbnailCosmosData struct {
 	Id        string          `json:"id"`
 	Pk        string          `json:"_pk"`
+	Tn        string          `json:"_sid"`
 	Cn        string          `json:"_cn"`
 	ETag      string          `json:"_etag"`
 	Timestamp int64           `json:"_ts"`
@@ -91,7 +92,7 @@ type thumbnailStatements struct {
 
 func queryThumbnail(s *thumbnailStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ThumbnailCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []ThumbnailCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -155,8 +156,8 @@ func (s *thumbnailStatements) insertThumbnail(
 		thumbnailMetadata.ThumbnailSize.Height,
 		thumbnailMetadata.ThumbnailSize.ResizeMethod,
 	)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	// _, err := stmt.ExecContext(
 	// 	ctx,
@@ -183,6 +184,7 @@ func (s *thumbnailStatements) insertThumbnail(
 
 	dbData := &ThumbnailCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -230,8 +232,8 @@ func (s *thumbnailStatements) selectThumbnail(
 		height,
 		resizeMethod,
 	)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	// row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)
 	row, err := getThumbnail(s, ctx, pk, cosmosDocId)

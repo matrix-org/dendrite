@@ -61,6 +61,7 @@ type OneTimeKeyAlgoNumberCosmosData struct {
 type OneTimeKeyCosmosData struct {
 	Id         string           `json:"id"`
 	Pk         string           `json:"_pk"`
+	Tn         string           `json:"_sid"`
 	Cn         string           `json:"_cn"`
 	ETag       string           `json:"_etag"`
 	Timestamp  int64            `json:"_ts"`
@@ -111,7 +112,7 @@ func queryOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, qry string, 
 	var response []OneTimeKeyCosmosData
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
 	var query = cosmosdbapi.GetQuery(qry, params)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
@@ -133,7 +134,7 @@ func queryOneTimeKeyAlgoCount(s *oneTimeKeysStatements, ctx context.Context, qry
 	var response []OneTimeKeyAlgoNumberCosmosData
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
 	// var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
 	var query = cosmosdbapi.GetQuery(qry, params)
@@ -273,7 +274,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 	}
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	for keyIDWithAlgo, keyJSON := range keys.KeyJSON {
 
@@ -286,7 +287,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 
 		//     UNIQUE (user_id, device_id, key_id, algorithm)
 		docId := fmt.Sprintf("%s_%s_%s_%s", keys.UserID, keys.DeviceID, keyID, algo)
-		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 		data := OneTimeKeyCosmos{
 			Algorithm: algo,
@@ -298,6 +299,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 
 		dbData := &OneTimeKeyCosmosData{
 			Id:         cosmosDocId,
+			Tn:         s.db.cosmosConfig.TenantName,
 			Cn:         dbCollectionName,
 			Pk:         pk,
 			Timestamp:  now,

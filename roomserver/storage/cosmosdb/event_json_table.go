@@ -42,6 +42,7 @@ type EventJSONCosmos struct {
 type EventJSONCosmosData struct {
 	Id        string          `json:"id"`
 	Pk        string          `json:"_pk"`
+	Tn        string          `json:"_sid"`
 	Cn        string          `json:"_cn"`
 	ETag      string          `json:"_etag"`
 	Timestamp int64           `json:"_ts"`
@@ -72,7 +73,7 @@ type eventJSONStatements struct {
 
 func queryEventJSON(s *eventJSONStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventJSONCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []EventJSONCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -117,8 +118,8 @@ func (s *eventJSONStatements) InsertEventJSON(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 
 	docId := fmt.Sprintf("%d", eventNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := EventJSONCosmos{
 		EventNID:  int64(eventNID),
@@ -127,6 +128,7 @@ func (s *eventJSONStatements) InsertEventJSON(
 
 	var dbData = EventJSONCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),

@@ -46,6 +46,7 @@ type ThreePIDCosmos struct {
 type ThreePIDCosmosData struct {
 	Id        string         `json:"id"`
 	Pk        string         `json:"_pk"`
+	Tn        string         `json:"_sid"`
 	Cn        string         `json:"_cn"`
 	ETag      string         `json:"_etag"`
 	Timestamp int64          `json:"_ts"`
@@ -71,7 +72,7 @@ func (s *threepidStatements) prepare(db *Database) (err error) {
 
 func queryThreePID(s *threepidStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ThreePIDCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []ThreePIDCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -159,10 +160,11 @@ func (s *threepidStatements) insertThreePID(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 
 	docId := fmt.Sprintf("%s_%s", threepid, medium)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var dbData = ThreePIDCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -189,8 +191,8 @@ func (s *threepidStatements) deleteThreePID(
 	// "DELETE FROM account_threepid WHERE threepid = $1 AND medium = $2"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 	docId := fmt.Sprintf("%s_%s", threepid, medium)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var options = cosmosdbapi.GetDeleteDocumentOptions(pk)
 	_, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,

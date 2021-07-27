@@ -67,6 +67,7 @@ type EventCosmosMaxDepth struct {
 type EventCosmosData struct {
 	Id        string      `json:"id"`
 	Pk        string      `json:"_pk"`
+	Tn        string      `json:"_sid"`
 	Cn        string      `json:"_cn"`
 	ETag      string      `json:"_etag"`
 	Timestamp int64       `json:"_ts"`
@@ -143,8 +144,8 @@ const bulkSelectEventNIDSQL = "" +
 // 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
 const selectMaxEventDepthSQL = "" +
 	"select sub.maxinner != null ? sub.maxinner + 1 : 0 as maxdepth from " +
-	"(select MAX(c.mx_roomserver_event.depth) maxinner from c where c._cn = @x1 " +
-	" and ARRAY_CONTAINS(@x2, c.mx_roomserver_event.event_nid)) sub"
+	"(select MAX(c.mx_roomserver_event.depth) maxinner from c where c._sid = @x1 and c._cn = @x2 " +
+	" and ARRAY_CONTAINS(@x3, c.mx_roomserver_event.event_nid)) sub"
 
 // 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid IN ($1)"
 const selectRoomNIDsForEventNIDsSQL = "" +
@@ -205,7 +206,7 @@ func mapFromEventNIDArray(eventNIDs []types.EventNID) []int64 {
 
 func queryEvent(s *eventStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []EventCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -341,8 +342,8 @@ func (s *eventStatements) InsertEvent(
 	//     event_id TEXT NOT NULL UNIQUE,
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := eventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	dbData, errGet := getEvent(s, ctx, pk, cosmosDocId)
 
@@ -368,6 +369,7 @@ func (s *eventStatements) InsertEvent(
 
 		dbData = &EventCosmosData{
 			Id:        cosmosDocId,
+			Tn:        s.db.cosmosConfig.TenantName,
 			Cn:        dbCollectionName,
 			Pk:        pk,
 			Timestamp: time.Now().Unix(),
@@ -425,9 +427,9 @@ func (s *eventStatements) SelectEvent(
 
 	// "SELECT event_nid, state_snapshot_nid FROM roomserver_events WHERE event_id = $1"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	docId := eventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	var response, err = getEvent(s, ctx, pk, cosmosDocId)
 	if err != nil {
 		return 0, 0, err
@@ -783,8 +785,9 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	var response []EventCosmosMaxDepth
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
-		"@x2": eventNIDs,
+		"@x1": s.db.cosmosConfig.TenantName,
+		"@x2": dbCollectionName,
+		"@x3": eventNIDs,
 	}
 
 	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()

@@ -43,6 +43,7 @@ type StateSnapshotCosmos struct {
 type StateSnapshotCosmosData struct {
 	Id            string              `json:"id"`
 	Pk            string              `json:"_pk"`
+	Tn            string              `json:"_sid"`
 	Cn            string              `json:"_cn"`
 	ETag          string              `json:"_etag"`
 	Timestamp     int64               `json:"_ts"`
@@ -120,11 +121,12 @@ func (s *stateSnapshotStatements) InsertState(
 
 	//     state_snapshot_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 	docId := fmt.Sprintf("%d", stateSnapshotNIDSeq)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = StateSnapshotCosmosData{
 		Id:            cosmosDocId,
+		Tn:            s.db.cosmosConfig.TenantName,
 		Cn:            dbCollectionName,
 		Pk:            pk,
 		Timestamp:     time.Now().Unix(),
@@ -154,7 +156,7 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	// "SELECT state_snapshot_nid, state_block_nids FROM roomserver_state_snapshots" +
 	// " WHERE state_snapshot_nid IN ($1) ORDER BY state_snapshot_nid ASC"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []StateSnapshotCosmosData
 	params := map[string]interface{}{
 		"@x1": dbCollectionName,

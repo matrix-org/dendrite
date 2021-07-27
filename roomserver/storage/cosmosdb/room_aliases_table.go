@@ -43,6 +43,7 @@ type RoomAliasCosmos struct {
 type RoomAliasCosmosData struct {
 	Id        string          `json:"id"`
 	Pk        string          `json:"_pk"`
+	Tn        string          `json:"_sid"`
 	Cn        string          `json:"_cn"`
 	ETag      string          `json:"_etag"`
 	Timestamp int64           `json:"_ts"`
@@ -82,7 +83,7 @@ type roomAliasesStatements struct {
 
 func queryRoomAlias(s *roomAliasesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]RoomAliasCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []RoomAliasCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -152,11 +153,12 @@ func (s *roomAliasesStatements) InsertRoomAlias(
 
 	//     alias TEXT NOT NULL PRIMARY KEY,
 	docId := alias
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = RoomAliasCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -184,8 +186,8 @@ func (s *roomAliasesStatements) SelectRoomIDFromAlias(
 
 	//     alias TEXT NOT NULL PRIMARY KEY,
 	docId := alias
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	response, err := getRoomAlias(s, ctx, pk, cosmosDocId)
 
 	if err != nil {
@@ -235,8 +237,8 @@ func (s *roomAliasesStatements) SelectCreatorIDFromAlias(
 
 	//     alias TEXT NOT NULL PRIMARY KEY,
 	docId := alias
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	response, err := getRoomAlias(s, ctx, pk, cosmosDocId)
 
 	if err != nil {
@@ -258,8 +260,8 @@ func (s *roomAliasesStatements) DeleteRoomAlias(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := alias
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var options = cosmosdbapi.GetDeleteDocumentOptions(pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,

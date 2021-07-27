@@ -53,6 +53,7 @@ type PreviousEventCosmos struct {
 type PreviousEventCosmosData struct {
 	Id            string              `json:"id"`
 	Pk            string              `json:"_pk"`
+	Tn            string              `json:"_sid"`
 	Cn            string              `json:"_cn"`
 	ETag          string              `json:"_etag"`
 	Timestamp     int64               `json:"_ts"`
@@ -136,8 +137,8 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	// TODO: Check value
 	// docId := fmt.Sprintf("%s_%s", previousEventID, previousEventReferenceSHA256)
 	docId := previousEventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	// SELECT 1 FROM roomserver_previous_events
 	//   WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
@@ -160,6 +161,7 @@ func (s *previousEventStatements) InsertPreviousEvent(
 
 		dbData = PreviousEventCosmosData{
 			Id:            cosmosDocId,
+			Tn:            s.db.cosmosConfig.TenantName,
 			Cn:            dbCollectionName,
 			Pk:            pk,
 			Timestamp:     time.Now().Unix(),
@@ -208,8 +210,8 @@ func (s *previousEventStatements) SelectPreviousEventExists(
 	// TODO: Check value
 	// docId := fmt.Sprintf("%s_%s", previousEventID, previousEventReferenceSHA256)
 	docId := eventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, string(docId))
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, string(docId))
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	// SELECT 1 FROM roomserver_previous_events
 	//   WHERE previous_event_id = $1 AND previous_reference_sha256 = $2

@@ -46,6 +46,7 @@ type TransactionCosmos struct {
 type TransactionCosmosData struct {
 	Id          string            `json:"id"`
 	Pk          string            `json:"_pk"`
+	Tn          string            `json:"_sid"`
 	Cn          string            `json:"_cn"`
 	ETag        string            `json:"_etag"`
 	Timestamp   int64             `json:"_ts"`
@@ -119,11 +120,12 @@ func (s *transactionStatements) InsertTransaction(
 
 	// 		PRIMARY KEY (transaction_id, session_id, user_id)
 	docId := fmt.Sprintf("%s_%d_%s", transactionID, sessionID, userID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = TransactionCosmosData{
 		Id:          cosmosDocId,
+		Tn:          s.db.cosmosConfig.TenantName,
 		Cn:          dbCollectionName,
 		Pk:          pk,
 		Timestamp:   time.Now().Unix(),
@@ -154,8 +156,8 @@ func (s *transactionStatements) SelectTransactionEventID(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 		PRIMARY KEY (transaction_id, session_id, user_id)
 	docId := fmt.Sprintf("%s_%d_%s", transactionID, sessionID, userID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	response, err := getTransaction(s, ctx, pk, cosmosDocId)
 

@@ -47,6 +47,7 @@ type BackwardExtremityCosmos struct {
 type BackwardExtremityCosmosData struct {
 	Id                string                  `json:"id"`
 	Pk                string                  `json:"_pk"`
+	Tn                string                  `json:"_sid"`
 	Cn                string                  `json:"_cn"`
 	ETag              string                  `json:"_etag"`
 	Timestamp         int64                   `json:"_ts"`
@@ -85,7 +86,7 @@ type backwardExtremitiesStatements struct {
 
 func queryBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]BackwardExtremityCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []BackwardExtremityCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -143,8 +144,8 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	PRIMARY KEY(room_id, event_id, prev_event_id)
 	docId := fmt.Sprintf("%s_%s_%s", roomID, eventID, prevEventID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := BackwardExtremityCosmos{
 		EventID:     eventID,
@@ -154,6 +155,7 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 
 	dbData := &BackwardExtremityCosmosData{
 		Id:                cosmosDocId,
+		Tn:                s.db.cosmosConfig.TenantName,
 		Cn:                dbCollectionName,
 		Pk:                pk,
 		Timestamp:         time.Now().Unix(),

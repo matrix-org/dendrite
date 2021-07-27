@@ -40,6 +40,7 @@ type TopicCosmosNumber struct {
 type TopicCosmosData struct {
 	Id        string      `json:"id"`
 	Pk        string      `json:"_pk"`
+	Tn        string      `json:"_sid"`
 	Cn        string      `json:"_cn"`
 	ETag      string      `json:"_etag"`
 	Timestamp int64       `json:"_ts"`
@@ -57,6 +58,7 @@ type MessageCosmos struct {
 type MessageCosmosData struct {
 	Id        string        `json:"id"`
 	Pk        string        `json:"_pk"`
+	Tn        string        `json:"_sid"`
 	Cn        string        `json:"_cn"`
 	ETag      string        `json:"_etag"`
 	Timestamp int64         `json:"_ts"`
@@ -233,6 +235,7 @@ func (t *topicsStatements) InsertTopic(
 
 	dbData := &TopicCosmosData{
 		Id:        cosmosDocId,
+		Tn:        t.DB.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -364,6 +367,7 @@ func (t *topicsStatements) InsertTopics(
 
 	dbData := &MessageCosmosData{
 		Id:        cosmosDocId,
+		Tn:        t.DB.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),

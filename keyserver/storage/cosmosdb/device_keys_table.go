@@ -57,6 +57,7 @@ type DeviceKeyCosmosNumber struct {
 type DeviceKeyCosmosData struct {
 	Id        string          `json:"id"`
 	Pk        string          `json:"_pk"`
+	Tn        string          `json:"_sid"`
 	Cn        string          `json:"_cn"`
 	ETag      string          `json:"_etag"`
 	Timestamp int64           `json:"_ts"`
@@ -80,14 +81,14 @@ const selectBatchDeviceKeysSQL = "" +
 
 // "SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id=$1"
 const selectMaxStreamForUserSQL = "" +
-	"select max(c.mx_keyserver_device_key.stream_id) as number from c where c._cn = @x1 " +
-	"and c.mx_keyserver_device_key.user_id = @x2 "
+	"select max(c.mx_keyserver_device_key.stream_id) as number from c where c._sid = @x1 and c._cn = @x2 " +
+	"and c.mx_keyserver_device_key.user_id = @x3 "
 
 // "SELECT COUNT(*) FROM keyserver_device_keys WHERE user_id=$1 AND stream_id IN ($2)"
 const countStreamIDsForUserSQL = "" +
-	"select count(c._ts) as number from c where c._cn = @x1 " +
-	"and c.mx_keyserver_device_key.user_id = @x2 " +
-	"and ARRAY_CONTAINS(@x3, c.mx_keyserver_device_key.stream_id) "
+	"select count(c._ts) as number from c where c._sid = @x1 and c._cn = @x2 " +
+	"and c.mx_keyserver_device_key.user_id = @x3 " +
+	"and ARRAY_CONTAINS(@x4, c.mx_keyserver_device_key.stream_id) "
 
 const selectAllDeviceKeysSQL = "" +
 	"select * from c where c._cn = @x1 " +
@@ -98,7 +99,7 @@ const selectAllDeviceKeysSQL = "" +
 
 func queryDeviceKey(s *deviceKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]DeviceKeyCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []DeviceKeyCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -122,7 +123,7 @@ func queryDeviceKeyNumber(s *deviceKeysStatements, ctx context.Context, qry stri
 
 	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
 	var query = cosmosdbapi.GetQuery(qry, params)
-	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+	var _, _ = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
@@ -130,9 +131,10 @@ func queryDeviceKeyNumber(s *deviceKeysStatements, ctx context.Context, qry stri
 		&response,
 		optionsQry)
 
-	if err != nil {
-		return nil, err
-	}
+	//WHen there is no data these GroupBy queries return errors
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	if len(response) == 0 {
 		return nil, cosmosdbutil.ErrNoRows
@@ -301,8 +303,8 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 		var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 		//     UNIQUE (user_id, device_id)
 		docId := fmt.Sprintf("%s_%s", key.UserID, key.DeviceID)
-		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-		pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+		pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 		response, err := getDeviceKey(s, ctx, pk, cosmosDocId)
 
@@ -333,12 +335,13 @@ func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
-		"@x2": userID,
+		"@x1": s.db.cosmosConfig.TenantName,
+		"@x2": dbCollectionName,
+		"@x3": userID,
 	}
 
 	// err = sqlutil.TxStmt(txn, s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
-	response, err := queryDeviceKeyNumber(s, ctx, countStreamIDsForUserSQL, params)
+	response, err := queryDeviceKeyNumber(s, ctx, selectMaxStreamForUserSQL, params)
 
 	if err != nil {
 		if err == cosmosdbutil.ErrNoRows {
@@ -370,9 +373,10 @@ func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
-		"@x2": userID,
-		"@x3": iStreamIDs,
+		"@x1": s.db.cosmosConfig.TenantName,
+		"@x2": dbCollectionName,
+		"@x3": userID,
+		"@x4": iStreamIDs,
 	}
 
 	// query := strings.Replace(countStreamIDsForUserSQL, "($2)", sqlutil.QueryVariadicOffset(len(streamIDs), 1), 1)
@@ -401,16 +405,17 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx
 	// " ON CONFLICT (user_id, device_id)" +
 	// " DO UPDATE SET key_json = $4, stream_id = $5, display_name = $6"
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	for _, key := range keys {
 		now := time.Now().Unix()
 		//     UNIQUE (user_id, device_id)
 		docId := fmt.Sprintf("%s_%s", key.UserID, key.DeviceID)
-		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 		dbData := &DeviceKeyCosmosData{
 			Id:        cosmosDocId,
+			Tn:        s.db.cosmosConfig.TenantName,
 			Cn:        dbCollectionName,
 			Pk:        pk,
 			Timestamp: now,

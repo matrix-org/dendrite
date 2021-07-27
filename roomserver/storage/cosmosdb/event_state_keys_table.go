@@ -46,6 +46,7 @@ type EventStateKeysCosmos struct {
 type EventStateKeysCosmosData struct {
 	Id             string               `json:"id"`
 	Pk             string               `json:"_pk"`
+	Tn             string               `json:"_sid"`
 	Cn             string               `json:"_cn"`
 	ETag           string               `json:"_etag"`
 	Timestamp      int64                `json:"_ts"`
@@ -91,7 +92,7 @@ type eventStateKeyStatements struct {
 
 func queryEventStateKeys(s *eventStateKeyStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventStateKeysCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []EventStateKeysCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -152,8 +153,8 @@ func ensureEventStateKeys(s *eventStateKeyStatements, ctx context.Context) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     event_state_key TEXT NOT NULL UNIQUE
 	docId := ""
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := EventStateKeysCosmos{
 		EventStateKey:    "",
@@ -163,6 +164,7 @@ func ensureEventStateKeys(s *eventStateKeyStatements, ctx context.Context) {
 	//     event_state_key_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 	dbData := EventStateKeysCosmosData{
 		Id:             cosmosDocId,
+		Tn:             s.db.cosmosConfig.TenantName,
 		Cn:             dbCollectionName,
 		Pk:             pk,
 		Timestamp:      time.Now().Unix(),
@@ -201,8 +203,8 @@ func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     event_state_key TEXT NOT NULL UNIQUE
 	docId := eventStateKey
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	existing, _ := getEventStateKeys(s, ctx, pk, cosmosDocId)
 
@@ -222,6 +224,7 @@ func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 		//     event_state_key_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 		dbData = EventStateKeysCosmosData{
 			Id:             cosmosDocId,
+			Tn:             s.db.cosmosConfig.TenantName,
 			Cn:             dbCollectionName,
 			Pk:             pk,
 			Timestamp:      time.Now().Unix(),

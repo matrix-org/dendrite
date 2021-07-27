@@ -55,6 +55,7 @@ type JoinedHostCosmos struct {
 type JoinedHostCosmosData struct {
 	Id         string           `json:"id"`
 	Pk         string           `json:"_pk"`
+	Tn         string           `json:"_sid"`
 	Cn         string           `json:"_cn"`
 	ETag       string           `json:"_etag"`
 	Timestamp  int64            `json:"_ts"`
@@ -103,7 +104,7 @@ type joinedHostsStatements struct {
 
 func queryJoinedHostDistinct(s *joinedHostsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]JoinedHostCosmos, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []JoinedHostCosmos
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -124,7 +125,7 @@ func queryJoinedHostDistinct(s *joinedHostsStatements, ctx context.Context, qry 
 
 func queryJoinedHost(s *joinedHostsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]JoinedHostCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []JoinedHostCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -186,8 +187,8 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 	// CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
 	//     ON federationsender_joined_hosts (event_id);
 	docId := fmt.Sprintf("%s", eventID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := JoinedHostCosmos{
 		EventID:    eventID,
@@ -197,6 +198,7 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 
 	dbData := &JoinedHostCosmosData{
 		Id: cosmosDocId,
+		Tn: s.db.cosmosConfig.TenantName,
 		Cn: dbCollectionName,
 		Pk: pk,
 		Timestamp:  time.Now().Unix(),

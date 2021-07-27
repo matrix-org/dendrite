@@ -54,6 +54,7 @@ type MembershipCosmos struct {
 type MembershipCosmosData struct {
 	Id         string           `json:"id"`
 	Pk         string           `json:"_pk"`
+	Tn         string           `json:"_sid"`
 	Cn         string           `json:"_cn"`
 	ETag       string           `json:"_etag"`
 	Timestamp  int64            `json:"_ts"`
@@ -177,7 +178,7 @@ type membershipStatements struct {
 
 func queryMembership(s *membershipStatements, ctx context.Context, qry string, params map[string]interface{}) ([]MembershipCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []MembershipCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -262,8 +263,8 @@ func (s *membershipStatements) InsertMembership(
 
 	// 		UNIQUE (room_nid, target_nid)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := MembershipCosmos{
 		EventNID:      0,
@@ -277,6 +278,7 @@ func (s *membershipStatements) InsertMembership(
 
 	var dbData = MembershipCosmosData{
 		Id:         cosmosDocId,
+		Tn:         s.db.cosmosConfig.TenantName,
 		Cn:         dbCollectionName,
 		Pk:         pk,
 		Timestamp:  time.Now().Unix(),
@@ -305,8 +307,8 @@ func (s *membershipStatements) SelectMembershipForUpdate(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	response, err := getMembership(s, ctx, pk, cosmosDocId)
 	if response != nil {
 		membership = tables.MembershipState(response.Membership.MembershipNID)
@@ -324,8 +326,8 @@ func (s *membershipStatements) SelectMembershipFromRoomAndTarget(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	response, err := getMembership(s, ctx, pk, cosmosDocId)
 	if response != nil {
 		eventNID = types.EventNID(response.Membership.EventNID)
@@ -412,8 +414,8 @@ func (s *membershipStatements) UpdateMembership(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	dbData, err := getMembership(s, ctx, pk, cosmosDocId)
 
 	if err != nil {
@@ -467,7 +469,7 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context,
 		"@x1": dbCollectionName,
 		"@x2": roomNIDs,
 	}
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []MembershipJoinedCountCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -506,7 +508,7 @@ func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID type
 		"@x4": limit,
 	}
 
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var responseDistinctRoom []MembershipCosmos
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -600,8 +602,8 @@ func (s *membershipStatements) UpdateForgetMembership(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	dbData, err := getMembership(s, ctx, pk, cosmosDocId)
 
 	if err != nil {

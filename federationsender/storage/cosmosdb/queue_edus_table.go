@@ -52,6 +52,7 @@ type QueueEDUCosmosNumber struct {
 type QueueEDUCosmosData struct {
 	Id        string         `json:"id"`
 	Pk        string         `json:"_pk"`
+	Tn        string         `json:"_sid"`
 	Cn        string         `json:"_cn"`
 	ETag      string         `json:"_etag"`
 	Timestamp int64          `json:"_ts"`
@@ -103,7 +104,7 @@ type queueEDUsStatements struct {
 
 func queryQueueEDUC(s *queueEDUsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]QueueEDUCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []QueueEDUCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -124,7 +125,7 @@ func queryQueueEDUC(s *queueEDUsStatements, ctx context.Context, qry string, par
 
 func queryQueueEDUCDistinct(s *queueEDUsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]QueueEDUCosmos, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []QueueEDUCosmos
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -145,7 +146,7 @@ func queryQueueEDUCDistinct(s *queueEDUsStatements, ctx context.Context, qry str
 
 func queryQueueEDUCNumber(s *queueEDUsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]QueueEDUCosmosNumber, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []QueueEDUCosmosNumber
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -207,8 +208,8 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 	// CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
 	//     ON federationsender_queue_edus (json_nid, server_name);
 	docId := fmt.Sprintf("%d_%s", nid, eduType)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := QueueEDUCosmos{
 		EDUType:    eduType,
@@ -218,6 +219,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 
 	dbData := &QueueEDUCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),

@@ -46,6 +46,7 @@ type StaleDeviceListCosmos struct {
 type StaleDeviceListCosmosData struct {
 	Id              string                `json:"id"`
 	Pk              string                `json:"_pk"`
+	Tn              string                `json:"_sid"`
 	Cn              string                `json:"_cn"`
 	ETag            string                `json:"_etag"`
 	Timestamp       int64                 `json:"_ts"`
@@ -60,9 +61,9 @@ type StaleDeviceListCosmosData struct {
 
 // "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2"
 const selectStaleDeviceListsWithDomainsSQL = "" +
-	"select * from c where c._cn = @x1 " +
-	"and c.mx_keyserver_stale_device_list.is_stale = @x2 " +
-	"and c.mx_keyserver_stale_device_list.domain = @x3 "
+	"select * from c where c._sid = @x1 and c._cn = @x2 " +
+	"and c.mx_keyserver_stale_device_list.is_stale = @x3 " +
+	"and c.mx_keyserver_stale_device_list.domain = @x4 "
 
 // "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
 const selectStaleDeviceListsSQL = "" +
@@ -120,10 +121,10 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 	}
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	//     user_id TEXT PRIMARY KEY NOT NULL,
 	docId := userID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	data := StaleDeviceListCosmos{
 		Domain:  string(domain),
@@ -133,6 +134,7 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 
 	dbData := StaleDeviceListCosmosData{
 		Id:              cosmosDocId,
+		Tn:              s.db.cosmosConfig.TenantName,
 		Cn:              dbCollectionName,
 		Pk:              pk,
 		Timestamp:       time.Now().Unix(),
@@ -159,8 +161,9 @@ func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx conte
 		// "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
 		// rows, err := s.selectStaleDeviceListsStmt.QueryContext(ctx, true)
 		params := map[string]interface{}{
-			"@x1": dbCollectionName,
-			"@x2": true,
+			"@x1": s.db.cosmosConfig.TenantName,
+			"@x2": dbCollectionName,
+			"@x3": true,
 		}
 		rows, err := queryStaleDeviceList(s, ctx, s.selectStaleDeviceListsWithDomainsStmt, params)
 

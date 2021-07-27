@@ -60,6 +60,7 @@ type PeekCosmosMaxNumber struct {
 type PeekCosmosData struct {
 	Id        string     `json:"id"`
 	Pk        string     `json:"_pk"`
+	Tn        string     `json:"_sid"`
 	Cn        string     `json:"_cn"`
 	ETag      string     `json:"_etag"`
 	Timestamp int64      `json:"_ts"`
@@ -122,7 +123,7 @@ type peekStatements struct {
 
 func queryPeek(s *peekStatements, ctx context.Context, qry string, params map[string]interface{}) ([]PeekCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []PeekCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -143,7 +144,7 @@ func queryPeek(s *peekStatements, ctx context.Context, qry string, params map[st
 
 func queryPeekMaxNumber(s *peekStatements, ctx context.Context, qry string, params map[string]interface{}) ([]PeekCosmosMaxNumber, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []PeekCosmosMaxNumber
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -204,8 +205,8 @@ func (s *peekStatements) InsertPeek(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     UNIQUE(room_id, user_id, device_id)
 	docId := fmt.Sprintf("%d_%s_%d", roomID, userID, deviceID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := PeekCosmos{
 		ID:       int64(streamPos),
@@ -216,6 +217,7 @@ func (s *peekStatements) InsertPeek(
 
 	dbData := &PeekCosmosData{
 		Id: cosmosDocId,
+		Tn: s.db.cosmosConfig.TenantName,
 		Cn: dbCollectionName,
 		Pk: pk,
 		// nowMilli := time.Now().UnixNano() / int64(time.Millisecond)

@@ -53,6 +53,7 @@ type StateBlockCosmosMaxNID struct {
 type StateBlockCosmosData struct {
 	Id         string           `json:"id"`
 	Pk         string           `json:"_pk"`
+	Tn         string           `json:"_sid"`
 	Cn         string           `json:"_cn"`
 	ETag       string           `json:"_etag"`
 	Timestamp  int64            `json:"_ts"`
@@ -67,7 +68,7 @@ type StateBlockCosmosData struct {
 const selectNextStateBlockNIDSQL = "" +
 	"select sub.maxinner != null ? sub.maxinner + 1 : 1 as maxstateblocknid " +
 	"from " +
-	"(select MAX(c.mx_roomserver_state_block.state_block_nid) maxinner from c where c._cn = @x1) as sub"
+	"(select MAX(c.mx_roomserver_state_block.state_block_nid) maxinner from c where c._sid = @x1 and c._cn = @x2) as sub"
 
 // Bulk state lookup by numeric state block ID.
 // Sort by the state_block_nid, event_type_nid, event_state_key_nid
@@ -120,7 +121,7 @@ type stateBlockStatements struct {
 
 func queryStateBlock(s *stateBlockStatements, ctx context.Context, qry string, params map[string]interface{}) ([]StateBlockCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []StateBlockCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -169,11 +170,12 @@ func inertStateBlockCore(s *stateBlockStatements, ctx context.Context, stateBloc
 
 	//     UNIQUE (state_block_nid, event_type_nid, event_state_key_nid)
 	docId := fmt.Sprintf("%d_%d_%d", data.StateBlockNID, data.EventTypeNID, data.EventStateKeyNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = StateBlockCosmosData{
 		Id:         cosmosDocId,
+		Tn:         s.db.cosmosConfig.TenantName,
 		Cn:         dbCollectionName,
 		Pk:         pk,
 		Timestamp:  time.Now().Unix(),
@@ -196,7 +198,8 @@ func getNextStateBlockNID(s *stateBlockStatements, ctx context.Context) (int64, 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	var stateBlockNext []StateBlockCosmosMaxNID
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.db.cosmosConfig.TenantName,
+		"@x2": dbCollectionName,
 	}
 
 	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()

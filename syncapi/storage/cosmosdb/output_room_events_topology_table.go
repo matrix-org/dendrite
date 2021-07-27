@@ -50,6 +50,7 @@ type OutputRoomEventTopologyCosmos struct {
 type OutputRoomEventTopologyCosmosData struct {
 	Id                      string                        `json:"id"`
 	Pk                      string                        `json:"_pk"`
+	Tn                      string                        `json:"_sid"`
 	Cn                      string                        `json:"_cn"`
 	ETag                    string                        `json:"_etag"`
 	Timestamp               int64                         `json:"_ts"`
@@ -133,7 +134,7 @@ type outputRoomEventsTopologyStatements struct {
 
 func queryOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutputRoomEventTopologyCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []OutputRoomEventTopologyCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -194,8 +195,8 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE(topological_position, room_id, stream_position)
 	docId := fmt.Sprintf("%d_%s_%d", event.Depth(), event.RoomID(), pos)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := OutputRoomEventTopologyCosmos{
 		EventID:             event.EventID(),
@@ -206,6 +207,7 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 
 	dbData := &OutputRoomEventTopologyCosmosData{
 		Id:                      cosmosDocId,
+		Tn:                      s.db.cosmosConfig.TenantName,
 		Cn:                      dbCollectionName,
 		Pk:                      pk,
 		Timestamp:               time.Now().Unix(),

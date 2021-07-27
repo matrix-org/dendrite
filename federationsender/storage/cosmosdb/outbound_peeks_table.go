@@ -50,6 +50,7 @@ type OutboundPeekCosmos struct {
 type OutboundPeekCosmosData struct {
 	Id           string             `json:"id"`
 	Pk           string             `json:"_pk"`
+	Tn           string             `json:"_sid"`
 	Cn           string             `json:"_cn"`
 	ETag         string             `json:"_etag"`
 	Timestamp    int64              `json:"_ts"`
@@ -91,7 +92,7 @@ type outboundPeeksStatements struct {
 
 func queryOutboundPeek(s *outboundPeeksStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutboundPeekCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []OutboundPeekCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -175,8 +176,8 @@ func (s *outboundPeeksStatements) InsertOutboundPeek(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (room_id, server_name, peek_id)
 	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := OutboundPeekCosmos{
 		RoomID:            roomID,
@@ -189,6 +190,7 @@ func (s *outboundPeeksStatements) InsertOutboundPeek(
 
 	dbData := &OutboundPeekCosmosData{
 		Id:           cosmosDocId,
+		Tn:           s.db.cosmosConfig.TenantName,
 		Cn:           dbCollectionName,
 		Pk:           pk,
 		Timestamp:    time.Now().Unix(),
@@ -217,8 +219,8 @@ func (s *outboundPeeksStatements) RenewOutboundPeek(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (room_id, server_name, peek_id)
 	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	// _, err = sqlutil.TxStmt(txn, s.renewOutboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
 	res, err := getOutboundPeek(s, ctx, pk, cosmosDocId)
@@ -247,8 +249,8 @@ func (s *outboundPeeksStatements) SelectOutboundPeek(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (room_id, server_name, peek_id)
 	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	// row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)
 	row, err := getOutboundPeek(s, ctx, pk, cosmosDocId)

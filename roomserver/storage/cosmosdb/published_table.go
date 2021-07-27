@@ -43,6 +43,7 @@ type PublishCosmos struct {
 type PublishCosmosData struct {
 	Id        string        `json:"id"`
 	Pk        string        `json:"_pk"`
+	Tn        string        `json:"_sid"`
 	Cn        string        `json:"_cn"`
 	ETag      string        `json:"_etag"`
 	Timestamp int64         `json:"_ts"`
@@ -71,7 +72,7 @@ type publishedStatements struct {
 
 func queryPublish(s *publishedStatements, ctx context.Context, qry string, params map[string]interface{}) ([]PublishCosmosData, error) {
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var response []PublishCosmosData
 
 	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
@@ -133,8 +134,8 @@ func (s *publishedStatements) UpsertRoomPublished(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     room_id TEXT NOT NULL PRIMARY KEY,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	data := PublishCosmos{
 		RoomID:    roomID,
@@ -143,6 +144,7 @@ func (s *publishedStatements) UpsertRoomPublished(
 
 	var dbData = PublishCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -169,8 +171,8 @@ func (s *publishedStatements) SelectPublishedFromRoomID(
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     room_id TEXT NOT NULL PRIMARY KEY,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	response, err := getPublish(s, ctx, pk, cosmosDocId)
 	if err != nil {

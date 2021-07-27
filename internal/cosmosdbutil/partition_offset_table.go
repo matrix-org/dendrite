@@ -56,6 +56,7 @@ type PartitionOffsetCosmos struct {
 type PartitionOffsetCosmosData struct {
 	Id              string                `json:"id"`
 	Pk              string                `json:"_pk"`
+	Tn              string                `json:"_sid"`
 	Cn              string                `json:"_cn"`
 	ETag            string                `json:"_etag"`
 	Timestamp       int64                 `json:"_ts"`
@@ -188,7 +189,7 @@ func (s *PartitionOffsetStatements) upsertPartitionOffset(
 		dbCollectionName := getCollectionName(*s)
 		//     UNIQUE (topic, partition)
 		docId := fmt.Sprintf("%s_%d", topic, partition)
-		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.CosmosConfig.ContainerName, dbCollectionName, docId)
+		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.CosmosConfig.TenantName, dbCollectionName, docId)
 		pk := cosmosdbapi.GetPartitionKey(s.db.CosmosConfig.ContainerName, dbCollectionName)
 
 		data := PartitionOffsetCosmos{
@@ -199,6 +200,7 @@ func (s *PartitionOffsetStatements) upsertPartitionOffset(
 
 		dbData := &PartitionOffsetCosmosData{
 			Id: cosmosDocId,
+			Tn: s.db.CosmosConfig.TenantName,
 			Cn: dbCollectionName,
 			Pk: pk,
 			// nowMilli := time.Now().UnixNano() / int64(time.Millisecond)

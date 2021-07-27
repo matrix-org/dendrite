@@ -50,6 +50,7 @@ type KeyChangeUserMaxCosmosData struct {
 type KeyChangeCosmosData struct {
 	Id        string          `json:"id"`
 	Pk        string          `json:"_pk"`
+	Tn        string          `json:"_sid"`
 	Cn        string          `json:"_cn"`
 	ETag      string          `json:"_etag"`
 	Timestamp int64           `json:"_ts"`
@@ -70,10 +71,10 @@ type KeyChangeCosmosData struct {
 // "SELECT user_id, MAX(offset) FROM keyserver_key_changes WHERE partition = $1 AND offset > $2 AND offset <= $3 GROUP BY user_id"
 const selectKeyChangesSQL = "" +
 	"select c.mx_keyserver_key_change.user_id as user_id, max(c.mx_keyserver_key_change._offset) as max_offset " +
-	"from c where c._cn = @x1 " +
-	"and c.mx_keyserver_key_change.partition = @x2 " +
-	"and c.mx_keyserver_key_change._offset > @x3 " +
-	"and c.mx_keyserver_key_change._offset < @x4 " +
+	"from c where c._sid = @x1 and c._cn = @x2 " +
+	"and c.mx_keyserver_key_change.partition = @x3 " +
+	"and c.mx_keyserver_key_change._offset > @x4 " +
+	"and c.mx_keyserver_key_change._offset < @x5 " +
 	"group by c.mx_keyserver_key_change.user_id "
 
 type keyChangesStatements struct {
@@ -121,10 +122,10 @@ func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, partition in
 	// " DO UPDATE SET user_id = $3"
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.ContainerName, dbCollectionName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// 	UNIQUE (partition, offset)
 	docId := fmt.Sprintf("%d_%d", partition, offset)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.ContainerName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	data := KeyChangeCosmos{
 		Offset:    offset,
@@ -134,6 +135,7 @@ func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, partition in
 
 	dbData := KeyChangeCosmosData{
 		Id:        cosmosDocId,
+		Tn:        s.db.cosmosConfig.TenantName,
 		Cn:        dbCollectionName,
 		Pk:        pk,
 		Timestamp: time.Now().Unix(),
@@ -165,10 +167,11 @@ func (s *keyChangesStatements) SelectKeyChanges(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
-		"@x2": partition,
-		"@x3": fromOffset,
-		"@x4": toOffset,
+		"@x1": s.db.cosmosConfig.TenantName,
+		"@x2": dbCollectionName,
+		"@x3": partition,
+		"@x4": fromOffset,
+		"@x5": toOffset,
 	}
 
 	response, err := queryKeyChangeUserMax(s, ctx, s.selectKeyChangesStmt, params)
