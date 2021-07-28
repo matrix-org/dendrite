@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -59,7 +58,7 @@ func prepareTransactionsTable(db *sql.DB) (tables.Transactions, error) {
 		db: db,
 	}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertTransactionStmt, insertTransactionSQL},
 		{&s.selectTransactionEventIDStmt, selectTransactionEventIDSQL},
 	}.Prepare(db)

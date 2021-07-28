@@ -24,7 +24,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -160,7 +159,7 @@ func createEventsTable(db *sql.DB) error {
 func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 	s := &eventStatements{}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
