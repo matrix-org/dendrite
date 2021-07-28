@@ -352,12 +352,12 @@ type QueryPresenceForUserRequest struct {
 
 // QueryPresenceForUserResponse is the response for QueryPresenceForUserRequest
 type QueryPresenceForUserResponse struct {
-	PresenceStatus  types.PresenceStatus        `json:"-"`
-	Presence        string                      `json:"presence"`
-	StatusMsg       string                      `json:"status_msg,omitempty"`
-	LastActiveTS    gomatrixserverlib.Timestamp `json:"-"`
-	LastActiveAgo   int64                       `json:"last_active_ago,omitempty"`
-	CurrentlyActive bool                        `json:"currently_active,omitempty"`
+	PresenceStatus  types.PresenceStatus
+	Presence        string
+	StatusMsg       string
+	LastActiveTS    gomatrixserverlib.Timestamp
+	LastActiveAgo   int64
+	CurrentlyActive bool
 }
 
 // Device represents a client's device (mobile, web, etc)

@@ -48,8 +48,8 @@ const upsertPresenceSQL = "" +
 	" (user_id, presence, status_msg, last_active_ts)" +
 	" VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (user_id)" +
-	" DO UPDATE SET id = nextval('presence_presences_user_id')," +
-	" presence = $2, status_msg = $3, last_active_ts = $4" +
+	" DO UPDATE SET id = currval('presence_presence_id')," +
+	" presence = $2, status_msg = COALESCE($3, p.status_msg), last_active_ts = $4" +
 	" RETURNING id"
 
 const selectPresenceForUserSQL = "" +
@@ -86,7 +86,13 @@ func (p *presenceStatements) UpsertPresence(
 	lastActiveTS int64,
 ) (pos int64, err error) {
 	stmt := sqlutil.TxStmt(txn, p.upsertPresenceStmt)
-	err = stmt.QueryRowContext(ctx, userID, presence, statusMsg, lastActiveTS).Scan(&pos)
+	msg := &statusMsg
+	// avoid clearing status_msg when going idle
+	// makes it impossible to delete status_msg, though..
+	if statusMsg == "" {
+		msg = nil
+	}
+	err = stmt.QueryRowContext(ctx, userID, presence, msg, lastActiveTS).Scan(&pos)
 	return
 }
 

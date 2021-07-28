@@ -104,6 +104,13 @@ func SetPresence(req *http.Request,
 	}
 }
 
+type presenceResponse struct {
+	Presence        string `json:"presence"`
+	StatusMsg       string `json:"status_msg,omitempty"`
+	LastActiveAgo   int64  `json:"last_active_ago,omitempty"`
+	CurrentlyActive bool   `json:"currently_active,omitempty"`
+}
+
 // GetPresence returns the presence status of a given user.
 // If the requesting user doesn't share a room with this user, the request is denied.
 func GetPresence(req *http.Request,
@@ -146,17 +153,17 @@ func GetPresence(req *http.Request,
 		}
 	}
 
+	resp := presenceResponse{}
 	lastActive := time.Since(presence.LastActiveTS.Time())
-	presence.LastActiveAgo = lastActive.Milliseconds()
+	resp.LastActiveAgo = lastActive.Milliseconds()
 
-	presence.CurrentlyActive = lastActive <= time.Minute*5
-	if !presence.CurrentlyActive {
+	resp.CurrentlyActive = lastActive <= time.Minute*5
+	if !resp.CurrentlyActive {
 		presence.PresenceStatus = types.Unavailable
 	}
-	presence.Presence = presence.PresenceStatus.String()
-
+	resp.Presence = presence.PresenceStatus.String()
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: presence,
+		JSON: resp,
 	}
 }

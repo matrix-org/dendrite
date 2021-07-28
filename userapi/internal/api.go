@@ -480,7 +480,7 @@ func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.Que
 	res.StatusMsg = p.StatusMsg
 	res.LastActiveTS = p.LastActiveTS
 	if maxLastSeen > p.LastActiveTS.Time().Unix() {
-		res.LastActiveAgo = maxLastSeen
+		res.LastActiveTS = gomatrixserverlib.Timestamp(maxLastSeen)
 	}
 	return nil
 }
