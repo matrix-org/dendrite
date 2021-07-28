@@ -72,13 +72,11 @@ func (a *KeyBackupSession) ShouldReplaceRoomKey(newKey *KeyBackupSession) bool {
 	// "if the keys have different values for is_verified, then it will keep the key that has is_verified set to true"
 	if newKey.IsVerified && !a.IsVerified {
 		return true
-	}
-	// "if they have the same values for is_verified, then it will keep the key with a lower first_message_index"
-	if newKey.FirstMessageIndex < a.FirstMessageIndex {
+	} else if newKey.FirstMessageIndex < a.FirstMessageIndex {
+		// "if they have the same values for is_verified, then it will keep the key with a lower first_message_index"
 		return true
-	}
-	// "and finally, is is_verified and first_message_index are equal, then it will keep the key with a lower forwarded_count"
-	if newKey.ForwardedCount < a.ForwardedCount {
+	} else if newKey.ForwardedCount < a.ForwardedCount {
+		// "and finally, is is_verified and first_message_index are equal, then it will keep the key with a lower forwarded_count"
 		return true
 	}
 	return false
