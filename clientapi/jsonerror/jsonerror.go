@@ -169,3 +169,15 @@ func NotTrusted(serverName string) *MatrixError {
 		Err:     fmt.Sprintf("Untrusted server '%s'", serverName),
 	}
 }
+// BadAlias is an error which is returned when one or more aliases within a
+// m.room.canonical_alias event do not point to the room ID for which the state
+// event is to be sent to.
+func BadAlias(msg string) *MatrixError {
+    return &MatrixError{"M_BAD_ALIAS", msg}
+}
+
+// InvalidParam is an error return when an alias from a m.room.canonical_alias
+// contains a malformed alias
+func InvalidParam(msg string) *MatrixError {
+    return &MatrixError{"M_INVALID_PARAM", msg}
+}

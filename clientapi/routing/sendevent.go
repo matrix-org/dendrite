@@ -15,6 +15,7 @@
 package routing
 
 import (
+    "encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -69,6 +70,7 @@ func SendEvent(
 	req *http.Request,
 	device *userapi.Device,
 	roomID, eventType string, txnID, stateKey *string,
+    federation *gomatrixserverlib.FederationClient,
 	cfg *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 	txnCache *transactions.Cache,
@@ -97,7 +99,7 @@ func SendEvent(
 	defer mutex.(*sync.Mutex).Unlock()
 
 	startedGeneratingEvent := time.Now()
-	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, rsAPI)
+	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, federation, cfg, rsAPI)
 	if resErr != nil {
 		return *resErr
 	}
@@ -154,6 +156,7 @@ func generateSendEvent(
 	req *http.Request,
 	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
+    federation *gomatrixserverlib.FederationClient,
 	cfg *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
@@ -228,5 +231,111 @@ func generateSendEvent(
 			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
 		}
 	}
+
+    if eventType == gomatrixserverlib.MRoomCanonicalAlias {
+        var content *eventutil.CanonicalAlias
+        err = json.Unmarshal(builder.Content, &content)
+        if err != nil {
+            return nil, &util.JSONResponse{
+                Code: http.StatusBadRequest,
+                JSON: jsonerror.BadJSON(err.Error()),
+            }
+        }
+
+        queryRes := api.GetAliasesForRoomIDResponse {
+            Aliases: make([]string, 1),
+        }
+
+        err = rsAPI.GetAliasesForRoomID(
+            req.Context(),
+            &api.GetAliasesForRoomIDRequest {
+                RoomID: roomID,
+            },
+            &queryRes,
+        )
+        if err != nil {
+            resErr := jsonerror.InternalServerError()
+            return nil, &resErr
+        }
+
+        //TODO: maybe do something like synapse where state is retrieved in order to only check new aliases
+        for _, alias := range content.AltAliases {
+            _, domain, err := gomatrixserverlib.SplitID('#', alias)
+            if err != nil {
+                return nil, &util.JSONResponse{
+                    Code: http.StatusBadRequest,
+                    JSON: jsonerror.InvalidParam("Room alias must be in the form '#localpart:domain'"),
+                }
+            }
+            found := false
+            for _, s := range queryRes.Aliases {
+                if alias == s {
+                    found = true
+                    break
+                }
+            }
+            if !found {
+                if domain == cfg.Matrix.ServerName {
+                    return nil, &util.JSONResponse{
+                        Code: http.StatusBadRequest,
+                        JSON: jsonerror.BadAlias("Alt alias not present in the room aliases"),
+                    }
+                }
+                fedRes, fedErr := federation.LookupRoomAlias(req.Context(), domain, alias)
+                if fedErr != nil {
+                    // TODO: Return 502 if the remote server errored.
+                    // TODO: Return 504 if the remote server timed out.
+                    util.GetLogger(req.Context()).WithError(fedErr).Error("federation.LookupRoomAlias failed")
+                    resErr := jsonerror.InternalServerError()
+                    return nil, &resErr
+                }
+                if fedRes.RoomID == "" {
+                    return nil, &util.JSONResponse{
+                        Code: http.StatusBadRequest,
+                        JSON: jsonerror.BadAlias("Alt alias not present in the room aliases"),
+                    }
+                }
+            }
+        }
+
+        if content.Alias != "" {
+            _, domain, err := gomatrixserverlib.SplitID('#', content.Alias)
+            if err != nil {
+                return nil, &util.JSONResponse{
+                    Code: http.StatusBadRequest,
+                    JSON: jsonerror.InvalidParam("Room alias must be in the form '#localpart:domain'"),
+                }
+            }
+            found := false
+            for _, s := range queryRes.Aliases {
+                if content.Alias == s {
+                    found = true
+                    break
+                }
+            }
+            if !found {
+                if domain == cfg.Matrix.ServerName {
+                    return nil, &util.JSONResponse{
+                        Code: http.StatusBadRequest,
+                        JSON: jsonerror.BadAlias("Canonical alias not present in the room aliases"),
+                    }
+                }
+                fedRes, fedErr := federation.LookupRoomAlias(req.Context(), domain, content.Alias)
+                if fedErr != nil {
+                    // TODO: Return 502 if the remote server errored.
+                    // TODO: Return 504 if the remote server timed out.
+                    util.GetLogger(req.Context()).WithError(fedErr).Error("federation.LookupRoomAlias failed")
+                    resErr := jsonerror.InternalServerError()
+                    return nil, &resErr
+                }
+                if fedRes.RoomID == "" {
+                    return nil, &util.JSONResponse{
+                        Code: http.StatusBadRequest,
+                        JSON: jsonerror.BadAlias("Canonical alias not present in the room aliases"),
+                    }
+                }
+            }
+        }
+    }
 	return e.Event, nil
 }

@@ -243,7 +243,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, cfg, rsAPI, nil)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, nil, federation, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
@@ -254,7 +254,7 @@ func Setup(
 			}
 			txnID := vars["txnID"]
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID,
-				nil, cfg, rsAPI, transactionsCache)
+				nil, federation, cfg, rsAPI, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	r0mux.Handle("/rooms/{roomID}/event/{eventID}",
@@ -318,7 +318,7 @@ func Setup(
 			if strings.HasSuffix(eventType, "/") {
 				eventType = eventType[:len(eventType)-1]
 			}
-			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, nil)
+			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, federation, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -329,7 +329,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			stateKey := vars["stateKey"]
-			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
+			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, federation, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
