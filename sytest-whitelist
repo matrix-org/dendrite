@@ -540,3 +540,5 @@ Key notary server must not overwrite a valid key with a spurious result from the
 GET /rooms/:room_id/aliases lists aliases
 Only room members can list aliases of a room
 Users with sufficient power-level can delete other's aliases
+GET /presence/:user_id/status fetches initial status
+PUT /presence/:user_id/status updates my presence
