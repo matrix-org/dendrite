@@ -36,6 +36,11 @@ func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database) 
 			MaxOpenConnections: 1,
 			MaxIdleConnections: 1,
 		},
+		PresenceDatabase: config.DatabaseOptions{
+			ConnectionString:   "file::memory:",
+			MaxOpenConnections: 1,
+			MaxIdleConnections: 1,
+		},
 		Matrix: &config.Global{
 			ServerName: serverName,
 		},

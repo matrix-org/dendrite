@@ -500,6 +500,14 @@ type testUserAPI struct {
 	accessTokens map[string]userapi.Device
 }
 
+func (u *testUserAPI) InputPresenceData(ctx context.Context, req *userapi.InputPresenceRequest, res *userapi.InputPresenceResponse) error {
+	return nil
+}
+
+func (u *testUserAPI) QueryPresenceForUser(ctx context.Context, req *userapi.QueryPresenceForUserRequest, res *userapi.QueryPresenceForUserResponse) error {
+	return nil
+}
+
 func (u *testUserAPI) InputAccountData(ctx context.Context, req *userapi.InputAccountDataRequest, res *userapi.InputAccountDataResponse) error {
 	return nil
 }

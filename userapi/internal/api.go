@@ -459,7 +459,8 @@ func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.Que
 	var maxLastSeen int64
 	// If it's a local user, we can check the devices for possible updated timestamps
 	if domain == a.ServerName {
-		devs, err := a.DeviceDB.GetDevicesByLocalpart(ctx, local)
+		var devs []api.Device
+		devs, err = a.DeviceDB.GetDevicesByLocalpart(ctx, local)
 		if err != nil {
 			return err
 		}

@@ -57,7 +57,6 @@ const selectPresenceForUserSQL = "" +
 	" WHERE user_id = $1 LIMIT 1"
 
 type presenceStatements struct {
-	db                         *sql.DB
 	upsertPresenceStmt         *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
 }
