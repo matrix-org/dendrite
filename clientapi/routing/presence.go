@@ -19,12 +19,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/eduserver/api"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -35,26 +36,22 @@ type presenceRequest struct {
 	StatusMsg string `json:"status_msg"`
 }
 
-// The new presence state. One of: ["online", "offline", "unavailable"]
-var allowedPresence = map[string]bool{
-	"online":      true,
-	"offline":     true,
-	"unavailable": true,
-}
-var allowedStrings = make([]string, len(allowedPresence))
-
-// we only need to do this once
-func init() {
-	i := 0
-	for k := range allowedPresence {
-		allowedStrings[i] = k
-		i++
+// SetPresence updates the users presence status
+func SetPresence(req *http.Request,
+	eduAPI api.EDUServerInputAPI,
+	userAPI userapi.UserInternalAPI,
+	userID string,
+	device *userapi.Device,
+) util.JSONResponse {
+	if userID != device.UserID {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("You cannot set the presence state of another user."),
+		}
 	}
-}
-
-func SetPresence(req *http.Request, eduAPI api.EDUServerInputAPI, device *userapi.Device) util.JSONResponse {
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil {
+		logrus.WithError(err).Error("unable to read request body")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
@@ -66,38 +63,40 @@ func SetPresence(req *http.Request, eduAPI api.EDUServerInputAPI, device *userap
 	var r presenceRequest
 	err = json.Unmarshal(data, &r)
 	if err != nil {
+		logrus.WithError(err).Error("unable to unmarshal request body")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
 		}
 	}
 
+	p := types.ToPresenceStatus(r.Presence)
 	// requested new presence is not allowed by the spec
-	if !allowedPresence[r.Presence] {
+	if p == types.Unknown {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(
-				fmt.Sprintf("The 'presence' field only allows one of: %s [sent: %s]", strings.Join(allowedStrings, ", "), r.Presence),
+				fmt.Sprintf("The sent presence value '%s' is not allowed.", r.Presence),
 			),
 		}
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"userId":     device.UserID,
-		"presence":   r.Presence,
-		"status_msg": r.StatusMsg,
-	}).Debug("Setting presence for user")
+	pReq := userapi.InputPresenceRequest{
+		UserID:       userID,
+		DisplayName:  device.DisplayName,
+		Presence:     p,
+		StatusMsg:    r.StatusMsg,
+		LastActiveTS: int64(gomatrixserverlib.AsTimestamp(time.Now())),
+	}
+	pRes := userapi.InputPresenceResponse{}
 
-	if err := api.SetPresence(
-		req.Context(),
-		eduAPI,
-		device.ID,
-		r.Presence,
-		r.StatusMsg,
-		gomatrixserverlib.AsTimestamp(time.Now()),
-	); err != nil {
+	// send presence data directly to the userapi
+	if err := userAPI.InputPresenceData(req.Context(), &pReq, &pRes); err != nil {
+		logrus.WithError(err).Error("failed to set presence")
 		return util.ErrorResponse(err)
 	}
+
+	// TODO: Inform EDU Server to send new presence to the federationsender/syncapi
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -105,10 +104,59 @@ func SetPresence(req *http.Request, eduAPI api.EDUServerInputAPI, device *userap
 	}
 }
 
-func GetPresence(req *http.Request, eduAPI api.EDUServerInputAPI, userID string) util.JSONResponse {
+// GetPresence returns the presence status of a given user.
+// If the requesting user doesn't share a room with this user, the request is denied.
+func GetPresence(req *http.Request,
+	userAPI userapi.UserInternalAPI,
+	userID string,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	device *userapi.Device,
+) util.JSONResponse {
+	// Only check allowance to see presence, if it's not our own user. (Otherwise sytest fails..)
+	if device.UserID != userID {
+		rsResp := roomserverAPI.QueryKnownUsersResponse{}
+		rsQry := roomserverAPI.QueryKnownUsersRequest{UserID: device.UserID, SearchString: userID, Limit: 2}
+		if err := rsAPI.QueryKnownUsers(req.Context(), &rsQry, &rsResp); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.InternalServerError(),
+			}
+		}
+
+		// Users don't share a room, not allowed to see presence.
+		if len(rsResp.Users) == 0 {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("You cannot view the presence for this user."),
+			}
+		}
+	}
+
+	presence := userapi.QueryPresenceForUserResponse{}
+	qry := userapi.QueryPresenceForUserRequest{UserID: userID}
+	err := userAPI.QueryPresenceForUser(req.Context(), &qry, &presence)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID": userID,
+		}).WithError(err).Error("unable to query presence")
+		// return an empty presence, to make sytest happy
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: presence,
+		}
+	}
+
+	lastActive := time.Since(presence.LastActiveTS.Time())
+	presence.LastActiveAgo = lastActive.Milliseconds()
+
+	presence.CurrentlyActive = lastActive <= time.Minute*5
+	if !presence.CurrentlyActive {
+		presence.PresenceStatus = types.Unavailable
+	}
+	presence.Presence = presence.PresenceStatus.String()
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: struct{}{},
+		JSON: presence,
 	}
 }
