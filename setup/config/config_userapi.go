@@ -19,6 +19,8 @@ type UserAPI struct {
 	// The Device database stores session information for the devices of logged
 	// in local users. It is accessed by the UserAPI.
 	DeviceDatabase DatabaseOptions `yaml:"device_database"`
+	// The presence database stores information about user (local and remote) presence status.
+	PresenceDatabase DatabaseOptions `yaml:"presence_database"`
 }
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
@@ -30,6 +32,7 @@ func (c *UserAPI) Defaults() {
 	c.DeviceDatabase.Defaults(10)
 	c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
 	c.DeviceDatabase.ConnectionString = "file:userapi_devices.db"
+	c.PresenceDatabase.ConnectionString = "file:userapi_presence.db"
 	c.BCryptCost = bcrypt.DefaultCost
 	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
 }
@@ -39,5 +42,6 @@ func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkURL(configErrs, "user_api.internal_api.connect", string(c.InternalAPI.Connect))
 	checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
 	checkNotEmpty(configErrs, "user_api.device_database.connection_string", string(c.DeviceDatabase.ConnectionString))
+	checkNotEmpty(configErrs, "user_api.presence_database.connection_string", string(c.PresenceDatabase.ConnectionString))
 	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
 }
