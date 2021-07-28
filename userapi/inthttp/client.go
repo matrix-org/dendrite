@@ -37,6 +37,7 @@ const (
 	PerformDeviceUpdatePath        = "/userapi/performDeviceUpdate"
 	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
 	PerformOpenIDTokenCreationPath = "/userapi/performOpenIDTokenCreation"
+	PerformKeyBackupPath           = "/userapi/performKeyBackup"
 
 	QueryProfilePath         = "/userapi/queryProfile"
 	QueryAccessTokenPath     = "/userapi/queryAccessToken"
@@ -46,6 +47,7 @@ const (
 	QuerySearchProfilesPath  = "/userapi/querySearchProfiles"
 	QueryOpenIDTokenPath     = "/userapi/queryOpenIDToken"
 	QueryPresenceForUserPath = "/userapi/queryPresenceForUser"
+	QueryKeyBackupPath       = "/userapi/queryKeyBackup"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -242,4 +244,26 @@ func (h *httpUserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api
 
 	apiURL := h.apiURL + QueryPresenceForUserPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformKeyBackup")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformKeyBackupPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = err.Error()
+	}
+}
+
+func (h *httpUserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryKeyBackupPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = err.Error()
+	}
 }
