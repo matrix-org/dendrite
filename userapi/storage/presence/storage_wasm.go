@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package devices
+package presence
 
 import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/presence/sqlite3"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
-func NewDatabase(
-	dbProperties *config.DatabaseOptions,
-	serverName gomatrixserverlib.ServerName,
-) (Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties)
