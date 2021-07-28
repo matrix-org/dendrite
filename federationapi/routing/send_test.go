@@ -158,32 +158,6 @@ func (t *testRoomserverAPI) QueryEventsByID(
 	return nil
 }
 
-// Query the membership event for an user for a room.
-func (t *testRoomserverAPI) QueryMembershipForUser(
-	ctx context.Context,
-	request *api.QueryMembershipForUserRequest,
-	response *api.QueryMembershipForUserResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (t *testRoomserverAPI) QueryPublishedRooms(
-	ctx context.Context,
-	request *api.QueryPublishedRoomsRequest,
-	response *api.QueryPublishedRoomsResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Query a list of membership events for a room
-func (t *testRoomserverAPI) QueryMembershipsForRoom(
-	ctx context.Context,
-	request *api.QueryMembershipsForRoomRequest,
-	response *api.QueryMembershipsForRoomResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
 // Query if a server is joined to a room
 func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 	ctx context.Context,
@@ -193,53 +167,6 @@ func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 	response.RoomExists = true
 	response.IsInRoom = true
 	return nil
-}
-
-// Query whether a server is allowed to see an event
-func (t *testRoomserverAPI) QueryServerAllowedToSeeEvent(
-	ctx context.Context,
-	request *api.QueryServerAllowedToSeeEventRequest,
-	response *api.QueryServerAllowedToSeeEventResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Query missing events for a room from roomserver
-func (t *testRoomserverAPI) QueryMissingEvents(
-	ctx context.Context,
-	request *api.QueryMissingEventsRequest,
-	response *api.QueryMissingEventsResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Query to get state and auth chain for a (potentially hypothetical) event.
-// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
-// the state and auth chain to return.
-func (t *testRoomserverAPI) QueryStateAndAuthChain(
-	ctx context.Context,
-	request *api.QueryStateAndAuthChainRequest,
-	response *api.QueryStateAndAuthChainResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Query a given amount (or less) of events prior to a given set of events.
-func (t *testRoomserverAPI) PerformBackfill(
-	ctx context.Context,
-	request *api.PerformBackfillRequest,
-	response *api.PerformBackfillResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Asks for the default room version as preferred by the server.
-func (t *testRoomserverAPI) QueryRoomVersionCapabilities(
-	ctx context.Context,
-	request *api.QueryRoomVersionCapabilitiesRequest,
-	response *api.QueryRoomVersionCapabilitiesResponse,
-) error {
-	return fmt.Errorf("not implemented")
 }
 
 // Asks for the room version for a given room.
@@ -252,72 +179,10 @@ func (t *testRoomserverAPI) QueryRoomVersionForRoom(
 	return nil
 }
 
-// Set a room alias
-func (t *testRoomserverAPI) SetRoomAlias(
-	ctx context.Context,
-	req *api.SetRoomAliasRequest,
-	response *api.SetRoomAliasResponse,
+func (t *testRoomserverAPI) QueryServerBannedFromRoom(
+	ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse,
 ) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Get the room ID for an alias
-func (t *testRoomserverAPI) GetRoomIDForAlias(
-	ctx context.Context,
-	req *api.GetRoomIDForAliasRequest,
-	response *api.GetRoomIDForAliasResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Get all known aliases for a room ID
-func (t *testRoomserverAPI) GetAliasesForRoomID(
-	ctx context.Context,
-	req *api.GetAliasesForRoomIDRequest,
-	response *api.GetAliasesForRoomIDResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Get the user ID of the creator of an alias
-func (t *testRoomserverAPI) GetCreatorIDForAlias(
-	ctx context.Context,
-	req *api.GetCreatorIDForAliasRequest,
-	response *api.GetCreatorIDForAliasResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-// Remove a room alias
-func (t *testRoomserverAPI) RemoveRoomAlias(
-	ctx context.Context,
-	req *api.RemoveRoomAliasRequest,
-	response *api.RemoveRoomAliasResponse,
-) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (t *testRoomserverAPI) QueryCurrentState(ctx context.Context, req *api.QueryCurrentStateRequest, res *api.QueryCurrentStateResponse) error {
-	return nil
-}
-
-func (t *testRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (t *testRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkStateContentRequest, res *api.QueryBulkStateContentResponse) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (t *testRoomserverAPI) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (t *testRoomserverAPI) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (t *testRoomserverAPI) QueryServerBannedFromRoom(ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse) error {
+	res.Banned = false
 	return nil
 }
 

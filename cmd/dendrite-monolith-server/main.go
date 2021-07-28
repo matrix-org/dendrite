@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
+	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -114,6 +115,11 @@ func main() {
 	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
+	if traceInternal {
+		userAPI = &uapi.UserInternalAPITrace{
+			Impl: userAPI,
+		}
+	}
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,
