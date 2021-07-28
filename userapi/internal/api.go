@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
+	"github.com/matrix-org/dendrite/userapi/storage/presence"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -37,6 +38,7 @@ import (
 type UserInternalAPI struct {
 	AccountDB  accounts.Database
 	DeviceDB   devices.Database
+	PresenceDB presence.Database
 	ServerName gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
@@ -55,6 +57,11 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 		return fmt.Errorf("data type must not be empty")
 	}
 	return a.AccountDB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData)
+}
+
+func (a *UserInternalAPI) InputPresenceData(ctx context.Context, req *api.InputPresenceRequest, res *api.InputPresenceResponse) error {
+	_, err := a.PresenceDB.UpsertPresence(ctx, req.UserID, req.StatusMsg, req.Presence, req.LastActiveTS)
+	return err
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
@@ -440,5 +447,39 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 	res.Sub = openIDTokenAttrs.UserID
 	res.ExpiresAtMS = openIDTokenAttrs.ExpiresAtMS
 
+	return nil
+}
+
+// QueryPresenceForUser gets the current presence status, if set.
+func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.QueryPresenceForUserRequest, res *api.QueryPresenceForUserResponse) error {
+	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return err
+	}
+	var maxLastSeen int64
+	// If it's a local user, we can check the devices for possible updated timestamps
+	if domain == a.ServerName {
+		devs, err := a.DeviceDB.GetDevicesByLocalpart(ctx, local)
+		if err != nil {
+			return err
+		}
+		for _, dev := range devs {
+			if dev.LastSeenTS > maxLastSeen {
+				maxLastSeen = dev.LastSeenTS
+			}
+		}
+	}
+
+	p, err := a.PresenceDB.GetPresenceForUser(ctx, req.UserID)
+	if err != nil {
+		return err
+	}
+
+	res.PresenceStatus = p.Presence
+	res.StatusMsg = p.StatusMsg
+	res.LastActiveTS = p.LastActiveTS
+	if maxLastSeen > p.LastActiveTS.Time().Unix() {
+		res.LastActiveAgo = maxLastSeen
+	}
 	return nil
 }

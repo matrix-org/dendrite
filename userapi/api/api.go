@@ -19,12 +19,14 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
+	InputPresenceData(ctx context.Context, req *InputPresenceRequest, res *InputPresenceResponse) error
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
@@ -40,6 +42,7 @@ type UserInternalAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
+	QueryPresenceForUser(ctx context.Context, req *QueryPresenceForUserRequest, res *QueryPresenceForUserResponse) error
 }
 
 // InputAccountDataRequest is the request for InputAccountData
@@ -247,6 +250,34 @@ type QueryOpenIDTokenRequest struct {
 type QueryOpenIDTokenResponse struct {
 	Sub         string // The Matrix User ID that generated the token
 	ExpiresAtMS int64
+}
+
+// InputPresenceRequest is the request for presence data
+type InputPresenceRequest struct {
+	UserID       string
+	DisplayName  string
+	AvatarURL    string
+	Presence     types.PresenceStatus
+	StatusMsg    string
+	LastActiveTS int64
+}
+
+// InputPresenceResponse is the response for InputPresenceRequest
+type InputPresenceResponse struct{}
+
+// QueryPresenceForUserRequest is the request for QueryPresenceForUserRequest
+type QueryPresenceForUserRequest struct {
+	UserID string
+}
+
+// QueryPresenceForUserResponse is the response for QueryPresenceForUserRequest
+type QueryPresenceForUserResponse struct {
+	PresenceStatus  types.PresenceStatus        `json:"-"`
+	Presence        string                      `json:"presence"`
+	StatusMsg       string                      `json:"status_msg,omitempty"`
+	LastActiveTS    gomatrixserverlib.Timestamp `json:"-"`
+	LastActiveAgo   int64                       `json:"last_active_ago,omitempty"`
+	CurrentlyActive bool                        `json:"currently_active,omitempty"`
 }
 
 // Device represents a client's device (mobile, web, etc)

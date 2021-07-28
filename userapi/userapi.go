@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
+	"github.com/matrix-org/dendrite/userapi/storage/presence"
 	"github.com/sirupsen/logrus"
 )
 
@@ -41,10 +42,15 @@ func NewInternalAPI(
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to device db")
 	}
+	presenceDB, err := presence.NewDatabase(&cfg.PresenceDatabase)
+	if err != nil {
+		logrus.WithError(err).WithField("connString", cfg.PresenceDatabase.ConnectionString).Panicf("failed to connect to presence db")
+	}
 
 	return &internal.UserInternalAPI{
 		AccountDB:   accountDB,
 		DeviceDB:    deviceDB,
+		PresenceDB:  presenceDB,
 		ServerName:  cfg.Matrix.ServerName,
 		AppServices: appServices,
 		KeyAPI:      keyAPI,

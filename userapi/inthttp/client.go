@@ -26,7 +26,8 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
-	InputAccountDataPath = "/userapi/inputAccountData"
+	InputAccountDataPath  = "/userapi/inputAccountData"
+	InputPresenceDataPath = "/userapi/inputPresenceData"
 
 	PerformDeviceCreationPath      = "/userapi/performDeviceCreation"
 	PerformAccountCreationPath     = "/userapi/performAccountCreation"
@@ -37,13 +38,14 @@ const (
 	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
 	PerformOpenIDTokenCreationPath = "/userapi/performOpenIDTokenCreation"
 
-	QueryProfilePath        = "/userapi/queryProfile"
-	QueryAccessTokenPath    = "/userapi/queryAccessToken"
-	QueryDevicesPath        = "/userapi/queryDevices"
-	QueryAccountDataPath    = "/userapi/queryAccountData"
-	QueryDeviceInfosPath    = "/userapi/queryDeviceInfos"
-	QuerySearchProfilesPath = "/userapi/querySearchProfiles"
-	QueryOpenIDTokenPath    = "/userapi/queryOpenIDToken"
+	QueryProfilePath         = "/userapi/queryProfile"
+	QueryAccessTokenPath     = "/userapi/queryAccessToken"
+	QueryDevicesPath         = "/userapi/queryDevices"
+	QueryAccountDataPath     = "/userapi/queryAccountData"
+	QueryDeviceInfosPath     = "/userapi/queryDeviceInfos"
+	QuerySearchProfilesPath  = "/userapi/querySearchProfiles"
+	QueryOpenIDTokenPath     = "/userapi/queryOpenIDToken"
+	QueryPresenceForUserPath = "/userapi/queryPresenceForUser"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -71,6 +73,14 @@ func (h *httpUserInternalAPI) InputAccountData(ctx context.Context, req *api.Inp
 	defer span.Finish()
 
 	apiURL := h.apiURL + InputAccountDataPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) InputPresenceData(ctx context.Context, req *api.InputPresenceRequest, res *api.InputPresenceResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputPresenceData")
+	defer span.Finish()
+
+	apiURL := h.apiURL + InputPresenceDataPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
@@ -223,5 +233,13 @@ func (h *httpUserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.Que
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryOpenIDTokenPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.QueryPresenceForUserRequest, res *api.QueryPresenceForUserResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPresenceForUser")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryPresenceForUserPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
