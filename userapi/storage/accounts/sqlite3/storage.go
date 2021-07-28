@@ -520,7 +520,7 @@ func (d *Database) UpsertBackupKeys(
 						err = d.keyBackups.updateBackupKey(ctx, txn, userID, version, newKey)
 						changed = true
 						if err != nil {
-							return err
+							return fmt.Errorf("d.keyBackups.updateBackupKey: %w", err)
 						}
 					}
 					// if we shouldn't replace the key we do nothing with it
@@ -531,7 +531,7 @@ func (d *Database) UpsertBackupKeys(
 			err = d.keyBackups.insertBackupKey(ctx, txn, userID, version, newKey)
 			changed = true
 			if err != nil {
-				return err
+				return fmt.Errorf("d.keyBackups.insertBackupKey: %w", err)
 			}
 		}
 

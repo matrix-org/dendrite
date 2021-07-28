@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS account_e2e_room_keys (
     session_data TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON account_e2e_room_keys(user_id, room_id, session_id, version);
-CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_versions_idx ON account_e2e_room_keys(user_id, version);
+CREATE INDEX IF NOT EXISTS e2e_room_keys_versions_idx ON account_e2e_room_keys(user_id, version);
 `
 
 const insertBackupKeySQL = "" +
