@@ -19,6 +19,7 @@ package api
 import (
 	"time"
 
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -88,8 +89,9 @@ type FederationReceiptData struct {
 
 // OutputPresence is an entry in the presence output kafka log
 type OutputPresence struct {
-	UserID    string                      `json:"user_id"`
-	Status    string                      `json:"status"`
-	StatusMsg string                      `json:"status_msg"`
-	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+	UserID        string                      `json:"user_id"`
+	Presence      types.PresenceStatus        `json:"presence"`
+	StatusMsg     string                      `json:"status_msg,omitempty"`
+	LastActiveTS  gomatrixserverlib.Timestamp `json:"-"`
+	LastActiveAgo int64                       `json:"last_active_ago,omitempty"`
 }

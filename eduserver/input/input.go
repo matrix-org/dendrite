@@ -218,14 +218,14 @@ func (t *EDUServerInputAPI) InputPresence(
 ) error {
 	logrus.WithFields(logrus.Fields{
 		"user_id":    request.UserID,
-		"status":     request.Status,
+		"status":     request.Presence,
 		"status_msg": request.StatusMsg,
 	}).Infof("Producing to topic '%s'", t.OutputPresenceTopic)
 	output := &api.OutputPresence{
-		UserID:    request.UserID,
-		Status:    request.Status,
-		StatusMsg: request.StatusMsg,
-		Timestamp: request.Timestamp,
+		UserID:       request.UserID,
+		Presence:     request.Presence,
+		StatusMsg:    request.StatusMsg,
+		LastActiveTS: request.LastActiveTS,
 	}
 	js, err := json.Marshal(output)
 	if err != nil {

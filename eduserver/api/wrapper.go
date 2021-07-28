@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -91,14 +92,15 @@ func SendReceipt(
 func SetPresence(
 	ctx context.Context,
 	eduAPI EDUServerInputAPI,
-	userID, status, statusMsg string,
+	userID, statusMsg string,
+	presence types.PresenceStatus,
 	timestamp gomatrixserverlib.Timestamp,
 ) error {
 	request := InputPresenceRequest{
-		UserID:    userID,
-		Status:    status,
-		StatusMsg: statusMsg,
-		Timestamp: timestamp,
+		UserID:       userID,
+		Presence:     presence,
+		StatusMsg:    statusMsg,
+		LastActiveTS: timestamp,
 	}
 	response := InputPresenceResponse{}
 	return eduAPI.InputPresence(ctx, &request, &response)

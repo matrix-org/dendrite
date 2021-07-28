@@ -20,6 +20,7 @@ package api
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -77,10 +78,10 @@ type InputReceiptEventResponse struct{}
 
 // InputPresenceRequest is a request to EDUServerInputAPI
 type InputPresenceRequest struct {
-	UserID    string                      `json:"user_id"`
-	Status    string                      `json:"status"`
-	StatusMsg string                      `json:"status_msg"`
-	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+	UserID       string                      `json:"user_id"`
+	Presence     types.PresenceStatus        `json:"status"`
+	StatusMsg    string                      `json:"status_msg"`
+	LastActiveTS gomatrixserverlib.Timestamp `json:"timestamp"`
 }
 
 // InputPresenceResponse is a response to InputPresenceRequest
