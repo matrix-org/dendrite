@@ -3,6 +3,9 @@
 # Hidden files
 .*
 
+# Allow GitHub config
+!.github
+
 # Downloads
 /.downloads
 
@@ -36,6 +39,7 @@ _testmain.go
 *.exe
 *.test
 *.prof
+*.wasm
 
 # Generated keys
 *.pem
@@ -53,3 +57,6 @@ dendrite.yaml
 
 # Generated code
 cmd/dendrite-demo-yggdrasil/embed/fs*.go
+
+# Test dependencies
+test/wasm/node_modules

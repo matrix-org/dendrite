@@ -378,7 +378,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 		return event, err
 	}
 
-	if prevEvent == nil {
+	if prevEvent == nil || prevEvent.EventID() == event.EventID() {
 		return event, nil
 	}
 

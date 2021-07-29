@@ -685,7 +685,7 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 			r.Logger.WithError(parseErr).Warn("Failed to parse content length")
 			return 0, nil, fmt.Errorf("strconv.ParseInt: %w", parseErr)
 		}
-		if parsedLength > int64(maxFileSizeBytes) {
+		if maxFileSizeBytes > 0 && parsedLength > int64(maxFileSizeBytes) {
 			return 0, nil, fmt.Errorf(
 				"remote file size (%d bytes) exceeds locally configured max media size (%d bytes)",
 				parsedLength, maxFileSizeBytes,

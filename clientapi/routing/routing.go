@@ -37,6 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
@@ -46,7 +47,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux *mux.Router, cfg *config.ClientAPI,
+	publicAPIMux, synapseAdminRouter *mux.Router, cfg *config.ClientAPI,
 	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -87,6 +88,32 @@ func Setup(
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	if cfg.RegistrationSharedSecret != "" {
+		logrus.Info("Enabling shared secret registration at /_synapse/admin/v1/register")
+		sr := NewSharedSecretRegistration(cfg.RegistrationSharedSecret)
+		synapseAdminRouter.Handle("/admin/v1/register",
+			httputil.MakeExternalAPI("shared_secret_registration", func(req *http.Request) util.JSONResponse {
+				if req.Method == http.MethodGet {
+					return util.JSONResponse{
+						Code: 200,
+						JSON: struct {
+							Nonce string `json:"nonce"`
+						}{
+							Nonce: sr.GenerateNonce(),
+						},
+					}
+				}
+				if req.Method == http.MethodPost {
+					return handleSharedSecretRegistration(userAPI, sr, req)
+				}
+				return util.JSONResponse{
+					Code: http.StatusMethodNotAllowed,
+					JSON: jsonerror.NotFound("unknown method"),
+				}
+			}),
+		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
+	}
 
 	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
@@ -246,6 +273,14 @@ func Setup(
 			return util.ErrorResponse(err)
 		}
 		return OnIncomingStateRequest(req.Context(), device, rsAPI, vars["roomID"])
+	})).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/rooms/{roomID}/aliases", httputil.MakeAuthAPI("aliases", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		return GetAliases(req, rsAPI, device, vars["roomID"])
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/rooms/{roomID}/state/{type:[^/]+/?}", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -860,6 +895,176 @@ func Setup(
 			return GetCapabilities(req, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	// Key Backup Versions (Metadata)
+
+	getBackupKeysVersion := httputil.MakeAuthAPI("get_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		return KeyBackupVersion(req, userAPI, device, vars["version"])
+	})
+
+	getLatestBackupKeysVersion := httputil.MakeAuthAPI("get_latest_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		return KeyBackupVersion(req, userAPI, device, "")
+	})
+
+	putBackupKeysVersion := httputil.MakeAuthAPI("put_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		return ModifyKeyBackupVersionAuthData(req, userAPI, device, vars["version"])
+	})
+
+	deleteBackupKeysVersion := httputil.MakeAuthAPI("delete_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		return DeleteKeyBackupVersion(req, userAPI, device, vars["version"])
+	})
+
+	postNewBackupKeysVersion := httputil.MakeAuthAPI("post_new_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		return CreateKeyBackupVersion(req, userAPI, device)
+	})
+
+	r0mux.Handle("/room_keys/version/{version}", getBackupKeysVersion).Methods(http.MethodGet, http.MethodOptions)
+	r0mux.Handle("/room_keys/version", getLatestBackupKeysVersion).Methods(http.MethodGet, http.MethodOptions)
+	r0mux.Handle("/room_keys/version/{version}", putBackupKeysVersion).Methods(http.MethodPut)
+	r0mux.Handle("/room_keys/version/{version}", deleteBackupKeysVersion).Methods(http.MethodDelete)
+	r0mux.Handle("/room_keys/version", postNewBackupKeysVersion).Methods(http.MethodPost, http.MethodOptions)
+
+	unstableMux.Handle("/room_keys/version/{version}", getBackupKeysVersion).Methods(http.MethodGet, http.MethodOptions)
+	unstableMux.Handle("/room_keys/version", getLatestBackupKeysVersion).Methods(http.MethodGet, http.MethodOptions)
+	unstableMux.Handle("/room_keys/version/{version}", putBackupKeysVersion).Methods(http.MethodPut)
+	unstableMux.Handle("/room_keys/version/{version}", deleteBackupKeysVersion).Methods(http.MethodDelete)
+	unstableMux.Handle("/room_keys/version", postNewBackupKeysVersion).Methods(http.MethodPost, http.MethodOptions)
+
+	// Inserting E2E Backup Keys
+
+	// Bulk room and session
+	putBackupKeys := httputil.MakeAuthAPI("put_backup_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		version := req.URL.Query().Get("version")
+		if version == "" {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+			}
+		}
+		var reqBody keyBackupSessionRequest
+		resErr := clientutil.UnmarshalJSONRequest(req, &reqBody)
+		if resErr != nil {
+			return *resErr
+		}
+		return UploadBackupKeys(req, userAPI, device, version, &reqBody)
+	})
+
+	// Single room bulk session
+	putBackupKeysRoom := httputil.MakeAuthAPI("put_backup_keys_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		version := req.URL.Query().Get("version")
+		if version == "" {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+			}
+		}
+		roomID := vars["roomID"]
+		var reqBody keyBackupSessionRequest
+		reqBody.Rooms = make(map[string]struct {
+			Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+		})
+		reqBody.Rooms[roomID] = struct {
+			Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+		}{
+			Sessions: map[string]userapi.KeyBackupSession{},
+		}
+		body := reqBody.Rooms[roomID]
+		resErr := clientutil.UnmarshalJSONRequest(req, &body)
+		if resErr != nil {
+			return *resErr
+		}
+		reqBody.Rooms[roomID] = body
+		return UploadBackupKeys(req, userAPI, device, version, &reqBody)
+	})
+
+	// Single room, single session
+	putBackupKeysRoomSession := httputil.MakeAuthAPI("put_backup_keys_room_session", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		version := req.URL.Query().Get("version")
+		if version == "" {
+			return util.JSONResponse{
+				Code: 400,
+				JSON: jsonerror.InvalidArgumentValue("version must be specified"),
+			}
+		}
+		var reqBody userapi.KeyBackupSession
+		resErr := clientutil.UnmarshalJSONRequest(req, &reqBody)
+		if resErr != nil {
+			return *resErr
+		}
+		roomID := vars["roomID"]
+		sessionID := vars["sessionID"]
+		var keyReq keyBackupSessionRequest
+		keyReq.Rooms = make(map[string]struct {
+			Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+		})
+		keyReq.Rooms[roomID] = struct {
+			Sessions map[string]userapi.KeyBackupSession `json:"sessions"`
+		}{
+			Sessions: make(map[string]userapi.KeyBackupSession),
+		}
+		keyReq.Rooms[roomID].Sessions[sessionID] = reqBody
+		return UploadBackupKeys(req, userAPI, device, version, &keyReq)
+	})
+
+	r0mux.Handle("/room_keys/keys", putBackupKeys).Methods(http.MethodPut)
+	r0mux.Handle("/room_keys/keys/{roomID}", putBackupKeysRoom).Methods(http.MethodPut)
+	r0mux.Handle("/room_keys/keys/{roomID}/{sessionID}", putBackupKeysRoomSession).Methods(http.MethodPut)
+
+	unstableMux.Handle("/room_keys/keys", putBackupKeys).Methods(http.MethodPut)
+	unstableMux.Handle("/room_keys/keys/{roomID}", putBackupKeysRoom).Methods(http.MethodPut)
+	unstableMux.Handle("/room_keys/keys/{roomID}/{sessionID}", putBackupKeysRoomSession).Methods(http.MethodPut)
+
+	// Querying E2E Backup Keys
+
+	getBackupKeys := httputil.MakeAuthAPI("get_backup_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		return GetBackupKeys(req, userAPI, device, req.URL.Query().Get("version"), "", "")
+	})
+
+	getBackupKeysRoom := httputil.MakeAuthAPI("get_backup_keys_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		return GetBackupKeys(req, userAPI, device, req.URL.Query().Get("version"), vars["roomID"], "")
+	})
+
+	getBackupKeysRoomSession := httputil.MakeAuthAPI("get_backup_keys_room_session", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+		if err != nil {
+			return util.ErrorResponse(err)
+		}
+		return GetBackupKeys(req, userAPI, device, req.URL.Query().Get("version"), vars["roomID"], vars["sessionID"])
+	})
+
+	r0mux.Handle("/room_keys/keys", getBackupKeys).Methods(http.MethodGet, http.MethodOptions)
+	r0mux.Handle("/room_keys/keys/{roomID}", getBackupKeysRoom).Methods(http.MethodGet, http.MethodOptions)
+	r0mux.Handle("/room_keys/keys/{roomID}/{sessionID}", getBackupKeysRoomSession).Methods(http.MethodGet, http.MethodOptions)
+
+	unstableMux.Handle("/room_keys/keys", getBackupKeys).Methods(http.MethodGet, http.MethodOptions)
+	unstableMux.Handle("/room_keys/keys/{roomID}", getBackupKeysRoom).Methods(http.MethodGet, http.MethodOptions)
+	unstableMux.Handle("/room_keys/keys/{roomID}/{sessionID}", getBackupKeysRoomSession).Methods(http.MethodGet, http.MethodOptions)
+
+	// Deleting E2E Backup Keys
 
 	// Supplying a device ID is deprecated.
 	r0mux.Handle("/keys/upload/{deviceID}",

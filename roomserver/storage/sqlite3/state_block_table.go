@@ -25,7 +25,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
@@ -57,7 +56,7 @@ const insertStateDataSQL = `
 
 const bulkSelectStateBlockEntriesSQL = "" +
 	"SELECT state_block_nid, event_nids" +
-	" FROM roomserver_state_block WHERE state_block_nid IN ($1)"
+	" FROM roomserver_state_block WHERE state_block_nid IN ($1) ORDER BY state_block_nid ASC"
 
 type stateBlockStatements struct {
 	db                              *sql.DB
@@ -75,7 +74,7 @@ func prepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 		db: db,
 	}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertStateDataStmt, insertStateDataSQL},
 		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
 	}.Prepare(db)

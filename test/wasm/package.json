@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "isomorphic-ws": "^4.0.1",
+    "sql.js": "github:neilalexander/sql.js#252a72bf57b0538cbd49bbd6f70af71e516966ae",
+    "ws": "^7.5.2"
+  }
+}

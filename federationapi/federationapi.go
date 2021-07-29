@@ -17,6 +17,7 @@ package federationapi
 import (
 	"github.com/gorilla/mux"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -39,10 +40,12 @@ func AddPublicRoutes(
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	mscCfg *config.MSCs,
+	servers federationAPI.ServersInRoomProvider,
 ) {
 	routing.Setup(
 		fedRouter, keyRouter, cfg, rsAPI,
 		eduAPI, federationSenderAPI, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
+		servers,
 	)
 }

@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 
 	"github.com/matrix-org/util"
@@ -113,13 +112,6 @@ func QueryVariadicOffset(count, offset int) string {
 	return str
 }
 
-func SQLiteDriverName() string {
-	if runtime.GOOS == "js" {
-		return "sqlite3_js"
-	}
-	return "sqlite3"
-}
-
 func minOfInts(a, b int) int {
 	if a <= b {
 		return a
@@ -159,4 +151,20 @@ func RunLimitedVariablesQuery(ctx context.Context, query string, qp QueryProvide
 		start = start + n
 	}
 	return nil
+}
+
+// StatementList is a list of SQL statements to prepare and a pointer to where to store the resulting prepared statement.
+type StatementList []struct {
+	Statement **sql.Stmt
+	SQL       string
+}
+
+// Prepare the SQL for each statement in the list and assign the result to the prepared statement.
+func (s StatementList) Prepare(db *sql.DB) (err error) {
+	for _, statement := range s {
+		if *statement.Statement, err = db.Prepare(statement.SQL); err != nil {
+			return
+		}
+	}
+	return
 }

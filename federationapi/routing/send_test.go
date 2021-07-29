@@ -190,7 +190,9 @@ func (t *testRoomserverAPI) QueryServerJoinedToRoom(
 	request *api.QueryServerJoinedToRoomRequest,
 	response *api.QueryServerJoinedToRoomResponse,
 ) error {
-	return fmt.Errorf("not implemented")
+	response.RoomExists = true
+	response.IsInRoom = true
+	return nil
 }
 
 // Query whether a server is allowed to see an event
@@ -370,7 +372,7 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 		keys:       &test.NopJSONVerifier{},
 		federation: fedClient,
 		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
-		newEvents:  make(map[string]bool),
+		hadEvents:  make(map[string]bool),
 		roomsMu:    internal.NewMutexByRoom(),
 	}
 	t.PDUs = pdus

@@ -16,10 +16,7 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -73,11 +70,7 @@ func (r *RoomserverInternalAPI) SetRoomAlias(
 		return err
 	}
 
-	// Send a m.room.aliases event with the updated list of aliases for this room
-	// At this point we've already committed the alias to the database so we
-	// shouldn't cancel this request.
-	// TODO: Ensure that we send unsent events when if server restarts.
-	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, request.RoomID)
+	return nil
 }
 
 // GetRoomIDForAlias implements alias.RoomserverInternalAPI
@@ -157,122 +150,44 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	// Look up the room ID in the database
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
-		return err
+		return fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
+	}
+	if roomID == "" {
+		response.Found = false
+		response.Removed = false
+		return nil
 	}
 
-	// Remove the dalias from the database
+	response.Found = true
+	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
+	if err != nil {
+		return fmt.Errorf("r.DB.GetCreatorIDForAlias: %w", err)
+	}
+
+	if creatorID != request.UserID {
+		plEvent, err := r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomPowerLevels, "")
+		if err != nil {
+			return fmt.Errorf("r.DB.GetStateEvent: %w", err)
+		}
+
+		pls, err := plEvent.PowerLevels()
+		if err != nil {
+			return fmt.Errorf("plEvent.PowerLevels: %w", err)
+		}
+
+		if pls.UserLevel(request.UserID) < pls.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
+			response.Removed = false
+			return nil
+		}
+	}
+
+	// Remove the alias from the database
 	if err := r.DB.RemoveRoomAlias(ctx, request.Alias); err != nil {
 		return err
 	}
 
-	// Send an updated m.room.aliases event
-	// At this point we've already committed the alias to the database so we
-	// shouldn't cancel this request.
-	// TODO: Ensure that we send unsent events when if server restarts.
-	return r.sendUpdatedAliasesEvent(context.TODO(), request.UserID, roomID)
-}
-
-type roomAliasesContent struct {
-	Aliases []string `json:"aliases"`
-}
-
-// Build the updated m.room.aliases event to send to the room after addition or
-// removal of an alias
-func (r *RoomserverInternalAPI) sendUpdatedAliasesEvent(
-	ctx context.Context, userID string, roomID string,
-) error {
-	serverName := string(r.Cfg.Matrix.ServerName)
-
-	builder := gomatrixserverlib.EventBuilder{
-		Sender:   userID,
-		RoomID:   roomID,
-		Type:     "m.room.aliases",
-		StateKey: &serverName,
-	}
-
-	// Retrieve the updated list of aliases, marhal it and set it as the
-	// event's content
-	aliases, err := r.DB.GetAliasesForRoomID(ctx, roomID)
-	if err != nil {
-		return err
-	}
-	content := roomAliasesContent{Aliases: aliases}
-	rawContent, err := json.Marshal(content)
-	if err != nil {
-		return err
-	}
-	err = builder.SetContent(json.RawMessage(rawContent))
-	if err != nil {
-		return err
-	}
-
-	// Get needed state events and depth
-	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(&builder)
-	if err != nil {
-		return err
-	}
-	if len(eventsNeeded.Tuples()) == 0 {
-		return errors.New("expecting state tuples for event builder, got none")
-	}
-	req := api.QueryLatestEventsAndStateRequest{
-		RoomID:       roomID,
-		StateToFetch: eventsNeeded.Tuples(),
-	}
-	var res api.QueryLatestEventsAndStateResponse
-	if err = r.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
-		return err
-	}
-	builder.Depth = res.Depth
-	builder.PrevEvents = res.LatestEvents
-
-	// Add auth events
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
-	for i := range res.StateEvents {
-		err = authEvents.AddEvent(res.StateEvents[i].Event)
-		if err != nil {
-			return err
-		}
-	}
-	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
-	if err != nil {
-		return err
-	}
-	builder.AuthEvents = refs
-
-	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
-	if err != nil {
-		return err
-	}
-	if roomInfo == nil {
-		return fmt.Errorf("room %s does not exist", roomID)
-	}
-
-	// Build the event
-	now := time.Now()
-	event, err := builder.Build(
-		now, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID,
-		r.Cfg.Matrix.PrivateKey, roomInfo.RoomVersion,
-	)
-	if err != nil {
-		return err
-	}
-
-	// Create the request
-	ire := api.InputRoomEvent{
-		Kind:         api.KindNew,
-		Event:        event.Headered(roomInfo.RoomVersion),
-		AuthEventIDs: event.AuthEventIDs(),
-		SendAsServer: serverName,
-	}
-	inputReq := api.InputRoomEventsRequest{
-		InputRoomEvents: []api.InputRoomEvent{ire},
-	}
-	var inputRes api.InputRoomEventsResponse
-
-	// Send the request
-	r.InputRoomEvents(ctx, &inputReq, &inputRes)
-	return inputRes.Err()
+	response.Removed = true
+	return nil
 }

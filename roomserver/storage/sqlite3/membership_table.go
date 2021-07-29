@@ -23,9 +23,9 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const membershipSchema = `
@@ -100,6 +100,24 @@ var selectKnownUsersSQL = "" +
 	"  SELECT DISTINCT room_nid FROM roomserver_membership WHERE target_nid=$1 AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
 	") AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " AND event_state_key LIKE $2 LIMIT $3"
 
+// selectLocalServerInRoomSQL is an optimised case for checking if we, the local server,
+// are in the room by using the target_local column of the membership table. Normally when
+// we want to know if a server is in a room, we have to unmarshal the entire room state which
+// is expensive. The presence of a single row from this query suggests we're still in the
+// room, no rows returned suggests we aren't.
+const selectLocalServerInRoomSQL = "" +
+	"SELECT room_nid FROM roomserver_membership WHERE target_local = 1 AND membership_nid = $1 AND room_nid = $2 LIMIT 1"
+
+// selectServerMembersInRoomSQL is an optimised case for checking for server members in a room.
+// The JOIN is significantly leaner than the previous case of looking up event NIDs and reading the
+// membership events from the database, as the JOIN query amounts to little more than two index
+// scans which are very fast. The presence of a single row from this query suggests the server is
+// in the room, no rows returned suggests they aren't.
+const selectServerInRoomSQL = "" +
+	"SELECT room_nid FROM roomserver_membership" +
+	" JOIN roomserver_event_state_keys ON roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
+	" WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
+
 type membershipStatements struct {
 	db                                              *sql.DB
 	insertMembershipStmt                            *sql.Stmt
@@ -113,6 +131,8 @@ type membershipStatements struct {
 	updateMembershipStmt                            *sql.Stmt
 	selectKnownUsersStmt                            *sql.Stmt
 	updateMembershipForgetRoomStmt                  *sql.Stmt
+	selectLocalServerInRoomStmt                     *sql.Stmt
+	selectServerInRoomStmt                          *sql.Stmt
 }
 
 func createMembershipTable(db *sql.DB) error {
@@ -125,7 +145,7 @@ func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 		db: db,
 	}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertMembershipStmt, insertMembershipSQL},
 		{&s.selectMembershipForUpdateStmt, selectMembershipForUpdateSQL},
 		{&s.selectMembershipFromRoomAndTargetStmt, selectMembershipFromRoomAndTargetSQL},
@@ -137,6 +157,8 @@ func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectRoomsWithMembershipStmt, selectRoomsWithMembershipSQL},
 		{&s.selectKnownUsersStmt, selectKnownUsersSQL},
 		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
+		{&s.selectLocalServerInRoomStmt, selectLocalServerInRoomSQL},
+		{&s.selectServerInRoomStmt, selectServerInRoomSQL},
 	}.Prepare(db)
 }
 
@@ -303,4 +325,29 @@ func (s *membershipStatements) UpdateForgetMembership(
 		ctx, forget, roomNID, targetUserNID,
 	)
 	return err
+}
+
+func (s *membershipStatements) SelectLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error) {
+	var nid types.RoomNID
+	err := s.selectLocalServerInRoomStmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID).Scan(&nid)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	found := nid > 0
+	return found, nil
+}
+
+func (s *membershipStatements) SelectServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error) {
+	var nid types.RoomNID
+	err := s.selectServerInRoomStmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID, serverName).Scan(&nid)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return roomNID == nid, nil
 }
