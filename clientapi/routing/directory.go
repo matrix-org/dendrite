@@ -17,9 +17,11 @@ package routing
 import (
 	"fmt"
 	"net/http"
+    "encoding/json"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+    "github.com/matrix-org/dendrite/internal/eventutil"
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -194,6 +196,7 @@ func RemoveLocalAlias(
 	req *http.Request,
 	device *api.Device,
 	alias string,
+    cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {
 	queryReq := roomserverAPI.RemoveRoomAliasRequest{
@@ -219,6 +222,88 @@ func RemoveLocalAlias(
 			JSON: jsonerror.Forbidden("You do not have permission to remove this alias."),
 		}
 	}
+
+    //if state contains alias
+    stateTuple := gomatrixserverlib.StateKeyTuple{
+        EventType: gomatrixserverlib.MRoomCanonicalAlias,
+        StateKey:  "",
+    }
+    stateReq := roomserverAPI.QueryCurrentStateRequest {
+        RoomID:      queryRes.RoomID,
+        StateTuples: []gomatrixserverlib.StateKeyTuple{stateTuple},
+    }
+    stateRes := &roomserverAPI.QueryCurrentStateResponse{}
+    err := rsAPI.QueryCurrentState(req.Context(), &stateReq, stateRes)
+    if err != nil {
+        util.GetLogger(req.Context()).WithError(err).Error("Query state failed")
+        resErr := jsonerror.InternalServerError()
+        return resErr
+    }
+
+    inAliases := false
+    if canonicalAliasEvent, ok := stateRes.StateEvents[stateTuple]; ok {
+        //var canonicalAliasContent *eventutil.CanonicalAlias
+        canonicalAliasContent := eventutil.CanonicalAlias {
+            Alias: "",
+            AltAliases: []string{""},
+        }
+        err := json.Unmarshal(canonicalAliasEvent.Content(), &canonicalAliasContent)
+        if err != nil {
+            util.GetLogger(req.Context()).WithError(err).Error("Get content failed")
+            resErr := jsonerror.InternalServerError()
+            return resErr
+        }
+        if alias == canonicalAliasContent.Alias {
+            inAliases = true
+        } else {
+            for _, s := range(canonicalAliasContent.AltAliases) {
+                if alias == s {
+                    inAliases = true
+                    break
+                }
+            }
+        }
+    }
+    if inAliases {
+        var stateKey = ""
+        // May cause some auth problems
+        builder := gomatrixserverlib.EventBuilder {
+            Sender:   device.UserID,
+            RoomID:   queryRes.RoomID,
+            Type:     gomatrixserverlib.MRoomCanonicalAlias,
+            StateKey: &stateKey,
+        }
+        //TODO reconstruct original minus removed
+        content := eventutil.CanonicalAlias {
+            Alias:      "",
+            AltAliases: make([]string, 0),
+        }
+        err := builder.SetContent(content)
+        if err != nil {
+            util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+            resErr := jsonerror.InternalServerError()
+            return resErr
+        }
+
+        evTime, err := httputil.ParseTSParam(req)
+        if err != nil {
+            return util.JSONResponse{
+                Code: http.StatusBadRequest,
+                JSON: jsonerror.InvalidArgumentValue(err.Error()),
+            }
+        }
+
+        e, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, evTime, rsAPI, nil)
+        if err != nil {
+            util.GetLogger(req.Context()).WithError(err).Errorf("failed to QueryAndBuildEvent")
+            return jsonerror.InternalServerError()
+        }
+        err = roomserverAPI.SendEvents(req.Context(), rsAPI, roomserverAPI.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, cfg.Matrix.ServerName, nil)
+        if  err != nil {
+            util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
+            return jsonerror.InternalServerError()
+        }
+    }
 
 	return util.JSONResponse{
 		Code: http.StatusOK,

@@ -154,6 +154,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	if err != nil {
 		return fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
 	}
+    response.RoomID = roomID
 	if roomID == "" {
 		response.Found = false
 		response.Removed = false

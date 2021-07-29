@@ -83,4 +83,6 @@ type RemoveRoomAliasResponse struct {
 	Found bool `json:"found"`
 	// Did we remove it?
 	Removed bool `json:"removed"`
+    // The room ID the alias refers to
+    RoomID string `json:"room_id"`
 }

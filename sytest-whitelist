@@ -542,3 +542,4 @@ Only room members can list aliases of a room
 Users with sufficient power-level can delete other's aliases
 Canonical alias can be set
 Canonical alias can include alt_aliases
+Can delete canonical alias

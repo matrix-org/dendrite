@@ -373,7 +373,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return RemoveLocalAlias(req, device, vars["roomAlias"], rsAPI)
+			return RemoveLocalAlias(req, device, vars["roomAlias"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodDelete, http.MethodOptions)
 	r0mux.Handle("/directory/list/room/{roomID}",
