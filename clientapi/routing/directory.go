@@ -223,7 +223,7 @@ func RemoveLocalAlias(
 		}
 	}
 
-    //if state contains alias
+    // Check if state contains removed alias
     stateTuple := gomatrixserverlib.StateKeyTuple{
         EventType: gomatrixserverlib.MRoomCanonicalAlias,
         StateKey:  "",
@@ -241,31 +241,39 @@ func RemoveLocalAlias(
     }
 
     inAliases := false
+    newAlias := ""
+    newAltAliases := []string{""}
+    // We try to get the current canonical_alias state, and if found compare its content
+    // to the removed alias
     if canonicalAliasEvent, ok := stateRes.StateEvents[stateTuple]; ok {
-        //var canonicalAliasContent *eventutil.CanonicalAlias
         canonicalAliasContent := eventutil.CanonicalAlias {
             Alias: "",
             AltAliases: []string{""},
         }
         err := json.Unmarshal(canonicalAliasEvent.Content(), &canonicalAliasContent)
         if err != nil {
-            util.GetLogger(req.Context()).WithError(err).Error("Get content failed")
+            util.GetLogger(req.Context()).WithError(err).Error("Get canonical_alias event content failed")
             resErr := jsonerror.InternalServerError()
             return resErr
         }
         if alias == canonicalAliasContent.Alias {
             inAliases = true
         } else {
-            for _, s := range(canonicalAliasContent.AltAliases) {
-                if alias == s {
-                    inAliases = true
-                    break
-                }
+            newAlias = canonicalAliasContent.Alias
+        }
+        for _, s := range(canonicalAliasContent.AltAliases) {
+            if alias == s {
+                inAliases = true
+            } else {
+                newAltAliases = append(newAltAliases, s)
             }
         }
     }
+    // If the alias removed is one of the alt_aliases or the canonical one,
+    // we need to also remove it from the canonical_alias event
     if inAliases {
         var stateKey = ""
+        // We create a new canonical_alias event with the new alias and alt_aliase
         // May cause some auth problems
         builder := gomatrixserverlib.EventBuilder {
             Sender:   device.UserID,
@@ -273,10 +281,9 @@ func RemoveLocalAlias(
             Type:     gomatrixserverlib.MRoomCanonicalAlias,
             StateKey: &stateKey,
         }
-        //TODO reconstruct original minus removed
         content := eventutil.CanonicalAlias {
-            Alias:      "",
-            AltAliases: make([]string, 0),
+            Alias:      newAlias,
+            AltAliases: newAltAliases,
         }
         err := builder.SetContent(content)
         if err != nil {
@@ -293,11 +300,13 @@ func RemoveLocalAlias(
             }
         }
 
+        // Build the event
         e, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, evTime, rsAPI, nil)
         if err != nil {
             util.GetLogger(req.Context()).WithError(err).Errorf("failed to QueryAndBuildEvent")
             return jsonerror.InternalServerError()
         }
+        // Send the event to the room server
         err = roomserverAPI.SendEvents(req.Context(), rsAPI, roomserverAPI.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, cfg.Matrix.ServerName, nil)
         if  err != nil {
             util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
