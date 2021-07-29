@@ -520,4 +520,3 @@ Inviting an AS-hosted user asks the AS server
 Can generate a openid access_token that can be exchanged for information about a user
 Invalid openid access tokens are rejected
 Requests to userinfo without access tokens are rejected
-Can get rooms/{roomId}/members at a given point
