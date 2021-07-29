@@ -52,17 +52,6 @@ type databaseJoinedMember struct {
 	AvatarURL   string `json:"avatar_url"`
 }
 
-// // MembershipFilter is an enum representing kinds of membership to a room
-// type MembershipFilter string
-
-// const (
-// 	MembershipDefault MembershipFilter = "none"
-// 	MembershipJoin    MembershipFilter = "join"
-// 	MembershipInvite  MembershipFilter = "invite"
-// 	MembershipLeave   MembershipFilter = "leave"
-// 	MembershipBan     MembershipFilter = "ban"
-// )
-
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
 	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
