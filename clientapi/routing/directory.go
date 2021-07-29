@@ -223,13 +223,41 @@ func RemoveLocalAlias(
 		}
 	}
 
-    // Check if state contains removed alias
+    var updatedCanonicalAlias *eventutil.CanonicalAlias
+    updated, resErr := getUpdatedCanonicalAliasState(req, device, queryRes.RoomID, alias, rsAPI, updatedCanonicalAlias)
+    if resErr != nil {
+        return *resErr;
+    }
+    // If the alias removed is one of the alt_aliases or the canonical one,
+    // we need to also remove it from the canonical_alias event
+    if updated {
+        resErr := updateCanonicalAlias(req, device, queryRes.RoomID, cfg, rsAPI, updatedCanonicalAlias)
+        if resErr != nil {
+            return *resErr;
+        }
+    }
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+func getUpdatedCanonicalAliasState(
+	req *http.Request,
+	device *api.Device,
+	roomID string,
+    alias string,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+    updatedCanonicalAlias *eventutil.CanonicalAlias,
+) ( bool, *util.JSONResponse ) {
+    updated := false
     stateTuple := gomatrixserverlib.StateKeyTuple{
         EventType: gomatrixserverlib.MRoomCanonicalAlias,
         StateKey:  "",
     }
     stateReq := roomserverAPI.QueryCurrentStateRequest {
-        RoomID:      queryRes.RoomID,
+        RoomID:      roomID,
         StateTuples: []gomatrixserverlib.StateKeyTuple{stateTuple},
     }
     stateRes := &roomserverAPI.QueryCurrentStateResponse{}
@@ -237,12 +265,13 @@ func RemoveLocalAlias(
     if err != nil {
         util.GetLogger(req.Context()).WithError(err).Error("Query state failed")
         resErr := jsonerror.InternalServerError()
-        return resErr
+        return false, &resErr
     }
 
-    inAliases := false
-    newAlias := ""
-    newAltAliases := []string{""}
+    updatedCanonicalAlias = &eventutil.CanonicalAlias {
+        Alias: "",
+        AltAliases: []string{""},
+    }
     // We try to get the current canonical_alias state, and if found compare its content
     // to the removed alias
     if canonicalAliasEvent, ok := stateRes.StateEvents[stateTuple]; ok {
@@ -254,70 +283,71 @@ func RemoveLocalAlias(
         if err != nil {
             util.GetLogger(req.Context()).WithError(err).Error("Get canonical_alias event content failed")
             resErr := jsonerror.InternalServerError()
-            return resErr
+            return false, &resErr
         }
         if alias == canonicalAliasContent.Alias {
-            inAliases = true
+            updated = true
         } else {
-            newAlias = canonicalAliasContent.Alias
+            updatedCanonicalAlias.Alias = canonicalAliasContent.Alias
         }
         for _, s := range(canonicalAliasContent.AltAliases) {
             if alias == s {
-                inAliases = true
+                updated = true
             } else {
-                newAltAliases = append(newAltAliases, s)
+                updatedCanonicalAlias.AltAliases = append(updatedCanonicalAlias.AltAliases, s)
             }
         }
     }
-    // If the alias removed is one of the alt_aliases or the canonical one,
-    // we need to also remove it from the canonical_alias event
-    if inAliases {
-        var stateKey = ""
-        // We create a new canonical_alias event with the new alias and alt_aliase
-        // May cause some auth problems
-        builder := gomatrixserverlib.EventBuilder {
-            Sender:   device.UserID,
-            RoomID:   queryRes.RoomID,
-            Type:     gomatrixserverlib.MRoomCanonicalAlias,
-            StateKey: &stateKey,
-        }
-        content := eventutil.CanonicalAlias {
-            Alias:      newAlias,
-            AltAliases: newAltAliases,
-        }
-        err := builder.SetContent(content)
-        if err != nil {
-            util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
-            resErr := jsonerror.InternalServerError()
-            return resErr
-        }
+    return updated, nil
+}
 
-        evTime, err := httputil.ParseTSParam(req)
-        if err != nil {
-            return util.JSONResponse{
-                Code: http.StatusBadRequest,
-                JSON: jsonerror.InvalidArgumentValue(err.Error()),
-            }
-        }
+func updateCanonicalAlias(
+	req *http.Request,
+	device *api.Device,
+	roomID string,
+    cfg *config.ClientAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+    updatedCanonicalAlias *eventutil.CanonicalAlias,
+) *util.JSONResponse {
+    var stateKey = ""
+    // We create a new canonical_alias event with the new alias and alt_aliase
+    // May cause some auth problems
+    builder := gomatrixserverlib.EventBuilder {
+        Sender:   device.UserID,
+        RoomID:   roomID,
+        Type:     gomatrixserverlib.MRoomCanonicalAlias,
+        StateKey: &stateKey,
+    }
+    err := builder.SetContent(updatedCanonicalAlias)
+    if err != nil {
+        util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+        resErr := jsonerror.InternalServerError()
+        return &resErr
+    }
 
-        // Build the event
-        e, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, evTime, rsAPI, nil)
-        if err != nil {
-            util.GetLogger(req.Context()).WithError(err).Errorf("failed to QueryAndBuildEvent")
-            return jsonerror.InternalServerError()
-        }
-        // Send the event to the room server
-        err = roomserverAPI.SendEvents(req.Context(), rsAPI, roomserverAPI.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, cfg.Matrix.ServerName, nil)
-        if  err != nil {
-            util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
-            return jsonerror.InternalServerError()
+    evTime, err := httputil.ParseTSParam(req)
+    if err != nil {
+        return &util.JSONResponse{
+            Code: http.StatusBadRequest,
+            JSON: jsonerror.InvalidArgumentValue(err.Error()),
         }
     }
 
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: struct{}{},
-	}
+    // Build the event
+    e, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, evTime, rsAPI, nil)
+    if err != nil {
+        util.GetLogger(req.Context()).WithError(err).Errorf("failed to QueryAndBuildEvent")
+        resErr := jsonerror.InternalServerError()
+        return &resErr
+    }
+    // Send the event to the room server
+    err = roomserverAPI.SendEvents(req.Context(), rsAPI, roomserverAPI.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, cfg.Matrix.ServerName, nil)
+    if  err != nil {
+        util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
+        resErr := jsonerror.InternalServerError()
+        return &resErr
+    }
+    return nil
 }
 
 type roomVisibility struct {
