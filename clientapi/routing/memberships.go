@@ -17,6 +17,7 @@ package routing
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -68,30 +69,45 @@ func GetMemberships(
 	_ *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
-	// how would i unpack this nicely into
-	// type queryParams struct {
-	// 	membership string
-	// 	notMembership string
-	// }
 	membership := req.URL.Query().Get("membership")
 	notMembership := req.URL.Query().Get("not_membership")
-	membershipStatusFilter := []string{"join", "invite", "leave", "ban"}
-	if len(notMembership) > 0 {
-		for i, v := range membershipStatusFilter {
-			if v == notMembership {
-				membershipStatusFilter = append(membershipStatusFilter[:i], membershipStatusFilter[i+1:]...)
+
+	regexpMembershipFilter, _ := regexp.Compile("join|invite|leave|ban")
+	if membership != "" && !regexpMembershipFilter.MatchString(membership) {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+		}
+	}
+	if notMembership != "" && !regexpMembershipFilter.MatchString(notMembership) {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+		}
+	}
+
+	membershipFilter := []string{"join", "invite", "leave", "ban"}
+
+	if notMembership != "" {
+		if membership != "" && membership != notMembership {
+			for idx, val := range membershipFilter {
+				if val == notMembership {
+					membershipFilter = append(membershipFilter[:idx], membershipFilter[idx+1:]...)
+					break
+				}
 			}
 		}
-	} else if len(membership) > 0 {
-		membershipStatusFilter = []string{membership}
+		// If membership and not_membership are both specified and they are the same,
+		// then we do no filtering at all because they create an OR conditional
 	} else {
-		membershipStatusFilter = []string{}
+		if membership != "" {
+			membershipFilter = []string{membership}
+		}
 	}
+
 	queryReq := api.QueryMembershipsForRoomRequest{
-		JoinedOnly:             joinedOnly,
-		MembershipStatusFilter: membershipStatusFilter,
-		RoomID:                 roomID,
-		Sender:                 device.UserID,
+		JoinedOnly:       joinedOnly,
+		MembershipFilter: membershipFilter,
+		RoomID:           roomID,
+		Sender:           device.UserID,
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
 	if err := rsAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {

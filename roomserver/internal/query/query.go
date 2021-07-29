@@ -251,7 +251,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	if request.Sender == "" {
 		var events []types.Event
 		var eventNIDs []types.EventNID
-		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.MembershipStatusFilter, false)
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, request.MembershipFilter, false)
 		if err != nil {
 			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
 		}
@@ -286,7 +286,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	var stateEntries []types.StateEntry
 	if stillInRoom {
 		var eventNIDs []types.EventNID
-		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.MembershipStatusFilter, false)
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, request.MembershipFilter, false)
 		if err != nil {
 			return err
 		}
@@ -328,7 +328,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	}
 	response.RoomExists = true
 
-	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, []string{"join"}, false)
+	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, []string{}, false)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
 	}

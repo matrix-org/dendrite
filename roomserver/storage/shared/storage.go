@@ -343,13 +343,20 @@ func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, req
 }
 
 func (d *Database) GetMembershipEventNIDsForRoom(
-	ctx context.Context, roomNID types.RoomNID, membershipStatusFilter []string, localOnly bool,
+	ctx context.Context, roomNID types.RoomNID, joinOnly bool, membershipFilter []string, localOnly bool,
 ) ([]types.EventNID, error) {
-	var eventNIDs []types.EventNID
-	var filteredEventNIDs []types.EventNID
-	var err error
-	if len(membershipStatusFilter) > 0 {
-		for _, filter := range membershipStatusFilter {
+	if joinOnly {
+		return d.MembershipTable.SelectMembershipsFromRoomAndMembership(
+			ctx, roomNID, tables.MembershipStateJoin, localOnly,
+		)
+	}
+
+	if len(membershipFilter) > 0 {
+		var eventNIDs []types.EventNID
+		var filteredEventNIDs []types.EventNID
+		var err error
+		leaveOrBan := false
+		for _, filter := range membershipFilter {
 			if filter == "join" {
 				filteredEventNIDs, err = d.MembershipTable.SelectMembershipsFromRoomAndMembership(
 					ctx, roomNID, tables.MembershipStateJoin, localOnly,
@@ -358,7 +365,8 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 					return eventNIDs, err
 				}
 				eventNIDs = append(eventNIDs, filteredEventNIDs...)
-			} else if filter == "invite" {
+			}
+			if filter == "invite" {
 				filteredEventNIDs, err = d.MembershipTable.SelectMembershipsFromRoomAndMembership(
 					ctx, roomNID, tables.MembershipStateInvite, localOnly,
 				)
@@ -366,7 +374,8 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 					return eventNIDs, err
 				}
 				eventNIDs = append(eventNIDs, filteredEventNIDs...)
-			} else {
+			}
+			if (filter == "ban" || filter == "leave") && !leaveOrBan {
 				filteredEventNIDs, err = d.MembershipTable.SelectMembershipsFromRoomAndMembership(
 					ctx, roomNID, tables.MembershipStateLeaveOrBan, localOnly,
 				)
@@ -374,6 +383,7 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 					return eventNIDs, err
 				}
 				eventNIDs = append(eventNIDs, filteredEventNIDs...)
+				leaveOrBan = true
 			}
 		}
 		return eventNIDs, err

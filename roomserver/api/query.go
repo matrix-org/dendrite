@@ -148,8 +148,10 @@ type QueryMembershipForUserResponse struct {
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
 type QueryMembershipsForRoomRequest struct {
 	// If true, only returns the membership events of "join" membership
-	JoinedOnly             bool     `json:"joined_only"`
-	MembershipStatusFilter []string `json:"membership_status_filter"`
+	JoinedOnly bool `json:"joined_only"`
+	// The kinds of membership to filter for - returns the membership
+	// events with the appropriate filter (ie. join, invite, leave, ban)
+	MembershipFilter []string `json:"membership_filter"`
 	// ID of the room to fetch memberships from
 	RoomID string `json:"room_id"`
 	// Optional - ID of the user sending the request, for checking if the
