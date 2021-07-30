@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	types2 "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/types"
 )
 
@@ -57,9 +58,13 @@ const selectPresenceForUserSQL = "" +
 	" FROM presence_presences" +
 	" WHERE user_id = $1 LIMIT 1"
 
+const selectMaxPresenceSQL = "" +
+	"SELECT MAX(id) FROM presence_presences"
+
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
+	selectMaxPresenceStmt      *sql.Stmt
 }
 
 func (p *presenceStatements) execSchema(db *sql.DB) error {
@@ -72,6 +77,9 @@ func (p *presenceStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if p.selectPresenceForUsersStmt, err = db.Prepare(selectPresenceForUserSQL); err != nil {
+		return
+	}
+	if p.selectMaxPresenceStmt, err = db.Prepare(selectMaxPresenceSQL); err != nil {
 		return
 	}
 	return
@@ -100,10 +108,16 @@ func (p *presenceStatements) UpsertPresence(
 func (p *presenceStatements) GetPresenceForUser(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
-) (presence api.OutputPresence, err error) {
+) (presence api.OutputPresenceData, err error) {
 	presence.UserID = userID
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
 
 	err = stmt.QueryRowContext(ctx, userID).Scan(&presence.Presence, &presence.StatusMsg, &presence.LastActiveTS)
+	return
+}
+
+func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types2.StreamingToken, err error) {
+	stmt := sqlutil.TxStmt(txn, p.selectMaxPresenceStmt)
+	err = stmt.QueryRowContext(ctx).Scan(&pos)
 	return
 }

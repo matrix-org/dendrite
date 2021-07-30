@@ -42,9 +42,9 @@ func TestNewSyncTokenWithLogs(t *testing.T) {
 
 func TestSyncTokens(t *testing.T) {
 	shouldPass := map[string]string{
-		"s4_0_0_0_0_0":        StreamingToken{4, 0, 0, 0, 0, 0, LogPosition{}}.String(),
-		"s3_1_0_0_0_0.dl-1-2": StreamingToken{3, 1, 0, 0, 0, 0, LogPosition{1, 2}}.String(),
-		"s3_1_2_3_5_0":        StreamingToken{3, 1, 2, 3, 5, 0, LogPosition{}}.String(),
+		"s4_0_0_0_0_0":        StreamingToken{4, 0, 0, 0, 0, 0, 0, LogPosition{}}.String(),
+		"s3_1_0_0_0_0.dl-1-2": StreamingToken{3, 1, 0, 0, 0, 0, 0, LogPosition{1, 2}}.String(),
+		"s3_1_2_3_5_0":        StreamingToken{3, 1, 2, 3, 5, 0, 0, LogPosition{}}.String(),
 		"t3_1":                TopologyToken{3, 1}.String(),
 	}
 

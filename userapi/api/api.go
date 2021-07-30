@@ -343,7 +343,9 @@ type InputPresenceRequest struct {
 }
 
 // InputPresenceResponse is the response for InputPresenceRequest
-type InputPresenceResponse struct{}
+type InputPresenceResponse struct {
+	StreamPos int64
+}
 
 // QueryPresenceForUserRequest is the request for QueryPresenceForUserRequest
 type QueryPresenceForUserRequest struct {

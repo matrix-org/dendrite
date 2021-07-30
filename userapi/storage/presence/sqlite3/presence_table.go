@@ -93,7 +93,7 @@ func (p *presenceStatements) UpsertPresence(
 func (p *presenceStatements) GetPresenceForUser(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
-) (presence api.OutputPresence, err error) {
+) (presence api.OutputPresenceData, err error) {
 	presence.UserID = userID
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
 

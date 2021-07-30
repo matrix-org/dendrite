@@ -124,6 +124,7 @@ type StreamingToken struct {
 	SendToDevicePosition StreamPosition
 	InvitePosition       StreamPosition
 	AccountDataPosition  StreamPosition
+	PresenceDataPostion  StreamPosition
 	DeviceListPosition   LogPosition
 }
 

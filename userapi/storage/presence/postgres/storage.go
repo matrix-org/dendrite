@@ -53,6 +53,6 @@ func (d *Database) UpsertPresence(
 	return
 }
 
-func (d *Database) GetPresenceForUser(ctx context.Context, userID string) (api.OutputPresence, error) {
+func (d *Database) GetPresenceForUser(ctx context.Context, userID string) (api.OutputPresenceData, error) {
 	return d.presence.GetPresenceForUser(ctx, nil, userID)
 }

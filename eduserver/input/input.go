@@ -221,11 +221,12 @@ func (t *EDUServerInputAPI) InputPresence(
 		"status":     request.Presence,
 		"status_msg": request.StatusMsg,
 	}).Infof("Producing to topic '%s'", t.OutputPresenceTopic)
-	output := &api.OutputPresence{
+	output := &api.OutputPresenceData{
 		UserID:       request.UserID,
 		Presence:     request.Presence,
 		StatusMsg:    request.StatusMsg,
 		LastActiveTS: request.LastActiveTS,
+		StreamPos:    request.StreamPos,
 	}
 	js, err := json.Marshal(output)
 	if err != nil {

@@ -20,6 +20,7 @@ package api
 import (
 	"context"
 
+	types2 "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -81,7 +82,8 @@ type InputPresenceRequest struct {
 	UserID       string                      `json:"user_id"`
 	Presence     types.PresenceStatus        `json:"status"`
 	StatusMsg    string                      `json:"status_msg"`
-	LastActiveTS gomatrixserverlib.Timestamp `json:"timestamp"`
+	LastActiveTS gomatrixserverlib.Timestamp `json:"last_active_ts"`
+	StreamPos    types2.StreamPosition       `json:"stream_pos"`
 }
 
 // InputPresenceResponse is a response to InputPresenceRequest
