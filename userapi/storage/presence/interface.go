@@ -34,4 +34,8 @@ type Database interface {
 		ctx context.Context,
 		userID string,
 	) (presence api.OutputPresenceData, err error)
+	GetPresenceAfter(
+		ctx context.Context,
+		pos int64,
+	) (presence []api.OutputPresenceData, err error)
 }

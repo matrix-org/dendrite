@@ -60,8 +60,12 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 }
 
 func (a *UserInternalAPI) InputPresenceData(ctx context.Context, req *api.InputPresenceRequest, res *api.InputPresenceResponse) error {
-	_, err := a.PresenceDB.UpsertPresence(ctx, req.UserID, req.StatusMsg, req.Presence, req.LastActiveTS)
-	return err
+	pos, err := a.PresenceDB.UpsertPresence(ctx, req.UserID, req.StatusMsg, req.Presence, req.LastActiveTS)
+	if err != nil {
+		return err
+	}
+	res.StreamPos = pos
+	return nil
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
@@ -482,6 +486,27 @@ func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.Que
 	if maxLastSeen > p.LastActiveTS.Time().Unix() {
 		res.LastActiveTS = gomatrixserverlib.Timestamp(maxLastSeen)
 	}
+	return nil
+}
+
+func (a *UserInternalAPI) QueryPresenceAfter(ctx context.Context, req *api.QueryPresenceAfterRequest, res *api.QueryPresenceAfterResponse) error {
+	p, err := a.PresenceDB.GetPresenceAfter(ctx, req.StreamPos)
+	if err != nil {
+		return err
+	}
+	presences := []api.QueryPresenceForUserResponse{}
+	for _, x := range p {
+		var y api.QueryPresenceForUserResponse
+		y.UserID = x.UserID
+		y.Presence = x.Presence.String()
+		y.StreamPos = int64(x.StreamPos)
+		y.LastActiveTS = x.LastActiveTS
+		y.LastActiveAgo = x.LastActiveAgo
+		y.PresenceStatus = x.Presence
+		y.StatusMsg = x.StatusMsg
+		presences = append(presences, y)
+	}
+	res.Presences = append(res.Presences, presences...)
 	return nil
 }
 

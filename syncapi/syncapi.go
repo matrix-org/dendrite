@@ -108,5 +108,12 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
+	presenceConsumer := consumers.NewOutputPresenceDataConsumer(
+		process, cfg, consumer, syncDB, notifier, streams.PresenceDataStreamProdiver,
+	)
+	if err = presenceConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start presence consumer")
+	}
+
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
 }

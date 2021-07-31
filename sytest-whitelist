@@ -552,3 +552,4 @@ Can delete backup
 Deleted & recreated backups are empty
 GET /presence/:user_id/status fetches initial status
 PUT /presence/:user_id/status updates my presence
+Presence change reports an event to myself

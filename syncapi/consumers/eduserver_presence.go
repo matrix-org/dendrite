@@ -74,7 +74,6 @@ func (s *OutputPresenceDataConsumer) Start() error {
 }
 
 func (s *OutputPresenceDataConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	log.Debug("presence received by sync api!")
 	var output api.OutputPresenceData
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
@@ -85,7 +84,7 @@ func (s *OutputPresenceDataConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 	log.Debugf("presence received by sync api! %+v", output)
 
 	s.stream.Advance(output.StreamPos)
-	s.notifier.OnNewPresence(types.StreamingToken{PresenceDataPostion: output.StreamPos}, output.UserID)
+	s.notifier.OnNewPresence(types.StreamingToken{PresenceDataPosition: output.StreamPos}, output.UserID)
 
 	return nil
 }

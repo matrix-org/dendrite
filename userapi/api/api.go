@@ -45,6 +45,7 @@ type UserInternalAPI interface {
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryPresenceForUser(ctx context.Context, req *QueryPresenceForUserRequest, res *QueryPresenceForUserResponse) error
+	QueryPresenceAfter(ctx context.Context, req *QueryPresenceAfterRequest, res *QueryPresenceAfterResponse) error
 }
 
 type PerformKeyBackupRequest struct {
@@ -354,12 +355,24 @@ type QueryPresenceForUserRequest struct {
 
 // QueryPresenceForUserResponse is the response for QueryPresenceForUserRequest
 type QueryPresenceForUserResponse struct {
-	PresenceStatus  types.PresenceStatus
-	Presence        string
-	StatusMsg       string
-	LastActiveTS    gomatrixserverlib.Timestamp
-	LastActiveAgo   int64
-	CurrentlyActive bool
+	UserID          string                      `json:"user_id"`
+	PresenceStatus  types.PresenceStatus        `json:"presence_status"`
+	Presence        string                      `json:"presence"`
+	StatusMsg       string                      `json:"status_msg"`
+	LastActiveTS    gomatrixserverlib.Timestamp `json:"last_active_ts"`
+	LastActiveAgo   int64                       `json:"last_active_ago"`
+	CurrentlyActive bool                        `json:"currently_active"`
+	StreamPos       int64                       `json:"stream_pos"`
+}
+
+// QueryPresenceAfterRequest is the request for QueryPresenceAfterRequest
+type QueryPresenceAfterRequest struct {
+	StreamPos int64
+}
+
+// QueryPresenceAfterResponse is the response for QueryPresenceAfterRequest
+type QueryPresenceAfterResponse struct {
+	Presences []QueryPresenceForUserResponse
 }
 
 // Device represents a client's device (mobile, web, etc)

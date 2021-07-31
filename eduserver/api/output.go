@@ -93,7 +93,7 @@ type OutputPresenceData struct {
 	UserID        string                      `json:"user_id"`
 	Presence      types.PresenceStatus        `json:"presence"`
 	StatusMsg     string                      `json:"status_msg,omitempty"`
-	LastActiveTS  gomatrixserverlib.Timestamp `json:"-"`
+	LastActiveTS  gomatrixserverlib.Timestamp `json:"last_active_ts"`
 	LastActiveAgo int64                       `json:"last_active_ago,omitempty"`
-	StreamPos     types2.StreamPosition
+	StreamPos     types2.StreamPosition       `json:"stream_pos"`
 }

@@ -124,7 +124,7 @@ type StreamingToken struct {
 	SendToDevicePosition StreamPosition
 	InvitePosition       StreamPosition
 	AccountDataPosition  StreamPosition
-	PresenceDataPostion  StreamPosition
+	PresenceDataPosition StreamPosition
 	DeviceListPosition   LogPosition
 }
 
@@ -141,10 +141,11 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
 		t.InvitePosition, t.AccountDataPosition,
+		t.PresenceDataPosition,
 	)
 	if dl := t.DeviceListPosition; !dl.IsEmpty() {
 		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
@@ -169,12 +170,15 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
 		return true
+	case t.PresenceDataPosition > other.PresenceDataPosition:
+		return true
 	}
+
 	return false
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition == 0 && t.DeviceListPosition.IsEmpty()
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.PresenceDataPosition == 0 && t.DeviceListPosition.IsEmpty()
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -211,6 +215,9 @@ func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	}
 	if other.DeviceListPosition.IsAfter(&t.DeviceListPosition) {
 		t.DeviceListPosition = other.DeviceListPosition
+	}
+	if other.PresenceDataPosition > t.PresenceDataPosition {
+		t.PresenceDataPosition = other.PresenceDataPosition
 	}
 }
 
@@ -302,7 +309,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	}
 	categories := strings.Split(tok[1:], ".")
 	parts := strings.Split(categories[0], "_")
-	var positions [6]StreamPosition
+	var positions [7]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -321,6 +328,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		SendToDevicePosition: positions[3],
 		InvitePosition:       positions[4],
 		AccountDataPosition:  positions[5],
+		PresenceDataPosition: positions[6],
 	}
 	// dl-0-1234
 	// $log_name-$partition-$offset

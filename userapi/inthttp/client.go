@@ -47,6 +47,7 @@ const (
 	QuerySearchProfilesPath  = "/userapi/querySearchProfiles"
 	QueryOpenIDTokenPath     = "/userapi/queryOpenIDToken"
 	QueryPresenceForUserPath = "/userapi/queryPresenceForUser"
+	QueryPresenceAfterPath   = "/userapi/queryPresenceAfter"
 	QueryKeyBackupPath       = "/userapi/queryKeyBackup"
 )
 
@@ -266,4 +267,12 @@ func (h *httpUserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.Query
 	if err != nil {
 		res.Error = err.Error()
 	}
+}
+
+func (h *httpUserInternalAPI) QueryPresenceAfter(ctx context.Context, req *api.QueryPresenceAfterRequest, res *api.QueryPresenceAfterResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPresenceAfter")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryPresenceAfterPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

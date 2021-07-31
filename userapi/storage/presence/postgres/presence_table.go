@@ -45,7 +45,7 @@ CREATE INDEX IF NOT EXISTS presence_presences_user_id ON presence_presences(user
 `
 
 const upsertPresenceSQL = "" +
-	"INSERT INTO presence_presences" +
+	"INSERT INTO presence_presences AS p" +
 	" (user_id, presence, status_msg, last_active_ts)" +
 	" VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (user_id)" +
@@ -61,10 +61,16 @@ const selectPresenceForUserSQL = "" +
 const selectMaxPresenceSQL = "" +
 	"SELECT MAX(id) FROM presence_presences"
 
+const selectPresenceAfter = "" +
+	" SELECT id, user_id, presence, status_msg, last_active_ts" +
+	" FROM presence_presences" +
+	" WHERE id > $1"
+
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
 	selectMaxPresenceStmt      *sql.Stmt
+	selectPresenceAfterStmt    *sql.Stmt
 }
 
 func (p *presenceStatements) execSchema(db *sql.DB) error {
@@ -80,6 +86,9 @@ func (p *presenceStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if p.selectMaxPresenceStmt, err = db.Prepare(selectMaxPresenceSQL); err != nil {
+		return
+	}
+	if p.selectPresenceAfterStmt, err = db.Prepare(selectPresenceAfter); err != nil {
 		return
 	}
 	return
@@ -120,4 +129,25 @@ func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) 
 	stmt := sqlutil.TxStmt(txn, p.selectMaxPresenceStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&pos)
 	return
+}
+
+// GetPresenceAfter returns the changes presences after a given stream id
+func (p *presenceStatements) GetPresenceAfter(
+	ctx context.Context, txn *sql.Tx,
+	after int64,
+) (presences []api.OutputPresenceData, err error) {
+	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
+
+	rows, err := stmt.QueryContext(ctx, after)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		presence := api.OutputPresenceData{}
+		if err := rows.Scan(&presence.StreamPos, &presence.UserID, &presence.Presence, &presence.StatusMsg, &presence.LastActiveTS); err != nil {
+			return nil, err
+		}
+		presences = append(presences, presence)
+	}
+	return presences, rows.Err()
 }

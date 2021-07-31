@@ -260,4 +260,17 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(QueryPresenceAfterPath,
+		httputil.MakeInternalAPI("queryPresenceAfter", func(req *http.Request) util.JSONResponse {
+			request := api.QueryPresenceAfterRequest{}
+			response := api.QueryPresenceAfterResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.QueryPresenceAfter(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

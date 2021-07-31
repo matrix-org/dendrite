@@ -171,7 +171,7 @@ func GetPresence(req *http.Request,
 	resp := presenceResponse{}
 	lastActive := time.Since(presence.LastActiveTS.Time())
 	resp.LastActiveAgo = lastActive.Milliseconds()
-
+	resp.StatusMsg = presence.StatusMsg
 	resp.CurrentlyActive = lastActive <= time.Minute*5
 	if !resp.CurrentlyActive {
 		presence.PresenceStatus = types.Unavailable

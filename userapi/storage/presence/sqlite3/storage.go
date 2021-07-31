@@ -70,3 +70,7 @@ func (d *Database) UpsertPresence(
 func (d *Database) GetPresenceForUser(ctx context.Context, userID string) (api.OutputPresenceData, error) {
 	return d.presence.GetPresenceForUser(ctx, nil, userID)
 }
+
+func (d *Database) GetPresenceAfter(ctx context.Context, pos int64) (presence []api.OutputPresenceData, err error) {
+	return d.presence.GetPresenceAfter(ctx, nil, pos)
+}

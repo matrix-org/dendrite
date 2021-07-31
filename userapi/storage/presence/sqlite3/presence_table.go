@@ -56,9 +56,15 @@ const selectPresenceForUserSQL = "" +
 	" FROM presence_presences" +
 	" WHERE user_id = $1 LIMIT 1"
 
+const selectPresenceAfter = "" +
+	" SELECT id, user_id, presence, status_msg, last_active_ts" +
+	" FROM presence_presences" +
+	" WHERE id > $1"
+
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
+	selectPresenceAfterStmt    *sql.Stmt
 }
 
 func (p *presenceStatements) execSchema(db *sql.DB) error {
@@ -71,6 +77,9 @@ func (p *presenceStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if p.selectPresenceForUsersStmt, err = db.Prepare(selectPresenceForUserSQL); err != nil {
+		return
+	}
+	if p.selectPresenceAfterStmt, err = db.Prepare(selectPresenceAfter); err != nil {
 		return
 	}
 	return
@@ -99,4 +108,25 @@ func (p *presenceStatements) GetPresenceForUser(
 
 	err = stmt.QueryRowContext(ctx, userID).Scan(&presence.Presence, &presence.StatusMsg, &presence.LastActiveTS)
 	return
+}
+
+// GetPresenceAfter returns the changes presences after a given stream id
+func (p *presenceStatements) GetPresenceAfter(
+	ctx context.Context, txn *sql.Tx,
+	after int64,
+) (presences []api.OutputPresenceData, err error) {
+	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
+
+	rows, err := stmt.QueryContext(ctx, after)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		presence := api.OutputPresenceData{}
+		if err := rows.Scan(&presence.StreamPos, &presence.UserID, &presence.Presence, &presence.StatusMsg, &presence.LastActiveTS); err != nil {
+			return nil, err
+		}
+		presences = append(presences, presence)
+	}
+	return presences, rows.Err()
 }
