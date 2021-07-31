@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	types2 "github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -83,32 +82,7 @@ func SetPresence(req *http.Request,
 	}
 
 	lastActive := gomatrixserverlib.AsTimestamp(time.Now())
-
-	pReq := userapi.InputPresenceRequest{
-		UserID:       userID,
-		DisplayName:  device.DisplayName,
-		Presence:     p,
-		StatusMsg:    r.StatusMsg,
-		LastActiveTS: int64(lastActive),
-	}
-	pRes := userapi.InputPresenceResponse{}
-
-	// send presence data directly to the userapi
-	if err := userAPI.InputPresenceData(req.Context(), &pReq, &pRes); err != nil {
-		logrus.WithError(err).Error("failed to set presence")
-		return util.ErrorResponse(err)
-	}
-
-	eduReq := api.InputPresenceRequest{
-		UserID:       userID,
-		Presence:     p,
-		StatusMsg:    r.StatusMsg,
-		LastActiveTS: lastActive,
-		StreamPos:    types2.StreamPosition(pRes.StreamPos),
-	}
-	eduRes := api.InputPresenceResponse{}
-	// TODO: Inform EDU Server to send new presence to the federationsender/syncapi
-	if err := eduAPI.InputPresence(req.Context(), &eduReq, &eduRes); err != nil {
+	if err := api.SetPresence(req.Context(), eduAPI, userAPI, userID, r.StatusMsg, p, lastActive); err != nil {
 		logrus.WithError(err).Error("failed to send presence to eduserver")
 		return util.ErrorResponse(err)
 	}
