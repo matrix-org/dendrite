@@ -1,5 +1,7 @@
 module github.com/matrix-org/dendrite
 
+replace github.com/matrix-org/gomatrixserverlib => ../gomatrixserverlib
+
 require (
 	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
 	github.com/DATA-DOG/go-sqlmock v1.5.0
