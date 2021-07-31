@@ -343,6 +343,10 @@ type testUserAPI struct {
 	accessTokens map[string]userapi.Device
 }
 
+func (u *testUserAPI) QueryPresenceAfter(ctx context.Context, req *userapi.QueryPresenceAfterRequest, res *userapi.QueryPresenceAfterResponse) error {
+	return nil
+}
+
 func (u *testUserAPI) InputPresenceData(ctx context.Context, req *userapi.InputPresenceRequest, res *userapi.InputPresenceResponse) error {
 	return nil
 }
