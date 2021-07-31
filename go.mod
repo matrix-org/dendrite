@@ -1,6 +1,6 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/matrix-org/gomatrixserverlib => ../gomatrixserverlib
+replace github.com/matrix-org/gomatrixserverlib => github.com/S7evinK/gomatrixserverlib v0.0.0-20210731142023-4060a37948a5
 
 require (
 	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
