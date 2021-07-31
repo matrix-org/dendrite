@@ -97,3 +97,6 @@ type OutputPresenceData struct {
 	LastActiveAgo int64                       `json:"last_active_ago,omitempty"`
 	StreamPos     types2.StreamPosition       `json:"stream_pos"`
 }
+
+type FederationPresenceData struct {
+}

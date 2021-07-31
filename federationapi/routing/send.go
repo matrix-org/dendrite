@@ -502,6 +502,13 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 					}
 				}
 			}
+		case gomatrixserverlib.MPresence:
+			payload := eduserverAPI.FederationPresenceData{}
+			util.GetLogger(ctx).Debug("%s", e.Content)
+			if err := json.Unmarshal(e.Content, &payload); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal presence event")
+				continue
+			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}
