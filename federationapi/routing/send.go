@@ -30,6 +30,8 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -159,6 +161,7 @@ func Send(
 	rsAPI api.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
 	keyAPI keyapi.KeyInternalAPI,
+	userAPI userapi.UserInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	mu *internal.MutexByRoom,
@@ -167,6 +170,7 @@ func Send(
 	t := txnReq{
 		rsAPI:      rsAPI,
 		eduAPI:     eduAPI,
+		userAPI:    userAPI,
 		keys:       keys,
 		federation: federation,
 		hadEvents:  make(map[string]bool),
@@ -226,6 +230,7 @@ type txnReq struct {
 	rsAPI      api.RoomserverInternalAPI
 	eduAPI     eduserverAPI.EDUServerInputAPI
 	keyAPI     keyapi.KeyInternalAPI
+	userAPI    userapi.UserInternalAPI
 	keys       gomatrixserverlib.JSONVerifier
 	federation txnFederationClient
 	roomsMu    *internal.MutexByRoom
@@ -503,11 +508,19 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case gomatrixserverlib.MPresence:
+			now := time.Now()
 			payload := eduserverAPI.FederationPresenceData{}
 			if err := json.Unmarshal(e.Content, &payload); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal presence event")
 				continue
 			}
+			for _, presence := range payload.Push {
+				timestamp := gomatrixserverlib.AsTimestamp(now.Add(-(time.Millisecond * time.Duration(presence.LastActiveAgo))))
+				if err := eduserverAPI.SetPresence(ctx, t.eduAPI, t.userAPI, presence.UserID, presence.StatusMsg, types.ToPresenceStatus(presence.Presence), timestamp); err != nil {
+					util.GetLogger(ctx).WithError(err).Error("unable to send presence data to edu server")
+				}
+			}
+
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}
