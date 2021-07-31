@@ -20,7 +20,7 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -67,7 +67,7 @@ func createEventJSONTable(db *sql.DB) error {
 func prepareEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
 	s := &eventJSONStatements{}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertEventJSONStmt, insertEventJSONSQL},
 		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},
 	}.Prepare(db)

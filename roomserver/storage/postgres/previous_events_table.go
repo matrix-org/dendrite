@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -73,7 +72,7 @@ func createPrevEventsTable(db *sql.DB) error {
 func preparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
 	s := &previousEventStatements{}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
 		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},
 	}.Prepare(db)

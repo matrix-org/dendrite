@@ -19,7 +19,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -69,7 +68,7 @@ func prepareRedactionsTable(db *sql.DB) (tables.Redactions, error) {
 		db: db,
 	}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertRedactionStmt, insertRedactionSQL},
 		{&s.selectRedactionInfoByRedactionEventIDStmt, selectRedactionInfoByRedactionEventIDSQL},
 		{&s.selectRedactionInfoByEventBeingRedactedStmt, selectRedactionInfoByEventBeingRedactedSQL},
