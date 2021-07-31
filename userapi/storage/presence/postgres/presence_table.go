@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS presence_presences (
 	-- The actual presence
 	presence INT NOT NULL,
 	-- The status message
-	status_msg TEXT,
+	status_msg TEXT NOT NULL,
 	-- The last time an action was received by this user
 	last_active_ts BIGINT NOT NULL,
 	CONSTRAINT presence_presences_unique UNIQUE (user_id)
@@ -102,13 +102,7 @@ func (p *presenceStatements) UpsertPresence(
 	lastActiveTS int64,
 ) (pos int64, err error) {
 	stmt := sqlutil.TxStmt(txn, p.upsertPresenceStmt)
-	msg := &statusMsg
-	// avoid clearing status_msg when going idle
-	// makes it impossible to delete status_msg, though..
-	if statusMsg == "" {
-		msg = nil
-	}
-	err = stmt.QueryRowContext(ctx, userID, presence, msg, lastActiveTS).Scan(&pos)
+	err = stmt.QueryRowContext(ctx, userID, presence, statusMsg, lastActiveTS).Scan(&pos)
 	return
 }
 
