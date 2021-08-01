@@ -25,7 +25,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -131,7 +130,7 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		db: db,
 	}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},

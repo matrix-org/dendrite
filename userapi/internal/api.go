@@ -442,3 +442,114 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 
 	return nil
 }
+
+func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+	// Delete metadata
+	if req.DeleteBackup {
+		if req.Version == "" {
+			res.BadInput = true
+			res.Error = "must specify a version to delete"
+			return
+		}
+		exists, err := a.AccountDB.DeleteKeyBackup(ctx, req.UserID, req.Version)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to delete backup: %s", err)
+		}
+		res.Exists = exists
+		res.Version = req.Version
+		return
+	}
+	// Create metadata
+	if req.Version == "" {
+		version, err := a.AccountDB.CreateKeyBackup(ctx, req.UserID, req.Algorithm, req.AuthData)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to create backup: %s", err)
+		}
+		res.Exists = err == nil
+		res.Version = version
+		return
+	}
+	// Update metadata
+	if len(req.Keys.Rooms) == 0 {
+		err := a.AccountDB.UpdateKeyBackupAuthData(ctx, req.UserID, req.Version, req.AuthData)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to update backup: %s", err)
+		}
+		res.Exists = err == nil
+		res.Version = req.Version
+		return
+	}
+	// Upload Keys for a specific version metadata
+	a.uploadBackupKeys(ctx, req, res)
+}
+
+func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+	// you can only upload keys for the CURRENT version
+	version, _, _, _, deleted, err := a.AccountDB.GetKeyBackup(ctx, req.UserID, "")
+	if err != nil {
+		res.Error = fmt.Sprintf("failed to query version: %s", err)
+		return
+	}
+	if deleted {
+		res.Error = "backup was deleted"
+		return
+	}
+	if version != req.Version {
+		res.BadInput = true
+		res.Error = fmt.Sprintf("%s isn't the current version, %s is.", req.Version, version)
+		return
+	}
+	res.Exists = true
+	res.Version = version
+
+	// map keys to a form we can upload more easily - the map ensures we have no duplicates.
+	var uploads []api.InternalKeyBackupSession
+	for roomID, data := range req.Keys.Rooms {
+		for sessionID, sessionData := range data.Sessions {
+			uploads = append(uploads, api.InternalKeyBackupSession{
+				RoomID:           roomID,
+				SessionID:        sessionID,
+				KeyBackupSession: sessionData,
+			})
+		}
+	}
+	count, etag, err := a.AccountDB.UpsertBackupKeys(ctx, version, req.UserID, uploads)
+	if err != nil {
+		res.Error = fmt.Sprintf("failed to upsert keys: %s", err)
+		return
+	}
+	res.KeyCount = count
+	res.KeyETag = etag
+}
+
+func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
+	version, algorithm, authData, etag, deleted, err := a.AccountDB.GetKeyBackup(ctx, req.UserID, req.Version)
+	res.Version = version
+	if err != nil {
+		if err == sql.ErrNoRows {
+			res.Exists = false
+			return
+		}
+		res.Error = fmt.Sprintf("failed to query key backup: %s", err)
+		return
+	}
+	res.Algorithm = algorithm
+	res.AuthData = authData
+	res.ETag = etag
+	res.Exists = !deleted
+
+	if !req.ReturnKeys {
+		res.Count, err = a.AccountDB.CountBackupKeys(ctx, version, req.UserID)
+		if err != nil {
+			res.Error = fmt.Sprintf("failed to count keys: %s", err)
+		}
+		return
+	}
+
+	result, err := a.AccountDB.GetBackupKeys(ctx, version, req.UserID, req.KeysForRoomID, req.KeysForSessionID)
+	if err != nil {
+		res.Error = fmt.Sprintf("failed to query keys: %s", err)
+		return
+	}
+	res.Keys = result
+}
