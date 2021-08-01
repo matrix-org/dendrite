@@ -98,5 +98,14 @@ type OutputPresenceData struct {
 	StreamPos     types2.StreamPosition       `json:"stream_pos"`
 }
 
+type FederationPresenceSingle struct {
+	CurrentlyActive bool   `json:"currently_active"`
+	LastActiveAgo   int    `json:"last_active_ago"`
+	Presence        string `json:"presence"`
+	UserID          string `json:"user_id"`
+	StatusMsg       string `json:"status_msg"`
+}
+
 type FederationPresenceData struct {
+	Push []FederationPresenceSingle `json:"push"`
 }
