@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/syslog"
 	"net/http"
 	"os"
 	"path"
@@ -30,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dugong"
 	"github.com/sirupsen/logrus"
+	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
 )
 
 type utcFormatter struct {
@@ -128,6 +130,9 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 		case "file":
 			checkFileHookParams(hook.Params)
 			setupFileHook(hook, level, componentName)
+		case "syslog":
+			checkSyslogHookParams(hook.Params)
+			setupSyslogHook(hook, level, componentName)
 		default:
 			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
 		}
@@ -171,6 +176,24 @@ func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName str
 			&dugong.DailyRotationSchedule{GZip: true},
 		),
 	})
+}
+
+func checkSyslogHookParams(params map[string]interface{}) {
+	addr, ok := params["address"]
+	if !ok {
+		logrus.Fatalf("Expecting a parameter \"address\" for logging hook of type \"syslog\"")
+	}
+
+	if _, ok := addr.(string); !ok {
+		logrus.Fatalf("Parameter \"address\" for logging hook of type \"syslog\" should be a string")
+	}
+}
+
+func setupSyslogHook(hook config.LogrusHook, level logrus.Level, componentName string) {
+	syslogHook, err := lSyslog.NewSyslogHook("udp", hook.Params["address"].(string), syslog.LOG_INFO, "")
+	if err == nil {
+		logrus.AddHook(syslogHook)
+	}
 }
 
 //CloseAndLogIfError Closes io.Closer and logs the error if any
