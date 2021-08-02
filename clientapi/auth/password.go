@@ -54,6 +54,20 @@ func (t *LoginTypePassword) Request() interface{} {
 	return &PasswordRequest{}
 }
 
+func (t *LoginTypePassword) CheckPassword(ctx context.Context, localpart string,
+	r *PasswordRequest) (*Login, *util.JSONResponse) {
+	_, err := t.GetAccountByPassword(ctx, localpart, r.Password)
+	if err != nil {
+		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+		// but that would leak the existence of the user.
+		return nil, &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+		}
+	}
+	return &r.Login, nil
+}
+
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
 	username := r.Username()
@@ -70,30 +84,19 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: jsonerror.InvalidUsername(err.Error()),
 		}
 	}
-	if len(t.Config.LDAP.Host) > 0 {
-		addr := ""
-		if t.Config.LDAP.TLS {
-			addr = "ldaps://" + t.Config.LDAP.Host + ":" + t.Config.LDAP.Port
-		} else {
-			addr = "ldap://" + t.Config.LDAP.Host + ":" + t.Config.LDAP.Port
-		}
-
+	if len(t.Config.LDAP.URI) > 0 {
 		var conn *ldap.Conn
-		conn, err = ldap.DialURL(addr)
+		conn, err = ldap.DialURL(t.Config.LDAP.URI)
 		if err != nil {
-			return nil, &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.InvalidUsername(err.Error()),
-			}
+			ise := jsonerror.InternalServerError()
+			return nil, &ise
 		}
 		defer conn.Close()
 
 		e1 := conn.Bind(t.Config.LDAP.BindDN, t.Config.LDAP.BindPSWD)
 		if e1 != nil {
-			return nil, &util.JSONResponse{
-				Code: http.StatusUnauthorized,
-				JSON: jsonerror.InvalidUsername(err.Error()),
-			}
+			ise := jsonerror.InternalServerError()
+			return nil, &ise
 		}
 		filter := fmt.Sprintf("(&%s(%s=%s))", t.Config.LDAP.Filter, "uid", localpart)
 		searchRequest := ldap.NewSearchRequest(t.Config.LDAP.BaseDN, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false, filter, []string{"uid"}, nil)
@@ -112,14 +115,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			}
 		}
 		if len(sr.Entries) == 0 {
-			_, err = t.GetAccountByPassword(ctx, localpart, r.Password)
-			if err != nil {
-				return nil, &util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
-				}
-			}
-			return &r.Login, nil
+			return t.CheckPassword(ctx, localpart, r)
 		}
 
 		userDN := sr.Entries[0].DN
@@ -165,14 +161,6 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}
 		return &r.Login, nil
 	}
-	_, err = t.GetAccountByPassword(ctx, localpart, r.Password)
-	if err != nil {
-		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
-		// but that would leak the existence of the user.
-		return nil, &util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
-		}
-	}
-	return &r.Login, nil
+
+	return t.CheckPassword(ctx, localpart, r)
 }

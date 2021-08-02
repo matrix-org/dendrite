@@ -127,9 +127,7 @@ func (r *RateLimiting) Defaults() {
 }
 
 type LDAP struct {
-	TLS      bool   `yaml:"tls"`
-	Host     string `yaml:"host"`
-	Port     string `yaml:"port"`
+	URI      string `yaml:"uri"`
 	BaseDN   string `yaml:"basedn"`
 	Filter   string `yaml:"filter"`
 	BindDN   string `yaml:"bind_dn"`
