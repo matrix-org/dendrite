@@ -41,14 +41,14 @@ const selectCrossSigningSigsForTargetSQL = "" +
 	"SELECT origin_user_id, origin_key_id, signature FROM keyserver_cross_signing_sigs" +
 	" WHERE target_user_id = $1 AND target_key_id = $2"
 
-const insertCrossSigningSigsForTargetSQL = "" +
+const upsertCrossSigningSigsForTargetSQL = "" +
 	"INSERT OR REPLACE INTO keyserver_cross_signing_sigs (origin_user_id, origin_key_id, target_user_id, target_key_id, signature)" +
 	" VALUES($1, $2, $3, $4, $5)"
 
 type crossSigningSigsStatements struct {
 	db                                  *sql.DB
 	selectCrossSigningSigsForTargetStmt *sql.Stmt
-	insertCrossSigningSigsForTargetStmt *sql.Stmt
+	upsertCrossSigningSigsForTargetStmt *sql.Stmt
 }
 
 func NewSqliteCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error) {
@@ -59,13 +59,10 @@ func NewSqliteCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error)
 	if err != nil {
 		return nil, err
 	}
-	if s.selectCrossSigningSigsForTargetStmt, err = db.Prepare(selectCrossSigningSigsForTargetSQL); err != nil {
-		return nil, err
-	}
-	if s.insertCrossSigningSigsForTargetStmt, err = db.Prepare(insertCrossSigningSigsForTargetSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.selectCrossSigningSigsForTargetStmt, selectCrossSigningSigsForTargetSQL},
+		{&s.upsertCrossSigningSigsForTargetStmt, upsertCrossSigningSigsForTargetSQL},
+	}.Prepare(db)
 }
 
 func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
@@ -92,14 +89,14 @@ func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
 	return
 }
 
-func (s *crossSigningSigsStatements) InsertCrossSigningSigsForTarget(
+func (s *crossSigningSigsStatements) UpsertCrossSigningSigsForTarget(
 	ctx context.Context, txn *sql.Tx,
 	originUserID string, originKeyID gomatrixserverlib.KeyID,
 	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 	signature gomatrixserverlib.Base64Bytes,
 ) error {
-	if _, err := sqlutil.TxStmt(txn, s.insertCrossSigningSigsForTargetStmt).ExecContext(ctx, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
-		return fmt.Errorf("s.insertCrossSigningSigsForTargetStmt: %w", err)
+	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningSigsForTargetStmt).ExecContext(ctx, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
+		return fmt.Errorf("s.upsertCrossSigningSigsForTargetStmt: %w", err)
 	}
 	return nil
 }

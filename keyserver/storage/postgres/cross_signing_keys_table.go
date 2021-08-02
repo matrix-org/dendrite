@@ -39,7 +39,7 @@ const selectCrossSigningKeysForUserSQL = "" +
 	"SELECT key_type, key_data FROM keyserver_cross_signing_keys" +
 	" WHERE user_id = $1"
 
-const insertCrossSigningKeysForUserSQL = "" +
+const upsertCrossSigningKeysForUserSQL = "" +
 	"INSERT INTO keyserver_cross_signing_keys (user_id, key_type, key_data)" +
 	" VALUES($1, $2, $3)" +
 	" ON CONFLICT (user_id, key_type) DO UPDATE SET key_data = $3"
@@ -47,7 +47,7 @@ const insertCrossSigningKeysForUserSQL = "" +
 type crossSigningKeysStatements struct {
 	db                                *sql.DB
 	selectCrossSigningKeysForUserStmt *sql.Stmt
-	insertCrossSigningKeysForUserStmt *sql.Stmt
+	upsertCrossSigningKeysForUserStmt *sql.Stmt
 }
 
 func NewPostgresCrossSigningKeysTable(db *sql.DB) (tables.CrossSigningKeys, error) {
@@ -58,13 +58,10 @@ func NewPostgresCrossSigningKeysTable(db *sql.DB) (tables.CrossSigningKeys, erro
 	if err != nil {
 		return nil, err
 	}
-	if s.selectCrossSigningKeysForUserStmt, err = db.Prepare(selectCrossSigningKeysForUserSQL); err != nil {
-		return nil, err
-	}
-	if s.insertCrossSigningKeysForUserStmt, err = db.Prepare(insertCrossSigningKeysForUserSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.selectCrossSigningKeysForUserStmt, selectCrossSigningKeysForUserSQL},
+		{&s.upsertCrossSigningKeysForUserStmt, upsertCrossSigningKeysForUserSQL},
+	}.Prepare(db)
 }
 
 func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
@@ -87,11 +84,11 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 	return
 }
 
-func (s *crossSigningKeysStatements) InsertCrossSigningKeysForUser(
+func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 	ctx context.Context, txn *sql.Tx, userID string, keyType gomatrixserverlib.CrossSigningKeyPurpose, keyData gomatrixserverlib.Base64Bytes,
 ) error {
-	if _, err := sqlutil.TxStmt(txn, s.insertCrossSigningKeysForUserStmt).ExecContext(ctx, userID, keyType, keyData); err != nil {
-		return fmt.Errorf("s.insertCrossSigningKeysForUserStmt: %w", err)
+	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningKeysForUserStmt).ExecContext(ctx, userID, keyType, keyData); err != nil {
+		return fmt.Errorf("s.upsertCrossSigningKeysForUserStmt: %w", err)
 	}
 	return nil
 }

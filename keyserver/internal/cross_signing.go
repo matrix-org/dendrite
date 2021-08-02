@@ -1,3 +1,17 @@
+// Copyright 2021 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package internal
 
 import (
@@ -40,6 +54,7 @@ func sanityCheckKey(key gomatrixserverlib.CrossSigningKey, userID string, purpos
 	for _, usage := range key.Usage {
 		if usage == purpose {
 			useful = true
+			break
 		}
 	}
 	if !useful {
@@ -50,6 +65,7 @@ func sanityCheckKey(key gomatrixserverlib.CrossSigningKey, userID string, purpos
 }
 
 func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) {
+	var masterKey gomatrixserverlib.Base64Bytes
 	hasMasterKey := false
 
 	if len(req.MasterKey.Keys) > 0 {
@@ -60,6 +76,9 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 			return
 		}
 		hasMasterKey = true
+		for _, keyData := range req.MasterKey.Keys { // iterates once, because sanityCheckKey requires one key
+			masterKey = keyData
+		}
 	}
 
 	if len(req.SelfSigningKey.Keys) > 0 {
@@ -82,29 +101,29 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 
 	// If the user hasn't given a new master key, then let's go and get their
 	// existing keys from the database.
-	var masterKey gomatrixserverlib.Base64Bytes
 	if !hasMasterKey {
 		existingKeys, err := a.DB.CrossSigningKeysForUser(ctx, req.UserID)
 		if err != nil {
 			res.Error = &api.KeyError{
-				Err: "User-signing key sanity check failed: " + err.Error(),
+				Err: "Retrieving cross-signing keys from database failed: " + err.Error(),
 			}
 			return
 		}
 
 		masterKey, hasMasterKey = existingKeys[gomatrixserverlib.CrossSigningKeyPurposeMaster]
-		if !hasMasterKey {
-			res.Error = &api.KeyError{
-				Err:            "No master key was found, either in the database or in the request!",
-				IsMissingParam: true,
-			}
-			return
-		}
-	} else {
-		for _, keyData := range req.MasterKey.Keys { // iterates once, see sanityCheckKey
-			masterKey = keyData
-		}
 	}
+
+	// If we still don't have a master key at this point then there's nothing else
+	// we can do - we've checked both the request and the database.
+	if !hasMasterKey {
+		res.Error = &api.KeyError{
+			Err:            "No master key was found, either in the database or in the request!",
+			IsMissingParam: true,
+		}
+		return
+	}
+
+	// The key ID is basically the key itself.
 	masterKeyID := gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", masterKey.Encode()))
 
 	// Work out which things we need to verify the signatures for.
@@ -116,7 +135,7 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 	if len(req.SelfSigningKey.Keys) > 0 {
 		toVerify[gomatrixserverlib.CrossSigningKeyPurposeSelfSigning] = req.SelfSigningKey
 	}
-	if len(req.SelfSigningKey.Keys) > 0 {
+	if len(req.UserSigningKey.Keys) > 0 {
 		toVerify[gomatrixserverlib.CrossSigningKeyPurposeUserSigning] = req.UserSigningKey
 	}
 	for purpose, key := range toVerify {
@@ -173,7 +192,7 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 					}
 					selfSignatures[userID][keyID] = keyOrDevice
 				} else {
-					if _, ok := selfSignatures[userID]; !ok {
+					if _, ok := otherSignatures[userID]; !ok {
 						otherSignatures[userID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice{}
 					}
 					otherSignatures[userID][keyID] = keyOrDevice
@@ -186,7 +205,7 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 					}
 					selfSignatures[userID][keyID] = keyOrDevice
 				} else {
-					if _, ok := selfSignatures[userID]; !ok {
+					if _, ok := otherSignatures[userID]; !ok {
 						otherSignatures[userID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice{}
 					}
 					otherSignatures[userID][keyID] = keyOrDevice

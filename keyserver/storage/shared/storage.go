@@ -171,7 +171,7 @@ func (d *Database) CrossSigningSigsForTarget(ctx context.Context, targetUserID s
 func (d *Database) StoreCrossSigningKeysForUser(ctx context.Context, userID string, keyMap api.CrossSigningKeyMap) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for keyType, keyData := range keyMap {
-			if err := d.CrossSigningKeysTable.InsertCrossSigningKeysForUser(ctx, txn, userID, keyType, keyData); err != nil {
+			if err := d.CrossSigningKeysTable.UpsertCrossSigningKeysForUser(ctx, txn, userID, keyType, keyData); err != nil {
 				return fmt.Errorf("d.CrossSigningKeysTable.InsertCrossSigningKeysForUser: %w", err)
 			}
 		}
@@ -187,7 +187,7 @@ func (d *Database) StoreCrossSigningSigsForTarget(
 	signature gomatrixserverlib.Base64Bytes,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.CrossSigningSigsTable.InsertCrossSigningSigsForTarget(ctx, nil, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
+		if err := d.CrossSigningSigsTable.UpsertCrossSigningSigsForTarget(ctx, nil, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
 			return fmt.Errorf("d.CrossSigningSigsTable.InsertCrossSigningSigsForTarget: %w", err)
 		}
 		return nil
