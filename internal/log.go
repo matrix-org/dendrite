@@ -188,12 +188,12 @@ func checkSyslogHookParams(params map[string]interface{}) {
 		logrus.Fatalf("Parameter \"address\" for logging hook of type \"syslog\" should be a string")
 	}
 
-	proto, ok := params["protocol"]
-	if !ok {
+	proto, ok2 := params["protocol"]
+	if !ok2 {
 		logrus.Fatalf("Expecting a parameter \"protocol\" for logging hook of type \"syslog\"")
 	}
 
-	if _, ok := proto.(string); !ok {
+	if _, ok2 := proto.(string); !ok2 {
 		logrus.Fatalf("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
 	}
 
