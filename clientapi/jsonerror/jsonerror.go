@@ -125,6 +125,18 @@ func GuestAccessForbidden(msg string) *MatrixError {
 	return &MatrixError{"M_GUEST_ACCESS_FORBIDDEN", msg}
 }
 
+// InvalidSignature is an error which is returned when the client tries
+// to upload invalid signatures.
+func InvalidSignature(msg string) *MatrixError {
+	return &MatrixError{"M_INVALID_SIGNATURE", msg}
+}
+
+// MissingParam is an error that is returned when a parameter was incorrect,
+// traditionally with cross-signing.
+func MissingParam(msg string) *MatrixError {
+	return &MatrixError{"M_MISSING_PARAM", msg}
+}
+
 type IncompatibleRoomVersionError struct {
 	RoomVersion string `json:"room_version"`
 	Error       string `json:"error"`

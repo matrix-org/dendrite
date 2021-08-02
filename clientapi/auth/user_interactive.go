@@ -220,7 +220,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	if !ok {
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("unknown auth.type: " + authType),
+			JSON: jsonerror.BadJSON("Unknown auth.type: " + authType),
 		}
 	}
 
@@ -231,7 +231,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 		if !u.IsSingleStageFlow(authType) {
 			return nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown("missing or unknown auth.session"),
+				JSON: jsonerror.Unknown("The auth.session is missing or unknown."),
 			}
 		}
 	}

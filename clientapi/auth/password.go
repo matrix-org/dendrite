@@ -52,7 +52,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.BadJSON("'user' must be supplied."),
+			JSON: jsonerror.BadJSON("A username must be supplied."),
 		}
 	}
 	localpart, err := userutil.ParseUsernameParam(username, &t.Config.Matrix.ServerName)
@@ -68,7 +68,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		// but that would leak the existence of the user.
 		return nil, &util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("username or password was incorrect, or the account does not exist"),
+			JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
 		}
 	}
 	return &r.Login, nil

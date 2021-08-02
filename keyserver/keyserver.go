@@ -18,10 +18,12 @@ import (
 	"github.com/gorilla/mux"
 	fedsenderapi "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/consumers"
 	"github.com/matrix-org/dendrite/keyserver/internal"
 	"github.com/matrix-org/dendrite/keyserver/inthttp"
 	"github.com/matrix-org/dendrite/keyserver/producers"
 	"github.com/matrix-org/dendrite/keyserver/storage"
+	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/kafka"
 	"github.com/sirupsen/logrus"
@@ -36,9 +38,9 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	cfg *config.KeyServer, fedClient fedsenderapi.FederationClient,
+	base *setup.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.FederationClient,
 ) api.KeyInternalAPI {
-	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	consumer, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
 	db, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
@@ -55,11 +57,21 @@ func NewInternalAPI(
 			logrus.WithError(err).Panicf("failed to start device list updater")
 		}
 	}()
-	return &internal.KeyInternalAPI{
+
+	ap := &internal.KeyInternalAPI{
 		DB:         db,
 		ThisServer: cfg.Matrix.ServerName,
 		FedClient:  fedClient,
 		Producer:   keyChangeProducer,
 		Updater:    updater,
 	}
+
+	keyconsumer := consumers.NewOutputSigningKeyUpdateConsumer(
+		base.ProcessContext, base.Cfg, consumer, db, ap,
+	)
+	if err := keyconsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start keyserver EDU server consumer")
+	}
+
+	return ap
 }
