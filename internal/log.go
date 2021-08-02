@@ -132,7 +132,7 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 			setupFileHook(hook, level, componentName)
 		case "syslog":
 			checkSyslogHookParams(hook.Params)
-			setupSyslogHook(hook, level, componentName)
+			setupSyslogHook(hook)
 		default:
 			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
 		}
@@ -187,10 +187,20 @@ func checkSyslogHookParams(params map[string]interface{}) {
 	if _, ok := addr.(string); !ok {
 		logrus.Fatalf("Parameter \"address\" for logging hook of type \"syslog\" should be a string")
 	}
+
+	proto, ok := params["protocol"]
+	if !ok {
+		logrus.Fatalf("Expecting a parameter \"protocol\" for logging hook of type \"syslog\"")
+	}
+
+	if _, ok := proto.(string); !ok {
+		logrus.Fatalf("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
+	}
+
 }
 
-func setupSyslogHook(hook config.LogrusHook, level logrus.Level, componentName string) {
-	syslogHook, err := lSyslog.NewSyslogHook("udp", hook.Params["address"].(string), syslog.LOG_INFO, "")
+func setupSyslogHook(hook config.LogrusHook) {
+	syslogHook, err := lSyslog.NewSyslogHook(hook.Params["protocol"].(string), hook.Params["address"].(string), syslog.LOG_INFO, "")
 	if err == nil {
 		logrus.AddHook(syslogHook)
 	}
