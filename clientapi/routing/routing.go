@@ -1071,7 +1071,7 @@ func Setup(
 	// Cross-signing device keys
 
 	postDeviceSigningKeys := httputil.MakeAuthAPI("post_device_signing_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-		return UploadCrossSigningDeviceKeys(req, keyAPI, device, accountDB, cfg)
+		return UploadCrossSigningDeviceKeys(req, userInteractiveAuth, keyAPI, device, accountDB, cfg)
 	})
 
 	postDeviceSigningSignatures := httputil.MakeAuthAPI("post_device_signing_signatures", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
