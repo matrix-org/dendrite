@@ -51,20 +51,19 @@ func NewInternalAPI(
 		Producer: producer,
 		DB:       db,
 	}
-	updater := internal.NewDeviceListUpdater(db, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
-	go func() {
-		if err := updater.Start(); err != nil {
-			logrus.WithError(err).Panicf("failed to start device list updater")
-		}
-	}()
-
 	ap := &internal.KeyInternalAPI{
 		DB:         db,
 		ThisServer: cfg.Matrix.ServerName,
 		FedClient:  fedClient,
 		Producer:   keyChangeProducer,
-		Updater:    updater,
 	}
+	updater := internal.NewDeviceListUpdater(db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
+	ap.Updater = updater
+	go func() {
+		if err := updater.Start(); err != nil {
+			logrus.WithError(err).Panicf("failed to start device list updater")
+		}
+	}()
 
 	keyconsumer := consumers.NewOutputSigningKeyUpdateConsumer(
 		base.ProcessContext, base.Cfg, consumer, db, ap,
