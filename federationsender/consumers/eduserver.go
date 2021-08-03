@@ -267,7 +267,6 @@ func (t *OutputEDUConsumer) onPresenceData(msg *sarama.ConsumerMessage) error {
 		log.WithError(err).Errorf("eduserver output log: message parse failed (expected presence)")
 		return nil
 	}
-	log.Debugf("Sending Presence to federated servers: %+v", presence)
 
 	// only send presence events which originated from us
 	_, senderServerName, err := gomatrixserverlib.SplitID('@', presence.UserID)
@@ -305,7 +304,7 @@ func (t *OutputEDUConsumer) onPresenceData(msg *sarama.ConsumerMessage) error {
 		return err
 	}
 
-	log.Debugf("Sending edu to federated servers: %+v", edu)
+	log.Debugf("Sending edu to federated servers: %s", string(edu.Content))
 
 	return t.queues.SendEDU(edu, t.ServerName, joined)
 }
