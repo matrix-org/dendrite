@@ -64,6 +64,7 @@ func sanityCheckKey(key gomatrixserverlib.CrossSigningKey, userID string, purpos
 	return nil
 }
 
+// nolint:gocyclo
 func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) {
 	var masterKey gomatrixserverlib.Base64Bytes
 	hasMasterKey := false
