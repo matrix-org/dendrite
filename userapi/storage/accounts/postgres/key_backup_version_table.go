@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const keyBackupVersionTableSchema = `
@@ -72,25 +74,14 @@ func (s *keyBackupVersionStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertKeyBackupStmt, err = db.Prepare(insertKeyBackupSQL); err != nil {
-		return
-	}
-	if s.updateKeyBackupAuthDataStmt, err = db.Prepare(updateKeyBackupAuthDataSQL); err != nil {
-		return
-	}
-	if s.deleteKeyBackupStmt, err = db.Prepare(deleteKeyBackupSQL); err != nil {
-		return
-	}
-	if s.selectKeyBackupStmt, err = db.Prepare(selectKeyBackupSQL); err != nil {
-		return
-	}
-	if s.selectLatestVersionStmt, err = db.Prepare(selectLatestVersionSQL); err != nil {
-		return
-	}
-	if s.updateKeyBackupETagStmt, err = db.Prepare(updateKeyBackupETagSQL); err != nil {
-		return
-	}
-	return
+	return sqlutil.StatementList{
+		{&s.insertKeyBackupStmt, insertKeyBackupSQL},
+		{&s.updateKeyBackupAuthDataStmt, updateKeyBackupAuthDataSQL},
+		{&s.deleteKeyBackupStmt, deleteKeyBackupSQL},
+		{&s.selectKeyBackupStmt, selectKeyBackupSQL},
+		{&s.selectLatestVersionStmt, selectLatestVersionSQL},
+		{&s.updateKeyBackupETagStmt, updateKeyBackupETagSQL},
+	}.Prepare(db)
 }
 
 func (s *keyBackupVersionStatements) insertKeyBackup(

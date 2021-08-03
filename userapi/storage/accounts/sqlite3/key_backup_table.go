@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -76,25 +77,14 @@ func (s *keyBackupStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertBackupKeyStmt, err = db.Prepare(insertBackupKeySQL); err != nil {
-		return
-	}
-	if s.updateBackupKeyStmt, err = db.Prepare(updateBackupKeySQL); err != nil {
-		return
-	}
-	if s.countKeysStmt, err = db.Prepare(countKeysSQL); err != nil {
-		return
-	}
-	if s.selectKeysStmt, err = db.Prepare(selectKeysSQL); err != nil {
-		return
-	}
-	if s.selectKeysByRoomIDStmt, err = db.Prepare(selectKeysByRoomIDSQL); err != nil {
-		return
-	}
-	if s.selectKeysByRoomIDAndSessionIDStmt, err = db.Prepare(selectKeysByRoomIDAndSessionIDSQL); err != nil {
-		return
-	}
-	return
+	return sqlutil.StatementList{
+		{&s.insertBackupKeyStmt, insertBackupKeySQL},
+		{&s.updateBackupKeyStmt, updateBackupKeySQL},
+		{&s.countKeysStmt, countKeysSQL},
+		{&s.selectKeysStmt, selectKeysSQL},
+		{&s.selectKeysByRoomIDStmt, selectKeysByRoomIDSQL},
+		{&s.selectKeysByRoomIDAndSessionIDStmt, selectKeysByRoomIDAndSessionIDSQL},
+	}.Prepare(db)
 }
 
 func (s keyBackupStatements) countKeys(

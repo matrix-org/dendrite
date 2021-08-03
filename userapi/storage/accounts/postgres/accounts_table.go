@@ -81,26 +81,15 @@ func (s *accountsStatements) execSchema(db *sql.DB) error {
 }
 
 func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
-	if s.insertAccountStmt, err = db.Prepare(insertAccountSQL); err != nil {
-		return
-	}
-	if s.updatePasswordStmt, err = db.Prepare(updatePasswordSQL); err != nil {
-		return
-	}
-	if s.deactivateAccountStmt, err = db.Prepare(deactivateAccountSQL); err != nil {
-		return
-	}
-	if s.selectAccountByLocalpartStmt, err = db.Prepare(selectAccountByLocalpartSQL); err != nil {
-		return
-	}
-	if s.selectPasswordHashStmt, err = db.Prepare(selectPasswordHashSQL); err != nil {
-		return
-	}
-	if s.selectNewNumericLocalpartStmt, err = db.Prepare(selectNewNumericLocalpartSQL); err != nil {
-		return
-	}
 	s.serverName = server
-	return
+	return sqlutil.StatementList{
+		{&s.insertAccountStmt, insertAccountSQL},
+		{&s.updatePasswordStmt, updatePasswordSQL},
+		{&s.deactivateAccountStmt, deactivateAccountSQL},
+		{&s.selectAccountByLocalpartStmt, selectAccountByLocalpartSQL},
+		{&s.selectPasswordHashStmt, selectPasswordHashSQL},
+		{&s.selectNewNumericLocalpartStmt, selectNewNumericLocalpartSQL},
+	}.Prepare(db)
 }
 
 // insertAccount creates a new account. 'hash' should be the password hash for this account. If it is missing,
