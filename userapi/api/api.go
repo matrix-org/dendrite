@@ -46,6 +46,7 @@ type UserInternalAPI interface {
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryPresenceForUser(ctx context.Context, req *QueryPresenceForUserRequest, res *QueryPresenceForUserResponse) error
 	QueryPresenceAfter(ctx context.Context, req *QueryPresenceAfterRequest, res *QueryPresenceAfterResponse) error
+	QueryMaxPresenceID(ctx context.Context, req *QueryMaxPresenceIDRequest, res *QueryMaxPresenceIDResponse) error
 }
 
 type PerformKeyBackupRequest struct {
@@ -373,6 +374,14 @@ type QueryPresenceAfterRequest struct {
 // QueryPresenceAfterResponse is the response for QueryPresenceAfterRequest
 type QueryPresenceAfterResponse struct {
 	Presences []QueryPresenceForUserResponse
+}
+
+// QueryMaxPresenceIDRequest is the request for QueryMaxPresenceIDRequest
+type QueryMaxPresenceIDRequest struct{}
+
+// QueryMaxPresenceIDResponse is the request for QueryMaxPresenceIDRequest
+type QueryMaxPresenceIDResponse struct {
+	ID int64
 }
 
 // Device represents a client's device (mobile, web, etc)

@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	types2 "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/types"
 )
 
@@ -49,7 +48,7 @@ const upsertPresenceSQL = "" +
 	" (user_id, presence, status_msg, last_active_ts)" +
 	" VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (user_id)" +
-	" DO UPDATE SET id = currval('presence_presence_id')," +
+	" DO UPDATE SET id = nextval('presence_presence_id')," +
 	" presence = $2, status_msg = COALESCE($3, p.status_msg), last_active_ts = $4" +
 	" RETURNING id"
 
@@ -59,7 +58,7 @@ const selectPresenceForUserSQL = "" +
 	" WHERE user_id = $1 LIMIT 1"
 
 const selectMaxPresenceSQL = "" +
-	"SELECT MAX(id) FROM presence_presences"
+	"SELECT COALESCE(MAX(id), 0) FROM presence_presences"
 
 const selectPresenceAfter = "" +
 	" SELECT id, user_id, presence, status_msg, last_active_ts" +
@@ -125,7 +124,7 @@ func (p *presenceStatements) GetPresenceForUser(
 	return
 }
 
-func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types2.StreamingToken, err error) {
+func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos int64, err error) {
 	stmt := sqlutil.TxStmt(txn, p.selectMaxPresenceStmt)
 	err = stmt.QueryRowContext(ctx).Scan(&pos)
 	return

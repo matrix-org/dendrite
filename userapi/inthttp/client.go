@@ -48,6 +48,7 @@ const (
 	QueryOpenIDTokenPath     = "/userapi/queryOpenIDToken"
 	QueryPresenceForUserPath = "/userapi/queryPresenceForUser"
 	QueryPresenceAfterPath   = "/userapi/queryPresenceAfter"
+	QueryMaxPresenceID       = "/userapi/queryMaxPresenceID"
 	QueryKeyBackupPath       = "/userapi/queryKeyBackup"
 )
 
@@ -274,5 +275,13 @@ func (h *httpUserInternalAPI) QueryPresenceAfter(ctx context.Context, req *api.Q
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryPresenceAfterPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) QueryMaxPresenceID(ctx context.Context, req *api.QueryMaxPresenceIDRequest, res *api.QueryMaxPresenceIDResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMaxPresenceID")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryMaxPresenceID
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

@@ -620,3 +620,12 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	}
 	res.Keys = result
 }
+
+func (a *UserInternalAPI) QueryMaxPresenceID(ctx context.Context, req *api.QueryMaxPresenceIDRequest, res *api.QueryMaxPresenceIDResponse) error {
+	id, err := a.PresenceDB.GetMaxPresenceID(ctx)
+	if err != nil {
+		return err
+	}
+	res.ID = id
+	return nil
+}

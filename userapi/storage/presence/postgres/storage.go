@@ -60,3 +60,7 @@ func (d *Database) GetPresenceForUser(ctx context.Context, userID string) (api.O
 func (d *Database) GetPresenceAfter(ctx context.Context, pos int64) (presence []api.OutputPresenceData, err error) {
 	return d.presence.GetPresenceAfter(ctx, nil, pos)
 }
+
+func (d *Database) GetMaxPresenceID(ctx context.Context) (pos int64, err error) {
+	return d.presence.GetMaxPresenceID(ctx, nil)
+}

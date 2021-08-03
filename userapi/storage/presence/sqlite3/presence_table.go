@@ -61,9 +61,13 @@ const selectPresenceAfter = "" +
 	" FROM presence_presences" +
 	" WHERE id > $1"
 
+const selectMaxPresenceSQL = "" +
+	"SELECT COALESCE(MAX(id), 0) FROM presence_presences"
+
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
+	selectMaxPresenceStmt      *sql.Stmt
 	selectPresenceAfterStmt    *sql.Stmt
 }
 
@@ -80,6 +84,9 @@ func (p *presenceStatements) prepare(db *sql.DB) (err error) {
 		return
 	}
 	if p.selectPresenceAfterStmt, err = db.Prepare(selectPresenceAfter); err != nil {
+		return
+	}
+	if p.selectMaxPresenceStmt, err = db.Prepare(selectMaxPresenceSQL); err != nil {
 		return
 	}
 	return
@@ -129,4 +136,10 @@ func (p *presenceStatements) GetPresenceAfter(
 		presences = append(presences, presence)
 	}
 	return presences, rows.Err()
+}
+
+func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos int64, err error) {
+	stmt := sqlutil.TxStmt(txn, p.selectMaxPresenceStmt)
+	err = stmt.QueryRowContext(ctx).Scan(&pos)
+	return
 }

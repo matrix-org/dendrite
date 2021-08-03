@@ -38,4 +38,5 @@ type Database interface {
 		ctx context.Context,
 		pos int64,
 	) (presence []api.OutputPresenceData, err error)
+	GetMaxPresenceID(ctx context.Context) (pos int64, err error)
 }
