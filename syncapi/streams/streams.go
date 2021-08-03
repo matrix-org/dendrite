@@ -66,6 +66,7 @@ func NewSyncStreamProviders(
 	streams.SendToDeviceStreamProvider.Setup()
 	streams.AccountDataStreamProvider.Setup()
 	streams.DeviceListStreamProvider.Setup()
+	streams.PresenceDataStreamProdiver.Setup()
 
 	return streams
 }
@@ -79,5 +80,6 @@ func (s *Streams) Latest(ctx context.Context) types.StreamingToken {
 		SendToDevicePosition: s.SendToDeviceStreamProvider.LatestPosition(ctx),
 		AccountDataPosition:  s.AccountDataStreamProvider.LatestPosition(ctx),
 		DeviceListPosition:   s.DeviceListStreamProvider.LatestPosition(ctx),
+		PresenceDataPosition: s.PresenceDataStreamProdiver.LatestPosition(ctx),
 	}
 }

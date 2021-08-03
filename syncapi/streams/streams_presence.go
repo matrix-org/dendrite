@@ -15,8 +15,17 @@ type PresenceStreamProvider struct {
 	UserAPI userapi.UserInternalAPI
 }
 
+func (p *PresenceStreamProvider) Setup() {
+	p.StreamProvider.Setup()
+
+	res := userapi.QueryMaxPresenceIDResponse{}
+	if err := p.UserAPI.QueryMaxPresenceID(context.Background(), &userapi.QueryMaxPresenceIDRequest{}, &res); err != nil {
+		panic(err)
+	}
+	p.latest = types.StreamPosition(res.ID)
+}
+
 func (p *PresenceStreamProvider) CompleteSync(ctx context.Context, req *types.SyncRequest) types.StreamPosition {
-	req.Log.Debug(" CompleteSyncrequested for presence!")
 	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
@@ -33,6 +42,9 @@ func (p *PresenceStreamProvider) IncrementalSync(ctx context.Context, req *types
 	if err := p.UserAPI.QueryPresenceAfter(ctx, &userapi.QueryPresenceAfterRequest{StreamPos: int64(from)}, &res); err != nil {
 		req.Log.WithError(err).Error("unable to fetch presence after")
 		return from
+	}
+	if len(res.Presences) == 0 {
+		return to
 	}
 	evs := []gomatrixserverlib.ClientEvent{}
 	var maxPos int64
