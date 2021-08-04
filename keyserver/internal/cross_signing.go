@@ -147,20 +147,6 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 			}
 			return
 		}
-		switch k := keys.SelfSigningKeys[req.UserID].CrossSigningBody.(type) {
-		case *gomatrixserverlib.CrossSigningKey:
-			if err := sanityCheckKey(*k, req.UserID, gomatrixserverlib.CrossSigningKeyPurposeSelfSigning); err != nil {
-				res.Error = &api.KeyError{
-					Err: "Self-signing key sanity check failed: " + err.Error(),
-				}
-				return
-			}
-		default:
-			res.Error = &api.KeyError{
-				Err: "Unexpected type for self-signing key retrieved from federation",
-			}
-			return
-		}
 	}
 
 	// If we still don't have a master key at this point then there's nothing else
