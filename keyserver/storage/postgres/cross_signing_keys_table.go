@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -67,13 +66,13 @@ func NewPostgresCrossSigningKeysTable(db *sql.DB) (tables.CrossSigningKeys, erro
 
 func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 	ctx context.Context, txn *sql.Tx, userID string,
-) (r api.CrossSigningKeyMap, err error) {
+) (r types.CrossSigningKeyMap, err error) {
 	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningKeysForUserStmt).QueryContext(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningKeysForUserStmt: rows.close() failed")
-	r = api.CrossSigningKeyMap{}
+	r = types.CrossSigningKeyMap{}
 	for rows.Next() {
 		var keyTypeInt int16
 		var keyData gomatrixserverlib.Base64Bytes

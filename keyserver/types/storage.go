@@ -31,3 +31,9 @@ var KeyTypeIntToPurpose = map[int16]gomatrixserverlib.CrossSigningKeyPurpose{
 	2: gomatrixserverlib.CrossSigningKeyPurposeSelfSigning,
 	3: gomatrixserverlib.CrossSigningKeyPurposeUserSigning,
 }
+
+// Map of purpose -> public key
+type CrossSigningKeyMap map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.Base64Bytes
+
+// Map of user ID -> key ID -> signature
+type CrossSigningSigMap map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes

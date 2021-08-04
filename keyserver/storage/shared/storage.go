@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
+	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -158,17 +159,17 @@ func (d *Database) MarkDeviceListStale(ctx context.Context, userID string, isSta
 }
 
 // CrossSigningKeysForUser returns the latest known cross-signing keys for a user, if any.
-func (d *Database) CrossSigningKeysForUser(ctx context.Context, userID string) (api.CrossSigningKeyMap, error) {
+func (d *Database) CrossSigningKeysForUser(ctx context.Context, userID string) (types.CrossSigningKeyMap, error) {
 	return d.CrossSigningKeysTable.SelectCrossSigningKeysForUser(ctx, nil, userID)
 }
 
 // CrossSigningSigsForTarget returns the signatures for a given user's key ID, if any.
-func (d *Database) CrossSigningSigsForTarget(ctx context.Context, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (api.CrossSigningSigMap, error) {
+func (d *Database) CrossSigningSigsForTarget(ctx context.Context, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (types.CrossSigningSigMap, error) {
 	return d.CrossSigningSigsTable.SelectCrossSigningSigsForTarget(ctx, nil, targetUserID, targetKeyID)
 }
 
 // StoreCrossSigningKeysForUser stores the latest known cross-signing keys for a user.
-func (d *Database) StoreCrossSigningKeysForUser(ctx context.Context, userID string, keyMap api.CrossSigningKeyMap) error {
+func (d *Database) StoreCrossSigningKeysForUser(ctx context.Context, userID string, keyMap types.CrossSigningKeyMap) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for keyType, keyData := range keyMap {
 			if err := d.CrossSigningKeysTable.UpsertCrossSigningKeysForUser(ctx, txn, userID, keyType, keyData); err != nil {
