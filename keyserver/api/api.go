@@ -40,12 +40,6 @@ type KeyInternalAPI interface {
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
 }
 
-// Map of purpose -> public key
-type CrossSigningKeyMap map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.Base64Bytes
-
-// Map of user ID -> key ID -> signature
-type CrossSigningSigMap map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes
-
 // KeyError is returned if there was a problem performing/querying the server
 type KeyError struct {
 	Err                string `json:"error"`

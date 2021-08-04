@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -164,7 +165,7 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 
 	// Work out which things we need to verify the signatures for.
 	toVerify := make(map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.CrossSigningKey, 3)
-	toStore := api.CrossSigningKeyMap{}
+	toStore := types.CrossSigningKeyMap{}
 	if len(req.MasterKey.Keys) > 0 {
 		toVerify[gomatrixserverlib.CrossSigningKeyPurposeMaster] = req.MasterKey
 	}
@@ -351,7 +352,7 @@ func (a *KeyInternalAPI) crossSigningKeysFromDatabase(
 
 			appendSignature := func(originUserID string, originKeyID gomatrixserverlib.KeyID, signature gomatrixserverlib.Base64Bytes) {
 				if key.Signatures == nil {
-					key.Signatures = api.CrossSigningSigMap{}
+					key.Signatures = types.CrossSigningSigMap{}
 				}
 				if _, ok := key.Signatures[originUserID]; !ok {
 					key.Signatures[originUserID] = make(map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes)
