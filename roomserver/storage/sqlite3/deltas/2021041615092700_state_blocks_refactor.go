@@ -100,8 +100,8 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 			// If we don't do this, we'll fail the assertions later on which try to ensure we didn't forget
 			// any snapshots.
 			_, err = tx.Exec(
-				`UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE event_type_nid = $1 AND state_snapshot_nid = $2`,
-				types.MRoomCreateNID, snapshot,
+				`UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE event_type_nid = $1 AND event_state_key_nid = $2 AND state_snapshot_nid = $3`,
+				types.MRoomCreateNID, types.EmptyStateKeyNID, snapshot,
 			)
 			if err != nil {
 				return fmt.Errorf("resetting create events snapshots to 0 errored: %s", err)
