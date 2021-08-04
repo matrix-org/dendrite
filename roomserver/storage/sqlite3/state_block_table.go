@@ -86,7 +86,7 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
 	entries = entries[:util.SortAndUnique(entries)]
-	var nids types.EventNIDs
+	nids := types.EventNIDs{} // zero slice to not store 'null' in the DB
 	for _, e := range entries {
 		nids = append(nids, e.EventNID)
 	}
