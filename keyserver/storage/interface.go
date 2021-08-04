@@ -18,11 +18,15 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
+	internal.PartitionStorer
+
 	// ExistingOneTimeKeys returns a map of keyIDWithAlgorithm to key JSON for the given parameters. If no keys exist with this combination
 	// of user/device/key/algorithm 4-uple then it is omitted from the map. Returns an error when failing to communicate with the database.
 	ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
@@ -73,4 +77,10 @@ type Database interface {
 
 	// MarkDeviceListStale sets the stale bit for this user to isStale.
 	MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error
+
+	CrossSigningKeysForUser(ctx context.Context, userID string) (types.CrossSigningKeyMap, error)
+	CrossSigningSigsForTarget(ctx context.Context, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (types.CrossSigningSigMap, error)
+
+	StoreCrossSigningKeysForUser(ctx context.Context, userID string, keyMap types.CrossSigningKeyMap) error
+	StoreCrossSigningSigsForTarget(ctx context.Context, originUserID string, originKeyID gomatrixserverlib.KeyID, targetUserID string, targetKeyID gomatrixserverlib.KeyID, signature gomatrixserverlib.Base64Bytes) error
 }

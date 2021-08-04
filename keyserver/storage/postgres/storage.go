@@ -43,12 +43,26 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 	if err != nil {
 		return nil, err
 	}
-	return &shared.Database{
+	csk, err := NewPostgresCrossSigningKeysTable(db)
+	if err != nil {
+		return nil, err
+	}
+	css, err := NewPostgresCrossSigningSigsTable(db)
+	if err != nil {
+		return nil, err
+	}
+	d := &shared.Database{
 		DB:                    db,
 		Writer:                sqlutil.NewDummyWriter(),
 		OneTimeKeysTable:      otk,
 		DeviceKeysTable:       dk,
 		KeyChangesTable:       kc,
 		StaleDeviceListsTable: sdl,
-	}, nil
+		CrossSigningKeysTable: csk,
+		CrossSigningSigsTable: css,
+	}
+	if err = d.PartitionOffsetStatements.Prepare(db, d.Writer, "keyserver"); err != nil {
+		return nil, err
+	}
+	return d, nil
 }
