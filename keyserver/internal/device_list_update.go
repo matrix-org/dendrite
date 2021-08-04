@@ -384,7 +384,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 				}
 			}
 			if res.SelfSigningKey != nil {
-				if err = sanityCheckKey(*res.MasterKey, userID, gomatrixserverlib.CrossSigningKeyPurposeSelfSigning); err == nil {
+				if err = sanityCheckKey(*res.SelfSigningKey, userID, gomatrixserverlib.CrossSigningKeyPurposeSelfSigning); err == nil {
 					uploadReq.SelfSigningKey = *res.SelfSigningKey
 				}
 			}
