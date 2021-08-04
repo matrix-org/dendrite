@@ -23,13 +23,14 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
+	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var crossSigningKeysSchema = `
 CREATE TABLE IF NOT EXISTS keyserver_cross_signing_keys (
     user_id TEXT NOT NULL,
-	key_type TEXT NOT NULL,
+	key_type SMALLINT NOT NULL,
 	key_data TEXT NOT NULL,
 	PRIMARY KEY (user_id, key_type)
 );
@@ -74,10 +75,14 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningKeysForUserStmt: rows.close() failed")
 	r = api.CrossSigningKeyMap{}
 	for rows.Next() {
-		var keyType gomatrixserverlib.CrossSigningKeyPurpose
+		var keyTypeInt int16
 		var keyData gomatrixserverlib.Base64Bytes
-		if err := rows.Scan(&keyType, &keyData); err != nil {
+		if err := rows.Scan(&keyTypeInt, &keyData); err != nil {
 			return nil, err
+		}
+		keyType, ok := types.KeyTypeIntToPurpose[keyTypeInt]
+		if !ok {
+			return nil, fmt.Errorf("unknown key purpose int %d", keyTypeInt)
 		}
 		r[keyType] = keyData
 	}
@@ -87,7 +92,11 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 	ctx context.Context, txn *sql.Tx, userID string, keyType gomatrixserverlib.CrossSigningKeyPurpose, keyData gomatrixserverlib.Base64Bytes,
 ) error {
-	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningKeysForUserStmt).ExecContext(ctx, userID, keyType, keyData); err != nil {
+	keyTypeInt, ok := types.KeyTypePurposeToInt[keyType]
+	if !ok {
+		return fmt.Errorf("unknown key purpose %q", keyType)
+	}
+	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningKeysForUserStmt).ExecContext(ctx, userID, keyTypeInt, keyData); err != nil {
 		return fmt.Errorf("s.upsertCrossSigningKeysForUserStmt: %w", err)
 	}
 	return nil
