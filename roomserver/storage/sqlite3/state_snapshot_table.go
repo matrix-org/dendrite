@@ -87,6 +87,9 @@ func prepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 func (s *stateSnapshotStatements) InsertState(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs types.StateBlockNIDs,
 ) (stateNID types.StateSnapshotNID, err error) {
+	if stateBlockNIDs == nil {
+		stateBlockNIDs = []types.StateBlockNID{} // zero slice to not store 'null' in the DB
+	}
 	stateBlockNIDs = stateBlockNIDs[:util.SortAndUnique(stateBlockNIDs)]
 	stateBlockNIDsJSON, err := json.Marshal(stateBlockNIDs)
 	if err != nil {
