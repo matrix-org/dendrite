@@ -64,7 +64,9 @@ func Setup(
 	rateLimits := newRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
 
-	unstableFeatures := make(map[string]bool)
+	unstableFeatures := map[string]bool{
+		//"org.matrix.e2e_cross_signing": true,
+	}
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
 	}
@@ -1066,6 +1068,22 @@ func Setup(
 
 	// Deleting E2E Backup Keys
 
+	// Cross-signing device keys
+
+	postDeviceSigningKeys := httputil.MakeAuthAPI("post_device_signing_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		return UploadCrossSigningDeviceKeys(req, userInteractiveAuth, keyAPI, device, accountDB, cfg)
+	})
+
+	postDeviceSigningSignatures := httputil.MakeAuthAPI("post_device_signing_signatures", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		return UploadCrossSigningDeviceSignatures(req, keyAPI, device)
+	})
+
+	r0mux.Handle("/keys/device_signing/upload", postDeviceSigningKeys).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/keys/signatures/upload", postDeviceSigningSignatures).Methods(http.MethodPost, http.MethodOptions)
+
+	unstableMux.Handle("/keys/device_signing/upload", postDeviceSigningKeys).Methods(http.MethodPost, http.MethodOptions)
+	unstableMux.Handle("/keys/signatures/upload", postDeviceSigningSignatures).Methods(http.MethodPost, http.MethodOptions)
+
 	// Supplying a device ID is deprecated.
 	r0mux.Handle("/keys/upload/{deviceID}",
 		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -1079,7 +1097,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/keys/query",
 		httputil.MakeAuthAPI("keys_query", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return QueryKeys(req, keyAPI)
+			return QueryKeys(req, keyAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	r0mux.Handle("/keys/claim",

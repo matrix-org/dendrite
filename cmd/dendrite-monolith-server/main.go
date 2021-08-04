@@ -112,7 +112,7 @@ func main() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsImpl.SetFederationSenderAPI(fsAPI)
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 	if traceInternal {

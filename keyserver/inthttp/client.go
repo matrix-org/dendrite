@@ -27,13 +27,15 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
-	InputDeviceListUpdatePath = "/keyserver/inputDeviceListUpdate"
-	PerformUploadKeysPath     = "/keyserver/performUploadKeys"
-	PerformClaimKeysPath      = "/keyserver/performClaimKeys"
-	QueryKeysPath             = "/keyserver/queryKeys"
-	QueryKeyChangesPath       = "/keyserver/queryKeyChanges"
-	QueryOneTimeKeysPath      = "/keyserver/queryOneTimeKeys"
-	QueryDeviceMessagesPath   = "/keyserver/queryDeviceMessages"
+	InputDeviceListUpdatePath         = "/keyserver/inputDeviceListUpdate"
+	PerformUploadKeysPath             = "/keyserver/performUploadKeys"
+	PerformClaimKeysPath              = "/keyserver/performClaimKeys"
+	PerformUploadDeviceKeysPath       = "/keyserver/performUploadDeviceKeys"
+	PerformUploadDeviceSignaturesPath = "/keyserver/performUploadDeviceSignatures"
+	QueryKeysPath                     = "/keyserver/queryKeys"
+	QueryKeyChangesPath               = "/keyserver/queryKeyChanges"
+	QueryOneTimeKeysPath              = "/keyserver/queryOneTimeKeys"
+	QueryDeviceMessagesPath           = "/keyserver/queryDeviceMessages"
 )
 
 // NewKeyServerClient creates a KeyInternalAPI implemented by talking to a HTTP POST API.
@@ -168,6 +170,40 @@ func (h *httpKeyInternalAPI) QueryKeyChanges(
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryKeyChangesPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.KeyError{
+			Err: err.Error(),
+		}
+	}
+}
+
+func (h *httpKeyInternalAPI) PerformUploadDeviceKeys(
+	ctx context.Context,
+	request *api.PerformUploadDeviceKeysRequest,
+	response *api.PerformUploadDeviceKeysResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUploadDeviceKeys")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformUploadDeviceKeysPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.KeyError{
+			Err: err.Error(),
+		}
+	}
+}
+
+func (h *httpKeyInternalAPI) PerformUploadDeviceSignatures(
+	ctx context.Context,
+	request *api.PerformUploadDeviceSignaturesRequest,
+	response *api.PerformUploadDeviceSignaturesResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUploadDeviceSignatures")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformUploadDeviceSignaturesPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.KeyError{

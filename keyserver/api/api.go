@@ -32,6 +32,8 @@ type KeyInternalAPI interface {
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
+	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
+	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
 	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
@@ -40,7 +42,9 @@ type KeyInternalAPI interface {
 
 // KeyError is returned if there was a problem performing/querying the server
 type KeyError struct {
-	Err string
+	Err                string `json:"error"`
+	IsInvalidSignature bool   `json:"is_invalid_signature,omitempty"` // M_INVALID_SIGNATURE
+	IsMissingParam     bool   `json:"is_missing_param,omitempty"`     // M_MISSING_PARAM
 }
 
 func (k *KeyError) Error() string {
@@ -151,7 +155,30 @@ type PerformClaimKeysResponse struct {
 	Error *KeyError
 }
 
+type PerformUploadDeviceKeysRequest struct {
+	gomatrixserverlib.CrossSigningKeys
+	// The user that uploaded the key, should be populated by the clientapi.
+	UserID string `json:"user_id"`
+}
+
+type PerformUploadDeviceKeysResponse struct {
+	Error *KeyError
+}
+
+type PerformUploadDeviceSignaturesRequest struct {
+	Signatures map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice
+	// The user that uploaded the sig, should be populated by the clientapi.
+	UserID string `json:"user_id"`
+}
+
+type PerformUploadDeviceSignaturesResponse struct {
+	Error *KeyError
+}
+
 type QueryKeysRequest struct {
+	// The user ID asking for the keys, e.g. if from a client API request.
+	// Will not be populated if the key request came from federation.
+	UserID string
 	// Maps user IDs to a list of devices
 	UserToDevices map[string][]string
 	Timeout       time.Duration
@@ -162,6 +189,10 @@ type QueryKeysResponse struct {
 	Failures map[string]interface{}
 	// Map of user_id to device_id to device_key
 	DeviceKeys map[string]map[string]json.RawMessage
+	// Maps of user_id to cross signing key
+	MasterKeys      map[string]gomatrixserverlib.CrossSigningKey
+	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
 	// Set if there was a fatal error processing this query
 	Error *KeyError
 }

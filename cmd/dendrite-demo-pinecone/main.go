@@ -179,7 +179,7 @@ func main() {
 		base, federation, rsAPI, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 

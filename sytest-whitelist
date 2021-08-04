@@ -550,3 +550,6 @@ Will not back up to an old backup version
 Can create more than 10 backup versions
 Can delete backup
 Deleted & recreated backups are empty
+Can upload self-signing keys
+Fails to upload self-signing keys with no auth
+Fails to upload self-signing key without master key
