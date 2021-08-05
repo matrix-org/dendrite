@@ -472,8 +472,14 @@ func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySign
 			for targetPurpose, targetKey := range keyMap {
 				switch targetPurpose {
 				case gomatrixserverlib.CrossSigningKeyPurposeMaster:
+					if res.MasterKeys == nil {
+						res.MasterKeys = map[string]gomatrixserverlib.CrossSigningKey{}
+					}
 					res.MasterKeys[targetUserID] = targetKey
 				case gomatrixserverlib.CrossSigningKeyPurposeSelfSigning:
+					if res.SelfSigningKeys == nil {
+						res.SelfSigningKeys = map[string]gomatrixserverlib.CrossSigningKey{}
+					}
 					res.SelfSigningKeys[targetUserID] = targetKey
 				}
 			}
