@@ -256,6 +256,8 @@ type QuerySignaturesResponse struct {
 	MasterKeys map[string]gomatrixserverlib.CrossSigningKey
 	// A map of target user ID -> cross-signing self-signing key
 	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	// A map of target user ID -> cross-signing user-signing key
+	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
 	// The request error, if any
 	Error *KeyError
 }
