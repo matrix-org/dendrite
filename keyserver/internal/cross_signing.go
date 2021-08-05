@@ -473,19 +473,19 @@ func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySign
 			}
 
 			for sourceUserID, forSourceUser := range keyMap {
-				if res.Signatures == nil {
-					res.Signatures = map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap{}
-				}
-				if _, ok := res.Signatures[targetUserID]; !ok {
-					res.Signatures[targetUserID] = map[gomatrixserverlib.KeyID]types.CrossSigningSigMap{}
-				}
-				if _, ok := res.Signatures[targetUserID][targetKeyID]; !ok {
-					res.Signatures[targetUserID][targetKeyID] = types.CrossSigningSigMap{}
-				}
-				if _, ok := res.Signatures[targetUserID][targetKeyID][sourceUserID]; !ok {
-					res.Signatures[targetUserID][targetKeyID][sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
-				}
 				for targetKeyID, targetSig := range forSourceUser {
+					if res.Signatures == nil {
+						res.Signatures = map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap{}
+					}
+					if _, ok := res.Signatures[targetUserID]; !ok {
+						res.Signatures[targetUserID] = map[gomatrixserverlib.KeyID]types.CrossSigningSigMap{}
+					}
+					if _, ok := res.Signatures[targetUserID][targetKeyID]; !ok {
+						res.Signatures[targetUserID][targetKeyID] = types.CrossSigningSigMap{}
+					}
+					if _, ok := res.Signatures[targetUserID][targetKeyID][sourceUserID]; !ok {
+						res.Signatures[targetUserID][targetKeyID][sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+					}
 					res.Signatures[targetUserID][targetKeyID][sourceUserID][targetKeyID] = targetSig
 				}
 			}
