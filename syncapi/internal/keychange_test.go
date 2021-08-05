@@ -50,6 +50,8 @@ func (k *mockKeyAPI) QueryDeviceMessages(ctx context.Context, req *keyapi.QueryD
 func (k *mockKeyAPI) InputDeviceListUpdate(ctx context.Context, req *keyapi.InputDeviceListUpdateRequest, res *keyapi.InputDeviceListUpdateResponse) {
 
 }
+func (k *mockKeyAPI) QuerySignatures(ctx context.Context, req *keyapi.QuerySignaturesRequest, res *keyapi.QuerySignaturesResponse) {
+}
 
 type mockRoomserverAPI struct {
 	api.RoomserverInternalAPITrace

@@ -252,7 +252,12 @@ type QuerySignaturesRequest struct {
 type QuerySignaturesResponse struct {
 	// A map of target user ID -> target key/device ID -> origin user ID -> origin key/device ID -> signatures
 	Signatures map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap
-	Error      *KeyError
+	// A map of target user ID -> cross-signing master key
+	MasterKeys map[string]gomatrixserverlib.CrossSigningKey
+	// A map of target user ID -> cross-signing self-signing key
+	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	// The request error, if any
+	Error *KeyError
 }
 
 type InputDeviceListUpdateRequest struct {

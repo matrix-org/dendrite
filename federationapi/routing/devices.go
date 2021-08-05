@@ -52,6 +52,13 @@ func GetUserDevices(
 		Devices:  []gomatrixserverlib.RespUserDevice{},
 	}
 
+	if masterKey, ok := sigRes.MasterKeys[userID]; ok {
+		response.MasterKey = &masterKey
+	}
+	if selfSigningKey, ok := sigRes.SelfSigningKeys[userID]; ok {
+		response.SelfSigningKey = &selfSigningKey
+	}
+
 	for _, dev := range res.Devices {
 		var key gomatrixserverlib.RespUserDeviceKeys
 		err := json.Unmarshal(dev.DeviceKeys.KeyJSON, &key)
