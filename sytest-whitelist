@@ -553,3 +553,6 @@ Deleted & recreated backups are empty
 GET /presence/:user_id/status fetches initial status
 PUT /presence/:user_id/status updates my presence
 Presence change reports an event to myself
+Can upload self-signing keys
+Fails to upload self-signing keys with no auth
+Fails to upload self-signing key without master key

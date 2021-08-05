@@ -99,6 +99,18 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 		return fmt.Errorf("tx.Exec (create snapshots table): %w", err)
 	}
 	logrus.Warn("New tables created...")
+	// some m.room.create events have a state snapshot but no state blocks at all which makes
+	// sense as there is no state before creation. The correct form should be to give the event
+	// in question a state snapshot NID of 0 to indicate 'no snapshot'.
+	// If we don't do this, we'll fail the assertions later on which try to ensure we didn't forget
+	// any snapshots.
+	_, err = tx.Exec(
+		`UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE event_type_nid = $1 AND event_state_key_nid = $2`,
+		types.MRoomCreateNID, types.EmptyStateKeyNID,
+	)
+	if err != nil {
+		return fmt.Errorf("resetting create events snapshots to 0 errored: %s", err)
+	}
 
 	batchsize := 100
 	for batchoffset := 0; batchoffset < snapshotcount; batchoffset += batchsize {

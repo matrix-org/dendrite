@@ -147,7 +147,7 @@ func main() {
 
 	accountDB := base.Base.CreateAccountsDB()
 	federation := createFederationClient(base)
-	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(&base.Base, &base.Base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
