@@ -177,21 +177,85 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 	}
 	for purpose, key := range toVerify {
 		// Collect together the key IDs we need to verify with. This will include
-		// all of the key IDs specified in the signatures. We don't do this for
-		// the master key because we have no means to verify the signatures - we
-		// instead just need to store them.
-		if purpose != gomatrixserverlib.CrossSigningKeyPurposeMaster {
-			// Marshal the specific key back into JSON so that we can verify the
-			// signature of it.
-			keyJSON, err := json.Marshal(key)
-			if err != nil {
-				res.Error = &api.KeyError{
-					Err: fmt.Sprintf("The JSON of the key section is invalid: %s", err.Error()),
+		// all of the key IDs specified in the signatures.
+		keyJSON, err := json.Marshal(key)
+		if err != nil {
+			res.Error = &api.KeyError{
+				Err: fmt.Sprintf("The JSON of the key section is invalid: %s", err.Error()),
+			}
+			return
+		}
+
+		switch purpose {
+		case gomatrixserverlib.CrossSigningKeyPurposeMaster:
+			// The master key should be signed by the device key that uploaded it.
+			// Does the device key exist?
+			var signaturesFound []string
+			for userID, forUser := range req.MasterKey.Signatures {
+				if userID != req.UserID {
+					// Ignore signatures that didn't come from this user. We only
+					// care if the user signed their own master key.
+					continue
 				}
-				return
+				for keyID := range forUser {
+					signaturesFound = append(signaturesFound, string(keyID))
+				}
 			}
 
-			// Now check if the subkey is signed by the master key.
+			// If there is a signature from another of the user's key, let's find those keys.
+			if len(signaturesFound) > 0 {
+				localKeys, err := a.DB.DeviceKeysForUser(ctx, req.UserID, signaturesFound)
+				if err != nil {
+					res.Error = &api.KeyError{
+						Err: fmt.Sprintf("Failed to retrieve user device keys: %s", err.Error()),
+					}
+					return
+				}
+
+				// Look through the keys we were given and unmarshal them.
+				allDeviceKeys := map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+				for _, localKey := range localKeys {
+					var deviceKeys gomatrixserverlib.DeviceKeys
+					if err := json.Unmarshal(localKey.KeyJSON, &deviceKeys); err != nil {
+						res.Error = &api.KeyError{
+							Err: fmt.Sprintf("Failed to unmarshal user device keys: %s", err.Error()),
+						}
+						return
+					}
+					allDeviceKeys[localKey.UserID] = deviceKeys.Keys
+				}
+
+				// For each signature we have, see if we can verify the signature.
+				for userID, forUser := range req.MasterKey.Signatures {
+					userKeys, ok := allDeviceKeys[userID]
+					if !ok {
+						res.Error = &api.KeyError{
+							Err: fmt.Sprintf("No keys were found for user %q", userID),
+						}
+						return
+					}
+					for keyID := range forUser {
+						key, ok := userKeys[keyID]
+						if !ok {
+							res.Error = &api.KeyError{
+								Err: fmt.Sprintf("No keys were found for user %q with key ID %q", userID, keyID),
+							}
+							return
+						}
+
+						if err := gomatrixserverlib.VerifyJSON(userID, keyID, ed25519.PublicKey(key), keyJSON); err != nil {
+							res.Error = &api.KeyError{
+								Err:                fmt.Sprintf("The master key failed signature verification: %s", err.Error()),
+								IsInvalidSignature: true,
+							}
+							return
+						}
+					}
+				}
+			}
+
+		default:
+			// Sub-keys should be signed by the master key.
 			if err := gomatrixserverlib.VerifyJSON(req.UserID, masterKeyID, ed25519.PublicKey(masterKey), keyJSON); err != nil {
 				res.Error = &api.KeyError{
 					Err:                fmt.Sprintf("The %q sub-key failed master key signature verification: %s", purpose, err.Error()),
