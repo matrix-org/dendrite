@@ -305,7 +305,7 @@ func (a *KeyInternalAPI) processSelfSignatures(
 				for originUserID, forOriginUserID := range sig.Signatures {
 					originDeviceKeys, ok := queryRes.DeviceKeys[originUserID]
 					if !ok {
-						continue
+						return fmt.Errorf("missing device keys for user %q", originUserID)
 					}
 
 					for originKeyID, originSig := range forOriginUserID {
@@ -336,9 +336,33 @@ func (a *KeyInternalAPI) processSelfSignatures(
 
 			case *gomatrixserverlib.DeviceKeys:
 				// The user is signing one of their devices with their self-signing key
+				// The QueryKeys response should contain the master key hopefully.
+				// First we need to marshal the blob back into JSON so we can verify
+				// it.
+				j, err := json.Marshal(sig)
+				if err != nil {
+					return fmt.Errorf("json.Marshal: %w", err)
+				}
 
 				for originUserID, forOriginUserID := range sig.Signatures {
 					for originKeyID, originSig := range forOriginUserID {
+						originMasterKeys, ok := queryRes.MasterKeys[originUserID]
+						if !ok {
+							return fmt.Errorf("missing master key for user %q", originUserID)
+						}
+
+						var originMasterKeyID gomatrixserverlib.KeyID
+						var originMasterKey gomatrixserverlib.Base64Bytes
+						for keyID, key := range originMasterKeys.Keys {
+							originMasterKeyID, originMasterKey = keyID, key
+							break
+						}
+
+						originMasterKeyPublic := ed25519.PublicKey(originMasterKey)
+
+						if err := gomatrixserverlib.VerifyJSON(originUserID, originMasterKeyID, originMasterKeyPublic, j); err != nil {
+							return fmt.Errorf("gomatrixserverlib.VerifyJSON: %w", err)
+						}
 
 						if err := a.DB.StoreCrossSigningSigsForTarget(
 							ctx, originUserID, originKeyID, targetUserID, targetKeyID, originSig,
