@@ -346,21 +346,21 @@ func (a *KeyInternalAPI) processSelfSignatures(
 
 				for originUserID, forOriginUserID := range sig.Signatures {
 					for originKeyID, originSig := range forOriginUserID {
-						originMasterKeys, ok := queryRes.MasterKeys[originUserID]
+						originSelfSigningKeys, ok := queryRes.SelfSigningKeys[originUserID]
 						if !ok {
 							return fmt.Errorf("missing master key for user %q", originUserID)
 						}
 
-						var originMasterKeyID gomatrixserverlib.KeyID
-						var originMasterKey gomatrixserverlib.Base64Bytes
-						for keyID, key := range originMasterKeys.Keys {
-							originMasterKeyID, originMasterKey = keyID, key
+						var originSelfSigningKeyID gomatrixserverlib.KeyID
+						var originSelfSigningKey gomatrixserverlib.Base64Bytes
+						for keyID, key := range originSelfSigningKeys.Keys {
+							originSelfSigningKeyID, originSelfSigningKey = keyID, key
 							break
 						}
 
-						originMasterKeyPublic := ed25519.PublicKey(originMasterKey)
+						originSelfSigningKeyPublic := ed25519.PublicKey(originSelfSigningKey)
 
-						if err := gomatrixserverlib.VerifyJSON(originUserID, originMasterKeyID, originMasterKeyPublic, j); err != nil {
+						if err := gomatrixserverlib.VerifyJSON(originUserID, originSelfSigningKeyID, originSelfSigningKeyPublic, j); err != nil {
 							return fmt.Errorf("gomatrixserverlib.VerifyJSON: %w", err)
 						}
 
