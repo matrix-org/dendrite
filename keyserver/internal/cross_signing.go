@@ -216,6 +216,28 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("a.DB.StoreCrossSigningKeysForUser: %s", err),
 		}
+		return
+	}
+
+	// Now upload any signatures that were included with the keys.
+	for _, key := range toVerify {
+		var targetKeyID gomatrixserverlib.KeyID
+		for targetKey := range key.Keys { // iterates once, see sanityCheckKey
+			targetKeyID = targetKey
+		}
+		for sigUserID, forSigUserID := range key.Signatures {
+			if sigUserID != req.UserID {
+				continue
+			}
+			for sigKeyID, sigBytes := range forSigUserID {
+				if err := a.DB.StoreCrossSigningSigsForTarget(ctx, sigUserID, targetKeyID, sigUserID, sigKeyID, sigBytes); err != nil {
+					res.Error = &api.KeyError{
+						Err: fmt.Sprintf("a.DB.StoreCrossSigningSigsForTarget: %s", err),
+					}
+					return
+				}
+			}
+		}
 	}
 }
 
