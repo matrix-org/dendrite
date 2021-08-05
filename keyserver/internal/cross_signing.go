@@ -348,7 +348,7 @@ func (a *KeyInternalAPI) processSelfSignatures(
 					for originKeyID, originSig := range forOriginUserID {
 						originSelfSigningKeys, ok := queryRes.SelfSigningKeys[originUserID]
 						if !ok {
-							return fmt.Errorf("missing master key for user %q", originUserID)
+							return fmt.Errorf("missing self-signing key for user %q", originUserID)
 						}
 
 						var originSelfSigningKeyID gomatrixserverlib.KeyID
