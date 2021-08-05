@@ -473,7 +473,7 @@ func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySign
 			}
 
 			for sourceUserID, forSourceUser := range keyMap {
-				for targetKeyID, targetSig := range forSourceUser {
+				for sourceKeyID, sourceSig := range forSourceUser {
 					if res.Signatures == nil {
 						res.Signatures = map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap{}
 					}
@@ -486,7 +486,7 @@ func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySign
 					if _, ok := res.Signatures[targetUserID][targetKeyID][sourceUserID]; !ok {
 						res.Signatures[targetUserID][targetKeyID][sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
 					}
-					res.Signatures[targetUserID][targetKeyID][sourceUserID][targetKeyID] = targetSig
+					res.Signatures[targetUserID][targetKeyID][sourceUserID][sourceKeyID] = sourceSig
 				}
 			}
 		}

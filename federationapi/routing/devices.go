@@ -20,7 +20,6 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // GetUserDevices for the given user id
@@ -45,8 +44,6 @@ func GetUserDevices(
 	for _, dev := range res.Devices {
 		sigReq.TargetIDs[userID] = append(sigReq.TargetIDs[userID], gomatrixserverlib.KeyID(dev.DeviceID))
 	}
-	logrus.Infof("Signatures request: %+v", sigReq)
-	logrus.Infof("Signatures response: %+v", sigRes)
 	keyAPI.QuerySignatures(req.Context(), sigReq, sigRes)
 
 	response := gomatrixserverlib.RespUserDevices{
