@@ -116,6 +116,30 @@ func (t *UserInternalAPITrace) QueryOpenIDToken(ctx context.Context, req *QueryO
 	return err
 }
 
+func (t *UserInternalAPITrace) InputPresenceData(ctx context.Context, req *InputPresenceRequest, res *InputPresenceResponse) error {
+	err := t.Impl.InputPresenceData(ctx, req, res)
+	util.GetLogger(ctx).Infof("InputPresenceData req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) QueryPresenceForUser(ctx context.Context, req *QueryPresenceForUserRequest, res *QueryPresenceForUserResponse) error {
+	err := t.Impl.QueryPresenceForUser(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryPresenceForUser req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) QueryPresenceAfter(ctx context.Context, req *QueryPresenceAfterRequest, res *QueryPresenceAfterResponse) error {
+	err := t.Impl.QueryPresenceAfter(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryPresenceAfter req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) QueryMaxPresenceID(ctx context.Context, req *QueryMaxPresenceIDRequest, res *QueryMaxPresenceIDResponse) error {
+	err := t.Impl.QueryMaxPresenceID(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryMaxPresenceID req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {
