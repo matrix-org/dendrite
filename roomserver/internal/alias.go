@@ -16,12 +16,16 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/util"
 )
 
 // RoomserverInternalAPIDatabase has the storage APIs needed to implement the alias API.
@@ -190,5 +194,101 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	}
 
 	response.Removed = true
+
+	// If the alias removed is one of the alt_aliases or the canonical one,
+	// we need to also remove it from the canonical_alias event
+	_ = updateCanonicalAlias(context.TODO(), r, request.UserID, roomID, request.Alias)
 	return nil
+}
+
+type roomAliasesContent struct {
+	Alias   string   `json:"alias,omitempty"`
+	Aliases []string `json:"alt_aliases,omitempty"`
+}
+
+// Build the updated m.room.aliases event to send to the room after addition or
+// removal of an alias
+func updateCanonicalAlias(
+	ctx context.Context,
+	rsAPI *RoomserverInternalAPI,
+	userID string,
+	roomID string,
+	alias string,
+) error {
+	updated := false
+	stateTuple := gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomCanonicalAlias,
+		StateKey:  "",
+	}
+	stateReq := api.QueryCurrentStateRequest{
+		RoomID:      roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{stateTuple},
+	}
+	stateRes := &api.QueryCurrentStateResponse{}
+	err := rsAPI.QueryCurrentState(ctx, &stateReq, stateRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Query state failed")
+		return err
+	}
+
+	updatedCanonicalAlias := roomAliasesContent{
+		Alias:   "",
+		Aliases: []string{""},
+	}
+
+	// We try to get the current canonical_alias state, and if found compare its content
+	// to the removed alias
+	if canonicalAliasEvent, ok := stateRes.StateEvents[stateTuple]; ok {
+		canonicalAliasContent := roomAliasesContent{
+			Alias:   "",
+			Aliases: []string{""},
+		}
+		// TODO skip malformed event?
+		err = json.Unmarshal(canonicalAliasEvent.Content(), &canonicalAliasContent)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("Get canonical_alias event content failed")
+			return err
+		}
+		if alias == canonicalAliasContent.Alias {
+			updated = true
+		} else {
+			updatedCanonicalAlias.Alias = canonicalAliasContent.Alias
+		}
+		for _, s := range canonicalAliasContent.Aliases {
+			if alias == s {
+				updated = true
+			} else {
+				updatedCanonicalAlias.Aliases = append(updatedCanonicalAlias.Aliases, s)
+			}
+		}
+	}
+
+	if !updated {
+		return nil
+	}
+
+	stateKey := ""
+
+	builder := gomatrixserverlib.EventBuilder{
+		Sender:   userID,
+		RoomID:   roomID,
+		Type:     gomatrixserverlib.MRoomCanonicalAlias,
+		StateKey: &stateKey,
+	}
+
+	rawContent, err := json.Marshal(updatedCanonicalAlias)
+	if err != nil {
+		return err
+	}
+	err = builder.SetContent(json.RawMessage(rawContent))
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	e, err := eventutil.QueryAndBuildEvent(ctx, &builder, rsAPI.Cfg.Matrix, now, rsAPI, nil)
+	if err != nil {
+		return err
+	}
+	err = api.SendEvents(ctx, rsAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, rsAPI.Cfg.Matrix.ServerName, nil)
+	return err
 }
