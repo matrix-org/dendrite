@@ -216,6 +216,18 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 }
 
 func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req *api.PerformUploadDeviceSignaturesRequest, res *api.PerformUploadDeviceSignaturesResponse) {
+	// Before we do anything, we need the master and self-signing keys for this user.
+	// Then we can verify the signatures make sense.
+	queryReq := &api.QueryKeysRequest{
+		UserID:        req.UserID,
+		UserToDevices: map[string][]string{},
+	}
+	queryRes := &api.QueryKeysResponse{}
+	for userID := range req.Signatures {
+		queryReq.UserToDevices[userID] = []string{}
+	}
+	a.QueryKeys(ctx, queryReq, queryRes)
+
 	selfSignatures := map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice{}
 	otherSignatures := map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice{}
 
@@ -254,14 +266,14 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 		}
 	}
 
-	if err := a.processSelfSignatures(ctx, req.UserID, selfSignatures); err != nil {
+	if err := a.processSelfSignatures(ctx, req.UserID, queryRes, selfSignatures); err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("a.processSelfSignatures: %s", err),
 		}
 		return
 	}
 
-	if err := a.processOtherSignatures(ctx, req.UserID, otherSignatures); err != nil {
+	if err := a.processOtherSignatures(ctx, req.UserID, queryRes, otherSignatures); err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("a.processOtherSignatures: %s", err),
 		}
@@ -270,7 +282,7 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 }
 
 func (a *KeyInternalAPI) processSelfSignatures(
-	ctx context.Context, _ string,
+	ctx context.Context, _ string, queryRes *api.QueryKeysResponse,
 	signatures map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice,
 ) error {
 	// Here we will process:
@@ -281,8 +293,39 @@ func (a *KeyInternalAPI) processSelfSignatures(
 		for targetKeyID, signature := range forTargetUserID {
 			switch sig := signature.CrossSigningBody.(type) {
 			case *gomatrixserverlib.CrossSigningKey:
+				// The user is signing their master key with one of their devices
+				// The QueryKeys response should contain the device key hopefully.
+				// First we need to marshal the blob back into JSON so we can verify
+				// it.
+				j, err := json.Marshal(sig)
+				if err != nil {
+					return fmt.Errorf("json.Marshal: %w", err)
+				}
+
 				for originUserID, forOriginUserID := range sig.Signatures {
+					originDeviceKeys, ok := queryRes.DeviceKeys[originUserID]
+					if !ok {
+						continue
+					}
+
 					for originKeyID, originSig := range forOriginUserID {
+						originDeviceKeyID := gomatrixserverlib.KeyID("ed25519:" + originKeyID)
+
+						var originKey gomatrixserverlib.DeviceKeys
+						if err := json.Unmarshal(originDeviceKeys[string(originKeyID)], &originKey); err != nil {
+							return fmt.Errorf("json.Unmarshal: %w", err)
+						}
+
+						originSigningKey, ok := originKey.Keys[originDeviceKeyID]
+						if !ok {
+							return fmt.Errorf("missing origin signing key %q", originDeviceKeyID)
+						}
+						originSigningKeyPublic := ed25519.PublicKey(originSigningKey)
+
+						if err := gomatrixserverlib.VerifyJSON(originUserID, originDeviceKeyID, originSigningKeyPublic, j); err != nil {
+							return fmt.Errorf("gomatrixserverlib.VerifyJSON: %w", err)
+						}
+
 						if err := a.DB.StoreCrossSigningSigsForTarget(
 							ctx, originUserID, originKeyID, targetUserID, targetKeyID, originSig,
 						); err != nil {
@@ -292,8 +335,11 @@ func (a *KeyInternalAPI) processSelfSignatures(
 				}
 
 			case *gomatrixserverlib.DeviceKeys:
+				// The user is signing one of their devices with their self-signing key
+
 				for originUserID, forOriginUserID := range sig.Signatures {
 					for originKeyID, originSig := range forOriginUserID {
+
 						if err := a.DB.StoreCrossSigningSigsForTarget(
 							ctx, originUserID, originKeyID, targetUserID, targetKeyID, originSig,
 						); err != nil {
@@ -312,7 +358,7 @@ func (a *KeyInternalAPI) processSelfSignatures(
 }
 
 func (a *KeyInternalAPI) processOtherSignatures(
-	ctx context.Context, userID string,
+	ctx context.Context, userID string, queryRes *api.QueryKeysResponse,
 	signatures map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice,
 ) error {
 	// Here we will process:
