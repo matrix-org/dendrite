@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"crypto/ed25519"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -466,6 +467,9 @@ func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySign
 		for _, targetKeyID := range forTargetUser {
 			keyMap, err := a.DB.CrossSigningSigsForTarget(ctx, targetUserID, targetKeyID)
 			if err != nil {
+				if err == sql.ErrNoRows {
+					continue
+				}
 				res.Error = &api.KeyError{
 					Err: fmt.Sprintf("a.DB.CrossSigningSigsForTarget: %s", err),
 				}

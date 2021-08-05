@@ -66,8 +66,8 @@ func GetUserDevices(
 			Keys:        key,
 		}
 
-		if targetUser, ok := sigRes.Signatures[dev.UserID]; ok {
-			if targetKey, ok := targetUser[gomatrixserverlib.KeyID(dev.DeviceID)]; !ok {
+		if targetUser, ok := sigRes.Signatures[userID]; ok {
+			if targetKey, ok := targetUser[gomatrixserverlib.KeyID(dev.DeviceID)]; ok {
 				for sourceUserID, forSourceUser := range targetKey {
 					for sourceKeyID, sourceKey := range forSourceUser {
 						if _, ok := device.Keys.Signatures[sourceUserID]; !ok {
