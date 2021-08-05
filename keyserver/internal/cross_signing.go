@@ -460,3 +460,32 @@ func (a *KeyInternalAPI) crossSigningKeysFromDatabase(
 		}
 	}
 }
+
+func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySignaturesRequest, res *api.QuerySignaturesResponse) {
+	for targetUserID, forTargetUser := range req.TargetIDs {
+		for _, targetKeyID := range forTargetUser {
+			keyMap, err := a.DB.CrossSigningSigsForTarget(ctx, targetUserID, targetKeyID)
+			if err != nil {
+				res.Error = &api.KeyError{
+					Err: fmt.Sprintf("a.DB.CrossSigningSigsForTarget: %s", err),
+				}
+				return
+			}
+
+			for sourceUserID, forSourceUser := range keyMap {
+				if _, ok := res.Signatures[targetUserID]; !ok {
+					res.Signatures[targetUserID] = map[gomatrixserverlib.KeyID]types.CrossSigningSigMap{}
+				}
+				if _, ok := res.Signatures[targetUserID][targetKeyID]; !ok {
+					res.Signatures[targetUserID][targetKeyID] = types.CrossSigningSigMap{}
+				}
+				if _, ok := res.Signatures[targetUserID][targetKeyID][sourceUserID]; !ok {
+					res.Signatures[targetUserID][targetKeyID][sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+				}
+				for targetKeyID, targetSig := range forSourceUser {
+					res.Signatures[targetUserID][targetKeyID][sourceUserID][targetKeyID] = targetSig
+				}
+			}
+		}
+	}
+}

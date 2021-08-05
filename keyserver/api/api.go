@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/keyserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -38,6 +39,7 @@ type KeyInternalAPI interface {
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
 	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
+	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server
@@ -240,6 +242,17 @@ type QueryDeviceMessagesResponse struct {
 	StreamID int
 	Devices  []DeviceMessage
 	Error    *KeyError
+}
+
+type QuerySignaturesRequest struct {
+	// A map of target user ID -> target key/device IDs to retrieve signatures for
+	TargetIDs map[string][]gomatrixserverlib.KeyID `json:"target_ids"`
+}
+
+type QuerySignaturesResponse struct {
+	// A map of target user ID -> target key/device ID -> origin user ID -> origin key/device ID -> signatures
+	Signatures map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap
+	Error      *KeyError
 }
 
 type InputDeviceListUpdateRequest struct {
