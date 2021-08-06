@@ -117,46 +117,11 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 		masterKey, hasMasterKey = existingKeys[gomatrixserverlib.CrossSigningKeyPurposeMaster]
 	}
 
-	// If the user isn't a local user and we haven't successfully found a key
-	// through any local means then ask over federation.
-	if !hasMasterKey {
-		_, host, err := gomatrixserverlib.SplitID('@', req.UserID)
-		if err != nil {
-			res.Error = &api.KeyError{
-				Err: "Retrieving cross-signing keys from federation failed: " + err.Error(),
-			}
-			return
-		}
-		keys, err := a.FedClient.QueryKeys(ctx, host, map[string][]string{
-			req.UserID: {},
-		})
-		if err != nil {
-			res.Error = &api.KeyError{
-				Err: "Retrieving cross-signing keys from federation failed: " + err.Error(),
-			}
-			return
-		}
-		switch k := keys.MasterKeys[req.UserID].CrossSigningBody.(type) {
-		case *gomatrixserverlib.CrossSigningKey:
-			if err := sanityCheckKey(*k, req.UserID, gomatrixserverlib.CrossSigningKeyPurposeMaster); err != nil {
-				res.Error = &api.KeyError{
-					Err: "Master key sanity check failed: " + err.Error(),
-				}
-				return
-			}
-		default:
-			res.Error = &api.KeyError{
-				Err: "Unexpected type for master key retrieved from federation",
-			}
-			return
-		}
-	}
-
 	// If we still don't have a master key at this point then there's nothing else
 	// we can do - we've checked both the request and the database.
 	if !hasMasterKey {
 		res.Error = &api.KeyError{
-			Err:            "No master key was found, either in the database or in the request!",
+			Err:            "No master key was found either in the database or in the request!",
 			IsMissingParam: true,
 		}
 		return

@@ -372,9 +372,15 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 
 	domains := map[string]struct{}{}
 	for domain := range domainToDeviceKeys {
+		if domain == string(a.ThisServer) {
+			continue
+		}
 		domains[domain] = struct{}{}
 	}
 	for domain := range domainToCrossSigningKeys {
+		if domain == string(a.ThisServer) {
+			continue
+		}
 		domains[domain] = struct{}{}
 	}
 	wg.Add(len(domains))
@@ -430,8 +436,12 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	res *api.QueryKeysResponse,
 ) {
 	defer wg.Done()
-	fedCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	fedCtx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		fedCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	// for users who we do not have any knowledge about, try to start doing device list updates for them
 	// by hitting /users/devices - otherwise fallback to /keys/query which has nicer bulk properties but
 	// lack a stream ID.
