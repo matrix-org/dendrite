@@ -338,20 +338,18 @@ func (a *KeyInternalAPI) processSelfSignatures(
 					}
 
 					for originKeyID, originSig := range forOriginUserID {
-						originDeviceKeyID := gomatrixserverlib.KeyID("ed25519:" + originKeyID)
-
 						var originKey gomatrixserverlib.DeviceKeys
 						if err := json.Unmarshal(originDeviceKeys[string(originKeyID)], &originKey); err != nil {
 							return fmt.Errorf("json.Unmarshal: %w", err)
 						}
 
-						originSigningKey, ok := originKey.Keys[originDeviceKeyID]
+						originSigningKey, ok := originKey.Keys[originKeyID]
 						if !ok {
-							return fmt.Errorf("missing origin signing key %q", originDeviceKeyID)
+							return fmt.Errorf("missing origin signing key %q", originKeyID)
 						}
 						originSigningKeyPublic := ed25519.PublicKey(originSigningKey)
 
-						if err := gomatrixserverlib.VerifyJSON(originUserID, originDeviceKeyID, originSigningKeyPublic, j); err != nil {
+						if err := gomatrixserverlib.VerifyJSON(originUserID, originKeyID, originSigningKeyPublic, j); err != nil {
 							return fmt.Errorf("gomatrixserverlib.VerifyJSON: %w", err)
 						}
 
