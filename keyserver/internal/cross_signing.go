@@ -448,6 +448,11 @@ func (a *KeyInternalAPI) processOtherSignatures(
 					return fmt.Errorf("there are no signatures from uploading user %q", userID)
 				}
 
+				// If the key ID is naked then we should add a scheme to it.
+				if !strings.HasPrefix(string(targetKeyID), "ed25519:") {
+					targetKeyID = "ed25519:" + targetKeyID
+				}
+
 				for originKeyID, originSig := range sigs {
 					if err := a.DB.StoreCrossSigningSigsForTarget(
 						ctx, userID, originKeyID, targetUserID, targetKeyID, originSig,
