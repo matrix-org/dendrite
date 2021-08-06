@@ -436,16 +436,16 @@ func (a *KeyInternalAPI) processOtherSignatures(
 					// actually be.
 					localKeyData, lok := masterKey.Keys[targetKeyID]
 					if !lok {
-						return fmt.Errorf("uploaded master key for user %q doesn't match local copy", targetUserID)
+						return fmt.Errorf("uploaded master key %q for user %q doesn't match local copy", targetKeyID, targetUserID)
 					} else if !bytes.Equal(suppliedKeyData, localKeyData) {
-						return fmt.Errorf("uploaded master key for user %q doesn't match local copy", targetUserID)
+						return fmt.Errorf("uploaded master key %q for user %q doesn't match local copy", targetKeyID, targetUserID)
 					}
 
 					// We only care about the signatures from the uploading user, so
 					// we will ignore anything that didn't originate from them.
 					userSigs, ok := sig.Signatures[userID]
 					if !ok {
-						return fmt.Errorf("there are no signatures from uploading user %q", userID)
+						return fmt.Errorf("there are no signatures on master key %q from uploading user %q", targetKeyID, userID)
 					}
 
 					for originKeyID, originSig := range userSigs {
@@ -458,8 +458,9 @@ func (a *KeyInternalAPI) processOtherSignatures(
 				}
 
 			default:
-				// Users shouldn't be signing anything other people's devices,
-				// so we'll just do nothing with it if that's the case.
+				// Users should only be signing another person's master key,
+				// so if we're here, it's probably because it's actually a
+				// gomatrixserverlib.DeviceKeys, which doesn't make sense.
 			}
 		}
 	}
@@ -485,7 +486,7 @@ func (a *KeyInternalAPI) crossSigningKeysFromDatabase(
 			}
 
 			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, userID, keyID)
-			if err != nil {
+			if err != nil && err != sql.ErrNoRows {
 				logrus.WithError(err).Errorf("Failed to get cross-signing signatures for user %q key %q", userID, keyID)
 				continue
 			}
