@@ -418,46 +418,47 @@ func (a *KeyInternalAPI) processOtherSignatures(
 	// * A user signing someone else's master keys using their user-signing keys
 
 	for targetUserID, forTargetUserID := range signatures {
-		for targetKeyID, signature := range forTargetUserID {
+		for _, signature := range forTargetUserID {
 			switch sig := signature.CrossSigningBody.(type) {
 			case *gomatrixserverlib.CrossSigningKey:
-				// Find the target master key.
+				// Find the local copy of the master key. We'll use this to be
+				// sure that the supplied stanza matches the key that we think it
+				// should be.
 				masterKey, ok := queryRes.MasterKeys[targetUserID]
 				if !ok {
 					return fmt.Errorf("failed to find master key for user %q", targetUserID)
 				}
 
-				// The master key will be supplied in the request, but we should
-				// make sure that it matches what we think the master key should
-				// actually be.
+				// For each key ID, write the signatures. Maybe there'll be more
+				// than one algorithm in the future so it's best not to focus on
+				// everything being ed25519:.
+				var targetKeyID gomatrixserverlib.KeyID
 				for keyID, suppliedKeyData := range sig.Keys {
+					targetKeyID = keyID
+
+					// The master key will be supplied in the request, but we should
+					// make sure that it matches what we think the master key should
+					// actually be.
 					localKeyData, lok := masterKey.Keys[keyID]
 					if !lok {
 						return fmt.Errorf("uploaded master key for user %q doesn't match local copy", targetUserID)
-					} else {
-						if !bytes.Equal(suppliedKeyData, localKeyData) {
-							return fmt.Errorf("uploaded master key for user %q doesn't match local copy", targetUserID)
-						}
+					} else if !bytes.Equal(suppliedKeyData, localKeyData) {
+						return fmt.Errorf("uploaded master key for user %q doesn't match local copy", targetUserID)
 					}
-				}
 
-				// We only care about the signatures from the uploading user, so
-				// we will ignore anything that didn't originate from them.
-				sigs, ok := sig.Signatures[userID]
-				if !ok {
-					return fmt.Errorf("there are no signatures from uploading user %q", userID)
-				}
+					// We only care about the signatures from the uploading user, so
+					// we will ignore anything that didn't originate from them.
+					userSigs, ok := sig.Signatures[userID]
+					if !ok {
+						return fmt.Errorf("there are no signatures from uploading user %q", userID)
+					}
 
-				// If the key ID is naked then we should add a scheme to it.
-				if !strings.HasPrefix(string(targetKeyID), "ed25519:") {
-					targetKeyID = "ed25519:" + targetKeyID
-				}
-
-				for originKeyID, originSig := range sigs {
-					if err := a.DB.StoreCrossSigningSigsForTarget(
-						ctx, userID, originKeyID, targetUserID, targetKeyID, originSig,
-					); err != nil {
-						return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+					for originKeyID, originSig := range userSigs {
+						if err := a.DB.StoreCrossSigningSigsForTarget(
+							ctx, userID, originKeyID, targetUserID, targetKeyID, originSig,
+						); err != nil {
+							return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+						}
 					}
 				}
 
