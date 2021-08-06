@@ -15,6 +15,7 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"database/sql"
@@ -257,6 +258,8 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 	selfSignatures := map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice{}
 	otherSignatures := map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice{}
 
+	// Sort signatures into two groups: one where people have signed their own
+	// keys and one where people have signed someone elses
 	for userID, forUserID := range req.Signatures {
 		for keyID, keyOrDevice := range forUserID {
 			switch key := keyOrDevice.CrossSigningBody.(type) {
@@ -413,6 +416,52 @@ func (a *KeyInternalAPI) processOtherSignatures(
 ) error {
 	// Here we will process:
 	// * A user signing someone else's master keys using their user-signing keys
+
+	for targetUserID, forTargetUserID := range signatures {
+		for targetKeyID, signature := range forTargetUserID {
+			switch sig := signature.CrossSigningBody.(type) {
+			case *gomatrixserverlib.CrossSigningKey:
+				// Find the target master key.
+				masterKey, ok := queryRes.MasterKeys[targetUserID]
+				if !ok {
+					return fmt.Errorf("failed to find master key for user %q", targetUserID)
+				}
+
+				// The master key will be supplied in the request, but we should
+				// make sure that it matches what we think the master key should
+				// actually be.
+				for keyID, suppliedKeyData := range sig.Keys {
+					localKeyData, lok := masterKey.Keys[keyID]
+					if !lok {
+						return fmt.Errorf("uploaded master key for user %q doesn't match local copy", targetUserID)
+					} else {
+						if !bytes.Equal(suppliedKeyData, localKeyData) {
+							return fmt.Errorf("uploaded master key for user %q doesn't match local copy", targetUserID)
+						}
+					}
+				}
+
+				// We only care about the signatures from the uploading user, so
+				// we will ignore anything that didn't originate from them.
+				sigs, ok := sig.Signatures[userID]
+				if !ok {
+					return fmt.Errorf("there are no signatures from uploading user %q", userID)
+				}
+
+				for originKeyID, originSig := range sigs {
+					if err := a.DB.StoreCrossSigningSigsForTarget(
+						ctx, userID, originKeyID, targetUserID, targetKeyID, originSig,
+					); err != nil {
+						return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+					}
+				}
+
+			default:
+				// Users shouldn't be signing anything other people's devices,
+				// so we'll just do nothing with it if that's the case.
+			}
+		}
+	}
 
 	return nil
 }
