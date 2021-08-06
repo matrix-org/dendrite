@@ -230,7 +230,6 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 				continue
 			}
 			for sigKeyID, sigBytes := range forSigUserID {
-				// origin origin target target
 				if err := a.DB.StoreCrossSigningSigsForTarget(ctx, sigUserID, sigKeyID, req.UserID, targetKeyID, sigBytes); err != nil {
 					res.Error = &api.KeyError{
 						Err: fmt.Sprintf("a.DB.StoreCrossSigningSigsForTarget: %s", err),
