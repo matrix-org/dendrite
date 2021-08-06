@@ -432,14 +432,11 @@ func (a *KeyInternalAPI) processOtherSignatures(
 				// For each key ID, write the signatures. Maybe there'll be more
 				// than one algorithm in the future so it's best not to focus on
 				// everything being ed25519:.
-				var targetKeyID gomatrixserverlib.KeyID
-				for keyID, suppliedKeyData := range sig.Keys {
-					targetKeyID = keyID
-
+				for targetKeyID, suppliedKeyData := range sig.Keys {
 					// The master key will be supplied in the request, but we should
 					// make sure that it matches what we think the master key should
 					// actually be.
-					localKeyData, lok := masterKey.Keys[keyID]
+					localKeyData, lok := masterKey.Keys[targetKeyID]
 					if !lok {
 						return fmt.Errorf("uploaded master key for user %q doesn't match local copy", targetUserID)
 					} else if !bytes.Equal(suppliedKeyData, localKeyData) {
