@@ -372,9 +372,15 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 
 	domains := map[string]struct{}{}
 	for domain := range domainToDeviceKeys {
+		if domain == string(a.ThisServer) {
+			continue
+		}
 		domains[domain] = struct{}{}
 	}
 	for domain := range domainToCrossSigningKeys {
+		if domain == string(a.ThisServer) {
+			continue
+		}
 		domains[domain] = struct{}{}
 	}
 	wg.Add(len(domains))
@@ -406,17 +412,11 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 		}
 
 		for userID, body := range result.MasterKeys {
-			switch b := body.CrossSigningBody.(type) {
-			case *gomatrixserverlib.CrossSigningKey:
-				res.MasterKeys[userID] = *b
-			}
+			res.MasterKeys[userID] = body
 		}
 
 		for userID, body := range result.SelfSigningKeys {
-			switch b := body.CrossSigningBody.(type) {
-			case *gomatrixserverlib.CrossSigningKey:
-				res.SelfSigningKeys[userID] = *b
-			}
+			res.SelfSigningKeys[userID] = body
 		}
 
 		// TODO: do we want to persist these somewhere now
@@ -430,8 +430,12 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	res *api.QueryKeysResponse,
 ) {
 	defer wg.Done()
-	fedCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	fedCtx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		fedCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	// for users who we do not have any knowledge about, try to start doing device list updates for them
 	// by hitting /users/devices - otherwise fallback to /keys/query which has nicer bulk properties but
 	// lack a stream ID.

@@ -71,8 +71,14 @@ func QueryDeviceKeys(
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct {
-			DeviceKeys interface{} `json:"device_keys"`
-		}{queryRes.DeviceKeys},
+			DeviceKeys      interface{} `json:"device_keys"`
+			MasterKeys      interface{} `json:"master_keys"`
+			SelfSigningKeys interface{} `json:"self_signing_keys"`
+		}{
+			queryRes.DeviceKeys,
+			queryRes.MasterKeys,
+			queryRes.SelfSigningKeys,
+		},
 	}
 }
 

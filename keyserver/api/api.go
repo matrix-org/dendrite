@@ -160,7 +160,7 @@ type PerformClaimKeysResponse struct {
 type PerformUploadDeviceKeysRequest struct {
 	gomatrixserverlib.CrossSigningKeys
 	// The user that uploaded the key, should be populated by the clientapi.
-	UserID string `json:"user_id"`
+	UserID string
 }
 
 type PerformUploadDeviceKeysResponse struct {
@@ -170,7 +170,7 @@ type PerformUploadDeviceKeysResponse struct {
 type PerformUploadDeviceSignaturesRequest struct {
 	Signatures map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice
 	// The user that uploaded the sig, should be populated by the clientapi.
-	UserID string `json:"user_id"`
+	UserID string
 }
 
 type PerformUploadDeviceSignaturesResponse struct {
