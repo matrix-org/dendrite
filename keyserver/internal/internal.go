@@ -412,17 +412,11 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 		}
 
 		for userID, body := range result.MasterKeys {
-			switch b := body.CrossSigningBody.(type) {
-			case *gomatrixserverlib.CrossSigningKey:
-				res.MasterKeys[userID] = *b
-			}
+			res.MasterKeys[userID] = body
 		}
 
 		for userID, body := range result.SelfSigningKeys {
-			switch b := body.CrossSigningBody.(type) {
-			case *gomatrixserverlib.CrossSigningKey:
-				res.SelfSigningKeys[userID] = *b
-			}
+			res.SelfSigningKeys[userID] = body
 		}
 
 		// TODO: do we want to persist these somewhere now
