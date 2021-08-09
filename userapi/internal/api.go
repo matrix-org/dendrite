@@ -460,7 +460,7 @@ func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.Que
 	if err != nil {
 		return err
 	}
-	var maxLastSeen int64
+	var maxLastSeenTS int64
 	// If it's a local user, we can check the devices for possible updated timestamps
 	if domain == a.ServerName {
 		var devs []api.Device
@@ -469,8 +469,8 @@ func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.Que
 			return err
 		}
 		for _, dev := range devs {
-			if dev.LastSeenTS > maxLastSeen {
-				maxLastSeen = dev.LastSeenTS
+			if dev.LastSeenTS > maxLastSeenTS {
+				maxLastSeenTS = dev.LastSeenTS
 			}
 		}
 	}
@@ -483,8 +483,10 @@ func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.Que
 	res.PresenceStatus = p.Presence
 	res.StatusMsg = p.StatusMsg
 	res.LastActiveTS = p.LastActiveTS
-	if maxLastSeen > p.LastActiveTS.Time().Unix() {
-		res.LastActiveTS = gomatrixserverlib.Timestamp(maxLastSeen)
+
+	maxLastSeen := gomatrixserverlib.Timestamp(maxLastSeenTS)
+	if maxLastSeen.Time().After(p.LastActiveTS.Time()) {
+		res.LastActiveTS = maxLastSeen
 	}
 	return nil
 }
