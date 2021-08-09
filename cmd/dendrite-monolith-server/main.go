@@ -120,6 +120,11 @@ func main() {
 			Impl: userAPI,
 		}
 	}
+	// needs to be after the SetUserAPI call above
+	if base.UseHTTPAPIs {
+		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI)
+		keyAPI = base.KeyServerHTTPClient()
+	}
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,

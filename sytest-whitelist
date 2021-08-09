@@ -556,3 +556,4 @@ Presence change reports an event to myself
 Can upload self-signing keys
 Fails to upload self-signing keys with no auth
 Fails to upload self-signing key without master key
+can fetch self-signing keys over federation

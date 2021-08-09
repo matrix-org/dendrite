@@ -300,12 +300,38 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 
 	// attempt to satisfy key queries from the local database first as we should get device updates pushed to us
 	domainToDeviceKeys = a.remoteKeysFromDatabase(ctx, res, domainToDeviceKeys)
-	if len(domainToDeviceKeys) == 0 && len(domainToCrossSigningKeys) == 0 {
-		return // nothing to query
+	if len(domainToDeviceKeys) > 0 || len(domainToCrossSigningKeys) > 0 {
+		// perform key queries for remote devices
+		a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys, domainToCrossSigningKeys)
 	}
 
-	// perform key queries for remote devices
-	a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys, domainToCrossSigningKeys)
+	// Finally, append signatures that we know about
+	// TODO: This is horrible because we need to round-trip the signature from
+	// JSON, add the signatures and marshal it again, for some reason?
+	for userID, forUserID := range res.DeviceKeys {
+		for keyID, key := range forUserID {
+			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, userID, gomatrixserverlib.KeyID(keyID))
+			if err != nil {
+				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
+				continue
+			}
+			if len(sigMap) == 0 {
+				continue
+			}
+			var deviceKey gomatrixserverlib.DeviceKeys
+			if err = json.Unmarshal(key, &deviceKey); err != nil {
+				continue
+			}
+			for sourceUserID, forSourceUser := range sigMap {
+				for sourceKeyID, sourceSig := range forSourceUser {
+					deviceKey.Signatures[sourceUserID][sourceKeyID] = sourceSig
+				}
+			}
+			if js, err := json.Marshal(deviceKey); err == nil {
+				res.DeviceKeys[userID][keyID] = js
+			}
+		}
+	}
 }
 
 func (a *KeyInternalAPI) remoteKeysFromDatabase(
@@ -346,9 +372,15 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 
 	domains := map[string]struct{}{}
 	for domain := range domainToDeviceKeys {
+		if domain == string(a.ThisServer) {
+			continue
+		}
 		domains[domain] = struct{}{}
 	}
 	for domain := range domainToCrossSigningKeys {
+		if domain == string(a.ThisServer) {
+			continue
+		}
 		domains[domain] = struct{}{}
 	}
 	wg.Add(len(domains))
@@ -380,17 +412,11 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 		}
 
 		for userID, body := range result.MasterKeys {
-			switch b := body.CrossSigningBody.(type) {
-			case *gomatrixserverlib.CrossSigningKey:
-				res.MasterKeys[userID] = *b
-			}
+			res.MasterKeys[userID] = body
 		}
 
 		for userID, body := range result.SelfSigningKeys {
-			switch b := body.CrossSigningBody.(type) {
-			case *gomatrixserverlib.CrossSigningKey:
-				res.SelfSigningKeys[userID] = *b
-			}
+			res.SelfSigningKeys[userID] = body
 		}
 
 		// TODO: do we want to persist these somewhere now
@@ -404,8 +430,12 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	res *api.QueryKeysResponse,
 ) {
 	defer wg.Done()
-	fedCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	fedCtx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		fedCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	// for users who we do not have any knowledge about, try to start doing device list updates for them
 	// by hitting /users/devices - otherwise fallback to /keys/query which has nicer bulk properties but
 	// lack a stream ID.

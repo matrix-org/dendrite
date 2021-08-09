@@ -159,7 +159,46 @@ func (d *Database) MarkDeviceListStale(ctx context.Context, userID string, isSta
 }
 
 // CrossSigningKeysForUser returns the latest known cross-signing keys for a user, if any.
-func (d *Database) CrossSigningKeysForUser(ctx context.Context, userID string) (types.CrossSigningKeyMap, error) {
+func (d *Database) CrossSigningKeysForUser(ctx context.Context, userID string) (map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.CrossSigningKey, error) {
+	keyMap, err := d.CrossSigningKeysTable.SelectCrossSigningKeysForUser(ctx, nil, userID)
+	if err != nil {
+		return nil, fmt.Errorf("d.CrossSigningKeysTable.SelectCrossSigningKeysForUser: %w", err)
+	}
+	results := map[gomatrixserverlib.CrossSigningKeyPurpose]gomatrixserverlib.CrossSigningKey{}
+	for purpose, key := range keyMap {
+		keyID := gomatrixserverlib.KeyID("ed25519:" + key.Encode())
+		result := gomatrixserverlib.CrossSigningKey{
+			UserID: userID,
+			Usage:  []gomatrixserverlib.CrossSigningKeyPurpose{purpose},
+			Keys: map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{
+				keyID: key,
+			},
+		}
+		sigMap, err := d.CrossSigningSigsTable.SelectCrossSigningSigsForTarget(ctx, nil, userID, keyID)
+		if err != nil {
+			continue
+		}
+		for sigUserID, forSigUserID := range sigMap {
+			if userID != sigUserID {
+				continue
+			}
+			if result.Signatures == nil {
+				result.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+			}
+			if _, ok := result.Signatures[sigUserID]; !ok {
+				result.Signatures[sigUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+			}
+			for sigKeyID, sigBytes := range forSigUserID {
+				result.Signatures[sigUserID][sigKeyID] = sigBytes
+			}
+		}
+		results[purpose] = result
+	}
+	return results, nil
+}
+
+// CrossSigningKeysForUser returns the latest known cross-signing keys for a user, if any.
+func (d *Database) CrossSigningKeysDataForUser(ctx context.Context, userID string) (types.CrossSigningKeyMap, error) {
 	return d.CrossSigningKeysTable.SelectCrossSigningKeysForUser(ctx, nil, userID)
 }
 

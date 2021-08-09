@@ -37,10 +37,25 @@ func GetUserDevices(
 		return jsonerror.InternalServerError()
 	}
 
+	sigReq := &keyapi.QuerySignaturesRequest{
+		TargetIDs: map[string][]gomatrixserverlib.KeyID{
+			userID: {},
+		},
+	}
+	sigRes := &keyapi.QuerySignaturesResponse{}
+	keyAPI.QuerySignatures(req.Context(), sigReq, sigRes)
+
 	response := gomatrixserverlib.RespUserDevices{
 		UserID:   userID,
 		StreamID: res.StreamID,
 		Devices:  []gomatrixserverlib.RespUserDevice{},
+	}
+
+	if masterKey, ok := sigRes.MasterKeys[userID]; ok {
+		response.MasterKey = &masterKey
+	}
+	if selfSigningKey, ok := sigRes.SelfSigningKeys[userID]; ok {
+		response.SelfSigningKey = &selfSigningKey
 	}
 
 	for _, dev := range res.Devices {
@@ -56,6 +71,20 @@ func GetUserDevices(
 			DisplayName: dev.DisplayName,
 			Keys:        key,
 		}
+
+		if targetUser, ok := sigRes.Signatures[userID]; ok {
+			if targetKey, ok := targetUser[gomatrixserverlib.KeyID(dev.DeviceID)]; ok {
+				for sourceUserID, forSourceUser := range targetKey {
+					for sourceKeyID, sourceKey := range forSourceUser {
+						if _, ok := device.Keys.Signatures[sourceUserID]; !ok {
+							device.Keys.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+						}
+						device.Keys.Signatures[sourceUserID][sourceKeyID] = sourceKey
+					}
+				}
+			}
+		}
+
 		response.Devices = append(response.Devices, device)
 	}
 
