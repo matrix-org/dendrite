@@ -19,6 +19,23 @@ type UserAPI struct {
 	// The Device database stores session information for the devices of logged
 	// in local users. It is accessed by the UserAPI.
 	DeviceDatabase DatabaseOptions `yaml:"device_database"`
+	// The Threepid database stores information for 3PID validation sessions.
+	// It is accessed by the UserAPI.
+	ThreepidDatabase DatabaseOptions `yaml:"threepid_database"`
+	Email            EmailConf       `yaml:"email"`
+}
+
+type EmailConf struct {
+	Enabled       bool   `yaml:"enabled"`
+	From          string `yaml:"from"`
+	TemplatesPath string `yaml:"templates_path"`
+	Smtp          Smtp   `yaml:"smtp"`
+}
+
+type Smtp struct {
+	Host     string `yaml:"host"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
 }
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes

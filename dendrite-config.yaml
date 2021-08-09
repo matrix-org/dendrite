@@ -367,6 +367,15 @@ user_api:
   # The default lifetime is 3600000ms (60 minutes).
   # openid_token_lifetime_ms: 3600000
 
+  # If following configuration is provided, HS will send verification emails on it's own.
+  email:
+    enabled: false
+    templates_path: res/default
+    smtp:
+      host: localhost:25
+      user: exampleusername
+      password: examplepassword
+
 # Configuration for Opentracing.
 # See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on
 # how this works and how to set it up.
