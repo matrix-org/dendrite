@@ -573,7 +573,8 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 	existingKeys := make([]api.DeviceMessage, len(keysToStore))
 	for i := range keysToStore {
 		existingKeys[i] = api.DeviceMessage{
-			DeviceKeys: api.DeviceKeys{
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
 				UserID:   keysToStore[i].UserID,
 				DeviceID: keysToStore[i].DeviceID,
 			},
