@@ -1,13 +1,17 @@
 package consumers
 
 import (
-	"fmt"
+	"context"
+	"encoding/json"
 
+	eduapi "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 
 	"github.com/Shopify/sarama"
 )
@@ -49,13 +53,29 @@ func (s *OutputSigningKeyUpdateConsumer) Start() error {
 }
 
 func (s *OutputSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	/*
-		var output eduapi.OutputSigningKeyUpdate
-		if err := json.Unmarshal(msg.Value, &output); err != nil {
-			log.WithError(err).Errorf("eduserver output log: message parse failure")
-			return nil
-		}
+	var output eduapi.OutputSigningKeyUpdate
+	if err := json.Unmarshal(msg.Value, &output); err != nil {
+		logrus.WithError(err).Errorf("eduserver output log: message parse failure")
 		return nil
-	*/
-	return fmt.Errorf("TODO")
+	}
+	_, host, err := gomatrixserverlib.SplitID('@', output.UserID)
+	if err != nil {
+		logrus.WithError(err).Errorf("eduserver output log: user ID parse failure")
+		return nil
+	}
+	if host == gomatrixserverlib.ServerName(s.serverName) {
+		// Ignore any messages that contain information about our own users, as
+		// they already originated from this server.
+		return nil
+	}
+	uploadReq := &api.PerformUploadDeviceKeysRequest{
+		CrossSigningKeys: gomatrixserverlib.CrossSigningKeys{
+			MasterKey:      output.MasterKey,
+			SelfSigningKey: output.SelfSigningKey,
+		},
+		UserID: output.UserID,
+	}
+	uploadRes := &api.PerformUploadDeviceKeysResponse{}
+	s.keyAPI.PerformUploadDeviceKeys(context.TODO(), uploadReq, uploadRes)
+	return uploadRes.Error
 }

@@ -15,6 +15,7 @@ const (
 	EDUServerInputTypingEventPath       = "/eduserver/input"
 	EDUServerInputSendToDeviceEventPath = "/eduserver/sendToDevice"
 	EDUServerInputReceiptEventPath      = "/eduserver/receipt"
+	EDUServerInputSigningKeyUpdatePath  = "/eduserver/signingKeyUpdate"
 )
 
 // NewEDUServerClient creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
@@ -66,5 +67,18 @@ func (h *httpEDUServerInputAPI) InputReceiptEvent(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputReceiptEventPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// InputSigningKeyUpdate implements EDUServerInputAPI
+func (h *httpEDUServerInputAPI) InputSigningKeyUpdate(
+	ctx context.Context,
+	request *api.InputSigningKeyUpdateRequest,
+	response *api.InputSigningKeyUpdateResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputSigningKeyUpdate")
+	defer span.Finish()
+
+	apiURL := h.eduServerURL + EDUServerInputSigningKeyUpdatePath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

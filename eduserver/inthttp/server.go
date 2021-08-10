@@ -51,4 +51,17 @@ func AddRoutes(t api.EDUServerInputAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(EDUServerInputSigningKeyUpdatePath,
+		httputil.MakeInternalAPI("inputSigningKeyUpdate", func(req *http.Request) util.JSONResponse {
+			var request api.InputSigningKeyUpdateRequest
+			var response api.InputSigningKeyUpdateResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := t.InputSigningKeyUpdate(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

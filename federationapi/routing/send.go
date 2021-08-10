@@ -502,6 +502,22 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 					}
 				}
 			}
+		case eduserverAPI.MSigningKeyUpdate:
+			var updatePayload eduserverAPI.SigningKeyUpdate
+			if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
+				util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+					"user_id": updatePayload.UserID,
+				}).Error("Failed to send signing key update to edu server")
+				continue
+			}
+			inputReq := &eduserverAPI.InputSigningKeyUpdateRequest{
+				SigningKeyUpdate: updatePayload,
+			}
+			inputRes := &eduserverAPI.InputSigningKeyUpdateResponse{}
+			if err := t.eduAPI.InputSigningKeyUpdate(ctx, inputReq, inputRes); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to send signing key update to EDU server")
+				continue
+			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}

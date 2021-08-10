@@ -39,6 +39,8 @@ type EDUServerInputAPI struct {
 	OutputSendToDeviceEventTopic string
 	// The kafka topic to output new receipt events to
 	OutputReceiptEventTopic string
+	// The kafka topic to output new signing key changes to
+	OutputSigningKeyUpdateTopic string
 	// kafka producer
 	Producer sarama.SyncProducer
 	// Internal user query API
@@ -75,6 +77,33 @@ func (t *EDUServerInputAPI) InputSendToDeviceEvent(
 ) error {
 	ise := &request.InputSendToDeviceEvent
 	return t.sendToDeviceEvent(ise)
+}
+
+// InputSigningKeyUpdate implements api.EDUServerInputAPI
+func (t *EDUServerInputAPI) InputSigningKeyUpdate(
+	ctx context.Context,
+	request *api.InputSigningKeyUpdateRequest,
+	response *api.InputSigningKeyUpdateResponse,
+) error {
+	eventJSON, err := json.Marshal(&api.OutputSigningKeyUpdateEvent{
+		SigningKeyUpdate: request.SigningKeyUpdate,
+	})
+	if err != nil {
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"user_id": request.UserID,
+	}).Infof("Producing to topic '%s'", t.OutputSigningKeyUpdateTopic)
+
+	m := &sarama.ProducerMessage{
+		Topic: string(t.OutputSigningKeyUpdateTopic),
+		Key:   sarama.StringEncoder(request.UserID),
+		Value: sarama.ByteEncoder(eventJSON),
+	}
+
+	_, _, err = t.Producer.SendMessage(m)
+	return err
 }
 
 func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {

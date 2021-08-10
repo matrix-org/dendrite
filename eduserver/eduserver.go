@@ -52,6 +52,7 @@ func NewInternalAPI(
 		OutputTypingEventTopic:       cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent),
 		OutputSendToDeviceEventTopic: cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent),
 		OutputReceiptEventTopic:      cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
+		OutputSigningKeyUpdateTopic:  cfg.Matrix.Kafka.TopicFor(config.TopicOutputSigningKeyUpdate),
 		ServerName:                   cfg.Matrix.ServerName,
 	}
 }
