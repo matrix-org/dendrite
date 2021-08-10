@@ -69,7 +69,7 @@ func TestBumpSendAttempt(t *testing.T) {
 func TestDeleteSession(t *testing.T) {
 	is := is.New(t)
 	dut := mustNewDatabaseWithTestSession(is)
-	err := dut.RemoveSession(testCtx, testSession.Sid)
+	err := dut.DeleteSession(testCtx, testSession.Sid)
 	is.NoErr(err)
 	_, err = dut.GetSession(testCtx, testSession.Sid)
 	is.Equal(err, sql.ErrNoRows)

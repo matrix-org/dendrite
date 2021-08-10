@@ -15,7 +15,7 @@ type Database interface {
 	GetSession(ctx context.Context, sid string) (*api.Session, error)
 	GetSessionByThreePidAndSecret(ctx context.Context, threePid, ClientSecret string) (*api.Session, error)
 	UpdateSendAttemptNextLink(ctx context.Context, sid, nextLink string) error
-	RemoveSession(ctx context.Context, sid string) error
+	DeleteSession(ctx context.Context, sid string) error
 	ValidateSession(ctx context.Context, sid string, validatedAt int) error
 }
 
@@ -59,7 +59,7 @@ func (d *Db) UpdateSendAttemptNextLink(ctx context.Context, sid, nextLink string
 	return d.writeHandler(h)
 }
 
-func (d *Db) RemoveSession(ctx context.Context, sid string) error {
+func (d *Db) DeleteSession(ctx context.Context, sid string) error {
 	h := func(_ *sql.Tx) error {
 		_, err := d.stm.deleteSessionStmt.ExecContext(ctx, sid)
 		return err
