@@ -47,7 +47,7 @@ const upsertPresenceSQL = "" +
 	" (user_id, presence, status_msg, last_active_ts)" +
 	" VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (user_id)" +
-	" DO UPDATE SET id = rowid+1," +
+	" DO UPDATE SET id = (select max(id) from presence_presences)+1," +
 	" presence = $5, status_msg = $6, last_active_ts = $7" +
 	" RETURNING id"
 
