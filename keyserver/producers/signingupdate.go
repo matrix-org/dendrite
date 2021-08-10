@@ -19,6 +19,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/sirupsen/logrus"
 )
 
 type SigningKeyUpdate struct {
@@ -46,6 +47,12 @@ func (p *SigningKeyUpdate) ProduceSigningKeyUpdate(key api.SigningKeyUpdate) err
 	m.Value = sarama.ByteEncoder(value)
 
 	_, _, err = p.Producer.SendMessage(&m)
+	if err != nil {
+		return err
+	}
 
-	return err
+	logrus.WithFields(logrus.Fields{
+		"user_id": key.UserID,
+	}).Infof("Produced to cross-signing update topic '%s'", p.Topic)
+	return nil
 }
