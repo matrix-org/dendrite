@@ -50,7 +50,7 @@ type UserInternalAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
-	CreateSession(context.Context, *CreateSessionRequest, *Session) error
+	CreateSession(context.Context, *CreateSessionRequest, *CreateSessionResponse) error
 	ValidateSession(context.Context, *ValidateSessionRequest, struct{}) error
 	GetThreePidForSession(context.Context, *SessionOwnership, *GetThreePidForSessionResponse) error
 	DeleteSession(context.Context, *SessionOwnership, struct{}) error
@@ -350,6 +350,13 @@ const (
 
 type CreateSessionRequest struct {
 	ClientSecret, NextLink, ThreePid string
+	Extra                            []string
+	SendAttempt                      int
+	SessionType                      ThreepidSessionType
+}
+
+type CreateSessionResponse struct {
+	Sid string
 }
 
 type ValidateSessionRequest struct {
