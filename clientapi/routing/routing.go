@@ -291,10 +291,7 @@ func Setup(
 			return util.ErrorResponse(err)
 		}
 		// If there's a trailing slash, remove it
-		eventType := vars["type"]
-		if strings.HasSuffix(eventType, "/") {
-			eventType = eventType[:len(eventType)-1]
-		}
+		eventType := strings.TrimSuffix(vars["type"], "/")
 		eventFormat := req.URL.Query().Get("format") == "event"
 		return OnIncomingStateTypeRequest(req.Context(), device, rsAPI, vars["roomID"], eventType, "", eventFormat)
 	})).Methods(http.MethodGet, http.MethodOptions)
@@ -315,11 +312,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			emptyString := ""
-			eventType := vars["eventType"]
-			// If there's a trailing slash, remove it
-			if strings.HasSuffix(eventType, "/") {
-				eventType = eventType[:len(eventType)-1]
-			}
+			eventType := strings.TrimSuffix(vars["eventType"], "/")
 			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, nil)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
