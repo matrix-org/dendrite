@@ -22,6 +22,16 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+const (
+	// Verification is used in
+	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-account-3pid-email-requesttoken
+	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-register-email-requesttoken
+	Verification ThreepidSessionType = iota
+	// Password is used in
+	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-account-password-email-requesttoken
+	Password
+)
+
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
@@ -365,3 +375,5 @@ type IsSessionValidatedResponse struct {
 	Validated   bool
 	ValidatedAt int
 }
+
+type ThreepidSessionType int
