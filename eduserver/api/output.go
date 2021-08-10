@@ -53,5 +53,5 @@ type OutputReceiptEvent struct {
 
 // OutputSigningKeyUpdate is an entry in the signing key update output kafka log
 type OutputSigningKeyUpdate struct {
-	SigningKeyUpdate `json:"signing_keys"`
+	CrossSigningKeyUpdate `json:"signing_keys"`
 }

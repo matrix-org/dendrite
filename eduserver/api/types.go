@@ -40,7 +40,7 @@ type ReceiptTS struct {
 	TS gomatrixserverlib.Timestamp `json:"ts"`
 }
 
-type SigningKeyUpdate struct {
+type CrossSigningKeyUpdate struct {
 	MasterKey      *gomatrixserverlib.CrossSigningKey `json:"master_key,omitempty"`
 	SelfSigningKey *gomatrixserverlib.CrossSigningKey `json:"self_signing_key,omitempty"`
 	UserID         string                             `json:"user_id"`

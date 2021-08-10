@@ -84,10 +84,10 @@ func (o *testEDUProducer) InputReceiptEvent(
 	return nil
 }
 
-func (o *testEDUProducer) InputSigningKeyUpdate(
+func (o *testEDUProducer) InputCrossSigningKeyUpdate(
 	ctx context.Context,
-	request *eduAPI.InputSigningKeyUpdateRequest,
-	response *eduAPI.InputSigningKeyUpdateResponse,
+	request *eduAPI.InputCrossSigningKeyUpdateRequest,
+	response *eduAPI.InputCrossSigningKeyUpdateResponse,
 ) error {
 	return nil
 }

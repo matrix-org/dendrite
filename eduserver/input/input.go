@@ -40,7 +40,7 @@ type EDUServerInputAPI struct {
 	// The kafka topic to output new receipt events to
 	OutputReceiptEventTopic string
 	// The kafka topic to output new signing key changes to
-	OutputSigningKeyUpdateTopic string
+	OutputCrossSigningKeyUpdateTopic string
 	// kafka producer
 	Producer sarama.SyncProducer
 	// Internal user query API
@@ -79,14 +79,14 @@ func (t *EDUServerInputAPI) InputSendToDeviceEvent(
 	return t.sendToDeviceEvent(ise)
 }
 
-// InputSigningKeyUpdate implements api.EDUServerInputAPI
-func (t *EDUServerInputAPI) InputSigningKeyUpdate(
+// InputCrossSigningKeyUpdate implements api.EDUServerInputAPI
+func (t *EDUServerInputAPI) InputCrossSigningKeyUpdate(
 	ctx context.Context,
-	request *api.InputSigningKeyUpdateRequest,
-	response *api.InputSigningKeyUpdateResponse,
+	request *api.InputCrossSigningKeyUpdateRequest,
+	response *api.InputCrossSigningKeyUpdateResponse,
 ) error {
 	eventJSON, err := json.Marshal(&api.OutputSigningKeyUpdate{
-		SigningKeyUpdate: request.SigningKeyUpdate,
+		CrossSigningKeyUpdate: request.CrossSigningKeyUpdate,
 	})
 	if err != nil {
 		return err
@@ -94,10 +94,10 @@ func (t *EDUServerInputAPI) InputSigningKeyUpdate(
 
 	logrus.WithFields(logrus.Fields{
 		"user_id": request.UserID,
-	}).Infof("Producing to topic '%s'", t.OutputSigningKeyUpdateTopic)
+	}).Infof("Producing to topic '%s'", t.OutputCrossSigningKeyUpdateTopic)
 
 	m := &sarama.ProducerMessage{
-		Topic: string(t.OutputSigningKeyUpdateTopic),
+		Topic: string(t.OutputCrossSigningKeyUpdateTopic),
 		Key:   sarama.StringEncoder(request.UserID),
 		Value: sarama.ByteEncoder(eventJSON),
 	}

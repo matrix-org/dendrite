@@ -16,28 +16,28 @@ import (
 	"github.com/Shopify/sarama"
 )
 
-type OutputSigningKeyUpdateConsumer struct {
+type OutputCrossSigningKeyUpdateConsumer struct {
 	eduServerConsumer *internal.ContinualConsumer
 	keyDB             storage.Database
 	keyAPI            api.KeyInternalAPI
 	serverName        string
 }
 
-func NewOutputSigningKeyUpdateConsumer(
+func NewOutputCrossSigningKeyUpdateConsumer(
 	process *process.ProcessContext,
 	cfg *config.Dendrite,
 	kafkaConsumer sarama.Consumer,
 	keyDB storage.Database,
 	keyAPI api.KeyInternalAPI,
-) *OutputSigningKeyUpdateConsumer {
+) *OutputCrossSigningKeyUpdateConsumer {
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "keyserver/eduserver",
-		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputSigningKeyUpdate),
+		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputCrossSigningKeyUpdate),
 		Consumer:       kafkaConsumer,
 		PartitionStore: keyDB,
 	}
-	s := &OutputSigningKeyUpdateConsumer{
+	s := &OutputCrossSigningKeyUpdateConsumer{
 		eduServerConsumer: &consumer,
 		keyDB:             keyDB,
 		keyAPI:            keyAPI,
@@ -48,11 +48,11 @@ func NewOutputSigningKeyUpdateConsumer(
 	return s
 }
 
-func (s *OutputSigningKeyUpdateConsumer) Start() error {
+func (s *OutputCrossSigningKeyUpdateConsumer) Start() error {
 	return s.eduServerConsumer.Start()
 }
 
-func (s *OutputSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+func (s *OutputCrossSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	var output eduapi.OutputSigningKeyUpdate
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		logrus.WithError(err).Errorf("eduserver output log: message parse failure")

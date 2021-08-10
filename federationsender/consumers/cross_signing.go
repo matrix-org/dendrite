@@ -32,7 +32,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type OutputSigningKeyUpdateConsumer struct {
+type CrossSigningKeyUpdateConsumer struct {
 	consumer   *internal.ContinualConsumer
 	db         storage.Database
 	queues     *queue.OutgoingQueues
@@ -40,19 +40,19 @@ type OutputSigningKeyUpdateConsumer struct {
 	rsAPI      roomserverAPI.RoomserverInternalAPI
 }
 
-func NewOutputSigningKeyUpdateConsumer(
+func NewCrossSigningKeyUpdateConsumer(
 	process *process.ProcessContext,
 	cfg *config.KeyServer,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-) *OutputSigningKeyUpdateConsumer {
-	c := &OutputSigningKeyUpdateConsumer{
+) *CrossSigningKeyUpdateConsumer {
+	c := &CrossSigningKeyUpdateConsumer{
 		consumer: &internal.ContinualConsumer{
 			Process:        process,
 			ComponentName:  "federationsender/signingkeys",
-			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSigningKeyUpdate)),
+			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputCrossSigningKeyUpdate)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
 		},
@@ -66,14 +66,14 @@ func NewOutputSigningKeyUpdateConsumer(
 	return c
 }
 
-func (t *OutputSigningKeyUpdateConsumer) Start() error {
+func (t *CrossSigningKeyUpdateConsumer) Start() error {
 	if err := t.consumer.Start(); err != nil {
 		return fmt.Errorf("t.consumer.Start: %w", err)
 	}
 	return nil
 }
 
-func (t *OutputSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+func (t *CrossSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	var output eduapi.OutputSigningKeyUpdate
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		logrus.WithError(err).Errorf("eduserver output log: message parse failure")
@@ -112,7 +112,7 @@ func (t *OutputSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) 
 		Type:   eduapi.MSigningKeyUpdate,
 		Origin: string(t.serverName),
 	}
-	if edu.Content, err = json.Marshal(output.SigningKeyUpdate); err != nil {
+	if edu.Content, err = json.Marshal(output.CrossSigningKeyUpdate); err != nil {
 		return err
 	}
 

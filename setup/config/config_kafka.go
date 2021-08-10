@@ -4,13 +4,13 @@ import "fmt"
 
 // Defined Kafka topics.
 const (
-	TopicOutputTypingEvent       = "OutputTypingEvent"
-	TopicOutputSendToDeviceEvent = "OutputSendToDeviceEvent"
-	TopicOutputKeyChangeEvent    = "OutputKeyChangeEvent"
-	TopicOutputRoomEvent         = "OutputRoomEvent"
-	TopicOutputClientData        = "OutputClientData"
-	TopicOutputReceiptEvent      = "OutputReceiptEvent"
-	TopicOutputSigningKeyUpdate  = "OutputSigningKeyUpdate"
+	TopicOutputTypingEvent           = "OutputTypingEvent"
+	TopicOutputSendToDeviceEvent     = "OutputSendToDeviceEvent"
+	TopicOutputKeyChangeEvent        = "OutputKeyChangeEvent"
+	TopicOutputRoomEvent             = "OutputRoomEvent"
+	TopicOutputClientData            = "OutputClientData"
+	TopicOutputReceiptEvent          = "OutputReceiptEvent"
+	TopicOutputCrossSigningKeyUpdate = "OutputCrossSigningKeyUpdate"
 )
 
 type Kafka struct {

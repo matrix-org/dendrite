@@ -226,7 +226,7 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 
 	// Finally, generate a notification that we updated the keys.
 	if _, host, err := gomatrixserverlib.SplitID('@', req.UserID); err == nil && host == a.ThisServer {
-		update := eduserverAPI.SigningKeyUpdate{
+		update := eduserverAPI.CrossSigningKeyUpdate{
 			UserID: req.UserID,
 		}
 		if _, ok := toStore[gomatrixserverlib.CrossSigningKeyPurposeMaster]; ok {

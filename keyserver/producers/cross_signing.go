@@ -22,19 +22,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type SigningKeyUpdate struct {
+type CrossSigningKeyUpdate struct {
 	Topic    string
 	Producer sarama.SyncProducer
 }
 
-func (p *SigningKeyUpdate) DefaultPartition() int32 {
+func (p *CrossSigningKeyUpdate) DefaultPartition() int32 {
 	return 0
 }
 
-func (p *SigningKeyUpdate) ProduceSigningKeyUpdate(key api.SigningKeyUpdate) error {
+func (p *CrossSigningKeyUpdate) ProduceSigningKeyUpdate(key api.CrossSigningKeyUpdate) error {
 	var m sarama.ProducerMessage
 	output := &api.OutputSigningKeyUpdate{
-		SigningKeyUpdate: key,
+		CrossSigningKeyUpdate: key,
 	}
 
 	value, err := json.Marshal(output)

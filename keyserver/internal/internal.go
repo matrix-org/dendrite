@@ -40,7 +40,7 @@ type KeyInternalAPI struct {
 	FedClient            fedsenderapi.FederationClient
 	UserAPI              userapi.UserInternalAPI
 	DeviceKeysProducer   *producers.KeyChange
-	CrossSigningProducer *producers.SigningKeyUpdate
+	CrossSigningProducer *producers.CrossSigningKeyUpdate
 	Updater              *DeviceListUpdater
 }
 

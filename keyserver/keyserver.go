@@ -51,8 +51,8 @@ func NewInternalAPI(
 		Producer: producer,
 		DB:       db,
 	}
-	signingKeyUpdateProducer := &producers.SigningKeyUpdate{
-		Topic:    string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSigningKeyUpdate)),
+	crossSigningKeyUpdateProducer := &producers.CrossSigningKeyUpdate{
+		Topic:    string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputCrossSigningKeyUpdate)),
 		Producer: producer,
 	}
 	ap := &internal.KeyInternalAPI{
@@ -60,7 +60,7 @@ func NewInternalAPI(
 		ThisServer:           cfg.Matrix.ServerName,
 		FedClient:            fedClient,
 		DeviceKeysProducer:   keyChangeProducer,
-		CrossSigningProducer: signingKeyUpdateProducer,
+		CrossSigningProducer: crossSigningKeyUpdateProducer,
 	}
 	updater := internal.NewDeviceListUpdater(db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
 	ap.Updater = updater
@@ -70,7 +70,7 @@ func NewInternalAPI(
 		}
 	}()
 
-	keyconsumer := consumers.NewOutputSigningKeyUpdateConsumer(
+	keyconsumer := consumers.NewOutputCrossSigningKeyUpdateConsumer(
 		base.ProcessContext, base.Cfg, consumer, db, ap,
 	)
 	if err := keyconsumer.Start(); err != nil {
