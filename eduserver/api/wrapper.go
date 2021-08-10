@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"time"
 
+	types2 "github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -92,16 +94,29 @@ func SendReceipt(
 func SetPresence(
 	ctx context.Context,
 	eduAPI EDUServerInputAPI,
+	userAPI userapi.UserInternalAPI,
 	userID, statusMsg string,
 	presence types.PresenceStatus,
-	timestamp gomatrixserverlib.Timestamp,
+	lastActiveTS gomatrixserverlib.Timestamp,
 ) error {
 	request := InputPresenceRequest{
 		UserID:       userID,
 		Presence:     presence,
 		StatusMsg:    statusMsg,
-		LastActiveTS: timestamp,
+		LastActiveTS: lastActiveTS,
 	}
 	response := InputPresenceResponse{}
+	// store the data in userapi
+	pReq := userapi.InputPresenceRequest{
+		UserID:       userID,
+		Presence:     presence,
+		StatusMsg:    statusMsg,
+		LastActiveTS: int64(lastActiveTS),
+	}
+	pRes := userapi.InputPresenceResponse{}
+	if err := userAPI.InputPresenceData(ctx, &pReq, &pRes); err != nil {
+		return err
+	}
+	request.StreamPos = types2.StreamPosition(pRes.StreamPos)
 	return eduAPI.InputPresence(ctx, &request, &response)
 }
