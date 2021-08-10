@@ -44,6 +44,12 @@ const (
 	QueryDeviceInfosPath    = "/userapi/queryDeviceInfos"
 	QuerySearchProfilesPath = "/userapi/querySearchProfiles"
 	QueryOpenIDTokenPath    = "/userapi/queryOpenIDToken"
+
+	CreateSessionPath         = "/userapi/createSession"
+	ValidateSessionPath       = "/userapi/validateSession"
+	GetThreePidForSessionPath = "/userapi/getThreePidForSession"
+	DeleteSessionPath         = "/userapi/deleteSession"
+	IsSessionValidatedPath    = "/userapi/isSessionValidated"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -223,5 +229,45 @@ func (h *httpUserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.Que
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryOpenIDTokenPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) CreateSession(ctx context.Context, req *api.CreateSessionRequest, res *api.CreateSessionResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "CreateSession")
+	defer span.Finish()
+
+	apiURL := h.apiURL + CreateSessionPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) ValidateSession(ctx context.Context, req *api.ValidateSessionRequest, res struct{}) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "ValidateSession")
+	defer span.Finish()
+
+	apiURL := h.apiURL + ValidateSessionPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) GetThreePidForSession(ctx context.Context, req *api.SessionOwnership, res *api.GetThreePidForSessionResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetThreePidForSession")
+	defer span.Finish()
+
+	apiURL := h.apiURL + GetThreePidForSessionPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) DeleteSession(ctx context.Context, req *api.SessionOwnership, res struct{}) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "DeleteSession")
+	defer span.Finish()
+
+	apiURL := h.apiURL + DeleteSessionPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) IsSessionValidated(ctx context.Context, req *api.SessionOwnership, res *api.IsSessionValidatedResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "IsSessionValidated")
+	defer span.Finish()
+
+	apiURL := h.apiURL + IsSessionValidatedPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

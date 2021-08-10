@@ -555,6 +555,22 @@ func (u *testUserAPI) QueryOpenIDToken(ctx context.Context, req *userapi.QueryOp
 	return nil
 }
 
+func (u *testUserAPI) CreateSession(context.Context, *userapi.CreateSessionRequest, *userapi.CreateSessionResponse) error {
+	return nil
+}
+func (u *testUserAPI) ValidateSession(context.Context, *userapi.ValidateSessionRequest, struct{}) error {
+	return nil
+}
+func (u *testUserAPI) GetThreePidForSession(context.Context, *userapi.SessionOwnership, *userapi.GetThreePidForSessionResponse) error {
+	return nil
+}
+func (u *testUserAPI) DeleteSession(context.Context, *userapi.SessionOwnership, struct{}) error {
+	return nil
+}
+func (u *testUserAPI) IsSessionValidated(context.Context, *userapi.SessionOwnership, *userapi.IsSessionValidatedResponse) error {
+	return nil
+}
+
 type testRoomserverAPI struct {
 	// use a trace API as it implements method stubs so we don't need to have them here.
 	// We'll override the functions we care about.

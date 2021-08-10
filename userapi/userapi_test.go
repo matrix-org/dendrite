@@ -13,9 +13,12 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
+	"github.com/matrix-org/dendrite/userapi/mail"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matryer/is"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,13 +26,37 @@ const (
 	serverName = gomatrixserverlib.ServerName("example.com")
 )
 
-func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database) {
+var (
+	testReq = &api.CreateSessionRequest{
+		ClientSecret: "foobar",
+		NextLink:     "http://foobar.com",
+		ThreePid:     "foo@bar.com",
+		Extra:        []string{},
+		SendAttempt:  0,
+	}
+	ctx    = context.Background()
+	mailer = &testMailer{
+		c: map[api.ThreepidSessionType]chan *mail.Mail{
+			api.Password:     make(chan *mail.Mail, 3),
+			api.Verification: make(chan *mail.Mail, 3),
+		},
+	}
+)
+
+type testMailer struct {
+	c map[api.ThreepidSessionType]chan *mail.Mail
+}
+
+func (tm *testMailer) Send(s *mail.Mail, t api.ThreepidSessionType) error {
+	tm.c[t] <- s
+	return nil
+}
+
+func mustMakeInternalAPI(is *is.I) (*internal.UserInternalAPI, accounts.Database) {
 	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
 		ConnectionString: "file::memory:",
 	}, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS)
-	if err != nil {
-		t.Fatalf("failed to create account DB: %s", err)
-	}
+	is.NoErr(err)
 	cfg := &config.UserAPI{
 		DeviceDatabase: config.DatabaseOptions{
 			ConnectionString:   "file::memory:",
@@ -39,15 +66,24 @@ func MustMakeInternalAPI(t *testing.T) (api.UserInternalAPI, accounts.Database) 
 		Matrix: &config.Global{
 			ServerName: serverName,
 		},
+		ThreepidDatabase: config.DatabaseOptions{
+			ConnectionString:   "file::memory:",
+			MaxOpenConnections: 1,
+			MaxIdleConnections: 1,
+		},
+		Email: config.EmailConf{
+			TemplatesPath: "../res/default",
+		},
 	}
 
 	return userapi.NewInternalAPI(accountDB, cfg, nil, nil), accountDB
 }
 
 func TestQueryProfile(t *testing.T) {
+	is := is.New(t)
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
-	userAPI, accountDB := MustMakeInternalAPI(t)
+	userAPI, accountDB := mustMakeInternalAPI(is)
 	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "")
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
@@ -118,4 +154,102 @@ func TestQueryProfile(t *testing.T) {
 	t.Run("Monolith", func(t *testing.T) {
 		runCases(userAPI)
 	})
+}
+
+func TestCreateSession(t *testing.T) {
+	is := is.New(t)
+	internalApi, _ := mustMakeInternalAPI(is)
+	mustCreateSession(is, internalApi)
+}
+
+func TestCreateSession_Twice(t *testing.T) {
+	is := is.New(t)
+	internalApi, _ := mustMakeInternalAPI(is)
+	mustCreateSession(is, internalApi)
+	resp := api.CreateSessionResponse{}
+	err := internalApi.CreateSession(ctx, testReq, &resp)
+	is.NoErr(err)
+	is.Equal(len(resp.Sid), 43)
+	select {
+	case <-mailer.c[api.Verification]:
+		t.Fatal("email was received, but sent attempt was not increased")
+	default:
+		break
+	}
+}
+
+func TestCreateSession_Twice_IncreaseSendAttempt(t *testing.T) {
+	is := is.New(t)
+	internalApi, _ := mustMakeInternalAPI(is)
+	mustCreateSession(is, internalApi)
+	resp := api.CreateSessionResponse{}
+	testReqBumped := *testReq
+	testReqBumped.SendAttempt = 1
+	err := internalApi.CreateSession(ctx, &testReqBumped, &resp)
+	is.NoErr(err)
+	is.Equal(len(resp.Sid), 43)
+	sub := <-mailer.c[api.Verification]
+	is.Equal(len(sub.Token), 64)
+	is.Equal(sub.To, testReq.ThreePid)
+}
+
+func TestValidateSession(t *testing.T) {
+	is := is.New(t)
+	internalApi, _ := mustMakeInternalAPI(is)
+	s, token := mustCreateSession(is, internalApi)
+	mustValidateSesson(is, internalApi, testReq.ClientSecret, token, s.Sid)
+}
+
+func TestIsSessionValidated_InvalidatedSession(t *testing.T) {
+	is := is.New(t)
+	internalApi, _ := mustMakeInternalAPI(is)
+	s, _ := mustCreateSession(is, internalApi)
+	resp := api.IsSessionValidatedResponse{}
+	err := internalApi.IsSessionValidated(ctx, &api.SessionOwnership{
+		Sid:          s.Sid,
+		ClientSecret: testReq.ClientSecret,
+	}, &resp)
+	is.NoErr(err)
+	is.Equal(resp.Validated, false)
+}
+
+func TestIsSessionValidated_ValidatedSession(t *testing.T) {
+	is := is.New(t)
+	internalApi, _ := mustMakeInternalAPI(is)
+	s, token := mustCreateSession(is, internalApi)
+	resp := api.IsSessionValidatedResponse{}
+	mustValidateSesson(is, internalApi, testReq.ClientSecret, token, s.Sid)
+	err := internalApi.IsSessionValidated(ctx, &api.SessionOwnership{
+		Sid:          s.Sid,
+		ClientSecret: testReq.ClientSecret,
+	}, &resp)
+	is.NoErr(err)
+	is.Equal(resp.Validated, true)
+	is.Equal(resp.ValidatedAt > 0, true)
+}
+
+func mustCreateSession(is *is.I, i *internal.UserInternalAPI) (resp *api.CreateSessionResponse, token string) {
+	resp = &api.CreateSessionResponse{}
+	i.Mail = mailer
+	err := i.CreateSession(ctx, testReq, resp)
+	is.NoErr(err)
+	is.Equal(len(resp.Sid), 43)
+	sub := <-mailer.c[api.Verification]
+	is.Equal(len(sub.Token), 64)
+	is.Equal(sub.To, testReq.ThreePid)
+	token = sub.Token
+	return
+}
+
+func mustValidateSesson(is *is.I, i *internal.UserInternalAPI, secret, token, sid string) {
+	err := i.ValidateSession(ctx, &api.ValidateSessionRequest{
+		SessionOwnership: api.SessionOwnership{
+			Sid:          sid,
+			ClientSecret: secret,
+		},
+		Token: token,
+	},
+		struct{}{},
+	)
+	is.NoErr(err)
 }

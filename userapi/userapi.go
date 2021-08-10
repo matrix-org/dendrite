@@ -21,8 +21,10 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
+	"github.com/matrix-org/dendrite/userapi/mail"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
+	"github.com/matrix-org/dendrite/userapi/storage/threepid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,17 +38,26 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	accountDB accounts.Database, cfg *config.UserAPI, appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
-) api.UserInternalAPI {
+) *internal.UserInternalAPI {
 	deviceDB, err := devices.NewDatabase(&cfg.DeviceDatabase, cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to device db")
 	}
-
+	threepidDb, err := threepid.NewDatabase(&cfg.ThreepidDatabase)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to threepid db")
+	}
+	mailer, err := mail.NewMailer(cfg)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to crate Mailer")
+	}
 	return &internal.UserInternalAPI{
 		AccountDB:   accountDB,
 		DeviceDB:    deviceDB,
+		ThreePidDB:  threepidDb,
 		ServerName:  cfg.Matrix.ServerName,
 		AppServices: appServices,
 		KeyAPI:      keyAPI,
+		Mail:        mailer,
 	}
 }
