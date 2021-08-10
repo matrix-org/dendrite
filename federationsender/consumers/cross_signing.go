@@ -51,7 +51,7 @@ func NewCrossSigningKeyUpdateConsumer(
 	c := &CrossSigningKeyUpdateConsumer{
 		consumer: &internal.ContinualConsumer{
 			Process:        process,
-			ComponentName:  "federationsender/signingkeys",
+			ComponentName:  "federationsender/crosssigning",
 			Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputCrossSigningKeyUpdate)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
@@ -74,7 +74,7 @@ func (t *CrossSigningKeyUpdateConsumer) Start() error {
 }
 
 func (t *CrossSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	var output eduapi.OutputSigningKeyUpdate
+	var output eduapi.OutputCrossSigningKeyUpdate
 	if err := json.Unmarshal(msg.Value, &output); err != nil {
 		logrus.WithError(err).Errorf("eduserver output log: message parse failure")
 		return nil

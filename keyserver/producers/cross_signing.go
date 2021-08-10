@@ -33,7 +33,7 @@ func (p *CrossSigningKeyUpdate) DefaultPartition() int32 {
 
 func (p *CrossSigningKeyUpdate) ProduceSigningKeyUpdate(key api.CrossSigningKeyUpdate) error {
 	var m sarama.ProducerMessage
-	output := &api.OutputSigningKeyUpdate{
+	output := &api.OutputCrossSigningKeyUpdate{
 		CrossSigningKeyUpdate: key,
 	}
 

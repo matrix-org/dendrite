@@ -85,7 +85,7 @@ func (t *EDUServerInputAPI) InputCrossSigningKeyUpdate(
 	request *api.InputCrossSigningKeyUpdateRequest,
 	response *api.InputCrossSigningKeyUpdateResponse,
 ) error {
-	eventJSON, err := json.Marshal(&api.OutputSigningKeyUpdate{
+	eventJSON, err := json.Marshal(&api.OutputCrossSigningKeyUpdate{
 		CrossSigningKeyUpdate: request.CrossSigningKeyUpdate,
 	})
 	if err != nil {

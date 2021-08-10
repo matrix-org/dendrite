@@ -51,7 +51,7 @@ type OutputReceiptEvent struct {
 	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
 }
 
-// OutputSigningKeyUpdate is an entry in the signing key update output kafka log
-type OutputSigningKeyUpdate struct {
+// OutputCrossSigningKeyUpdate is an entry in the signing key update output kafka log
+type OutputCrossSigningKeyUpdate struct {
 	CrossSigningKeyUpdate `json:"signing_keys"`
 }

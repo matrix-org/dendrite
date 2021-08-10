@@ -72,6 +72,14 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start key change consumer")
 	}
 
+	crossSigningKeyUpdateConsumer := consumers.NewOutputCrossSigningKeyUpdateConsumer(
+		process, cfg.Matrix.ServerName, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputCrossSigningKeyUpdate)),
+		consumer, keyAPI, rsAPI, syncDB, notifier, streams.DeviceListStreamProvider,
+	)
+	if err = crossSigningKeyUpdateConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start cross-signing key change consumer")
+	}
+
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		process, cfg, consumer, syncDB, notifier, streams.PDUStreamProvider,
 		streams.InviteStreamProvider, rsAPI,
