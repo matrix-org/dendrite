@@ -51,11 +51,16 @@ func NewInternalAPI(
 		Producer: producer,
 		DB:       db,
 	}
+	signingKeyUpdateProducer := &producers.SigningKeyUpdate{
+		Topic:    string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputSigningKeyUpdate)),
+		Producer: producer,
+	}
 	ap := &internal.KeyInternalAPI{
-		DB:         db,
-		ThisServer: cfg.Matrix.ServerName,
-		FedClient:  fedClient,
-		Producer:   keyChangeProducer,
+		DB:                   db,
+		ThisServer:           cfg.Matrix.ServerName,
+		FedClient:            fedClient,
+		DeviceKeysProducer:   keyChangeProducer,
+		CrossSigningProducer: signingKeyUpdateProducer,
 	}
 	updater := internal.NewDeviceListUpdater(db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
 	ap.Updater = updater

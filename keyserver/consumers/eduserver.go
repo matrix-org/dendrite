@@ -69,11 +69,13 @@ func (s *OutputSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) 
 		return nil
 	}
 	uploadReq := &api.PerformUploadDeviceKeysRequest{
-		CrossSigningKeys: gomatrixserverlib.CrossSigningKeys{
-			MasterKey:      output.MasterKey,
-			SelfSigningKey: output.SelfSigningKey,
-		},
 		UserID: output.UserID,
+	}
+	if output.MasterKey != nil {
+		uploadReq.MasterKey = *output.MasterKey
+	}
+	if output.SelfSigningKey != nil {
+		uploadReq.SelfSigningKey = *output.SelfSigningKey
 	}
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
 	s.keyAPI.PerformUploadDeviceKeys(context.TODO(), uploadReq, uploadRes)

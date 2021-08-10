@@ -94,6 +94,12 @@ func NewInternalAPI(
 	if err := keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
+	signingKeyConsumer := consumers.NewOutputSigningKeyUpdateConsumer(
+		base.ProcessContext, &base.Cfg.KeyServer, consumer, queues, federationSenderDB, rsAPI,
+	)
+	if err := signingKeyConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start signing key consumer")
+	}
 
 	return internal.NewFederationSenderInternalAPI(federationSenderDB, cfg, rsAPI, federation, keyRing, stats, queues)
 }

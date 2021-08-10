@@ -41,7 +41,7 @@ type ReceiptTS struct {
 }
 
 type SigningKeyUpdate struct {
-	MasterKey      gomatrixserverlib.CrossSigningKey `json:"master_key"`
-	SelfSigningKey gomatrixserverlib.CrossSigningKey `json:"self_signing_key"`
-	UserID         string                            `json:"user_id"`
+	MasterKey      *gomatrixserverlib.CrossSigningKey `json:"master_key,omitempty"`
+	SelfSigningKey *gomatrixserverlib.CrossSigningKey `json:"self_signing_key,omitempty"`
+	UserID         string                             `json:"user_id"`
 }

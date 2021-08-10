@@ -35,12 +35,13 @@ import (
 )
 
 type KeyInternalAPI struct {
-	DB         storage.Database
-	ThisServer gomatrixserverlib.ServerName
-	FedClient  fedsenderapi.FederationClient
-	UserAPI    userapi.UserInternalAPI
-	Producer   *producers.KeyChange
-	Updater    *DeviceListUpdater
+	DB                   storage.Database
+	ThisServer           gomatrixserverlib.ServerName
+	FedClient            fedsenderapi.FederationClient
+	UserAPI              userapi.UserInternalAPI
+	DeviceKeysProducer   *producers.KeyChange
+	CrossSigningProducer *producers.SigningKeyUpdate
+	Updater              *DeviceListUpdater
 }
 
 func (a *KeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
@@ -60,7 +61,7 @@ func (a *KeyInternalAPI) InputDeviceListUpdate(
 
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
 	if req.Partition < 0 {
-		req.Partition = a.Producer.DefaultPartition()
+		req.Partition = a.DeviceKeysProducer.DefaultPartition()
 	}
 	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Partition, req.Offset, req.ToOffset)
 	if err != nil {
@@ -597,7 +598,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		}
 		return
 	}
-	err = emitDeviceKeyChanges(a.Producer, existingKeys, keysToStore)
+	err = emitDeviceKeyChanges(a.DeviceKeysProducer, existingKeys, keysToStore)
 	if err != nil {
 		util.GetLogger(ctx).Errorf("Failed to emitDeviceKeyChanges: %s", err)
 	}

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strings"
 
+	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -221,6 +222,23 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 				}
 			}
 		}
+	}
+
+	// Finally, generate a notification that we updated the keys.
+	update := eduserverAPI.SigningKeyUpdate{
+		UserID: req.UserID,
+	}
+	if _, ok := toStore[gomatrixserverlib.CrossSigningKeyPurposeMaster]; ok {
+		update.MasterKey = &req.MasterKey
+	}
+	if _, ok := toStore[gomatrixserverlib.CrossSigningKeyPurposeSelfSigning]; ok {
+		update.SelfSigningKey = &req.SelfSigningKey
+	}
+	if err := a.CrossSigningProducer.ProduceSigningKeyUpdate(update); err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("a.CrossSigningProducer.ProduceSigningKeyUpdate: %s", err),
+		}
+		return
 	}
 }
 
