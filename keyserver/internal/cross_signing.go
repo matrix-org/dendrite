@@ -225,20 +225,22 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 	}
 
 	// Finally, generate a notification that we updated the keys.
-	update := eduserverAPI.SigningKeyUpdate{
-		UserID: req.UserID,
-	}
-	if _, ok := toStore[gomatrixserverlib.CrossSigningKeyPurposeMaster]; ok {
-		update.MasterKey = &req.MasterKey
-	}
-	if _, ok := toStore[gomatrixserverlib.CrossSigningKeyPurposeSelfSigning]; ok {
-		update.SelfSigningKey = &req.SelfSigningKey
-	}
-	if err := a.CrossSigningProducer.ProduceSigningKeyUpdate(update); err != nil {
-		res.Error = &api.KeyError{
-			Err: fmt.Sprintf("a.CrossSigningProducer.ProduceSigningKeyUpdate: %s", err),
+	if _, host, err := gomatrixserverlib.SplitID('@', req.UserID); err == nil && host == a.ThisServer {
+		update := eduserverAPI.SigningKeyUpdate{
+			UserID: req.UserID,
 		}
-		return
+		if _, ok := toStore[gomatrixserverlib.CrossSigningKeyPurposeMaster]; ok {
+			update.MasterKey = &req.MasterKey
+		}
+		if _, ok := toStore[gomatrixserverlib.CrossSigningKeyPurposeSelfSigning]; ok {
+			update.SelfSigningKey = &req.SelfSigningKey
+		}
+		if err := a.CrossSigningProducer.ProduceSigningKeyUpdate(update); err != nil {
+			res.Error = &api.KeyError{
+				Err: fmt.Sprintf("a.CrossSigningProducer.ProduceSigningKeyUpdate: %s", err),
+			}
+			return
+		}
 	}
 }
 
