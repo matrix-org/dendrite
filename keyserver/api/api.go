@@ -53,9 +53,17 @@ func (k *KeyError) Error() string {
 	return k.Err
 }
 
+type DeviceMessageType int
+
+const (
+	TypeDeviceKeyUpdate DeviceMessageType = iota
+	TypeCrossSigningUpdate
+)
+
 // DeviceMessage represents the message produced into Kafka by the key server.
 type DeviceMessage struct {
-	DeviceKeys
+	Type        DeviceMessageType `json:"Type,omitempty"`
+	*DeviceKeys `json:"DeviceKeys,omitempty"`
 	// A monotonically increasing number which represents device changes for this user.
 	StreamID int
 }
@@ -76,7 +84,7 @@ type DeviceKeys struct {
 // WithStreamID returns a copy of this device message with the given stream ID
 func (k *DeviceKeys) WithStreamID(streamID int) DeviceMessage {
 	return DeviceMessage{
-		DeviceKeys: *k,
+		DeviceKeys: k,
 		StreamID:   streamID,
 	}
 }

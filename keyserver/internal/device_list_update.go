@@ -231,7 +231,8 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 		}
 		keys := []api.DeviceMessage{
 			{
-				DeviceKeys: api.DeviceKeys{
+				Type: api.TypeDeviceKeyUpdate,
+				DeviceKeys: &api.DeviceKeys{
 					DeviceID:    event.DeviceID,
 					DisplayName: event.DeviceDisplayName,
 					KeyJSON:     k,
@@ -417,8 +418,9 @@ func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevi
 			continue
 		}
 		keys[i] = api.DeviceMessage{
+			Type:     api.TypeDeviceKeyUpdate,
 			StreamID: res.StreamID,
-			DeviceKeys: api.DeviceKeys{
+			DeviceKeys: &api.DeviceKeys{
 				DeviceID:    device.DeviceID,
 				DisplayName: device.DisplayName,
 				UserID:      res.UserID,
@@ -426,7 +428,8 @@ func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevi
 			},
 		}
 		existingKeys[i] = api.DeviceMessage{
-			DeviceKeys: api.DeviceKeys{
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
 				UserID:   res.UserID,
 				DeviceID: device.DeviceID,
 			},
