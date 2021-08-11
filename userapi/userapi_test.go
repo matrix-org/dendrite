@@ -36,15 +36,16 @@ var (
 	}
 	ctx    = context.Background()
 	mailer = &testMailer{
-		c: map[api.ThreepidSessionType]chan *mail.Mail{
-			api.Password:     make(chan *mail.Mail, 3),
-			api.Verification: make(chan *mail.Mail, 3),
+		c: []chan *mail.Mail{
+			api.AccountPassword: make(chan *mail.Mail, 3),
+			api.AccountThreepid: make(chan *mail.Mail, 3),
+			api.Register:        make(chan *mail.Mail, 3),
 		},
 	}
 )
 
 type testMailer struct {
-	c map[api.ThreepidSessionType]chan *mail.Mail
+	c []chan *mail.Mail
 }
 
 func (tm *testMailer) Send(s *mail.Mail, t api.ThreepidSessionType) error {
@@ -171,7 +172,7 @@ func TestCreateSession_Twice(t *testing.T) {
 	is.NoErr(err)
 	is.Equal(len(resp.Sid), 43)
 	select {
-	case <-mailer.c[api.Verification]:
+	case <-mailer.c[api.AccountPassword]:
 		t.Fatal("email was received, but sent attempt was not increased")
 	default:
 		break
@@ -188,7 +189,7 @@ func TestCreateSession_Twice_IncreaseSendAttempt(t *testing.T) {
 	err := internalApi.CreateSession(ctx, &testReqBumped, &resp)
 	is.NoErr(err)
 	is.Equal(len(resp.Sid), 43)
-	sub := <-mailer.c[api.Verification]
+	sub := <-mailer.c[api.AccountPassword]
 	is.Equal(len(sub.Token), 64)
 	is.Equal(sub.To, testReq.ThreePid)
 }
@@ -234,7 +235,7 @@ func mustCreateSession(is *is.I, i *internal.UserInternalAPI) (resp *api.CreateS
 	err := i.CreateSession(ctx, testReq, resp)
 	is.NoErr(err)
 	is.Equal(len(resp.Sid), 43)
-	sub := <-mailer.c[api.Verification]
+	sub := <-mailer.c[api.AccountPassword]
 	is.Equal(len(sub.Token), 64)
 	is.Equal(sub.To, testReq.ThreePid)
 	token = sub.Token

@@ -26,7 +26,7 @@ type Mailer interface {
 }
 type SmtpMailer struct {
 	conf      config.EmailConf
-	templates map[api.ThreepidSessionType]*template.Template
+	templates []*template.Template
 }
 
 type Mail struct {
@@ -78,25 +78,23 @@ func (m *SmtpMailer) send(mail *Mail, t *template.Template) error {
 }
 
 func NewMailer(c *config.UserAPI) (Mailer, error) {
-	templateRaw, err := ioutil.ReadFile(fmt.Sprintf("%s/verification.eml", c.Email.TemplatesPath))
-	if err != nil {
-		return nil, err
+	sessionTypes := api.ThreepidSessionTypes()
+	templates := make([]*template.Template, len(sessionTypes))
+	for _, t := range sessionTypes {
+		name := t.Name()
+		templateRaw, err := ioutil.ReadFile(fmt.Sprintf("%s/%s.eml", c.Email.TemplatesPath, name))
+		if err != nil {
+			return nil, err
+		}
+		template, err := template.New(name).Parse(string(templateRaw))
+		if err != nil {
+			return nil, err
+		}
+		templates[t] = template
 	}
-	verificationT, err := template.New("verification").Parse(string(templateRaw))
-	if err != nil {
-		return nil, err
-	}
-	templateRaw, err = ioutil.ReadFile(fmt.Sprintf("%s/password.eml", c.Email.TemplatesPath))
-	if err != nil {
-		return nil, err
-	}
-	passwordT, err := template.New("password").Parse(string(templateRaw))
 	return &SmtpMailer{
-		conf: c.Email,
-		templates: map[api.ThreepidSessionType]*template.Template{
-			api.Password:     passwordT,
-			api.Verification: verificationT,
-		},
-	}, err
+		conf:      c.Email,
+		templates: templates,
+	}, nil
 
 }

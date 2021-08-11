@@ -7,5 +7,7 @@ MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Disposition: inline
 
+We have received request to register account in Matrix server using this email. Please click following link to finish registration:
 {{.Link}}
+Alternatively pass following token to your Matrix client:
 {{.Token}}

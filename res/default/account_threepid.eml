@@ -1,0 +1,13 @@
+Date: {{.Date}}
+From: noreply@example.com
+To: {{.To}}
+Message-ID: <{{.MessageId}}>
+Subject: Confirm your email address for Matrix
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Disposition: inline
+
+We have received request to add this email to your Matrix account. Please click following link to confirm your email:
+{{.Link}}
+Alternatively pass following token to your Matrix client:
+{{.Token}}

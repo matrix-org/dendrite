@@ -23,13 +23,15 @@ import (
 )
 
 const (
-	// Verification is used in
-	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-account-3pid-email-requesttoken
-	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-register-email-requesttoken
-	Verification ThreepidSessionType = iota
-	// Password is used in
+	// AccountPassword is used in
 	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-account-password-email-requesttoken
-	Password
+	AccountPassword ThreepidSessionType = iota
+	// AccountThreepid is used in
+	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-account-3pid-email-requesttoken
+	AccountThreepid
+	// Register is used in
+	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-register-email-requesttoken
+	Register
 )
 
 // UserInternalAPI is the internal API for information about users and devices.
@@ -464,3 +466,19 @@ type IsSessionValidatedResponse struct {
 }
 
 type ThreepidSessionType int
+
+func (t ThreepidSessionType) Name() string {
+	return [...]string{
+		"account_password",
+		"account_threepid",
+		"register",
+	}[t]
+}
+
+func ThreepidSessionTypes() []ThreepidSessionType {
+	return []ThreepidSessionType{
+		AccountPassword,
+		AccountThreepid,
+		Register,
+	}
+}
