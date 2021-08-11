@@ -146,8 +146,9 @@ func TestUpdateHavePrevID(t *testing.T) {
 		t.Fatalf("Update returned an error: %s", err)
 	}
 	want := api.DeviceMessage{
+		Type:     api.TypeDeviceKeyUpdate,
 		StreamID: event.StreamID,
-		DeviceKeys: api.DeviceKeys{
+		DeviceKeys: &api.DeviceKeys{
 			DeviceID:    event.DeviceID,
 			DisplayName: event.DeviceDisplayName,
 			KeyJSON:     event.Keys,
@@ -224,8 +225,9 @@ func TestUpdateNoPrevID(t *testing.T) {
 	// wait a bit for db to be updated...
 	time.Sleep(100 * time.Millisecond)
 	want := api.DeviceMessage{
+		Type:     api.TypeDeviceKeyUpdate,
 		StreamID: 5,
-		DeviceKeys: api.DeviceKeys{
+		DeviceKeys: &api.DeviceKeys{
 			DeviceID:    "JLAFKJWSCS",
 			DisplayName: "Mobile Phone",
 			UserID:      remoteUserID,
