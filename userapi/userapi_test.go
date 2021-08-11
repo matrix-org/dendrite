@@ -75,8 +75,8 @@ func mustMakeInternalAPI(is *is.I) (*internal.UserInternalAPI, accounts.Database
 			TemplatesPath: "../res/default",
 		},
 	}
-
-	return userapi.NewInternalAPI(accountDB, cfg, nil, nil), accountDB
+	apiInt := userapi.NewInternalAPI(accountDB, cfg, nil, nil).(*internal.UserInternalAPI)
+	return apiInt, accountDB
 }
 
 func TestQueryProfile(t *testing.T) {

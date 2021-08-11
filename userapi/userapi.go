@@ -38,7 +38,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	accountDB accounts.Database, cfg *config.UserAPI, appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
-) *internal.UserInternalAPI {
+) api.UserInternalAPI {
 	deviceDB, err := devices.NewDatabase(&cfg.DeviceDatabase, cfg.Matrix.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to device db")
