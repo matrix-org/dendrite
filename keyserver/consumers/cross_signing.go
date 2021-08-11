@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	eduapi "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
@@ -33,7 +32,7 @@ func NewOutputCrossSigningKeyUpdateConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "keyserver/crosssigning",
-		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputCrossSigningKeyUpdate),
+		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputKeyChangeEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: keyDB,
 	}
@@ -52,12 +51,24 @@ func (s *OutputCrossSigningKeyUpdateConsumer) Start() error {
 	return s.eduServerConsumer.Start()
 }
 
-func (s *OutputCrossSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	var output eduapi.OutputCrossSigningKeyUpdate
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
-		logrus.WithError(err).Errorf("eduserver output log: message parse failure")
+// onMessage is called in response to a message received on the
+// key change events topic from the key server.
+func (t *OutputCrossSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+	var m api.DeviceMessage
+	if err := json.Unmarshal(msg.Value, &m); err != nil {
+		logrus.WithError(err).Errorf("failed to read device message from key change topic")
 		return nil
 	}
+	switch m.Type {
+	case api.TypeCrossSigningUpdate:
+		return t.onCrossSigningMessage(m)
+	default:
+		return nil
+	}
+}
+
+func (s *OutputCrossSigningKeyUpdateConsumer) onCrossSigningMessage(m api.DeviceMessage) error {
+	output := m.CrossSigningKeyUpdate
 	_, host, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
 		logrus.WithError(err).Errorf("eduserver output log: user ID parse failure")

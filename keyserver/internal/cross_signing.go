@@ -235,9 +235,9 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 		if _, ok := toStore[gomatrixserverlib.CrossSigningKeyPurposeSelfSigning]; ok {
 			update.SelfSigningKey = &req.SelfSigningKey
 		}
-		if err := a.CrossSigningProducer.ProduceSigningKeyUpdate(update); err != nil {
+		if err := a.Producer.ProduceSigningKeyUpdate(update); err != nil {
 			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("a.CrossSigningProducer.ProduceSigningKeyUpdate: %s", err),
+				Err: fmt.Sprintf("a.Producer.ProduceSigningKeyUpdate: %s", err),
 			}
 			return
 		}

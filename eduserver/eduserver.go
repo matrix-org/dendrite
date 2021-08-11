@@ -46,13 +46,13 @@ func NewInternalAPI(
 	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
 	return &input.EDUServerInputAPI{
-		Cache:                            eduCache,
-		UserAPI:                          userAPI,
-		Producer:                         producer,
-		OutputTypingEventTopic:           cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent),
-		OutputSendToDeviceEventTopic:     cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent),
-		OutputReceiptEventTopic:          cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
-		OutputCrossSigningKeyUpdateTopic: cfg.Matrix.Kafka.TopicFor(config.TopicOutputCrossSigningKeyUpdate),
-		ServerName:                       cfg.Matrix.ServerName,
+		Cache:                        eduCache,
+		UserAPI:                      userAPI,
+		Producer:                     producer,
+		OutputTypingEventTopic:       cfg.Matrix.Kafka.TopicFor(config.TopicOutputTypingEvent),
+		OutputSendToDeviceEventTopic: cfg.Matrix.Kafka.TopicFor(config.TopicOutputSendToDeviceEvent),
+		OutputReceiptEventTopic:      cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent),
+		OutputKeyChangeEventTopic:    cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent),
+		ServerName:                   cfg.Matrix.ServerName,
 	}
 }
