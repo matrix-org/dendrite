@@ -116,6 +116,32 @@ func (t *UserInternalAPITrace) QueryOpenIDToken(ctx context.Context, req *QueryO
 	return err
 }
 
+func (t *UserInternalAPITrace) CreateSession(ctx context.Context, req *CreateSessionRequest, res *CreateSessionResponse) error {
+	err := t.Impl.CreateSession(ctx, req, res)
+	util.GetLogger(ctx).Infof("CreateSession req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) ValidateSession(ctx context.Context, req *ValidateSessionRequest, res struct{}) error {
+	err := t.Impl.ValidateSession(ctx, req, res)
+	util.GetLogger(ctx).Infof("ValidateSession req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) GetThreePidForSession(ctx context.Context, req *SessionOwnership, res *GetThreePidForSessionResponse) error {
+	err := t.Impl.GetThreePidForSession(ctx, req, res)
+	util.GetLogger(ctx).Infof("GetThreePidForSession req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) DeleteSession(ctx context.Context, req *SessionOwnership, res struct{}) error {
+	err := t.Impl.DeleteSession(ctx, req, res)
+	util.GetLogger(ctx).Infof("DeleteSession req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) IsSessionValidated(ctx context.Context, req *SessionOwnership, res *IsSessionValidatedResponse) error {
+	err := t.Impl.IsSessionValidated(ctx, req, res)
+	util.GetLogger(ctx).Infof("IsSessionValidated req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {
