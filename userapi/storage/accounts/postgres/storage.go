@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -45,6 +46,8 @@ type Database struct {
 	accountDatas          accountDataStatements
 	threepids             threepidStatements
 	openIDTokens          tokenStatements
+	keyBackupVersions     keyBackupVersionStatements
+	keyBackups            keyBackupStatements
 	serverName            gomatrixserverlib.ServerName
 	bcryptCost            int
 	openIDTokenLifetimeMS int64
@@ -91,6 +94,12 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, err
 	}
 	if err = d.openIDTokens.prepare(db, serverName); err != nil {
+		return nil, err
+	}
+	if err = d.keyBackupVersions.prepare(db); err != nil {
+		return nil, err
+	}
+	if err = d.keyBackups.prepare(db); err != nil {
 		return nil, err
 	}
 
@@ -367,4 +376,146 @@ func (d *Database) GetOpenIDTokenAttributes(
 	token string,
 ) (*api.OpenIDTokenAttributes, error) {
 	return d.openIDTokens.selectOpenIDTokenAtrributes(ctx, token)
+}
+
+func (d *Database) CreateKeyBackup(
+	ctx context.Context, userID, algorithm string, authData json.RawMessage,
+) (version string, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		version, err = d.keyBackupVersions.insertKeyBackup(ctx, txn, userID, algorithm, authData, "")
+		return err
+	})
+	return
+}
+
+func (d *Database) UpdateKeyBackupAuthData(
+	ctx context.Context, userID, version string, authData json.RawMessage,
+) (err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.keyBackupVersions.updateKeyBackupAuthData(ctx, txn, userID, version, authData)
+	})
+	return
+}
+
+func (d *Database) DeleteKeyBackup(
+	ctx context.Context, userID, version string,
+) (exists bool, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		exists, err = d.keyBackupVersions.deleteKeyBackup(ctx, txn, userID, version)
+		return err
+	})
+	return
+}
+
+func (d *Database) GetKeyBackup(
+	ctx context.Context, userID, version string,
+) (versionResult, algorithm string, authData json.RawMessage, etag string, deleted bool, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		versionResult, algorithm, authData, etag, deleted, err = d.keyBackupVersions.selectKeyBackup(ctx, txn, userID, version)
+		return err
+	})
+	return
+}
+
+func (d *Database) GetBackupKeys(
+	ctx context.Context, version, userID, filterRoomID, filterSessionID string,
+) (result map[string]map[string]api.KeyBackupSession, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if filterSessionID != "" {
+			result, err = d.keyBackups.selectKeysByRoomIDAndSessionID(ctx, txn, userID, version, filterRoomID, filterSessionID)
+			return err
+		}
+		if filterRoomID != "" {
+			result, err = d.keyBackups.selectKeysByRoomID(ctx, txn, userID, version, filterRoomID)
+			return err
+		}
+		result, err = d.keyBackups.selectKeys(ctx, txn, userID, version)
+		return err
+	})
+	return
+}
+
+func (d *Database) CountBackupKeys(
+	ctx context.Context, version, userID string,
+) (count int64, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		count, err = d.keyBackups.countKeys(ctx, txn, userID, version)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return
+}
+
+// nolint:nakedret
+func (d *Database) UpsertBackupKeys(
+	ctx context.Context, version, userID string, uploads []api.InternalKeyBackupSession,
+) (count int64, etag string, err error) {
+	// wrap the following logic in a txn to ensure we atomically upload keys
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		_, _, _, oldETag, deleted, err := d.keyBackupVersions.selectKeyBackup(ctx, txn, userID, version)
+		if err != nil {
+			return err
+		}
+		if deleted {
+			return fmt.Errorf("backup was deleted")
+		}
+		// pull out all keys for this (user_id, version)
+		existingKeys, err := d.keyBackups.selectKeys(ctx, txn, userID, version)
+		if err != nil {
+			return err
+		}
+
+		changed := false
+		// loop over all the new keys (which should be smaller than the set of backed up keys)
+		for _, newKey := range uploads {
+			// if we have a matching (room_id, session_id), we may need to update the key if it meets some rules, check them.
+			existingRoom := existingKeys[newKey.RoomID]
+			if existingRoom != nil {
+				existingSession, ok := existingRoom[newKey.SessionID]
+				if ok {
+					if existingSession.ShouldReplaceRoomKey(&newKey.KeyBackupSession) {
+						err = d.keyBackups.updateBackupKey(ctx, txn, userID, version, newKey)
+						changed = true
+						if err != nil {
+							return fmt.Errorf("d.keyBackups.updateBackupKey: %w", err)
+						}
+					}
+					// if we shouldn't replace the key we do nothing with it
+					continue
+				}
+			}
+			// if we're here, either the room or session are new, either way, we insert
+			err = d.keyBackups.insertBackupKey(ctx, txn, userID, version, newKey)
+			changed = true
+			if err != nil {
+				return fmt.Errorf("d.keyBackups.insertBackupKey: %w", err)
+			}
+		}
+
+		count, err = d.keyBackups.countKeys(ctx, txn, userID, version)
+		if err != nil {
+			return err
+		}
+		if changed {
+			// update the etag
+			var newETag string
+			if oldETag == "" {
+				newETag = "1"
+			} else {
+				oldETagInt, err := strconv.ParseInt(oldETag, 10, 64)
+				if err != nil {
+					return fmt.Errorf("failed to parse old etag: %s", err)
+				}
+				newETag = strconv.FormatInt(oldETagInt+1, 10)
+			}
+			etag = newETag
+			return d.keyBackupVersions.updateKeyBackupETag(ctx, txn, userID, version, newETag)
+		} else {
+			etag = oldETag
+		}
+		return nil
+	})
+	return
 }

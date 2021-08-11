@@ -44,6 +44,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -56,21 +58,23 @@ func main() {
 	flag.Parse()
 	internal.SetupPprof()
 
-	ygg, err := yggconn.Setup(*instanceName, ".")
+	ygg, err := yggconn.Setup(*instanceName, ".", *instancePeer)
 	if err != nil {
 		panic(err)
 	}
-	ygg.SetMulticastEnabled(true)
-	if instancePeer != nil && *instancePeer != "" {
-		if err = ygg.SetStaticPeer(*instancePeer); err != nil {
-			logrus.WithError(err).Error("Failed to set static peer")
+	/*
+		ygg.SetMulticastEnabled(true)
+		if instancePeer != nil && *instancePeer != "" {
+			if err = ygg.SetStaticPeer(*instancePeer); err != nil {
+				logrus.WithError(err).Error("Failed to set static peer")
+			}
 		}
-	}
+	*/
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
-	cfg.Global.PrivateKey = ygg.SigningPrivateKey()
+	cfg.Global.PrivateKey = ygg.PrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
@@ -98,7 +102,7 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -116,18 +120,6 @@ func main() {
 	fsAPI := federationsender.NewInternalAPI(
 		base, federation, rsAPI, keyRing, true,
 	)
-
-	ygg.SetSessionFunc(func(address string) {
-		req := &api.PerformServersAliveRequest{
-			Servers: []gomatrixserverlib.ServerName{
-				gomatrixserverlib.ServerName(address),
-			},
-		}
-		res := &api.PerformServersAliveResponse{}
-		if err := fsAPI.PerformServersAlive(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Error("Failed to send wake-up message to newly connected node")
-		}
-	})
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
 
@@ -154,6 +146,7 @@ func main() {
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
+		base.SynapseAdminMux,
 	)
 	if err := mscs.Enable(base, &monolith); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")

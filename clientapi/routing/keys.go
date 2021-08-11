@@ -100,7 +100,7 @@ func (r *queryKeysRequest) GetTimeout() time.Duration {
 	return time.Duration(r.Timeout) * time.Millisecond
 }
 
-func QueryKeys(req *http.Request, keyAPI api.KeyInternalAPI) util.JSONResponse {
+func QueryKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {
 	var r queryKeysRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
@@ -108,6 +108,7 @@ func QueryKeys(req *http.Request, keyAPI api.KeyInternalAPI) util.JSONResponse {
 	}
 	queryRes := api.QueryKeysResponse{}
 	keyAPI.QueryKeys(req.Context(), &api.QueryKeysRequest{
+		UserID:        device.UserID,
 		UserToDevices: r.DeviceKeys,
 		Timeout:       r.GetTimeout(),
 		// TODO: Token?
@@ -115,8 +116,11 @@ func QueryKeys(req *http.Request, keyAPI api.KeyInternalAPI) util.JSONResponse {
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
-			"device_keys": queryRes.DeviceKeys,
-			"failures":    queryRes.Failures,
+			"device_keys":       queryRes.DeviceKeys,
+			"master_keys":       queryRes.MasterKeys,
+			"self_signing_keys": queryRes.SelfSigningKeys,
+			"user_signing_keys": queryRes.UserSigningKeys,
+			"failures":          queryRes.Failures,
 		},
 	}
 }

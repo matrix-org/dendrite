@@ -31,7 +31,7 @@ If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or j
 
 ## Requirements
 
-To build Dendrite, you will need Go 1.13 or later. 
+To build Dendrite, you will need Go 1.15 or later. 
 
 For a usable federating Dendrite deployment, you will also need:
 - A domain name (or subdomain) 

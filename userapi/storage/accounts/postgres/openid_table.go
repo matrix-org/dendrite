@@ -39,14 +39,11 @@ func (s *tokenStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerNam
 	if err != nil {
 		return
 	}
-	if s.insertTokenStmt, err = db.Prepare(insertTokenSQL); err != nil {
-		return
-	}
-	if s.selectTokenStmt, err = db.Prepare(selectTokenSQL); err != nil {
-		return
-	}
 	s.serverName = server
-	return
+	return sqlutil.StatementList{
+		{&s.insertTokenStmt, insertTokenSQL},
+		{&s.selectTokenStmt, selectTokenSQL},
+	}.Prepare(db)
 }
 
 // insertToken inserts a new OpenID Connect token to the DB.

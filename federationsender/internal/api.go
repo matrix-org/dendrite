@@ -202,20 +202,6 @@ func (a *FederationSenderInternalAPI) GetEvent(
 	return ires.(gomatrixserverlib.Transaction), nil
 }
 
-func (a *FederationSenderInternalAPI) GetServerKeys(
-	ctx context.Context, s gomatrixserverlib.ServerName,
-) (gomatrixserverlib.ServerKeys, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-	ires, err := a.doRequest(s, func() (interface{}, error) {
-		return a.federation.GetServerKeys(ctx, s)
-	})
-	if err != nil {
-		return gomatrixserverlib.ServerKeys{}, err
-	}
-	return ires.(gomatrixserverlib.ServerKeys), nil
-}
-
 func (a *FederationSenderInternalAPI) LookupServerKeys(
 	ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) ([]gomatrixserverlib.ServerKeys, error) {

@@ -1,5 +1,66 @@
 # Changelog
 
+## Dendrite 0.4.1 (2021-07-26)
+
+### Features
+
+* Support for room version 7 has been added
+* Key notary support is now more complete, allowing Dendrite to be used as a notary server for looking up signing keys
+* State resolution v2 performance has been optimised further by caching the create event, power levels and join rules in memory instead of parsing them repeatedly
+* The media API now handles cases where the maximum file size is configured to be less than 0 for unlimited size
+* The `initial_state` in a `/createRoom` request is now respected when creating a room
+* Code paths for checking if servers are joined to rooms have been optimised significantly
+
+### Fixes
+
+* A bug resulting in `cannot xref null state block with snapshot` during the new state storage migration has been fixed
+* Invites are now retired correctly when rejecting an invite from a remote server which is no longer reachable
+* The DNS cache `cache_lifetime` option is now handled correctly (contributed by [S7evinK](https://github.com/S7evinK))
+* Invalid events in a room join response are now dropped correctly, rather than failing the entire join
+* The `prev_state` of an event will no longer be populated incorrectly to the state of the current event
+* Receiving an invite to an unsupported room version will now correctly return the `M_UNSUPPORTED_ROOM_VERSION` error code instead of `M_BAD_JSON` (contributed by [meenal06](https://github.com/meenal06))
+
+## Dendrite 0.4.0 (2021-07-12)
+
+### Features
+
+* All-new state storage in the roomserver, which dramatically reduces disk space utilisation
+  * State snapshots and blocks are now aggressively deduplicated and reused wherever possible, with state blocks being reduced by up to 15x and snapshot references being reduced up to 2x
+  * Dendrite will upgrade to the new state storage automatically on the first run after upgrade, although this may take some time depending on the size of the state storage
+* Appservice support has been improved significantly, with many bridges now working correctly with Dendrite
+  * Events are now correctly sent to appservices based on room memberships
+  * Aliases and namespaces are now handled correctly, calling the appservice to query for aliases as needed
+  * Appservice user registrations are no longer being subject to incorrect validation checks
+* Shared secret registration has now been implemented correctly
+* The roomserver input API implements a new queuing system to reduce backpressure across rooms
+* Checking if the local server is in a room has been optimised substantially, reducing CPU usage
+* State resolution v2 has been optimised further by improving the power level checks, reducing CPU usage
+* The federation API `/send` endpoint now deduplicates missing auth and prev events more aggressively to reduce memory usage
+* The federation API `/send` endpoint now uses workers to reduce backpressure across rooms
+* The bcrypt cost for password storage is now configurable with the `user_api.bcrypt_cost` option
+* The federation API will now use significantly less memory when calling `/get_missing_events`
+* MSC2946 Spaces endpoints have been updated to stable endpoint naming
+* The media API can now be configured without a maximum file size
+* A new `dendrite-upgrade-test` test has been added for verifying database schema upgrades across versions
+* Added Prometheus metrics for roomserver backpressure, excessive device list updates and federation API event processing summaries
+* Sentry support has been added for error reporting
+
+### Fixes
+
+* Removed the legacy `/v1` register endpoint. Dendrite only implements `/r0` of the CS API, and the legacy `/v1` endpoint had implementation errors which made it possible to bypass shared secret registration (thanks to Jakob Varmose Bentzen for reporting this)
+* Attempting to register an account that already exists now returns a sensible error code rather than a HTTP 500
+* Dendrite will no longer attempt to `/make_join` with itself if listed in the request `server_names`
+* `/sync` will no longer return immediately if there is nothing to sync, which happened particularly with new accounts, causing high CPU usage
+* Malicious media uploads can no longer exhaust all available memory (contributed by [S7evinK](https://github.com/S7evinK))
+* Selecting one-time keys from the database has been optimised (contributed by [S7evinK](https://github.com/S7evinK))
+* The return code when trying to fetch missing account data has been fixed (contributed by [adamgreig](https://github.com/adamgreig))
+* Dendrite will no longer attempt to use `/make_leave` over federation when rejecting a local invite
+* A panic has been fixed in `QueryMembershipsForRoom`
+* A panic on duplicate membership events has been fixed in the federation sender
+* A panic has been fixed in in `IsInterestedInRoomID` (contributed by [bodqhrohro](https://github.com/bodqhrohro))
+* A panic in the roomserver has been fixed when handling empty state sets
+* A panic in the federation API has been fixed when handling cached events
+
 ## Dendrite 0.3.11 (2021-03-02)
 
 ### Fixes

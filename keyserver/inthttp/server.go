@@ -58,6 +58,28 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(PerformUploadDeviceKeysPath,
+		httputil.MakeInternalAPI("performUploadDeviceKeys", func(req *http.Request) util.JSONResponse {
+			request := api.PerformUploadDeviceKeysRequest{}
+			response := api.PerformUploadDeviceKeysResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			s.PerformUploadDeviceKeys(req.Context(), &request, &response)
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(PerformUploadDeviceSignaturesPath,
+		httputil.MakeInternalAPI("performUploadDeviceSignatures", func(req *http.Request) util.JSONResponse {
+			request := api.PerformUploadDeviceSignaturesRequest{}
+			response := api.PerformUploadDeviceSignaturesResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			s.PerformUploadDeviceSignatures(req.Context(), &request, &response)
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(QueryKeysPath,
 		httputil.MakeInternalAPI("queryKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryKeysRequest{}
@@ -99,6 +121,17 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			s.QueryKeyChanges(req.Context(), &request, &response)
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QuerySignaturesPath,
+		httputil.MakeInternalAPI("querySignatures", func(req *http.Request) util.JSONResponse {
+			request := api.QuerySignaturesRequest{}
+			response := api.QuerySignaturesResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			s.QuerySignatures(req.Context(), &request, &response)
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)

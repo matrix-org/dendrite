@@ -82,6 +82,7 @@ type DeviceListUpdater struct {
 	mu            *sync.Mutex // protects UserIDToMutex
 
 	db          DeviceListUpdaterDatabase
+	api         DeviceListUpdaterAPI
 	producer    KeyChangeProducer
 	fedClient   fedsenderapi.FederationClient
 	workerChans []chan gomatrixserverlib.ServerName
@@ -114,6 +115,10 @@ type DeviceListUpdaterDatabase interface {
 	DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error
 }
 
+type DeviceListUpdaterAPI interface {
+	PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse)
+}
+
 // KeyChangeProducer is the interface for producers.KeyChange useful for testing.
 type KeyChangeProducer interface {
 	ProduceKeyChanges(keys []api.DeviceMessage) error
@@ -121,13 +126,14 @@ type KeyChangeProducer interface {
 
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
-	db DeviceListUpdaterDatabase, producer KeyChangeProducer, fedClient fedsenderapi.FederationClient,
-	numWorkers int,
+	db DeviceListUpdaterDatabase, api DeviceListUpdaterAPI, producer KeyChangeProducer,
+	fedClient fedsenderapi.FederationClient, numWorkers int,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
 		userIDToMutex:  make(map[string]*sync.Mutex),
 		mu:             &sync.Mutex{},
 		db:             db,
+		api:            api,
 		producer:       producer,
 		fedClient:      fedClient,
 		workerChans:    make([]chan gomatrixserverlib.ServerName, numWorkers),
@@ -366,6 +372,23 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 				logger.WithError(err).Warn("GetUserDevices returned unknown error type")
 			}
 			continue
+		}
+		if res.MasterKey != nil || res.SelfSigningKey != nil {
+			uploadReq := &api.PerformUploadDeviceKeysRequest{
+				UserID: userID,
+			}
+			uploadRes := &api.PerformUploadDeviceKeysResponse{}
+			if res.MasterKey != nil {
+				if err = sanityCheckKey(*res.MasterKey, userID, gomatrixserverlib.CrossSigningKeyPurposeMaster); err == nil {
+					uploadReq.MasterKey = *res.MasterKey
+				}
+			}
+			if res.SelfSigningKey != nil {
+				if err = sanityCheckKey(*res.SelfSigningKey, userID, gomatrixserverlib.CrossSigningKeyPurposeSelfSigning); err == nil {
+					uploadReq.SelfSigningKey = *res.SelfSigningKey
+				}
+			}
+			u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 		}
 		err = u.updateDeviceList(&res)
 		if err != nil {

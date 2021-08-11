@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math"
 	"net"
 	"net/http"
 	"os"
@@ -48,14 +47,15 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
-	"go.uber.org/atomic"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
+	"github.com/matrix-org/pinecone/router"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
-	pineconeTypes "github.com/matrix-org/pinecone/types"
 
 	"github.com/sirupsen/logrus"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -123,27 +123,23 @@ func main() {
 	pMulticast := pineconeMulticast.NewMulticast(logger, pRouter)
 	pMulticast.Start()
 
-	var staticPeerAttempts atomic.Uint32
-	var connectToStaticPeer func()
-	connectToStaticPeer = func() {
-		uri := *instancePeer
-		if uri == "" {
-			return
+	connectToStaticPeer := func() {
+		attempt := func() {
+			if pRouter.PeerCount(router.PeerTypeRemote) == 0 {
+				uri := *instancePeer
+				if uri == "" {
+					return
+				}
+				if err := conn.ConnectToPeer(pRouter, uri); err != nil {
+					logrus.WithError(err).Error("Failed to connect to static peer")
+				}
+			}
 		}
-		if err := conn.ConnectToPeer(pRouter, uri); err != nil {
-			exp := time.Second * time.Duration(math.Exp2(float64(staticPeerAttempts.Inc())))
-			time.AfterFunc(exp, connectToStaticPeer)
-		} else {
-			staticPeerAttempts.Store(0)
+		for {
+			attempt()
+			time.Sleep(time.Second * 5)
 		}
 	}
-	pRouter.SetDisconnectedCallback(func(port pineconeTypes.SwitchPortID, public pineconeTypes.PublicKey, peertype int, err error) {
-		if peertype == pineconeRouter.PeerTypeRemote && err != nil {
-			staticPeerAttempts.Store(0)
-			time.AfterFunc(time.Second, connectToStaticPeer)
-		}
-	})
-	go connectToStaticPeer()
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
@@ -183,7 +179,7 @@ func main() {
 		base, federation, rsAPI, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -216,9 +212,14 @@ func main() {
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
+		base.SynapseAdminMux,
 	)
 
-	wsUpgrader := websocket.Upgrader{}
+	wsUpgrader := websocket.Upgrader{
+		CheckOrigin: func(_ *http.Request) bool {
+			return true
+		},
+	}
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
@@ -257,6 +258,7 @@ func main() {
 		Handler: pMux,
 	}
 
+	go connectToStaticPeer()
 	go func() {
 		pubkey := pRouter.PublicKey()
 		logrus.Info("Listening on ", hex.EncodeToString(pubkey[:]))

@@ -112,7 +112,7 @@ global:
     # Maximum number of entries to hold in the DNS cache, and
     # for how long those items should be considered valid in seconds.
     cache_size: 256
-    cache_lifetime: 300
+    cache_lifetime: "5m" # 5minutes; see https://pkg.go.dev/time@master#ParseDuration for more
 
 # Configuration for the Appservice API.
 app_service_api:

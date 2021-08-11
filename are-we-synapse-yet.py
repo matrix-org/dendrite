@@ -35,6 +35,7 @@ test_mappings = {
     "nsp": "Non-Spec API",
     "unk": "Unknown API (no group specified)",
     "app": "Application Services API",
+    "msc": "MSCs",
     "f": "Federation", # flag to mark test involves federation
 
     "federation_apis": {
@@ -223,6 +224,7 @@ def main(results_tap_path, verbose):
         },
         "nonspec": {
             "nsp": {},
+            "msc": {},
             "unk": {}
         },
     }
@@ -237,6 +239,8 @@ def main(results_tap_path, verbose):
                 summary["nonspec"]["unk"][name] = test_result["ok"]
             if group_id == "nsp":
                 summary["nonspec"]["nsp"][name] = test_result["ok"]
+            elif group_id == "msc":
+                summary["nonspec"]["msc"][name] = test_result["ok"]
             elif group_id == "app":
                 summary["appservice"]["app"][name] = test_result["ok"]
             elif group_id in test_mappings["federation_apis"]:
