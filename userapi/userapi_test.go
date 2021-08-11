@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -238,6 +239,14 @@ func mustCreateSession(is *is.I, i *internal.UserInternalAPI) (resp *api.CreateS
 	sub := <-mailer.c[api.AccountPassword]
 	is.Equal(len(sub.Token), 64)
 	is.Equal(sub.To, testReq.ThreePid)
+	submitUrl, err := url.Parse(sub.Link)
+	is.NoErr(err)
+	is.Equal(submitUrl.Host, "example.com")
+	is.Equal(submitUrl.Path, "/_matrix/client/r0/account/password/email/submitToken")
+	q := submitUrl.Query()
+	is.Equal(len(q["sid"][0]), 43)
+	is.Equal(q["token"][0], sub.Token)
+	is.Equal(q["client_secret"][0], "foobar")
 	token = sub.Token
 	return
 }

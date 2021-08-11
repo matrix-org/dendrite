@@ -475,6 +475,14 @@ func (t ThreepidSessionType) Name() string {
 	}[t]
 }
 
+func (t ThreepidSessionType) SubmitPath() string {
+	return [...]string{
+		"/_matrix/client/r0/account/password/email/submitToken",
+		"/_matrix/client/r0/account/3pid/email/submitToken",
+		"/_matrix/client/r0/register/email/submitToken",
+	}[t]
+}
+
 func ThreepidSessionTypes() []ThreepidSessionType {
 	return []ThreepidSessionType{
 		AccountPassword,

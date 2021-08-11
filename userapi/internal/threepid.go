@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/url"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -58,11 +59,22 @@ func (a *UserInternalAPI) CreateSession(ctx context.Context, req *api.CreateSess
 		}
 	}
 	res.Sid = s.Sid
+	query := url.Values{
+		"sid":           []string{s.Sid},
+		"client_secret": []string{s.ClientSecret},
+		"token":         []string{s.Token},
+	}
+	link := url.URL{
+		Scheme:   "https",
+		Host:     string(a.ServerName),
+		Path:     req.SessionType.SubmitPath(),
+		RawQuery: query.Encode(),
+	}
 	// TODO - if we fail sending email, send_attempt for next requests must be bumped,
 	// otherwise we will just return nil from this function and not sent email
 	return a.Mail.Send(&mail.Mail{
 		To:    s.ThreePid,
-		Link:  s.NextLink,
+		Link:  link.String(),
 		Token: s.Token,
 		Extra: req.Extra,
 	}, req.SessionType)
