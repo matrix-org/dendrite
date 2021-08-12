@@ -93,7 +93,11 @@ func (p *KeyChange) ProduceSigningKeyUpdate(key eduapi.CrossSigningKeyUpdate) er
 	m.Key = sarama.StringEncoder(key.UserID)
 	m.Value = sarama.ByteEncoder(value)
 
-	_, _, err = p.Producer.SendMessage(&m)
+	partition, offset, err := p.Producer.SendMessage(&m)
+	if err != nil {
+		return err
+	}
+	err = p.DB.StoreKeyChange(context.Background(), partition, offset, key.UserID)
 	if err != nil {
 		return err
 	}

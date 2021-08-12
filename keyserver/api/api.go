@@ -48,6 +48,7 @@ type KeyError struct {
 	Err                string `json:"error"`
 	IsInvalidSignature bool   `json:"is_invalid_signature,omitempty"` // M_INVALID_SIGNATURE
 	IsMissingParam     bool   `json:"is_missing_param,omitempty"`     // M_MISSING_PARAM
+	IsInvalidParam     bool   `json:"is_invalid_param,omitempty"`     // M_INVALID_PARAM
 }
 
 func (k *KeyError) Error() string {
