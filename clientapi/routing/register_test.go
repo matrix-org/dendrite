@@ -237,7 +237,10 @@ func TestValidatePassword(t *testing.T) {
 			&util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", defaults.MinPasswordLength)),
-			}}, {"default reject too long",
+			},
+		},
+		{
+			"default reject too long",
 			*defaults,
 			// len 600
 			"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -247,7 +250,19 @@ func TestValidatePassword(t *testing.T) {
 			},
 		},
 		{
-			"set min too short",
+			"default allow long enough",
+			*defaults,
+			"thisisalongenoughpassword",
+			nil,
+		},
+		{
+			"default allow with symbols",
+			*defaults,
+			"ih@ve$ome$ymbol$_here",
+			nil,
+		},
+		{
+			"set min reject too short",
 			*custom,
 			"abcd",
 			&util.JSONResponse{
@@ -256,7 +271,7 @@ func TestValidatePassword(t *testing.T) {
 			},
 		},
 		{
-			"set max too long",
+			"set max reject too long",
 			*custom,
 			// len 33
 			"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -275,7 +290,7 @@ func TestValidatePassword(t *testing.T) {
 			},
 		},
 		{
-			"require mixed case but none",
+			"require mixed case but none given",
 			*custom,
 			"haha_all_lowercase_cant_catch_me",
 			&util.JSONResponse{
@@ -284,7 +299,7 @@ func TestValidatePassword(t *testing.T) {
 			},
 		},
 		{
-			"custom settings but valid",
+			"custom settings allow",
 			*custom,
 			"$0me_$up3r_$trong_P@ass",
 			nil,
