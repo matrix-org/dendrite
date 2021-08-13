@@ -57,8 +57,6 @@ var (
 )
 
 const (
-	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
-	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
 	sessionIDLength   = 24
 )
@@ -111,6 +109,10 @@ var (
 	// sessions stores the completed flow stages for all sessions. Referenced using their sessionID.
 	sessions           = newSessionsDict()
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
+
+	passwordSymbols   = regexp.MustCompile(`[^0-9a-zA-Z]`)
+	passwordUppercase = regexp.MustCompile(`[A-Z]`)
+	passwordLowercase = regexp.MustCompile(`[a-z]`)
 )
 
 // registerRequest represents the submitted registration request.
@@ -225,17 +227,38 @@ func validateApplicationServiceUsername(username string) *util.JSONResponse {
 }
 
 // validatePassword returns an error response if the password is invalid
-func validatePassword(password string) *util.JSONResponse {
+func validatePassword(password string, cfg config.PasswordRequirements) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
-	if len(password) > maxPasswordLength {
+	if len(password) > cfg.MaxPasswordLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
+			JSON: jsonerror.WeakPassword(fmt.Sprintf("'password' >%d characters", cfg.MaxPasswordLength)),
 		}
-	} else if len(password) > 0 && len(password) < minPasswordLength {
+	} else if len(password) > 0 && len(password) < cfg.MinPasswordLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
+			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", cfg.MinPasswordLength)),
+		}
+	}
+
+	if cfg.MinNumberSymbols > 0 {
+		matches := passwordSymbols.FindAllStringIndex(password, -1)
+		if len(matches) < cfg.MinNumberSymbols {
+			return &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: minimum %d symbols", cfg.MinNumberSymbols)),
+			}
+		}
+	}
+
+	if cfg.RequireMixedCase {
+		lowercase := passwordLowercase.FindAllStringIndex(password, -1)
+		uppercase := passwordUppercase.FindAllStringIndex(password, -1)
+		if len(lowercase) == 0 || len(uppercase) == 0 {
+			return &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword("password must have uppercase and lowercase letters"),
+			}
 		}
 	}
 	return nil
@@ -511,7 +534,7 @@ func Register(
 			return *resErr
 		}
 	}
-	if resErr = validatePassword(r.Password); resErr != nil {
+	if resErr = validatePassword(r.Password, cfg.PasswordRequirements); resErr != nil {
 		return *resErr
 	}
 
@@ -935,7 +958,7 @@ func RegisterAvailable(
 	}
 }
 
-func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
+func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedSecretRegistration, passwordRequirements config.PasswordRequirements, req *http.Request) util.JSONResponse {
 	ssrr, err := NewSharedSecretRegistrationRequest(req.Body)
 	if err != nil {
 		return util.JSONResponse{
@@ -959,7 +982,7 @@ func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedS
 	if resErr := validateUsername(ssrr.User); resErr != nil {
 		return *resErr
 	}
-	if resErr := validatePassword(ssrr.Password); resErr != nil {
+	if resErr := validatePassword(ssrr.Password, passwordRequirements); resErr != nil {
 		return *resErr
 	}
 	deviceID := "shared_secret_registration"

@@ -32,6 +32,9 @@ type ClientAPI struct {
 	// was successful
 	RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
 
+	// Used to enforce standards on password strengths
+	PasswordRequirements PasswordRequirements `yaml:"password_requirements"`
+
 	// TURN options
 	TURN TURN `yaml:"turn"`
 
@@ -53,6 +56,7 @@ func (c *ClientAPI) Defaults() {
 	c.RecaptchaSiteVerifyAPI = ""
 	c.RegistrationDisabled = false
 	c.RateLimiting.Defaults()
+	c.PasswordRequirements.Defaults()
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -68,6 +72,7 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	}
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
+	c.PasswordRequirements.Verify(configErrs)
 }
 
 type TURN struct {
@@ -122,4 +127,28 @@ func (r *RateLimiting) Defaults() {
 	r.Enabled = true
 	r.Threshold = 5
 	r.CooloffMS = 500
+}
+
+type PasswordRequirements struct {
+	// Minimum number of characters
+	MinPasswordLength int `yaml:"min_password_length"`
+	// Maximum number of characters
+	MaxPasswordLength int `yaml:"max_password_length"`
+	// Number of symbols required
+	MinNumberSymbols int `yaml:"minimum_number_of_symbols"`
+	// Should the password have uppercase and lowercase characters
+	RequireMixedCase bool `yaml:"require_mixed_case"`
+}
+
+func (p *PasswordRequirements) Verify(configErrs *ConfigErrors) {
+	checkPositive(configErrs, "client_api.password_requirements.min_password_length", int64(p.MinPasswordLength))
+	checkPositive(configErrs, "client_api.password_requirements.max_password_length", int64(p.MaxPasswordLength))
+	checkPositive(configErrs, "client_api.password_requirements.min_number_symbols", int64(p.MinNumberSymbols))
+}
+
+func (p *PasswordRequirements) Defaults() {
+	p.MinPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
+	p.MaxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	p.MinNumberSymbols = 0
+	p.RequireMixedCase = false
 }

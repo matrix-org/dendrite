@@ -78,7 +78,7 @@ func Password(
 	AddCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	// Check the new password strength.
-	if resErr = validatePassword(r.NewPassword); resErr != nil {
+	if resErr = validatePassword(r.NewPassword, cfg.PasswordRequirements); resErr != nil {
 		return *resErr
 	}
 

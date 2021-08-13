@@ -86,6 +86,11 @@ client_api:
     turn_shared_secret: ""
     turn_username: ""
     turn_password: ""
+  password_requirements:
+    min_password_length: 6
+    max_password_length: 64
+    required_number_symbols: 2
+    require_mixed_case: true
 current_state_server:
   internal_api:
     listen: http://localhost:7782

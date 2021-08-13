@@ -15,11 +15,15 @@
 package routing
 
 import (
+	"fmt"
+	"net/http"
 	"regexp"
 	"testing"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/util"
 )
 
 var (
@@ -206,5 +210,110 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	asID, resp = validateApplicationService(&fakeConfig.ClientAPI, "_something_else", "1234")
 	if resp == nil || asID == fakeID {
 		t.Errorf("user_id should not have been valid: @_something_else:localhost")
+	}
+}
+
+func TestValidatePassword(t *testing.T) {
+	t.Parallel()
+	defaults := &config.PasswordRequirements{}
+	defaults.Defaults()
+
+	custom := &config.PasswordRequirements{
+		MinPasswordLength: 16,
+		MaxPasswordLength: 32,
+		RequireMixedCase:  true,
+		MinNumberSymbols:  5,
+	}
+	var testCases = []struct {
+		name     string
+		config   config.PasswordRequirements
+		password string
+		expected *util.JSONResponse
+	}{
+		{
+			"default reject too short",
+			*defaults,
+			"foobar",
+			&util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", defaults.MinPasswordLength)),
+			}}, {"default reject too long",
+			*defaults,
+			// len 600
+			"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			&util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword(fmt.Sprintf("'password' >%d characters", defaults.MaxPasswordLength)),
+			},
+		},
+		{
+			"set min too short",
+			*custom,
+			"abcd",
+			&util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", custom.MinPasswordLength)),
+			},
+		},
+		{
+			"set max too long",
+			*custom,
+			// len 33
+			"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			&util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword(fmt.Sprintf("'password' >%d characters", custom.MaxPasswordLength)),
+			},
+		},
+		{
+			"set symbols not enough",
+			*custom,
+			"thi$i$apasswordshouldbelong",
+			&util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: minimum %d symbols", custom.MinNumberSymbols)),
+			},
+		},
+		{
+			"require mixed case but none",
+			*custom,
+			"haha_all_lowercase_cant_catch_me",
+			&util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword("password must have uppercase and lowercase letters"),
+			},
+		},
+		{
+			"custom settings but valid",
+			*custom,
+			"$0me_$up3r_$trong_P@ass",
+			nil,
+		},
+	}
+
+	for _, test := range testCases {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			response := validatePassword(test.password, test.config)
+			if test.expected == nil && response != nil {
+				t.Errorf("expected password to be validated. got error: %s", response.JSON.(*jsonerror.MatrixError).Err)
+			} else if test.expected != nil && response == nil {
+				t.Errorf("expected password to fail, but was validated")
+			} else if test.expected != nil && test.expected.Code != response.Code {
+				t.Errorf("expected error code %d, got %d", test.expected.Code, response.Code)
+			} else if test.expected != nil && response != nil {
+				matrixError := response.JSON.(*jsonerror.MatrixError)
+				expectedError := test.expected.JSON.(*jsonerror.MatrixError)
+
+				if expectedError.Err != matrixError.Err {
+					t.Errorf("expected error: %s, got error: %s", expectedError.Err, matrixError.Err)
+				}
+			} else if test.expected == nil && response == nil {
+				t.Log("password validation passed")
+			} else {
+				t.Errorf("uncaught test result. expected %v, got %v", test.expected, response)
+			}
+		})
 	}
 }
