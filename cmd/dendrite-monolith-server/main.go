@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
+	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -111,9 +112,19 @@ func main() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsImpl.SetFederationSenderAPI(fsAPI)
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
+	if traceInternal {
+		userAPI = &uapi.UserInternalAPITrace{
+			Impl: userAPI,
+		}
+	}
+	// needs to be after the SetUserAPI call above
+	if base.UseHTTPAPIs {
+		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI)
+		keyAPI = base.KeyServerHTTPClient()
+	}
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,

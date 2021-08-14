@@ -571,6 +571,9 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 }
 
 func eventNIDsAsArray(eventNIDs []types.EventNID) string {
+	if eventNIDs == nil {
+		eventNIDs = []types.EventNID{} // don't store 'null' in the DB
+	}
 	b, _ := json.Marshal(eventNIDs)
 	return string(b)
 }

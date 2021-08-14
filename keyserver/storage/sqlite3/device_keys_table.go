@@ -113,7 +113,11 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 	defer internal.CloseAndLogIfError(ctx, rows, "selectBatchDeviceKeysStmt: rows.close() failed")
 	var result []api.DeviceMessage
 	for rows.Next() {
-		var dk api.DeviceMessage
+		dk := api.DeviceMessage{
+			Type:       api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{},
+		}
+		dk.Type = api.TypeDeviceKeyUpdate
 		dk.UserID = userID
 		var keyJSON string
 		var streamID int
@@ -144,6 +148,7 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 			return err
 		}
 		// this will be '' when there is no device
+		keys[i].Type = api.TypeDeviceKeyUpdate
 		keys[i].KeyJSON = []byte(keyJSONStr)
 		keys[i].StreamID = streamID
 		if displayName.Valid {
