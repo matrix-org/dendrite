@@ -515,7 +515,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			}
 			inputRes := &eduserverAPI.InputCrossSigningKeyUpdateResponse{}
 			if err := t.eduAPI.InputCrossSigningKeyUpdate(ctx, inputReq, inputRes); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to send signing key update to EDU server")
+				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal cross-signing update")
 				continue
 			}
 		default:

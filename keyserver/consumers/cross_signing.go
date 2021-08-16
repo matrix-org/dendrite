@@ -43,9 +43,13 @@ func NewOutputCrossSigningKeyUpdateConsumer(
 	keyDB storage.Database,
 	keyAPI api.KeyInternalAPI,
 ) *OutputCrossSigningKeyUpdateConsumer {
+	// The keyserver both produces and consumes on the TopicOutputKeyChangeEvent
+	// topic. We will only produce events where the UserID matches our server name,
+	// and we will only consume events where the UserID does NOT match our server
+	// name (because the update came from a remote server).
 	consumer := internal.ContinualConsumer{
 		Process:        process,
-		ComponentName:  "keyserver/crosssigning",
+		ComponentName:  "keyserver/keyserver",
 		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputKeyChangeEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: keyDB,

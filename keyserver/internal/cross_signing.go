@@ -59,8 +59,8 @@ func sanityCheckKey(key gomatrixserverlib.CrossSigningKey, userID string, purpos
 			// We can't enforce the key length to be correct for an
 			// algorithm that we don't recognise, so instead we'll
 			// just make sure that it isn't incredibly excessive.
-			if len(keyData) > 4096 {
-				return fmt.Errorf("unknown key type is too long")
+			if l := len(keyData); l > 4096 {
+				return fmt.Errorf("unknown key type is too long (%d bytes)", l)
 			}
 		}
 	}
@@ -76,8 +76,8 @@ func sanityCheckKey(key gomatrixserverlib.CrossSigningKey, userID string, purpos
 			case "curve25519":
 				return fmt.Errorf("curve25519 signatures are impossible")
 			default:
-				if len(originSignature) > 4096 {
-					return fmt.Errorf("unknown signature type is too long")
+				if l := len(originSignature); l > 4096 {
+					return fmt.Errorf("unknown signature type is too long (%d bytes)", l)
 				}
 			}
 		}

@@ -150,7 +150,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) error {
 	output := m.CrossSigningKeyUpdate
 	_, host, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
-		logrus.WithError(err).Errorf("eduserver output log: user ID parse failure")
+		logrus.WithError(err).Errorf("fedsender key change consumer: user ID parse failure")
 		return nil
 	}
 	if host != gomatrixserverlib.ServerName(t.serverName) {
@@ -166,13 +166,13 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) error {
 		WantMembership: "join",
 	}, &queryRes)
 	if err != nil {
-		logger.WithError(err).Error("failed to calculate joined rooms for user")
+		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined rooms for user")
 		return nil
 	}
 	// send this key change to all servers who share rooms with this user.
 	destinations, err := t.db.GetJoinedHostsForRooms(context.Background(), queryRes.RoomIDs)
 	if err != nil {
-		logger.WithError(err).Error("failed to calculate joined hosts for rooms user is in")
+		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined hosts for rooms user is in")
 		return nil
 	}
 
@@ -182,7 +182,8 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) error {
 		Origin: string(t.serverName),
 	}
 	if edu.Content, err = json.Marshal(output); err != nil {
-		return err
+		logger.WithError(err).Error("fedsender key change consumer: failed to marshal output, dropping")
+		return nil
 	}
 
 	logger.Infof("Sending cross-signing update message to %q", destinations)
