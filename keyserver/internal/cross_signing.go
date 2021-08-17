@@ -294,7 +294,7 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 		}
 	}
 
-	if err := a.processSelfSignatures(ctx, req.UserID, selfSignatures); err != nil {
+	if err := a.processSelfSignatures(ctx, selfSignatures); err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("a.processSelfSignatures: %s", err),
 		}
@@ -325,7 +325,7 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 }
 
 func (a *KeyInternalAPI) processSelfSignatures(
-	ctx context.Context, _ string,
+	ctx context.Context,
 	signatures map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice,
 ) error {
 	// Here we will process:
