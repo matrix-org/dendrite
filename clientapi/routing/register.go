@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -109,10 +110,6 @@ var (
 	// sessions stores the completed flow stages for all sessions. Referenced using their sessionID.
 	sessions           = newSessionsDict()
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
-
-	passwordSymbols   = regexp.MustCompile(`[^0-9a-zA-Z]`)
-	passwordUppercase = regexp.MustCompile(`[A-Z]`)
-	passwordLowercase = regexp.MustCompile(`[a-z]`)
 )
 
 // registerRequest represents the submitted registration request.
@@ -229,36 +226,47 @@ func validateApplicationServiceUsername(username string) *util.JSONResponse {
 // validatePassword returns an error response if the password is invalid
 func validatePassword(password string, cfg config.PasswordRequirements) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+
 	if len(password) > cfg.MaxPasswordLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.WeakPassword(fmt.Sprintf("'password' >%d characters", cfg.MaxPasswordLength)),
 		}
-	} else if len(password) > 0 && len(password) < cfg.MinPasswordLength {
+	} else if len(password) >= 0 && len(password) < cfg.MinPasswordLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", cfg.MinPasswordLength)),
 		}
 	}
 
-	if cfg.MinNumberSymbols > 0 {
-		matches := passwordSymbols.FindAllStringIndex(password, -1)
-		if len(matches) < cfg.MinNumberSymbols {
-			return &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: minimum %d symbols", cfg.MinNumberSymbols)),
-			}
+	var (
+		symbolCount    = 0
+		uppercaseCount = 0
+		lowercaseCount = 0
+	)
+
+	for _, letter := range password {
+		switch {
+		case unicode.IsSymbol(letter) || unicode.IsPunct(letter):
+			symbolCount++
+		case unicode.IsUpper(letter):
+			uppercaseCount++
+		case unicode.IsLower(letter):
+			lowercaseCount++
 		}
 	}
 
-	if cfg.RequireMixedCase {
-		lowercase := passwordLowercase.FindAllStringIndex(password, -1)
-		uppercase := passwordUppercase.FindAllStringIndex(password, -1)
-		if len(lowercase) == 0 || len(uppercase) == 0 {
-			return &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.WeakPassword("password must have uppercase and lowercase letters"),
-			}
+	if cfg.MinNumberSymbols > 0 && symbolCount < cfg.MinNumberSymbols {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: minimum %d symbols", cfg.MinNumberSymbols)),
+		}
+	}
+
+	if cfg.RequireMixedCase && (uppercaseCount == 0 || lowercaseCount == 0) {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.WeakPassword("password must have uppercase and lowercase letters"),
 		}
 	}
 	return nil
