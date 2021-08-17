@@ -131,6 +131,12 @@ func InvalidSignature(msg string) *MatrixError {
 	return &MatrixError{"M_INVALID_SIGNATURE", msg}
 }
 
+// InvalidParam is an error that is returned when a parameter was invalid,
+// traditionally with cross-signing.
+func InvalidParam(msg string) *MatrixError {
+	return &MatrixError{"M_INVALID_PARAM", msg}
+}
+
 // MissingParam is an error that is returned when a parameter was incorrect,
 // traditionally with cross-signing.
 func MissingParam(msg string) *MatrixError {

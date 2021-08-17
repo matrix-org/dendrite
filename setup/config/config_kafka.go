@@ -10,7 +10,6 @@ const (
 	TopicOutputRoomEvent         = "OutputRoomEvent"
 	TopicOutputClientData        = "OutputClientData"
 	TopicOutputReceiptEvent      = "OutputReceiptEvent"
-	TopicOutputSigningKeyUpdate  = "OutputSigningKeyUpdate"
 )
 
 type Kafka struct {

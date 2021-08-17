@@ -502,6 +502,22 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 					}
 				}
 			}
+		case eduserverAPI.MSigningKeyUpdate:
+			var updatePayload eduserverAPI.CrossSigningKeyUpdate
+			if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
+				util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+					"user_id": updatePayload.UserID,
+				}).Error("Failed to send signing key update to edu server")
+				continue
+			}
+			inputReq := &eduserverAPI.InputCrossSigningKeyUpdateRequest{
+				CrossSigningKeyUpdate: updatePayload,
+			}
+			inputRes := &eduserverAPI.InputCrossSigningKeyUpdateResponse{}
+			if err := t.eduAPI.InputCrossSigningKeyUpdate(ctx, inputReq, inputRes); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal cross-signing update")
+				continue
+			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}

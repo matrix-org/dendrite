@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	eduapi "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/keyserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -47,6 +48,7 @@ type KeyError struct {
 	Err                string `json:"error"`
 	IsInvalidSignature bool   `json:"is_invalid_signature,omitempty"` // M_INVALID_SIGNATURE
 	IsMissingParam     bool   `json:"is_missing_param,omitempty"`     // M_MISSING_PARAM
+	IsInvalidParam     bool   `json:"is_invalid_param,omitempty"`     // M_INVALID_PARAM
 }
 
 func (k *KeyError) Error() string {
@@ -62,8 +64,9 @@ const (
 
 // DeviceMessage represents the message produced into Kafka by the key server.
 type DeviceMessage struct {
-	Type        DeviceMessageType `json:"Type,omitempty"`
-	*DeviceKeys `json:"DeviceKeys,omitempty"`
+	Type                                DeviceMessageType `json:"Type,omitempty"`
+	*DeviceKeys                         `json:"DeviceKeys,omitempty"`
+	*eduapi.OutputCrossSigningKeyUpdate `json:"CrossSigningKeyUpdate,omitempty"`
 	// A monotonically increasing number which represents device changes for this user.
 	StreamID int
 }

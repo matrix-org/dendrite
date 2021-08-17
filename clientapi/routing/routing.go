@@ -65,7 +65,7 @@ func Setup(
 	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
 
 	unstableFeatures := map[string]bool{
-		//"org.matrix.e2e_cross_signing": true,
+		"org.matrix.e2e_cross_signing": true,
 	}
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
