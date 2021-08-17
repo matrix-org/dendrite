@@ -305,13 +305,6 @@ func TestValidatePassword(t *testing.T) {
 				t.Errorf("expected password to fail, but was validated")
 			} else if test.expected != nil && test.expected.Code != response.Code {
 				t.Errorf("expected error code %d, got %d", test.expected.Code, response.Code)
-				// } else if test.expected != nil && response != nil {
-				// 	matrixError := response.JSON.(*jsonerror.MatrixError)
-				// 	expectedError := test.expected.JSON.(*jsonerror.MatrixError)
-
-				// 	if expectedError.Err != matrixError.Err {
-				// 		t.Errorf("expected error: %s, got error: %s", expectedError.Err, matrixError.Err)
-				// 	}
 			} else if test.expected != nil && test.expected.Code == response.Code {
 				t.Logf("expected error code %d matches %d", test.expected.Code, response.Code)
 			} else if test.expected == nil && response == nil {
