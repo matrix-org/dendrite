@@ -60,7 +60,7 @@ type Database interface {
 
 	// DeleteDeviceKeys removes the device keys for a given user/device, and any accompanying
 	// cross-signing signatures relating to that device.
-	DeleteDeviceKeys(ctx context.Context, userID string, deviceID gomatrixserverlib.KeyID) error
+	DeleteDeviceKeys(ctx context.Context, userID string, deviceIDs []gomatrixserverlib.KeyID) error
 
 	// ClaimKeys based on the 3-uple of user_id, device_id and algorithm name. Returns the keys claimed. Returns no error if a key
 	// cannot be claimed or if none exist for this (user, device, algorithm), instead it is omitted from the returned slice.

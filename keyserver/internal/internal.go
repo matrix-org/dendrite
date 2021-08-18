@@ -183,11 +183,9 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 }
 
 func (a *KeyInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.PerformDeleteKeysRequest, res *api.PerformDeleteKeysResponse) {
-	for _, keyID := range req.KeyIDs {
-		if err := a.DB.DeleteDeviceKeys(ctx, req.UserID, keyID); err != nil {
-			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("Failed to delete device keys: %s", err),
-			}
+	if err := a.DB.DeleteDeviceKeys(ctx, req.UserID, req.KeyIDs); err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("Failed to delete device keys: %s", err),
 		}
 	}
 }
