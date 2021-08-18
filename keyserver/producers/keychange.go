@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/Shopify/sarama"
+	eduapi "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/sirupsen/logrus"
@@ -71,5 +72,38 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 			"num_key_changes": count,
 		}).Infof("Produced to key change topic '%s'", p.Topic)
 	}
+	return nil
+}
+
+func (p *KeyChange) ProduceSigningKeyUpdate(key eduapi.CrossSigningKeyUpdate) error {
+	var m sarama.ProducerMessage
+	output := &api.DeviceMessage{
+		Type: api.TypeCrossSigningUpdate,
+		OutputCrossSigningKeyUpdate: &eduapi.OutputCrossSigningKeyUpdate{
+			CrossSigningKeyUpdate: key,
+		},
+	}
+
+	value, err := json.Marshal(output)
+	if err != nil {
+		return err
+	}
+
+	m.Topic = string(p.Topic)
+	m.Key = sarama.StringEncoder(key.UserID)
+	m.Value = sarama.ByteEncoder(value)
+
+	partition, offset, err := p.Producer.SendMessage(&m)
+	if err != nil {
+		return err
+	}
+	err = p.DB.StoreKeyChange(context.Background(), partition, offset, key.UserID)
+	if err != nil {
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"user_id": key.UserID,
+	}).Infof("Produced to cross-signing update topic '%s'", p.Topic)
 	return nil
 }

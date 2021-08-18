@@ -84,6 +84,14 @@ func (o *testEDUProducer) InputReceiptEvent(
 	return nil
 }
 
+func (o *testEDUProducer) InputCrossSigningKeyUpdate(
+	ctx context.Context,
+	request *eduAPI.InputCrossSigningKeyUpdateRequest,
+	response *eduAPI.InputCrossSigningKeyUpdateResponse,
+) error {
+	return nil
+}
+
 type testRoomserverAPI struct {
 	api.RoomserverInternalAPITrace
 	inputRoomEvents            []api.InputRoomEvent

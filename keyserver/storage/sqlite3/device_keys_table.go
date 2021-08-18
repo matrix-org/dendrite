@@ -58,6 +58,9 @@ const selectMaxStreamForUserSQL = "" +
 const countStreamIDsForUserSQL = "" +
 	"SELECT COUNT(*) FROM keyserver_device_keys WHERE user_id=$1 AND stream_id IN ($2)"
 
+const deleteDeviceKeysSQL = "" +
+	"DELETE FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
+
 const deleteAllDeviceKeysSQL = "" +
 	"DELETE FROM keyserver_device_keys WHERE user_id=$1"
 
@@ -67,6 +70,7 @@ type deviceKeysStatements struct {
 	selectDeviceKeysStmt       *sql.Stmt
 	selectBatchDeviceKeysStmt  *sql.Stmt
 	selectMaxStreamForUserStmt *sql.Stmt
+	deleteDeviceKeysStmt       *sql.Stmt
 	deleteAllDeviceKeysStmt    *sql.Stmt
 }
 
@@ -90,10 +94,18 @@ func NewSqliteDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 	if s.selectMaxStreamForUserStmt, err = db.Prepare(selectMaxStreamForUserSQL); err != nil {
 		return nil, err
 	}
+	if s.deleteDeviceKeysStmt, err = db.Prepare(deleteDeviceKeysSQL); err != nil {
+		return nil, err
+	}
 	if s.deleteAllDeviceKeysStmt, err = db.Prepare(deleteAllDeviceKeysSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+func (s *deviceKeysStatements) DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error {
+	_, err := sqlutil.TxStmt(txn, s.deleteDeviceKeysStmt).ExecContext(ctx, userID, deviceID)
+	return err
 }
 
 func (s *deviceKeysStatements) DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error {

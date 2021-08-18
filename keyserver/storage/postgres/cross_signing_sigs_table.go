@@ -46,10 +46,14 @@ const upsertCrossSigningSigsForTargetSQL = "" +
 	" VALUES($1, $2, $3, $4, $5)" +
 	" ON CONFLICT (origin_user_id, target_user_id, target_key_id) DO UPDATE SET (origin_key_id, signature) = ($2, $5)"
 
+const deleteCrossSigningSigsForTargetSQL = "" +
+	"DELETE FROM keyserver_cross_signing_sigs WHERE target_user_id=$1 AND target_key_id=$2"
+
 type crossSigningSigsStatements struct {
 	db                                  *sql.DB
 	selectCrossSigningSigsForTargetStmt *sql.Stmt
 	upsertCrossSigningSigsForTargetStmt *sql.Stmt
+	deleteCrossSigningSigsForTargetStmt *sql.Stmt
 }
 
 func NewPostgresCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error) {
@@ -63,6 +67,7 @@ func NewPostgresCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, erro
 	return s, sqlutil.StatementList{
 		{&s.selectCrossSigningSigsForTargetStmt, selectCrossSigningSigsForTargetSQL},
 		{&s.upsertCrossSigningSigsForTargetStmt, upsertCrossSigningSigsForTargetSQL},
+		{&s.deleteCrossSigningSigsForTargetStmt, deleteCrossSigningSigsForTargetSQL},
 	}.Prepare(db)
 }
 
@@ -98,6 +103,16 @@ func (s *crossSigningSigsStatements) UpsertCrossSigningSigsForTarget(
 ) error {
 	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningSigsForTargetStmt).ExecContext(ctx, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
 		return fmt.Errorf("s.upsertCrossSigningSigsForTargetStmt: %w", err)
+	}
+	return nil
+}
+
+func (s *crossSigningSigsStatements) DeleteCrossSigningSigsForTarget(
+	ctx context.Context, txn *sql.Tx,
+	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
+) error {
+	if _, err := sqlutil.TxStmt(txn, s.deleteCrossSigningSigsForTargetStmt).ExecContext(ctx, targetUserID, targetKeyID); err != nil {
+		return fmt.Errorf("s.deleteCrossSigningSigsForTargetStmt: %w", err)
 	}
 	return nil
 }

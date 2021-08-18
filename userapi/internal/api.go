@@ -145,6 +145,18 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 	if err != nil {
 		return err
 	}
+	// Ask the keyserver to delete device keys and signatures for those devices
+	deleteReq := &keyapi.PerformDeleteKeysRequest{
+		UserID: req.UserID,
+	}
+	for _, keyID := range req.DeviceIDs {
+		deleteReq.KeyIDs = append(deleteReq.KeyIDs, gomatrixserverlib.KeyID(keyID))
+	}
+	deleteRes := &keyapi.PerformDeleteKeysResponse{}
+	a.KeyAPI.PerformDeleteKeys(ctx, deleteReq, deleteRes)
+	if err := deleteRes.Error; err != nil {
+		return fmt.Errorf("a.KeyAPI.PerformDeleteKeys: %w", err)
+	}
 	// create empty device keys and upload them to delete what was once there and trigger device list changes
 	return a.deviceListUpdate(req.UserID, deletedDeviceIDs)
 }

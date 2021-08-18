@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	eduapi "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/keyserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,6 +34,7 @@ type KeyInternalAPI interface {
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
+	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse)
 	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
 	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
@@ -47,6 +49,7 @@ type KeyError struct {
 	Err                string `json:"error"`
 	IsInvalidSignature bool   `json:"is_invalid_signature,omitempty"` // M_INVALID_SIGNATURE
 	IsMissingParam     bool   `json:"is_missing_param,omitempty"`     // M_MISSING_PARAM
+	IsInvalidParam     bool   `json:"is_invalid_param,omitempty"`     // M_INVALID_PARAM
 }
 
 func (k *KeyError) Error() string {
@@ -62,8 +65,9 @@ const (
 
 // DeviceMessage represents the message produced into Kafka by the key server.
 type DeviceMessage struct {
-	Type        DeviceMessageType `json:"Type,omitempty"`
-	*DeviceKeys `json:"DeviceKeys,omitempty"`
+	Type                                DeviceMessageType `json:"Type,omitempty"`
+	*DeviceKeys                         `json:"DeviceKeys,omitempty"`
+	*eduapi.OutputCrossSigningKeyUpdate `json:"CrossSigningKeyUpdate,omitempty"`
 	// A monotonically increasing number which represents device changes for this user.
 	StreamID int
 }
@@ -140,6 +144,18 @@ type PerformUploadKeysResponse struct {
 	// A map of user_id -> device_id -> Error for tracking failures.
 	KeyErrors        map[string]map[string]*KeyError
 	OneTimeKeyCounts []OneTimeKeysCount
+}
+
+// PerformDeleteKeysRequest asks the keyserver to forget about certain
+// keys, and signatures related to those keys.
+type PerformDeleteKeysRequest struct {
+	UserID string
+	KeyIDs []gomatrixserverlib.KeyID
+}
+
+// PerformDeleteKeysResponse is the response to PerformDeleteKeysRequest.
+type PerformDeleteKeysResponse struct {
+	Error *KeyError
 }
 
 // KeyError sets a key error field on KeyErrors

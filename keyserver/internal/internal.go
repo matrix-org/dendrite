@@ -182,6 +182,14 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 	util.GetLogger(ctx).WithField("num_keys", keysClaimed).Info("Claimed remote keys")
 }
 
+func (a *KeyInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.PerformDeleteKeysRequest, res *api.PerformDeleteKeysResponse) {
+	if err := a.DB.DeleteDeviceKeys(ctx, req.UserID, req.KeyIDs); err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("Failed to delete device keys: %s", err),
+		}
+	}
+}
+
 func (a *KeyInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOneTimeKeysRequest, res *api.QueryOneTimeKeysResponse) {
 	count, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 	if err != nil {
