@@ -30,6 +30,7 @@ const (
 	InputDeviceListUpdatePath         = "/keyserver/inputDeviceListUpdate"
 	PerformUploadKeysPath             = "/keyserver/performUploadKeys"
 	PerformClaimKeysPath              = "/keyserver/performClaimKeys"
+	PerformDeleteKeysPath             = "/keyserver/performDeleteKeys"
 	PerformUploadDeviceKeysPath       = "/keyserver/performUploadDeviceKeys"
 	PerformUploadDeviceSignaturesPath = "/keyserver/performUploadDeviceSignatures"
 	QueryKeysPath                     = "/keyserver/queryKeys"
@@ -81,6 +82,23 @@ func (h *httpKeyInternalAPI) PerformClaimKeys(
 	ctx context.Context,
 	request *api.PerformClaimKeysRequest,
 	response *api.PerformClaimKeysResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformClaimKeys")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformClaimKeysPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.KeyError{
+			Err: err.Error(),
+		}
+	}
+}
+
+func (h *httpKeyInternalAPI) PerformDeleteKeys(
+	ctx context.Context,
+	request *api.PerformDeleteKeysRequest,
+	response *api.PerformDeleteKeysResponse,
 ) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformClaimKeys")
 	defer span.Finish()
