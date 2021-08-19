@@ -17,7 +17,7 @@ require (
 	github.com/h2non/filetype v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/juju/testing v0.0.0-20210324180055-18c50b0c2098 // indirect
-	github.com/lib/pq v1.10.2
+	github.com/lib/pq v1.10.1
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
 	github.com/libp2p/go-libp2p-core v0.8.3
@@ -33,7 +33,7 @@ require (
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20210817115641-f9416ac1a723
 	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
-	github.com/matrix-org/pinecone v0.0.0-20210819133928-21e3b392289b
+	github.com/matrix-org/pinecone v0.0.0-20210819150600-e692df1a5c42
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/morikuni/aec v1.0.0 // indirect
