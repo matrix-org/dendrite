@@ -40,7 +40,7 @@ type EDUServerInputAPI struct {
 	OutputSendToDeviceEventTopic string
 	// The kafka topic to output new receipt events to
 	OutputReceiptEventTopic string
-  // The kafka topic to output presence changes to
+	// The kafka topic to output presence changes to
 	OutputPresenceTopic string
 	// The kafka topic to output new key change events to
 	OutputKeyChangeEventTopic string

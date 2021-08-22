@@ -118,9 +118,9 @@ type EDUServerInputAPI interface {
 	InputPresence(
 		ctx context.Context,
 		request *InputPresenceRequest,
-    response *InputPresenceResponse,
-  ) error
-  
+		response *InputPresenceResponse,
+	) error
+
 	InputCrossSigningKeyUpdate(
 		ctx context.Context,
 		request *InputCrossSigningKeyUpdateRequest,

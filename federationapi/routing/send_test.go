@@ -84,7 +84,6 @@ func (o *testEDUProducer) InputReceiptEvent(
 	return nil
 }
 
-
 func (t *testEDUProducer) InputPresence(
 	ctx context.Context,
 	request *eduAPI.InputPresenceRequest,

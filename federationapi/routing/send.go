@@ -508,18 +508,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case gomatrixserverlib.MPresence:
-			now := time.Now()
-			payload := eduserverAPI.FederationPresenceData{}
-			if err := json.Unmarshal(e.Content, &payload); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal presence event")
-				continue
-			}
-			for _, presence := range payload.Push {
-				timestamp := gomatrixserverlib.AsTimestamp(now.Add(-(time.Millisecond * time.Duration(presence.LastActiveAgo))))
-				if err := eduserverAPI.SetPresence(ctx, t.eduAPI, t.userAPI, presence.UserID, presence.StatusMsg, types.ToPresenceStatus(presence.Presence), timestamp); err != nil {
-					util.GetLogger(ctx).WithError(err).Error("unable to send presence data to edu server")
-				}
-			}
+			t.handlePresence(ctx, e)
 		case eduserverAPI.MSigningKeyUpdate:
 			var updatePayload eduserverAPI.CrossSigningKeyUpdate
 			if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
@@ -538,6 +527,21 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
+		}
+	}
+}
+
+func (t *txnReq) handlePresence(ctx context.Context, e gomatrixserverlib.EDU) {
+	now := time.Now()
+	payload := eduserverAPI.FederationPresenceData{}
+	if err := json.Unmarshal(e.Content, &payload); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal presence event")
+		return
+	}
+	for _, presence := range payload.Push {
+		timestamp := gomatrixserverlib.AsTimestamp(now.Add(-(time.Millisecond * time.Duration(presence.LastActiveAgo))))
+		if err := eduserverAPI.SetPresence(ctx, t.eduAPI, t.userAPI, presence.UserID, presence.StatusMsg, types.ToPresenceStatus(presence.Presence), timestamp); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("unable to send presence data to edu server")
 		}
 	}
 }
