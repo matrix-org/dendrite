@@ -15,7 +15,7 @@ const (
 	EDUServerInputTypingEventPath           = "/eduserver/input"
 	EDUServerInputSendToDeviceEventPath     = "/eduserver/sendToDevice"
 	EDUServerInputReceiptEventPath          = "/eduserver/receipt"
-  EDUServerInputPresencePath              = "/eduserver/presence"
+	EDUServerInputPresencePath              = "/eduserver/presence"
 	EDUServerInputCrossSigningKeyUpdatePath = "/eduserver/crossSigningKeyUpdate"
 )
 
@@ -81,7 +81,7 @@ func (h *httpEDUServerInputAPI) InputPresence(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputPresencePath
-  return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
 // InputCrossSigningKeyUpdate implements EDUServerInputAPI
