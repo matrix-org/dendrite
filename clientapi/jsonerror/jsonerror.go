@@ -111,6 +111,12 @@ func UserInUse(msg string) *MatrixError {
 	return &MatrixError{"M_USER_IN_USE", msg}
 }
 
+// RoomInUse is an error returned when the client tries to make a room
+// that already exists
+func RoomInUse(msg string) *MatrixError {
+	return &MatrixError{"M_ROOM_IN_USE", msg}
+}
+
 // ASExclusive is an error returned when an application service tries to
 // register an username that is outside of its registered namespace, or if a
 // user attempts to register a username or room alias within an exclusive
@@ -129,6 +135,12 @@ func GuestAccessForbidden(msg string) *MatrixError {
 // to upload invalid signatures.
 func InvalidSignature(msg string) *MatrixError {
 	return &MatrixError{"M_INVALID_SIGNATURE", msg}
+}
+
+// InvalidParam is an error that is returned when a parameter was invalid,
+// traditionally with cross-signing.
+func InvalidParam(msg string) *MatrixError {
+	return &MatrixError{"M_INVALID_PARAM", msg}
 }
 
 // MissingParam is an error that is returned when a parameter was incorrect,

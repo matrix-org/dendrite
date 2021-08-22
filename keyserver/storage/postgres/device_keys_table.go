@@ -62,6 +62,9 @@ const selectMaxStreamForUserSQL = "" +
 const countStreamIDsForUserSQL = "" +
 	"SELECT COUNT(*) FROM keyserver_device_keys WHERE user_id=$1 AND stream_id = ANY($2)"
 
+const deleteDeviceKeysSQL = "" +
+	"DELETE FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
+
 const deleteAllDeviceKeysSQL = "" +
 	"DELETE FROM keyserver_device_keys WHERE user_id=$1"
 
@@ -72,6 +75,7 @@ type deviceKeysStatements struct {
 	selectBatchDeviceKeysStmt  *sql.Stmt
 	selectMaxStreamForUserStmt *sql.Stmt
 	countStreamIDsForUserStmt  *sql.Stmt
+	deleteDeviceKeysStmt       *sql.Stmt
 	deleteAllDeviceKeysStmt    *sql.Stmt
 }
 
@@ -98,6 +102,9 @@ func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 	if s.countStreamIDsForUserStmt, err = db.Prepare(countStreamIDsForUserSQL); err != nil {
 		return nil, err
 	}
+	if s.deleteDeviceKeysStmt, err = db.Prepare(deleteDeviceKeysSQL); err != nil {
+		return nil, err
+	}
 	if s.deleteAllDeviceKeysStmt, err = db.Prepare(deleteAllDeviceKeysSQL); err != nil {
 		return nil, err
 	}
@@ -114,6 +121,7 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 			return err
 		}
 		// this will be '' when there is no device
+		keys[i].Type = api.TypeDeviceKeyUpdate
 		keys[i].KeyJSON = []byte(keyJSONStr)
 		keys[i].StreamID = streamID
 		if displayName.Valid {
@@ -162,6 +170,11 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx
 	return nil
 }
 
+func (s *deviceKeysStatements) DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error {
+	_, err := sqlutil.TxStmt(txn, s.deleteDeviceKeysStmt).ExecContext(ctx, userID, deviceID)
+	return err
+}
+
 func (s *deviceKeysStatements) DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error {
 	_, err := sqlutil.TxStmt(txn, s.deleteAllDeviceKeysStmt).ExecContext(ctx, userID)
 	return err
@@ -179,7 +192,10 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 	}
 	var result []api.DeviceMessage
 	for rows.Next() {
-		var dk api.DeviceMessage
+		dk := api.DeviceMessage{
+			Type:       api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{},
+		}
 		dk.UserID = userID
 		var keyJSON string
 		var streamID int

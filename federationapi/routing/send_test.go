@@ -84,10 +84,19 @@ func (o *testEDUProducer) InputReceiptEvent(
 	return nil
 }
 
+
 func (t *testEDUProducer) InputPresence(
 	ctx context.Context,
 	request *eduAPI.InputPresenceRequest,
 	response *eduAPI.InputPresenceResponse,
+) error {
+	return nil
+}
+
+func (o *testEDUProducer) InputCrossSigningKeyUpdate(
+	ctx context.Context,
+	request *eduAPI.InputCrossSigningKeyUpdateRequest,
+	response *eduAPI.InputCrossSigningKeyUpdateResponse,
 ) error {
 	return nil
 }

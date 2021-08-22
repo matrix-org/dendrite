@@ -39,6 +39,7 @@ type DeviceKeys interface {
 	SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int32, err error)
 	CountStreamIDsForUser(ctx context.Context, userID string, streamIDs []int64) (int, error)
 	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error)
+	DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error
 	DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error
 }
 
@@ -62,4 +63,5 @@ type CrossSigningKeys interface {
 type CrossSigningSigs interface {
 	SelectCrossSigningSigsForTarget(ctx context.Context, txn *sql.Tx, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (r types.CrossSigningSigMap, err error)
 	UpsertCrossSigningSigsForTarget(ctx context.Context, txn *sql.Tx, originUserID string, originKeyID gomatrixserverlib.KeyID, targetUserID string, targetKeyID gomatrixserverlib.KeyID, signature gomatrixserverlib.Base64Bytes) error
+	DeleteCrossSigningSigsForTarget(ctx context.Context, txn *sql.Tx, targetUserID string, targetKeyID gomatrixserverlib.KeyID) error
 }

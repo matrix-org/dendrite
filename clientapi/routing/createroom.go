@@ -325,7 +325,10 @@ func createRoom(
 			return jsonerror.InternalServerError()
 		}
 		if aliasResp.RoomID != "" {
-			return util.MessageResponse(400, "Alias already exists")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.RoomInUse("Room ID already exists."),
+			}
 		}
 
 		aliasEvent = &fledglingEvent{
@@ -484,7 +487,10 @@ func createRoom(
 		}
 
 		if aliasResp.AliasExists {
-			return util.MessageResponse(400, "Alias already exists")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.RoomInUse("Room alias already exists."),
+			}
 		}
 	}
 

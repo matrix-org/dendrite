@@ -73,6 +73,11 @@ func UploadCrossSigningDeviceKeys(
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.MissingParam(err.Error()),
 			}
+		case err.IsInvalidParam:
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidParam(err.Error()),
+			}
 		default:
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
@@ -109,6 +114,11 @@ func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.KeyI
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.MissingParam(err.Error()),
+			}
+		case err.IsInvalidParam:
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidParam(err.Error()),
 			}
 		default:
 			return util.JSONResponse{

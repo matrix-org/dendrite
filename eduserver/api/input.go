@@ -89,6 +89,12 @@ type InputPresenceRequest struct {
 // InputPresenceResponse is a response to InputPresenceRequest
 type InputPresenceResponse struct{}
 
+type InputCrossSigningKeyUpdateRequest struct {
+	CrossSigningKeyUpdate `json:"signing_keys"`
+}
+
+type InputCrossSigningKeyUpdateResponse struct{}
+
 // EDUServerInputAPI is used to write events to the typing server.
 type EDUServerInputAPI interface {
 	InputTypingEvent(
@@ -112,6 +118,12 @@ type EDUServerInputAPI interface {
 	InputPresence(
 		ctx context.Context,
 		request *InputPresenceRequest,
-		response *InputPresenceResponse,
+    response *InputPresenceResponse,
+  ) error
+  
+	InputCrossSigningKeyUpdate(
+		ctx context.Context,
+		request *InputCrossSigningKeyUpdateRequest,
+		response *InputCrossSigningKeyUpdateResponse,
 	) error
 }

@@ -12,10 +12,11 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
-	EDUServerInputTypingEventPath       = "/eduserver/input"
-	EDUServerInputSendToDeviceEventPath = "/eduserver/sendToDevice"
-	EDUServerInputReceiptEventPath      = "/eduserver/receipt"
-	EDUServerInputPresencePath          = "/eduserver/presence"
+	EDUServerInputTypingEventPath           = "/eduserver/input"
+	EDUServerInputSendToDeviceEventPath     = "/eduserver/sendToDevice"
+	EDUServerInputReceiptEventPath          = "/eduserver/receipt"
+  EDUServerInputPresencePath              = "/eduserver/presence"
+	EDUServerInputCrossSigningKeyUpdatePath = "/eduserver/crossSigningKeyUpdate"
 )
 
 // NewEDUServerClient creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
@@ -80,5 +81,18 @@ func (h *httpEDUServerInputAPI) InputPresence(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputPresencePath
+  return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+// InputCrossSigningKeyUpdate implements EDUServerInputAPI
+func (h *httpEDUServerInputAPI) InputCrossSigningKeyUpdate(
+	ctx context.Context,
+	request *api.InputCrossSigningKeyUpdateRequest,
+	response *api.InputCrossSigningKeyUpdateResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputCrossSigningKeyUpdate")
+	defer span.Finish()
+
+	apiURL := h.eduServerURL + EDUServerInputCrossSigningKeyUpdatePath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
