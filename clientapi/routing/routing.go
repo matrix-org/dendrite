@@ -1102,6 +1102,12 @@ func Setup(
 			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
+			if !cfg.Matrix.PresenceEnabled {
+				return util.JSONResponse{
+					Code: http.StatusOK,
+					JSON: struct{}{},
+				}
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -1115,7 +1121,12 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-
+			if !cfg.Matrix.PresenceEnabled {
+				return util.JSONResponse{
+					Code: http.StatusOK,
+					JSON: struct{}{},
+				}
+			}
 			return GetPresence(req, userAPI, vars["userId"], rsAPI, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)

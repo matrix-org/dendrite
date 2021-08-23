@@ -38,6 +38,9 @@ type Global struct {
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
 
+	// Enable/Disable presence. Defaults to false
+	PresenceEnabled bool `yaml:"presence_enabled"`
+
 	// List of domains that the server will trust as identity servers to
 	// verify third-party identifiers.
 	// Defaults to an empty array.

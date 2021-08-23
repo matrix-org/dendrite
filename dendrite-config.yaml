@@ -48,6 +48,9 @@ global:
   # - private_key: old_matrix_key.pem
   #   expired_at: 1601024554498
 
+  # Enable/Disable presence. Enabling presence might cause a high load on your server.
+  presence_enabled: false
+
   # How long a remote server can cache our server signing key before requesting it
   # again. Increasing this number will reduce the number of requests made by other
   # servers for our key but increases the period that a compromised key will be

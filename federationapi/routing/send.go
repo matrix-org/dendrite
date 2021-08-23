@@ -168,16 +168,17 @@ func Send(
 	servers federationAPI.ServersInRoomProvider,
 ) util.JSONResponse {
 	t := txnReq{
-		rsAPI:      rsAPI,
-		eduAPI:     eduAPI,
-		userAPI:    userAPI,
-		keys:       keys,
-		federation: federation,
-		hadEvents:  make(map[string]bool),
-		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
-		servers:    servers,
-		keyAPI:     keyAPI,
-		roomsMu:    mu,
+		rsAPI:           rsAPI,
+		eduAPI:          eduAPI,
+		userAPI:         userAPI,
+		keys:            keys,
+		federation:      federation,
+		hadEvents:       make(map[string]bool),
+		haveEvents:      make(map[string]*gomatrixserverlib.HeaderedEvent),
+		servers:         servers,
+		keyAPI:          keyAPI,
+		roomsMu:         mu,
+		presenceEnabled: cfg.Matrix.PresenceEnabled,
 	}
 
 	var txnEvents struct {
@@ -244,6 +245,7 @@ type txnReq struct {
 	haveEvents      map[string]*gomatrixserverlib.HeaderedEvent
 	haveEventsMutex sync.Mutex
 	work            string // metrics
+	presenceEnabled bool
 }
 
 func (t *txnReq) hadEvent(eventID string, had bool) {
@@ -508,7 +510,9 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case gomatrixserverlib.MPresence:
-			t.handlePresence(ctx, e)
+			if t.presenceEnabled {
+				t.handlePresence(ctx, e)
+			}
 		case eduserverAPI.MSigningKeyUpdate:
 			var updatePayload eduserverAPI.CrossSigningKeyUpdate
 			if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
