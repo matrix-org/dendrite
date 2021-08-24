@@ -18,7 +18,7 @@ const (
 	VersionMajor = 0
 	VersionMinor = 5
 	VersionPatch = 0
-	VersionTag   = "rc1" // example: "rc1"
+	VersionTag   = "" // example: "rc1"
 )
 
 func VersionString() string {
