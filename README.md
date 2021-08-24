@@ -67,7 +67,7 @@ $ ./bin/generate-keys --tls-cert server.crt --tls-key server.key
 $ cp dendrite-config.yaml dendrite.yaml
 
 # Build and run the server:
-$ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+$ go run ./cmd/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
 ```
 
 Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
