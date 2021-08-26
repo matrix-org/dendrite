@@ -68,18 +68,18 @@ func (r *SharedSecretRegistration) IsValidMacLogin(
 ) (bool, error) {
 	// Check that shared secret registration isn't disabled.
 	if r.sharedSecret == "" {
-		return false, errors.New("Shared secret registration is disabled")
+		return false, errors.New("shared secret registration is disabled")
 	}
 	if !r.validNonce(nonce) {
-		return false, fmt.Errorf("Incorrect or expired nonce: %s", nonce)
+		return false, fmt.Errorf("incorrect or expired nonce: %s", nonce)
 	}
 
 	// Check that username/password don't contain the HMAC delimiters.
 	if strings.Contains(username, "\x00") {
-		return false, errors.New("Username contains invalid character")
+		return false, errors.New("username contains invalid character")
 	}
 	if strings.Contains(password, "\x00") {
-		return false, errors.New("Password contains invalid character")
+		return false, errors.New("password contains invalid character")
 	}
 
 	adminString := "notadmin"

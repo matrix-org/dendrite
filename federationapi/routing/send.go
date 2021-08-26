@@ -711,7 +711,7 @@ withNextEvent:
 	}
 
 	if missing := len(missingAuthEvents); missing > 0 {
-		return fmt.Errorf("Event refers to %d auth_events which we failed to fetch", missing)
+		return fmt.Errorf("event refers to %d auth_events which we failed to fetch", missing)
 	}
 	return nil
 }

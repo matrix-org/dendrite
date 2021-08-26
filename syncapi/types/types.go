@@ -29,10 +29,10 @@ var (
 	// ErrInvalidSyncTokenType is returned when an attempt at creating a
 	// new instance of SyncToken with an invalid type (i.e. neither "s"
 	// nor "t").
-	ErrInvalidSyncTokenType = fmt.Errorf("Sync token has an unknown prefix (should be either s or t)")
+	ErrInvalidSyncTokenType = fmt.Errorf("sync token has an unknown prefix (should be either s or t)")
 	// ErrInvalidSyncTokenLen is returned when the pagination token is an
 	// invalid length
-	ErrInvalidSyncTokenLen = fmt.Errorf("Sync token has an invalid length")
+	ErrInvalidSyncTokenLen = fmt.Errorf("sync token has an invalid length")
 )
 
 type StateDelta struct {

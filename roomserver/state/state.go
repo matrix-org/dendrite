@@ -71,7 +71,7 @@ func (v *StateResolution) LoadStateAtSnapshot(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("Corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+			panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
 		}
 		fullState = append(fullState, entries...)
 	}
@@ -146,7 +146,7 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("Corrupt DB: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
+			panic(fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
 		}
 
 		// Combine all the state entries for this snapshot.
@@ -157,7 +157,7 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				panic(fmt.Errorf("Corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+				panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
 			}
 			fullState = append(fullState, entries...)
 		}
@@ -757,7 +757,7 @@ func (v *StateResolution) resolveConflictsV1(
 	for _, resolvedEvent := range resolvedEvents {
 		entry, ok := eventIDMap[resolvedEvent.EventID()]
 		if !ok {
-			panic(fmt.Errorf("Missing state entry for event ID %q", resolvedEvent.EventID()))
+			panic(fmt.Errorf("missing state entry for event ID %q", resolvedEvent.EventID()))
 		}
 		notConflicted = append(notConflicted, entry)
 	}
@@ -880,7 +880,7 @@ func (v *StateResolution) resolveConflictsV2(
 	for _, resolvedEvent := range resolvedEvents {
 		entry, ok := eventIDMap[resolvedEvent.EventID()]
 		if !ok {
-			panic(fmt.Errorf("Missing state entry for event ID %q", resolvedEvent.EventID()))
+			panic(fmt.Errorf("missing state entry for event ID %q", resolvedEvent.EventID()))
 		}
 		notConflicted = append(notConflicted, entry)
 	}
@@ -958,7 +958,7 @@ func (v *StateResolution) loadStateEvents(
 	for _, entry := range eventEntries {
 		event, ok := eventMap(events).lookup(entry.EventNID)
 		if !ok {
-			panic(fmt.Errorf("Corrupt DB: Missing event numeric ID %d", entry.EventNID))
+			panic(fmt.Errorf("corrupt DB: Missing event numeric ID %d", entry.EventNID))
 		}
 		result = append(result, event.Event)
 		eventIDMap[event.Event.EventID()] = entry

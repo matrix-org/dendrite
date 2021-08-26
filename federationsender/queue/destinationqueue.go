@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 )
 
@@ -72,7 +71,7 @@ type destinationQueue struct {
 // start sending events to that destination.
 func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, receipt *shared.Receipt) {
 	if event == nil {
-		log.Errorf("attempt to send nil PDU with destination %q", oq.destination)
+		logrus.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return
 	}
 	// Create a database entry that associates the given PDU NID with
@@ -84,7 +83,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		oq.destination, // the destination server name
 		receipt,        // NIDs from federationsender_queue_json table
 	); err != nil {
-		log.WithError(err).Errorf("failed to associate PDU %q with destination %q", event.EventID(), oq.destination)
+		logrus.WithError(err).Errorf("failed to associate PDU %q with destination %q", event.EventID(), oq.destination)
 		return
 	}
 	// Check if the destination is blacklisted. If it isn't then wake
@@ -116,7 +115,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 // start sending events to that destination.
 func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *shared.Receipt) {
 	if event == nil {
-		log.Errorf("attempt to send nil EDU with destination %q", oq.destination)
+		logrus.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
 	}
 	// Create a database entry that associates the given PDU NID with
@@ -127,7 +126,7 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		oq.destination, // the destination server name
 		receipt,        // NIDs from federationsender_queue_json table
 	); err != nil {
-		log.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
+		logrus.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
 		return
 	}
 	// Check if the destination is blacklisted. If it isn't then wake
@@ -281,7 +280,7 @@ func (oq *destinationQueue) backgroundSend() {
 			// It's been suggested that we should give up because the backoff
 			// has exceeded a maximum allowable value. Clean up the in-memory
 			// buffers at this point. The PDU clean-up is already on a defer.
-			log.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
+			logrus.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
 			oq.pendingMutex.Lock()
 			for i := range oq.pendingPDUs {
 				oq.pendingPDUs[i] = nil
@@ -298,7 +297,7 @@ func (oq *destinationQueue) backgroundSend() {
 			// We haven't backed off yet, so wait for the suggested amount of
 			// time.
 			duration := time.Until(*until)
-			log.Warnf("Backing off %q for %s", oq.destination, duration)
+			logrus.Warnf("Backing off %q for %s", oq.destination, duration)
 			oq.backingOff.Store(true)
 			destinationQueueBackingOff.Inc()
 			select {
@@ -421,13 +420,13 @@ func (oq *destinationQueue) nextTransaction(
 		if pduReceipts != nil {
 			//logrus.Infof("Cleaning PDUs %q", pduReceipt.String())
 			if err = oq.db.CleanPDUs(context.Background(), oq.destination, pduReceipts); err != nil {
-				log.WithError(err).Errorf("Failed to clean PDUs for server %q", t.Destination)
+				logrus.WithError(err).Errorf("Failed to clean PDUs for server %q", t.Destination)
 			}
 		}
 		if eduReceipts != nil {
 			//logrus.Infof("Cleaning EDUs %q", eduReceipt.String())
 			if err = oq.db.CleanEDUs(context.Background(), oq.destination, eduReceipts); err != nil {
-				log.WithError(err).Errorf("Failed to clean EDUs for server %q", t.Destination)
+				logrus.WithError(err).Errorf("Failed to clean EDUs for server %q", t.Destination)
 			}
 		}
 		// Reset the transaction ID.
@@ -440,9 +439,9 @@ func (oq *destinationQueue) nextTransaction(
 		// will retry again, subject to backoff.
 		return false, 0, 0, err
 	default:
-		log.WithFields(log.Fields{
-			"destination": oq.destination,
-			log.ErrorKey:  err,
+		logrus.WithFields(logrus.Fields{
+			"destination":   oq.destination,
+			logrus.ErrorKey: err,
 		}).Debugf("Failed to send transaction %q", t.TransactionID)
 		return false, 0, 0, err
 	}

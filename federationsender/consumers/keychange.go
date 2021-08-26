@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 // KeyChangeConsumer consumes events that originate in key server.
@@ -82,7 +81,7 @@ func (t *KeyChangeConsumer) Start() error {
 func (t *KeyChangeConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 	var m api.DeviceMessage
 	if err := json.Unmarshal(msg.Value, &m); err != nil {
-		log.WithError(err).Errorf("failed to read device message from key change topic")
+		logrus.WithError(err).Errorf("failed to read device message from key change topic")
 		return nil
 	}
 	switch m.Type {
@@ -96,7 +95,7 @@ func (t *KeyChangeConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 }
 
 func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) error {
-	logger := log.WithField("user_id", m.UserID)
+	logger := logrus.WithField("user_id", m.UserID)
 
 	// only send key change events which originated from us
 	_, originServerName, err := gomatrixserverlib.SplitID('@', m.UserID)
@@ -142,7 +141,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) error {
 		return err
 	}
 
-	log.Infof("Sending device list update message to %q", destinations)
+	logrus.Infof("Sending device list update message to %q", destinations)
 	return t.queues.SendEDU(edu, t.serverName, destinations)
 }
 
@@ -158,7 +157,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) error {
 		// end up parroting information we received from other servers.
 		return nil
 	}
-	logger := log.WithField("user_id", output.UserID)
+	logger := logrus.WithField("user_id", output.UserID)
 
 	var queryRes roomserverAPI.QueryRoomsForUserResponse
 	err = t.rsAPI.QueryRoomsForUser(context.Background(), &roomserverAPI.QueryRoomsForUserRequest{
