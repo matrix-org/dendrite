@@ -69,6 +69,7 @@ func main() {
 		cfg.RoomServer.InternalAPI.Connect = httpAPIAddr
 		cfg.SigningKeyServer.InternalAPI.Connect = httpAPIAddr
 		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
+		cfg.UserAPI.InternalAPI.Connect = httpAPIAddr
 	}
 
 	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
@@ -114,12 +115,27 @@ func main() {
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
+
+	// The appservice might try to create a new service account on startup, which will fail if running in httpapi mode
+	// since there won't be an userapi endpoint yet, so move this before switching to httpapi mode.
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	if base.UseHTTPAPIs {
+		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
+		asAPI = base.AppserviceHTTPClient()
+	}
+	rsAPI.SetAppserviceAPI(asAPI)
+
+	if base.UseHTTPAPIs {
+		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
+		userAPI = base.UserAPIClient()
+	}
 	if traceInternal {
 		userAPI = &uapi.UserInternalAPITrace{
 			Impl: userAPI,
 		}
 	}
+	keyAPI.SetUserAPI(userAPI)
+
 	// needs to be after the SetUserAPI call above
 	if base.UseHTTPAPIs {
 		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI)
@@ -133,13 +149,6 @@ func main() {
 		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
 		eduInputAPI = base.EDUServerClient()
 	}
-
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	if base.UseHTTPAPIs {
-		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
-		asAPI = base.AppserviceHTTPClient()
-	}
-	rsAPI.SetAppserviceAPI(asAPI)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
