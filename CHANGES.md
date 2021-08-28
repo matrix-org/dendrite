@@ -1,5 +1,21 @@
 # Changelog
 
+## Dendrite 0.5.0 (2021-08-24)
+
+### Features
+
+* Support for serverside key backups has been added, allowing your E2EE keys to be backed up and to be restored after logging out or when logging in from a new device
+* Experimental support for cross-signing has been added, allowing verifying your own device keys and verifying other user's public keys
+* Dendrite can now send logs to a TCP syslog server by using the `syslog` logger type (contributed by [sambhavsaggi](https://github.com/sambhavsaggi))
+* Go 1.15 is now the minimum supported version for Dendrite
+
+### Fixes
+
+* Device keys are now cleaned up from the keyserver when the user API removes a device session
+* The `M_ROOM_IN_USE` error code is now returned when a room alias is already taken (contributed by [nivekuil](https://github.com/nivekuil))
+* A bug in the state storage migration has been fixed where room create events had incorrect state snapshots
+* A bug when deactivating accounts caused by only reading the deprecated username field has been fixed
+
 ## Dendrite 0.4.1 (2021-07-26)
 
 ### Features

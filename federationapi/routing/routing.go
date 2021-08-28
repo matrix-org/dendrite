@@ -449,7 +449,7 @@ func Setup(
 		httputil.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
 			return GetPostPublicRooms(req, rsAPI)
 		}),
-	).Methods(http.MethodGet)
+	).Methods(http.MethodGet, http.MethodPost)
 
 	v1fedmux.Handle("/user/keys/claim", httputil.MakeFedAPI(
 		"federation_keys_claim", cfg.Matrix.ServerName, keys, wakeup,
