@@ -256,9 +256,9 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
-			s.PerformKeyBackup(req.Context(), &request, &response)
-			if response.Error != "" {
-				return util.ErrorResponse(fmt.Errorf("PerformKeyBackup: %s", response.Error))
+			err := s.PerformKeyBackup(req.Context(), &request, &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
