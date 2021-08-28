@@ -201,7 +201,7 @@ func UploadBackupKeys(
 		UserID:  device.UserID,
 		Version: version,
 		Keys:    *keys,
-	}, &performKeyBackupResp); err != nil {
+	}, &performKeyBackupResp); err != nil && performKeyBackupResp.Error == "" {
 		return jsonerror.InternalServerError()
 	}
 	if performKeyBackupResp.Error != "" {
