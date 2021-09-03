@@ -223,8 +223,8 @@ func buildInviteStrippedState(
 	// https://matrix.org/docs/spec/client_server/r0.6.0#m-room-member
 	for _, t := range []string{
 		gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias,
-		gomatrixserverlib.MRoomAliases, gomatrixserverlib.MRoomJoinRules,
-		"m.room.avatar", "m.room.encryption", gomatrixserverlib.MRoomCreate,
+		gomatrixserverlib.MRoomJoinRules, gomatrixserverlib.MRoomAvatar,
+		gomatrixserverlib.MRoomEncryption, gomatrixserverlib.MRoomCreate,
 	} {
 		stateWanted = append(stateWanted, gomatrixserverlib.StateKeyTuple{
 			EventType: t,

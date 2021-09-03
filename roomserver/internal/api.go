@@ -59,6 +59,7 @@ func NewRoomserverAPI(
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
+			ServerName: cfg.Matrix.ServerName,
 			ServerACLs: serverACLs,
 		},
 		Inputer: &input.Inputer{
@@ -92,6 +93,7 @@ func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSen
 		FSAPI:      r.fsAPI,
 		RSAPI:      r,
 		Inputer:    r.Inputer,
+		Queryer:    r.Queryer,
 	}
 	r.Peeker = &perform.Peeker{
 		ServerName: r.Cfg.Matrix.ServerName,

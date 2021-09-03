@@ -95,6 +95,13 @@ func (d *mockDeviceListUpdaterDatabase) DeviceKeysJSON(ctx context.Context, keys
 	return nil
 }
 
+type mockDeviceListUpdaterAPI struct {
+}
+
+func (d *mockDeviceListUpdaterAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) {
+
+}
+
 type roundTripper struct {
 	fn func(*http.Request) (*http.Response, error)
 }
@@ -122,8 +129,9 @@ func TestUpdateHavePrevID(t *testing.T) {
 			return true
 		},
 	}
+	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
-	updater := NewDeviceListUpdater(db, producer, nil, 1)
+	updater := NewDeviceListUpdater(db, ap, producer, nil, 1)
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Foo Bar",
 		Deleted:           false,
@@ -138,8 +146,9 @@ func TestUpdateHavePrevID(t *testing.T) {
 		t.Fatalf("Update returned an error: %s", err)
 	}
 	want := api.DeviceMessage{
+		Type:     api.TypeDeviceKeyUpdate,
 		StreamID: event.StreamID,
-		DeviceKeys: api.DeviceKeys{
+		DeviceKeys: &api.DeviceKeys{
 			DeviceID:    event.DeviceID,
 			DisplayName: event.DeviceDisplayName,
 			KeyJSON:     event.Keys,
@@ -166,6 +175,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			return false
 		},
 	}
+	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
 	remoteUserID := "@alice:example.somewhere"
 	var wg sync.WaitGroup
@@ -193,7 +203,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(db, producer, fedClient, 2)
+	updater := NewDeviceListUpdater(db, ap, producer, fedClient, 2)
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -215,8 +225,9 @@ func TestUpdateNoPrevID(t *testing.T) {
 	// wait a bit for db to be updated...
 	time.Sleep(100 * time.Millisecond)
 	want := api.DeviceMessage{
+		Type:     api.TypeDeviceKeyUpdate,
 		StreamID: 5,
-		DeviceKeys: api.DeviceKeys{
+		DeviceKeys: &api.DeviceKeys{
 			DeviceID:    "JLAFKJWSCS",
 			DisplayName: "Mobile Phone",
 			UserID:      remoteUserID,

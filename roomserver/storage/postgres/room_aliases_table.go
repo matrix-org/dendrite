@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -62,13 +61,15 @@ type roomAliasesStatements struct {
 	deleteRoomAliasStmt          *sql.Stmt
 }
 
-func NewPostgresRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
-	s := &roomAliasesStatements{}
+func createRoomAliasesTable(db *sql.DB) error {
 	_, err := db.Exec(roomAliasesSchema)
-	if err != nil {
-		return nil, err
-	}
-	return s, shared.StatementList{
+	return err
+}
+
+func prepareRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
+	s := &roomAliasesStatements{}
+
+	return s, sqlutil.StatementList{
 		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
 		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},
 		{&s.selectAliasesFromRoomIDStmt, selectAliasesFromRoomIDSQL},

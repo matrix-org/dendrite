@@ -16,9 +16,11 @@
 package types
 
 import (
+	"encoding/json"
 	"sort"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/blake2b"
 )
 
 // EventTypeNID is a numeric ID for an event type.
@@ -39,6 +41,38 @@ type StateSnapshotNID int64
 // StateBlockNID is a numeric ID for a block of state data.
 // These blocks of state data are combined to form the actual state.
 type StateBlockNID int64
+
+// EventNIDs is used to sort and dedupe event NIDs.
+type EventNIDs []EventNID
+
+func (a EventNIDs) Len() int           { return len(a) }
+func (a EventNIDs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a EventNIDs) Less(i, j int) bool { return a[i] < a[j] }
+
+func (a EventNIDs) Hash() []byte {
+	j, err := json.Marshal(a)
+	if err != nil {
+		return nil
+	}
+	h := blake2b.Sum256(j)
+	return h[:]
+}
+
+// StateBlockNIDs is used to sort and dedupe state block NIDs.
+type StateBlockNIDs []StateBlockNID
+
+func (a StateBlockNIDs) Len() int           { return len(a) }
+func (a StateBlockNIDs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a StateBlockNIDs) Less(i, j int) bool { return a[i] < a[j] }
+
+func (a StateBlockNIDs) Hash() []byte {
+	j, err := json.Marshal(a)
+	if err != nil {
+		return nil
+	}
+	h := blake2b.Sum256(j)
+	return h[:]
+}
 
 // A StateKeyTuple is a pair of a numeric event type and a numeric state key.
 // It is used to lookup state entries.
@@ -64,6 +98,12 @@ type StateEntry struct {
 	// The numeric ID for the event.
 	EventNID EventNID
 }
+
+type StateEntries []StateEntry
+
+func (a StateEntries) Len() int           { return len(a) }
+func (a StateEntries) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a StateEntries) Less(i, j int) bool { return a[i].EventNID < a[j].EventNID }
 
 // LessThan returns true if this state entry is less than the other state entry.
 // The ordering is arbitrary and is used to implement binary search and to efficiently deduplicate entries.

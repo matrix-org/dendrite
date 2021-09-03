@@ -17,10 +17,7 @@ package routing
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha1"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -594,7 +591,6 @@ func handleRegistrationFlow(
 	accessToken string,
 	accessTokenErr error,
 ) util.JSONResponse {
-	// TODO: Shared secret registration (create new user scripts)
 	// TODO: Enable registration config flag
 	// TODO: Guest account upgrading
 
@@ -642,20 +638,6 @@ func handleRegistrationFlow(
 
 		// Add Recaptcha to the list of completed registration stages
 		AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
-
-	case authtypes.LoginTypeSharedSecret:
-		// Check shared secret against config
-		valid, err := isValidMacLogin(cfg, r.Username, r.Password, r.Admin, r.Auth.Mac)
-
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("isValidMacLogin failed")
-			return jsonerror.InternalServerError()
-		} else if !valid {
-			return util.MessageResponse(http.StatusForbidden, "HMAC incorrect")
-		}
-
-		// Add SharedSecret to the list of completed registration stages
-		AddCompletedSessionStage(sessionID, authtypes.LoginTypeSharedSecret)
 
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
@@ -849,49 +831,6 @@ func completeRegistration(
 	}
 }
 
-// Used for shared secret registration.
-// Checks if the username, password and isAdmin flag matches the given mac.
-func isValidMacLogin(
-	cfg *config.ClientAPI,
-	username, password string,
-	isAdmin bool,
-	givenMac []byte,
-) (bool, error) {
-	sharedSecret := cfg.RegistrationSharedSecret
-
-	// Check that shared secret registration isn't disabled.
-	if cfg.RegistrationSharedSecret == "" {
-		return false, errors.New("Shared secret registration is disabled")
-	}
-
-	// Double check that username/password don't contain the HMAC delimiters. We should have
-	// already checked this.
-	if strings.Contains(username, "\x00") {
-		return false, errors.New("Username contains invalid character")
-	}
-	if strings.Contains(password, "\x00") {
-		return false, errors.New("Password contains invalid character")
-	}
-	if sharedSecret == "" {
-		return false, errors.New("Shared secret registration is disabled")
-	}
-
-	adminString := "notadmin"
-	if isAdmin {
-		adminString = "admin"
-	}
-	joined := strings.Join([]string{username, password, adminString}, "\x00")
-
-	mac := hmac.New(sha1.New, []byte(sharedSecret))
-	_, err := mac.Write([]byte(joined))
-	if err != nil {
-		return false, err
-	}
-	expectedMAC := mac.Sum(nil)
-
-	return hmac.Equal(givenMac, expectedMAC), nil
-}
-
 // checkFlows checks a single completed flow against another required one. If
 // one contains at least all of the stages that the other does, checkFlows
 // returns true.
@@ -994,4 +933,35 @@ func RegisterAvailable(
 			Available: true,
 		},
 	}
+}
+
+func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
+	ssrr, err := NewSharedSecretRegistrationRequest(req.Body)
+	if err != nil {
+		return util.JSONResponse{
+			Code: 400,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("malformed json: %s", err)),
+		}
+	}
+	valid, err := sr.IsValidMacLogin(ssrr.Nonce, ssrr.User, ssrr.Password, ssrr.Admin, ssrr.MacBytes)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	if !valid {
+		return util.JSONResponse{
+			Code: 403,
+			JSON: jsonerror.Forbidden("bad mac"),
+		}
+	}
+	// downcase capitals
+	ssrr.User = strings.ToLower(ssrr.User)
+
+	if resErr := validateUsername(ssrr.User); resErr != nil {
+		return *resErr
+	}
+	if resErr := validatePassword(ssrr.Password); resErr != nil {
+		return *resErr
+	}
+	deviceID := "shared_secret_registration"
+	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID)
 }

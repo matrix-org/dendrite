@@ -192,7 +192,7 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	federation := createFederationClient(cfg, node)
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -210,7 +210,7 @@ func main() {
 		base, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
-	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, &keyRing)
+	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, &keyRing, true)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
 
@@ -236,6 +236,7 @@ func main() {
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
+		base.SynapseAdminMux,
 	)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()

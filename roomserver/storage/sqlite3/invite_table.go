@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -70,16 +69,17 @@ type inviteStatements struct {
 	selectInvitesAboutToRetireStmt      *sql.Stmt
 }
 
-func NewSqliteInvitesTable(db *sql.DB) (tables.Invites, error) {
+func createInvitesTable(db *sql.DB) error {
+	_, err := db.Exec(inviteSchema)
+	return err
+}
+
+func prepareInvitesTable(db *sql.DB) (tables.Invites, error) {
 	s := &inviteStatements{
 		db: db,
 	}
-	_, err := db.Exec(inviteSchema)
-	if err != nil {
-		return nil, err
-	}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
 		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},

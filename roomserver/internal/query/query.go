@@ -36,6 +36,7 @@ import (
 type Queryer struct {
 	DB         storage.Database
 	Cache      caching.RoomServerCaches
+	ServerName gomatrixserverlib.ServerName
 	ServerACLs *acls.ServerACLs
 }
 
@@ -328,35 +329,16 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	}
 	response.RoomExists = true
 
-	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
-	if err != nil {
-		return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
-	}
-	if len(eventNIDs) == 0 {
-		return nil
-	}
-
-	events, err := r.DB.Events(ctx, eventNIDs)
-	if err != nil {
-		return fmt.Errorf("r.DB.Events: %w", err)
-	}
-
-	servers := map[gomatrixserverlib.ServerName]struct{}{}
-	for _, e := range events {
-		if e.Type() == gomatrixserverlib.MRoomMember && e.StateKey() != nil {
-			_, serverName, err := gomatrixserverlib.SplitID('@', *e.StateKey())
-			if err != nil {
-				continue
-			}
-			servers[serverName] = struct{}{}
-			if serverName == request.ServerName {
-				response.IsInRoom = true
-			}
+	if request.ServerName == r.ServerName || request.ServerName == "" {
+		response.IsInRoom, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
 		}
-	}
-
-	for server := range servers {
-		response.ServerNames = append(response.ServerNames, server)
+	} else {
+		response.IsInRoom, err = r.DB.GetServerInRoom(ctx, info.RoomNID, request.ServerName)
+		if err != nil {
+			return fmt.Errorf("r.DB.GetServerInRoom: %w", err)
+		}
 	}
 
 	return nil
@@ -377,10 +359,16 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 		return
 	}
 	roomID := events[0].RoomID()
-	isServerInRoom, err := helpers.IsServerCurrentlyInRoom(ctx, r.DB, request.ServerName, roomID)
-	if err != nil {
-		return
+
+	inRoomReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID:     roomID,
+		ServerName: request.ServerName,
 	}
+	inRoomRes := &api.QueryServerJoinedToRoomResponse{}
+	if err = r.QueryServerJoinedToRoom(ctx, inRoomReq, inRoomRes); err != nil {
+		return fmt.Errorf("r.Queryer.QueryServerJoinedToRoom: %w", err)
+	}
+
 	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
 		return err
@@ -389,7 +377,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 		return fmt.Errorf("QueryServerAllowedToSeeEvent: no room info for room %s", roomID)
 	}
 	response.AllowedToSeeEvent, err = helpers.CheckServerAllowedToSeeEvent(
-		ctx, r.DB, *info, request.EventID, request.ServerName, isServerInRoom,
+		ctx, r.DB, *info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
 	)
 	return
 }

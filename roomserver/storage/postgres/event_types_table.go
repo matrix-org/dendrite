@@ -22,7 +22,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -100,14 +99,15 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
-func NewPostgresEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
-	s := &eventTypeStatements{}
+func createEventTypesTable(db *sql.DB) error {
 	_, err := db.Exec(eventTypesSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
 
-	return s, shared.StatementList{
+func prepareEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+	s := &eventTypeStatements{}
+
+	return s, sqlutil.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
 		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},

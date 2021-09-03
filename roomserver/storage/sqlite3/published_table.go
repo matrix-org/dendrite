@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -50,15 +49,17 @@ type publishedStatements struct {
 	selectPublishedStmt    *sql.Stmt
 }
 
-func NewSqlitePublishedTable(db *sql.DB) (tables.Published, error) {
+func createPublishedTable(db *sql.DB) error {
+	_, err := db.Exec(publishedSchema)
+	return err
+}
+
+func preparePublishedTable(db *sql.DB) (tables.Published, error) {
 	s := &publishedStatements{
 		db: db,
 	}
-	_, err := db.Exec(publishedSchema)
-	if err != nil {
-		return nil, err
-	}
-	return s, shared.StatementList{
+
+	return s, sqlutil.StatementList{
 		{&s.upsertPublishedStmt, upsertPublishedSQL},
 		{&s.selectAllPublishedStmt, selectAllPublishedSQL},
 		{&s.selectPublishedStmt, selectPublishedSQL},

@@ -19,7 +19,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -59,16 +58,17 @@ type redactionStatements struct {
 	markRedactionValidatedStmt                  *sql.Stmt
 }
 
-func NewSqliteRedactionsTable(db *sql.DB) (tables.Redactions, error) {
+func createRedactionsTable(db *sql.DB) error {
+	_, err := db.Exec(redactionsSchema)
+	return err
+}
+
+func prepareRedactionsTable(db *sql.DB) (tables.Redactions, error) {
 	s := &redactionStatements{
 		db: db,
 	}
-	_, err := db.Exec(redactionsSchema)
-	if err != nil {
-		return nil, err
-	}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertRedactionStmt, insertRedactionSQL},
 		{&s.selectRedactionInfoByRedactionEventIDStmt, selectRedactionInfoByRedactionEventIDSQL},
 		{&s.selectRedactionInfoByEventBeingRedactedStmt, selectRedactionInfoByEventBeingRedactedSQL},

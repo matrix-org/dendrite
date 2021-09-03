@@ -19,8 +19,6 @@ import (
 	"context"
 	"database/sql"
 
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
@@ -53,17 +51,22 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	// which it will never obtain.
 	db.SetMaxOpenConns(20)
 
-	// Create tables before executing migrations so we don't fail if the table is missing,
-	// and THEN prepare statements so we don't fail due to referencing new columns
-	ms := membershipStatements{}
-	if err := ms.execSchema(db); err != nil {
+	// Create the tables.
+	if err := d.create(db); err != nil {
 		return nil, err
 	}
+
+	// Then execute the migrations. By this point the tables are created with the latest
+	// schemas.
 	m := sqlutil.NewMigrations()
 	deltas.LoadAddForgottenColumn(m)
+	deltas.LoadStateBlocksRefactor(m)
 	if err := m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
+
+	// Then prepare the statements. Now that the migrations have run, any columns referred
+	// to in the database code should now exist.
 	if err := d.prepare(db, cache); err != nil {
 		return nil, err
 	}
@@ -71,62 +74,107 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	return &d, nil
 }
 
-// nolint: gocyclo
+func (d *Database) create(db *sql.DB) error {
+	if err := createEventStateKeysTable(db); err != nil {
+		return err
+	}
+	if err := createEventTypesTable(db); err != nil {
+		return err
+	}
+	if err := createEventJSONTable(db); err != nil {
+		return err
+	}
+	if err := createEventsTable(db); err != nil {
+		return err
+	}
+	if err := createRoomsTable(db); err != nil {
+		return err
+	}
+	if err := createTransactionsTable(db); err != nil {
+		return err
+	}
+	if err := createStateBlockTable(db); err != nil {
+		return err
+	}
+	if err := createStateSnapshotTable(db); err != nil {
+		return err
+	}
+	if err := createPrevEventsTable(db); err != nil {
+		return err
+	}
+	if err := createRoomAliasesTable(db); err != nil {
+		return err
+	}
+	if err := createInvitesTable(db); err != nil {
+		return err
+	}
+	if err := createMembershipTable(db); err != nil {
+		return err
+	}
+	if err := createPublishedTable(db); err != nil {
+		return err
+	}
+	if err := createRedactionsTable(db); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
-	var err error
-	eventStateKeys, err := NewSqliteEventStateKeysTable(db)
+	eventStateKeys, err := prepareEventStateKeysTable(db)
 	if err != nil {
 		return err
 	}
-	eventTypes, err := NewSqliteEventTypesTable(db)
+	eventTypes, err := prepareEventTypesTable(db)
 	if err != nil {
 		return err
 	}
-	eventJSON, err := NewSqliteEventJSONTable(db)
+	eventJSON, err := prepareEventJSONTable(db)
 	if err != nil {
 		return err
 	}
-	events, err := NewSqliteEventsTable(db)
+	events, err := prepareEventsTable(db)
 	if err != nil {
 		return err
 	}
-	rooms, err := NewSqliteRoomsTable(db)
+	rooms, err := prepareRoomsTable(db)
 	if err != nil {
 		return err
 	}
-	transactions, err := NewSqliteTransactionsTable(db)
+	transactions, err := prepareTransactionsTable(db)
 	if err != nil {
 		return err
 	}
-	stateBlock, err := NewSqliteStateBlockTable(db)
+	stateBlock, err := prepareStateBlockTable(db)
 	if err != nil {
 		return err
 	}
-	stateSnapshot, err := NewSqliteStateSnapshotTable(db)
+	stateSnapshot, err := prepareStateSnapshotTable(db)
 	if err != nil {
 		return err
 	}
-	prevEvents, err := NewSqlitePrevEventsTable(db)
+	prevEvents, err := preparePrevEventsTable(db)
 	if err != nil {
 		return err
 	}
-	roomAliases, err := NewSqliteRoomAliasesTable(db)
+	roomAliases, err := prepareRoomAliasesTable(db)
 	if err != nil {
 		return err
 	}
-	invites, err := NewSqliteInvitesTable(db)
+	invites, err := prepareInvitesTable(db)
 	if err != nil {
 		return err
 	}
-	membership, err := NewSqliteMembershipTable(db)
+	membership, err := prepareMembershipTable(db)
 	if err != nil {
 		return err
 	}
-	published, err := NewSqlitePublishedTable(db)
+	published, err := preparePublishedTable(db)
 	if err != nil {
 		return err
 	}
-	redactions, err := NewSqliteRedactionsTable(db)
+	redactions, err := prepareRedactionsTable(db)
 	if err != nil {
 		return err
 	}

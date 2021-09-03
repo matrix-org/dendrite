@@ -109,7 +109,7 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 		dsn = string(dbProperties.ConnectionString)
 		return nil, fmt.Errorf("CosmosDB %q", dbProperties.ConnectionString)
 	case dbProperties.ConnectionString.IsSQLite():
-		driverName = SQLiteDriverName()
+		driverName = "sqlite3"
 		dsn, err = ParseFileURI(dbProperties.ConnectionString)
 		if err != nil {
 			return nil, fmt.Errorf("ParseFileURI: %w", err)
@@ -128,11 +128,11 @@ func Open(dbProperties *config.DatabaseOptions) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if driverName != SQLiteDriverName() {
+	if driverName != "sqlite3" {
 		logrus.WithFields(logrus.Fields{
-			"MaxOpenConns":    dbProperties.MaxOpenConns,
-			"MaxIdleConns":    dbProperties.MaxIdleConns,
-			"ConnMaxLifetime": dbProperties.ConnMaxLifetime,
+			"MaxOpenConns":    dbProperties.MaxOpenConns(),
+			"MaxIdleConns":    dbProperties.MaxIdleConns(),
+			"ConnMaxLifetime": dbProperties.ConnMaxLifetime(),
 			"dataSourceName":  regexp.MustCompile(`://[^@]*@`).ReplaceAllLiteralString(dsn, "://"),
 		}).Debug("Setting DB connection limits")
 		db.SetMaxOpenConns(dbProperties.MaxOpenConns())

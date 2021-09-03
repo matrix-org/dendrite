@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -65,14 +64,15 @@ type previousEventStatements struct {
 	selectPreviousEventExistsStmt *sql.Stmt
 }
 
-func NewPostgresPreviousEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
-	s := &previousEventStatements{}
+func createPrevEventsTable(db *sql.DB) error {
 	_, err := db.Exec(previousEventSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
 
-	return s, shared.StatementList{
+func preparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
+	s := &previousEventStatements{}
+
+	return s, sqlutil.StatementList{
 		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
 		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},
 	}.Prepare(db)

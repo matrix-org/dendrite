@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+	eduapi "github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/keyserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -32,24 +34,40 @@ type KeyInternalAPI interface {
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
+	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse)
+	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
+	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
 	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
+	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server
 type KeyError struct {
-	Err string
+	Err                string `json:"error"`
+	IsInvalidSignature bool   `json:"is_invalid_signature,omitempty"` // M_INVALID_SIGNATURE
+	IsMissingParam     bool   `json:"is_missing_param,omitempty"`     // M_MISSING_PARAM
+	IsInvalidParam     bool   `json:"is_invalid_param,omitempty"`     // M_INVALID_PARAM
 }
 
 func (k *KeyError) Error() string {
 	return k.Err
 }
 
+type DeviceMessageType int
+
+const (
+	TypeDeviceKeyUpdate DeviceMessageType = iota
+	TypeCrossSigningUpdate
+)
+
 // DeviceMessage represents the message produced into Kafka by the key server.
 type DeviceMessage struct {
-	DeviceKeys
+	Type                                DeviceMessageType `json:"Type,omitempty"`
+	*DeviceKeys                         `json:"DeviceKeys,omitempty"`
+	*eduapi.OutputCrossSigningKeyUpdate `json:"CrossSigningKeyUpdate,omitempty"`
 	// A monotonically increasing number which represents device changes for this user.
 	StreamID int
 }
@@ -70,7 +88,7 @@ type DeviceKeys struct {
 // WithStreamID returns a copy of this device message with the given stream ID
 func (k *DeviceKeys) WithStreamID(streamID int) DeviceMessage {
 	return DeviceMessage{
-		DeviceKeys: *k,
+		DeviceKeys: k,
 		StreamID:   streamID,
 	}
 }
@@ -128,6 +146,18 @@ type PerformUploadKeysResponse struct {
 	OneTimeKeyCounts []OneTimeKeysCount
 }
 
+// PerformDeleteKeysRequest asks the keyserver to forget about certain
+// keys, and signatures related to those keys.
+type PerformDeleteKeysRequest struct {
+	UserID string
+	KeyIDs []gomatrixserverlib.KeyID
+}
+
+// PerformDeleteKeysResponse is the response to PerformDeleteKeysRequest.
+type PerformDeleteKeysResponse struct {
+	Error *KeyError
+}
+
 // KeyError sets a key error field on KeyErrors
 func (r *PerformUploadKeysResponse) KeyError(userID, deviceID string, err *KeyError) {
 	if r.KeyErrors[userID] == nil {
@@ -151,7 +181,30 @@ type PerformClaimKeysResponse struct {
 	Error *KeyError
 }
 
+type PerformUploadDeviceKeysRequest struct {
+	gomatrixserverlib.CrossSigningKeys
+	// The user that uploaded the key, should be populated by the clientapi.
+	UserID string
+}
+
+type PerformUploadDeviceKeysResponse struct {
+	Error *KeyError
+}
+
+type PerformUploadDeviceSignaturesRequest struct {
+	Signatures map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.CrossSigningForKeyOrDevice
+	// The user that uploaded the sig, should be populated by the clientapi.
+	UserID string
+}
+
+type PerformUploadDeviceSignaturesResponse struct {
+	Error *KeyError
+}
+
 type QueryKeysRequest struct {
+	// The user ID asking for the keys, e.g. if from a client API request.
+	// Will not be populated if the key request came from federation.
+	UserID string
 	// Maps user IDs to a list of devices
 	UserToDevices map[string][]string
 	Timeout       time.Duration
@@ -162,6 +215,10 @@ type QueryKeysResponse struct {
 	Failures map[string]interface{}
 	// Map of user_id to device_id to device_key
 	DeviceKeys map[string]map[string]json.RawMessage
+	// Maps of user_id to cross signing key
+	MasterKeys      map[string]gomatrixserverlib.CrossSigningKey
+	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
 	// Set if there was a fatal error processing this query
 	Error *KeyError
 }
@@ -209,6 +266,24 @@ type QueryDeviceMessagesResponse struct {
 	StreamID int
 	Devices  []DeviceMessage
 	Error    *KeyError
+}
+
+type QuerySignaturesRequest struct {
+	// A map of target user ID -> target key/device IDs to retrieve signatures for
+	TargetIDs map[string][]gomatrixserverlib.KeyID `json:"target_ids"`
+}
+
+type QuerySignaturesResponse struct {
+	// A map of target user ID -> target key/device ID -> origin user ID -> origin key/device ID -> signatures
+	Signatures map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap
+	// A map of target user ID -> cross-signing master key
+	MasterKeys map[string]gomatrixserverlib.CrossSigningKey
+	// A map of target user ID -> cross-signing self-signing key
+	SelfSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	// A map of target user ID -> cross-signing user-signing key
+	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
+	// The request error, if any
+	Error *KeyError
 }
 
 type InputDeviceListUpdateRequest struct {

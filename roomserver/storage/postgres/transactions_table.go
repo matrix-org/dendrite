@@ -19,7 +19,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -54,14 +54,15 @@ type transactionStatements struct {
 	selectTransactionEventIDStmt *sql.Stmt
 }
 
-func NewPostgresTransactionsTable(db *sql.DB) (tables.Transactions, error) {
-	s := &transactionStatements{}
+func createTransactionsTable(db *sql.DB) error {
 	_, err := db.Exec(transactionsSchema)
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
 
-	return s, shared.StatementList{
+func prepareTransactionsTable(db *sql.DB) (tables.Transactions, error) {
+	s := &transactionStatements{}
+
+	return s, sqlutil.StatementList{
 		{&s.insertTransactionStmt, insertTransactionSQL},
 		{&s.selectTransactionEventIDStmt, selectTransactionEventIDSQL},
 	}.Prepare(db)

@@ -64,22 +64,13 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertProfileStmt, err = db.Prepare(insertProfileSQL); err != nil {
-		return
-	}
-	if s.selectProfileByLocalpartStmt, err = db.Prepare(selectProfileByLocalpartSQL); err != nil {
-		return
-	}
-	if s.setAvatarURLStmt, err = db.Prepare(setAvatarURLSQL); err != nil {
-		return
-	}
-	if s.setDisplayNameStmt, err = db.Prepare(setDisplayNameSQL); err != nil {
-		return
-	}
-	if s.selectProfilesBySearchStmt, err = db.Prepare(selectProfilesBySearchSQL); err != nil {
-		return
-	}
-	return
+	return sqlutil.StatementList{
+		{&s.insertProfileStmt, insertProfileSQL},
+		{&s.selectProfileByLocalpartStmt, selectProfileByLocalpartSQL},
+		{&s.setAvatarURLStmt, setAvatarURLSQL},
+		{&s.setDisplayNameStmt, setDisplayNameSQL},
+		{&s.selectProfilesBySearchStmt, selectProfilesBySearchSQL},
+	}.Prepare(db)
 }
 
 func (s *profilesStatements) insertProfile(

@@ -43,6 +43,7 @@ type Events interface {
 	// bulkSelectStateEventByID lookups a list of state events by event ID.
 	// If any of the requested events are missing from the database it returns a types.MissingEventError
 	BulkSelectStateEventByID(ctx context.Context, eventIDs []string) ([]types.StateEntry, error)
+	BulkSelectStateEventByNID(ctx context.Context, eventNIDs []types.EventNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntry, error)
 	// BulkSelectStateAtEventByID lookups the state at a list of events by event ID.
 	// If any of the requested events are missing from the database it returns a types.MissingEventError.
 	// If we do not have the state for any of the requested events it returns a types.MissingEventError.
@@ -81,14 +82,14 @@ type Transactions interface {
 }
 
 type StateSnapshot interface {
-	InsertState(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID) (stateNID types.StateSnapshotNID, err error)
+	InsertState(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs types.StateBlockNIDs) (stateNID types.StateSnapshotNID, err error)
 	BulkSelectStateBlockNIDs(ctx context.Context, stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
 }
 
 type StateBlock interface {
-	BulkInsertStateData(ctx context.Context, txn *sql.Tx, entries []types.StateEntry) (types.StateBlockNID, error)
-	BulkSelectStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
-	BulkSelectFilteredStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
+	BulkInsertStateData(ctx context.Context, txn *sql.Tx, entries types.StateEntries) (types.StateBlockNID, error)
+	BulkSelectStateBlockEntries(ctx context.Context, stateBlockNIDs types.StateBlockNIDs) ([][]types.EventNID, error)
+	//BulkSelectFilteredStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 }
 
 type RoomAliases interface {
@@ -119,6 +120,7 @@ const (
 	MembershipStateLeaveOrBan MembershipState = 1
 	MembershipStateInvite     MembershipState = 2
 	MembershipStateJoin       MembershipState = 3
+	MembershipStateKnock      MembershipState = 4
 )
 
 type Membership interface {
@@ -134,6 +136,8 @@ type Membership interface {
 	SelectJoinedUsersSetForRooms(ctx context.Context, roomNIDs []types.RoomNID) (map[types.EventStateKeyNID]int, error)
 	SelectKnownUsers(ctx context.Context, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error)
 	UpdateForgetMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, forget bool) error
+	SelectLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error)
+	SelectServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error)
 }
 
 type Published interface {

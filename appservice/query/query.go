@@ -51,6 +51,10 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 		if appservice.URL != "" && appservice.IsInterestedInRoomAlias(request.Alias) {
 			// The full path to the rooms API, includes hs token
 			URL, err := url.Parse(appservice.URL + roomAliasExistsPath)
+			if err != nil {
+				return err
+			}
+
 			URL.Path += request.Alias
 			apiURL := URL.String() + "?access_token=" + appservice.HSToken
 
@@ -114,6 +118,9 @@ func (a *AppServiceQueryAPI) UserIDExists(
 		if appservice.URL != "" && appservice.IsInterestedInUserID(request.UserID) {
 			// The full path to the rooms API, includes hs token
 			URL, err := url.Parse(appservice.URL + userIDExistsPath)
+			if err != nil {
+				return err
+			}
 			URL.Path += request.UserID
 			apiURL := URL.String() + "?access_token=" + appservice.HSToken
 

@@ -22,7 +22,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -53,15 +52,17 @@ type eventJSONStatements struct {
 	bulkSelectEventJSONStmt *sql.Stmt
 }
 
-func NewSqliteEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
+func createEventJSONTable(db *sql.DB) error {
+	_, err := db.Exec(eventJSONSchema)
+	return err
+}
+
+func prepareEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
 	s := &eventJSONStatements{
 		db: db,
 	}
-	_, err := db.Exec(eventJSONSchema)
-	if err != nil {
-		return nil, err
-	}
-	return s, shared.StatementList{
+
+	return s, sqlutil.StatementList{
 		{&s.insertEventJSONStmt, insertEventJSONSQL},
 		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},
 	}.Prepare(db)

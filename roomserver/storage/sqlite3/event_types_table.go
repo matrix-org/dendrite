@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -85,16 +84,17 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt   *sql.Stmt
 }
 
-func NewSqliteEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+func createEventTypesTable(db *sql.DB) error {
+	_, err := db.Exec(eventTypesSchema)
+	return err
+}
+
+func prepareEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
 	s := &eventTypeStatements{
 		db: db,
 	}
-	_, err := db.Exec(eventTypesSchema)
-	if err != nil {
-		return nil, err
-	}
 
-	return s, shared.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.insertEventTypeNIDResultStmt, insertEventTypeNIDResultSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},

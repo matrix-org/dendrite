@@ -66,20 +66,12 @@ func (s *threepidStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.selectLocalpartForThreePIDStmt, err = db.Prepare(selectLocalpartForThreePIDSQL); err != nil {
-		return
-	}
-	if s.selectThreePIDsForLocalpartStmt, err = db.Prepare(selectThreePIDsForLocalpartSQL); err != nil {
-		return
-	}
-	if s.insertThreePIDStmt, err = db.Prepare(insertThreePIDSQL); err != nil {
-		return
-	}
-	if s.deleteThreePIDStmt, err = db.Prepare(deleteThreePIDSQL); err != nil {
-		return
-	}
-
-	return
+	return sqlutil.StatementList{
+		{&s.selectLocalpartForThreePIDStmt, selectLocalpartForThreePIDSQL},
+		{&s.selectThreePIDsForLocalpartStmt, selectThreePIDsForLocalpartSQL},
+		{&s.insertThreePIDStmt, insertThreePIDSQL},
+		{&s.deleteThreePIDStmt, deleteThreePIDSQL},
+	}.Prepare(db)
 }
 
 func (s *threepidStatements) selectLocalpartForThreePID(
