@@ -166,10 +166,16 @@ func (d *Database) AddState(
 			return 0, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", berr)
 		}
 		for i := len(state) - 1; i >= 0; i-- {
-			for _, events := range blocks {
+			for j := 0; j < len(blocks) && i < len(state); j++ {
+				events := blocks[j]
 				for _, event := range events {
 					if state[i].EventNID == event {
-						state = append(state[:i], state[i+1:]...)
+						if i+1 < len(state) {
+							state = append(state[:i], state[i+1:]...)
+						} else {
+							state = state[:i]
+						}
+						break
 					}
 				}
 			}
