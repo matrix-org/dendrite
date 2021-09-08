@@ -31,9 +31,9 @@ const (
 		"INSERT INTO threepid_sessions (sid, client_secret, threepid, token, next_link, send_attempt, validated_at_ts, validated)" +
 		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
 	selectSessionSQL = "" +
-		"SELECT client_secret, threepid, token, next_link, validated, validated_at_ts, send_attempt FROM threepid_sessions WHERE sid == $1"
+		"SELECT client_secret, threepid, token, next_link, validated, validated_at_ts, send_attempt FROM threepid_sessions WHERE sid = $1"
 	selectSessionByThreePidAndCLientSecretSQL = "" +
-		"SELECT sid, token, next_link, validated, validated_at_ts, send_attempt FROM threepid_sessions WHERE threepid == $1 AND client_secret == $2"
+		"SELECT sid, token, next_link, validated, validated_at_ts, send_attempt FROM threepid_sessions WHERE threepid = $1 AND client_secret = $2"
 	deleteSessionSQL = "" +
 		"DELETE FROM threepid_sessions WHERE sid = $1"
 	validateSessionSQL = "" +
