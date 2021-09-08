@@ -345,7 +345,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	}
 
 	if c := len(results); c > 0 {
-		util.GetLogger(ctx).Infof("Processed %d PDUs from transaction %q", c, t.TransactionID)
+		util.GetLogger(ctx).Infof("Processed %d PDUs from %v in transaction %q", c, t.Origin, t.TransactionID)
 	}
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
