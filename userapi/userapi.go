@@ -47,9 +47,12 @@ func NewInternalAPI(
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to threepid db")
 	}
-	mailer, err := mail.NewMailer(cfg)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to crate Mailer")
+	var mailer mail.Mailer
+	if cfg.Email.Enabled {
+		mailer, err = mail.NewMailer(cfg)
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to crate Mailer")
+		}
 	}
 	return &internal.UserInternalAPI{
 		AccountDB:   accountDB,
