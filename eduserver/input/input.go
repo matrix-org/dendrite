@@ -24,6 +24,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,8 @@ type EDUServerInputAPI struct {
 	OutputSendToDeviceEventTopic string
 	// The kafka topic to output new receipt events to
 	OutputReceiptEventTopic string
+	// The kafka topic to output new key change events to
+	OutputKeyChangeEventTopic string
 	// kafka producer
 	Producer sarama.SyncProducer
 	// Internal user query API
@@ -75,6 +78,36 @@ func (t *EDUServerInputAPI) InputSendToDeviceEvent(
 ) error {
 	ise := &request.InputSendToDeviceEvent
 	return t.sendToDeviceEvent(ise)
+}
+
+// InputCrossSigningKeyUpdate implements api.EDUServerInputAPI
+func (t *EDUServerInputAPI) InputCrossSigningKeyUpdate(
+	ctx context.Context,
+	request *api.InputCrossSigningKeyUpdateRequest,
+	response *api.InputCrossSigningKeyUpdateResponse,
+) error {
+	eventJSON, err := json.Marshal(&keyapi.DeviceMessage{
+		Type: keyapi.TypeCrossSigningUpdate,
+		OutputCrossSigningKeyUpdate: &api.OutputCrossSigningKeyUpdate{
+			CrossSigningKeyUpdate: request.CrossSigningKeyUpdate,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"user_id": request.UserID,
+	}).Infof("Producing to topic '%s'", t.OutputKeyChangeEventTopic)
+
+	m := &sarama.ProducerMessage{
+		Topic: string(t.OutputKeyChangeEventTopic),
+		Key:   sarama.StringEncoder(request.UserID),
+		Value: sarama.ByteEncoder(eventJSON),
+	}
+
+	_, _, err = t.Producer.SendMessage(m)
+	return err
 }
 
 func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {

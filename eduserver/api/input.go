@@ -75,6 +75,12 @@ type InputReceiptEventRequest struct {
 // InputReceiptEventResponse is a response to InputReceiptEventRequest
 type InputReceiptEventResponse struct{}
 
+type InputCrossSigningKeyUpdateRequest struct {
+	CrossSigningKeyUpdate `json:"signing_keys"`
+}
+
+type InputCrossSigningKeyUpdateResponse struct{}
+
 // EDUServerInputAPI is used to write events to the typing server.
 type EDUServerInputAPI interface {
 	InputTypingEvent(
@@ -93,5 +99,11 @@ type EDUServerInputAPI interface {
 		ctx context.Context,
 		request *InputReceiptEventRequest,
 		response *InputReceiptEventResponse,
+	) error
+
+	InputCrossSigningKeyUpdate(
+		ctx context.Context,
+		request *InputCrossSigningKeyUpdateRequest,
+		response *InputCrossSigningKeyUpdateResponse,
 	) error
 }

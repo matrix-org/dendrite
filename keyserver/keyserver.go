@@ -65,7 +65,7 @@ func NewInternalAPI(
 		}
 	}()
 
-	keyconsumer := consumers.NewOutputSigningKeyUpdateConsumer(
+	keyconsumer := consumers.NewOutputCrossSigningKeyUpdateConsumer(
 		base.ProcessContext, base.Cfg, consumer, db, ap,
 	)
 	if err := keyconsumer.Start(); err != nil {
