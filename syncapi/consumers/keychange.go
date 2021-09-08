@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.
@@ -128,7 +127,7 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, o
 		UserID: output.UserID,
 	}, &queryRes)
 	if err != nil {
-		log.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
 		sentry.CaptureException(err)
 		return err
 	}
@@ -155,7 +154,7 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage
 		UserID: output.UserID,
 	}, &queryRes)
 	if err != nil {
-		log.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
 		sentry.CaptureException(err)
 		return err
 	}

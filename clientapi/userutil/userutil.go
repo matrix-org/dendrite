@@ -31,11 +31,11 @@ func ParseUsernameParam(usernameParam string, expectedServerName *gomatrixserver
 		lp, domain, err := gomatrixserverlib.SplitID('@', usernameParam)
 
 		if err != nil {
-			return "", errors.New("Invalid username")
+			return "", errors.New("invalid username")
 		}
 
 		if expectedServerName != nil && domain != *expectedServerName {
-			return "", errors.New("User ID does not belong to this server")
+			return "", errors.New("user ID does not belong to this server")
 		}
 
 		localpart = lp

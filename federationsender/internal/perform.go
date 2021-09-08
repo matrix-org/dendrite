@@ -409,7 +409,7 @@ func (r *FederationSenderInternalAPI) performOutboundPeekUsingServer(
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
 	if err = respState.Check(ctx, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName)); err != nil {
-		return fmt.Errorf("Error checking state returned from peeking: %w", err)
+		return fmt.Errorf("error checking state returned from peeking: %w", err)
 	}
 
 	// If we've got this far, the remote server is peeking.
@@ -523,7 +523,7 @@ func (r *FederationSenderInternalAPI) PerformLeave(
 
 	// If we reach here then we didn't complete a leave for some reason.
 	return fmt.Errorf(
-		"Failed to leave room %q through %d server(s)",
+		"failed to leave room %q through %d server(s)",
 		request.RoomID, len(request.ServerNames),
 	)
 }

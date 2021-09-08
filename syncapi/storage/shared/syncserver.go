@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
@@ -309,7 +308,7 @@ func (d *Database) StreamEventsToEvents(device *userapi.Device, in []types.Strea
 					"transaction_id", in[i].TransactionID.TransactionID,
 				)
 				if err != nil {
-					log.WithFields(log.Fields{
+					logrus.WithFields(logrus.Fields{
 						"event_id": out[i].EventID(),
 					}).WithError(err).Warnf("Failed to add transaction ID to event")
 				}
@@ -529,7 +528,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		return err
 	}
 	if len(redactedEvents) == 0 {
-		log.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
+		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
 		return nil
 	}
 	eventToRedact := redactedEvents[0].Unwrap()
@@ -645,7 +644,7 @@ func (d *Database) fetchMissingStateEvents(
 		return nil, err
 	}
 	if len(stateEvents) != len(missing) {
-		log.WithContext(ctx).Warnf("Failed to map all event IDs to events (got %d, wanted %d)", len(stateEvents), len(missing))
+		logrus.WithContext(ctx).Warnf("Failed to map all event IDs to events (got %d, wanted %d)", len(stateEvents), len(missing))
 
 		// TODO: Why is this happening? It's probably the roomserver. Uncomment
 		// this error again when we work out what it is and fix it, otherwise we
