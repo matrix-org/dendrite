@@ -19,16 +19,15 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
 // Logout handles POST /logout
 func Logout(
-	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 ) util.JSONResponse {
-	var performRes userapi.PerformDeviceDeletionResponse
-	err := userAPI.PerformDeviceDeletion(req.Context(), &userapi.PerformDeviceDeletionRequest{
+	var performRes api.PerformDeviceDeletionResponse
+	err := userAPI.PerformDeviceDeletion(req.Context(), &api.PerformDeviceDeletionRequest{
 		UserID:    device.UserID,
 		DeviceIDs: []string{device.ID},
 	}, &performRes)
@@ -45,10 +44,10 @@ func Logout(
 
 // LogoutAll handles POST /logout/all
 func LogoutAll(
-	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 ) util.JSONResponse {
-	var performRes userapi.PerformDeviceDeletionResponse
-	err := userAPI.PerformDeviceDeletion(req.Context(), &userapi.PerformDeviceDeletionRequest{
+	var performRes api.PerformDeviceDeletionResponse
+	err := userAPI.PerformDeviceDeletion(req.Context(), &api.PerformDeviceDeletionRequest{
 		UserID:    device.UserID,
 		DeviceIDs: nil,
 	}, &performRes)

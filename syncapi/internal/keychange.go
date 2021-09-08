@@ -19,7 +19,6 @@ import (
 	"strings"
 
 	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/keyserver/api"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -31,8 +30,8 @@ const DeviceListLogName = "dl"
 
 // DeviceOTKCounts adds one-time key counts to the /sync response
 func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, deviceID string, res *types.Response) error {
-	var queryRes api.QueryOneTimeKeysResponse
-	keyAPI.QueryOneTimeKeys(ctx, &api.QueryOneTimeKeysRequest{
+	var queryRes keyapi.QueryOneTimeKeysResponse
+	keyAPI.QueryOneTimeKeys(ctx, &keyapi.QueryOneTimeKeysRequest{
 		UserID:   userID,
 		DeviceID: deviceID,
 	}, &queryRes)
@@ -81,8 +80,8 @@ func DeviceListCatchup(
 	if toLog := to; toLog.Partition == partition && toLog.Offset > 0 {
 		toOffset = toLog.Offset
 	}
-	var queryRes api.QueryKeyChangesResponse
-	keyAPI.QueryKeyChanges(ctx, &api.QueryKeyChangesRequest{
+	var queryRes keyapi.QueryKeyChangesResponse
+	keyAPI.QueryKeyChanges(ctx, &keyapi.QueryKeyChangesRequest{
 		Partition: partition,
 		Offset:    offset,
 		ToOffset:  toOffset,
