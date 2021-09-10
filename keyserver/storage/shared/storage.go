@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
@@ -28,6 +29,7 @@ import (
 )
 
 type Database struct {
+	internal.PartitionStorer
 	DB                    *sql.DB
 	Writer                sqlutil.Writer
 	OneTimeKeysTable      tables.OneTimeKeys
@@ -36,7 +38,6 @@ type Database struct {
 	StaleDeviceListsTable tables.StaleDeviceLists
 	CrossSigningKeysTable tables.CrossSigningKeys
 	CrossSigningSigsTable tables.CrossSigningSigs
-	sqlutil.PartitionOffsetStatements
 }
 
 func (d *Database) ExistingOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {

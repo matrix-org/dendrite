@@ -24,7 +24,7 @@ import (
 
 // A Database is used to store room events and stream offsets.
 type Database struct {
-	shared.Database
+	database     cosmosdbutil.Database
 	connection   cosmosdbapi.CosmosConnection
 	databaseName string
 	cosmosConfig cosmosdbapi.CosmosConfig
@@ -33,38 +33,62 @@ type Database struct {
 
 func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
 	conn := cosmosdbutil.GetCosmosConnection(&dbProperties.ConnectionString)
-	config := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
-	d := &Database{
+	configCosmos := cosmosdbutil.GetCosmosConfig(&dbProperties.ConnectionString)
+	result := &Database{
 		databaseName: "keyserver",
 		connection:   conn,
-		cosmosConfig: config,
+		cosmosConfig: configCosmos,
+	}
+
+	result.database = cosmosdbutil.Database{
+		Connection:   conn,
+		CosmosConfig: configCosmos,
+		DatabaseName: result.databaseName,
 	}
 
 	// db, err := sqlutil.Open(dbProperties)
 	// if err != nil {
 	// 	return nil, err
 	// }
-	otk, err := NewCosmosDBOneTimeKeysTable(d)
+	otk, err := NewCosmosDBOneTimeKeysTable(result)
 	if err != nil {
 		return nil, err
 	}
-	dk, err := NewCosmosDBDeviceKeysTable(d)
+	dk, err := NewCosmosDBDeviceKeysTable(result)
 	if err != nil {
 		return nil, err
 	}
-	kc, err := NewCosmosDBKeyChangesTable(d)
+	kc, err := NewCosmosDBKeyChangesTable(result)
 	if err != nil {
 		return nil, err
 	}
-	sdl, err := NewCosmosDBStaleDeviceListsTable(d)
+	sdl, err := NewCosmosDBStaleDeviceListsTable(result)
 	if err != nil {
 		return nil, err
 	}
+	csk, err := NewSqliteCrossSigningKeysTable(result)
+	if err != nil {
+		return nil, err
+	}
+	css, err := NewSqliteCrossSigningSigsTable(result)
+	if err != nil {
+		return nil, err
+	}
+
+	writer := cosmosdbutil.NewExclusiveWriterFake()
+	storer := cosmosdbutil.PartitionOffsetStatements{}
+	if err = storer.Prepare(&result.database, writer, "keyserver"); err != nil {
+		return nil, err
+	}
+
 	return &shared.Database{
-		Writer:                cosmosdbutil.NewExclusiveWriterFake(),
+		Writer:                writer,
 		OneTimeKeysTable:      otk,
 		DeviceKeysTable:       dk,
 		KeyChangesTable:       kc,
 		StaleDeviceListsTable: sdl,
+		CrossSigningKeysTable: csk,
+		CrossSigningSigsTable: css,
+		PartitionStorer:       &storer,
 	}, nil
 }

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/sirupsen/logrus"
@@ -80,10 +79,13 @@ const selectSendToDeviceMessagesSQL = "" +
 	"and c.mx_syncapi_send_to_device.id <= @x5 " +
 	"order by c.mx_syncapi_send_to_device.id desc "
 
-const deleteSendToDeviceMessagesSQL = `
-	DELETE FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id < $3
-`
+// DELETE FROM syncapi_send_to_device
+// 	WHERE user_id = $1 AND device_id = $2 AND id < $3
+const deleteSendToDeviceMessagesSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_syncapi_send_to_device.user_id = @x2 " +
+	"and c.mx_syncapi_send_to_device.device_id = @x3 " +
+	"and c.mx_syncapi_send_to_device.id < @x4 "
 
 // "SELECT MAX(id) FROM syncapi_send_to_device"
 const selectMaxSendToDeviceIDSQL = "" +
@@ -93,7 +95,7 @@ type sendToDeviceStatements struct {
 	db *SyncServerDatasource
 	// insertSendToDeviceMessageStmt  *sql.Stmt
 	selectSendToDeviceMessagesStmt string
-	deleteSendToDeviceMessagesStmt *sql.Stmt
+	deleteSendToDeviceMessagesStmt string
 	selectMaxSendToDeviceIDStmt    string
 	tableName                      string
 }
@@ -140,6 +142,21 @@ func querySendToDeviceNumber(s *sendToDeviceStatements, ctx context.Context, qry
 	return response, nil
 }
 
+func deleteSendToDevice(s *sendToDeviceStatements, ctx context.Context, dbData SendToDeviceCosmosData) error {
+	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
+	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		dbData.Id,
+		options)
+
+	if err != nil {
+		return err
+	}
+	return err
+}
+
 func NewCosmosDBSendToDeviceTable(db *SyncServerDatasource) (tables.SendToDevice, error) {
 	s := &sendToDeviceStatements{
 		db: db,
@@ -148,9 +165,7 @@ func NewCosmosDBSendToDeviceTable(db *SyncServerDatasource) (tables.SendToDevice
 	// 	return nil, err
 	// }
 	s.selectSendToDeviceMessagesStmt = selectSendToDeviceMessagesSQL
-	// if s.deleteSendToDeviceMessagesStmt, err = db.Prepare(deleteSendToDeviceMessagesSQL); err != nil {
-	// 	return nil, err
-	// }
+	s.deleteSendToDeviceMessagesStmt = deleteSendToDeviceMessagesSQL
 	s.selectMaxSendToDeviceIDStmt = selectMaxSendToDeviceIDSQL
 	s.tableName = "send_to_device"
 	return s, nil
@@ -260,7 +275,29 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
 	ctx context.Context, txn *sql.Tx, userID, deviceID string, pos types.StreamPosition,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, userID, deviceID, pos)
+	// DELETE FROM syncapi_send_to_device
+	// 	WHERE user_id = $1 AND device_id = $2 AND id < $3
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": userID,
+		"@x3": deviceID,
+		"@x4": pos,
+	}
+
+	// _, err = sqlutil.TxStmt(txn, s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, userID, deviceID, pos)
+	rows, err := querySendToDevice(s, ctx, s.deleteSendToDeviceMessagesStmt, params)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range rows {
+		err = deleteSendToDevice(s, ctx, item)
+		if err != nil {
+			return err
+		}
+	}
 	return
 }
 

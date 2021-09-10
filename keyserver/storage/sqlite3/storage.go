@@ -59,8 +59,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 		CrossSigningKeysTable: csk,
 		CrossSigningSigsTable: css,
 	}
-	if err = d.PartitionOffsetStatements.Prepare(db, d.Writer, "keyserver"); err != nil {
+	storer := sqlutil.PartitionOffsetStatements{}
+	if err = storer.Prepare(db, d.Writer, "keyserver"); err != nil {
 		return nil, err
 	}
+	d.PartitionStorer = &storer
 	return d, nil
 }

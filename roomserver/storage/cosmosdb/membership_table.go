@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -160,6 +161,32 @@ var selectKnownUsersSQLDistinctRoom = "" +
 	"and c.mx_roomserver_membership.membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " " +
 	"and contains(c.mx_roomserver_membership.event_state_key, @x3) "
 
+// selectLocalServerInRoomSQL is an optimised case for checking if we, the local server,
+// are in the room by using the target_local column of the membership table. Normally when
+// we want to know if a server is in a room, we have to unmarshal the entire room state which
+// is expensive. The presence of a single row from this query suggests we're still in the
+// room, no rows returned suggests we aren't.
+// "SELECT room_nid FROM roomserver_membership WHERE target_local = 1 AND membership_nid = $1 AND room_nid = $2 LIMIT 1"
+const selectLocalServerInRoomSQL = "" +
+	"select top 1 * from c where c._cn = @x1 " +
+	" and c.mx_roomserver_membership.target_local = 1" +
+	" and c.mx_roomserver_membership.membership_nid = @x2" +
+	" and c.mx_roomserver_membership.room_nid = @x3"
+
+// selectServerMembersInRoomSQL is an optimised case for checking for server members in a room.
+// The JOIN is significantly leaner than the previous case of looking up event NIDs and reading the
+// membership events from the database, as the JOIN query amounts to little more than two index
+// scans which are very fast. The presence of a single row from this query suggests the server is
+// in the room, no rows returned suggests they aren't.
+// "SELECT room_nid FROM roomserver_membership" +
+// " JOIN roomserver_event_state_keys ON roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
+// " WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
+const selectServerInRoomSQL = "" +
+	"select top 1 * from c where c._cn = @x1 " +
+	" and c.mx_roomserver_membership.membership_nid = @x2" +
+	" and c.mx_roomserver_membership.room_nid = @x3" +
+	" and contains(c.mx_roomserver_membership.target_nid, @x4) "
+
 type membershipStatements struct {
 	db *Database
 	// insertMembershipStmt                            *sql.Stmt
@@ -172,6 +199,8 @@ type membershipStatements struct {
 	selectRoomsWithMembershipStmt                   string
 	// updateMembershipStmt                            *sql.Stmt
 	// selectKnownUsersStmt string
+	selectLocalServerInRoomStmt string
+	selectServerInRoomStmt      string
 	// updateMembershipForgetRoomStmt                  *sql.Stmt
 	tableName string
 }
@@ -242,6 +271,8 @@ func NewCosmosDBMembershipTable(db *Database) (tables.Membership, error) {
 	// {&s.updateMembershipStmt, updateMembershipSQL},
 	s.selectRoomsWithMembershipStmt = selectRoomsWithMembershipSQL
 	// {&s.selectKnownUsersStmt, selectKnownUsersSQL},
+	s.selectLocalServerInRoomStmt = selectLocalServerInRoomSQL
+	s.selectServerInRoomStmt = selectServerInRoomSQL
 	// {&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 	// }.Prepare(db)
 
@@ -493,6 +524,91 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context,
 		result[userID] = count
 	}
 	return result, nil
+}
+
+func (s *membershipStatements) SelectLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error) {
+	// "SELECT room_nid FROM roomserver_membership WHERE target_local = 1 AND membership_nid = $1 AND room_nid = $2 LIMIT 1"
+
+	var nid types.RoomNID
+	// err := s.selectLocalServerInRoomStmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID).Scan(&nid)
+	//
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": tables.MembershipStateJoin,
+		"@x3": roomNID,
+	}
+	response, err := queryMembership(s, ctx, s.selectLocalServerInRoomStmt, params)
+	if len(response) == 0 {
+		if err == cosmosdbutil.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	nid = types.RoomNID(response[0].Membership.RoomNID)
+
+	found := nid > 0
+	return found, nil
+}
+
+func (s *membershipStatements) SelectServerInRoom(ctx context.Context, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error) {
+	var nid types.RoomNID
+	// "SELECT room_nid FROM roomserver_membership" +
+	// " JOIN roomserver_event_state_keys ON roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
+	// " WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
+
+	//First get the JOIN table
+	// SELECT event_state_key_nid FROM roomserver_event_state_keys
+	// WHERE event_state_key LIKE '%:' || $3 LIMIT 1
+	selectEventStateKeyNIDSQL := "" +
+		"select * from c where c._cn = @x1 " +
+		"and (endswith(c.mx_roomserver_event_state_keys.event_state_key, \":\") or c.mx_roomserver_event_state_keys.event_state_key = @x2) "
+
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": serverName,
+	}
+
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	var eventStateKeys []EventStateKeysCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(selectEventStateKeyNIDSQL, params) //
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&eventStateKeys,
+		optionsQry)
+
+	eventStateKeyNids := []int64{}
+	for _, item := range eventStateKeys {
+		eventStateKeyNids = append(eventStateKeyNids, item.EventStateKeys.EventStateKeyNID)
+	}
+
+	//Now do the JOIN
+	// "SELECT room_nid FROM roomserver_membership" +
+	// " JOIN roomserver_event_state_keys ON roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
+	// " WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
+
+	// err := s.selectServerInRoomStmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID, serverName).Scan(&nid)
+	params = map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": tables.MembershipStateJoin,
+		"@x3": roomNID,
+		"@x4": eventStateKeyNids,
+	}
+	response, err := queryMembership(s, ctx, s.selectServerInRoomStmt, params)
+	if len(response) == 0 {
+		if err == cosmosdbutil.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	nid = types.RoomNID(response[0].Membership.RoomNID)
+	return roomNID == nid, nil
 }
 
 func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID types.EventStateKeyNID, searchString string, limit int) ([]string, error) {

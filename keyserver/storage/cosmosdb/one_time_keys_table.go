@@ -341,7 +341,7 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 	ctx context.Context, txn *sql.Tx, userID, deviceID, algorithm string,
 ) (map[string]json.RawMessage, error) {
 	var keyID string
-	var keyJSON string
+	// var keyJSON string
 
 	// "SELECT key_id, key_json FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 LIMIT 1"
 
@@ -360,14 +360,16 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 		}
 		return nil, err
 	}
+	keyID = response[0].OneTimeKey.KeyID
+	keyJSONBytes := response[0].OneTimeKey.KeyJSON
 	err = deleteOneTimeKeyCore(s, ctx, response[0])
 	if err != nil {
 		return nil, err
 	}
-	if keyJSON == "" {
+	if keyID == "" {
 		return nil, nil
 	}
 	return map[string]json.RawMessage{
-		algorithm + ":" + keyID: json.RawMessage(keyJSON),
+		algorithm + ":" + keyID: keyJSONBytes,
 	}, err
 }

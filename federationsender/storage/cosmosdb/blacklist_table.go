@@ -57,12 +57,17 @@ type BlacklistCosmosData struct {
 // const deleteBlacklistSQL = "" +
 // 	"DELETE FROM federationsender_blacklist WHERE server_name = $1"
 
+// 	"DELETE FROM federationsender_blacklist"
+const deleteAllBlacklistSQL = "" +
+	"select * from c where c._cn = @x1 "
+
 type blacklistStatements struct {
 	db *Database
 	// insertBlacklistStmt *sql.Stmt
 	// selectBlacklistStmt *sql.Stmt
 	// deleteBlacklistStmt *sql.Stmt
-	tableName string
+	deleteAllBlacklistStmt string
+	tableName              string
 }
 
 func getBlacklist(s *blacklistStatements, ctx context.Context, pk string, docId string) (*BlacklistCosmosData, error) {
@@ -80,6 +85,27 @@ func getBlacklist(s *blacklistStatements, ctx context.Context, pk string, docId 
 	}
 
 	return &response, err
+}
+
+func queryBlacklist(s *blacklistStatements, ctx context.Context, qry string, params map[string]interface{}) ([]BlacklistCosmosData, error) {
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	var response []BlacklistCosmosData
+
+	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
+	var query = cosmosdbapi.GetQuery(qry, params)
+	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
+		ctx,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		query,
+		&response,
+		optionsQry)
+
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 func deleteBlacklist(s *blacklistStatements, ctx context.Context, dbData BlacklistCosmosData) error {
@@ -101,6 +127,7 @@ func NewCosmosDBBlacklistTable(db *Database) (s *blacklistStatements, err error)
 	s = &blacklistStatements{
 		db: db,
 	}
+	s.deleteAllBlacklistStmt = deleteAllBlacklistSQL
 	s.tableName = "blacklists"
 	return
 }
@@ -189,8 +216,36 @@ func (s *blacklistStatements) DeleteBlacklist(
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// _, err := stmt.ExecContext(ctx, serverName)
 	res, err := getBlacklist(s, ctx, pk, cosmosDocId)
-	if(res != nil) {
+	if res != nil {
 		_ = deleteBlacklist(s, ctx, *res)
+	}
+	return err
+}
+
+func (s *blacklistStatements) DeleteAllBlacklist(
+	ctx context.Context, txn *sql.Tx,
+) error {
+	// 	"DELETE FROM federationsender_blacklist"
+
+	// stmt := sqlutil.TxStmt(txn, s.deleteAllBlacklistStmt)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+	}
+
+	// rows, err := sqlutil.TxStmt(txn, s.selectInboundPeeksStmt).QueryContext(ctx, roomID)
+	rows, err := queryBlacklist(s, ctx, s.deleteAllBlacklistStmt, params)
+
+	if err != nil {
+		return err
+	}
+	// _, err := stmt.ExecContext(ctx)
+	for _, item := range rows {
+		// stmt := sqlutil.TxStmt(txn, deleteStmt)
+		err = deleteBlacklist(s, ctx, item)
+		if err != nil {
+			return err
+		}
 	}
 	return err
 }

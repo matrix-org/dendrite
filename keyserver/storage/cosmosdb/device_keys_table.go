@@ -94,7 +94,13 @@ const selectAllDeviceKeysSQL = "" +
 	"select * from c where c._cn = @x1 " +
 	"and c.mx_keyserver_device_key.user_id = @x2 "
 
-// const deleteAllDeviceKeysSQL = "" +
+// "DELETE FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
+const deleteDeviceKeysSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_keyserver_device_key.user_id = @x2 " +
+	"and c.mx_keyserver_device_key.device_id = @x3 "
+
+	// const deleteAllDeviceKeysSQL = "" +
 // 	"DELETE FROM keyserver_device_keys WHERE user_id=$1"
 
 func queryDeviceKey(s *deviceKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]DeviceKeyCosmosData, error) {
@@ -192,6 +198,7 @@ type deviceKeysStatements struct {
 	// selectDeviceKeysStmt       *sql.Stmt
 	selectBatchDeviceKeysStmt  string
 	selectMaxStreamForUserStmt string
+	deleteDeviceKeysStmt       string
 	// deleteAllDeviceKeysStmt    *sql.Stmt
 	tableName string
 }
@@ -202,6 +209,7 @@ func NewCosmosDBDeviceKeysTable(db *Database) (tables.DeviceKeys, error) {
 	}
 	s.selectBatchDeviceKeysStmt = selectBatchDeviceKeysSQL
 	s.selectMaxStreamForUserStmt = selectMaxStreamForUserSQL
+	s.deleteDeviceKeysStmt = deleteDeviceKeysSQL
 	s.tableName = "device_keys"
 	return s, nil
 }
@@ -219,6 +227,30 @@ func deleteDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData De
 		return err
 	}
 	return err
+}
+
+func (s *deviceKeysStatements) DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error {
+	// "DELETE FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
+	// _, err := sqlutil.TxStmt(txn, s.deleteDeviceKeysStmt).ExecContext(ctx, userID, deviceID)
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": userID,
+		"@x3": deviceID,
+	}
+	response, err := queryDeviceKey(s, ctx, selectAllDeviceKeysSQL, params)
+
+	if err != nil {
+		return err
+	}
+
+	for _, item := range response {
+		errItem := deleteDeviceKeyCore(s, ctx, item)
+		if errItem != nil {
+			return errItem
+		}
+	}
+	return nil
 }
 
 func (s *deviceKeysStatements) DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error {
@@ -268,20 +300,25 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 
 	var result []api.DeviceMessage
 	for _, item := range response {
-		var dk api.DeviceMessage
-		dk.UserID = userID
+		dk := api.DeviceMessage{
+			Type:       api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{},
+		}
+		dk.Type = api.TypeDeviceKeyUpdate
+		dk.UserID = item.DeviceKey.UserID
 		// var keyJSON string
 		var streamID int
 		// var displayName sql.NullString
 		// if err := rows.Scan(&dk.DeviceID, &keyJSON, &streamID, &displayName); err != nil {
 		// 	return nil, err
 		// }
-		streamID = item.DeviceKey.StreamID
-
+		dk.DeviceID = item.DeviceKey.DeviceID
 		dk.KeyJSON = item.DeviceKey.KeyJSON
+		streamID = item.DeviceKey.StreamID
+		displayName := item.DeviceKey.DisplayName
 		dk.StreamID = streamID
-		if len(item.DeviceKey.DisplayName) > 0 {
-			dk.DisplayName = item.DeviceKey.DisplayName
+		if len(displayName) > 0 {
+			dk.DisplayName = displayName
 		}
 		// include the key if we want all keys (no device) or it was asked
 		if deviceIDMap[dk.DeviceID] || len(deviceIDs) == 0 {

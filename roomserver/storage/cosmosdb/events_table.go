@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -97,6 +98,14 @@ const bulkSelectStateEventByIDSQL = "" +
 	// Cant do multi field order by - The order by query does not have a corresponding composite index that it can be served from
 	// ", c.mx_roomserver_event.event_state_key_nid " +
 	"asc"
+
+// "SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
+// " WHERE event_nid IN ($1)"
+// // Rest of query is built by BulkSelectStateEventByNID
+const bulkSelectStateEventByNIDSQL = "" +
+	"select * from c where c._cn = @x1 " +
+	"and ARRAY_CONTAINS(@x2, c.mx_roomserver_event.event_nid) "
+	// Rest of query is built by BulkSelectStateEventByNID
 
 // 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, is_rejected FROM roomserver_events" +
 // 	" WHERE event_id IN ($1)"
@@ -489,6 +498,83 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		)
 	}
 	return results, err
+}
+
+// bulkSelectStateEventByID lookups a list of state events by event ID.
+// If any of the requested events are missing from the database it returns a types.MissingEventError
+func (s *eventStatements) BulkSelectStateEventByNID(
+	ctx context.Context, eventNIDs []types.EventNID,
+	stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntry, error) {
+	// "SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
+	// " WHERE event_nid IN ($1)"
+	// // Rest of query is built by BulkSelectStateEventByNID
+	tuples := stateKeyTupleSorter(stateKeyTuples)
+	sort.Sort(tuples)
+	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
+	// params := make([]interface{}, 0, len(eventNIDs)+len(eventTypeNIDArray)+len(eventStateKeyNIDArray))
+	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	params := map[string]interface{}{
+		"@x1": dbCollectionName,
+		"@x2": eventNIDs,
+	}
+	// selectOrig := strings.Replace(bulkSelectStateEventByNIDSQL, "($1)", sqlutil.QueryVariadic(len(eventNIDs)), 1)
+	selectOrig := bulkSelectStateEventByNIDSQL
+	// for _, v := range eventNIDs {
+	// 	params = append(params, v)
+	// }
+	if len(eventTypeNIDArray) > 0 {
+		// selectOrig += " AND event_type_nid IN " + sqlutil.QueryVariadicOffset(len(eventTypeNIDArray), len(params))
+		selectOrig += " and ARRAY_CONTAINS(@x3, c.mx_roomserver_event.event_type_nid) "
+		// for _, v := range eventTypeNIDArray {
+		// 	params = append(params, v)
+		// }
+		params["@x3"] = eventTypeNIDArray
+	}
+	if len(eventStateKeyNIDArray) > 0 {
+		// selectOrig += " AND event_state_key_nid IN " + sqlutil.QueryVariadicOffset(len(eventStateKeyNIDArray), len(params))
+		selectOrig += " and ARRAY_CONTAINS(@x4, c.mx_roomserver_event.event_state_key_nid) "
+		// for _, v := range eventStateKeyNIDArray {
+		// 	params = append(params, v)
+		// }
+		params["@x4"] = eventStateKeyNIDArray
+	}
+	// selectOrig += " ORDER BY event_type_nid, event_state_key_nid ASC"
+	//No Composite Index so just order by the 1st one
+	selectOrig += " order by c.mx_roomserver_event.event_type_nid asc "
+	// selectStmt, err := s.db.Prepare(selectOrig)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("s.db.Prepare: %w", err)
+	// }
+	// rows, err := selectStmt.QueryContext(ctx, params...)
+	rows, err := queryEvent(s, ctx, selectOrig, params)
+
+	if err != nil {
+		return nil, fmt.Errorf("selectStmt.QueryContext: %w", err)
+	}
+	// defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
+	// We know that we will only get as many results as event IDs
+	// because of the unique constraint on event IDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
+	results := make([]types.StateEntry, len(eventNIDs))
+	i := 0
+	// for ; rows.Next(); i++ {
+	for _, item := range rows {
+		result := &results[i]
+		result.EventTypeNID = types.EventTypeNID(item.Event.EventTypeNID)
+		result.EventStateKeyNID = types.EventStateKeyNID(item.Event.EventStateKeyNID)
+		result.EventNID = types.EventNID(item.Event.EventNID)
+		// if err = rows.Scan(
+		// 	&result.EventTypeNID,
+		// 	&result.EventStateKeyNID,
+		// 	&result.EventNID,
+		// ); err != nil {
+		// 	return nil, err
+		// }
+		i++
+	}
+	return results[:i], err
 }
 
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
