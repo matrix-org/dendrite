@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -38,6 +39,7 @@ type DeviceKeys interface {
 	SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int32, err error)
 	CountStreamIDsForUser(ctx context.Context, userID string, streamIDs []int64) (int, error)
 	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error)
+	DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error
 	DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error
 }
 
@@ -51,4 +53,15 @@ type KeyChanges interface {
 type StaleDeviceLists interface {
 	InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error
 	SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error)
+}
+
+type CrossSigningKeys interface {
+	SelectCrossSigningKeysForUser(ctx context.Context, txn *sql.Tx, userID string) (r types.CrossSigningKeyMap, err error)
+	UpsertCrossSigningKeysForUser(ctx context.Context, txn *sql.Tx, userID string, keyType gomatrixserverlib.CrossSigningKeyPurpose, keyData gomatrixserverlib.Base64Bytes) error
+}
+
+type CrossSigningSigs interface {
+	SelectCrossSigningSigsForTarget(ctx context.Context, txn *sql.Tx, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (r types.CrossSigningSigMap, err error)
+	UpsertCrossSigningSigsForTarget(ctx context.Context, txn *sql.Tx, originUserID string, originKeyID gomatrixserverlib.KeyID, targetUserID string, targetKeyID gomatrixserverlib.KeyID, signature gomatrixserverlib.Base64Bytes) error
+	DeleteCrossSigningSigsForTarget(ctx context.Context, txn *sql.Tx, targetUserID string, targetKeyID gomatrixserverlib.KeyID) error
 }

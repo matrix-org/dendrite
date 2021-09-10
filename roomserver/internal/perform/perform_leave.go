@@ -45,15 +45,15 @@ func (r *Leaver) PerformLeave(
 ) ([]api.OutputEvent, error) {
 	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("Supplied user ID %q in incorrect format", req.UserID)
+		return nil, fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)
 	}
 	if domain != r.Cfg.Matrix.ServerName {
-		return nil, fmt.Errorf("User %q does not belong to this homeserver", req.UserID)
+		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.UserID)
 	}
 	if strings.HasPrefix(req.RoomID, "!") {
 		return r.performLeaveRoomByID(ctx, req, res)
 	}
-	return nil, fmt.Errorf("Room ID %q is invalid", req.RoomID)
+	return nil, fmt.Errorf("room ID %q is invalid", req.RoomID)
 }
 
 func (r *Leaver) performLeaveRoomByID(
@@ -68,7 +68,7 @@ func (r *Leaver) performLeaveRoomByID(
 		var host gomatrixserverlib.ServerName
 		_, host, err = gomatrixserverlib.SplitID('@', senderUser)
 		if err != nil {
-			return nil, fmt.Errorf("Sender %q is invalid", senderUser)
+			return nil, fmt.Errorf("sender %q is invalid", senderUser)
 		}
 		if host != r.Cfg.Matrix.ServerName {
 			return r.performFederatedRejectInvite(ctx, req, res, senderUser, eventID)
@@ -91,19 +91,19 @@ func (r *Leaver) performLeaveRoomByID(
 		return nil, err
 	}
 	if !latestRes.RoomExists {
-		return nil, fmt.Errorf("Room %q does not exist", req.RoomID)
+		return nil, fmt.Errorf("room %q does not exist", req.RoomID)
 	}
 
 	// Now let's see if the user is in the room.
 	if len(latestRes.StateEvents) == 0 {
-		return nil, fmt.Errorf("User %q is not a member of room %q", req.UserID, req.RoomID)
+		return nil, fmt.Errorf("user %q is not a member of room %q", req.UserID, req.RoomID)
 	}
 	membership, err := latestRes.StateEvents[0].Membership()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting membership: %w", err)
+		return nil, fmt.Errorf("error getting membership: %w", err)
 	}
 	if membership != gomatrixserverlib.Join && membership != gomatrixserverlib.Invite {
-		return nil, fmt.Errorf("User %q is not joined to the room (membership is %q)", req.UserID, membership)
+		return nil, fmt.Errorf("user %q is not joined to the room (membership is %q)", req.UserID, membership)
 	}
 
 	// Prepare the template for the leave event.
@@ -161,7 +161,7 @@ func (r *Leaver) performFederatedRejectInvite(
 ) ([]api.OutputEvent, error) {
 	_, domain, err := gomatrixserverlib.SplitID('@', senderUser)
 	if err != nil {
-		return nil, fmt.Errorf("User ID %q invalid: %w", senderUser, err)
+		return nil, fmt.Errorf("user ID %q invalid: %w", senderUser, err)
 	}
 
 	// Ask the federation sender to perform a federated leave for us.

@@ -57,7 +57,7 @@ type Monolith struct {
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
-func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ssMux, keyMux, mediaMux, synapseMux *mux.Router) {
+func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ssMux, keyMux, wkMux, mediaMux, synapseMux *mux.Router) {
 	clientapi.AddPublicRoutes(
 		csMux, synapseMux, &m.Config.ClientAPI, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
@@ -66,7 +66,7 @@ func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ss
 		&m.Config.MSCs,
 	)
 	federationapi.AddPublicRoutes(
-		ssMux, keyMux, &m.Config.FederationAPI, m.UserAPI, m.FedClient,
+		ssMux, keyMux, wkMux, &m.Config.FederationAPI, m.UserAPI, m.FedClient,
 		m.KeyRing, m.RoomserverAPI, m.FederationSenderAPI,
 		m.EDUInternalAPI, m.KeyAPI, &m.Config.MSCs, nil,
 	)

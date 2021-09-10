@@ -345,7 +345,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	}
 
 	if c := len(results); c > 0 {
-		util.GetLogger(ctx).Infof("Processed %d PDUs from transaction %q", c, t.TransactionID)
+		util.GetLogger(ctx).Infof("Processed %d PDUs from %v in transaction %q", c, t.Origin, t.TransactionID)
 	}
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
@@ -501,6 +501,22 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 						continue
 					}
 				}
+			}
+		case eduserverAPI.MSigningKeyUpdate:
+			var updatePayload eduserverAPI.CrossSigningKeyUpdate
+			if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
+				util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+					"user_id": updatePayload.UserID,
+				}).Error("Failed to send signing key update to edu server")
+				continue
+			}
+			inputReq := &eduserverAPI.InputCrossSigningKeyUpdateRequest{
+				CrossSigningKeyUpdate: updatePayload,
+			}
+			inputRes := &eduserverAPI.InputCrossSigningKeyUpdateResponse{}
+			if err := t.eduAPI.InputCrossSigningKeyUpdate(ctx, inputReq, inputRes); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal cross-signing update")
+				continue
 			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
@@ -695,7 +711,7 @@ withNextEvent:
 	}
 
 	if missing := len(missingAuthEvents); missing > 0 {
-		return fmt.Errorf("Event refers to %d auth_events which we failed to fetch", missing)
+		return fmt.Errorf("event refers to %d auth_events which we failed to fetch", missing)
 	}
 	return nil
 }

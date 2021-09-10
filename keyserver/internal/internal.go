@@ -182,6 +182,14 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 	util.GetLogger(ctx).WithField("num_keys", keysClaimed).Info("Claimed remote keys")
 }
 
+func (a *KeyInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.PerformDeleteKeysRequest, res *api.PerformDeleteKeysResponse) {
+	if err := a.DB.DeleteDeviceKeys(ctx, req.UserID, req.KeyIDs); err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("Failed to delete device keys: %s", err),
+		}
+	}
+}
+
 func (a *KeyInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOneTimeKeysRequest, res *api.QueryOneTimeKeysResponse) {
 	count, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 	if err != nil {
@@ -221,9 +229,17 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
+	res.MasterKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
+	res.SelfSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
+	res.UserSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
 	res.Failures = make(map[string]interface{})
+
+	// get cross-signing keys from the database
+	a.crossSigningKeysFromDatabase(ctx, req, res)
+
 	// make a map from domain to device keys
 	domainToDeviceKeys := make(map[string]map[string][]string)
+	domainToCrossSigningKeys := make(map[string]map[string]struct{})
 	for userID, deviceIDs := range req.UserToDevices {
 		_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 		if err != nil {
@@ -274,16 +290,56 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 			domainToDeviceKeys[domain] = make(map[string][]string)
 			domainToDeviceKeys[domain][userID] = append(domainToDeviceKeys[domain][userID], deviceIDs...)
 		}
+		// work out if our cross-signing request for this user was
+		// satisfied, if not add them to the list of things to fetch
+		if _, ok := res.MasterKeys[userID]; !ok {
+			if _, ok := domainToCrossSigningKeys[domain]; !ok {
+				domainToCrossSigningKeys[domain] = make(map[string]struct{})
+			}
+			domainToCrossSigningKeys[domain][userID] = struct{}{}
+		}
+		if _, ok := res.SelfSigningKeys[userID]; !ok {
+			if _, ok := domainToCrossSigningKeys[domain]; !ok {
+				domainToCrossSigningKeys[domain] = make(map[string]struct{})
+			}
+			domainToCrossSigningKeys[domain][userID] = struct{}{}
+		}
 	}
 
 	// attempt to satisfy key queries from the local database first as we should get device updates pushed to us
 	domainToDeviceKeys = a.remoteKeysFromDatabase(ctx, res, domainToDeviceKeys)
-	if len(domainToDeviceKeys) == 0 {
-		return // nothing to query
+	if len(domainToDeviceKeys) > 0 || len(domainToCrossSigningKeys) > 0 {
+		// perform key queries for remote devices
+		a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys, domainToCrossSigningKeys)
 	}
 
-	// perform key queries for remote devices
-	a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
+	// Finally, append signatures that we know about
+	// TODO: This is horrible because we need to round-trip the signature from
+	// JSON, add the signatures and marshal it again, for some reason?
+	for userID, forUserID := range res.DeviceKeys {
+		for keyID, key := range forUserID {
+			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, userID, gomatrixserverlib.KeyID(keyID))
+			if err != nil {
+				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
+				continue
+			}
+			if len(sigMap) == 0 {
+				continue
+			}
+			var deviceKey gomatrixserverlib.DeviceKeys
+			if err = json.Unmarshal(key, &deviceKey); err != nil {
+				continue
+			}
+			for sourceUserID, forSourceUser := range sigMap {
+				for sourceKeyID, sourceSig := range forSourceUser {
+					deviceKey.Signatures[sourceUserID][sourceKeyID] = sourceSig
+				}
+			}
+			if js, err := json.Marshal(deviceKey); err == nil {
+				res.DeviceKeys[userID][keyID] = js
+			}
+		}
+	}
 }
 
 func (a *KeyInternalAPI) remoteKeysFromDatabase(
@@ -313,18 +369,36 @@ func (a *KeyInternalAPI) remoteKeysFromDatabase(
 }
 
 func (a *KeyInternalAPI) queryRemoteKeys(
-	ctx context.Context, timeout time.Duration, res *api.QueryKeysResponse, domainToDeviceKeys map[string]map[string][]string,
+	ctx context.Context, timeout time.Duration, res *api.QueryKeysResponse,
+	domainToDeviceKeys map[string]map[string][]string, domainToCrossSigningKeys map[string]map[string]struct{},
 ) {
 	resultCh := make(chan *gomatrixserverlib.RespQueryKeys, len(domainToDeviceKeys))
 	// allows us to wait until all federation servers have been poked
 	var wg sync.WaitGroup
-	wg.Add(len(domainToDeviceKeys))
 	// mutex for writing directly to res (e.g failures)
 	var respMu sync.Mutex
 
+	domains := map[string]struct{}{}
+	for domain := range domainToDeviceKeys {
+		if domain == string(a.ThisServer) {
+			continue
+		}
+		domains[domain] = struct{}{}
+	}
+	for domain := range domainToCrossSigningKeys {
+		if domain == string(a.ThisServer) {
+			continue
+		}
+		domains[domain] = struct{}{}
+	}
+	wg.Add(len(domains))
+
 	// fan out
-	for domain, deviceKeys := range domainToDeviceKeys {
-		go a.queryRemoteKeysOnServer(ctx, domain, deviceKeys, &wg, &respMu, timeout, resultCh, res)
+	for domain := range domains {
+		go a.queryRemoteKeysOnServer(
+			ctx, domain, domainToDeviceKeys[domain], domainToCrossSigningKeys[domain],
+			&wg, &respMu, timeout, resultCh, res,
+		)
 	}
 
 	// Close the result channel when the goroutines have quit so the for .. range exits
@@ -344,28 +418,53 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 				res.DeviceKeys[userID][deviceID] = keyJSON
 			}
 		}
+
+		for userID, body := range result.MasterKeys {
+			res.MasterKeys[userID] = body
+		}
+
+		for userID, body := range result.SelfSigningKeys {
+			res.SelfSigningKeys[userID] = body
+		}
+
+		// TODO: do we want to persist these somewhere now
+		// that we have fetched them?
 	}
 }
 
 func (a *KeyInternalAPI) queryRemoteKeysOnServer(
-	ctx context.Context, serverName string, devKeys map[string][]string, wg *sync.WaitGroup,
-	respMu *sync.Mutex, timeout time.Duration, resultCh chan<- *gomatrixserverlib.RespQueryKeys,
+	ctx context.Context, serverName string, devKeys map[string][]string, crossSigningKeys map[string]struct{},
+	wg *sync.WaitGroup, respMu *sync.Mutex, timeout time.Duration, resultCh chan<- *gomatrixserverlib.RespQueryKeys,
 	res *api.QueryKeysResponse,
 ) {
 	defer wg.Done()
-	fedCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	fedCtx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		fedCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	// for users who we do not have any knowledge about, try to start doing device list updates for them
 	// by hitting /users/devices - otherwise fallback to /keys/query which has nicer bulk properties but
 	// lack a stream ID.
-	var userIDsForAllDevices []string
+	userIDsForAllDevices := map[string]struct{}{}
 	for userID, deviceIDs := range devKeys {
 		if len(deviceIDs) == 0 {
-			userIDsForAllDevices = append(userIDsForAllDevices, userID)
+			userIDsForAllDevices[userID] = struct{}{}
 			delete(devKeys, userID)
 		}
 	}
-	for _, userID := range userIDsForAllDevices {
+	// for cross-signing keys, it's probably easier just to hit /keys/query if we aren't already doing
+	// a device list update, so we'll populate those back into the /keys/query list if not
+	for userID := range crossSigningKeys {
+		if devKeys == nil {
+			devKeys = map[string][]string{}
+		}
+		if _, ok := userIDsForAllDevices[userID]; !ok {
+			devKeys[userID] = []string{}
+		}
+	}
+	for userID := range userIDsForAllDevices {
 		err := a.Updater.ManualUpdate(context.Background(), gomatrixserverlib.ServerName(serverName), userID)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
@@ -482,7 +581,8 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 	existingKeys := make([]api.DeviceMessage, len(keysToStore))
 	for i := range keysToStore {
 		existingKeys[i] = api.DeviceMessage{
-			DeviceKeys: api.DeviceKeys{
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
 				UserID:   keysToStore[i].UserID,
 				DeviceID: keysToStore[i].DeviceID,
 			},

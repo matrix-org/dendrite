@@ -33,14 +33,6 @@ type OutputTypingEvent struct {
 	ExpireTime *time.Time
 }
 
-// TypingEvent represents a matrix edu event of type 'm.typing'.
-type TypingEvent struct {
-	Type   string `json:"type"`
-	RoomID string `json:"room_id"`
-	UserID string `json:"user_id"`
-	Typing bool   `json:"typing"`
-}
-
 // OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.
 // This contains the full event content, along with the user ID and device ID
 // to which it is destined.
@@ -48,14 +40,6 @@ type OutputSendToDeviceEvent struct {
 	UserID   string `json:"user_id"`
 	DeviceID string `json:"device_id"`
 	gomatrixserverlib.SendToDeviceEvent
-}
-
-type ReceiptEvent struct {
-	UserID    string                      `json:"user_id"`
-	RoomID    string                      `json:"room_id"`
-	EventID   string                      `json:"event_id"`
-	Type      string                      `json:"type"`
-	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
 }
 
 // OutputReceiptEvent is an entry in the receipt output kafka log
@@ -67,21 +51,7 @@ type OutputReceiptEvent struct {
 	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
 }
 
-// Helper structs for receipts json creation
-type ReceiptMRead struct {
-	User map[string]ReceiptTS `json:"m.read"`
-}
-
-type ReceiptTS struct {
-	TS gomatrixserverlib.Timestamp `json:"ts"`
-}
-
-// FederationSender output
-type FederationReceiptMRead struct {
-	User map[string]FederationReceiptData `json:"m.read"`
-}
-
-type FederationReceiptData struct {
-	Data     ReceiptTS `json:"data"`
-	EventIDs []string  `json:"event_ids"`
+// OutputCrossSigningKeyUpdate is an entry in the signing key update output kafka log
+type OutputCrossSigningKeyUpdate struct {
+	CrossSigningKeyUpdate `json:"signing_keys"`
 }

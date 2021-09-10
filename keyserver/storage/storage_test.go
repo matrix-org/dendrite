@@ -105,7 +105,8 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	bob := "@bob:TestDeviceKeysStreamIDGeneration"
 	msgs := []api.DeviceMessage{
 		{
-			DeviceKeys: api.DeviceKeys{
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
 				DeviceID: "AAA",
 				UserID:   alice,
 				KeyJSON:  []byte(`{"key":"v1"}`),
@@ -113,7 +114,8 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 			// StreamID: 1
 		},
 		{
-			DeviceKeys: api.DeviceKeys{
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
 				DeviceID: "AAA",
 				UserID:   bob,
 				KeyJSON:  []byte(`{"key":"v1"}`),
@@ -121,7 +123,8 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 			// StreamID: 1 as this is a different user
 		},
 		{
-			DeviceKeys: api.DeviceKeys{
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
 				DeviceID: "another_device",
 				UserID:   alice,
 				KeyJSON:  []byte(`{"key":"v1"}`),
@@ -143,7 +146,8 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	// updating a device sets the next stream ID for that user
 	msgs = []api.DeviceMessage{
 		{
-			DeviceKeys: api.DeviceKeys{
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
 				DeviceID: "AAA",
 				UserID:   alice,
 				KeyJSON:  []byte(`{"key":"v2"}`),

@@ -46,7 +46,7 @@ func (m *Migrations) RunDeltas(db *sql.DB, props *config.DatabaseOptions) error 
 	minVer := int64(0)
 	migrations, err := m.collect(minVer, maxVer)
 	if err != nil {
-		return fmt.Errorf("RunDeltas: Failed to collect migrations: %w", err)
+		return fmt.Errorf("runDeltas: Failed to collect migrations: %w", err)
 	}
 	if props.ConnectionString.IsPostgres() {
 		if err = goose.SetDialect("postgres"); err != nil {
@@ -57,12 +57,12 @@ func (m *Migrations) RunDeltas(db *sql.DB, props *config.DatabaseOptions) error 
 			return err
 		}
 	} else {
-		return fmt.Errorf("Unknown connection string: %s", props.ConnectionString)
+		return fmt.Errorf("unknown connection string: %s", props.ConnectionString)
 	}
 	for {
 		current, err := goose.EnsureDBVersion(db)
 		if err != nil {
-			return fmt.Errorf("RunDeltas: Failed to EnsureDBVersion: %w", err)
+			return fmt.Errorf("runDeltas: Failed to EnsureDBVersion: %w", err)
 		}
 
 		next, err := migrations.Next(current)
@@ -71,11 +71,11 @@ func (m *Migrations) RunDeltas(db *sql.DB, props *config.DatabaseOptions) error 
 				return nil
 			}
 
-			return fmt.Errorf("RunDeltas: Failed to load next migration to %+v : %w", next, err)
+			return fmt.Errorf("runDeltas: Failed to load next migration to %+v : %w", next, err)
 		}
 
 		if err = next.Up(db); err != nil {
-			return fmt.Errorf("RunDeltas: Failed run migration: %w", err)
+			return fmt.Errorf("runDeltas: Failed run migration: %w", err)
 		}
 	}
 }

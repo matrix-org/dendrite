@@ -40,7 +40,6 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
-	"github.com/matrix-org/pinecone/router"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 	"github.com/matrix-org/pinecone/types"
@@ -196,7 +195,7 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 
 func (m *DendriteMonolith) staticPeerConnect() {
 	attempt := func() {
-		if m.PineconeRouter.PeerCount(router.PeerTypeRemote) == 0 {
+		if m.PineconeRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
 			m.staticPeerMutex.RLock()
 			uri := m.staticPeerURI
 			m.staticPeerMutex.RUnlock()
@@ -299,7 +298,7 @@ func (m *DendriteMonolith) Start() {
 		base, federation, rsAPI, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	m.userAPI = userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(m.userAPI)
 
@@ -333,6 +332,7 @@ func (m *DendriteMonolith) Start() {
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
+		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
 	)

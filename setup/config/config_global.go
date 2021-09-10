@@ -34,6 +34,9 @@ type Global struct {
 	// Defaults to 24 hours.
 	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
 
+	// The server name to delegate server-server communications to, with optional port
+	WellKnownServerName string `yaml:"well_known_server_name"`
+
 	// Disables federation. Dendrite will not be able to make any outbound HTTP requests
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
