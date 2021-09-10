@@ -54,6 +54,10 @@ global:
   # considered valid by other homeservers.
   key_validity_period: 168h0m0s
 
+  # The server name to delegate server-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_server_name: ""
+
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
   trusted_third_party_id_servers:
