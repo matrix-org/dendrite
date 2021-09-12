@@ -297,13 +297,23 @@ func (s *membershipStatements) InsertMembership(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
+	// " ON CONFLICT DO NOTHING"
+	exists, _ := getMembership(s, ctx, pk, cosmosDocId)
+	if exists != nil {
+		exists.Membership.RoomNID = int64(roomNID)
+		exists.Membership.TargetNID = int64(targetUserNID)
+		exists.Membership.TargetLocal = localTarget
+		_, errSet := setMembership(s, ctx, *exists)
+		return errSet
+	}
+
 	data := MembershipCosmos{
 		EventNID:      0,
 		Forgotten:     false,
 		MembershipNID: 1,
 		RoomNID:       int64(roomNID),
 		SenderNID:     0,
-		TargetLocal:   false,
+		TargetLocal:   localTarget,
 		TargetNID:     int64(targetUserNID),
 	}
 

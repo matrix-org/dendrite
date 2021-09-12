@@ -104,7 +104,7 @@ const bulkSelectRoomIDsSQL = "" +
 // 	"SELECT room_nid FROM roomserver_rooms WHERE room_id IN ($1)"
 const bulkSelectRoomNIDsSQL = "" +
 	"select * from c where c._cn = @x1 " +
-	"and ARRAY_CONTAINS(@x2, c.mx_roomserver_room.room_nid)"
+	"and ARRAY_CONTAINS(@x2, c.mx_roomserver_room.room_id)"
 
 type roomStatements struct {
 	db *Database
