@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -107,7 +106,7 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 
 	if err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
-		api.KindNew,
+		roomserverAPI.KindNew,
 		[]*gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
 		cfg.Matrix.ServerName,
 		nil,
@@ -328,11 +327,11 @@ func loadProfile(
 	return profile, err
 }
 
-func extractRequestData(req *http.Request, roomID string, rsAPI api.RoomserverInternalAPI) (
+func extractRequestData(req *http.Request, roomID string, rsAPI roomserverAPI.RoomserverInternalAPI) (
 	body *threepid.MembershipRequest, evTime time.Time, roomVer gomatrixserverlib.RoomVersion, resErr *util.JSONResponse,
 ) {
-	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
-	verRes := api.QueryRoomVersionForRoomResponse{}
+	verReq := roomserverAPI.QueryRoomVersionForRoomRequest{RoomID: roomID}
+	verRes := roomserverAPI.QueryRoomVersionForRoomResponse{}
 	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
 		resErr = &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -402,13 +401,13 @@ func checkAndProcessThreepid(
 	return
 }
 
-func checkMemberInRoom(ctx context.Context, rsAPI api.RoomserverInternalAPI, userID, roomID string) *util.JSONResponse {
+func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, userID, roomID string) *util.JSONResponse {
 	tuple := gomatrixserverlib.StateKeyTuple{
 		EventType: gomatrixserverlib.MRoomMember,
 		StateKey:  userID,
 	}
-	var membershipRes api.QueryCurrentStateResponse
-	err := rsAPI.QueryCurrentState(ctx, &api.QueryCurrentStateRequest{
+	var membershipRes roomserverAPI.QueryCurrentStateResponse
+	err := rsAPI.QueryCurrentState(ctx, &roomserverAPI.QueryCurrentStateRequest{
 		RoomID:      roomID,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
 	}, &membershipRes)
@@ -445,8 +444,8 @@ func SendForget(
 ) util.JSONResponse {
 	ctx := req.Context()
 	logger := util.GetLogger(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
-	var membershipRes api.QueryMembershipForUserResponse
-	membershipReq := api.QueryMembershipForUserRequest{
+	var membershipRes roomserverAPI.QueryMembershipForUserResponse
+	membershipReq := roomserverAPI.QueryMembershipForUserRequest{
 		RoomID: roomID,
 		UserID: device.UserID,
 	}
@@ -468,11 +467,11 @@ func SendForget(
 		}
 	}
 
-	request := api.PerformForgetRequest{
+	request := roomserverAPI.PerformForgetRequest{
 		RoomID: roomID,
 		UserID: device.UserID,
 	}
-	response := api.PerformForgetResponse{}
+	response := roomserverAPI.PerformForgetResponse{}
 	if err := rsAPI.PerformForget(ctx, &request, &response); err != nil {
 		logger.WithError(err).Error("PerformForget: unable to forget room")
 		return jsonerror.InternalServerError()

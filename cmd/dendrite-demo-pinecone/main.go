@@ -49,7 +49,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
-	"github.com/matrix-org/pinecone/router"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 
@@ -125,7 +124,7 @@ func main() {
 
 	connectToStaticPeer := func() {
 		attempt := func() {
-			if pRouter.PeerCount(router.PeerTypeRemote) == 0 {
+			if pRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
 				uri := *instancePeer
 				if uri == "" {
 					return
@@ -211,6 +210,7 @@ func main() {
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
+		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
 	)

@@ -51,7 +51,7 @@ func (r *Inviter) PerformInvite(
 	targetUserID := *event.StateKey()
 	info, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to load RoomInfo: %w", err)
+		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 
 	log.WithFields(log.Fields{
