@@ -438,7 +438,7 @@ type CreateSessionRequest struct {
 }
 
 type CreateSessionResponse struct {
-	Sid string
+	Sid int64
 }
 
 type ValidateSessionRequest struct {
@@ -451,13 +451,16 @@ type GetThreePidForSessionResponse struct {
 }
 
 type SessionOwnership struct {
-	Sid, ClientSecret string
+	Sid          int64
+	ClientSecret string
 }
 
 type Session struct {
-	Sid, ClientSecret, ThreePid, Token, NextLink string
-	SendAttempt, ValidatedAt                     int
-	Validated                                    bool
+	ClientSecret, ThreePid, Token, NextLink string
+	Sid                                     int64
+	SendAttempt                             int
+	ValidatedAt                             int64
+	Validated                               bool
 }
 
 type IsSessionValidatedResponse struct {

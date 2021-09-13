@@ -43,7 +43,7 @@ func NewInternalAPI(
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to device db")
 	}
-	threepidDb, err := threepid.NewDatabase(&cfg.ThreepidDatabase)
+	threepidDb, err := threepid.Open(&cfg.ThreepidDatabase)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to threepid db")
 	}

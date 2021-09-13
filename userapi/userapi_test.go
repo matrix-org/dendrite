@@ -171,7 +171,7 @@ func TestCreateSession_Twice(t *testing.T) {
 	resp := api.CreateSessionResponse{}
 	err := internalApi.CreateSession(ctx, testReq, &resp)
 	is.NoErr(err)
-	is.Equal(len(resp.Sid), 43)
+	is.Equal(resp.Sid, int64(1))
 	select {
 	case <-mailer.c[api.AccountPassword]:
 		t.Fatal("email was received, but sent attempt was not increased")
@@ -189,7 +189,7 @@ func TestCreateSession_Twice_IncreaseSendAttempt(t *testing.T) {
 	testReqBumped.SendAttempt = 1
 	err := internalApi.CreateSession(ctx, &testReqBumped, &resp)
 	is.NoErr(err)
-	is.Equal(len(resp.Sid), 43)
+	is.Equal(resp.Sid, int64(1))
 	sub := <-mailer.c[api.AccountPassword]
 	is.Equal(len(sub.Token), 64)
 	is.Equal(sub.To, testReq.ThreePid)
@@ -235,7 +235,7 @@ func mustCreateSession(is *is.I, i *internal.UserInternalAPI) (resp *api.CreateS
 	i.Mail = mailer
 	err := i.CreateSession(ctx, testReq, resp)
 	is.NoErr(err)
-	is.Equal(len(resp.Sid), 43)
+	is.Equal(resp.Sid, int64(1))
 	sub := <-mailer.c[api.AccountPassword]
 	is.Equal(len(sub.Token), 64)
 	is.Equal(sub.To, testReq.ThreePid)
@@ -244,14 +244,14 @@ func mustCreateSession(is *is.I, i *internal.UserInternalAPI) (resp *api.CreateS
 	is.Equal(submitUrl.Host, "example.com")
 	is.Equal(submitUrl.Path, "/_matrix/client/r0/account/password/email/submitToken")
 	q := submitUrl.Query()
-	is.Equal(len(q["sid"][0]), 43)
+	is.Equal(q["sid"][0], "1")
 	is.Equal(q["token"][0], sub.Token)
 	is.Equal(q["client_secret"][0], "foobar")
 	token = sub.Token
 	return
 }
 
-func mustValidateSesson(is *is.I, i *internal.UserInternalAPI, secret, token, sid string) {
+func mustValidateSesson(is *is.I, i *internal.UserInternalAPI, secret, token string, sid int64) {
 	err := i.ValidateSession(ctx, &api.ValidateSessionRequest{
 		SessionOwnership: api.SessionOwnership{
 			Sid:          sid,

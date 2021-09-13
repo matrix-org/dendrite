@@ -14,7 +14,6 @@ import (
 )
 
 var testSession = api.Session{
-	// Sid:          "123",
 	ClientSecret: "099azAZ.=_-",
 	ThreePid:     "azAZ09!#$%&'*+-/=?^_`{|}~@bar09.com",
 	Token:        "fooBAR123",
@@ -26,15 +25,24 @@ var testSession = api.Session{
 
 var testCtx = context.Background()
 
-func mustNewDatabaseWithTestSession(is *is.I) *Db {
+func mustNewDatabaseWithTestSession(is *is.I) Database {
 	randPostfix := strconv.Itoa(rand.Int())
 	dbPath := os.TempDir() + "/dendrite-" + randPostfix
 	println(dbPath)
-	dut, err := newSQLiteDatabase(&config.DatabaseOptions{
+	dut, err := Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource("file:" + dbPath),
 	})
 	is.NoErr(err)
-	err = dut.InsertSession(testCtx, &testSession)
+	sid, err := dut.InsertSession(
+		testCtx,
+		testSession.ClientSecret,
+		testSession.ThreePid,
+		testSession.Token,
+		testSession.NextLink,
+		testSession.ValidatedAt,
+		testSession.Validated,
+		testSession.SendAttempt)
+	testSession.Sid = sid
 	is.NoErr(err)
 	return dut
 }
@@ -78,7 +86,7 @@ func TestDeleteSession(t *testing.T) {
 func TestValidateSession(t *testing.T) {
 	is := is.New(t)
 	dut := mustNewDatabaseWithTestSession(is)
-	validatedAt := 1_623_406_296
+	validatedAt := int64(1_623_406_296)
 	err := dut.ValidateSession(testCtx, testSession.Sid, validatedAt)
 	is.NoErr(err)
 	session, err := dut.GetSession(testCtx, testSession.Sid)

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -28,19 +29,14 @@ func (a *UserInternalAPI) CreateSession(ctx context.Context, req *api.CreateSess
 			if errB != nil {
 				return errB
 			}
-			sid, errB := internal.GenerateBlob(sessionIdByteLength)
-			if errB != nil {
-				return errB
-			}
 			s = &api.Session{
-				Sid:          sid,
 				ClientSecret: req.ClientSecret,
 				ThreePid:     req.ThreePid,
 				SendAttempt:  req.SendAttempt,
 				Token:        token,
 				NextLink:     req.NextLink,
 			}
-			err = a.ThreePidDB.InsertSession(ctx, s)
+			s.Sid, err = a.ThreePidDB.InsertSession(ctx, req.ClientSecret, req.ThreePid, token, req.NextLink, 0, false, req.SendAttempt)
 			if err != nil {
 				return err
 			}
@@ -60,7 +56,7 @@ func (a *UserInternalAPI) CreateSession(ctx context.Context, req *api.CreateSess
 	}
 	res.Sid = s.Sid
 	query := url.Values{
-		"sid":           []string{s.Sid},
+		"sid":           []string{strconv.Itoa(int(s.Sid))},
 		"client_secret": []string{s.ClientSecret},
 		"token":         []string{s.Token},
 	}
@@ -88,7 +84,7 @@ func (a *UserInternalAPI) ValidateSession(ctx context.Context, req *api.Validate
 	if s.Token != req.Token {
 		return ErrBadSession
 	}
-	return a.ThreePidDB.ValidateSession(ctx, s.Sid, int(time.Now().Unix()))
+	return a.ThreePidDB.ValidateSession(ctx, s.Sid, time.Now().Unix())
 }
 
 func (a *UserInternalAPI) GetThreePidForSession(ctx context.Context, req *api.SessionOwnership, res *api.GetThreePidForSessionResponse) error {
@@ -114,7 +110,7 @@ func (a *UserInternalAPI) IsSessionValidated(ctx context.Context, req *api.Sessi
 		return err
 	}
 	res.Validated = s.Validated
-	res.ValidatedAt = s.ValidatedAt
+	res.ValidatedAt = int(s.ValidatedAt)
 	return nil
 }
 
