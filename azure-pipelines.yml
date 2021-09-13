@@ -42,7 +42,8 @@ steps:
       ./build/docker/images-build.sh
 
 - task: Docker@2
+  displayName: 'Push the container to the dockerhub registry'
   inputs:
     containerRegistry: 'service-connection-docker_jaredjacobson'
-    repository: 'dendrite-monolith'
+    repository: 'jaredjacobson/dendrite-monolith'
     command: 'push'
