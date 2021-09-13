@@ -27,11 +27,6 @@ steps:
     echo '##vso[task.prependpath]$(GOROOT)/bin'
   displayName: 'Set up the Go workspace'
 
-- script: |
-    go version
-  workingDirectory: '$(modulePath)'
-  displayName: 'Display go version'
-
 - task: CmdLine@2
   name: Build
   inputs:
