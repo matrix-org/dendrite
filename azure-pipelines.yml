@@ -21,15 +21,11 @@ steps:
   inputs:
     script: |
       echo "Structure of work folder of this pipeline:"
-      tree $(Agent.WorkFolder)\1 /f
+      tree $(Agent.WorkFolder) /f
       echo "Build.ArtifactStagingDirectory:" 
-      echo "$(Build.ArtifactStagingDirectory)"
+      echo "$(Build.ArtifactStagingDirectory)"      
       echo "Build.BinariesDirectory:" 
       echo "$(Build.BinariesDirectory)"
       echo "Build.SourcesDirectory:"
       echo "$(Build.SourcesDirectory)"
-- task: CmdLine@2
-  name: Build
-  inputs:
-    workingDirectory: '$(Build.Repository.LocalPath)/dendrite'
-    script: './build.sh'
+      tree $(Build.SourcesDirectory) /f
