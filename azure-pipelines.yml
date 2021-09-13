@@ -28,3 +28,16 @@ steps:
     targetType: 'inline'
     script: './build.sh'
     workingDirectory: '$(Build.SourcesDirectory)'
+
+- task: DockerInstaller@0
+  inputs:
+    dockerVersion: '17.09.0-ce'
+
+- task: Bash@3
+  displayName: 'Build the docker container'
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo 'Building docker container'
+      ./build/docker/images-build.sh
+
