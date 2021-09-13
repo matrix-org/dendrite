@@ -9,27 +9,11 @@ trigger:
 pool:
   vmImage: ubuntu-latest
 
-variables:
-  GOBIN:  '$(GOPATH)/bin' # Go binaries path
-  GOROOT: '/usr/local/go1.11' # Go installation path
-  GOPATH: '$(system.defaultWorkingDirectory)/gopath' # Go workspace path
-  modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)' # Path to the module's code
 
 steps:
-# - task: CmdLine@2
-#   displayName: 'List all directories'
-#   inputs:
-#     script: |
-#       echo "Structure of work folder of this pipeline:"
-#       tree $(Agent.WorkFolder) /f
-#       echo "Build.ArtifactStagingDirectory:" 
-#       echo "$(Build.ArtifactStagingDirectory)"      
-#       echo "Build.BinariesDirectory:" 
-#       echo "$(Build.BinariesDirectory)"
-#       echo "Build.SourcesDirectory:"
-#       echo "$(Build.SourcesDirectory)"
-#       tree $(Build.SourcesDirectory) /f
-
+- task: GoTool@0
+  inputs:
+    version: '1.13.5'
 - task: CmdLine@2
   name: Build
   inputs:
