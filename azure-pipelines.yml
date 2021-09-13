@@ -16,19 +16,27 @@ variables:
   modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)' # Path to the module's code
 
 steps:
-# - task: CmdLine@2
-#   displayName: 'List all directories'
-#   inputs:
-#     script: |
-#       echo "Structure of work folder of this pipeline:"
-#       tree $(Agent.WorkFolder) /f
-#       echo "Build.ArtifactStagingDirectory:" 
-#       echo "$(Build.ArtifactStagingDirectory)"      
-#       echo "Build.BinariesDirectory:" 
-#       echo "$(Build.BinariesDirectory)"
-#       echo "Build.SourcesDirectory:"
-#       echo "$(Build.SourcesDirectory)"
-#       tree $(Build.SourcesDirectory) /f
+- script: |
+    mkdir -p '$(GOBIN)'
+    mkdir -p '$(GOPATH)/pkg'
+    mkdir -p '$(modulePath)'
+    shopt -s extglob
+    shopt -s dotglob
+    mv !(gopath) '$(modulePath)'
+    echo '##vso[task.prependpath]$(GOBIN)'
+    echo '##vso[task.prependpath]$(GOROOT)/bin'
+  displayName: 'Set up the Go workspace'
+
+- script: |
+    go version
+    go get -v -t -d ./...
+    if [ -f Gopkg.toml ]; then
+        curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+        dep ensure
+    fi
+    go build -v .
+  workingDirectory: '$(modulePath)'
+  displayName: 'Get dependencies, then build'
 
 - task: CmdLine@2
   name: Build
