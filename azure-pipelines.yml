@@ -12,6 +12,7 @@ pool:
 
 steps:
 - task: Bash@3
+  displayName: 'Manually install golang environment v1.17.1'
   inputs:
     targetType: 'inline'
     script: |
