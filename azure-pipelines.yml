@@ -16,16 +16,22 @@ variables:
   modulePath: '$(GOPATH)/src/github.com/$(build.repository.name)' # Path to the module's code
 
 steps:
+# - task: CmdLine@2
+#   displayName: 'List all directories'
+#   inputs:
+#     script: |
+#       echo "Structure of work folder of this pipeline:"
+#       tree $(Agent.WorkFolder) /f
+#       echo "Build.ArtifactStagingDirectory:" 
+#       echo "$(Build.ArtifactStagingDirectory)"      
+#       echo "Build.BinariesDirectory:" 
+#       echo "$(Build.BinariesDirectory)"
+#       echo "Build.SourcesDirectory:"
+#       echo "$(Build.SourcesDirectory)"
+#       tree $(Build.SourcesDirectory) /f
+
 - task: CmdLine@2
-  displayName: 'List all directories'
+  name: Build
   inputs:
-    script: |
-      echo "Structure of work folder of this pipeline:"
-      tree $(Agent.WorkFolder) /f
-      echo "Build.ArtifactStagingDirectory:" 
-      echo "$(Build.ArtifactStagingDirectory)"      
-      echo "Build.BinariesDirectory:" 
-      echo "$(Build.BinariesDirectory)"
-      echo "Build.SourcesDirectory:"
-      echo "$(Build.SourcesDirectory)"
-      tree $(Build.SourcesDirectory) /f
+    workingDirectory: '$(Build.SourcesDirectory)'
+    script: './build.sh'
