@@ -19,7 +19,7 @@ steps:
       wget https://dl.google.com/go/go1.17.1.linux-amd64.tar.gz
       sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.17.1.linux-amd64.tar.gz
       export PATH=$PATH:/usr/local/go/bin
-      echo go version
+      go version
 
 - task: Bash@3
   displayName: 'Build the executables'
