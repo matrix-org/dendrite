@@ -13,7 +13,8 @@ pool:
 steps:
 - task: GoTool@0
   inputs:
-    version: '1.1.4'
+    version: '1.1.0'
+
 - task: Bash@3
   displayName: 'Build the executables'
   inputs:
