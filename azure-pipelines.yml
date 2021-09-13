@@ -41,13 +41,8 @@ steps:
       echo 'Building docker container'
       ./build/docker/images-build.sh
 
-- task: Bash@3
-  displayName: 'Push the container to the registry'
+- task: Docker@2
   inputs:
-    targetType: 'inline'
-    script: |
-      echo 'Uploading container'
-      export PAT=$(dockerhub_access_token)
-      echo $PAT | docker login -u $(dockerhub_username) --password-stdin
-      docker push $(dockerhub_username)/dendrite-monolith:latest
-
+    containerRegistry: 'service-connection-docker_jaredjacobson'
+    repository: 'dendrite-monolith'
+    command: 'push'
