@@ -47,6 +47,7 @@ steps:
     targetType: 'inline'
     script: |
       echo 'Uploading container'
-      echo $(dockerhub_access_token) | docker login -u $(dockerhub_username) --password-stdin
+      export PAT=$(dockerhub_access_token)
+      echo $PAT | docker login -u $(dockerhub_username) --password-stdin
       docker push $(dockerhub_username)/dendrite-monolith:latest
 
