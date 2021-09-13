@@ -41,3 +41,12 @@ steps:
       echo 'Building docker container'
       ./build/docker/images-build.sh
 
+- task: Bash@3
+  displayName: 'Push the container to the registry'
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo 'Uploading container'
+      echo $(dockerhub_access_token) | docker login -u $(dockerhub_username) --password-stdin
+      docker push $(dockerhub_username)/dendrite-monolith:latest
+
