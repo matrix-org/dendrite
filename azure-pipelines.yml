@@ -41,4 +41,5 @@ steps:
 - task: CmdLine@2
   name: Build
   inputs:
+    workingDirectory: '$(Build.Repository.LocalPath)'
     script: './build.sh'
