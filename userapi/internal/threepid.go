@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	sessionIdByteLength = 32
-	tokenByteLength     = 48
+	tokenByteLength = 48
 )
 
 var ErrBadSession = errors.New("provided sid, client_secret and token does not point to valid session")
@@ -25,9 +24,10 @@ func (a *UserInternalAPI) CreateSession(ctx context.Context, req *api.CreateSess
 	s, err := a.ThreePidDB.GetSessionByThreePidAndSecret(ctx, req.ThreePid, req.ClientSecret)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			token, errB := internal.GenerateBlob(tokenByteLength)
-			if errB != nil {
-				return errB
+			var token string
+			token, err = internal.GenerateBlob(tokenByteLength)
+			if err != nil {
+				return err
 			}
 			s = &api.Session{
 				ClientSecret: req.ClientSecret,

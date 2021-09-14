@@ -40,11 +40,12 @@ func Open(dbProperties *config.DatabaseOptions) (*Database, error) {
 	}
 
 	// Create the tables.
-	if err := create(db); err != nil {
+	if err = create(db); err != nil {
 		return nil, err
 	}
 
-	sharedDb, err := shared.NewDatabase(db, sqlutil.NewExclusiveWriter())
+	var sharedDb *shared.Database
+	sharedDb, err = shared.NewDatabase(db, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		return nil, err
 	}

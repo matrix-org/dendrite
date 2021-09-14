@@ -11,8 +11,6 @@ const (
 		"INSERT INTO threepid_sessions (client_secret, threepid, token, next_link, validated_at_ts, validated, send_attempt)" +
 		"VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 		"RETURNING sid;"
-	// selectSidSQL = "" +
-	// 	"SELECT last_insert_rowid();"
 	selectSessionSQL = "" +
 		"SELECT client_secret, threepid, token, next_link, validated_at_ts, validated, send_attempt FROM threepid_sessions WHERE sid = $1"
 	selectSessionByThreePidAndCLientSecretSQL = "" +
@@ -26,8 +24,7 @@ const (
 )
 
 type ThreePidSessionStatements struct {
-	insertSessionStmt *sql.Stmt
-	// selectSidStmt                              *sql.Stmt
+	insertSessionStmt                          *sql.Stmt
 	selectSessionStmt                          *sql.Stmt
 	selectSessionByThreePidAndCLientSecretStmt *sql.Stmt
 	deleteSessionStmt                          *sql.Stmt
@@ -39,7 +36,6 @@ func PrepareThreePidSessionsTable(db *sql.DB) (*ThreePidSessionStatements, error
 	s := ThreePidSessionStatements{}
 	return &s, sqlutil.StatementList{
 		{&s.insertSessionStmt, insertSessionSQL},
-		// {&s.selectSidStmt, selectSidSQL},
 		{&s.selectSessionStmt, selectSessionSQL},
 		{&s.selectSessionByThreePidAndCLientSecretStmt, selectSessionByThreePidAndCLientSecretSQL},
 		{&s.deleteSessionStmt, deleteSessionSQL},
