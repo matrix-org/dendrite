@@ -1,4 +1,5 @@
-//+build test_mail
+//go:build test_mail
+// +build test_mail
 
 package mail
 
