@@ -514,7 +514,7 @@ func (u *testUserAPI) QueryAccessToken(ctx context.Context, req *userapi.QueryAc
 func (u *testUserAPI) CreateSession(context.Context, *userapi.CreateSessionRequest, *userapi.CreateSessionResponse) error {
 	return nil
 }
-func (u *testUserAPI) ValidateSession(context.Context, *userapi.ValidateSessionRequest, struct{}) error {
+func (u *testUserAPI) ValidateSession(context.Context, *userapi.ValidateSessionRequest, *userapi.ValidateSessionResponse) error {
 	return nil
 }
 func (u *testUserAPI) GetThreePidForSession(context.Context, *userapi.SessionOwnership, *userapi.GetThreePidForSessionResponse) error {

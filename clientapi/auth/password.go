@@ -26,6 +26,10 @@ import (
 	"github.com/matrix-org/util"
 )
 
+const (
+	email = "email"
+)
+
 type GetAccountByPassword func(ctx context.Context, localpart, password string) (*api.Account, error)
 
 type PasswordRequest struct {
@@ -59,9 +63,9 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if username != "" {
 		localpart, err = userutil.ParseUsernameParam(username, &t.Config.Matrix.ServerName)
 	} else {
-		if r.Medium == "email" {
+		if r.Medium == email {
 			if r.Address != "" {
-				localpart, err = t.AccountDB.GetLocalpartForThreePID(ctx, r.Address, "email")
+				localpart, err = t.AccountDB.GetLocalpartForThreePID(ctx, r.Address, email)
 				if localpart == "" {
 					return nil, &util.JSONResponse{
 						Code: http.StatusForbidden,

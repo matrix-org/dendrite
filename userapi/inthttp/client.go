@@ -242,7 +242,7 @@ func (h *httpUserInternalAPI) CreateSession(ctx context.Context, req *api.Create
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
-func (h *httpUserInternalAPI) ValidateSession(ctx context.Context, req *api.ValidateSessionRequest, res struct{}) error {
+func (h *httpUserInternalAPI) ValidateSession(ctx context.Context, req *api.ValidateSessionRequest, res *api.ValidateSessionResponse) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "ValidateSession")
 	defer span.Finish()
 

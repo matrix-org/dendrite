@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"net/url"
 	"strconv"
 	"time"
@@ -17,8 +16,6 @@ import (
 const (
 	tokenByteLength = 48
 )
-
-var ErrBadSession = errors.New("provided sid, client_secret and token does not point to valid session")
 
 func (a *UserInternalAPI) CreateSession(ctx context.Context, req *api.CreateSessionRequest, res *api.CreateSessionResponse) error {
 	s, err := a.ThreePidDB.GetSessionByThreePidAndSecret(ctx, req.ThreePid, req.ClientSecret)
@@ -76,15 +73,20 @@ func (a *UserInternalAPI) CreateSession(ctx context.Context, req *api.CreateSess
 	}, req.SessionType)
 }
 
-func (a *UserInternalAPI) ValidateSession(ctx context.Context, req *api.ValidateSessionRequest, res struct{}) error {
+func (a *UserInternalAPI) ValidateSession(ctx context.Context, req *api.ValidateSessionRequest, res *api.ValidateSessionResponse) error {
 	s, err := getSessionByOwnership(ctx, &req.SessionOwnership, a.ThreePidDB)
 	if err != nil {
 		return err
 	}
 	if s.Token != req.Token {
-		return ErrBadSession
+		return api.ErrBadSession
 	}
-	return a.ThreePidDB.ValidateSession(ctx, s.Sid, time.Now().Unix())
+	err = a.ThreePidDB.ValidateSession(ctx, s.Sid, time.Now().Unix())
+	if err != nil {
+		return err
+	}
+	res.NextLink = s.NextLink
+	return nil
 }
 
 func (a *UserInternalAPI) GetThreePidForSession(ctx context.Context, req *api.SessionOwnership, res *api.GetThreePidForSessionResponse) error {
@@ -111,6 +113,7 @@ func (a *UserInternalAPI) IsSessionValidated(ctx context.Context, req *api.Sessi
 	}
 	res.Validated = s.Validated
 	res.ValidatedAt = int(s.ValidatedAt)
+	res.ThreePid = s.ThreePid
 	return nil
 }
 
@@ -118,12 +121,12 @@ func getSessionByOwnership(ctx context.Context, so *api.SessionOwnership, d thre
 	s, err := d.GetSession(ctx, so.Sid)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrBadSession
+			return nil, api.ErrBadSession
 		}
 		return nil, err
 	}
 	if s.ClientSecret != so.ClientSecret {
-		return nil, ErrBadSession
+		return nil, api.ErrBadSession
 	}
 	return s, err
 }

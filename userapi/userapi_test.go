@@ -252,6 +252,7 @@ func mustCreateSession(is *is.I, i *internal.UserInternalAPI) (resp *api.CreateS
 }
 
 func mustValidateSesson(is *is.I, i *internal.UserInternalAPI, secret, token string, sid int64) {
+	res := api.ValidateSessionResponse{}
 	err := i.ValidateSession(ctx, &api.ValidateSessionRequest{
 		SessionOwnership: api.SessionOwnership{
 			Sid:          sid,
@@ -259,7 +260,8 @@ func mustValidateSesson(is *is.I, i *internal.UserInternalAPI, secret, token str
 		},
 		Token: token,
 	},
-		struct{}{},
+		&res,
 	)
 	is.NoErr(err)
+	is.Equal(res.NextLink, testReq.NextLink)
 }

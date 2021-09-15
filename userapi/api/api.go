@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,6 +34,8 @@ const (
 	// - https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-register-email-requesttoken
 	Register
 )
+
+var ErrBadSession = errors.New("provided sid, client_secret and token does not point to valid session")
 
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
@@ -55,7 +58,7 @@ type UserInternalAPI interface {
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	CreateSession(context.Context, *CreateSessionRequest, *CreateSessionResponse) error
-	ValidateSession(context.Context, *ValidateSessionRequest, struct{}) error
+	ValidateSession(context.Context, *ValidateSessionRequest, *ValidateSessionResponse) error
 	GetThreePidForSession(context.Context, *SessionOwnership, *GetThreePidForSessionResponse) error
 	DeleteSession(context.Context, *SessionOwnership, struct{}) error
 	IsSessionValidated(context.Context, *SessionOwnership, *IsSessionValidatedResponse) error
@@ -438,12 +441,16 @@ type CreateSessionRequest struct {
 }
 
 type CreateSessionResponse struct {
-	Sid int64
+	Sid int64 `json:"sid"`
 }
 
 type ValidateSessionRequest struct {
 	SessionOwnership
 	Token string
+}
+
+type ValidateSessionResponse struct {
+	NextLink string
 }
 
 type GetThreePidForSessionResponse struct {
@@ -466,6 +473,7 @@ type Session struct {
 type IsSessionValidatedResponse struct {
 	Validated   bool
 	ValidatedAt int
+	ThreePid    string
 }
 
 type ThreepidSessionType int

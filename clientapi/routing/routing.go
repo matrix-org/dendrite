@@ -598,7 +598,7 @@ func Setup(
 
 	r0mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return CheckAndSave3PIDAssociation(req, accountDB, device, cfg)
+			return CheckAndSave3PIDAssociation(req, accountDB, device, cfg, userAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -610,9 +610,21 @@ func Setup(
 
 	r0mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
 		httputil.MakeExternalAPI("account_3pid_request_token", func(req *http.Request) util.JSONResponse {
-			return RequestEmailToken(req, accountDB, cfg)
+			return RequestEmailToken(req, accountDB, userAPI, cfg)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	r0mux.Handle("/account/password/email/requestToken",
+		httputil.MakeAuthAPI("account_password_request_token", userAPI, func(req *http.Request, dev *userapi.Device) util.JSONResponse {
+			return RequestAccountPasswordEmailToken(req, accountDB, userAPI, dev)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	r0mux.Handle("/{path:(?:account/password|account/3pid|register)}/email/submitToken",
+		httputil.MakeExternalAPI("email_submit_token", func(req *http.Request) util.JSONResponse {
+			return SubmitToken(req, userAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	// Element logs get flooded unless this is handled
 	r0mux.Handle("/presence/{userID}/status",

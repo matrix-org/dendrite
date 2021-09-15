@@ -121,7 +121,7 @@ func (t *UserInternalAPITrace) CreateSession(ctx context.Context, req *CreateSes
 	util.GetLogger(ctx).Infof("CreateSession req=%+v res=%+v", js(req), js(res))
 	return err
 }
-func (t *UserInternalAPITrace) ValidateSession(ctx context.Context, req *ValidateSessionRequest, res struct{}) error {
+func (t *UserInternalAPITrace) ValidateSession(ctx context.Context, req *ValidateSessionRequest, res *ValidateSessionResponse) error {
 	err := t.Impl.ValidateSession(ctx, req, res)
 	util.GetLogger(ctx).Infof("ValidateSession req=%+v res=%+v", js(req), js(res))
 	return err

@@ -112,6 +112,8 @@ type Derived struct {
 	ExclusiveApplicationServicesAliasRegexp *regexp.Regexp
 	// Note: An Exclusive Regex for room ID isn't necessary as we aren't blocking
 	// servers from creating RoomIDs in exclusive application service namespaces
+	// SendEmails is set to true when Email is enabled in User API.
+	SendEmails bool
 }
 
 type InternalAPIOptions struct {
@@ -288,7 +290,7 @@ func (config *Dendrite) Derive() error {
 	if err := loadAppServices(&config.AppServiceAPI, &config.Derived); err != nil {
 		return err
 	}
-
+	config.Derived.SendEmails = config.UserAPI.Email.Enabled
 	return nil
 }
 
