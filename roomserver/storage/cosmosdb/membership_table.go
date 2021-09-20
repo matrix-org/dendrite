@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -53,12 +52,7 @@ type MembershipCosmos struct {
 }
 
 type MembershipCosmosData struct {
-	Id         string           `json:"id"`
-	Pk         string           `json:"_pk"`
-	Tn         string           `json:"_sid"`
-	Cn         string           `json:"_cn"`
-	ETag       string           `json:"_etag"`
-	Timestamp  int64            `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	Membership MembershipCosmos `json:"mx_roomserver_membership"`
 }
 
@@ -303,6 +297,7 @@ func (s *membershipStatements) InsertMembership(
 		exists.Membership.RoomNID = int64(roomNID)
 		exists.Membership.TargetNID = int64(targetUserNID)
 		exists.Membership.TargetLocal = localTarget
+		exists.SetUpdateTime()
 		_, errSet := setMembership(s, ctx, *exists)
 		return errSet
 	}
@@ -318,23 +313,18 @@ func (s *membershipStatements) InsertMembership(
 	}
 
 	var dbData = MembershipCosmosData{
-		Id:         cosmosDocId,
-		Tn:         s.db.cosmosConfig.TenantName,
-		Cn:         dbCollectionName,
-		Pk:         pk,
-		Timestamp:  time.Now().Unix(),
-		Membership: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Membership:     data,
 	}
 
 	// " ON CONFLICT DO NOTHING"
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
 	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
 		&dbData,
 		options)
-
 	return err
 }
 

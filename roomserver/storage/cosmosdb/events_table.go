@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -66,13 +65,8 @@ type EventCosmosMaxDepth struct {
 }
 
 type EventCosmosData struct {
-	Id        string      `json:"id"`
-	Pk        string      `json:"_pk"`
-	Tn        string      `json:"_sid"`
-	Cn        string      `json:"_cn"`
-	ETag      string      `json:"_etag"`
-	Timestamp int64       `json:"_ts"`
-	Event     EventCosmos `json:"mx_roomserver_event"`
+	cosmosdbapi.CosmosDocument
+	Event EventCosmos `json:"mx_roomserver_event"`
 }
 
 // const insertEventSQL = `
@@ -377,12 +371,8 @@ func (s *eventStatements) InsertEvent(
 		}
 
 		dbData = &EventCosmosData{
-			Id:        cosmosDocId,
-			Tn:        s.db.cosmosConfig.TenantName,
-			Cn:        dbCollectionName,
-			Pk:        pk,
-			Timestamp: time.Now().Unix(),
-			Event:     data,
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			Event:          data,
 		}
 	} else {
 		modified := !isEventSame(
@@ -410,17 +400,16 @@ func (s *eventStatements) InsertEvent(
 		dbData.Event.ReferenceSha256 = referenceSHA256
 		dbData.Event.RoomNID = int64(roomNID)
 
-		dbData.Timestamp = time.Now().Unix()
+		dbData.SetUpdateTime()
 	}
 
 	// ON CONFLICT DO NOTHING; - Do Upsert
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	err := cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
+		dbData.Pk,
+		dbData)
 
 	if err != nil {
 		return 0, 0, err

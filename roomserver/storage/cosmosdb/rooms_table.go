@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -42,13 +41,8 @@ import (
 // `
 
 type RoomCosmosData struct {
-	Id        string     `json:"id"`
-	Pk        string     `json:"_pk"`
-	Tn        string     `json:"_sid"`
-	Cn        string     `json:"_cn"`
-	ETag      string     `json:"_etag"`
-	Timestamp int64      `json:"_ts"`
-	Room      RoomCosmos `json:"mx_roomserver_room"`
+	cosmosdbapi.CosmosDocument
+	Room RoomCosmos `json:"mx_roomserver_room"`
 }
 
 type RoomCosmos struct {
@@ -273,23 +267,21 @@ func (s *roomStatements) InsertRoomNID(
 		}
 
 		dbData = &RoomCosmosData{
-			Id:        cosmosDocId,
-			Tn:        s.db.cosmosConfig.TenantName,
-			Cn:        dbCollectionName,
-			Pk:        pk,
-			Timestamp: time.Now().Unix(),
-			Room:      data,
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			Room:           data,
 		}
+	} else {
+		dbData.SetUpdateTime()
+		dbData.Room.RoomVersion = string(roomVersion)
 	}
 
 	// ON CONFLICT DO NOTHING; - Do Upsert
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	err = cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
+		dbData.Pk,
+		dbData)
 
 	if err != nil {
 		return 0, fmt.Errorf("s.SelectRoomNID: %w", err)

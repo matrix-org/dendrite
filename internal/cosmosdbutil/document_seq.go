@@ -8,13 +8,8 @@ import (
 )
 
 type SequenceCosmosData struct {
-	Id        string `json:"id"`
-	Pk        string `json:"_pk"`
-	Tn        string `json:"_sid"`
-	Cn        string `json:"_cn"`
-	ETag      string `json:"_etag"`
-	Timestamp int64  `json:"_ts"`
-	Value     int64  `json:"_value"`
+	cosmosdbapi.CosmosDocument
+	Value int64 `json:"_value"`
 }
 
 func GetNextSequence(
@@ -43,10 +38,7 @@ func GetNextSequence(
 
 	if dbData.Id == "" {
 		dbData = SequenceCosmosData{}
-		dbData.Id = cosmosDocId
-		dbData.Pk = pk
-		dbData.Tn = config.TenantName
-		dbData.Cn = dbCollectionName
+		dbData.CosmosDocument = cosmosdbapi.GenerateDocument(dbCollectionName, config.TenantName, pk, cosmosDocId)
 		dbData.Value = initial
 		var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
 		var _, _, err = cosmosdbapi.GetClient(connection).CreateDocument(

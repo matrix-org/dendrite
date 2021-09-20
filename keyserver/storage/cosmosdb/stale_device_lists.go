@@ -36,20 +36,14 @@ import (
 // `
 
 type StaleDeviceListCosmos struct {
-	UserID  string `json:"user_id"`
-	Domain  string `json:"domain"`
-	IsStale bool   `json:"is_stale"`
-	// Use the CosmosDB.Timestamp for this one
-	// ts_added_secs    int64  `json:"ts_added_secs"`
+	UserID    string `json:"user_id"`
+	Domain    string `json:"domain"`
+	IsStale   bool   `json:"is_stale"`
+	AddedSecs int64  `json:"ts_added_secs"`
 }
 
 type StaleDeviceListCosmosData struct {
-	Id              string                `json:"id"`
-	Pk              string                `json:"_pk"`
-	Tn              string                `json:"_sid"`
-	Cn              string                `json:"_cn"`
-	ETag            string                `json:"_etag"`
-	Timestamp       int64                 `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	StaleDeviceList StaleDeviceListCosmos `json:"mx_keyserver_stale_device_list"`
 }
 
@@ -76,6 +70,23 @@ type staleDeviceListsStatements struct {
 	selectStaleDeviceListsWithDomainsStmt string
 	selectStaleDeviceListsStmt            string
 	tableName                             string
+}
+
+func getStaleDeviceList(s *staleDeviceListsStatements, ctx context.Context, pk string, docId string) (*StaleDeviceListCosmosData, error) {
+	response := StaleDeviceListCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryStaleDeviceList(s *staleDeviceListsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]StaleDeviceListCosmosData, error) {
@@ -126,31 +137,30 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 	docId := userID
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
-	data := StaleDeviceListCosmos{
-		Domain:  string(domain),
-		IsStale: isStale,
-		UserID:  userID,
-	}
+	dbData, _ := getStaleDeviceList(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.StaleDeviceList.IsStale = isStale
+		dbData.StaleDeviceList.AddedSecs = time.Now().Unix()
+	} else {
+		data := StaleDeviceListCosmos{
+			Domain:  string(domain),
+			IsStale: isStale,
+			UserID:  userID,
+		}
 
-	dbData := StaleDeviceListCosmosData{
-		Id:              cosmosDocId,
-		Tn:              s.db.cosmosConfig.TenantName,
-		Cn:              dbCollectionName,
-		Pk:              pk,
-		Timestamp:       time.Now().Unix(),
-		StaleDeviceList: data,
+		dbData = &StaleDeviceListCosmosData{
+			CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			StaleDeviceList: data,
+		}
 	}
-
 	// _, err := s.upsertKeyChangeStmt.ExecContext(ctx, partition, offset, userID)
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {

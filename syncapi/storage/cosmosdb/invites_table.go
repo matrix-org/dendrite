@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -58,12 +57,7 @@ type InviteEventCosmosMaxNumber struct {
 }
 
 type InviteEventCosmosData struct {
-	Id          string            `json:"id"`
-	Pk          string            `json:"_pk"`
-	Tn          string            `json:"_sid"`
-	Cn          string            `json:"_cn"`
-	ETag        string            `json:"_etag"`
-	Timestamp   int64             `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	InviteEvent InviteEventCosmos `json:"mx_syncapi_invite_event"`
 }
 
@@ -228,12 +222,8 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	var dbData = InviteEventCosmosData{
-		Id:          cosmosDocId,
-		Tn:          s.db.cosmosConfig.TenantName,
-		Cn:          dbCollectionName,
-		Pk:          pk,
-		Timestamp:   time.Now().Unix(),
-		InviteEvent: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		InviteEvent:    data,
 	}
 
 	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

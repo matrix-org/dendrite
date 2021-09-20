@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -54,12 +53,7 @@ type StateBlockCosmosMaxNID struct {
 }
 
 type StateBlockCosmosData struct {
-	Id         string           `json:"id"`
-	Pk         string           `json:"_pk"`
-	Tn         string           `json:"_sid"`
-	Cn         string           `json:"_cn"`
-	ETag       string           `json:"_etag"`
-	Timestamp  int64            `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	StateBlock StateBlockCosmos `json:"mx_roomserver_state_block"`
 }
 
@@ -192,6 +186,7 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	if existing != nil {
 		//if exists, just update and dont create a new seq
 		existing.StateBlock.EventNIDs = ids
+		existing.SetUpdateTime()
 		_, err = setStateBlock(s, ctx, *existing)
 		if err != nil {
 			return 0, err
@@ -211,21 +206,16 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	}
 
 	var dbData = StateBlockCosmosData{
-		Id:         cosmosDocId,
-		Tn:         s.db.cosmosConfig.TenantName,
-		Cn:         dbCollectionName,
-		Pk:         pk,
-		Timestamp:  time.Now().Unix(),
-		StateBlock: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		StateBlock:     data,
 	}
 
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	err = cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
+		dbData.Pk,
+		dbData)
 
 	return
 }

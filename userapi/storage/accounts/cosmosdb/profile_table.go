@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -46,13 +45,8 @@ type ProfileCosmos struct {
 }
 
 type ProfileCosmosData struct {
-	Id        string        `json:"id"`
-	Pk        string        `json:"_pk"`
-	Tn        string        `json:"_sid"`
-	Cn        string        `json:"_cn"`
-	ETag      string        `json:"_etag"`
-	Timestamp int64         `json:"_ts"`
-	Profile   ProfileCosmos `json:"mx_userapi_profile"`
+	cosmosdbapi.CosmosDocument
+	Profile ProfileCosmos `json:"mx_userapi_profile"`
 }
 
 type profilesStatements struct {
@@ -155,12 +149,8 @@ func (s *profilesStatements) insertProfile(
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = ProfileCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Profile:   mapToProfile(*result),
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Profile:        mapToProfile(*result),
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

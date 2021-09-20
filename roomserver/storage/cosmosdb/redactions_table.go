@@ -17,7 +17,6 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -45,12 +44,7 @@ type RedactionCosmos struct {
 }
 
 type RedactionCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	Redaction RedactionCosmos `json:"mx_roomserver_redaction"`
 }
 
@@ -165,12 +159,8 @@ func (s *redactionStatements) InsertRedaction(
 	}
 
 	var dbData = RedactionCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Redaction: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Redaction:      data,
 	}
 
 	// "INSERT OR IGNORE INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +

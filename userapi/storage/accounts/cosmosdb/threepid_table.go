@@ -17,7 +17,6 @@ package cosmosdb
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 
@@ -44,13 +43,8 @@ type ThreePIDCosmos struct {
 }
 
 type ThreePIDCosmosData struct {
-	Id        string         `json:"id"`
-	Pk        string         `json:"_pk"`
-	Tn        string         `json:"_sid"`
-	Cn        string         `json:"_cn"`
-	ETag      string         `json:"_etag"`
-	Timestamp int64          `json:"_ts"`
-	ThreePID  ThreePIDCosmos `json:"mx_userapi_threepid"`
+	cosmosdbapi.CosmosDocument
+	ThreePID ThreePIDCosmos `json:"mx_userapi_threepid"`
 }
 
 type threepidStatements struct {
@@ -163,12 +157,8 @@ func (s *threepidStatements) insertThreePID(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	var dbData = ThreePIDCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		ThreePID:  result,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		ThreePID:       result,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

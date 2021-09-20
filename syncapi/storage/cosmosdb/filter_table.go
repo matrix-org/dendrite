@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -49,13 +48,8 @@ type FilterCosmos struct {
 }
 
 type FilterCosmosData struct {
-	Id        string       `json:"id"`
-	Pk        string       `json:"_pk"`
-	Tn        string       `json:"_sid"`
-	Cn        string       `json:"_cn"`
-	ETag      string       `json:"_etag"`
-	Timestamp int64        `json:"_ts"`
-	Filter    FilterCosmos `json:"mx_syncapi_filter"`
+	cosmosdbapi.CosmosDocument
+	Filter FilterCosmos `json:"mx_syncapi_filter"`
 }
 
 // const selectFilterSQL = "" +
@@ -235,12 +229,8 @@ func (s *filterStatements) InsertFilter(
 	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = FilterCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Filter:    data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Filter:         data,
 	}
 
 	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

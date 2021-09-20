@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -55,12 +54,7 @@ type DeviceKeyCosmosNumber struct {
 }
 
 type DeviceKeyCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	DeviceKey DeviceKeyCosmos `json:"mx_keyserver_device_key"`
 }
 
@@ -167,13 +161,26 @@ func getDeviceKey(s *deviceKeysStatements, ctx context.Context, pk string, docId
 }
 
 func insertDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData DeviceKeyCosmosData) error {
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	// "INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json, stream_id, display_name)" +
+	// " VALUES ($1, $2, $3, $4, $5, $6)" +
+	// " ON CONFLICT (user_id, device_id)" +
+	// " DO UPDATE SET key_json = $4, stream_id = $5, display_name = $6"
+	existing, _ := getDeviceKey(s, ctx, dbData.Pk, dbData.Id)
+	if existing != nil {
+		existing.SetUpdateTime()
+		existing.DeviceKey.KeyJSON = dbData.DeviceKey.KeyJSON
+		existing.DeviceKey.StreamID = dbData.DeviceKey.StreamID
+		existing.DeviceKey.DisplayName = dbData.DeviceKey.DisplayName
+	} else {
+		existing = &dbData
+	}
+
+	err := cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		dbData,
-		options)
+		existing.Pk,
+		existing)
 
 	if err != nil {
 		return err
@@ -445,18 +452,13 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	for _, key := range keys {
-		now := time.Now().Unix()
 		//     UNIQUE (user_id, device_id)
 		docId := fmt.Sprintf("%s_%s", key.UserID, key.DeviceID)
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 		dbData := &DeviceKeyCosmosData{
-			Id:        cosmosDocId,
-			Tn:        s.db.cosmosConfig.TenantName,
-			Cn:        dbCollectionName,
-			Pk:        pk,
-			Timestamp: now,
-			DeviceKey: mapFromDeviceKeyMessage(key),
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			DeviceKey:      mapFromDeviceKeyMessage(key),
 		}
 
 		err := insertDeviceKeyCore(s, ctx, *dbData)

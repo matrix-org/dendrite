@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 
@@ -38,12 +37,7 @@ type BlacklistCosmos struct {
 }
 
 type BlacklistCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	Blacklist BlacklistCosmos `json:"mx_federationsender_blacklist"`
 }
 
@@ -149,30 +143,28 @@ func (s *blacklistStatements) InsertBlacklist(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := BlacklistCosmos{
-		ServerName: string(serverName),
-	}
+	dbData, _ := getBlacklist(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+	} else {
+		data := BlacklistCosmos{
+			ServerName: string(serverName),
+		}
 
-	dbData := &BlacklistCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Blacklist: data,
+		dbData = &BlacklistCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			Blacklist:      data,
+		}
 	}
 
 	// _, err := stmt.ExecContext(ctx, serverName)
 
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		&dbData)
 }
 
 // selectRoomForUpdate locks the row for the room and returns the last_event_id.

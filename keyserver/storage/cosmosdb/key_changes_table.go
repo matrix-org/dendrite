@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
@@ -48,12 +47,7 @@ type KeyChangeUserMaxCosmosData struct {
 }
 
 type KeyChangeCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	KeyChange KeyChangeCosmos `json:"mx_keyserver_key_change"`
 }
 
@@ -82,6 +76,23 @@ type keyChangesStatements struct {
 	// upsertKeyChangeStmt  *sql.Stmt
 	selectKeyChangesStmt string
 	tableName            string
+}
+
+func getKeyChangeUser(s *keyChangesStatements, ctx context.Context, pk string, docId string) (*KeyChangeCosmosData, error) {
+	response := KeyChangeCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryKeyChangeUserMax(s *keyChangesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]KeyChangeUserMaxCosmosData, error) {
@@ -127,31 +138,30 @@ func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, partition in
 	docId := fmt.Sprintf("%d_%d", partition, offset)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
-	data := KeyChangeCosmos{
-		Offset:    offset,
-		Partition: partition,
-		UserID:    userID,
-	}
+	dbData, _ := getKeyChangeUser(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.KeyChange.UserID = userID
+	} else {
+		data := KeyChangeCosmos{
+			Offset:    offset,
+			Partition: partition,
+			UserID:    userID,
+		}
 
-	dbData := KeyChangeCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		KeyChange: data,
+		dbData = &KeyChangeCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			KeyChange:      data,
+		}
 	}
 
 	// _, err := s.upsertKeyChangeStmt.ExecContext(ctx, partition, offset, userID)
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func (s *keyChangesStatements) SelectKeyChanges(

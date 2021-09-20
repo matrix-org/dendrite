@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -66,12 +65,7 @@ type CurrentRoomStateCosmos struct {
 }
 
 type CurrentRoomStateCosmosData struct {
-	Id               string                 `json:"id"`
-	Pk               string                 `json:"_pk"`
-	Tn               string                 `json:"_sid"`
-	Cn               string                 `json:"_cn"`
-	ETag             string                 `json:"_etag"`
-	Timestamp        int64                  `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	CurrentRoomState CurrentRoomStateCosmos `json:"mx_syncapi_current_room_state"`
 }
 
@@ -424,37 +418,42 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		membershipData = *membership
 	}
 
-	data := CurrentRoomStateCosmos{
-		RoomID:            event.RoomID(),
-		EventID:           event.EventID(),
-		Type:              event.Type(),
-		Sender:            event.Sender(),
-		ContainsUrl:       containsURL,
-		StateKey:          *event.StateKey(),
-		HeaderedEventJSON: headeredJSON,
-		Membership:        membershipData,
-		AddedAt:           int64(addedAt),
-	}
+	dbData, _ := getEvent(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		// " DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
+		dbData.SetUpdateTime()
+		dbData.CurrentRoomState.EventID = event.EventID()
+		dbData.CurrentRoomState.Sender = event.Sender()
+		dbData.CurrentRoomState.ContainsUrl = containsURL
+		dbData.CurrentRoomState.HeaderedEventJSON = headeredJSON
+		dbData.CurrentRoomState.Membership = membershipData
+		dbData.CurrentRoomState.AddedAt = int64(addedAt)
+	} else {
+		data := CurrentRoomStateCosmos{
+			RoomID:            event.RoomID(),
+			EventID:           event.EventID(),
+			Type:              event.Type(),
+			Sender:            event.Sender(),
+			ContainsUrl:       containsURL,
+			StateKey:          *event.StateKey(),
+			HeaderedEventJSON: headeredJSON,
+			Membership:        membershipData,
+			AddedAt:           int64(addedAt),
+		}
 
-	dbData := &CurrentRoomStateCosmosData{
-		Id:               cosmosDocId,
-		Tn:               s.db.cosmosConfig.TenantName,
-		Cn:               dbCollectionName,
-		Pk:               pk,
-		Timestamp:        time.Now().Unix(),
-		CurrentRoomState: data,
+		dbData = &CurrentRoomStateCosmosData{
+			CosmosDocument:   cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			CurrentRoomState: data,
+		}
 	}
 
 	// _, err = sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, pos, userID, roomID, dataType, pos)
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func minOfInts(a, b int) int {

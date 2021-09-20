@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 
@@ -54,12 +53,7 @@ type PartitionOffsetCosmos struct {
 }
 
 type PartitionOffsetCosmosData struct {
-	Id              string                `json:"id"`
-	Pk              string                `json:"_pk"`
-	Tn              string                `json:"_sid"`
-	Cn              string                `json:"_cn"`
-	ETag            string                `json:"_etag"`
-	Timestamp       int64                 `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	PartitionOffset PartitionOffsetCosmos `json:"mx_partition_offset"`
 }
 
@@ -88,6 +82,23 @@ type PartitionOffsetStatements struct {
 	// upsertPartitionOffsetStmt  *sql.Stmt
 	prefix    string
 	tableName string
+}
+
+func getPartitionOffset(s *PartitionOffsetStatements, ctx context.Context, pk string, docId string) (*PartitionOffsetCosmosData, error) {
+	response := PartitionOffsetCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.Connection,
+		s.db.CosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryPartitionOffset(s *PartitionOffsetStatements, ctx context.Context, qry string, params map[string]interface{}) ([]PartitionOffsetCosmosData, error) {
@@ -192,33 +203,32 @@ func (s *PartitionOffsetStatements) upsertPartitionOffset(
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.CosmosConfig.TenantName, dbCollectionName, docId)
 		pk := cosmosdbapi.GetPartitionKey(s.db.CosmosConfig.ContainerName, dbCollectionName)
 
-		data := PartitionOffsetCosmos{
-			Partition:       partition,
-			PartitionOffset: offset,
-			Topic:           topic,
-		}
+		dbData, _ := getPartitionOffset(s, ctx, pk, cosmosDocId)
+		if dbData != nil {
+			dbData.SetUpdateTime()
+			dbData.PartitionOffset.PartitionOffset = offset
+		} else {
+			data := PartitionOffsetCosmos{
+				Partition:       partition,
+				PartitionOffset: offset,
+				Topic:           topic,
+			}
 
-		dbData := &PartitionOffsetCosmosData{
-			Id: cosmosDocId,
-			Tn: s.db.CosmosConfig.TenantName,
-			Cn: dbCollectionName,
-			Pk: pk,
-			// nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-			Timestamp:       time.Now().Unix(),
-			PartitionOffset: data,
+			dbData = &PartitionOffsetCosmosData{
+				CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.CosmosConfig.TenantName, pk, cosmosDocId),
+				PartitionOffset: data,
+			}
+
 		}
 
 		// _, err := stmt.ExecContext(ctx, topic, partition, offset)
 
-		var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-		_, _, err := cosmosdbapi.GetClient(s.db.Connection).CreateDocument(
-			ctx,
+		return cosmosdbapi.UpsertDocument(ctx,
+			s.db.Connection,
 			s.db.CosmosConfig.DatabaseName,
 			s.db.CosmosConfig.ContainerName,
-			&dbData,
-			options)
-
-		return err
+			dbData.Pk,
+			&dbData)
 	})
 }
 

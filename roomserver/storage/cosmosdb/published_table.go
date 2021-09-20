@@ -17,7 +17,6 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -41,13 +40,8 @@ type PublishCosmos struct {
 }
 
 type PublishCosmosData struct {
-	Id        string        `json:"id"`
-	Pk        string        `json:"_pk"`
-	Tn        string        `json:"_sid"`
-	Cn        string        `json:"_cn"`
-	ETag      string        `json:"_etag"`
-	Timestamp int64         `json:"_ts"`
-	Publish   PublishCosmos `json:"mx_roomserver_publish"`
+	cosmosdbapi.CosmosDocument
+	Publish PublishCosmos `json:"mx_roomserver_publish"`
 }
 
 // const upsertPublishedSQL = "" +
@@ -137,30 +131,29 @@ func (s *publishedStatements) UpsertRoomPublished(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := PublishCosmos{
-		RoomID:    roomID,
-		Published: false,
-	}
+	dbData, _ := getPublish(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.Publish.Published = published
+	} else {
+		data := PublishCosmos{
+			RoomID:    roomID,
+			Published: false,
+		}
 
-	var dbData = PublishCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Publish:   data,
+		dbData = &PublishCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			Publish:        data,
+		}
 	}
 
 	// 	"INSERT OR REPLACE INTO roomserver_published (room_id, published) VALUES ($1, $2)"
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func (s *publishedStatements) SelectPublishedFromRoomID(

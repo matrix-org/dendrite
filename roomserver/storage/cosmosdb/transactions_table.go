@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -44,12 +43,7 @@ type TransactionCosmos struct {
 }
 
 type TransactionCosmosData struct {
-	Id          string            `json:"id"`
-	Pk          string            `json:"_pk"`
-	Tn          string            `json:"_sid"`
-	Cn          string            `json:"_cn"`
-	ETag        string            `json:"_etag"`
-	Timestamp   int64             `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	Transaction TransactionCosmos `json:"mx_roomserver_transaction"`
 }
 
@@ -124,12 +118,8 @@ func (s *transactionStatements) InsertTransaction(
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = TransactionCosmosData{
-		Id:          cosmosDocId,
-		Tn:          s.db.cosmosConfig.TenantName,
-		Cn:          dbCollectionName,
-		Pk:          pk,
-		Timestamp:   time.Now().Unix(),
-		Transaction: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Transaction:    data,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

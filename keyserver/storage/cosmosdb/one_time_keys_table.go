@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -59,12 +58,7 @@ type OneTimeKeyAlgoNumberCosmosData struct {
 }
 
 type OneTimeKeyCosmosData struct {
-	Id         string           `json:"id"`
-	Pk         string           `json:"_pk"`
-	Tn         string           `json:"_sid"`
-	Cn         string           `json:"_cn"`
-	ETag       string           `json:"_etag"`
-	Timestamp  int64            `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	OneTimeKey OneTimeKeyCosmos `json:"mx_keyserver_one_time_key"`
 }
 
@@ -106,6 +100,23 @@ type oneTimeKeysStatements struct {
 	selectKeyByAlgorithmStmt string
 	// deleteOneTimeKeyStmt     *sql.Stmt
 	tableName string
+}
+
+func getOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, pk string, docId string) (*OneTimeKeyCosmosData, error) {
+	response := OneTimeKeyCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OneTimeKeyCosmosData, error) {
@@ -155,13 +166,23 @@ func queryOneTimeKeyAlgoCount(s *oneTimeKeysStatements, ctx context.Context, qry
 }
 
 func insertOneTimeKeyCore(s *oneTimeKeysStatements, ctx context.Context, dbData OneTimeKeyCosmosData) error {
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	// "INSERT INTO keyserver_one_time_keys (user_id, device_id, key_id, algorithm, ts_added_secs, key_json)" +
+	// " VALUES ($1, $2, $3, $4, $5, $6)" +
+	// " ON CONFLICT (user_id, device_id, key_id, algorithm)" +
+	// " DO UPDATE SET key_json = $6"
+	existing, _ := getOneTimeKey(s, ctx, dbData.Pk, dbData.Id)
+	if existing != nil {
+		existing.SetUpdateTime()
+		existing.OneTimeKey.KeyJSON = dbData.OneTimeKey.KeyJSON
+	} else {
+		existing = &dbData
+	}
+	err := cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		dbData,
-		options)
+		existing.Pk,
+		existing)
 
 	if err != nil {
 		return err
@@ -266,7 +287,6 @@ func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, de
 func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 	ctx context.Context, txn *sql.Tx, keys api.OneTimeKeys,
 ) (*api.OneTimeKeysCount, error) {
-	now := time.Now().Unix()
 	counts := &api.OneTimeKeysCount{
 		DeviceID: keys.DeviceID,
 		UserID:   keys.UserID,
@@ -298,12 +318,8 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 		}
 
 		dbData := &OneTimeKeyCosmosData{
-			Id:         cosmosDocId,
-			Tn:         s.db.cosmosConfig.TenantName,
-			Cn:         dbCollectionName,
-			Pk:         pk,
-			Timestamp:  now,
-			OneTimeKey: data,
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			OneTimeKey:     data,
 		}
 
 		err := insertOneTimeKeyCore(s, ctx, *dbData)

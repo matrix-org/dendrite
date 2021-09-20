@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
@@ -42,12 +41,7 @@ type CrossSigningKeysCosmos struct {
 }
 
 type CrossSigningKeysCosmosData struct {
-	Id               string                 `json:"id"`
-	Pk               string                 `json:"_pk"`
-	Tn               string                 `json:"_sid"`
-	Cn               string                 `json:"_cn"`
-	ETag             string                 `json:"_etag"`
-	Timestamp        int64                  `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	CrossSigningKeys CrossSigningKeysCosmos `json:"mx_keyserver_cross_signing_keys"`
 }
 
@@ -66,6 +60,23 @@ type crossSigningKeysStatements struct {
 	selectCrossSigningKeysForUserStmt string
 	// upsertCrossSigningKeysForUserStmt *sql.Stmt
 	tableName string
+}
+
+func getCrossSigningKeys(s *crossSigningKeysStatements, ctx context.Context, pk string, docId string) (*CrossSigningKeysCosmosData, error) {
+	response := CrossSigningKeysCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryCrossSigningKeys(s *crossSigningKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]CrossSigningKeysCosmosData, error) {
@@ -149,31 +160,29 @@ func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 	docId := fmt.Sprintf("%s_%s", userID, keyType)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
-	data := CrossSigningKeysCosmos{
-		UserID:  userID,
-		KeyType: int64(keyTypeInt),
-		KeyData: keyData,
-	}
+	dbData, _ := getCrossSigningKeys(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.CrossSigningKeys.KeyData = keyData
+	} else {
+		data := CrossSigningKeysCosmos{
+			UserID:  userID,
+			KeyType: int64(keyTypeInt),
+			KeyData: keyData,
+		}
 
-	dbData := CrossSigningKeysCosmosData{
-		Id:               cosmosDocId,
-		Tn:               s.db.cosmosConfig.TenantName,
-		Cn:               dbCollectionName,
-		Pk:               pk,
-		Timestamp:        time.Now().Unix(),
-		CrossSigningKeys: data,
+		dbData = &CrossSigningKeysCosmosData{
+			CosmosDocument:   cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			CrossSigningKeys: data,
+		}
 	}
-
 	// if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningKeysForUserStmt).ExecContext(ctx, userID, keyTypeInt, keyData); err != nil {
 	// 	return fmt.Errorf("s.upsertCrossSigningKeysForUserStmt: %w", err)
 	// }
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }

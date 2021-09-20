@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -53,12 +52,7 @@ type SendToDeviceCosmosMaxNumber struct {
 }
 
 type SendToDeviceCosmosData struct {
-	Id           string             `json:"id"`
-	Pk           string             `json:"_pk"`
-	Tn           string             `json:"_sid"`
-	Cn           string             `json:"_cn"`
-	ETag         string             `json:"_etag"`
-	Timestamp    int64              `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	SendToDevice SendToDeviceCosmos `json:"mx_syncapi_send_to_device"`
 }
 
@@ -200,12 +194,8 @@ func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	var dbData = SendToDeviceCosmosData{
-		Id:           cosmosDocId,
-		Tn:           s.db.cosmosConfig.TenantName,
-		Cn:           dbCollectionName,
-		Pk:           pk,
-		Timestamp:    time.Now().Unix(),
-		SendToDevice: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		SendToDevice:   data,
 	}
 
 	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

@@ -48,12 +48,7 @@ type InboundPeekCosmos struct {
 }
 
 type InboundPeekCosmosData struct {
-	Id          string             `json:"id"`
-	Pk          string             `json:"_pk"`
-	Tn          string             `json:"_sid"`
-	Cn          string             `json:"_cn"`
-	ETag        string             `json:"_etag"`
-	Timestamp   int64              `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	InboundPeek InboundPeekCosmos `json:"mx_federationsender_inbound_peek"`
 }
 
@@ -183,33 +178,35 @@ func (s *inboundPeeksStatements) InsertInboundPeek(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := InboundPeekCosmos{
-		RoomID:            roomID,
-		ServerName:        string(serverName),
-		PeekID:            peekID,
-		CreationTimestamp: nowMilli,
-		RenewedTimestamp:  nowMilli,
-		RenewalInterval:   renewalInterval,
-	}
+	dbData, _ := getInboundPeek(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.InboundPeek.RenewedTimestamp = nowMilli
+		dbData.InboundPeek.RenewalInterval = renewalInterval
+	} else {
+		data := InboundPeekCosmos{
+			RoomID:            roomID,
+			ServerName:        string(serverName),
+			PeekID:            peekID,
+			CreationTimestamp: nowMilli,
+			RenewedTimestamp:  nowMilli,
+			RenewalInterval:   renewalInterval,
+		}
 
-	dbData := &InboundPeekCosmosData{
-		Id:          cosmosDocId,
-		Tn:          s.db.cosmosConfig.TenantName,
-		Cn:          dbCollectionName,
-		Pk:          pk,
-		Timestamp:   time.Now().Unix(),
-		InboundPeek: data,
+		dbData = &InboundPeekCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			InboundPeek:    data,
+		}
 	}
 
 	// _, err = stmt.ExecContext(ctx, roomID, serverName, peekID, nowMilli, nowMilli, renewalInterval)
 
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	err = cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
+		dbData.Pk,
+		&dbData)
 
 	return
 }

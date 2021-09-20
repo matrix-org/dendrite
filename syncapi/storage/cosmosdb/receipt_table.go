@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
@@ -56,13 +55,8 @@ type ReceiptCosmosMaxNumber struct {
 }
 
 type ReceiptCosmosData struct {
-	Id        string        `json:"id"`
-	Pk        string        `json:"_pk"`
-	Tn        string        `json:"_sid"`
-	Cn        string        `json:"_cn"`
-	ETag      string        `json:"_etag"`
-	Timestamp int64         `json:"_ts"`
-	Receipt   ReceiptCosmos `json:"mx_syncapi_receipt"`
+	cosmosdbapi.CosmosDocument
+	Receipt ReceiptCosmos `json:"mx_syncapi_receipt"`
 }
 
 // const upsertReceipt = "" +
@@ -174,12 +168,8 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 	cosmosDocId := cosmosdbapi.GetDocumentId(r.db.cosmosConfig.ContainerName, dbCollectionName, docId)
 
 	var dbData = ReceiptCosmosData{
-		Id:        cosmosDocId,
-		Tn:        r.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Receipt:   data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, r.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Receipt:        data,
 	}
 
 	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

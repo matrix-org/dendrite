@@ -66,12 +66,7 @@ type MediaRepositoryCosmos struct {
 }
 
 type MediaRepositoryCosmosData struct {
-	Id              string                `json:"id"`
-	Pk              string                `json:"_pk"`
-	Tn              string                `json:"_sid"`
-	Cn              string                `json:"_cn"`
-	ETag            string                `json:"_etag"`
-	Timestamp       int64                 `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	MediaRepository MediaRepositoryCosmos `json:"mx_mediaapi_media_repository"`
 }
 
@@ -173,11 +168,7 @@ func (s *mediaStatements) insertMedia(
 	}
 
 	dbData := &MediaRepositoryCosmosData{
-		Id:              cosmosDocId,
-		Tn:              s.db.cosmosConfig.TenantName,
-		Cn:              dbCollectionName,
-		Pk:              pk,
-		Timestamp:       time.Now().Unix(),
+		CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
 		MediaRepository: data,
 	}
 

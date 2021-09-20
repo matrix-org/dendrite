@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 
@@ -40,12 +39,7 @@ type EventJSONCosmos struct {
 }
 
 type EventJSONCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	EventJSON EventJSONCosmos `json:"mx_roomserver_event_json"`
 }
 
@@ -69,6 +63,23 @@ type eventJSONStatements struct {
 	// insertEventJSONStmt     *sql.Stmt
 	bulkSelectEventJSONStmt string
 	tableName               string
+}
+
+func getEventJSON(s *eventJSONStatements, ctx context.Context, pk string, docId string) (*EventJSONCosmosData, error) {
+	response := EventJSONCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryEventJSON(s *eventJSONStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventJSONCosmosData, error) {
@@ -121,30 +132,29 @@ func (s *eventJSONStatements) InsertEventJSON(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := EventJSONCosmos{
-		EventNID:  int64(eventNID),
-		EventJSON: eventJSON,
-	}
+	dbData, _ := getEventJSON(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.EventJSON.EventJSON = eventJSON
+	} else {
+		data := EventJSONCosmos{
+			EventNID:  int64(eventNID),
+			EventJSON: eventJSON,
+		}
 
-	var dbData = EventJSONCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		EventJSON: data,
+		dbData = &EventJSONCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			EventJSON:      data,
+		}
 	}
 
 	//Insert OR Replace
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func (s *eventJSONStatements) BulkSelectEventJSON(

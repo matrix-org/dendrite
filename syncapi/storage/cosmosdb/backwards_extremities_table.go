@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 
@@ -45,12 +44,7 @@ type BackwardExtremityCosmos struct {
 }
 
 type BackwardExtremityCosmosData struct {
-	Id                string                  `json:"id"`
-	Pk                string                  `json:"_pk"`
-	Tn                string                  `json:"_sid"`
-	Cn                string                  `json:"_cn"`
-	ETag              string                  `json:"_etag"`
-	Timestamp         int64                   `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	BackwardExtremity BackwardExtremityCosmos `json:"mx_syncapi_backward_extremity"`
 }
 
@@ -82,6 +76,23 @@ type backwardExtremitiesStatements struct {
 	deleteBackwardExtremityStmt          string
 	deleteBackwardExtremitiesForRoomStmt string
 	tableName                            string
+}
+
+func getBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, pk string, docId string) (*BackwardExtremityCosmosData, error) {
+	response := BackwardExtremityCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]BackwardExtremityCosmosData, error) {
@@ -147,28 +158,28 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := BackwardExtremityCosmos{
-		EventID:     eventID,
-		PrevEventID: prevEventID,
-		RoomID:      roomID,
+	dbData, _ := getBackwardExtremity(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+	} else {
+		data := BackwardExtremityCosmos{
+			EventID:     eventID,
+			PrevEventID: prevEventID,
+			RoomID:      roomID,
+		}
+
+		dbData = &BackwardExtremityCosmosData{
+			CosmosDocument:    cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			BackwardExtremity: data,
+		}
 	}
 
-	dbData := &BackwardExtremityCosmosData{
-		Id:                cosmosDocId,
-		Tn:                s.db.cosmosConfig.TenantName,
-		Cn:                dbCollectionName,
-		Pk:                pk,
-		Timestamp:         time.Now().Unix(),
-		BackwardExtremity: data,
-	}
-
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	err = cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
+		dbData.Pk,
+		dbData)
 
 	return
 }

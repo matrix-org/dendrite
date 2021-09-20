@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 
@@ -62,12 +61,7 @@ type MembershipCosmos struct {
 }
 
 type MembershipCosmosData struct {
-	Id         string           `json:"id"`
-	Pk         string           `json:"_pk"`
-	Tn         string           `json:"_sid"`
-	Cn         string           `json:"_cn"`
-	ETag       string           `json:"_etag"`
-	Timestamp  int64            `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	Membership MembershipCosmos `json:"mx_syncapi_membership"`
 }
 
@@ -92,6 +86,23 @@ type membershipsStatements struct {
 	db *SyncServerDatasource
 	// upsertMembershipStmt *sql.Stmt
 	tableName string
+}
+
+func getMembership(s *membershipsStatements, ctx context.Context, pk string, docId string) (*MembershipCosmosData, error) {
+	response := MembershipCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryMembership(s *membershipsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]MembershipCosmosData, error) {
@@ -147,39 +158,41 @@ func (s *membershipsStatements) UpsertMembership(
 	// 	topologicalPos,
 	// )
 
-	data := MembershipCosmos{
-		RoomID:         event.RoomID(),
-		UserID:         *event.StateKey(),
-		Membership:     membership,
-		EventID:        event.EventID(),
-		StreamPos:      int64(streamPos),
-		TopologicalPos: int64(topologicalPos),
-	}
-
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// 	UNIQUE (room_id, user_id, membership)
 	docId := fmt.Sprintf("%s_%s_%s", event.RoomID(), *event.StateKey(), membership)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
-	var dbData = MembershipCosmosData{
-		Id:         cosmosDocId,
-		Tn:         s.db.cosmosConfig.TenantName,
-		Cn:         dbCollectionName,
-		Pk:         pk,
-		Timestamp:  time.Now().Unix(),
-		Membership: data,
+	dbData, _ := getMembership(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		// " DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6"
+		dbData.SetUpdateTime()
+		dbData.Membership.EventID = event.EventID()
+		dbData.Membership.StreamPos = int64(streamPos)
+		dbData.Membership.TopologicalPos = int64(topologicalPos)
+	} else {
+		data := MembershipCosmos{
+			RoomID:         event.RoomID(),
+			UserID:         *event.StateKey(),
+			Membership:     membership,
+			EventID:        event.EventID(),
+			StreamPos:      int64(streamPos),
+			TopologicalPos: int64(topologicalPos),
+		}
+
+		dbData = &MembershipCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			Membership:     data,
+		}
 	}
 
-	var optionsCreate = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		dbData,
-		optionsCreate)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func (s *membershipsStatements) SelectMembership(

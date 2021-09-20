@@ -18,7 +18,6 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -44,12 +43,7 @@ type EventStateKeysCosmos struct {
 }
 
 type EventStateKeysCosmosData struct {
-	Id             string               `json:"id"`
-	Pk             string               `json:"_pk"`
-	Tn             string               `json:"_sid"`
-	Cn             string               `json:"_cn"`
-	ETag           string               `json:"_etag"`
-	Timestamp      int64                `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	EventStateKeys EventStateKeysCosmos `json:"mx_roomserver_event_state_keys"`
 }
 
@@ -163,11 +157,7 @@ func ensureEventStateKeys(s *eventStateKeyStatements, ctx context.Context) {
 
 	//     event_state_key_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 	dbData := EventStateKeysCosmosData{
-		Id:             cosmosDocId,
-		Tn:             s.db.cosmosConfig.TenantName,
-		Cn:             dbCollectionName,
-		Pk:             pk,
-		Timestamp:      time.Now().Unix(),
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
 		EventStateKeys: data,
 	}
 
@@ -175,13 +165,12 @@ func ensureEventStateKeys(s *eventStateKeyStatements, ctx context.Context) {
 }
 
 func insertEventStateKeyCore(s *eventStateKeyStatements, ctx context.Context, dbData EventStateKeysCosmosData) error {
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	err := cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		dbData,
-		options)
+		dbData.Pk,
+		dbData)
 
 	if err != nil {
 		return err
@@ -223,14 +212,11 @@ func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 
 		//     event_state_key_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 		dbData = EventStateKeysCosmosData{
-			Id:             cosmosDocId,
-			Tn:             s.db.cosmosConfig.TenantName,
-			Cn:             dbCollectionName,
-			Pk:             pk,
-			Timestamp:      time.Now().Unix(),
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
 			EventStateKeys: data,
 		}
 	} else {
+		dbData.SetUpdateTime()
 		dbData.EventStateKeys = existing.EventStateKeys
 	}
 

@@ -11,7 +11,7 @@ func GetCreateDocumentOptions(pk string) cosmosapi.CreateDocumentOptions {
 	}
 }
 
-func GetUpsertDocumentOptions(pk string) cosmosapi.CreateDocumentOptions {
+func getUpsertDocumentOptions(pk string) cosmosapi.CreateDocumentOptions {
 	return cosmosapi.CreateDocumentOptions{
 		IsUpsert:          true,
 		PartitionKeyValue: pk,

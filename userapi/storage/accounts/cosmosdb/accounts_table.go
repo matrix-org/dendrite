@@ -57,13 +57,8 @@ type AccountCosmos struct {
 }
 
 type AccountCosmosData struct {
-	Id        string        `json:"id"`
-	Pk        string        `json:"_pk"`
-	Tn        string        `json:"_sid"`
-	Cn        string        `json:"_cn"`
-	ETag      string        `json:"_etag"`
-	Timestamp int64         `json:"_ts"`
-	Account   AccountCosmos `json:"mx_userapi_account"`
+	cosmosdbapi.CosmosDocument
+	Account AccountCosmos `json:"mx_userapi_account"`
 }
 
 type AccountCosmosUserCount struct {
@@ -187,12 +182,8 @@ func (s *accountsStatements) insertAccount(
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = AccountCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Account:   data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Account:        data,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

@@ -18,7 +18,6 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -44,12 +43,7 @@ import (
 // `
 
 type EventTypeCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	EventType EventTypeCosmos `json:"mx_roomserver_event_type"`
 }
 
@@ -172,12 +166,8 @@ func insertEventTypeCore(s *eventTypeStatements, ctx context.Context, eventType 
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = EventTypeCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		EventType: eventType,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		EventType:      eventType,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

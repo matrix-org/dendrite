@@ -57,13 +57,8 @@ type EventNumberCosmosData struct {
 }
 
 type EventCosmosData struct {
-	Id        string      `json:"id"`
-	Pk        string      `json:"_pk"`
-	Tn        string      `json:"_sid"`
-	Cn        string      `json:"_cn"`
-	ETag      string      `json:"_etag"`
-	Timestamp int64       `json:"_ts"`
-	Event     EventCosmos `json:"mx_appservice_event"`
+	cosmosdbapi.CosmosDocument
+	Event EventCosmos `json:"mx_appservice_event"`
 }
 
 // "SELECT id, headered_event_json, txn_id " +
@@ -164,6 +159,23 @@ func queryEventEventNumber(s *eventsStatements, ctx context.Context, qry string,
 		return nil, err
 	}
 	return response, nil
+}
+
+func getEvent(s *eventsStatements, ctx context.Context, pk string, docId string) (*EventCosmosData, error) {
+	response := EventCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func setEvent(s *eventsStatements, ctx context.Context, event EventCosmosData) (*EventCosmosData, error) {
@@ -338,46 +350,45 @@ func (s *eventsStatements) insertEvent(
 	// "INSERT INTO appservice_events(as_id, headered_event_json, txn_id) " +
 	// "VALUES ($1, $2, $3)"
 
-	// 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	idSeq, seqErr := GetNextEventID(s, ctx)
-	if seqErr != nil {
-		return seqErr
-	}
-
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	docId := fmt.Sprintf("%d", idSeq)
+	docId := fmt.Sprintf("%s", appServiceID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	// appServiceID,
-	// eventJSON,
-	// -1, // No transaction ID yet
-	data := EventCosmos{
-		AppServiceID:      appServiceID,
-		HeaderedEventJSON: eventJSON,
-		ID:                idSeq,
-		TXNID:             -1,
+	dbData, err := getEvent(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.Event.HeaderedEventJSON = eventJSON
+	} else {
+		// 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+		idSeq, seqErr := GetNextEventID(s, ctx)
+		if seqErr != nil {
+			return seqErr
+		}
+
+		// appServiceID,
+		// eventJSON,
+		// -1, // No transaction ID yet
+		data := EventCosmos{
+			AppServiceID:      appServiceID,
+			HeaderedEventJSON: eventJSON,
+			ID:                idSeq,
+			TXNID:             -1,
+		}
+
+		dbData = &EventCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			Event:          data,
+		}
+
 	}
 
-	dbData := &EventCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Event:     data,
-	}
-
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return err
-
+		dbData.Pk,
+		&dbData)
 }
 
 // updateTxnIDForEvents sets the transactionID for a collection of events. Done

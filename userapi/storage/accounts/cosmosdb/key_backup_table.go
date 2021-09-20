@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -42,12 +41,7 @@ import (
 // `
 
 type KeyBackupCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	KeyBackup KeyBackupCosmos `json:"mx_userapi_account_e2e_room_keys"`
 }
 
@@ -252,12 +246,8 @@ func (s *keyBackupStatements) insertBackupKey(
 	}
 
 	dbData := &KeyBackupCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		KeyBackup: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		KeyBackup:      data,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

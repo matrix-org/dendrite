@@ -2,7 +2,6 @@ package cosmosdb
 
 import (
 	"context"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 
@@ -30,12 +29,7 @@ type OpenIDTokenCosmos struct {
 }
 
 type OpenIdTokenCosmosData struct {
-	Id          string            `json:"id"`
-	Pk          string            `json:"_pk"`
-	Tn          string            `json:"_sid"`
-	Cn          string            `json:"_cn"`
-	ETag        string            `json:"_etag"`
-	Timestamp   int64             `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	OpenIdToken OpenIDTokenCosmos `json:"mx_userapi_openidtoken"`
 }
 
@@ -114,12 +108,8 @@ func (s *tokenStatements) insertToken(
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = OpenIdTokenCosmosData{
-		Id:          cosmosDocId,
-		Tn:          s.db.cosmosConfig.TenantName,
-		Cn:          dbCollectionName,
-		Pk:          pk,
-		Timestamp:   time.Now().Unix(),
-		OpenIdToken: mapToToken(*result),
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		OpenIdToken:    mapToToken(*result),
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

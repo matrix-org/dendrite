@@ -18,7 +18,6 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -51,13 +50,8 @@ type InviteCosmos struct {
 }
 
 type InviteCosmosData struct {
-	Id        string       `json:"id"`
-	Pk        string       `json:"_pk"`
-	Tn        string       `json:"_sid"`
-	Cn        string       `json:"_cn"`
-	ETag      string       `json:"_etag"`
-	Timestamp int64        `json:"_ts"`
-	Invite    InviteCosmos `json:"mx_roomserver_invite"`
+	cosmosdbapi.CosmosDocument
+	Invite InviteCosmos `json:"mx_roomserver_invite"`
 }
 
 // const insertInviteEventSQL = "" +
@@ -191,12 +185,8 @@ func (s *inviteStatements) InsertInviteEvent(
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = InviteCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Invite:    data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Invite:         data,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

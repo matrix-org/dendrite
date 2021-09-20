@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -48,12 +47,7 @@ type OutputRoomEventTopologyCosmos struct {
 }
 
 type OutputRoomEventTopologyCosmosData struct {
-	Id                      string                        `json:"id"`
-	Pk                      string                        `json:"_pk"`
-	Tn                      string                        `json:"_sid"`
-	Cn                      string                        `json:"_cn"`
-	ETag                    string                        `json:"_etag"`
-	Timestamp               int64                         `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	OutputRoomEventTopology OutputRoomEventTopologyCosmos `json:"mx_syncapi_output_room_event_topology"`
 }
 
@@ -153,6 +147,23 @@ func queryOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx con
 	return response, nil
 }
 
+func getOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, pk string, docId string) (*OutputRoomEventTopologyCosmosData, error) {
+	response := OutputRoomEventTopologyCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
+}
+
 func deleteOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, dbData OutputRoomEventTopologyCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
@@ -198,35 +209,35 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := OutputRoomEventTopologyCosmos{
-		EventID:             event.EventID(),
-		TopologicalPosition: event.Depth(),
-		RoomID:              event.RoomID(),
-		StreamPosition:      int64(pos),
+	var err error
+	dbData, _ := getOutputRoomEventTopology(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		// 	" ON CONFLICT DO NOTHING"
+	} else {
+		data := OutputRoomEventTopologyCosmos{
+			EventID:             event.EventID(),
+			TopologicalPosition: event.Depth(),
+			RoomID:              event.RoomID(),
+			StreamPosition:      int64(pos),
+		}
+
+		dbData = &OutputRoomEventTopologyCosmosData{
+			CosmosDocument:          cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			OutputRoomEventTopology: data,
+		}
+		// _, err := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).ExecContext(
+		// 	ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
+		// )
+
+		err = cosmosdbapi.UpsertDocument(ctx,
+			s.db.connection,
+			s.db.cosmosConfig.DatabaseName,
+			s.db.cosmosConfig.ContainerName,
+			dbData.Pk,
+			dbData)
 	}
 
-	dbData := &OutputRoomEventTopologyCosmosData{
-		Id:                      cosmosDocId,
-		Tn:                      s.db.cosmosConfig.TenantName,
-		Cn:                      dbCollectionName,
-		Pk:                      pk,
-		Timestamp:               time.Now().Unix(),
-		OutputRoomEventTopology: data,
-	}
-
-	// _, err := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).ExecContext(
-	// 	ctx, event.EventID(), event.Depth(), event.RoomID(), pos,
-	// )
-
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return types.StreamPosition(event.Depth()), err
+	return types.StreamPosition(dbData.OutputRoomEventTopology.TopologicalPosition), err
 }
 
 func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(

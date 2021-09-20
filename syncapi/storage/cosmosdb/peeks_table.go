@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -58,13 +57,8 @@ type PeekCosmosMaxNumber struct {
 }
 
 type PeekCosmosData struct {
-	Id        string     `json:"id"`
-	Pk        string     `json:"_pk"`
-	Tn        string     `json:"_sid"`
-	Cn        string     `json:"_cn"`
-	ETag      string     `json:"_etag"`
-	Timestamp int64      `json:"_ts"`
-	Peek      PeekCosmos `json:"mx_syncapi_peek"`
+	cosmosdbapi.CosmosDocument
+	Peek PeekCosmos `json:"mx_syncapi_peek"`
 }
 
 // const insertPeekSQL = "" +
@@ -163,6 +157,23 @@ func queryPeekMaxNumber(s *peekStatements, ctx context.Context, qry string, para
 	return response, nil
 }
 
+func getPeek(s *peekStatements, ctx context.Context, pk string, docId string) (*PeekCosmosData, error) {
+	response := PeekCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
+}
+
 func setPeek(s *peekStatements, ctx context.Context, peek PeekCosmosData) (*PeekCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(peek.Pk, peek.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
@@ -208,32 +219,34 @@ func (s *peekStatements) InsertPeek(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := PeekCosmos{
-		ID:       int64(streamPos),
-		RoomID:   roomID,
-		UserID:   userID,
-		DeviceID: deviceID,
-	}
+	dbData, _ := getPeek(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		// " (id, room_id, user_id, device_id, creation_ts, deleted)" +
+		// " VALUES ($1, $2, $3, $4, $5, false)"
+		dbData.SetUpdateTime()
+		dbData.Peek.Deleted = false
+	} else {
+		data := PeekCosmos{
+			ID:       int64(streamPos),
+			RoomID:   roomID,
+			UserID:   userID,
+			DeviceID: deviceID,
+		}
 
-	dbData := &PeekCosmosData{
-		Id: cosmosDocId,
-		Tn: s.db.cosmosConfig.TenantName,
-		Cn: dbCollectionName,
-		Pk: pk,
-		// nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-		Timestamp: time.Now().Unix(),
-		Peek:      data,
+		dbData = &PeekCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			Peek:           data,
+		}
 	}
 
 	// _, err = sqlutil.TxStmt(txn, s.insertPeekStmt).ExecContext(ctx, streamPos, roomID, userID, deviceID, nowMilli)
 
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	err = cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
+		dbData.Pk,
+		dbData)
 
 	return
 }

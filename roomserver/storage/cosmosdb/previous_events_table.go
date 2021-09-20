@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -51,12 +50,7 @@ type PreviousEventCosmos struct {
 }
 
 type PreviousEventCosmosData struct {
-	Id            string              `json:"id"`
-	Pk            string              `json:"_pk"`
-	Tn            string              `json:"_sid"`
-	Cn            string              `json:"_cn"`
-	ETag          string              `json:"_etag"`
-	Timestamp     int64               `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	PreviousEvent PreviousEventCosmos `json:"mx_roomserver_previous_event"`
 }
 
@@ -160,15 +154,12 @@ func (s *previousEventStatements) InsertPreviousEvent(
 		}
 
 		dbData = PreviousEventCosmosData{
-			Id:            cosmosDocId,
-			Tn:            s.db.cosmosConfig.TenantName,
-			Cn:            dbCollectionName,
-			Pk:            pk,
-			Timestamp:     time.Now().Unix(),
-			PreviousEvent: data,
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			PreviousEvent:  data,
 		}
 	} else {
 		dbData = *existing
+		dbData.SetUpdateTime()
 	}
 
 	var nids []string
@@ -188,15 +179,12 @@ func (s *previousEventStatements) InsertPreviousEvent(
 	//   (previous_event_id, previous_reference_sha256, event_nids)
 	//   VALUES ($1, $2, $3)
 
-	var optionsReplace = cosmosdbapi.GetUpsertDocumentOptions(pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		optionsReplace,
-	)
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 // Check if the event reference exists

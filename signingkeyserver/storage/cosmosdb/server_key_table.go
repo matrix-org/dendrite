@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -62,12 +61,7 @@ type ServerKeyCosmos struct {
 }
 
 type ServerKeyCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	ServerKey ServerKeyCosmos `json:"mx_keydb_server_key"`
 }
 
@@ -91,6 +85,23 @@ type serverKeyStatements struct {
 	bulkSelectServerKeysStmt *sql.Stmt
 	// upsertServerKeysStmt     *sql.Stmt
 	tableName string
+}
+
+func getServerKey(s *serverKeyStatements, ctx context.Context, pk string, docId string) (*ServerKeyCosmosData, error) {
+	response := ServerKeyCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryServerKey(s *serverKeyStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ServerKeyCosmosData, error) {
@@ -208,24 +219,27 @@ func (s *serverKeyStatements) upsertServerKeys(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := ServerKeyCosmos{
-		ServerName:          string(request.ServerName),
-		ServerKeyID:         string(request.KeyID),
-		ServerNameAndKeyID:  nameAndKeyID(request),
-		ValidUntilTimestamp: int64(key.ValidUntilTS),
-		ExpiredTimestamp:    int64(key.ExpiredTS),
-		ServerKey:           key.Key.Encode(),
-	}
+	dbData, _ := getServerKey(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.ServerKey.ValidUntilTimestamp = int64(key.ValidUntilTS)
+		dbData.ServerKey.ExpiredTimestamp = int64(key.ExpiredTS)
+		dbData.ServerKey.ServerKey = key.Key.Encode()
+	} else {
+		data := ServerKeyCosmos{
+			ServerName:          string(request.ServerName),
+			ServerKeyID:         string(request.KeyID),
+			ServerNameAndKeyID:  nameAndKeyID(request),
+			ValidUntilTimestamp: int64(key.ValidUntilTS),
+			ExpiredTimestamp:    int64(key.ExpiredTS),
+			ServerKey:           key.Key.Encode(),
+		}
 
-	dbData := &ServerKeyCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		ServerKey: data,
+		dbData = &ServerKeyCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			ServerKey:      data,
+		}
 	}
-
 	// _, err := stmt.ExecContext(
 	// 	ctx,
 	// 	string(request.ServerName),
@@ -236,15 +250,12 @@ func (s *serverKeyStatements) upsertServerKeys(
 	// 	key.Key.Encode(),
 	// )
 
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func nameAndKeyID(request gomatrixserverlib.PublicKeyLookupRequest) string {

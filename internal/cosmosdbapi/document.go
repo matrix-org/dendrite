@@ -1,10 +1,20 @@
 package cosmosdbapi
 
 import (
-	"context"
 	"fmt"
 	"strings"
 )
+
+type CosmosDocument struct {
+	Id        string `json:"id"`
+	Pk        string `json:"_pk"`
+	Tn        string `json:"_sid"`
+	Cn        string `json:"_cn"`
+	Ct        string `json:"_ct"`
+	Ut        string `json:"_ut"`
+	ETag      string `json:"_etag"`
+	Timestamp int64  `json:"_ts"`
+}
 
 func removeSpecialChars(docId string) string {
 	// The following characters are restricted and cannot be used in the Id property: '/', '\', '?', '#'
@@ -24,25 +34,4 @@ func GetDocumentId(tenantName string, collectionName string, id string) string {
 
 func GetPartitionKey(tenantName string, collectionName string) string {
 	return fmt.Sprintf("%s,%s", collectionName, tenantName)
-}
-
-func GetDocumentOrNil(connection CosmosConnection, config CosmosConfig, ctx context.Context, partitionKey string, cosmosDocId string, dbData interface{}) error {
-	var _, err = GetClient(connection).GetDocument(
-		ctx,
-		config.DatabaseName,
-		config.ContainerName,
-		cosmosDocId,
-		GetGetDocumentOptions(partitionKey),
-		&dbData,
-	)
-
-	if err != nil {
-		if err.Error() == "Resource that no longer exists" {
-			dbData = nil
-			return nil
-		}
-		return err
-	}
-
-	return nil
 }

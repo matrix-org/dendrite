@@ -55,12 +55,7 @@ type ThumbnailCosmos struct {
 }
 
 type ThumbnailCosmosData struct {
-	Id        string          `json:"id"`
-	Pk        string          `json:"_pk"`
-	Tn        string          `json:"_sid"`
-	Cn        string          `json:"_cn"`
-	ETag      string          `json:"_etag"`
-	Timestamp int64           `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	Thumbnail ThumbnailCosmos `json:"mx_mediaapi_thumbnail"`
 }
 
@@ -149,7 +144,7 @@ func (s *thumbnailStatements) insertThumbnail(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
-	docId := fmt.Sprintf("%s_%s_%d_%d_s",
+	docId := fmt.Sprintf("%s_%s_%d_%d_%s",
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.ThumbnailSize.Width,
@@ -183,22 +178,17 @@ func (s *thumbnailStatements) insertThumbnail(
 	}
 
 	dbData := &ThumbnailCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Thumbnail: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Thumbnail:      data,
 	}
 
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
+	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)
 	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
 		&dbData,
 		options)
-
 	return err
 }
 
@@ -225,7 +215,7 @@ func (s *thumbnailStatements) selectThumbnail(
 
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
-	docId := fmt.Sprintf("%s_%s_%d_%d_s",
+	docId := fmt.Sprintf("%s_%s_%d_%d_%s",
 		mediaID,
 		mediaOrigin,
 		width,

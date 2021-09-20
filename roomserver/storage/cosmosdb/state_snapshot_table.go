@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
@@ -56,12 +55,7 @@ type StateSnapshotCosmos struct {
 }
 
 type StateSnapshotCosmosData struct {
-	Id            string              `json:"id"`
-	Pk            string              `json:"_pk"`
-	Tn            string              `json:"_sid"`
-	Cn            string              `json:"_cn"`
-	ETag          string              `json:"_etag"`
-	Timestamp     int64               `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	StateSnapshot StateSnapshotCosmos `json:"mx_roomserver_state_snapshot"`
 }
 
@@ -154,12 +148,8 @@ func (s *stateSnapshotStatements) InsertState(
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	var dbData = StateSnapshotCosmosData{
-		Id:            cosmosDocId,
-		Tn:            s.db.cosmosConfig.TenantName,
-		Cn:            dbCollectionName,
-		Pk:            pk,
-		Timestamp:     time.Now().Unix(),
-		StateSnapshot: data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		StateSnapshot:  data,
 	}
 
 	var options = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

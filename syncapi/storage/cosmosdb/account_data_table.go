@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -52,12 +51,7 @@ type AccountDataTypeNumberCosmosData struct {
 }
 
 type AccountDataTypeCosmosData struct {
-	Id              string                `json:"id"`
-	Pk              string                `json:"_pk"`
-	Tn              string                `json:"_sid"`
-	Cn              string                `json:"_cn"`
-	ETag            string                `json:"_etag"`
-	Timestamp       int64                 `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	AccountDataType AccountDataTypeCosmos `json:"mx_syncapi_account_data_type"`
 }
 
@@ -87,6 +81,23 @@ type accountDataStatements struct {
 	selectMaxAccountDataIDStmt   string
 	selectAccountDataInRangeStmt string
 	tableName                    string
+}
+
+func getAccountDataType(s *accountDataStatements, ctx context.Context, pk string, docId string) (*AccountDataTypeCosmosData, error) {
+	response := AccountDataTypeCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryAccountDataType(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataTypeCosmosData, error) {
@@ -163,30 +174,31 @@ func (s *accountDataStatements) InsertAccountData(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := AccountDataTypeCosmos{
-		ID:       int64(pos),
-		UserID:   userID,
-		RoomID:   roomID,
-		DataType: dataType,
-	}
+	dbData, _ := getAccountDataType(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.AccountDataType.ID = int64(pos)
+	} else {
+		data := AccountDataTypeCosmos{
+			ID:       int64(pos),
+			UserID:   userID,
+			RoomID:   roomID,
+			DataType: dataType,
+		}
 
-	dbData := &AccountDataTypeCosmosData{
-		Id:              cosmosDocId,
-		Tn:              s.db.cosmosConfig.TenantName,
-		Cn:              dbCollectionName,
-		Pk:              pk,
-		Timestamp:       time.Now().Unix(),
-		AccountDataType: data,
+		dbData = &AccountDataTypeCosmosData{
+			CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			AccountDataType: data,
+		}
 	}
 
 	// _, err = sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, pos, userID, roomID, dataType, pos)
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	err = cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
+		dbData.Pk,
+		dbData)
 
 	return
 }

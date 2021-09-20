@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 )
@@ -40,12 +39,7 @@ import (
 // `
 
 type AccountDataCosmosData struct {
-	Id          string            `json:"id"`
-	Pk          string            `json:"_pk"`
-	Tn          string            `json:"_sid"`
-	Cn          string            `json:"_cn"`
-	ETag        string            `json:"_etag"`
-	Timestamp   int64             `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	AccountData AccountDataCosmos `json:"mx_userapi_accountdata"`
 }
 
@@ -70,6 +64,23 @@ func (s *accountDataStatements) prepare(db *Database) (err error) {
 	s.selectAccountDataByTypeStmt = "select * from c where c._cn = @x1 and c.mx_userapi_accountdata.local_part = @x2 and c.mx_userapi_accountdata.room_id = @x3 and c.mx_userapi_accountdata.type = @x4"
 	s.tableName = "account_data"
 	return
+}
+
+func getAccountData(s *accountDataStatements, ctx context.Context, pk string, docId string) (*AccountDataCosmosData, error) {
+	response := AccountDataCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryAccountData(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataCosmosData, error) {
@@ -99,43 +110,43 @@ func (s *accountDataStatements) insertAccountData(
 
 	// 	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
 	// 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
-	var result = AccountDataCosmos{
-		LocalPart: localpart,
-		RoomId:    roomID,
-		Type:      dataType,
-		Content:   content,
-	}
-
 	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
 	id := ""
 	if roomID == "" {
-		id = fmt.Sprintf("%s_%s", result.LocalPart, result.Type)
+		id = fmt.Sprintf("%s_%s", localpart, dataType)
 	} else {
-		id = fmt.Sprintf("%s_%s_%s", result.LocalPart, result.RoomId, result.Type)
+		id = fmt.Sprintf("%s_%s_%s", localpart, roomID, dataType)
 	}
 
 	docId := id
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	var dbData = AccountDataCosmosData{
-		Id:          cosmosDocId,
-		Tn:          s.db.cosmosConfig.TenantName,
-		Cn:          dbCollectionName,
-		Pk:          pk,
-		Timestamp:   time.Now().Unix(),
-		AccountData: result,
+	dbData, _ := getAccountData(s, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		// 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
+		dbData.SetUpdateTime()
+		dbData.AccountData.Content = content
+	} else {
+		var result = AccountDataCosmos{
+			LocalPart: localpart,
+			RoomId:    roomID,
+			Type:      dataType,
+			Content:   content,
+		}
+
+		dbData = &AccountDataCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			AccountData:    result,
+		}
 	}
 
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	var _, _, err = cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func (s *accountDataStatements) selectAccountData(

@@ -38,13 +38,8 @@ type TopicCosmosNumber struct {
 }
 
 type TopicCosmosData struct {
-	Id        string      `json:"id"`
-	Pk        string      `json:"_pk"`
-	Tn        string      `json:"_sid"`
-	Cn        string      `json:"_cn"`
-	ETag      string      `json:"_etag"`
-	Timestamp int64       `json:"_ts"`
-	Topic     TopicCosmos `json:"mx_naffka_topic"`
+	cosmosdbapi.CosmosDocument
+	Topic TopicCosmos `json:"mx_naffka_topic"`
 }
 
 type MessageCosmos struct {
@@ -56,13 +51,8 @@ type MessageCosmos struct {
 }
 
 type MessageCosmosData struct {
-	Id        string        `json:"id"`
-	Pk        string        `json:"_pk"`
-	Tn        string        `json:"_sid"`
-	Cn        string        `json:"_cn"`
-	ETag      string        `json:"_etag"`
-	Timestamp int64         `json:"_ts"`
-	Message   MessageCosmos `json:"mx_naffka_message"`
+	cosmosdbapi.CosmosDocument
+	Message MessageCosmos `json:"mx_naffka_message"`
 }
 
 // const insertTopicSQL = "" +
@@ -228,31 +218,30 @@ func (t *topicsStatements) InsertTopic(
 	cosmosDocId := cosmosdbapi.GetDocumentId(t.DB.cosmosConfig.ContainerName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(t.DB.cosmosConfig.ContainerName, dbCollectionName)
 
-	data := TopicCosmos{
-		TopicNID:  topicNID,
-		TopicName: topicName,
-	}
+	dbData, _ := getTopic(t, ctx, pk, cosmosDocId)
+	if dbData != nil {
+		dbData.SetUpdateTime()
+		dbData.Topic.TopicName = topicName
+	} else {
+		data := TopicCosmos{
+			TopicNID:  topicNID,
+			TopicName: topicName,
+		}
 
-	dbData := &TopicCosmosData{
-		Id:        cosmosDocId,
-		Tn:        t.DB.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Topic:     data,
+		dbData = &TopicCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, t.DB.cosmosConfig.TenantName, pk, cosmosDocId),
+			Topic:          data,
+		}
 	}
 
 	// _, err := stmt.ExecContext(ctx, topicName, topicNID)
 
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err := cosmosdbapi.GetClient(t.DB.connection).CreateDocument(
-		ctx,
+	return cosmosdbapi.UpsertDocument(ctx,
+		t.DB.connection,
 		t.DB.cosmosConfig.DatabaseName,
 		t.DB.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return err
+		dbData.Pk,
+		dbData)
 }
 
 func (t *topicsStatements) SelectNextTopicNID(
@@ -366,12 +355,8 @@ func (t *topicsStatements) InsertTopics(
 	}
 
 	dbData := &MessageCosmosData{
-		Id:        cosmosDocId,
-		Tn:        t.DB.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Message:   data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, t.DB.cosmosConfig.TenantName, pk, cosmosDocId),
+		Message:        data,
 	}
 
 	// _, err := stmt.ExecContext(ctx, topicNID, messageOffset, topicKey, topicValue, messageTimestampNs)
@@ -383,7 +368,6 @@ func (t *topicsStatements) InsertTopics(
 		t.DB.cosmosConfig.ContainerName,
 		&dbData,
 		options)
-
 	return err
 }
 

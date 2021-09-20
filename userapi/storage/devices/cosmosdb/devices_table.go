@@ -70,13 +70,8 @@ type DeviceCosmos struct {
 }
 
 type DeviceCosmosData struct {
-	Id        string       `json:"id"`
-	Pk        string       `json:"_pk"`
-	Tn        string       `json:"_sid"`
-	Cn        string       `json:"_cn"`
-	ETag      string       `json:"_etag"`
-	Timestamp int64        `json:"_ts"`
-	Device    DeviceCosmos `json:"mx_userapi_device"`
+	cosmosdbapi.CosmosDocument
+	Device DeviceCosmos `json:"mx_userapi_device"`
 }
 
 type DeviceCosmosSessionCount struct {
@@ -238,12 +233,8 @@ func (s *devicesStatements) insertDevice(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	var dbData = DeviceCosmosData{
-		Id:        cosmosDocId,
-		Tn:        s.db.cosmosConfig.TenantName,
-		Cn:        dbCollectionName,
-		Pk:        pk,
-		Timestamp: time.Now().Unix(),
-		Device:    data,
+		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		Device:         data,
 	}
 
 	var optionsCreate = cosmosdbapi.GetCreateDocumentOptions(dbData.Pk)

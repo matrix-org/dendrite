@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -43,12 +42,7 @@ import (
 // `
 
 type KeyBackupVersionCosmosData struct {
-	Id               string                 `json:"id"`
-	Pk               string                 `json:"_pk"`
-	Tn               string                 `json:"_sid"`
-	Cn               string                 `json:"_cn"`
-	ETag             string                 `json:"_etag"`
-	Timestamp        int64                  `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	KeyBackupVersion KeyBackupVersionCosmos `json:"mx_userapi_account_e2e_room_keys_versions"`
 }
 
@@ -194,11 +188,7 @@ func (s *keyBackupVersionStatements) insertKeyBackup(
 	}
 
 	dbData := &KeyBackupVersionCosmosData{
-		Id:               cosmosDocId,
-		Tn:               s.db.cosmosConfig.TenantName,
-		Cn:               dbCollectionName,
-		Pk:               pk,
-		Timestamp:        time.Now().Unix(),
+		CosmosDocument:   cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
 		KeyBackupVersion: data,
 	}
 

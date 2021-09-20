@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
 
@@ -73,12 +72,7 @@ type OutputRoomEventCosmosMaxNumber struct {
 }
 
 type OutputRoomEventCosmosData struct {
-	Id              string                `json:"id"`
-	Pk              string                `json:"_pk"`
-	Tn              string                `json:"_sid"`
-	Cn              string                `json:"_cn"`
-	ETag            string                `json:"_etag"`
-	Timestamp       int64                 `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	OutputRoomEvent OutputRoomEventCosmos `json:"mx_syncapi_output_room_event"`
 }
 
@@ -495,11 +489,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 
 	var dbData = OutputRoomEventCosmosData{
-		Id:              cosmosDocId,
-		Tn:              s.db.cosmosConfig.TenantName,
-		Cn:              dbCollectionName,
-		Pk:              pk,
-		Timestamp:       time.Now().Unix(),
+		CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
 		OutputRoomEvent: data,
 	}
 

@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/types"
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
@@ -53,12 +52,7 @@ type JoinedHostCosmos struct {
 }
 
 type JoinedHostCosmosData struct {
-	Id         string           `json:"id"`
-	Pk         string           `json:"_pk"`
-	Tn         string           `json:"_sid"`
-	Cn         string           `json:"_cn"`
-	ETag       string           `json:"_etag"`
-	Timestamp  int64            `json:"_ts"`
+	cosmosdbapi.CosmosDocument
 	JoinedHost JoinedHostCosmos `json:"mx_federationsender_joined_host"`
 }
 
@@ -100,6 +94,23 @@ type joinedHostsStatements struct {
 	selectAllJoinedHostsStmt     string
 	// selectJoinedHostsForRoomsStmt *sql.Stmt - prepared at runtime due to variadic
 	tableName string
+}
+
+func getJoinedHost(s *joinedHostsStatements, ctx context.Context, pk string, docId string) (*JoinedHostCosmosData, error) {
+	response := JoinedHostCosmosData{}
+	err := cosmosdbapi.GetDocumentOrNil(
+		s.db.connection,
+		s.db.cosmosConfig,
+		ctx,
+		pk,
+		docId,
+		&response)
+
+	if response.Id == "" {
+		return nil, nil
+	}
+
+	return &response, err
 }
 
 func queryJoinedHostDistinct(s *joinedHostsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]JoinedHostCosmos, error) {
@@ -190,32 +201,28 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
 	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
-	data := JoinedHostCosmos{
-		EventID:    eventID,
-		RoomID:     roomID,
-		ServerName: string(serverName),
+	dbData, _ := getJoinedHost(s, ctx, pk, cosmosDocId)
+	if dbData == nil {
+		data := JoinedHostCosmos{
+			EventID:    eventID,
+			RoomID:     roomID,
+			ServerName: string(serverName),
+		}
+
+		dbData = &JoinedHostCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+			JoinedHost:     data,
+		}
+		// _, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
+
+		return cosmosdbapi.UpsertDocument(ctx,
+			s.db.connection,
+			s.db.cosmosConfig.DatabaseName,
+			s.db.cosmosConfig.ContainerName,
+			dbData.Pk,
+			&dbData)
 	}
-
-	dbData := &JoinedHostCosmosData{
-		Id: cosmosDocId,
-		Tn: s.db.cosmosConfig.TenantName,
-		Cn: dbCollectionName,
-		Pk: pk,
-		Timestamp:  time.Now().Unix(),
-		JoinedHost: data,
-	}
-
-	// _, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
-
-	var options = cosmosdbapi.GetUpsertDocumentOptions(dbData.Pk)
-	_, _, err := cosmosdbapi.GetClient(s.db.connection).CreateDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		&dbData,
-		options)
-
-	return err
+	return nil
 }
 
 func (s *joinedHostsStatements) DeleteJoinedHosts(
