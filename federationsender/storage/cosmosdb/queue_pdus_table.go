@@ -39,19 +39,19 @@ import (
 //     ON federationsender_queue_pdus (json_nid, server_name);
 // `
 
-type QueuePDUCosmos struct {
+type queuePDUCosmos struct {
 	TransactionID string `json:"transaction_id"`
 	ServerName    string `json:"server_name"`
 	JSONNID       int64  `json:"json_nid"`
 }
 
-type QueuePDUCosmosNumber struct {
+type queuePDUCosmosNumber struct {
 	Number int64 `json:"number"`
 }
 
-type QueuePDUCosmosData struct {
+type queuePDUCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	QueuePDU QueuePDUCosmos `json:"mx_federationsender_queue_pdu"`
+	QueuePDU queuePDUCosmos `json:"mx_federationsender_queue_pdu"`
 }
 
 // const insertQueuePDUSQL = "" +
@@ -108,70 +108,15 @@ type queuePDUsStatements struct {
 	tableName string
 }
 
-func queryQueuePDU(s *queuePDUsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]QueuePDUCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []QueuePDUCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *queuePDUsStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func queryQueuePDUDistinct(s *queuePDUsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]QueuePDUCosmos, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []QueuePDUCosmos
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *queuePDUsStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
-func queryQueuePDUNumber(s *queuePDUsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]QueuePDUCosmosNumber, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []QueuePDUCosmosNumber
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func deleteQueuePDU(s *queuePDUsStatements, ctx context.Context, dbData QueuePDUCosmosData) error {
+func deleteQueuePDU(s *queuePDUsStatements, ctx context.Context, dbData queuePDUCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -210,21 +155,19 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 	// "INSERT INTO federationsender_queue_pdus (transaction_id, server_name, json_nid)" +
 	// " VALUES ($1, $2, $3)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_pdus_pdus_json_nid_idx
 	//     ON federationsender_queue_pdus (json_nid, server_name);
 	docId := fmt.Sprintf("%d_%s", nid, serverName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	data := QueuePDUCosmos{
+	data := queuePDUCosmos{
 		JSONNID:       nid,
 		ServerName:    string(serverName),
 		TransactionID: string(transactionID),
 	}
 
-	dbData := &QueuePDUCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	dbData := &queuePDUCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		QueuePDU:       data,
 	}
 
@@ -255,16 +198,20 @@ func (s *queuePDUsStatements) DeleteQueuePDUs(
 
 	// "DELETE FROM federationsender_queue_pdus WHERE server_name = $1 AND json_nid IN ($2)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": serverName,
 		"@x3": jsonNIDs,
 	}
 
 	// deleteSQL := strings.Replace(deleteQueuePDUsSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
 	// deleteStmt, err := txn.Prepare(deleteSQL)
-	rows, err := queryQueuePDU(s, ctx, deleteQueuePDUsSQL, params)
+	var rows []queuePDUCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), deleteQueuePDUsSQL, params, &rows)
 
 	if err != nil {
 		return err
@@ -290,14 +237,18 @@ func (s *queuePDUsStatements) SelectQueuePDUNextTransactionID(
 	// " ORDER BY transaction_id ASC" +
 	// " LIMIT 1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": serverName,
 	}
 
 	// stmt := sqlutil.TxStmt(txn, s.selectQueueNextTransactionIDStmt)
-	rows, err := queryQueuePDU(s, ctx, s.selectQueueNextTransactionIDStmt, params)
+	var rows []queuePDUCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectQueueNextTransactionIDStmt, params, &rows)
 
 	if err != nil {
 		return "", err
@@ -319,14 +270,18 @@ func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
 	// "SELECT COUNT(*) FROM federationsender_queue_pdus" +
 	// " WHERE json_nid = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": jsonNID,
 	}
 
 	// stmt := sqlutil.TxStmt(txn, s.selectQueueReferenceJSONCountStmt)
-	rows, err := queryQueuePDUNumber(s, ctx, s.selectQueueReferenceJSONCountStmt, params)
+	var rows []queuePDUCosmosNumber
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectQueueReferenceJSONCountStmt, params, &rows)
 
 	if err != nil {
 		return -1, err
@@ -348,14 +303,18 @@ func (s *queuePDUsStatements) SelectQueuePDUCount(
 	// "SELECT COUNT(*) FROM federationsender_queue_pdus" +
 	// " WHERE server_name = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": serverName,
 	}
 
 	// stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsCountStmt)
-	rows, err := queryQueuePDUNumber(s, ctx, s.selectQueuePDUsCountStmt, params)
+	var rows []queuePDUCosmosNumber
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectQueuePDUsCountStmt, params, &rows)
 
 	if err != nil {
 		return 0, err
@@ -382,16 +341,20 @@ func (s *queuePDUsStatements) SelectQueuePDUs(
 	// " WHERE server_name = $1" +
 	// " LIMIT $2"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": serverName,
 		"@x3": limit,
 	}
 
 	// stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsStmt)
 	// rows, err := stmt.QueryContext(ctx, serverName, limit)
-	rows, err := queryQueuePDU(s, ctx, s.selectQueuePDUsStmt, params)
+	var rows []queuePDUCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectQueuePDUsStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -412,14 +375,19 @@ func (s *queuePDUsStatements) SelectQueuePDUServerNames(
 
 	// "SELECT DISTINCT server_name FROM federationsender_queue_pdus"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
 
 	// stmt := sqlutil.TxStmt(txn, s.selectQueueServerNamesStmt)
 	// rows, err := stmt.QueryContext(ctx)
-	rows, err := queryQueuePDUDistinct(s, ctx, s.selectQueueServerNamesStmt, params)
+	var rows []queuePDUCosmos
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectQueueServerNamesStmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}

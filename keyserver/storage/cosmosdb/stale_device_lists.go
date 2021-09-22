@@ -35,16 +35,16 @@ import (
 // CREATE INDEX IF NOT EXISTS keyserver_stale_device_lists_idx ON keyserver_stale_device_lists (domain, is_stale);
 // `
 
-type StaleDeviceListCosmos struct {
+type staleDeviceListCosmos struct {
 	UserID    string `json:"user_id"`
 	Domain    string `json:"domain"`
 	IsStale   bool   `json:"is_stale"`
 	AddedSecs int64  `json:"ts_added_secs"`
 }
 
-type StaleDeviceListCosmosData struct {
+type staleDeviceListCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	StaleDeviceList StaleDeviceListCosmos `json:"mx_keyserver_stale_device_list"`
+	StaleDeviceList staleDeviceListCosmos `json:"mx_keyserver_stale_device_list"`
 }
 
 // const upsertStaleDeviceListSQL = "" +
@@ -72,8 +72,16 @@ type staleDeviceListsStatements struct {
 	tableName                             string
 }
 
-func getStaleDeviceList(s *staleDeviceListsStatements, ctx context.Context, pk string, docId string) (*StaleDeviceListCosmosData, error) {
-	response := StaleDeviceListCosmosData{}
+func (s *staleDeviceListsStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *staleDeviceListsStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getStaleDeviceList(s *staleDeviceListsStatements, ctx context.Context, pk string, docId string) (*staleDeviceListCosmosData, error) {
+	response := staleDeviceListCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -87,26 +95,6 @@ func getStaleDeviceList(s *staleDeviceListsStatements, ctx context.Context, pk s
 	}
 
 	return &response, err
-}
-
-func queryStaleDeviceList(s *staleDeviceListsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]StaleDeviceListCosmosData, error) {
-	var response []StaleDeviceListCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
-	var query = cosmosdbapi.GetQuery(qry, params)
-	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
 }
 
 func NewCosmosDBStaleDeviceListsTable(db *Database) (tables.StaleDeviceLists, error) {
@@ -131,26 +119,24 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 		return err
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	//     user_id TEXT PRIMARY KEY NOT NULL,
 	docId := userID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getStaleDeviceList(s, ctx, pk, cosmosDocId)
+	dbData, _ := getStaleDeviceList(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.StaleDeviceList.IsStale = isStale
 		dbData.StaleDeviceList.AddedSecs = time.Now().Unix()
 	} else {
-		data := StaleDeviceListCosmos{
+		data := staleDeviceListCosmos{
 			Domain:  string(domain),
 			IsStale: isStale,
 			UserID:  userID,
 		}
 
-		dbData = &StaleDeviceListCosmosData{
-			CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &staleDeviceListCosmosData{
+			CosmosDocument:  cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			StaleDeviceList: data,
 		}
 	}
@@ -165,17 +151,22 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 
 func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
 	// we only query for 1 domain or all domains so optimise for those use cases
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	if len(domains) == 0 {
 
 		// "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
 		// rows, err := s.selectStaleDeviceListsStmt.QueryContext(ctx, true)
 		params := map[string]interface{}{
 			"@x1": s.db.cosmosConfig.TenantName,
-			"@x2": dbCollectionName,
+			"@x2": s.getCollectionName(),
 			"@x3": true,
 		}
-		rows, err := queryStaleDeviceList(s, ctx, s.selectStaleDeviceListsWithDomainsStmt, params)
+
+		var rows []staleDeviceListCosmosData
+		err := cosmosdbapi.PerformQuery(ctx,
+			s.db.connection,
+			s.db.cosmosConfig.DatabaseName,
+			s.db.cosmosConfig.ContainerName,
+			s.getPartitionKey(), s.selectStaleDeviceListsStmt, params, &rows)
 
 		if err != nil {
 			return nil, err
@@ -188,12 +179,17 @@ func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx conte
 		// "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2"
 		// rows, err := s.selectStaleDeviceListsWithDomainsStmt.QueryContext(ctx, true, string(domain))
 		params := map[string]interface{}{
-			"@x1": dbCollectionName,
+			"@x1": s.getCollectionName(),
 			"@x2": true,
 			"@x3": string(domain),
 		}
 
-		rows, err := queryStaleDeviceList(s, ctx, s.selectStaleDeviceListsWithDomainsStmt, params)
+		var rows []staleDeviceListCosmosData
+		err := cosmosdbapi.PerformQuery(ctx,
+			s.db.connection,
+			s.db.cosmosConfig.DatabaseName,
+			s.db.cosmosConfig.ContainerName,
+			s.getPartitionKey(), s.selectStaleDeviceListsWithDomainsStmt, params, &rows)
 
 		if err != nil {
 			return nil, err
@@ -207,7 +203,7 @@ func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx conte
 	return result, nil
 }
 
-func rowsToUserIDs(ctx context.Context, rows []StaleDeviceListCosmosData) (result []string, err error) {
+func rowsToUserIDs(ctx context.Context, rows []staleDeviceListCosmosData) (result []string, err error) {
 	for _, item := range rows {
 		var userID string
 		userID = item.StaleDeviceList.UserID

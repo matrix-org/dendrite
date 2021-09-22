@@ -43,15 +43,15 @@ import (
 //   );
 // `
 
-type PreviousEventCosmos struct {
+type previousEventCosmos struct {
 	PreviousEventID         string `json:"previous_event_id"`
 	PreviousReferenceSha256 []byte `json:"previous_reference_sha256"`
 	EventNIDs               string `json:"event_nids"`
 }
 
-type PreviousEventCosmosData struct {
+type previousEventCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	PreviousEvent PreviousEventCosmos `json:"mx_roomserver_previous_event"`
+	PreviousEvent previousEventCosmos `json:"mx_roomserver_previous_event"`
 }
 
 // Insert an entry into the previous_events table.
@@ -85,8 +85,16 @@ type previousEventStatements struct {
 	tableName string
 }
 
-func getPreviousEvent(s *previousEventStatements, ctx context.Context, pk string, docId string) (*PreviousEventCosmosData, error) {
-	response := PreviousEventCosmosData{}
+func (s *previousEventStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *previousEventStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getPreviousEvent(s *previousEventStatements, ctx context.Context, pk string, docId string) (*previousEventCosmosData, error) {
+	response := previousEventCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -125,18 +133,15 @@ func (s *previousEventStatements) InsertPreviousEvent(
 ) error {
 	eventNIDAsString := fmt.Sprintf("%d", eventNID)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-
 	//     UNIQUE (previous_event_id, previous_reference_sha256)
 	// TODO: Check value
 	// docId := fmt.Sprintf("%s_%s", previousEventID, previousEventReferenceSHA256)
 	docId := previousEventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// SELECT 1 FROM roomserver_previous_events
 	//   WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
-	existing, err := getPreviousEvent(s, ctx, pk, cosmosDocId)
+	existing, err := getPreviousEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		if err != cosmosdbutil.ErrNoRows {
@@ -144,17 +149,17 @@ func (s *previousEventStatements) InsertPreviousEvent(
 		}
 	}
 
-	var dbData PreviousEventCosmosData
+	var dbData previousEventCosmosData
 	// Doesnt exist, create a new one
 	if existing == nil {
-		data := PreviousEventCosmos{
+		data := previousEventCosmos{
 			EventNIDs:               "",
 			PreviousEventID:         previousEventID,
 			PreviousReferenceSha256: previousEventReferenceSHA256,
 		}
 
-		dbData = PreviousEventCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = previousEventCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			PreviousEvent:  data,
 		}
 	} else {
@@ -192,18 +197,16 @@ func (s *previousEventStatements) InsertPreviousEvent(
 func (s *previousEventStatements) SelectPreviousEventExists(
 	ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte,
 ) error {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 
 	//     UNIQUE (previous_event_id, previous_reference_sha256)
 	// TODO: Check value
 	// docId := fmt.Sprintf("%s_%s", previousEventID, previousEventReferenceSHA256)
 	docId := eventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, string(docId))
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), string(docId))
 
 	// SELECT 1 FROM roomserver_previous_events
 	//   WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
-	dbData, err := getPreviousEvent(s, ctx, pk, cosmosDocId)
+	dbData, err := getPreviousEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		return err
 	}

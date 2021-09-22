@@ -45,15 +45,15 @@ import (
 //     ON federationsender_joined_hosts (room_id)
 // `
 
-type JoinedHostCosmos struct {
+type joinedHostCosmos struct {
 	RoomID     string `json:"room_id"`
 	EventID    string `json:"event_id"`
 	ServerName string `json:"server_name"`
 }
 
-type JoinedHostCosmosData struct {
+type joinedHostCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	JoinedHost JoinedHostCosmos `json:"mx_federationsender_joined_host"`
+	JoinedHost joinedHostCosmos `json:"mx_federationsender_joined_host"`
 }
 
 // const insertJoinedHostsSQL = "" +
@@ -96,8 +96,16 @@ type joinedHostsStatements struct {
 	tableName string
 }
 
-func getJoinedHost(s *joinedHostsStatements, ctx context.Context, pk string, docId string) (*JoinedHostCosmosData, error) {
-	response := JoinedHostCosmosData{}
+func (s *joinedHostsStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *joinedHostsStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getJoinedHost(s *joinedHostsStatements, ctx context.Context, pk string, docId string) (*joinedHostCosmosData, error) {
+	response := joinedHostCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -113,49 +121,7 @@ func getJoinedHost(s *joinedHostsStatements, ctx context.Context, pk string, doc
 	return &response, err
 }
 
-func queryJoinedHostDistinct(s *joinedHostsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]JoinedHostCosmos, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []JoinedHostCosmos
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func queryJoinedHost(s *joinedHostsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]JoinedHostCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []JoinedHostCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func deleteJoinedHost(s *joinedHostsStatements, ctx context.Context, dbData JoinedHostCosmosData) error {
+func deleteJoinedHost(s *joinedHostsStatements, ctx context.Context, dbData joinedHostCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -194,23 +160,21 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 
 	// stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
 	//     ON federationsender_joined_hosts (event_id);
 	docId := fmt.Sprintf("%s", eventID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getJoinedHost(s, ctx, pk, cosmosDocId)
+	dbData, _ := getJoinedHost(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData == nil {
-		data := JoinedHostCosmos{
+		data := joinedHostCosmos{
 			EventID:    eventID,
 			RoomID:     roomID,
 			ServerName: string(serverName),
 		}
 
-		dbData = &JoinedHostCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &joinedHostCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			JoinedHost:     data,
 		}
 		// _, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
@@ -231,14 +195,17 @@ func (s *joinedHostsStatements) DeleteJoinedHosts(
 	for _, eventID := range eventIDs {
 		// "DELETE FROM federationsender_joined_hosts WHERE event_id = $1"
 
-		var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 		params := map[string]interface{}{
-			"@x1": dbCollectionName,
+			"@x1": s.getCollectionName(),
 			"@x2": eventID,
 		}
 		// stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsStmt)
-
-		rows, err := queryJoinedHost(s, ctx, s.deleteJoinedHostsStmt, params)
+		var rows []joinedHostCosmosData
+		err := cosmosdbapi.PerformQuery(ctx,
+			s.db.connection,
+			s.db.cosmosConfig.DatabaseName,
+			s.db.cosmosConfig.ContainerName,
+			s.getPartitionKey(), s.deleteJoinedHostsStmt, params, &rows)
 
 		for _, item := range rows {
 			if err = deleteJoinedHost(s, ctx, item); err != nil {
@@ -254,14 +221,18 @@ func (s *joinedHostsStatements) DeleteJoinedHostsForRoom(
 ) error {
 	// "DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
 
 	// stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsForRoomStmt)
-	rows, err := queryJoinedHost(s, ctx, s.deleteJoinedHostsStmt, params)
+	var rows []joinedHostCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteJoinedHostsStmt, params, &rows)
 
 	// _, err := stmt.ExecContext(ctx, roomID)
 	for _, item := range rows {
@@ -278,14 +249,18 @@ func (s *joinedHostsStatements) SelectJoinedHostsWithTx(
 	// "SELECT event_id, server_name FROM federationsender_joined_hosts" +
 	// " WHERE room_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
 
 	// stmt := sqlutil.TxStmt(txn, s.selectJoinedHostsStmt)
-	rows, err := queryJoinedHost(s, ctx, s.deleteJoinedHostsStmt, params)
+	var rows []joinedHostCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectJoinedHostsStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -305,13 +280,18 @@ func (s *joinedHostsStatements) SelectAllJoinedHosts(
 ) ([]gomatrixserverlib.ServerName, error) {
 	// "SELECT DISTINCT server_name FROM federationsender_joined_hosts"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
 
 	// rows, err := s.selectAllJoinedHostsStmt.QueryContext(ctx)
-	rows, err := queryJoinedHostDistinct(s, ctx, s.selectAllJoinedHostsStmt, params)
+	var rows []joinedHostCosmos
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectAllJoinedHostsStmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}
@@ -337,14 +317,19 @@ func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
 	// "SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
 
 	// sql := strings.Replace(selectJoinedHostsForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomIDs,
 	}
 
 	// rows, err := s.db.QueryContext(ctx, sql, iRoomIDs...)
-	rows, err := queryJoinedHostDistinct(s, ctx, s.selectAllJoinedHostsStmt, params)
+	var rows []joinedHostCosmos
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectAllJoinedHostsStmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +344,7 @@ func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
 	return result, nil
 }
 
-func rowsToJoinedHosts(rows *[]JoinedHostCosmosData) []types.JoinedHost {
+func rowsToJoinedHosts(rows *[]joinedHostCosmosData) []types.JoinedHost {
 	var result []types.JoinedHost
 	if rows == nil {
 		return result

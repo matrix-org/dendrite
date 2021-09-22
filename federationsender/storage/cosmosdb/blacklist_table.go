@@ -32,13 +32,13 @@ import (
 // );
 // `
 
-type BlacklistCosmos struct {
+type blacklistCosmos struct {
 	ServerName string `json:"server_name"`
 }
 
-type BlacklistCosmosData struct {
+type blacklistCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Blacklist BlacklistCosmos `json:"mx_federationsender_blacklist"`
+	Blacklist blacklistCosmos `json:"mx_federationsender_blacklist"`
 }
 
 // const insertBlacklistSQL = "" +
@@ -64,8 +64,16 @@ type blacklistStatements struct {
 	tableName              string
 }
 
-func getBlacklist(s *blacklistStatements, ctx context.Context, pk string, docId string) (*BlacklistCosmosData, error) {
-	response := BlacklistCosmosData{}
+func (s *blacklistStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *blacklistStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getBlacklist(s *blacklistStatements, ctx context.Context, pk string, docId string) (*blacklistCosmosData, error) {
+	response := blacklistCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -81,28 +89,7 @@ func getBlacklist(s *blacklistStatements, ctx context.Context, pk string, docId 
 	return &response, err
 }
 
-func queryBlacklist(s *blacklistStatements, ctx context.Context, qry string, params map[string]interface{}) ([]BlacklistCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []BlacklistCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func deleteBlacklist(s *blacklistStatements, ctx context.Context, dbData BlacklistCosmosData) error {
+func deleteBlacklist(s *blacklistStatements, ctx context.Context, dbData blacklistCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -137,22 +124,20 @@ func (s *blacklistStatements) InsertBlacklist(
 
 	// stmt := sqlutil.TxStmt(txn, s.insertBlacklistStmt)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (server_name)
 	docId := fmt.Sprintf("%s", serverName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getBlacklist(s, ctx, pk, cosmosDocId)
+	dbData, _ := getBlacklist(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 	} else {
-		data := BlacklistCosmos{
+		data := blacklistCosmos{
 			ServerName: string(serverName),
 		}
 
-		dbData = &BlacklistCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &blacklistCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			Blacklist:      data,
 		}
 	}
@@ -177,13 +162,11 @@ func (s *blacklistStatements) SelectBlacklist(
 
 	// stmt := sqlutil.TxStmt(txn, s.selectBlacklistStmt)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (server_name)
 	docId := fmt.Sprintf("%s", serverName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	// res, err := stmt.QueryContext(ctx, serverName)
-	res, err := getBlacklist(s, ctx, pk, cosmosDocId)
+	res, err := getBlacklist(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		return false, err
 	}
@@ -201,13 +184,11 @@ func (s *blacklistStatements) DeleteBlacklist(
 	// 	"DELETE FROM federationsender_blacklist WHERE server_name = $1"
 
 	// stmt := sqlutil.TxStmt(txn, s.deleteBlacklistStmt)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (server_name)
 	docId := fmt.Sprintf("%s", serverName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	// _, err := stmt.ExecContext(ctx, serverName)
-	res, err := getBlacklist(s, ctx, pk, cosmosDocId)
+	res, err := getBlacklist(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if res != nil {
 		_ = deleteBlacklist(s, ctx, *res)
 	}
@@ -220,13 +201,17 @@ func (s *blacklistStatements) DeleteAllBlacklist(
 	// 	"DELETE FROM federationsender_blacklist"
 
 	// stmt := sqlutil.TxStmt(txn, s.deleteAllBlacklistStmt)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
 
 	// rows, err := sqlutil.TxStmt(txn, s.selectInboundPeeksStmt).QueryContext(ctx, roomID)
-	rows, err := queryBlacklist(s, ctx, s.deleteAllBlacklistStmt, params)
+	var rows []blacklistCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteAllBlacklistStmt, params, &rows)
 
 	if err != nil {
 		return err

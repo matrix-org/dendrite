@@ -22,7 +22,7 @@ import (
 // `
 
 // OpenIDToken represents an OpenID token
-type OpenIDTokenCosmos struct {
+type openIDTokenCosmos struct {
 	Token       string `json:"token"`
 	UserID      string `json:"user_id"`
 	ExpiresAtMS int64  `json:"expires_at"`
@@ -30,7 +30,7 @@ type OpenIDTokenCosmos struct {
 
 type OpenIdTokenCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	OpenIdToken OpenIDTokenCosmos `json:"mx_userapi_openidtoken"`
+	OpenIdToken openIDTokenCosmos `json:"mx_userapi_openidtoken"`
 }
 
 type tokenStatements struct {
@@ -41,7 +41,15 @@ type tokenStatements struct {
 	serverName      gomatrixserverlib.ServerName
 }
 
-func mapFromToken(db OpenIDTokenCosmos) api.OpenIDToken {
+func (s *tokenStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *tokenStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func mapFromToken(db openIDTokenCosmos) api.OpenIDToken {
 	return api.OpenIDToken{
 		ExpiresAtMS: db.ExpiresAtMS,
 		Token:       db.Token,
@@ -49,33 +57,12 @@ func mapFromToken(db OpenIDTokenCosmos) api.OpenIDToken {
 	}
 }
 
-func mapToToken(api api.OpenIDToken) OpenIDTokenCosmos {
-	return OpenIDTokenCosmos{
+func mapToToken(api api.OpenIDToken) openIDTokenCosmos {
+	return openIDTokenCosmos{
 		ExpiresAtMS: api.ExpiresAtMS,
 		Token:       api.Token,
 		UserID:      api.UserID,
 	}
-}
-
-func queryOpenIdToken(s *tokenStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OpenIdTokenCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []OpenIdTokenCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
 }
 
 func (s *tokenStatements) prepare(db *Database, server gomatrixserverlib.ServerName) (err error) {
@@ -95,20 +82,17 @@ func (s *tokenStatements) insertToken(
 ) (err error) {
 
 	// "INSERT INTO open_id_tokens(token, localpart, token_expires_at_ms) VALUES ($1, $2, $3)"
+	docId := token
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+
 	var result = &api.OpenIDToken{
 		UserID:      localpart,
 		Token:       token,
 		ExpiresAtMS: expiresAtMS,
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
-
-	docId := result.Token
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-
 	var dbData = OpenIdTokenCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		OpenIdToken:    mapToToken(*result),
 	}
 
@@ -136,22 +120,26 @@ func (s *tokenStatements) selectOpenIDTokenAtrributes(
 	var openIDTokenAttrs api.OpenIDTokenAttributes
 
 	// "SELECT localpart, token_expires_at_ms FROM open_id_tokens WHERE token = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": token,
 	}
-	response, err := queryOpenIdToken(s, ctx, s.selectTokenStmt, params)
+	var rows []OpenIdTokenCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectTokenStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return nil, nil
 	}
 
-	var openIdToken = response[0].OpenIdToken
+	var openIdToken = rows[0].OpenIdToken
 	openIDTokenAttrs = api.OpenIDTokenAttributes{
 		UserID:      openIdToken.UserID,
 		ExpiresAtMS: openIdToken.ExpiresAtMS,

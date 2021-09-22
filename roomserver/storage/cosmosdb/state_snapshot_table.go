@@ -47,16 +47,16 @@ import (
 //     state_block_nids TEXT NOT NULL DEFAULT '[]'
 //   );
 
-type StateSnapshotCosmos struct {
+type stateSnapshotCosmos struct {
 	StateSnapshotNID  int64   `json:"state_snapshot_nid"`
 	StateSnapshotHash []byte  `json:"state_snapshot_hash"`
 	RoomNID           int64   `json:"room_nid"`
 	StateBlockNIDs    []int64 `json:"state_block_nids"`
 }
 
-type StateSnapshotCosmosData struct {
+type stateSnapshotCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	StateSnapshot StateSnapshotCosmos `json:"mx_roomserver_state_snapshot"`
+	StateSnapshot stateSnapshotCosmos `json:"mx_roomserver_state_snapshot"`
 }
 
 // const insertStateSQL = `
@@ -80,6 +80,14 @@ type stateSnapshotStatements struct {
 	// insertStateStmt              *sql.Stmt
 	bulkSelectStateBlockNIDsStmt string
 	tableName                    string
+}
+
+func (s *stateSnapshotStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *stateSnapshotStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
 func mapFromStateBlockNIDArray(stateBlockNIDs []types.StateBlockNID) []int64 {
@@ -133,22 +141,19 @@ func (s *stateSnapshotStatements) InsertState(
 	// 	return
 	// }
 
-	data := StateSnapshotCosmos{
+	//     state_snapshot_nid INTEGER PRIMARY KEY AUTOINCREMENT,
+	docId := fmt.Sprintf("%d", stateSnapshotNIDSeq)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+
+	data := stateSnapshotCosmos{
 		RoomNID:           int64(roomNID),
 		StateSnapshotHash: stateBlockNIDs.Hash(),
 		StateBlockNIDs:    mapFromStateBlockNIDArray(stateBlockNIDs),
 		StateSnapshotNID:  int64(stateSnapshotNIDSeq),
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-
-	//     state_snapshot_nid INTEGER PRIMARY KEY AUTOINCREMENT,
-	docId := fmt.Sprintf("%d", stateSnapshotNIDSeq)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-
-	var dbData = StateSnapshotCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = stateSnapshotCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		StateSnapshot:  data,
 	}
 
@@ -174,30 +179,25 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 
 	// "SELECT state_snapshot_nid, state_block_nids FROM roomserver_state_snapshots" +
 	// " WHERE state_snapshot_nid IN ($1) ORDER BY state_snapshot_nid ASC"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []StateSnapshotCosmosData
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": stateNIDs,
 	}
 
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.bulkSelectStateBlockNIDsStmt, params)
-	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
+	var rows []stateSnapshotCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
+		s.getPartitionKey(), s.bulkSelectStateBlockNIDsStmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}
 
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
-	for _, item := range response {
+	for _, item := range rows {
 		result := &results[i]
 		result.StateSnapshotNID = types.StateSnapshotNID(item.StateSnapshot.StateSnapshotNID)
 		result.StateBlockNIDs = mapToStateBlockNIDArray(item.StateSnapshot.StateBlockNIDs)

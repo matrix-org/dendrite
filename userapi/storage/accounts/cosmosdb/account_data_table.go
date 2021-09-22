@@ -38,16 +38,16 @@ import (
 // );
 // `
 
-type AccountDataCosmosData struct {
-	cosmosdbapi.CosmosDocument
-	AccountData AccountDataCosmos `json:"mx_userapi_accountdata"`
-}
-
-type AccountDataCosmos struct {
+type accountDataCosmos struct {
 	LocalPart string `json:"local_part"`
 	RoomId    string `json:"room_id"`
 	Type      string `json:"type"`
 	Content   []byte `json:"content"`
+}
+
+type accountDataCosmosData struct {
+	cosmosdbapi.CosmosDocument
+	AccountData accountDataCosmos `json:"mx_userapi_accountdata"`
 }
 
 type accountDataStatements struct {
@@ -58,6 +58,14 @@ type accountDataStatements struct {
 	tableName                   string
 }
 
+func (s *accountDataStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *accountDataStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
 func (s *accountDataStatements) prepare(db *Database) (err error) {
 	s.db = db
 	s.selectAccountDataStmt = "select * from c where c._cn = @x1 and c.mx_userapi_accountdata.local_part = @x2"
@@ -66,8 +74,8 @@ func (s *accountDataStatements) prepare(db *Database) (err error) {
 	return
 }
 
-func getAccountData(s *accountDataStatements, ctx context.Context, pk string, docId string) (*AccountDataCosmosData, error) {
-	response := AccountDataCosmosData{}
+func getAccountData(s *accountDataStatements, ctx context.Context, pk string, docId string) (*accountDataCosmosData, error) {
+	response := accountDataCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -83,34 +91,12 @@ func getAccountData(s *accountDataStatements, ctx context.Context, pk string, do
 	return &response, err
 }
 
-func queryAccountData(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []AccountDataCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
 func (s *accountDataStatements) insertAccountData(
 	ctx context.Context, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
 
 	// 	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
 	// 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
 	id := ""
 	if roomID == "" {
 		id = fmt.Sprintf("%s_%s", localpart, dataType)
@@ -119,24 +105,23 @@ func (s *accountDataStatements) insertAccountData(
 	}
 
 	docId := id
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getAccountData(s, ctx, pk, cosmosDocId)
+	dbData, _ := getAccountData(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		// 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
 		dbData.SetUpdateTime()
 		dbData.AccountData.Content = content
 	} else {
-		var result = AccountDataCosmos{
+		var result = accountDataCosmos{
 			LocalPart: localpart,
 			RoomId:    roomID,
 			Type:      dataType,
 			Content:   content,
 		}
 
-		dbData = &AccountDataCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &accountDataCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			AccountData:    result,
 		}
 	}
@@ -157,13 +142,16 @@ func (s *accountDataStatements) selectAccountData(
 	error,
 ) {
 	// 	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": localpart,
 	}
-
-	response, err := queryAccountData(s, ctx, s.selectAccountDataStmt, params)
+	var rows []accountDataCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectAccountDataStmt, params, &rows)
 
 	if err != nil {
 		return nil, nil, err
@@ -172,8 +160,8 @@ func (s *accountDataStatements) selectAccountData(
 	global := map[string]json.RawMessage{}
 	rooms := map[string]map[string]json.RawMessage{}
 
-	for i := 0; i < len(response); i++ {
-		var row = response[i]
+	for i := 0; i < len(rows); i++ {
+		var row = rows[i]
 		var roomID = row.AccountData.RoomId
 		if roomID != "" {
 			if _, ok := rooms[row.AccountData.RoomId]; !ok {
@@ -194,25 +182,28 @@ func (s *accountDataStatements) selectAccountDataByType(
 	var bytes []byte
 
 	// 	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accountDatas.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": localpart,
 		"@x3": roomID,
 		"@x4": dataType,
 	}
-
-	response, err := queryAccountData(s, ctx, s.selectAccountDataByTypeStmt, params)
+	var rows []accountDataCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectAccountDataByTypeStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return data, nil
 	}
 
-	bytes = response[0].AccountData.Content
+	bytes = rows[0].AccountData.Content
 
 	data = json.RawMessage(bytes)
 	return

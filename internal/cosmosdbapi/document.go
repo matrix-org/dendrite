@@ -32,6 +32,10 @@ func GetDocumentId(tenantName string, collectionName string, id string) string {
 	return fmt.Sprintf("%s,%s,%s", collectionName, tenantName, safeId)
 }
 
-func GetPartitionKey(tenantName string, collectionName string) string {
+func GetPartitionKeyByCollection(tenantName string, collectionName string) string {
 	return fmt.Sprintf("%s,%s", collectionName, tenantName)
+}
+
+func GetPartitionKeyByUniqueId(tenantName string, collectionName string, uniqueId string) string {
+	return fmt.Sprintf("%s,%s,%s", collectionName, tenantName, uniqueId)
 }

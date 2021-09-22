@@ -42,7 +42,7 @@ import (
 // );
 // `
 
-type OneTimeKeyCosmos struct {
+type oneTimeKeyCosmos struct {
 	UserID    string `json:"user_id"`
 	DeviceID  string `json:"device_id"`
 	KeyID     string `json:"key_id"`
@@ -52,14 +52,14 @@ type OneTimeKeyCosmos struct {
 	KeyJSON []byte `json:"key_json"`
 }
 
-type OneTimeKeyAlgoNumberCosmosData struct {
+type oneTimeKeyAlgoNumberCosmosData struct {
 	Algorithm string `json:"algorithm"`
 	Number    int    `json:"number"`
 }
 
-type OneTimeKeyCosmosData struct {
+type oneTimeKeyCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	OneTimeKey OneTimeKeyCosmos `json:"mx_keyserver_one_time_key"`
+	OneTimeKey oneTimeKeyCosmos `json:"mx_keyserver_one_time_key"`
 }
 
 // const upsertKeysSQL = "" +
@@ -102,8 +102,16 @@ type oneTimeKeysStatements struct {
 	tableName string
 }
 
-func getOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, pk string, docId string) (*OneTimeKeyCosmosData, error) {
-	response := OneTimeKeyCosmosData{}
+func (s *oneTimeKeysStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *oneTimeKeysStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, pk string, docId string) (*oneTimeKeyCosmosData, error) {
+	response := oneTimeKeyCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -119,53 +127,7 @@ func getOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, pk string, doc
 	return &response, err
 }
 
-func queryOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OneTimeKeyCosmosData, error) {
-	var response []OneTimeKeyCosmosData
-
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-func queryOneTimeKeyAlgoCount(s *oneTimeKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OneTimeKeyAlgoNumberCosmosData, error) {
-	var response []OneTimeKeyAlgoNumberCosmosData
-
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	// var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
-	var query = cosmosdbapi.GetQuery(qry, params)
-	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	// When there are no Rows we seem to get the generic Bad Req JSON error
-	if err != nil {
-		// return nil, err
-	}
-
-	return response, nil
-}
-
-func insertOneTimeKeyCore(s *oneTimeKeysStatements, ctx context.Context, dbData OneTimeKeyCosmosData) error {
+func insertOneTimeKeyCore(s *oneTimeKeysStatements, ctx context.Context, dbData oneTimeKeyCosmosData) error {
 	// "INSERT INTO keyserver_one_time_keys (user_id, device_id, key_id, algorithm, ts_added_secs, key_json)" +
 	// " VALUES ($1, $2, $3, $4, $5, $6)" +
 	// " ON CONFLICT (user_id, device_id, key_id, algorithm)" +
@@ -191,7 +153,7 @@ func insertOneTimeKeyCore(s *oneTimeKeysStatements, ctx context.Context, dbData 
 	return nil
 }
 
-func deleteOneTimeKeyCore(s *oneTimeKeysStatements, ctx context.Context, dbData OneTimeKeyCosmosData) error {
+func deleteOneTimeKeyCore(s *oneTimeKeysStatements, ctx context.Context, dbData oneTimeKeyCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -221,14 +183,19 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 
 	//  "SELECT key_id, algorithm, key_json FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": deviceID,
 	}
 
-	response, err := queryOneTimeKey(s, ctx, s.selectKeyByAlgorithmStmt, params)
+	var rows []oneTimeKeyCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectKeyByAlgorithmStmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +206,7 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 	}
 
 	result := make(map[string]json.RawMessage)
-	for _, item := range response {
+	for _, item := range rows {
 		var keyID string
 		var algorithm string
 		keyID = item.OneTimeKey.KeyID
@@ -260,21 +227,25 @@ func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, de
 		KeyCount: make(map[string]int),
 	}
 	// rows, err := s.selectKeysCountStmt.QueryContext(ctx, userID, deviceID)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": counts.UserID,
 		"@x3": counts.DeviceID,
 	}
 
 	// "SELECT algorithm, COUNT(key_id) FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2 GROUP BY algorithm"
-	response, err := queryOneTimeKeyAlgoCount(s, ctx, s.selectKeysCountStmt, params)
+	var rows []oneTimeKeyAlgoNumberCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectKeysCountStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		var algorithm string
 		var count int
 		algorithm = item.Algorithm
@@ -293,9 +264,6 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 		KeyCount: make(map[string]int),
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-
 	for keyIDWithAlgo, keyJSON := range keys.KeyJSON {
 
 		// "INSERT INTO keyserver_one_time_keys (user_id, device_id, key_id, algorithm, ts_added_secs, key_json)" +
@@ -307,9 +275,9 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 
 		//     UNIQUE (user_id, device_id, key_id, algorithm)
 		docId := fmt.Sprintf("%s_%s_%s_%s", keys.UserID, keys.DeviceID, keyID, algo)
-		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-		data := OneTimeKeyCosmos{
+		data := oneTimeKeyCosmos{
 			Algorithm: algo,
 			DeviceID:  keys.DeviceID,
 			KeyID:     keyID,
@@ -317,8 +285,8 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 			UserID:    keys.UserID,
 		}
 
-		dbData := &OneTimeKeyCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData := &oneTimeKeyCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			OneTimeKey:     data,
 		}
 
@@ -330,19 +298,24 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 	}
 	// rows, err := sqlutil.TxStmt(txn, s.selectKeysCountStmt).QueryContext(ctx, keys.UserID, keys.DeviceID)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": keys.UserID,
 		"@x3": keys.DeviceID,
 	}
 
 	// "SELECT algorithm, COUNT(key_id) FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2 GROUP BY algorithm"
-	response, err := queryOneTimeKeyAlgoCount(s, ctx, s.selectKeysCountStmt, params)
+	var rows []oneTimeKeyAlgoNumberCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectKeysCountStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		var algorithm string
 		var count int
 		algorithm = item.Algorithm
@@ -361,24 +334,29 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 
 	// "SELECT key_id, key_json FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 LIMIT 1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": deviceID,
 		"@x4": algorithm,
 	}
 
-	response, err := queryOneTimeKey(s, ctx, s.selectKeyByAlgorithmStmt, params)
+	var rows []oneTimeKeyCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectKeyByAlgorithmStmt, params, &rows)
+
 	if err != nil {
 		if err == cosmosdbutil.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	keyID = response[0].OneTimeKey.KeyID
-	keyJSONBytes := response[0].OneTimeKey.KeyJSON
-	err = deleteOneTimeKeyCore(s, ctx, response[0])
+	keyID = rows[0].OneTimeKey.KeyID
+	keyJSONBytes := rows[0].OneTimeKey.KeyJSON
+	err = deleteOneTimeKeyCore(s, ctx, rows[0])
 	if err != nil {
 		return nil, err
 	}

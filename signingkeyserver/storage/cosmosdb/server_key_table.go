@@ -51,7 +51,7 @@ import (
 // CREATE INDEX IF NOT EXISTS keydb_server_name_and_key_id ON keydb_server_keys (server_name_and_key_id);
 // `
 
-type ServerKeyCosmos struct {
+type serverKeyCosmos struct {
 	ServerName          string `json:"server_name"`
 	ServerKeyID         string `json:"server_key_id"`
 	ServerNameAndKeyID  string `json:"server_name_and_key_id"`
@@ -60,9 +60,9 @@ type ServerKeyCosmos struct {
 	ServerKey           string `json:"server_key"`
 }
 
-type ServerKeyCosmosData struct {
+type serverKeyCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	ServerKey ServerKeyCosmos `json:"mx_keydb_server_key"`
+	ServerKey serverKeyCosmos `json:"mx_keydb_server_key"`
 }
 
 // "SELECT server_name, server_key_id, valid_until_ts, expired_ts, " +
@@ -87,8 +87,16 @@ type serverKeyStatements struct {
 	tableName string
 }
 
-func getServerKey(s *serverKeyStatements, ctx context.Context, pk string, docId string) (*ServerKeyCosmosData, error) {
-	response := ServerKeyCosmosData{}
+func (s *serverKeyStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *serverKeyStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getServerKey(s *serverKeyStatements, ctx context.Context, pk string, docId string) (*serverKeyCosmosData, error) {
+	response := serverKeyCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -102,27 +110,6 @@ func getServerKey(s *serverKeyStatements, ctx context.Context, pk string, docId 
 	}
 
 	return &response, err
-}
-
-func queryServerKey(s *serverKeyStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ServerKeyCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []ServerKeyCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
 }
 
 func (s *serverKeyStatements) prepare(db *Database, writer sqlutil.Writer) (err error) {
@@ -146,9 +133,8 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	// 	iKeyIDs[i] = v
 	// }
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": nameAndKeyIDs,
 	}
 
@@ -159,8 +145,12 @@ func (s *serverKeyStatements) bulkSelectServerKeys(
 	// err := sqlutil.RunLimitedVariablesQuery(
 	// 	ctx, bulkSelectServerKeysSQL, s.db, iKeyIDs, sqlutil.SQLite3MaxVariables,
 	// 	func(rows *sql.Rows) error {
-
-	rows, err := queryServerKey(s, ctx, bulkSelectServerKeysSQL, params)
+	var rows []serverKeyCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), bulkSelectServerKeysSQL, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -213,20 +203,18 @@ func (s *serverKeyStatements) upsertServerKeys(
 
 	// stmt := sqlutil.TxStmt(txn, s.upsertServerKeysStmt)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (server_name, server_key_id)
 	docId := fmt.Sprintf("%s_%s", string(request.ServerName), string(request.KeyID))
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getServerKey(s, ctx, pk, cosmosDocId)
+	dbData, _ := getServerKey(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.ServerKey.ValidUntilTimestamp = int64(key.ValidUntilTS)
 		dbData.ServerKey.ExpiredTimestamp = int64(key.ExpiredTS)
 		dbData.ServerKey.ServerKey = key.Key.Encode()
 	} else {
-		data := ServerKeyCosmos{
+		data := serverKeyCosmos{
 			ServerName:          string(request.ServerName),
 			ServerKeyID:         string(request.KeyID),
 			ServerNameAndKeyID:  nameAndKeyID(request),
@@ -235,8 +223,8 @@ func (s *serverKeyStatements) upsertServerKeys(
 			ServerKey:           key.Key.Encode(),
 		}
 
-		dbData = &ServerKeyCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &serverKeyCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			ServerKey:      data,
 		}
 	}

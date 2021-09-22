@@ -36,15 +36,15 @@ import (
 // 	PRIMARY KEY(threepid, medium)
 // );
 
-type ThreePIDCosmos struct {
+type threePIDCosmos struct {
 	Localpart string `json:"local_part"`
 	ThreePID  string `json:"three_pid"`
 	Medium    string `json:"medium"`
 }
 
-type ThreePIDCosmosData struct {
+type threePIDCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	ThreePID ThreePIDCosmos `json:"mx_userapi_threepid"`
+	ThreePID threePIDCosmos `json:"mx_userapi_threepid"`
 }
 
 type threepidStatements struct {
@@ -56,6 +56,14 @@ type threepidStatements struct {
 	tableName string
 }
 
+func (s *threepidStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *threepidStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
 func (s *threepidStatements) prepare(db *Database) (err error) {
 	s.db = db
 	s.selectLocalpartForThreePIDStmt = "select * from c where c._cn = @x1 and c.mx_userapi_threepid.three_pid = @x2 and c.mx_userapi_threepid.medium = @x3"
@@ -64,50 +72,33 @@ func (s *threepidStatements) prepare(db *Database) (err error) {
 	return
 }
 
-func queryThreePID(s *threepidStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ThreePIDCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []ThreePIDCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
 func (s *threepidStatements) selectLocalpartForThreePID(
 	ctx context.Context, threepid string, medium string,
 ) (localpart string, err error) {
 
 	// "SELECT localpart FROM account_threepid WHERE threepid = $1 AND medium = $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.threepids.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": threepid,
 		"@x3": medium,
 	}
 
-	response, err := queryThreePID(s, ctx, s.selectLocalpartForThreePIDStmt, params)
+	var rows []threePIDCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectLocalpartForThreePIDStmt, params, &rows)
 
 	if err != nil {
 		return "", err
 	}
 
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return "", nil
 	}
 
-	return response[0].ThreePID.Localpart, nil
+	return rows[0].ThreePID.Localpart, nil
 }
 
 func (s *threepidStatements) selectThreePIDsForLocalpart(
@@ -115,23 +106,27 @@ func (s *threepidStatements) selectThreePIDsForLocalpart(
 ) (threepids []authtypes.ThreePID, err error) {
 
 	// "SELECT threepid, medium FROM account_threepid WHERE localpart = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.threepids.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": localpart,
 	}
-	response, err := queryThreePID(s, ctx, s.selectThreePIDsForLocalpartStmt, params)
+	var rows []threePIDCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectThreePIDsForLocalpartStmt, params, &rows)
 
 	if err != nil {
 		return threepids, err
 	}
 
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return threepids, nil
 	}
 
 	threepids = []authtypes.ThreePID{}
-	for _, item := range response {
+	for _, item := range rows {
 		threepids = append(threepids, authtypes.ThreePID{
 			Address: item.ThreePID.ThreePID,
 			Medium:  item.ThreePID.Medium,
@@ -145,19 +140,16 @@ func (s *threepidStatements) insertThreePID(
 ) (err error) {
 
 	// "INSERT INTO account_threepid (threepid, medium, localpart) VALUES ($1, $2, $3)"
-	var result = ThreePIDCosmos{
+	var result = threePIDCosmos{
 		Localpart: localpart,
 		Medium:    medium,
 		ThreePID:  threepid,
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
-
 	docId := fmt.Sprintf("%s_%s", threepid, medium)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var dbData = ThreePIDCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var dbData = threePIDCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		ThreePID:       result,
 	}
 
@@ -179,11 +171,9 @@ func (s *threepidStatements) deleteThreePID(
 	ctx context.Context, threepid string, medium string) (err error) {
 
 	// "DELETE FROM account_threepid WHERE threepid = $1 AND medium = $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.accounts.tableName)
 	docId := fmt.Sprintf("%s_%s", threepid, medium)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var options = cosmosdbapi.GetDeleteDocumentOptions(pk)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var options = cosmosdbapi.GetDeleteDocumentOptions(s.getPartitionKey())
 	_, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,

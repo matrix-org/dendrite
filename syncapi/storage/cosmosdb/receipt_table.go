@@ -41,7 +41,7 @@ import (
 // CREATE INDEX IF NOT EXISTS syncapi_receipts_room_id_idx ON syncapi_receipts(room_id);
 // `
 
-type ReceiptCosmos struct {
+type receiptCosmos struct {
 	ID          int64  `json:"id"`
 	RoomID      string `json:"room_id"`
 	ReceiptType string `json:"receipt_type"`
@@ -50,13 +50,13 @@ type ReceiptCosmos struct {
 	ReceiptTS   int64  `json:"receipt_ts"`
 }
 
-type ReceiptCosmosMaxNumber struct {
+type receiptCosmosMaxNumber struct {
 	Max int64 `json:"number"`
 }
 
-type ReceiptCosmosData struct {
+type receiptCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Receipt ReceiptCosmos `json:"mx_syncapi_receipt"`
+	Receipt receiptCosmos `json:"mx_syncapi_receipt"`
 }
 
 // const upsertReceipt = "" +
@@ -87,46 +87,12 @@ type receiptStatements struct {
 	tableName          string
 }
 
-func queryReceipt(s *receiptStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ReceiptCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []ReceiptCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *receiptStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func queryReceiptNumber(s *receiptStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ReceiptCosmosMaxNumber, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []ReceiptCosmosMaxNumber
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, nil
-	}
-	return response, nil
+func (s *receiptStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
 func NewCosmosDBReceiptsTable(db *SyncServerDatasource, streamID *streamIDStatements) (tables.Receipts, error) {
@@ -152,7 +118,11 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 	// " ON CONFLICT (room_id, receipt_type, user_id)" +
 	// " DO UPDATE SET id = $7, event_id = $8, receipt_ts = $9"
 
-	data := ReceiptCosmos{
+	// 	CONSTRAINT syncapi_receipts_unique UNIQUE (room_id, receipt_type, user_id)
+	docId := fmt.Sprintf("%s_%s_%s", roomId, receiptType, userId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(r.db.cosmosConfig.ContainerName, r.getCollectionName(), docId)
+
+	data := receiptCosmos{
 		ID:          int64(pos),
 		RoomID:      roomId,
 		ReceiptType: receiptType,
@@ -161,14 +131,8 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 		ReceiptTS:   int64(timestamp),
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(r.db.databaseName, r.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(r.db.cosmosConfig.ContainerName, dbCollectionName)
-	// 	CONSTRAINT syncapi_receipts_unique UNIQUE (room_id, receipt_type, user_id)
-	docId := fmt.Sprintf("%s_%s_%s", roomId, receiptType, userId)
-	cosmosDocId := cosmosdbapi.GetDocumentId(r.db.cosmosConfig.ContainerName, dbCollectionName, docId)
-
-	var dbData = ReceiptCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, r.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = receiptCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(r.getCollectionName(), r.db.cosmosConfig.TenantName, r.getPartitionKey(), cosmosDocId),
 		Receipt:        data,
 	}
 
@@ -197,14 +161,18 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs
 	// for k, v := range roomIDs {
 	// 	params[k+1] = v
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(r.db.databaseName, r.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": r.getCollectionName(),
 		"@x2": streamPos,
 		"@x3": roomIDs,
 	}
+	var rows []receiptCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		r.db.connection,
+		r.db.cosmosConfig.DatabaseName,
+		r.db.cosmosConfig.ContainerName,
+		r.getPartitionKey(), selectRoomReceipts, params, &rows)
 
-	rows, err := queryReceipt(r, ctx, selectRoomReceipts, params)
 	// rows, err := r.db.QueryContext(ctx, selectSQL, params...)
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)
@@ -239,12 +207,16 @@ func (s *receiptStatements) SelectMaxReceiptID(
 
 	// "SELECT MAX(id) FROM syncapi_receipts"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
+	var rows []receiptCosmosMaxNumber
+	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.selectMaxReceiptID, params, &rows)
 
-	rows, err := queryReceiptNumber(s, ctx, s.selectMaxReceiptID, params)
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
 
 	if rows != nil {

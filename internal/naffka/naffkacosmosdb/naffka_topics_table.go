@@ -28,21 +28,21 @@ import (
 // );
 // `
 
-type TopicCosmos struct {
+type topicCosmos struct {
 	TopicName string `json:"topic_name"`
 	TopicNID  int64  `json:"topic_nid"`
 }
 
-type TopicCosmosNumber struct {
+type topicCosmosNumber struct {
 	Number int64 `json:"number"`
 }
 
-type TopicCosmosData struct {
+type topicCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Topic TopicCosmos `json:"mx_naffka_topic"`
+	Topic topicCosmos `json:"mx_naffka_topic"`
 }
 
-type MessageCosmos struct {
+type messageCosmos struct {
 	TopicNID           int64  `json:"topic_nid"`
 	MessageOffset      int64  `json:"message_offset"`
 	MessageKey         []byte `json:"message_key"`
@@ -50,9 +50,9 @@ type MessageCosmos struct {
 	MessageTimestampNS int64  `json:"message_timestamp_ns"`
 }
 
-type MessageCosmosData struct {
+type messageCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Message MessageCosmos `json:"mx_naffka_message"`
+	Message messageCosmos `json:"mx_naffka_message"`
 }
 
 // const insertTopicSQL = "" +
@@ -104,71 +104,24 @@ type topicsStatements struct {
 	tableNameMessages   string
 }
 
-func queryTopic(s *topicsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]TopicCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.DB.databaseName, s.tableNameTopics)
-	var pk = cosmosdbapi.GetPartitionKey(s.DB.cosmosConfig.ContainerName, dbCollectionName)
-	var response []TopicCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.DB.connection).QueryDocuments(
-		ctx,
-		s.DB.cosmosConfig.DatabaseName,
-		s.DB.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *topicsStatements) getCollectionNameTopics() string {
+	return cosmosdbapi.GetCollectionName(s.DB.databaseName, s.tableNameTopics)
 }
 
-func queryTopicNumber(s *topicsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]TopicCosmosNumber, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.DB.databaseName, s.tableNameTopics)
-	var pk = cosmosdbapi.GetPartitionKey(s.DB.cosmosConfig.ContainerName, dbCollectionName)
-	var response []TopicCosmosNumber
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.DB.connection).QueryDocuments(
-		ctx,
-		s.DB.cosmosConfig.DatabaseName,
-		s.DB.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *topicsStatements) getPartitionKeyTopics() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.DB.cosmosConfig.TenantName, s.getCollectionNameTopics())
 }
 
-func queryMessage(s *topicsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]MessageCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.DB.databaseName, s.tableNameMessages)
-	var pk = cosmosdbapi.GetPartitionKey(s.DB.cosmosConfig.ContainerName, dbCollectionName)
-	var response []MessageCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.DB.connection).QueryDocuments(
-		ctx,
-		s.DB.cosmosConfig.DatabaseName,
-		s.DB.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *topicsStatements) getCollectionNameMessages() string {
+	return cosmosdbapi.GetCollectionName(s.DB.databaseName, s.tableNameMessages)
 }
 
-func getTopic(s *topicsStatements, ctx context.Context, pk string, docId string) (*TopicCosmosData, error) {
-	response := TopicCosmosData{}
+func (s *topicsStatements) getPartitionKeyMessages() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.DB.cosmosConfig.TenantName, s.getCollectionNameMessages())
+}
+
+func getTopic(s *topicsStatements, ctx context.Context, pk string, docId string) (*topicCosmosData, error) {
+	response := topicCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.DB.connection,
 		s.DB.cosmosConfig,
@@ -212,24 +165,22 @@ func (t *topicsStatements) InsertTopic(
 	// 	return errSeq
 	// }
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(t.DB.databaseName, t.tableNameTopics)
 	// 	topic_name TEXT UNIQUE,
 	docId := fmt.Sprintf("%s", topicName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(t.DB.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(t.DB.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(t.DB.cosmosConfig.ContainerName, t.getCollectionNameTopics(), docId)
 
-	dbData, _ := getTopic(t, ctx, pk, cosmosDocId)
+	dbData, _ := getTopic(t, ctx, t.getPartitionKeyTopics(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.Topic.TopicName = topicName
 	} else {
-		data := TopicCosmos{
+		data := topicCosmos{
 			TopicNID:  topicNID,
 			TopicName: topicName,
 		}
 
-		dbData = &TopicCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, t.DB.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &topicCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(t.getCollectionNameTopics(), t.DB.cosmosConfig.TenantName, t.getPartitionKeyTopics(), cosmosDocId),
 			Topic:          data,
 		}
 	}
@@ -250,14 +201,18 @@ func (t *topicsStatements) SelectNextTopicNID(
 
 	// "SELECT COUNT(topic_nid)+1 AS topic_nid FROM naffka_topics"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(t.DB.databaseName, t.tableNameTopics)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": t.getCollectionNameTopics(),
 	}
 
 	// stmt := sqlutil.TxStmt(txn, t.selectNextTopicNIDStmt)
 	// err = stmt.QueryRowContext(ctx).Scan(&topicNID)
-	rows, err := queryTopicNumber(t, ctx, t.selectNextTopicNIDStmt, params)
+	var rows []topicCosmosNumber
+	err = cosmosdbapi.PerformQuery(ctx,
+		t.DB.connection,
+		t.DB.cosmosConfig.DatabaseName,
+		t.DB.cosmosConfig.ContainerName,
+		t.getPartitionKeyTopics(), t.selectNextTopicNIDStmt, params, &rows)
 
 	if err != nil {
 		return 0, err
@@ -279,14 +234,12 @@ func (t *topicsStatements) SelectTopic(
 
 	// stmt := sqlutil.TxStmt(txn, t.selectTopicStmt)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(t.DB.databaseName, t.tableNameTopics)
 	// 	topic_name TEXT UNIQUE,
 	docId := fmt.Sprintf("%s", topicName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(t.DB.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(t.DB.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(t.DB.cosmosConfig.ContainerName, t.getCollectionNameTopics(), docId)
 
 	// err = stmt.QueryRowContext(ctx, topicName).Scan(&topicNID)
-	res, err := getTopic(t, ctx, pk, cosmosDocId)
+	res, err := getTopic(t, ctx, t.getPartitionKeyTopics(), cosmosDocId)
 
 	if err != nil {
 		return 0, err
@@ -304,14 +257,18 @@ func (t *topicsStatements) SelectTopics(
 
 	// "SELECT topic_name, topic_nid FROM naffka_topics"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(t.DB.databaseName, t.tableNameTopics)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": t.getCollectionNameTopics(),
 	}
 
 	// stmt := sqlutil.TxStmt(txn, t.selectTopicsStmt)
 	// rows, err := stmt.QueryContext(ctx)
-	rows, err := queryTopic(t, ctx, t.selectTopicsStmt, params)
+	var rows []topicCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		t.DB.connection,
+		t.DB.cosmosConfig.DatabaseName,
+		t.DB.cosmosConfig.ContainerName,
+		t.getPartitionKeyTopics(), t.selectTopicsStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -340,13 +297,11 @@ func (t *topicsStatements) InsertTopics(
 
 	// stmt := sqlutil.TxStmt(txn, t.insertTopicsStmt)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(t.DB.databaseName, t.tableNameMessages)
 	// 	UNIQUE (topic_nid, message_offset)
 	docId := fmt.Sprintf("%d_%d", topicNID, messageOffset)
-	cosmosDocId := cosmosdbapi.GetDocumentId(t.DB.cosmosConfig.ContainerName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(t.DB.cosmosConfig.ContainerName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(t.DB.cosmosConfig.ContainerName, t.getCollectionNameMessages(), docId)
 
-	data := MessageCosmos{
+	data := messageCosmos{
 		TopicNID:           topicNID,
 		MessageOffset:      messageOffset,
 		MessageKey:         topicKey,
@@ -354,8 +309,8 @@ func (t *topicsStatements) InsertTopics(
 		MessageTimestampNS: messageTimestampNs,
 	}
 
-	dbData := &MessageCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, t.DB.cosmosConfig.TenantName, pk, cosmosDocId),
+	dbData := &messageCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(t.getCollectionNameMessages(), t.DB.cosmosConfig.TenantName, t.getPartitionKeyMessages(), cosmosDocId),
 		Message:        data,
 	}
 
@@ -379,9 +334,8 @@ func (t *topicsStatements) SelectMessages(
 	// " FROM naffka_messages WHERE topic_nid = $1 AND $2 <= message_offset AND message_offset < $3" +
 	// " ORDER BY message_offset ASC"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(t.DB.databaseName, t.tableNameMessages)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": t.getCollectionNameMessages(),
 		"@x2": topicNID,
 		"@x3": startOffset,
 		"@x4": endOffset,
@@ -389,7 +343,12 @@ func (t *topicsStatements) SelectMessages(
 
 	// stmt := sqlutil.TxStmt(txn, t.selectMessagesStmt)
 	// rows, err := stmt.QueryContext(ctx, topicNID, startOffset, endOffset)
-	rows, err := queryMessage(t, ctx, t.selectMessagesStmt, params)
+	var rows []messageCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		t.DB.connection,
+		t.DB.cosmosConfig.DatabaseName,
+		t.DB.cosmosConfig.ContainerName,
+		t.getPartitionKeyMessages(), t.selectMessagesStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -416,15 +375,19 @@ func (t *topicsStatements) SelectMaxOffset(
 	// "SELECT message_offset FROM naffka_messages WHERE topic_nid = $1" +
 	// " ORDER BY message_offset DESC LIMIT 1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(t.DB.databaseName, t.tableNameMessages)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": t.getCollectionNameMessages(),
 		"@x2": topicNID,
 	}
 
 	// stmt := sqlutil.TxStmt(txn, t.selectMaxOffsetStmt)
 	// err = stmt.QueryRowContext(ctx, topicNID).Scan(&offset)
-	rows, err := queryMessage(t, ctx, t.selectMaxOffsetStmt, params)
+	var rows []messageCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		t.DB.connection,
+		t.DB.cosmosConfig.DatabaseName,
+		t.DB.cosmosConfig.ContainerName,
+		t.getPartitionKeyMessages(), t.selectMaxOffsetStmt, params, &rows)
 
 	if err != nil {
 		return 0, err

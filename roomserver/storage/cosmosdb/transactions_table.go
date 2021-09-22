@@ -35,16 +35,16 @@ import (
 // 	);
 // `
 
-type TransactionCosmos struct {
+type transactionCosmos struct {
 	TransactionID string `json:"transaction_id"`
 	SessionID     int64  `json:"session_id"`
 	UserID        string `json:"user_id"`
 	EventID       string `json:"event_id"`
 }
 
-type TransactionCosmosData struct {
+type transactionCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Transaction TransactionCosmos `json:"mx_roomserver_transaction"`
+	Transaction transactionCosmos `json:"mx_roomserver_transaction"`
 }
 
 // const insertTransactionSQL = `
@@ -64,8 +64,16 @@ type transactionStatements struct {
 	tableName                    string
 }
 
-func getTransaction(s *transactionStatements, ctx context.Context, pk string, docId string) (*TransactionCosmosData, error) {
-	response := TransactionCosmosData{}
+func (s *transactionStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *transactionStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getTransaction(s *transactionStatements, ctx context.Context, pk string, docId string) (*transactionCosmosData, error) {
+	response := transactionCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -103,22 +111,20 @@ func (s *transactionStatements) InsertTransaction(
 
 	// INSERT INTO roomserver_transactions (transaction_id, session_id, user_id, event_id)
 	// VALUES ($1, $2, $3, $4)
-	data := TransactionCosmos{
+
+	// 		PRIMARY KEY (transaction_id, session_id, user_id)
+	docId := fmt.Sprintf("%s_%d_%s", transactionID, sessionID, userID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+
+	data := transactionCosmos{
 		EventID:       eventID,
 		SessionID:     sessionID,
 		TransactionID: transactionID,
 		UserID:        userID,
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-
-	// 		PRIMARY KEY (transaction_id, session_id, user_id)
-	docId := fmt.Sprintf("%s_%d_%s", transactionID, sessionID, userID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-
-	var dbData = TransactionCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = transactionCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		Transaction:    data,
 	}
 
@@ -143,13 +149,11 @@ func (s *transactionStatements) SelectTransactionEventID(
 	// SELECT event_id FROM roomserver_transactions
 	// WHERE transaction_id = $1 AND session_id = $2 AND user_id = $3
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 		PRIMARY KEY (transaction_id, session_id, user_id)
 	docId := fmt.Sprintf("%s_%d_%s", transactionID, sessionID, userID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	response, err := getTransaction(s, ctx, pk, cosmosDocId)
+	response, err := getTransaction(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return "", err

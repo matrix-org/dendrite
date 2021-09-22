@@ -52,7 +52,7 @@ import (
 // CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON syncapi_current_room_state(event_id);
 // `
 
-type CurrentRoomStateCosmos struct {
+type currentRoomStateCosmos struct {
 	RoomID            string `json:"room_id"`
 	EventID           string `json:"event_id"`
 	Type              string `json:"type"`
@@ -64,9 +64,9 @@ type CurrentRoomStateCosmos struct {
 	AddedAt           int64  `json:"added_at"`
 }
 
-type CurrentRoomStateCosmosData struct {
+type currentRoomStateCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	CurrentRoomState CurrentRoomStateCosmos `json:"mx_syncapi_current_room_state"`
+	CurrentRoomState currentRoomStateCosmos `json:"mx_syncapi_current_room_state"`
 }
 
 // const upsertRoomStateSQL = "" +
@@ -132,50 +132,16 @@ type currentRoomStateStatements struct {
 	jsonPropertyName string
 }
 
-func queryCurrentRoomState(s *currentRoomStateStatements, ctx context.Context, qry string, params map[string]interface{}) ([]CurrentRoomStateCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []CurrentRoomStateCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *currentRoomStateStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func queryCurrentRoomStateDistinct(s *currentRoomStateStatements, ctx context.Context, qry string, params map[string]interface{}) ([]CurrentRoomStateCosmos, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []CurrentRoomStateCosmos
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *currentRoomStateStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
-func getEvent(s *currentRoomStateStatements, ctx context.Context, pk string, docId string) (*CurrentRoomStateCosmosData, error) {
-	response := CurrentRoomStateCosmosData{}
+func getEvent(s *currentRoomStateStatements, ctx context.Context, pk string, docId string) (*currentRoomStateCosmosData, error) {
+	response := currentRoomStateCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -191,7 +157,7 @@ func getEvent(s *currentRoomStateStatements, ctx context.Context, pk string, doc
 	return &response, err
 }
 
-func deleteCurrentRoomState(s *currentRoomStateStatements, ctx context.Context, dbData CurrentRoomStateCosmosData) error {
+func deleteCurrentRoomState(s *currentRoomStateStatements, ctx context.Context, dbData currentRoomStateCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -228,12 +194,15 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 	// "SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
 	// rows, err := s.selectJoinedUsersStmt.QueryContext(ctx)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
-
-	rows, err := queryCurrentRoomState(s, ctx, s.selectJoinedUsersStmt, params)
+	var rows []currentRoomStateCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectJoinedUsersStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -264,14 +233,18 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 
 	// stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
 	// rows, err := stmt.QueryContext(ctx, userID, membership)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": membership,
 	}
 
-	rows, err := queryCurrentRoomStateDistinct(s, ctx, s.selectRoomIDsWithMembershipStmt, params)
+	var rows []currentRoomStateCosmos
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectRoomIDsWithMembershipStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -296,9 +269,8 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	// "SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1"
 	// // WHEN, ORDER BY and LIMIT will be added by prepareWithFilter
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 		"@x3": stateFilter.Limit,
 	}
@@ -309,7 +281,12 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		stateFilter.Types, stateFilter.NotTypes,
 		excludeEventIDs, stateFilter.Limit, FilterOrderNone,
 	)
-	rows, err := queryCurrentRoomState(s, ctx, stmt, params)
+	var rows []currentRoomStateCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), stmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -325,13 +302,16 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 	// "DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 	// stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventID,
 	}
-
-	rows, err := queryCurrentRoomState(s, ctx, s.deleteRoomStateByEventIDStmt, params)
+	var rows []currentRoomStateCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteRoomStateByEventIDStmt, params, &rows)
 
 	for _, item := range rows {
 		err = deleteCurrentRoomState(s, ctx, item)
@@ -348,13 +328,16 @@ func (s *currentRoomStateStatements) DeleteRoomStateForRoom(
 	// "DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 
 	// stmt := sqlutil.TxStmt(txn, s.DeleteRoomStateForRoomStmt)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
-
-	rows, err := queryCurrentRoomState(s, ctx, s.DeleteRoomStateForRoomStmt, params)
+	var rows []currentRoomStateCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.DeleteRoomStateForRoomStmt, params, &rows)
 
 	for _, item := range rows {
 		err = deleteCurrentRoomState(s, ctx, item)
@@ -407,18 +390,16 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	// 	addedAt,
 	// )
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// " ON CONFLICT (room_id, type, state_key)" +
 	docId := fmt.Sprintf("%s_%s_%s", event.RoomID(), event.Type(), *event.StateKey())
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	membershipData := ""
 	if membership != nil {
 		membershipData = *membership
 	}
 
-	dbData, _ := getEvent(s, ctx, pk, cosmosDocId)
+	dbData, _ := getEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		// " DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
 		dbData.SetUpdateTime()
@@ -429,7 +410,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		dbData.CurrentRoomState.Membership = membershipData
 		dbData.CurrentRoomState.AddedAt = int64(addedAt)
 	} else {
-		data := CurrentRoomStateCosmos{
+		data := currentRoomStateCosmos{
 			RoomID:            event.RoomID(),
 			EventID:           event.EventID(),
 			Type:              event.Type(),
@@ -441,8 +422,8 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 			AddedAt:           int64(addedAt),
 		}
 
-		dbData = &CurrentRoomStateCosmosData{
-			CosmosDocument:   cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &currentRoomStateCosmosData{
+			CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			CurrentRoomState: data,
 		}
 	}
@@ -480,13 +461,17 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 		// query := strings.Replace(selectEventsWithEventIDsSQL, "@x2", sql.QueryVariadic(n), 1)
 
 		// rows, err := txn.QueryContext(ctx, query, iEventIDs[start:start+n]...)
-		var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 		params := map[string]interface{}{
-			"@x1": dbCollectionName,
+			"@x1": s.getCollectionName(),
 			"@x2": eventIDs,
 		}
 
-		rows, err := queryCurrentRoomState(s, ctx, s.DeleteRoomStateForRoomStmt, params)
+		var rows []currentRoomStateCosmosData
+		err := cosmosdbapi.PerformQuery(ctx,
+			s.db.connection,
+			s.db.cosmosConfig.DatabaseName,
+			s.db.cosmosConfig.ContainerName,
+			s.getPartitionKey(), s.DeleteRoomStateForRoomStmt, params, &rows)
 
 		if err != nil {
 			return nil, err
@@ -502,7 +487,7 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 }
 
 // Copied from output_room_events_table
-func rowsToStreamEventsFromCurrentRoomState(rows *[]CurrentRoomStateCosmosData) ([]types.StreamEvent, error) {
+func rowsToStreamEventsFromCurrentRoomState(rows *[]currentRoomStateCosmosData) ([]types.StreamEvent, error) {
 	var result []types.StreamEvent
 	for _, item := range *rows {
 		var (
@@ -546,7 +531,7 @@ func rowsToStreamEventsFromCurrentRoomState(rows *[]CurrentRoomStateCosmosData) 
 	return result, nil
 }
 
-func rowsToEvents(rows *[]CurrentRoomStateCosmosData) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func rowsToEvents(rows *[]currentRoomStateCosmosData) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	result := []*gomatrixserverlib.HeaderedEvent{}
 	for _, item := range *rows {
 		var eventID string
@@ -570,12 +555,10 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 	// stmt := s.selectStateEventStmt
 	var res []byte
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// " ON CONFLICT (room_id, type, state_key)" +
 	docId := fmt.Sprintf("%s_%s_%s", roomID, evType, stateKey)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	var response, err = getEvent(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var response, err = getEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	// err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
 	if err == cosmosdbutil.ErrNoRows {

@@ -37,14 +37,14 @@ import (
 // 		ON CONFLICT DO NOTHING;
 // `
 
-type EventStateKeysCosmos struct {
+type eventStateKeysCosmos struct {
 	EventStateKeyNID int64  `json:"event_state_key_nid"`
 	EventStateKey    string `json:"event_state_key"`
 }
 
-type EventStateKeysCosmosData struct {
+type eventStateKeysCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	EventStateKeys EventStateKeysCosmos `json:"mx_roomserver_event_state_keys"`
+	EventStateKeys eventStateKeysCosmos `json:"mx_roomserver_event_state_keys"`
 }
 
 // Same as insertEventTypeNIDSQL
@@ -84,29 +84,16 @@ type eventStateKeyStatements struct {
 	tableName                      string
 }
 
-func queryEventStateKeys(s *eventStateKeyStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventStateKeysCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []EventStateKeysCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *eventStateKeyStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getEventStateKeys(s *eventStateKeyStatements, ctx context.Context, pk string, docId string) (*EventStateKeysCosmosData, error) {
-	response := EventStateKeysCosmosData{}
+func (s *eventStateKeyStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getEventStateKeys(s *eventStateKeyStatements, ctx context.Context, pk string, docId string) (*eventStateKeysCosmosData, error) {
+	response := eventStateKeysCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -144,27 +131,25 @@ func ensureEventStateKeys(s *eventStateKeyStatements, ctx context.Context) {
 	// VALUES (1, '')
 	// ON CONFLICT DO NOTHING;
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     event_state_key TEXT NOT NULL UNIQUE
 	docId := ""
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	data := EventStateKeysCosmos{
+	data := eventStateKeysCosmos{
 		EventStateKey:    "",
 		EventStateKeyNID: 1,
 	}
 
 	//     event_state_key_nid INTEGER PRIMARY KEY AUTOINCREMENT,
-	dbData := EventStateKeysCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	dbData := eventStateKeysCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		EventStateKeys: data,
 	}
 
 	insertEventStateKeyCore(s, ctx, dbData)
 }
 
-func insertEventStateKeyCore(s *eventStateKeyStatements, ctx context.Context, dbData EventStateKeysCosmosData) error {
+func insertEventStateKeyCore(s *eventStateKeyStatements, ctx context.Context, dbData eventStateKeysCosmosData) error {
 	err := cosmosdbapi.UpsertDocument(ctx,
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
@@ -189,15 +174,13 @@ func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 		return 0, cosmosdbutil.ErrNoRows
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     event_state_key TEXT NOT NULL UNIQUE
 	docId := eventStateKey
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	existing, _ := getEventStateKeys(s, ctx, pk, cosmosDocId)
+	existing, _ := getEventStateKeys(s, ctx, s.getPartitionKey(), cosmosDocId)
 
-	var dbData EventStateKeysCosmosData
+	var dbData eventStateKeysCosmosData
 	if existing == nil {
 		//Not exists, we need to create a new one with a SEQ
 		eventStateKeyNIDSeq, seqErr := GetNextEventStateKeyNID(s, ctx)
@@ -205,14 +188,14 @@ func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 			return -1, seqErr
 		}
 
-		data := EventStateKeysCosmos{
+		data := eventStateKeysCosmos{
 			EventStateKey:    eventStateKey,
 			EventStateKeyNID: eventStateKeyNIDSeq,
 		}
 
 		//     event_state_key_nid INTEGER PRIMARY KEY AUTOINCREMENT,
-		dbData = EventStateKeysCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = eventStateKeysCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			EventStateKeys: data,
 		}
 	} else {
@@ -232,23 +215,27 @@ func (s *eventStateKeyStatements) SelectEventStateKeyNID(
 	// SELECT event_state_key_nid FROM roomserver_event_state_keys
 	//   WHERE event_state_key = $1
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventStateKey,
 	}
 
-	response, err := queryEventStateKeys(s, ctx, s.selectEventStateKeyNIDStmt, params)
+	var rows []eventStateKeysCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectEventStateKeyNIDStmt, params, &rows)
 
 	if err != nil {
 		return 0, err
 	}
 	//See storage.assignStateKeyNID()
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return 0, cosmosdbutil.ErrNoRows
 	}
 
-	return types.EventStateKeyNID(response[0].EventStateKeys.EventStateKeyNID), err
+	return types.EventStateKeyNID(rows[0].EventStateKeys.EventStateKeyNID), err
 }
 
 func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
@@ -262,20 +249,24 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 	// SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys
 	//   WHERE event_state_key IN ($1)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventStateKeys,
 	}
 
-	response, err := queryEventStateKeys(s, ctx, s.bulkSelectEventStateKeyNIDStmt, params)
+	var rows []eventStateKeysCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectEventStateKeyNIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]types.EventStateKeyNID, len(eventStateKeys))
-	for _, item := range response {
+	for _, item := range rows {
 		result[item.EventStateKeys.EventStateKey] = types.EventStateKeyNID(item.EventStateKeys.EventStateKeyNID)
 	}
 	return result, nil
@@ -288,19 +279,23 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKey(
 	// SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys
 	//   WHERE event_state_key_nid IN ($1)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventStateKeyNIDs,
 	}
 
-	response, err := queryEventStateKeys(s, ctx, s.bulkSelectEventStateKeyStmt, params)
+	var rows []eventStateKeysCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectEventStateKeyStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
-	for _, item := range response {
+	for _, item := range rows {
 		result[types.EventStateKeyNID(item.EventStateKeys.EventStateKeyNID)] = item.EventStateKeys.EventStateKey
 	}
 	return result, nil

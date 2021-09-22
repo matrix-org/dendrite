@@ -43,7 +43,7 @@ import (
 // CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
 // `
 
-type ThumbnailCosmos struct {
+type thumbnailCosmos struct {
 	MediaID           string `json:"media_id"`
 	MediaOrigin       string `json:"media_origin"`
 	ContentType       string `json:"content_type"`
@@ -54,9 +54,9 @@ type ThumbnailCosmos struct {
 	ResizeMethod      string `json:"resize_method"`
 }
 
-type ThumbnailCosmosData struct {
+type thumbnailCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Thumbnail ThumbnailCosmos `json:"mx_mediaapi_thumbnail"`
+	Thumbnail thumbnailCosmos `json:"mx_mediaapi_thumbnail"`
 }
 
 // const insertThumbnailSQL = `
@@ -85,29 +85,16 @@ type thumbnailStatements struct {
 	tableName            string
 }
 
-func queryThumbnail(s *thumbnailStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ThumbnailCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []ThumbnailCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *thumbnailStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getThumbnail(s *thumbnailStatements, ctx context.Context, pk string, docId string) (*ThumbnailCosmosData, error) {
-	response := ThumbnailCosmosData{}
+func (s *thumbnailStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getThumbnail(s *thumbnailStatements, ctx context.Context, pk string, docId string) (*thumbnailCosmosData, error) {
+	response := thumbnailCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -142,7 +129,6 @@ func (s *thumbnailStatements) insertThumbnail(
 	// return s.writer.Do(s.db, nil, func(txn *sql.Tx) error {
 	// stmt := sqlutil.TxStmt(txn, s.insertThumbnailStmt)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
 	docId := fmt.Sprintf("%s_%s_%d_%d_%s",
 		thumbnailMetadata.MediaMetadata.MediaID,
@@ -151,8 +137,7 @@ func (s *thumbnailStatements) insertThumbnail(
 		thumbnailMetadata.ThumbnailSize.Height,
 		thumbnailMetadata.ThumbnailSize.ResizeMethod,
 	)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// _, err := stmt.ExecContext(
 	// 	ctx,
@@ -166,7 +151,7 @@ func (s *thumbnailStatements) insertThumbnail(
 	// 	thumbnailMetadata.ThumbnailSize.ResizeMethod,
 	// )
 
-	data := ThumbnailCosmos{
+	data := thumbnailCosmos{
 		MediaID:           string(thumbnailMetadata.MediaMetadata.MediaID),
 		MediaOrigin:       string(thumbnailMetadata.MediaMetadata.Origin),
 		ContentType:       string(thumbnailMetadata.MediaMetadata.ContentType),
@@ -177,8 +162,8 @@ func (s *thumbnailStatements) insertThumbnail(
 		ResizeMethod:      string(thumbnailMetadata.ThumbnailSize.ResizeMethod),
 	}
 
-	dbData := &ThumbnailCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	dbData := &thumbnailCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		Thumbnail:      data,
 	}
 
@@ -213,7 +198,6 @@ func (s *thumbnailStatements) selectThumbnail(
 
 	// SELECT content_type, file_size_bytes, creation_ts FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2 AND width = $3 AND height = $4 AND resize_method = $5
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
 	docId := fmt.Sprintf("%s_%s_%d_%d_%s",
 		mediaID,
@@ -222,11 +206,10 @@ func (s *thumbnailStatements) selectThumbnail(
 		height,
 		resizeMethod,
 	)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)
-	row, err := getThumbnail(s, ctx, pk, cosmosDocId)
+	row, err := getThumbnail(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return nil, err
@@ -253,9 +236,8 @@ func (s *thumbnailStatements) selectThumbnails(
 
 	// SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": mediaID,
 		"@x3": mediaOrigin,
 	}
@@ -263,7 +245,12 @@ func (s *thumbnailStatements) selectThumbnails(
 	// rows, err := s.selectThumbnailsStmt.QueryContext(
 	// 	ctx, mediaID, mediaOrigin,
 	// )
-	rows, err := queryThumbnail(s, ctx, s.selectThumbnailsStmt, params)
+	var rows []thumbnailCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectThumbnailsStmt, params, &rows)
 
 	if err != nil {
 		return nil, err

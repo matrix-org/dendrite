@@ -41,12 +41,7 @@ import (
 // CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
 // `
 
-type KeyBackupVersionCosmosData struct {
-	cosmosdbapi.CosmosDocument
-	KeyBackupVersion KeyBackupVersionCosmos `json:"mx_userapi_account_e2e_room_keys_versions"`
-}
-
-type KeyBackupVersionCosmos struct {
+type keyBackupVersionCosmos struct {
 	UserId    string `json:"user_id"`
 	Version   int64  `json:"vesion"`
 	Algorithm string `json:"algorithm"`
@@ -55,7 +50,12 @@ type KeyBackupVersionCosmos struct {
 	Deleted   int    `json:"deleted"`
 }
 
-type KeyBackupVersionCosmosNumber struct {
+type keyBackupVersionCosmosData struct {
+	cosmosdbapi.CosmosDocument
+	KeyBackupVersion keyBackupVersionCosmos `json:"mx_userapi_account_e2e_room_keys_versions"`
+}
+
+type keyBackupVersionCosmosNumber struct {
 	Number int64 `json:"number"`
 }
 
@@ -91,33 +91,16 @@ type keyBackupVersionStatements struct {
 	serverName gomatrixserverlib.ServerName
 }
 
-func queryKeyBackupVersionNumber(s *keyBackupVersionStatements, ctx context.Context, qry string, params map[string]interface{}) ([]KeyBackupVersionCosmosNumber, error) {
-	var response []KeyBackupVersionCosmosNumber
-
-	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
-	var query = cosmosdbapi.GetQuery(qry, params)
-	var _, _ = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	//WHen there is no data these GroupBy queries return errors
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	if len(response) == 0 {
-		return nil, cosmosdbutil.ErrNoRows
-	}
-
-	return response, nil
+func (s *keyBackupVersionStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getKeyBackupVersion(s *keyBackupVersionStatements, ctx context.Context, pk string, docId string) (*KeyBackupVersionCosmosData, error) {
-	response := KeyBackupVersionCosmosData{}
+func (s *keyBackupVersionStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getKeyBackupVersion(s *keyBackupVersionStatements, ctx context.Context, pk string, docId string) (*keyBackupVersionCosmosData, error) {
+	response := keyBackupVersionCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -133,7 +116,7 @@ func getKeyBackupVersion(s *keyBackupVersionStatements, ctx context.Context, pk 
 	return &response, err
 }
 
-func setKeyBackupVersion(s *keyBackupVersionStatements, ctx context.Context, keyBackup KeyBackupVersionCosmosData) (*KeyBackupVersionCosmosData, error) {
+func setKeyBackupVersion(s *keyBackupVersionStatements, ctx context.Context, keyBackup keyBackupVersionCosmosData) (*keyBackupVersionCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(keyBackup.Pk, keyBackup.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -171,14 +154,11 @@ func (s *keyBackupVersionStatements) insertKeyBackup(
 		return "", seqErr
 	}
 	// err = txn.Stmt(s.insertKeyBackupStmt).QueryRowContext(ctx, userID, algorithm, string(authData), etag).Scan(&versionInt)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-
-	data := KeyBackupVersionCosmos{
+	data := keyBackupVersionCosmos{
 		UserId:    userID,
 		Version:   versionInt,
 		Algorithm: algorithm,
@@ -187,8 +167,8 @@ func (s *keyBackupVersionStatements) insertKeyBackup(
 		Deleted:   0,
 	}
 
-	dbData := &KeyBackupVersionCosmosData{
-		CosmosDocument:   cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	dbData := &keyBackupVersionCosmosData{
+		CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		KeyBackupVersion: data,
 	}
 
@@ -211,13 +191,11 @@ func (s *keyBackupVersionStatements) updateKeyBackupAuthData(
 	if err != nil {
 		return fmt.Errorf("invalid version")
 	}
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, pk, cosmosDocId)
+	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return err
@@ -243,13 +221,11 @@ func (s *keyBackupVersionStatements) updateKeyBackupETag(
 	if err != nil {
 		return fmt.Errorf("invalid version")
 	}
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, pk, cosmosDocId)
+	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return err
@@ -275,13 +251,11 @@ func (s *keyBackupVersionStatements) deleteKeyBackup(
 	if err != nil {
 		return false, fmt.Errorf("invalid version")
 	}
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, pk, cosmosDocId)
+	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return false, err
@@ -309,17 +283,21 @@ func (s *keyBackupVersionStatements) selectKeyBackup(
 	var versionInt int64
 	if version == "" {
 		// var v *int64 // allows nulls
-		var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 		params := map[string]interface{}{
 			"@x1": s.db.cosmosConfig.TenantName,
-			"@x2": dbCollectionName,
+			"@x2": s.getCollectionName(),
 			"@x3": userID,
 		}
 
 		// err = sqlutil.TxStmt(txn, s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
-		response, err1 := queryKeyBackupVersionNumber(s, ctx, s.selectLatestVersionStmt, params)
+		var rows []keyBackupVersionCosmosNumber
+		err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+			s.db.connection,
+			s.db.cosmosConfig.DatabaseName,
+			s.db.cosmosConfig.ContainerName,
+			s.selectLatestVersionStmt, params, &rows)
 
-		if err1 != nil {
+		if err != nil {
 			if err == cosmosdbutil.ErrNoRows {
 				err = nil
 			}
@@ -327,12 +305,12 @@ func (s *keyBackupVersionStatements) selectKeyBackup(
 		// if err = txn.Stmt(s.selectLatestVersionStmt).QueryRowContext(ctx, userID).Scan(&v); err != nil {
 		// 	return
 		// }
-		if response == nil || len(response) == 0 {
+		if rows == nil || len(rows) == 0 {
 			err = cosmosdbutil.ErrNoRows
 			versionInt = 0
 			return
 		}
-		versionInt = response[0].Number
+		versionInt = rows[0].Number
 	} else {
 		if versionInt, err = strconv.ParseInt(version, 10, 64); err != nil {
 			return
@@ -342,13 +320,11 @@ func (s *keyBackupVersionStatements) selectKeyBackup(
 	if err != nil {
 		return
 	}
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, pk, cosmosDocId)
+	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return

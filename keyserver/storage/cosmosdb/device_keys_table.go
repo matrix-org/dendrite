@@ -39,7 +39,7 @@ import (
 // );
 // `
 
-type DeviceKeyCosmos struct {
+type deviceKeyCosmos struct {
 	UserID   string `json:"user_id"`
 	DeviceID string `json:"device_id"`
 	// Use the CosmosDB.Timestamp for this one
@@ -49,13 +49,13 @@ type DeviceKeyCosmos struct {
 	DisplayName string `json:"display_name"`
 }
 
-type DeviceKeyCosmosNumber struct {
+type deviceKeyCosmosNumber struct {
 	Number int64 `json:"number"`
 }
 
-type DeviceKeyCosmosData struct {
+type deviceKeyCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	DeviceKey DeviceKeyCosmos `json:"mx_keyserver_device_key"`
+	DeviceKey deviceKeyCosmos `json:"mx_keyserver_device_key"`
 }
 
 // const upsertDeviceKeysSQL = "" +
@@ -97,54 +97,8 @@ const deleteDeviceKeysSQL = "" +
 	// const deleteAllDeviceKeysSQL = "" +
 // 	"DELETE FROM keyserver_device_keys WHERE user_id=$1"
 
-func queryDeviceKey(s *deviceKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]DeviceKeyCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []DeviceKeyCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func queryDeviceKeyNumber(s *deviceKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]DeviceKeyCosmosNumber, error) {
-	var response []DeviceKeyCosmosNumber
-
-	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
-	var query = cosmosdbapi.GetQuery(qry, params)
-	var _, _ = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	//WHen there is no data these GroupBy queries return errors
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	if len(response) == 0 {
-		return nil, cosmosdbutil.ErrNoRows
-	}
-
-	return response, nil
-}
-
-func getDeviceKey(s *deviceKeysStatements, ctx context.Context, pk string, docId string) (*DeviceKeyCosmosData, error) {
-	response := DeviceKeyCosmosData{}
+func getDeviceKey(s *deviceKeysStatements, ctx context.Context, pk string, docId string) (*deviceKeyCosmosData, error) {
+	response := deviceKeyCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -160,7 +114,7 @@ func getDeviceKey(s *deviceKeysStatements, ctx context.Context, pk string, docId
 	return &response, err
 }
 
-func insertDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData DeviceKeyCosmosData) error {
+func insertDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData deviceKeyCosmosData) error {
 	// "INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json, stream_id, display_name)" +
 	// " VALUES ($1, $2, $3, $4, $5, $6)" +
 	// " ON CONFLICT (user_id, device_id)" +
@@ -189,8 +143,8 @@ func insertDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData De
 	return nil
 }
 
-func mapFromDeviceKeyMessage(key api.DeviceMessage) DeviceKeyCosmos {
-	return DeviceKeyCosmos{
+func mapFromDeviceKeyMessage(key api.DeviceMessage) deviceKeyCosmos {
+	return deviceKeyCosmos{
 		DeviceID:    key.DeviceID,
 		DisplayName: key.DisplayName,
 		KeyJSON:     key.KeyJSON,
@@ -210,6 +164,14 @@ type deviceKeysStatements struct {
 	tableName string
 }
 
+func (s *deviceKeysStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *deviceKeysStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
 func NewCosmosDBDeviceKeysTable(db *Database) (tables.DeviceKeys, error) {
 	s := &deviceKeysStatements{
 		db: db,
@@ -221,7 +183,7 @@ func NewCosmosDBDeviceKeysTable(db *Database) (tables.DeviceKeys, error) {
 	return s, nil
 }
 
-func deleteDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData DeviceKeyCosmosData) error {
+func deleteDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData deviceKeyCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -239,19 +201,24 @@ func deleteDeviceKeyCore(s *deviceKeysStatements, ctx context.Context, dbData De
 func (s *deviceKeysStatements) DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error {
 	// "DELETE FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
 	// _, err := sqlutil.TxStmt(txn, s.deleteDeviceKeysStmt).ExecContext(ctx, userID, deviceID)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": deviceID,
 	}
-	response, err := queryDeviceKey(s, ctx, selectAllDeviceKeysSQL, params)
+
+	var rows []deviceKeyCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), selectAllDeviceKeysSQL, params, &rows)
 
 	if err != nil {
 		return err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		errItem := deleteDeviceKeyCore(s, ctx, item)
 		if errItem != nil {
 			return errItem
@@ -265,18 +232,23 @@ func (s *deviceKeysStatements) DeleteAllDeviceKeys(ctx context.Context, txn *sql
 	// 	"DELETE FROM keyserver_device_keys WHERE user_id=$1"
 	// _, err := sqlutil.TxStmt(txn, s.deleteAllDeviceKeysStmt).ExecContext(ctx, userID)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 	}
-	response, err := queryDeviceKey(s, ctx, selectAllDeviceKeysSQL, params)
+
+	var rows []deviceKeyCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), selectAllDeviceKeysSQL, params, &rows)
 
 	if err != nil {
 		return err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		errItem := deleteDeviceKeyCore(s, ctx, item)
 		if errItem != nil {
 			return errItem
@@ -293,12 +265,18 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 	for _, d := range deviceIDs {
 		deviceIDMap[d] = true
 	}
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 	}
-	response, err := queryDeviceKey(s, ctx, s.selectBatchDeviceKeysStmt, params)
+
+	var rows []deviceKeyCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectBatchDeviceKeysStmt, params, &rows)
+
 	// rows, err := s.selectBatchDeviceKeysStmt.QueryContext(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -306,7 +284,7 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 	// defer internal.CloseAndLogIfError(ctx, rows, "selectBatchDeviceKeysStmt: rows.close() failed")
 
 	var result []api.DeviceMessage
-	for _, item := range response {
+	for _, item := range rows {
 		dk := api.DeviceMessage{
 			Type:       api.TypeDeviceKeyUpdate,
 			DeviceKeys: &api.DeviceKeys{},
@@ -344,13 +322,12 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 		// 	"SELECT key_json, stream_id, display_name FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
 
 		// err := s.selectDeviceKeysStmt.QueryRowContext(ctx, key.UserID, key.DeviceID).Scan(&keyJSONStr, &streamID, &displayName)
-		var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+
 		//     UNIQUE (user_id, device_id)
 		docId := fmt.Sprintf("%s_%s", key.UserID, key.DeviceID)
-		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-		pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-		response, err := getDeviceKey(s, ctx, pk, cosmosDocId)
+		response, err := getDeviceKey(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 		if err != nil && err != cosmosdbutil.ErrNoRows {
 			return err
@@ -377,15 +354,19 @@ func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn
 
 	// "SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id=$1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
 		"@x1": s.db.cosmosConfig.TenantName,
-		"@x2": dbCollectionName,
+		"@x2": s.getCollectionName(),
 		"@x3": userID,
 	}
 
 	// err = sqlutil.TxStmt(txn, s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
-	response, err := queryDeviceKeyNumber(s, ctx, selectMaxStreamForUserSQL, params)
+	var rows []deviceKeyCosmosNumber
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), selectMaxStreamForUserSQL, params, &rows)
 
 	if err != nil {
 		if err == cosmosdbutil.ErrNoRows {
@@ -395,8 +376,8 @@ func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn
 		}
 	}
 
-	if len(response) > 0 {
-		nullStream.Int32 = int32(response[0].Number)
+	if len(rows) > 0 {
+		nullStream.Int32 = int32(rows[0].Number)
 	}
 
 	if nullStream.Valid {
@@ -415,10 +396,9 @@ func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID
 		iStreamIDs[i+1] = streamIDs[i]
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
 		"@x1": s.db.cosmosConfig.TenantName,
-		"@x2": dbCollectionName,
+		"@x2": s.getCollectionName(),
 		"@x3": userID,
 		"@x4": iStreamIDs,
 	}
@@ -428,7 +408,12 @@ func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID
 	// var count sql.NullInt32
 	// err := s.db.QueryRowContext(ctx, query, iStreamIDs...).Scan(&count)
 
-	response, err := queryDeviceKeyNumber(s, ctx, countStreamIDsForUserSQL, params)
+	var rows []deviceKeyCosmosNumber
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), countStreamIDsForUserSQL, params, &rows)
 
 	if err != nil {
 		return 0, err
@@ -436,8 +421,8 @@ func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID
 	// if count.Valid {
 	// 	return int(count.Int32), nil
 	// }
-	if response[0].Number >= 0 {
-		return int(response[0].Number), nil
+	if rows[0].Number >= 0 {
+		return int(rows[0].Number), nil
 	}
 	return 0, nil
 }
@@ -448,16 +433,14 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx
 	// " VALUES ($1, $2, $3, $4, $5, $6)" +
 	// " ON CONFLICT (user_id, device_id)" +
 	// " DO UPDATE SET key_json = $4, stream_id = $5, display_name = $6"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 
 	for _, key := range keys {
 		//     UNIQUE (user_id, device_id)
 		docId := fmt.Sprintf("%s_%s", key.UserID, key.DeviceID)
-		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-		dbData := &DeviceKeyCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData := &deviceKeyCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			DeviceKey:      mapFromDeviceKeyMessage(key),
 		}
 

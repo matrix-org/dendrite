@@ -37,15 +37,15 @@ import (
 // );
 // `
 
-type RedactionCosmos struct {
+type redactionCosmos struct {
 	RedactionEventID string `json:"redaction_event_id"`
 	RedactsEventID   string `json:"redacts_event_id"`
 	Validated        bool   `json:"validated"`
 }
 
-type RedactionCosmosData struct {
+type redactionCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Redaction RedactionCosmos `json:"mx_roomserver_redaction"`
+	Redaction redactionCosmos `json:"mx_roomserver_redaction"`
 }
 
 // const insertRedactionSQL = "" +
@@ -74,29 +74,16 @@ type redactionStatements struct {
 	tableName string
 }
 
-func queryRedaction(s *redactionStatements, ctx context.Context, qry string, params map[string]interface{}) ([]RedactionCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []RedactionCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *redactionStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getRedaction(s *redactionStatements, ctx context.Context, pk string, docId string) (*RedactionCosmosData, error) {
-	response := RedactionCosmosData{}
+func (s *redactionStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getRedaction(s *redactionStatements, ctx context.Context, pk string, docId string) (*redactionCosmosData, error) {
+	response := redactionCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -112,7 +99,7 @@ func getRedaction(s *redactionStatements, ctx context.Context, pk string, docId 
 	return &response, err
 }
 
-func setRedaction(s *redactionStatements, ctx context.Context, redaction RedactionCosmosData) (*RedactionCosmosData, error) {
+func setRedaction(s *redactionStatements, ctx context.Context, redaction redactionCosmosData) (*redactionCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(redaction.Pk, redaction.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -146,20 +133,18 @@ func (s *redactionStatements) InsertRedaction(
 	// "INSERT OR IGNORE INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
 	// " VALUES ($1, $2, $3)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     redaction_event_id TEXT PRIMARY KEY,
 	docId := info.RedactionEventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	data := RedactionCosmos{
+	data := redactionCosmos{
 		RedactionEventID: info.RedactionEventID,
 		RedactsEventID:   info.RedactsEventID,
 		Validated:        info.Validated,
 	}
 
-	var dbData = RedactionCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = redactionCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		Redaction:      data,
 	}
 
@@ -188,13 +173,11 @@ func (s *redactionStatements) SelectRedactionInfoByRedactionEventID(
 
 	// "SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
 	// " WHERE redaction_event_id = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     redaction_event_id TEXT PRIMARY KEY,
 	docId := redactionEventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	response, err := getRedaction(s, ctx, pk, cosmosDocId)
+	response, err := getRedaction(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		info = nil
 		err = err
@@ -221,27 +204,31 @@ func (s *redactionStatements) SelectRedactionInfoByEventBeingRedacted(
 	// "SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
 	// " WHERE redacts_event_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventID,
 	}
-	response, err := queryRedaction(s, ctx, s.selectRedactionInfoByEventBeingRedactedStmt, params)
+	var rows []redactionCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectRedactionInfoByEventBeingRedactedStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		info = nil
 		err = nil
 		return
 	}
 	// TODO: Check this is ok to return the 1st one
 	*info = tables.RedactionInfo{
-		RedactionEventID: response[0].Redaction.RedactionEventID,
-		RedactsEventID:   response[0].Redaction.RedactsEventID,
-		Validated:        response[0].Redaction.Validated,
+		RedactionEventID: rows[0].Redaction.RedactionEventID,
+		RedactsEventID:   rows[0].Redaction.RedactsEventID,
+		Validated:        rows[0].Redaction.Validated,
 	}
 	return
 }
@@ -252,13 +239,11 @@ func (s *redactionStatements) MarkRedactionValidated(
 
 	// " UPDATE roomserver_redactions SET validated = $2 WHERE redaction_event_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     redaction_event_id TEXT PRIMARY KEY,
 	docId := redactionEventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	response, err := getRedaction(s, ctx, pk, cosmosDocId)
+	response, err := getRedaction(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		return err
 	}

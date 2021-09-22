@@ -40,7 +40,7 @@ import (
 // 		WHERE NOT retired;
 // `
 
-type InviteCosmos struct {
+type inviteCosmos struct {
 	InviteEventID   string `json:"invite_event_id"`
 	RoomNID         int64  `json:"room_nid"`
 	TargetNID       int64  `json:"target_nid"`
@@ -49,9 +49,9 @@ type InviteCosmos struct {
 	InviteEventJSON []byte `json:"invite_event_json"`
 }
 
-type InviteCosmosData struct {
+type inviteCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Invite InviteCosmos `json:"mx_roomserver_invite"`
+	Invite inviteCosmos `json:"mx_roomserver_invite"`
 }
 
 // const insertInviteEventSQL = "" +
@@ -93,29 +93,16 @@ type inviteStatements struct {
 	tableName                      string
 }
 
-func queryInvite(s *inviteStatements, ctx context.Context, qry string, params map[string]interface{}) ([]InviteCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []InviteCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *inviteStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getInvite(s *inviteStatements, ctx context.Context, pk string, docId string) (*InviteCosmosData, error) {
-	response := InviteCosmosData{}
+func (s *inviteStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getInvite(s *inviteStatements, ctx context.Context, pk string, docId string) (*inviteCosmosData, error) {
+	response := inviteCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -131,7 +118,7 @@ func getInvite(s *inviteStatements, ctx context.Context, pk string, docId string
 	return &response, err
 }
 
-func setInvite(s *inviteStatements, ctx context.Context, invite InviteCosmosData) (*InviteCosmosData, error) {
+func setInvite(s *inviteStatements, ctx context.Context, invite inviteCosmosData) (*inviteCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(invite.Pk, invite.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -168,9 +155,11 @@ func (s *inviteStatements) InsertInviteEvent(
 	// " sender_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
 	// " ON CONFLICT DO NOTHING"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+	// 		invite_event_id TEXT PRIMARY KEY,
+	docId := inviteEventID
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	data := InviteCosmos{
+	data := inviteCosmos{
 		InviteEventID:   inviteEventID,
 		InviteEventJSON: inviteEventJSON,
 		Retired:         false,
@@ -179,13 +168,8 @@ func (s *inviteStatements) InsertInviteEvent(
 		TargetNID:       int64(targetUserNID),
 	}
 
-	// 		invite_event_id TEXT PRIMARY KEY,
-	docId := inviteEventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-
-	var dbData = InviteCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = inviteCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		Invite:         data,
 	}
 
@@ -216,20 +200,24 @@ func (s *inviteStatements) UpdateInviteRetired(
 	// " AND NOT retired"
 
 	// gather all the event IDs we will retire
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": targetUserNID,
 		"@x3": roomNID,
 	}
 
-	response, err := queryInvite(s, ctx, s.selectInvitesAboutToRetireStmt, params)
+	var rows []inviteCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectInvitesAboutToRetireStmt, params, &rows)
 
 	if err != nil {
 		return
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		eventIDs = append(eventIDs, item.Invite.InviteEventID)
 		// 	UPDATE roomserver_invites SET retired = TRUE WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
 
@@ -249,14 +237,18 @@ func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 
 	// SELECT invite_event_id FROM roomserver_invites WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNID,
 		"@x3": targetUserNID,
 	}
 
-	response, err := queryInvite(s, ctx, s.selectInviteActiveForUserInRoomStmt, params)
+	var rows []inviteCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectInviteActiveForUserInRoomStmt, params, &rows)
 
 	if err != nil {
 		return nil, nil, err
@@ -264,7 +256,7 @@ func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 
 	var result []types.EventStateKeyNID
 	var eventIDs []string
-	for _, item := range response {
+	for _, item := range rows {
 		var eventID = item.Invite.InviteEventID
 		var senderUserNID = item.Invite.SenderNID
 		result = append(result, types.EventStateKeyNID(senderUserNID))

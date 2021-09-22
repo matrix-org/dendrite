@@ -39,16 +39,16 @@ import (
 // -- CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_topological_position_idx ON syncapi_output_room_events_topology(topological_position, stream_position, room_id);
 // `
 
-type OutputRoomEventTopologyCosmos struct {
+type outputRoomEventTopologyCosmos struct {
 	EventID             string `json:"event_id"`
 	TopologicalPosition int64  `json:"topological_position"`
 	StreamPosition      int64  `json:"stream_position"`
 	RoomID              string `json:"room_id"`
 }
 
-type OutputRoomEventTopologyCosmosData struct {
+type outputRoomEventTopologyCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	OutputRoomEventTopology OutputRoomEventTopologyCosmos `json:"mx_syncapi_output_room_event_topology"`
+	OutputRoomEventTopology outputRoomEventTopologyCosmos `json:"mx_syncapi_output_room_event_topology"`
 }
 
 // const insertEventInTopologySQL = "" +
@@ -126,29 +126,16 @@ type outputRoomEventsTopologyStatements struct {
 	tableName                       string
 }
 
-func queryOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutputRoomEventTopologyCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []OutputRoomEventTopologyCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *outputRoomEventsTopologyStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, pk string, docId string) (*OutputRoomEventTopologyCosmosData, error) {
-	response := OutputRoomEventTopologyCosmosData{}
+func (s *outputRoomEventsTopologyStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, pk string, docId string) (*outputRoomEventTopologyCosmosData, error) {
+	response := outputRoomEventTopologyCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -164,7 +151,7 @@ func getOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx conte
 	return &response, err
 }
 
-func deleteOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, dbData OutputRoomEventTopologyCosmosData) error {
+func deleteOutputRoomEventTopology(s *outputRoomEventsTopologyStatements, ctx context.Context, dbData outputRoomEventTopologyCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -203,26 +190,24 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	// 	" VALUES ($1, $2, $3, $4)" +
 	// 	" ON CONFLICT DO NOTHING"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE(topological_position, room_id, stream_position)
 	docId := fmt.Sprintf("%d_%s_%d", event.Depth(), event.RoomID(), pos)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	var err error
-	dbData, _ := getOutputRoomEventTopology(s, ctx, pk, cosmosDocId)
+	dbData, _ := getOutputRoomEventTopology(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		// 	" ON CONFLICT DO NOTHING"
 	} else {
-		data := OutputRoomEventTopologyCosmos{
+		data := outputRoomEventTopologyCosmos{
 			EventID:             event.EventID(),
 			TopologicalPosition: event.Depth(),
 			RoomID:              event.RoomID(),
 			StreamPosition:      int64(pos),
 		}
 
-		dbData = &OutputRoomEventTopologyCosmosData{
-			CosmosDocument:          cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &outputRoomEventTopologyCosmosData{
+			CosmosDocument:          cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			OutputRoomEventTopology: data,
 		}
 		// _, err := sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).ExecContext(
@@ -265,9 +250,8 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	}
 
 	// Query the event IDs.
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 		"@x3": minDepth,
 		"@x4": maxDepth,
@@ -275,8 +259,12 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 		"@x6": maxStreamPos,
 		"@x7": limit,
 	}
-
-	rows, err := queryOutputRoomEventTopology(s, ctx, stmt, params)
+	var rows []outputRoomEventTopologyCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), stmt, params, &rows)
 	// rows, err := stmt.QueryContext(ctx, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit)
 
 	if err == sql.ErrNoRows {
@@ -308,13 +296,17 @@ func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
 	// "SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	// " WHERE event_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventID,
 	}
+	var rows []outputRoomEventTopologyCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectPositionInTopologyStmt, params, &rows)
 
-	rows, err := queryOutputRoomEventTopology(s, ctx, s.selectPositionInTopologyStmt, params)
 	// stmt := sqlutil.TxStmt(txn, s.selectPositionInTopologyStmt)
 
 	if err != nil {
@@ -342,13 +334,17 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	// ") ORDER BY stream_position DESC LIMIT 1"
 
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
+	var rows []outputRoomEventTopologyCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectMaxPositionInTopologyStmt, params, &rows)
 
-	rows, err := queryOutputRoomEventTopology(s, ctx, s.selectMaxPositionInTopologyStmt, params)
 	// err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 
 	if err != nil {
@@ -369,13 +365,17 @@ func (s *outputRoomEventsTopologyStatements) DeleteTopologyForRoom(
 ) (err error) {
 
 	// "DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
+	var rows []outputRoomEventTopologyCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteTopologyForRoomStmt, params, &rows)
 
-	rows, err := queryOutputRoomEventTopology(s, ctx, s.deleteTopologyForRoomStmt, params)
 	// _, err = sqlutil.TxStmt(txn, s.deleteTopologyForRoomStmt).ExecContext(ctx, roomID)
 
 	if err != nil {

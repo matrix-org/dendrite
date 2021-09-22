@@ -42,19 +42,19 @@ import (
 //   );
 // `
 
-type StateBlockCosmos struct {
+type stateBlockCosmos struct {
 	StateBlockNID  int64   `json:"state_block_nid"`
 	StateBlockHash []byte  `json:"state_block_hash"`
 	EventNIDs      []int64 `json:"event_nids"`
 }
 
-type StateBlockCosmosMaxNID struct {
+type stateBlockCosmosMaxNID struct {
 	Max int64 `json:"maxstateblocknid"`
 }
 
-type StateBlockCosmosData struct {
+type stateBlockCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	StateBlock StateBlockCosmos `json:"mx_roomserver_state_block"`
+	StateBlock stateBlockCosmos `json:"mx_roomserver_state_block"`
 }
 
 // Insert a new state block. If we conflict on the hash column then
@@ -82,29 +82,16 @@ type stateBlockStatements struct {
 	tableName                       string
 }
 
-func queryStateBlock(s *stateBlockStatements, ctx context.Context, qry string, params map[string]interface{}) ([]StateBlockCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []StateBlockCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *stateBlockStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getStateBlock(s *stateBlockStatements, ctx context.Context, pk string, docId string) (*StateBlockCosmosData, error) {
-	response := StateBlockCosmosData{}
+func (s *stateBlockStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getStateBlock(s *stateBlockStatements, ctx context.Context, pk string, docId string) (*stateBlockCosmosData, error) {
+	response := stateBlockCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -120,7 +107,7 @@ func getStateBlock(s *stateBlockStatements, ctx context.Context, pk string, docI
 	return &response, err
 }
 
-func setStateBlock(s *stateBlockStatements, ctx context.Context, item StateBlockCosmosData) (*StateBlockCosmosData, error) {
+func setStateBlock(s *stateBlockStatements, ctx context.Context, item stateBlockCosmosData) (*stateBlockCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(item.Pk, item.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -168,16 +155,12 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	// 	ctx, nids.Hash(), js,
 	// ).Scan(&id)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-
 	// 	state_block_hash BLOB UNIQUE,
 	docId := hex.EncodeToString(nids.Hash())
-
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	//See if it exists
-	existing, err := getStateBlock(s, ctx, pk, cosmosDocId)
+	existing, err := getStateBlock(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		if err != cosmosdbutil.ErrNoRows {
 			return 0, err
@@ -199,14 +182,14 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	seq, err := GetNextStateBlockNID(s, ctx)
 	id = types.StateBlockNID(seq)
 
-	data := StateBlockCosmos{
+	data := stateBlockCosmos{
 		StateBlockNID:  seq,
 		StateBlockHash: nids.Hash(),
 		EventNIDs:      ids,
 	}
 
-	var dbData = StateBlockCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = stateBlockCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		StateBlock:     data,
 	}
 
@@ -235,14 +218,18 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	// if err != nil {
 	// 	return nil, err
 	// }
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": stateBlockNIDs,
 	}
 
 	// rows, err := selectStmt.QueryContext(ctx, intfs...)
-	rows, err := queryStateBlock(s, ctx, s.bulkSelectStateBlockEntriesStmt, params)
+	var rows []stateBlockCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectStateBlockEntriesStmt, params, &rows)
 
 	if err != nil {
 		return nil, err

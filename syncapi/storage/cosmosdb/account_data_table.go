@@ -39,7 +39,7 @@ import (
 // );
 // `
 
-type AccountDataTypeCosmos struct {
+type accountDataTypeCosmos struct {
 	ID       int64  `json:"id"`
 	UserID   string `json:"user_id"`
 	RoomID   string `json:"room_id"`
@@ -50,9 +50,9 @@ type AccountDataTypeNumberCosmosData struct {
 	Number int64 `json:"number"`
 }
 
-type AccountDataTypeCosmosData struct {
+type accountDataTypeCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	AccountDataType AccountDataTypeCosmos `json:"mx_syncapi_account_data_type"`
+	AccountDataType accountDataTypeCosmos `json:"mx_syncapi_account_data_type"`
 }
 
 // const insertAccountDataSQL = "" +
@@ -83,8 +83,16 @@ type accountDataStatements struct {
 	tableName                    string
 }
 
-func getAccountDataType(s *accountDataStatements, ctx context.Context, pk string, docId string) (*AccountDataTypeCosmosData, error) {
-	response := AccountDataTypeCosmosData{}
+func (s *accountDataStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *accountDataStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getAccountDataType(s *accountDataStatements, ctx context.Context, pk string, docId string) (*accountDataTypeCosmosData, error) {
+	response := accountDataTypeCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -98,48 +106,6 @@ func getAccountDataType(s *accountDataStatements, ctx context.Context, pk string
 	}
 
 	return &response, err
-}
-
-func queryAccountDataType(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataTypeCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []AccountDataTypeCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func queryAccountDataTypeNumber(s *accountDataStatements, ctx context.Context, qry string, params map[string]interface{}) ([]AccountDataTypeNumberCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []AccountDataTypeNumberCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, cosmosdbutil.ErrNoRows
-	}
-	return response, nil
 }
 
 func NewCosmosDBAccountDataTable(db *SyncServerDatasource, streamID *streamIDStatements) (tables.AccountData, error) {
@@ -168,26 +134,24 @@ func (s *accountDataStatements) InsertAccountData(
 		return
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     UNIQUE (user_id, room_id, type)
 	docId := fmt.Sprintf("%s_%s_%s", userID, roomID, dataType)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getAccountDataType(s, ctx, pk, cosmosDocId)
+	dbData, _ := getAccountDataType(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.AccountDataType.ID = int64(pos)
 	} else {
-		data := AccountDataTypeCosmos{
+		data := accountDataTypeCosmos{
 			ID:       int64(pos),
 			UserID:   userID,
 			RoomID:   roomID,
 			DataType: dataType,
 		}
 
-		dbData = &AccountDataTypeCosmosData{
-			CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &accountDataTypeCosmosData{
+			CosmosDocument:  cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			AccountDataType: data,
 		}
 	}
@@ -216,15 +180,18 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	// " ORDER BY id ASC"
 
 	// rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High())
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": r.Low(),
 		"@x4": r.High(),
 	}
-
-	rows, err := queryAccountDataType(s, ctx, s.selectAccountDataInRangeStmt, params)
+	var rows []accountDataTypeCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectAccountDataInRangeStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -276,12 +243,16 @@ func (s *accountDataStatements) SelectMaxAccountDataID(
 
 	var nullableID sql.NullInt64
 	// err = sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt).QueryRowContext(ctx).Scan(&nullableID)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
 
-	rows, err := queryAccountDataTypeNumber(s, ctx, s.selectMaxAccountDataIDStmt, params)
+	var rows []AccountDataTypeNumberCosmosData
+	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.selectMaxAccountDataIDStmt, params, &rows)
 
 	if err != cosmosdbutil.ErrNoRows && len(rows) == 1 {
 		nullableID.Int64 = rows[0].Number

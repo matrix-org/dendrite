@@ -34,15 +34,15 @@ import (
 // );
 // `
 
-type CrossSigningKeysCosmos struct {
+type crossSigningKeysCosmos struct {
 	UserID  string `json:"user_id"`
 	KeyType int64  `json:"key_type"`
 	KeyData []byte `json:"key_data"`
 }
 
-type CrossSigningKeysCosmosData struct {
+type crossSigningKeysCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	CrossSigningKeys CrossSigningKeysCosmos `json:"mx_keyserver_cross_signing_keys"`
+	CrossSigningKeys crossSigningKeysCosmos `json:"mx_keyserver_cross_signing_keys"`
 }
 
 // "SELECT key_type, key_data FROM keyserver_cross_signing_keys" +
@@ -62,8 +62,16 @@ type crossSigningKeysStatements struct {
 	tableName string
 }
 
-func getCrossSigningKeys(s *crossSigningKeysStatements, ctx context.Context, pk string, docId string) (*CrossSigningKeysCosmosData, error) {
-	response := CrossSigningKeysCosmosData{}
+func (s *crossSigningKeysStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *crossSigningKeysStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getCrossSigningKeys(s *crossSigningKeysStatements, ctx context.Context, pk string, docId string) (*crossSigningKeysCosmosData, error) {
+	response := crossSigningKeysCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -77,27 +85,6 @@ func getCrossSigningKeys(s *crossSigningKeysStatements, ctx context.Context, pk 
 	}
 
 	return &response, err
-}
-
-func queryCrossSigningKeys(s *crossSigningKeysStatements, ctx context.Context, qry string, params map[string]interface{}) ([]CrossSigningKeysCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []CrossSigningKeysCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
 }
 
 func NewSqliteCrossSigningKeysTable(db *Database) (tables.CrossSigningKeys, error) {
@@ -115,12 +102,18 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 ) (r types.CrossSigningKeyMap, err error) {
 	// "SELECT key_type, key_data FROM keyserver_cross_signing_keys" +
 	// " WHERE user_id = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 	}
-	rows, err := queryCrossSigningKeys(s, ctx, s.selectCrossSigningKeysForUserStmt, params)
+
+	var rows []crossSigningKeysCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectCrossSigningKeysForUserStmt, params, &rows)
+
 	// rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningKeysForUserStmt).QueryContext(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -154,25 +147,23 @@ func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 	if !ok {
 		return fmt.Errorf("unknown key purpose %q", keyType)
 	}
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// 	PRIMARY KEY (user_id, key_type)
 	docId := fmt.Sprintf("%s_%s", userID, keyType)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getCrossSigningKeys(s, ctx, pk, cosmosDocId)
+	dbData, _ := getCrossSigningKeys(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.CrossSigningKeys.KeyData = keyData
 	} else {
-		data := CrossSigningKeysCosmos{
+		data := crossSigningKeysCosmos{
 			UserID:  userID,
 			KeyType: int64(keyTypeInt),
 			KeyData: keyData,
 		}
 
-		dbData = &CrossSigningKeysCosmosData{
-			CosmosDocument:   cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &crossSigningKeysCosmosData{
+			CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			CrossSigningKeys: data,
 		}
 	}

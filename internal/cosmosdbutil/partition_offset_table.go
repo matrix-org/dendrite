@@ -46,15 +46,15 @@ import (
 // );
 // `
 
-type PartitionOffsetCosmos struct {
+type partitionOffsetCosmos struct {
 	Topic           string `json:"topic"`
 	Partition       int32  `json:"partition"`
 	PartitionOffset int64  `json:"partition_offset"`
 }
 
-type PartitionOffsetCosmosData struct {
+type partitionOffsetCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	PartitionOffset PartitionOffsetCosmos `json:"mx_partition_offset"`
+	PartitionOffset partitionOffsetCosmos `json:"mx_partition_offset"`
 }
 
 // "SELECT partition, partition_offset FROM ${prefix}_partition_offsets WHERE topic = $1"
@@ -84,8 +84,18 @@ type PartitionOffsetStatements struct {
 	tableName string
 }
 
-func getPartitionOffset(s *PartitionOffsetStatements, ctx context.Context, pk string, docId string) (*PartitionOffsetCosmosData, error) {
-	response := PartitionOffsetCosmosData{}
+func (s PartitionOffsetStatements) getCollectionName() string {
+	// Include the Prefix
+	tableName := fmt.Sprintf("%s_%s", s.prefix, s.tableName)
+	return cosmosdbapi.GetCollectionName(s.db.DatabaseName, tableName)
+}
+
+func (s *PartitionOffsetStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.CosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getPartitionOffset(s *PartitionOffsetStatements, ctx context.Context, pk string, docId string) (*partitionOffsetCosmosData, error) {
+	response := partitionOffsetCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.Connection,
 		s.db.CosmosConfig,
@@ -99,27 +109,6 @@ func getPartitionOffset(s *PartitionOffsetStatements, ctx context.Context, pk st
 	}
 
 	return &response, err
-}
-
-func queryPartitionOffset(s *PartitionOffsetStatements, ctx context.Context, qry string, params map[string]interface{}) ([]PartitionOffsetCosmosData, error) {
-	var dbCollectionName = getCollectionName(*s)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.CosmosConfig.ContainerName, dbCollectionName)
-	var response []PartitionOffsetCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.Connection).QueryDocuments(
-		ctx,
-		s.db.CosmosConfig.DatabaseName,
-		s.db.CosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
 }
 
 // Prepare converts the raw SQL statements into prepared statements.
@@ -155,13 +144,18 @@ func (s *PartitionOffsetStatements) selectPartitionOffsets(
 
 	// "SELECT partition, partition_offset FROM ${prefix}_partition_offsets WHERE topic = $1"
 
-	var dbCollectionName = getCollectionName(*s)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": topic,
 	}
 
-	rows, err := queryPartitionOffset(s, ctx, s.selectPartitionOffsetsStmt, params)
+	var rows []partitionOffsetCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.Connection,
+		s.db.CosmosConfig.DatabaseName,
+		s.db.CosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectPartitionOffsetsStmt, params, &rows)
+
 	// rows, err := s.selectPartitionOffsetsStmt.QueryContext(ctx, topic)
 	if err != nil {
 		return nil, err
@@ -197,25 +191,23 @@ func (s *PartitionOffsetStatements) upsertPartitionOffset(
 
 		// stmt := TxStmt(txn, s.upsertPartitionOffsetStmt)
 
-		dbCollectionName := getCollectionName(*s)
 		//     UNIQUE (topic, partition)
 		docId := fmt.Sprintf("%s_%d", topic, partition)
-		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.CosmosConfig.TenantName, dbCollectionName, docId)
-		pk := cosmosdbapi.GetPartitionKey(s.db.CosmosConfig.ContainerName, dbCollectionName)
+		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.CosmosConfig.TenantName, s.getCollectionName(), docId)
 
-		dbData, _ := getPartitionOffset(s, ctx, pk, cosmosDocId)
+		dbData, _ := getPartitionOffset(s, ctx, s.getPartitionKey(), cosmosDocId)
 		if dbData != nil {
 			dbData.SetUpdateTime()
 			dbData.PartitionOffset.PartitionOffset = offset
 		} else {
-			data := PartitionOffsetCosmos{
+			data := partitionOffsetCosmos{
 				Partition:       partition,
 				PartitionOffset: offset,
 				Topic:           topic,
 			}
 
-			dbData = &PartitionOffsetCosmosData{
-				CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.CosmosConfig.TenantName, pk, cosmosDocId),
+			dbData = &partitionOffsetCosmosData{
+				CosmosDocument:  cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.CosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 				PartitionOffset: data,
 			}
 
@@ -230,10 +222,4 @@ func (s *PartitionOffsetStatements) upsertPartitionOffset(
 			dbData.Pk,
 			&dbData)
 	})
-}
-
-func getCollectionName(s PartitionOffsetStatements) string {
-	// Include the Prefix
-	tableName := fmt.Sprintf("%s_%s", s.prefix, s.tableName)
-	return cosmosdbapi.GetCollectionName(s.db.DatabaseName, tableName)
 }

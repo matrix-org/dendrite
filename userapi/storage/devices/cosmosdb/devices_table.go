@@ -49,7 +49,7 @@ import (
 // );
 // `
 
-type DeviceCosmos struct {
+type deviceCosmos struct {
 	ID     string `json:"device_id"`
 	UserID string `json:"user_id"`
 	// The access_token granted to this device.
@@ -69,12 +69,12 @@ type DeviceCosmos struct {
 	AppserviceID string `json:"app_service_id"`
 }
 
-type DeviceCosmosData struct {
+type deviceCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Device DeviceCosmos `json:"mx_userapi_device"`
+	Device deviceCosmos `json:"mx_userapi_device"`
 }
 
-type DeviceCosmosSessionCount struct {
+type deviceCosmosSessionCount struct {
 	SessionCount int64 `json:"sessioncount"`
 }
 
@@ -90,7 +90,15 @@ type devicesStatements struct {
 	tableName                            string
 }
 
-func mapFromDevice(db DeviceCosmos) api.Device {
+func (s *devicesStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *devicesStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func mapFromDevice(db deviceCosmos) api.Device {
 	return api.Device{
 		AccessToken:  db.AccessToken,
 		AppserviceID: db.AppserviceID,
@@ -103,9 +111,9 @@ func mapFromDevice(db DeviceCosmos) api.Device {
 	}
 }
 
-func mapTodevice(api api.Device, s *devicesStatements) DeviceCosmos {
+func mapTodevice(api api.Device, s *devicesStatements) deviceCosmos {
 	localPart, _ := userutil.ParseUsernameParam(api.UserID, &s.serverName)
-	return DeviceCosmos{
+	return deviceCosmos{
 		AccessToken:  api.AccessToken,
 		AppserviceID: api.AppserviceID,
 		ID:           api.ID,
@@ -118,29 +126,8 @@ func mapTodevice(api api.Device, s *devicesStatements) DeviceCosmos {
 	}
 }
 
-func queryDevice(s *devicesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]DeviceCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []DeviceCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func getDevice(s *devicesStatements, ctx context.Context, pk string, docId string) (*DeviceCosmosData, error) {
-	response := DeviceCosmosData{}
+func getDevice(s *devicesStatements, ctx context.Context, pk string, docId string) (*deviceCosmosData, error) {
+	response := deviceCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -156,7 +143,7 @@ func getDevice(s *devicesStatements, ctx context.Context, pk string, docId strin
 	return &response, err
 }
 
-func setDevice(s *devicesStatements, ctx context.Context, device DeviceCosmosData) (*DeviceCosmosData, error) {
+func setDevice(s *devicesStatements, ctx context.Context, device deviceCosmosData) (*deviceCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(device.Pk, device.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -191,31 +178,31 @@ func (s *devicesStatements) insertDevice(
 	var sessionID int64
 	// "SELECT COUNT(access_token) FROM device_devices"
 	// HACK: Do we need a Cosmos Table for the sequence?
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []DeviceCosmosSessionCount
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
 
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(s.selectDevicesCountStmt, params)
-	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
+	var rows []deviceCosmosSessionCount
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
+		s.getPartitionKey(), s.selectDevicesCountStmt, params, &rows)
 	if err != nil {
 		return nil, err
 	}
-	sessionID = response[0].SessionCount
+	sessionID = rows[0].SessionCount
 	sessionID++
 	// "INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_seen_ts, ip, user_agent)" +
 	// 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
 
-	data := DeviceCosmos{
+	//     access_token TEXT PRIMARY KEY,
+	// 		UNIQUE (localpart, device_id)
+	// HACK: check for duplicate PK as we are using the UNIQUE key for the DocId
+	docId := fmt.Sprintf("%s_%s", localpart, id)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+
+	data := deviceCosmos{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, s.serverName),
 		AccessToken: accessToken,
@@ -226,14 +213,8 @@ func (s *devicesStatements) insertDevice(
 		UserAgent:   userAgent,
 	}
 
-	//     access_token TEXT PRIMARY KEY,
-	// 		UNIQUE (localpart, device_id)
-	// HACK: check for duplicate PK as we are using the UNIQUE key for the DocId
-	docId := fmt.Sprintf("%s_%s", localpart, id)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-
-	var dbData = DeviceCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = deviceCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		Device:         data,
 	}
 
@@ -257,11 +238,9 @@ func (s *devicesStatements) deleteDevice(
 	ctx context.Context, id, localpart string,
 ) error {
 	// "DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
 	docId := fmt.Sprintf("%s_%s", localpart, id)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var options = cosmosdbapi.GetDeleteDocumentOptions(pk)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var options = cosmosdbapi.GetDeleteDocumentOptions(s.getPartitionKey())
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
 		s.db.cosmosConfig.DatabaseName,
@@ -279,20 +258,23 @@ func (s *devicesStatements) deleteDevices(
 	ctx context.Context, localpart string, devices []string,
 ) error {
 	// "DELETE FROM device_devices WHERE localpart = $1 AND device_id IN ($2)"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
-	var response []DeviceCosmosData
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": localpart,
 		"@x3": devices,
 	}
 
-	response, err := queryDevice(s, ctx, s.selectDevicesByLocalpartStmt, params)
+	var rows []deviceCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectDevicesByLocalpartStmt, params, &rows)
 
 	if err != nil {
 		return err
 	}
-	for _, item := range response {
+	for _, item := range rows {
 		s.deleteDevice(ctx, item.Device.ID, item.Device.Localpart)
 	}
 	return err
@@ -302,22 +284,25 @@ func (s *devicesStatements) deleteDevicesByLocalpart(
 	ctx context.Context, localpart, exceptDeviceID string,
 ) error {
 	// "DELETE FROM device_devices WHERE localpart = $1 AND device_id != $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
 	exceptDevices := []string{
 		exceptDeviceID,
 	}
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": localpart,
 		"@x3": exceptDevices,
 	}
-
-	response, err := queryDevice(s, ctx, s.selectDevicesByLocalpartStmt, params)
+	var rows []deviceCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectDevicesByLocalpartStmt, params, &rows)
 
 	if err != nil {
 		return err
 	}
-	for _, item := range response {
+	for _, item := range rows {
 		s.deleteDevice(ctx, item.Device.ID, item.Device.Localpart)
 	}
 	return err
@@ -327,11 +312,9 @@ func (s *devicesStatements) updateDeviceName(
 	ctx context.Context, localpart, deviceID string, displayName *string,
 ) error {
 	// "UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
 	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response, exGet = getDevice(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var response, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
@@ -349,24 +332,27 @@ func (s *devicesStatements) selectDeviceByToken(
 	ctx context.Context, accessToken string,
 ) (*api.Device, error) {
 	// "SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
-	var response []DeviceCosmosData
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": accessToken,
 	}
 
-	response, err := queryDevice(s, ctx, s.selectDeviceByTokenStmt, params)
+	var rows []deviceCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectDeviceByTokenStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return nil, cosmosdbutil.ErrNoRows
 	}
 
 	if err == nil {
-		result := mapFromDevice(response[0].Device)
+		result := mapFromDevice(rows[0].Device)
 		return &result, nil
 	}
 	return nil, err
@@ -378,11 +364,9 @@ func (s *devicesStatements) selectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
 ) (*api.Device, error) {
 	// "SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
 	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response, exGet = getDevice(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var response, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return nil, exGet
 	}
@@ -395,20 +379,23 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 ) ([]api.Device, error) {
 	devices := []api.Device{}
 	// "SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": localpart,
 		"@x3": exceptDeviceID,
 	}
-
-	response, err := queryDevice(s, ctx, s.selectDevicesByLocalpartExceptIDStmt, params)
+	var rows []deviceCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectDevicesByLocalpartExceptIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		dev := mapFromDevice(item.Device)
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		devices = append(devices, dev)
@@ -420,19 +407,21 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 func (s *devicesStatements) selectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
 	// "SELECT device_id, localpart, display_name FROM device_devices WHERE device_id IN ($1)"
 	var devices []api.Device
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
-	var response []DeviceCosmosData
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": deviceIDs,
 	}
-
-	response, err := queryDevice(s, ctx, s.selectDevicesByIDStmt, params)
+	var rows []deviceCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectDevicesByIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
-	for _, item := range response {
+	for _, item := range rows {
 		dev := mapFromDevice(item.Device)
 		devices = append(devices, dev)
 	}
@@ -443,11 +432,9 @@ func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, localpart,
 	lastSeenTs := time.Now().UnixNano() / 1000000
 
 	// "UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.devices.tableName)
 	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response, exGet = getDevice(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var response, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}

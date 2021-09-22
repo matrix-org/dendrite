@@ -35,20 +35,20 @@ import (
 // );
 // `
 
-type KeyChangeCosmos struct {
+type keyChangeCosmos struct {
 	Partition int32  `json:"partition"`
 	Offset    int64  `json:"_offset"` //offset is reserved
 	UserID    string `json:"user_id"`
 }
 
-type KeyChangeUserMaxCosmosData struct {
+type keyChangeUserMaxCosmosData struct {
 	UserID    string `json:"user_id"`
 	MaxOffset int64  `json:"max_offset"`
 }
 
-type KeyChangeCosmosData struct {
+type keyChangeCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	KeyChange KeyChangeCosmos `json:"mx_keyserver_key_change"`
+	KeyChange keyChangeCosmos `json:"mx_keyserver_key_change"`
 }
 
 // Replace based on partition|offset - we should never insert duplicates unless the kafka logs are wiped.
@@ -78,8 +78,16 @@ type keyChangesStatements struct {
 	tableName            string
 }
 
-func getKeyChangeUser(s *keyChangesStatements, ctx context.Context, pk string, docId string) (*KeyChangeCosmosData, error) {
-	response := KeyChangeCosmosData{}
+func (s *keyChangesStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *keyChangesStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getKeyChangeUser(s *keyChangesStatements, ctx context.Context, pk string, docId string) (*keyChangeCosmosData, error) {
+	response := keyChangeCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -93,27 +101,6 @@ func getKeyChangeUser(s *keyChangesStatements, ctx context.Context, pk string, d
 	}
 
 	return &response, err
-}
-
-func queryKeyChangeUserMax(s *keyChangesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]KeyChangeUserMaxCosmosData, error) {
-	var response []KeyChangeUserMaxCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
-	var query = cosmosdbapi.GetQuery(qry, params)
-	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	// When there are no Rows we seem to get the generic Bad Req JSON error
-	if err != nil {
-		// return nil, err
-	}
-
-	return response, nil
 }
 
 func NewCosmosDBKeyChangesTable(db *Database) (tables.KeyChanges, error) {
@@ -132,25 +119,23 @@ func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, partition in
 	// " ON CONFLICT (partition, offset)" +
 	// " DO UPDATE SET user_id = $3"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// 	UNIQUE (partition, offset)
 	docId := fmt.Sprintf("%d_%d", partition, offset)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getKeyChangeUser(s, ctx, pk, cosmosDocId)
+	dbData, _ := getKeyChangeUser(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.KeyChange.UserID = userID
 	} else {
-		data := KeyChangeCosmos{
+		data := keyChangeCosmos{
 			Offset:    offset,
 			Partition: partition,
 			UserID:    userID,
 		}
 
-		dbData = &KeyChangeCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &keyChangeCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			KeyChange:      data,
 		}
 	}
@@ -175,22 +160,26 @@ func (s *keyChangesStatements) SelectKeyChanges(
 	// "SELECT user_id, MAX(offset) FROM keyserver_key_changes WHERE partition = $1 AND offset > $2 AND offset <= $3 GROUP BY user_id"
 	// rows, err := s.selectKeyChangesStmt.QueryContext(ctx, partition, fromOffset, toOffset)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
 		"@x1": s.db.cosmosConfig.TenantName,
-		"@x2": dbCollectionName,
+		"@x2": s.getCollectionName(),
 		"@x3": partition,
 		"@x4": fromOffset,
 		"@x5": toOffset,
 	}
 
-	response, err := queryKeyChangeUserMax(s, ctx, s.selectKeyChangesStmt, params)
+	var rows []keyChangeUserMaxCosmosData
+	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.selectKeyChangesStmt, params, &rows)
 
 	if err != nil {
 		return nil, 0, err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		var userID string
 		var offset int64
 		userID = item.UserID

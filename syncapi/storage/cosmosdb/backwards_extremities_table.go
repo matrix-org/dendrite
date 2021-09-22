@@ -37,15 +37,15 @@ import (
 // );
 // `
 
-type BackwardExtremityCosmos struct {
+type backwardExtremityCosmos struct {
 	RoomID      string `json:"room_id"`
 	EventID     string `json:"event_id"`
 	PrevEventID string `json:"prev_event_id"`
 }
 
-type BackwardExtremityCosmosData struct {
+type backwardExtremityCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	BackwardExtremity BackwardExtremityCosmos `json:"mx_syncapi_backward_extremity"`
+	BackwardExtremity backwardExtremityCosmos `json:"mx_syncapi_backward_extremity"`
 }
 
 // const insertBackwardExtremitySQL = "" +
@@ -78,8 +78,16 @@ type backwardExtremitiesStatements struct {
 	tableName                            string
 }
 
-func getBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, pk string, docId string) (*BackwardExtremityCosmosData, error) {
-	response := BackwardExtremityCosmosData{}
+func (s *backwardExtremitiesStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *backwardExtremitiesStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, pk string, docId string) (*backwardExtremityCosmosData, error) {
+	response := backwardExtremityCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -95,28 +103,7 @@ func getBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context,
 	return &response, err
 }
 
-func queryBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]BackwardExtremityCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []BackwardExtremityCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func deleteBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, dbData BackwardExtremityCosmosData) error {
+func deleteBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, dbData backwardExtremityCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -152,24 +139,22 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 
 	// _, err = sqlutil.TxStmt(txn, s.insertBackwardExtremityStmt).ExecContext(ctx, roomID, eventID, prevEventID)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	PRIMARY KEY(room_id, event_id, prev_event_id)
 	docId := fmt.Sprintf("%s_%s_%s", roomID, eventID, prevEventID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getBackwardExtremity(s, ctx, pk, cosmosDocId)
+	dbData, _ := getBackwardExtremity(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 	} else {
-		data := BackwardExtremityCosmos{
+		data := backwardExtremityCosmos{
 			EventID:     eventID,
 			PrevEventID: prevEventID,
 			RoomID:      roomID,
 		}
 
-		dbData = &BackwardExtremityCosmosData{
-			CosmosDocument:    cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &backwardExtremityCosmosData{
+			CosmosDocument:    cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			BackwardExtremity: data,
 		}
 	}
@@ -191,13 +176,16 @@ func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
 	// "SELECT event_id, prev_event_id FROM syncapi_backward_extremities WHERE room_id = $1"
 
 	// rows, err := s.selectBackwardExtremitiesForRoomStmt.QueryContext(ctx, roomID)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
-
-	rows, err := queryBackwardExtremity(s, ctx, s.selectBackwardExtremitiesForRoomStmt, params)
+	var rows []backwardExtremityCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectBackwardExtremitiesForRoomStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -223,14 +211,18 @@ func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 
 	// _, err = sqlutil.TxStmt(txn, s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 		"@x3": knownEventID,
 	}
+	var rows []backwardExtremityCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteBackwardExtremityStmt, params, &rows)
 
-	rows, err := queryBackwardExtremity(s, ctx, s.deleteBackwardExtremityStmt, params)
 	if err != nil {
 		return
 	}
@@ -249,13 +241,18 @@ func (s *backwardExtremitiesStatements) DeleteBackwardExtremitiesForRoom(
 
 	// _, err = sqlutil.TxStmt(txn, s.deleteBackwardExtremitiesForRoomStmt).ExecContext(ctx, roomID)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
 
-	rows, err := queryBackwardExtremity(s, ctx, s.deleteBackwardExtremitiesForRoomStmt, params)
+	var rows []backwardExtremityCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteBackwardExtremitiesForRoomStmt, params, &rows)
+
 	if err != nil {
 		return
 	}

@@ -54,7 +54,7 @@ import (
 // CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
 // `
 
-type MediaRepositoryCosmos struct {
+type mediaRepositoryCosmos struct {
 	MediaID           string `json:"media_id"`
 	MediaOrigin       string `json:"media_origin"`
 	ContentType       string `json:"content_type"`
@@ -65,9 +65,9 @@ type MediaRepositoryCosmos struct {
 	UserID            string `json:"user_id"`
 }
 
-type MediaRepositoryCosmosData struct {
+type mediaRepositoryCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	MediaRepository MediaRepositoryCosmos `json:"mx_mediaapi_media_repository"`
+	MediaRepository mediaRepositoryCosmos `json:"mx_mediaapi_media_repository"`
 }
 
 // const insertMediaSQL = `
@@ -94,29 +94,16 @@ type mediaStatements struct {
 	tableName             string
 }
 
-func queryMediaRepository(s *mediaStatements, ctx context.Context, qry string, params map[string]interface{}) ([]MediaRepositoryCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []MediaRepositoryCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *mediaStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getMediaRepository(s *mediaStatements, ctx context.Context, pk string, docId string) (*MediaRepositoryCosmosData, error) {
-	response := MediaRepositoryCosmosData{}
+func (s *mediaStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getMediaRepository(s *mediaStatements, ctx context.Context, pk string, docId string) (*mediaRepositoryCosmosData, error) {
+	response := mediaRepositoryCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -150,13 +137,11 @@ func (s *mediaStatements) insertMedia(
 	// INSERT INTO mediaapi_media_repository (media_id, media_origin, content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
 	// VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
 	docId := fmt.Sprintf("%s_%s", mediaMetadata.MediaID, mediaMetadata.Origin)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	data := MediaRepositoryCosmos{
+	data := mediaRepositoryCosmos{
 		MediaID:           string(mediaMetadata.MediaID),
 		MediaOrigin:       string(mediaMetadata.Origin),
 		ContentType:       string(mediaMetadata.ContentType),
@@ -167,8 +152,8 @@ func (s *mediaStatements) insertMedia(
 		UserID:            string(mediaMetadata.UserID),
 	}
 
-	dbData := &MediaRepositoryCosmosData{
-		CosmosDocument:  cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	dbData := &mediaRepositoryCosmosData{
+		CosmosDocument:  cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		MediaRepository: data,
 	}
 
@@ -207,15 +192,13 @@ func (s *mediaStatements) selectMedia(
 
 	// SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM mediaapi_media_repository WHERE media_id = $1 AND media_origin = $2
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
 	docId := fmt.Sprintf("%s_%s", mediaMetadata.MediaID, mediaMetadata.Origin)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// err := s.selectMediaStmt.QueryRowContext(
 	// ctx, mediaMetadata.MediaID, mediaMetadata.Origin,
-	row, err := getMediaRepository(s, ctx, pk, cosmosDocId)
+	row, err := getMediaRepository(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return nil, err
@@ -245,9 +228,8 @@ func (s *mediaStatements) selectMediaByHash(
 
 	// SELECT content_type, file_size_bytes, creation_ts, upload_name, media_id, user_id FROM mediaapi_media_repository WHERE base64hash = $1 AND media_origin = $2
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": mediaHash,
 		"@x3": mediaOrigin,
 	}
@@ -255,7 +237,12 @@ func (s *mediaStatements) selectMediaByHash(
 	// err := s.selectMediaStmt.QueryRowContext(
 	// 	ctx, mediaMetadata.Base64Hash, mediaMetadata.Origin,
 	// ).Scan(
-	rows, err := queryMediaRepository(s, ctx, s.selectMediaByHashStmt, params)
+	var rows []mediaRepositoryCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectMediaByHashStmt, params, &rows)
 
 	if err != nil {
 		return nil, err

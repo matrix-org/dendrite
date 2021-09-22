@@ -46,7 +46,7 @@ import (
 //   );
 // `
 
-type EventCosmos struct {
+type eventCosmos struct {
 	EventNID         int64   `json:"event_nid"`
 	RoomNID          int64   `json:"room_nid"`
 	EventTypeNID     int64   `json:"event_type_nid"`
@@ -60,13 +60,13 @@ type EventCosmos struct {
 	IsRejected       bool    `json:"is_rejected"`
 }
 
-type EventCosmosMaxDepth struct {
+type eventCosmosMaxDepth struct {
 	Max int64 `json:"maxdepth"`
 }
 
-type EventCosmosData struct {
+type eventCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Event EventCosmos `json:"mx_roomserver_event"`
+	Event eventCosmos `json:"mx_roomserver_event"`
 }
 
 // const insertEventSQL = `
@@ -173,6 +173,14 @@ type eventStatements struct {
 	tableName string
 }
 
+func (s *eventStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *eventStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
 func NewCosmosDBEventsTable(db *Database) (tables.Events, error) {
 	s := &eventStatements{
 		db: db,
@@ -207,29 +215,8 @@ func mapFromEventNIDArray(eventNIDs []types.EventNID) []int64 {
 	return result
 }
 
-func queryEvent(s *eventStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []EventCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func getEvent(s *eventStatements, ctx context.Context, pk string, docId string) (*EventCosmosData, error) {
-	response := EventCosmosData{}
+func getEvent(s *eventStatements, ctx context.Context, pk string, docId string) (*eventCosmosData, error) {
+	response := eventCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -245,7 +232,7 @@ func getEvent(s *eventStatements, ctx context.Context, pk string, docId string) 
 	return &response, err
 }
 
-func setEvent(s *eventStatements, ctx context.Context, event EventCosmosData) (*EventCosmosData, error) {
+func setEvent(s *eventStatements, ctx context.Context, event eventCosmosData) (*eventCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(event.Pk, event.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -288,7 +275,7 @@ func isReferenceSha256Same(
 }
 
 func isEventSame(
-	event EventCosmos,
+	event eventCosmos,
 	roomNID types.RoomNID,
 	eventTypeNID types.EventTypeNID,
 	eventStateKeyNID types.EventStateKeyNID,
@@ -343,12 +330,10 @@ func (s *eventStatements) InsertEvent(
 
 	//     event_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 	//     event_id TEXT NOT NULL UNIQUE,
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := eventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, errGet := getEvent(s, ctx, pk, cosmosDocId)
+	dbData, errGet := getEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	// ON CONFLICT DO NOTHING;
 	//     event_nid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -358,7 +343,7 @@ func (s *eventStatements) InsertEvent(
 		if seqErr != nil {
 			return 0, 0, seqErr
 		}
-		data := EventCosmos{
+		data := eventCosmos{
 			AuthEventNIDs:    mapFromEventNIDArray(authEventNIDs),
 			Depth:            depth,
 			EventId:          eventID,
@@ -370,8 +355,8 @@ func (s *eventStatements) InsertEvent(
 			RoomNID:          int64(roomNID),
 		}
 
-		dbData = &EventCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &eventCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			Event:          data,
 		}
 	} else {
@@ -424,11 +409,9 @@ func (s *eventStatements) SelectEvent(
 ) (types.EventNID, types.StateSnapshotNID, error) {
 
 	// "SELECT event_nid, state_snapshot_nid FROM roomserver_events WHERE event_id = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	docId := eventID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	var response, err = getEvent(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var response, err = getEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -451,13 +434,17 @@ func (s *eventStatements) BulkSelectStateEventByID(
 	// " WHERE event_id IN ($1)" +
 	// " ORDER BY event_type_nid, event_state_key_nid ASC"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventIDs,
 	}
 
-	response, err := queryEvent(s, ctx, s.bulkSelectStateEventByIDStmt, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectStateEventByIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -467,9 +454,9 @@ func (s *eventStatements) BulkSelectStateEventByID(
 	// because of the unique constraint on event IDs.
 	// So we can allocate an array of the correct size now.
 	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
-	results := make([]types.StateEntry, len(response))
+	results := make([]types.StateEntry, len(rows))
 	i := 0
-	for _, item := range response {
+	for _, item := range rows {
 		result := &results[i]
 		result.EventTypeNID = types.EventTypeNID(item.Event.EventTypeNID)
 		result.EventStateKeyNID = types.EventStateKeyNID(item.Event.EventStateKeyNID)
@@ -502,9 +489,8 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 	sort.Sort(tuples)
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
 	// params := make([]interface{}, 0, len(eventNIDs)+len(eventTypeNIDArray)+len(eventStateKeyNIDArray))
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNIDs,
 	}
 	// selectOrig := strings.Replace(bulkSelectStateEventByNIDSQL, "($1)", sqlutil.QueryVariadic(len(eventNIDs)), 1)
@@ -536,7 +522,13 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 	// 	return nil, fmt.Errorf("s.db.Prepare: %w", err)
 	// }
 	// rows, err := selectStmt.QueryContext(ctx, params...)
-	rows, err := queryEvent(s, ctx, selectOrig, params)
+
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), selectOrig, params, &rows)
 
 	if err != nil {
 		return nil, fmt.Errorf("selectStmt.QueryContext: %w", err)
@@ -578,13 +570,17 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 
 	// "SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, is_rejected FROM roomserver_events" +
 	// " WHERE event_id IN ($1)"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventIDs,
 	}
 
-	response, err := queryEvent(s, ctx, s.bulkSelectStateAtEventByIDStmt, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectStateAtEventByIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -592,7 +588,7 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 
 	results := make([]types.StateAtEvent, len(eventIDs))
 	i := 0
-	for _, item := range response {
+	for _, item := range rows {
 		result := &results[i]
 		result.EventTypeNID = types.EventTypeNID(item.Event.EventTypeNID)
 		result.EventStateKeyNID = types.EventStateKeyNID(item.Event.EventStateKeyNID)
@@ -620,19 +616,23 @@ func (s *eventStatements) UpdateEventState(
 
 	// "UPDATE roomserver_events SET state_snapshot_nid = $1 WHERE event_nid = $2"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNID,
 	}
 
-	response, err := queryEvent(s, ctx, s.updateEventStateStmt, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.updateEventStateStmt, params, &rows)
 
 	if err != nil {
 		return err
 	}
 
-	item := response[0]
+	item := rows[0]
 	item.Event.StateSnapshotNID = int64(stateNID)
 
 	var _, exReplace = setEvent(s, ctx, item)
@@ -648,19 +648,23 @@ func (s *eventStatements) SelectEventSentToOutput(
 
 	// 	"SELECT sent_to_output FROM roomserver_events WHERE event_nid = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNID,
 	}
 
-	response, err := queryEvent(s, ctx, s.selectEventSentToOutputStmt, params)
+	var rows []eventCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectEventSentToOutputStmt, params, &rows)
 
 	if err != nil {
 		return false, err
 	}
 
-	item := response[0]
+	item := rows[0]
 	sentToOutput = item.Event.SentToOutput
 	return
 }
@@ -669,19 +673,23 @@ func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.
 
 	// "UPDATE roomserver_events SET sent_to_output = TRUE WHERE event_nid = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNID,
 	}
 
-	response, err := queryEvent(s, ctx, s.updateEventSentToOutputStmt, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.updateEventSentToOutputStmt, params, &rows)
 
 	if err != nil {
 		return err
 	}
 
-	item := response[0]
+	item := rows[0]
 	item.Event.SentToOutput = true
 
 	var _, exReplace = setEvent(s, ctx, item)
@@ -697,19 +705,23 @@ func (s *eventStatements) SelectEventID(
 
 	// "SELECT event_id FROM roomserver_events WHERE event_nid = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNID,
 	}
 
-	response, err := queryEvent(s, ctx, s.selectEventIDStmt, params)
+	var rows []eventCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectEventIDStmt, params, &rows)
 
 	if err != nil {
 		return "", err
 	}
 
-	item := response[0]
+	item := rows[0]
 	eventNID = types.EventNID(item.Event.EventNID)
 	return
 }
@@ -724,21 +736,25 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 	// "SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, event_id, reference_sha256" +
 	// " FROM roomserver_events WHERE event_nid IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNIDs,
 	}
 
-	response, err := queryEvent(s, ctx, s.bulkSelectStateAtEventAndReferenceStmt, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectStateAtEventAndReferenceStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	results := make([]types.StateAtEventAndReference, len(response))
+	results := make([]types.StateAtEventAndReference, len(rows))
 	i := 0
-	for _, item := range response {
+	for _, item := range rows {
 		result := &results[i]
 		result.EventTypeNID = types.EventTypeNID(item.Event.EventTypeNID)
 		result.EventStateKeyNID = types.EventStateKeyNID(item.Event.EventStateKeyNID)
@@ -762,13 +778,17 @@ func (s *eventStatements) BulkSelectEventReference(
 	}
 	// "SELECT event_id, reference_sha256 FROM roomserver_events WHERE event_nid IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNIDs,
 	}
 
-	response, err := queryEvent(s, ctx, s.bulkSelectEventReferenceStmt, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectEventReferenceStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -776,7 +796,7 @@ func (s *eventStatements) BulkSelectEventReference(
 
 	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
 	i := 0
-	for _, item := range response {
+	for _, item := range rows {
 		result := &results[i]
 		result.EventID = item.Event.EventId
 		result.EventSHA256 = item.Event.ReferenceSha256
@@ -797,20 +817,24 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, eventNIDs []typ
 
 	// "SELECT event_nid, event_id FROM roomserver_events WHERE event_nid IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNIDs,
 	}
 
-	response, err := queryEvent(s, ctx, s.bulkSelectEventIDStmt, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectEventIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	i := 0
-	for _, item := range response {
+	for _, item := range rows {
 		eventNID := item.Event.EventNID
 		eventID := item.Event.EventId
 		results[types.EventNID(eventNID)] = eventID
@@ -830,20 +854,24 @@ func (s *eventStatements) BulkSelectEventNID(ctx context.Context, eventIDs []str
 	}
 	// "SELECT event_id, event_nid FROM roomserver_events WHERE event_id IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventIDs,
 	}
 
-	response, err := queryEvent(s, ctx, s.bulkSelectEventNIDStmt, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectEventNIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	results := make(map[string]types.EventNID, len(eventIDs))
-	for _, item := range response {
+	for _, item := range rows {
 		eventID := item.Event.EventId
 		eventNID := item.Event.EventNID
 		results[eventID] = types.EventNID(eventNID)
@@ -857,28 +885,23 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 	}
 
 	// "SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var response []EventCosmosMaxDepth
 	params := map[string]interface{}{
 		"@x1": s.db.cosmosConfig.TenantName,
-		"@x2": dbCollectionName,
+		"@x2": s.getCollectionName(),
 		"@x3": eventNIDs,
 	}
 
-	var optionsQry = cosmosdbapi.GetQueryAllPartitionsDocumentsOptions()
-	var query = cosmosdbapi.GetQuery(selectMaxEventDepthSQL, params)
-	var _, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
+	var rows []eventCosmosMaxDepth
+	err := cosmosdbapi.PerformQueryAllPartitions(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
+		selectMaxEventDepthSQL, params, &rows)
 
 	if err != nil {
 		return 0, fmt.Errorf("sqlutil.TxStmt.QueryRowContext: %w", err)
 	}
-	return response[0].Max, nil
+	return rows[0].Max, nil
 }
 
 func (s *eventStatements) SelectRoomNIDsForEventNIDs(
@@ -890,20 +913,24 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 
 	// "SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNIDs,
 	}
 
-	response, err := queryEvent(s, ctx, selectRoomNIDsForEventNIDsSQL, params)
+	var rows []eventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), selectRoomNIDsForEventNIDsSQL, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[types.EventNID]types.RoomNID)
-	for _, item := range response {
+	for _, item := range rows {
 		roomNID := types.RoomNID(item.Event.RoomNID)
 		eventNID := types.EventNID(item.Event.EventNID)
 		result[eventNID] = roomNID

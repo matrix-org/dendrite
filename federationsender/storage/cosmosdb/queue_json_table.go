@@ -35,14 +35,14 @@ import (
 // );
 // `
 
-type QueueJSONCosmos struct {
+type queueJSONCosmos struct {
 	JSONNID  int64  `json:"json_nid"`
 	JSONBody []byte `json:"json_body"`
 }
 
-type QueueJSONCosmosData struct {
+type queueJSONCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	QueueJSON QueueJSONCosmos `json:"mx_federationsender_queue_json"`
+	QueueJSON queueJSONCosmos `json:"mx_federationsender_queue_json"`
 }
 
 // const insertJSONSQL = "" +
@@ -68,28 +68,15 @@ type queueJSONStatements struct {
 	tableName string
 }
 
-func queryQueueJSON(s *queueJSONStatements, ctx context.Context, qry string, params map[string]interface{}) ([]QueueJSONCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []QueueJSONCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *queueJSONStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func deleteQueueJSON(s *queueJSONStatements, ctx context.Context, dbData QueueJSONCosmosData) error {
+func (s *queueJSONStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func deleteQueueJSON(s *queueJSONStatements, ctx context.Context, dbData queueJSONCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -122,22 +109,20 @@ func (s *queueJSONStatements) InsertQueueJSON(
 	// 	json_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 	idSeq, err := GetNextQueueJSONNID(s, ctx)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	json_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 	docId := fmt.Sprintf("%d", idSeq)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	//Convert to byte
 	jsonData := []byte(json)
 
-	data := QueueJSONCosmos{
+	data := queueJSONCosmos{
 		JSONNID:  idSeq,
 		JSONBody: jsonData,
 	}
 
-	dbData := &QueueJSONCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	dbData := &queueJSONCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		QueueJSON:      data,
 	}
 
@@ -165,16 +150,20 @@ func (s *queueJSONStatements) DeleteQueueJSON(
 
 	// "DELETE FROM federationsender_queue_json WHERE json_nid IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": nids,
 	}
 
 	// deleteSQL := strings.Replace(deleteJSONSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
 	// deleteStmt, err := txn.Prepare(deleteSQL)
 	// stmt := sqlutil.TxStmt(txn, deleteStmt)
-	rows, err := queryQueueJSON(s, ctx, deleteJSONSQL, params)
+	var rows []queueJSONCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), deleteJSONSQL, params, &rows)
 
 	if err != nil {
 		return err
@@ -198,15 +187,19 @@ func (s *queueJSONStatements) SelectQueueJSON(
 	// "SELECT json_nid, json_body FROM federationsender_queue_json" +
 	// " WHERE json_nid IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": jsonNIDs,
 	}
 
 	// selectSQL := strings.Replace(selectJSONSQL, "($1)", sqlutil.QueryVariadic(len(jsonNIDs)), 1)
 	// selectStmt, err := txn.Prepare(selectSQL)
-	rows, err := queryQueueJSON(s, ctx, selectJSONSQL, params)
+	var rows []queueJSONCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), selectJSONSQL, params, &rows)
 
 	if err != nil {
 		return nil, fmt.Errorf("s.selectQueueJSON stmt.QueryContext: %w", err)

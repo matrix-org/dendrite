@@ -43,7 +43,7 @@ import (
 // CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx ON syncapi_invite_events (event_id);
 // `
 
-type InviteEventCosmos struct {
+type inviteEventCosmos struct {
 	ID                int64  `json:"id"`
 	EventID           string `json:"event_id"`
 	RoomID            string `json:"room_id"`
@@ -52,13 +52,13 @@ type InviteEventCosmos struct {
 	Deleted           bool   `json:"deleted"`
 }
 
-type InviteEventCosmosMaxNumber struct {
+type inviteEventCosmosMaxNumber struct {
 	Max int64 `json:"number"`
 }
 
-type InviteEventCosmosData struct {
+type inviteEventCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	InviteEvent InviteEventCosmos `json:"mx_syncapi_invite_event"`
+	InviteEvent inviteEventCosmos `json:"mx_syncapi_invite_event"`
 }
 
 // const insertInviteEventSQL = "" +
@@ -95,51 +95,16 @@ type inviteEventsStatements struct {
 	tableName                     string
 }
 
-func queryInviteEvent(s *inviteEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]InviteEventCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []InviteEventCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *inviteEventsStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func queryInviteEventMaxNumber(s *inviteEventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]InviteEventCosmosMaxNumber, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []InviteEventCosmosMaxNumber
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, nil
-	}
-
-	return response, nil
+func (s *inviteEventsStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
-func getInviteEvent(s *inviteEventsStatements, ctx context.Context, pk string, docId string) (*InviteEventCosmosData, error) {
-	response := InviteEventCosmosData{}
+func getInviteEvent(s *inviteEventsStatements, ctx context.Context, pk string, docId string) (*inviteEventCosmosData, error) {
+	response := inviteEventCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -155,7 +120,7 @@ func getInviteEvent(s *inviteEventsStatements, ctx context.Context, pk string, d
 	return &response, err
 }
 
-func setInviteEvent(s *inviteEventsStatements, ctx context.Context, invite InviteEventCosmosData) (*InviteEventCosmosData, error) {
+func setInviteEvent(s *inviteEventsStatements, ctx context.Context, invite inviteEventCosmosData) (*inviteEventCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(invite.Pk, invite.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -207,7 +172,7 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 	// 	*inviteEvent.StateKey(),
 	// 	headeredJSON,
 	// )
-	data := InviteEventCosmos{
+	data := inviteEventCosmos{
 		ID:                int64(streamPos),
 		RoomID:            inviteEvent.RoomID(),
 		EventID:           inviteEvent.EventID(),
@@ -215,14 +180,12 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 		HeaderedEventJSON: headeredJSON,
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
 	// id INTEGER PRIMARY KEY,
 	docId := fmt.Sprintf("%d", streamPos)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	var dbData = InviteEventCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = inviteEventCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		InviteEvent:    data,
 	}
 
@@ -249,14 +212,18 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 
 	// stmt := sqlutil.TxStmt(txn, s.deleteInviteEventStmt)
 	// _, err = stmt.ExecContext(ctx, streamPos, inviteEventID)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": inviteEventID,
 	}
-	response, err := queryInviteEvent(s, ctx, s.deleteInviteEventStmt, params)
+	var rows []inviteEventCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteInviteEventStmt, params, &rows)
 
-	for _, item := range response {
+	for _, item := range rows {
 		item.InviteEvent.Deleted = true
 		item.InviteEvent.ID = int64(streamPos)
 		setInviteEvent(s, ctx, item)
@@ -276,14 +243,18 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 
 	// stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	// rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": targetUserID,
 		"@x3": r.Low(),
 		"@x4": r.High(),
 	}
-	rows, err := queryInviteEvent(s, ctx, s.selectInviteEventsInRangeStmt, params)
+	var rows []inviteEventCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectInviteEventsInRangeStmt, params, &rows)
 
 	if err != nil {
 		return nil, nil, err
@@ -333,14 +304,18 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxInviteIDStmt)
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
-	response, err := queryInviteEventMaxNumber(s, ctx, s.selectMaxInviteIDStmt, params)
+	var rows []inviteEventCosmosMaxNumber
+	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.selectMaxInviteIDStmt, params, &rows)
 
-	if response != nil {
-		nullableID.Int64 = response[0].Max
+	if len(rows) > 0 {
+		nullableID.Int64 = rows[0].Max
 	}
 
 	if nullableID.Valid {

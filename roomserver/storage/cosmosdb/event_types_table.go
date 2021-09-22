@@ -42,14 +42,14 @@ import (
 // (7, 'm.room.history_visibility') ON CONFLICT DO NOTHING;
 // `
 
-type EventTypeCosmosData struct {
-	cosmosdbapi.CosmosDocument
-	EventType EventTypeCosmos `json:"mx_roomserver_event_type"`
-}
-
-type EventTypeCosmos struct {
+type eventTypeCosmos struct {
 	EventTypeNID int64  `json:"event_type_nid"`
 	EventType    string `json:"event_type"`
+}
+
+type eventTypeCosmosData struct {
+	cosmosdbapi.CosmosDocument
+	EventType eventTypeCosmos `json:"mx_roomserver_event_type"`
 }
 
 // Assign a new numeric event type ID.
@@ -96,6 +96,14 @@ type eventTypeStatements struct {
 	tableName                  string
 }
 
+func (s *eventTypeStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *eventTypeStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
 func NewCosmosDBEventTypesTable(db *Database) (tables.EventTypes, error) {
 	s := &eventTypeStatements{
 		db: db,
@@ -112,27 +120,6 @@ func NewCosmosDBEventTypesTable(db *Database) (tables.EventTypes, error) {
 	return s, nil
 }
 
-func queryEventTypes(s *eventTypeStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventTypeCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []EventTypeCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
 func (s *eventTypeStatements) InsertEventTypeNID(
 	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
@@ -142,7 +129,7 @@ func (s *eventTypeStatements) InsertEventTypeNID(
 		return -1, seqErr
 	}
 
-	data := EventTypeCosmos{
+	data := eventTypeCosmos{
 		EventType:    eventType,
 		EventTypeNID: eventTypeNIDSeq,
 	}
@@ -156,17 +143,15 @@ func (s *eventTypeStatements) InsertEventTypeNID(
 	return types.EventTypeNID(dbData.EventTypeNID), err
 }
 
-func insertEventTypeCore(s *eventTypeStatements, ctx context.Context, eventType EventTypeCosmos) (*EventTypeCosmos, error) {
+func insertEventTypeCore(s *eventTypeStatements, ctx context.Context, eventType eventTypeCosmos) (*eventTypeCosmos, error) {
 	// INSERT INTO roomserver_event_types (event_type) VALUES ($1)
 	//   ON CONFLICT DO NOTHING;
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 
 	//Unique on eventType
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, eventType.EventType)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), eventType.EventType)
 
-	var dbData = EventTypeCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = eventTypeCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		EventType:      eventType,
 	}
 
@@ -200,53 +185,53 @@ func ensureEventTypes(s *eventTypeStatements, ctx context.Context) error {
 	// (7, 'm.room.history_visibility') ON CONFLICT DO NOTHING;
 
 	// (1, 'm.room.create'),
-	_, err := insertEventTypeCore(s, context.Background(), EventTypeCosmos{EventTypeNID: 1, EventType: "m.room.create"})
+	_, err := insertEventTypeCore(s, context.Background(), eventTypeCosmos{EventTypeNID: 1, EventType: "m.room.create"})
 	if err != nil {
 		return err
 	}
 	// (2, 'm.room.power_levels'),
-	_, err = insertEventTypeCore(s, context.Background(), EventTypeCosmos{EventTypeNID: 2, EventType: "m.room.power_levels"})
+	_, err = insertEventTypeCore(s, context.Background(), eventTypeCosmos{EventTypeNID: 2, EventType: "m.room.power_levels"})
 	if err != nil {
 		return err
 	}
 	// (3, 'm.room.join_rules'),
-	_, err = insertEventTypeCore(s, context.Background(), EventTypeCosmos{EventTypeNID: 3, EventType: "m.room.join_rules"})
+	_, err = insertEventTypeCore(s, context.Background(), eventTypeCosmos{EventTypeNID: 3, EventType: "m.room.join_rules"})
 	if err != nil {
 		return err
 	}
 	// (4, 'm.room.third_party_invite'),
-	_, err = insertEventTypeCore(s, context.Background(), EventTypeCosmos{EventTypeNID: 4, EventType: "m.room.third_party_invite"})
+	_, err = insertEventTypeCore(s, context.Background(), eventTypeCosmos{EventTypeNID: 4, EventType: "m.room.third_party_invite"})
 	if err != nil {
 		return err
 	}
 	// (5, 'm.room.member'),
-	_, err = insertEventTypeCore(s, context.Background(), EventTypeCosmos{EventTypeNID: 5, EventType: "m.room.member"})
+	_, err = insertEventTypeCore(s, context.Background(), eventTypeCosmos{EventTypeNID: 5, EventType: "m.room.member"})
 	if err != nil {
 		return err
 	}
 	// (6, 'm.room.redaction'),
-	_, err = insertEventTypeCore(s, context.Background(), EventTypeCosmos{EventTypeNID: 6, EventType: "m.room.redaction"})
+	_, err = insertEventTypeCore(s, context.Background(), eventTypeCosmos{EventTypeNID: 6, EventType: "m.room.redaction"})
 	if err != nil {
 		return err
 	}
 	// (7, 'm.room.history_visibility') ON CONFLICT DO NOTHING;
-	_, err = insertEventTypeCore(s, context.Background(), EventTypeCosmos{EventTypeNID: 7, EventType: "m.room.history_visibility"})
+	_, err = insertEventTypeCore(s, context.Background(), eventTypeCosmos{EventTypeNID: 7, EventType: "m.room.history_visibility"})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func selectEventTypeCore(s *eventTypeStatements, ctx context.Context, eventType string) (*EventTypeCosmos, error) {
-	var response EventTypeCosmosData
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, eventType)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+func selectEventTypeCore(s *eventTypeStatements, ctx context.Context, eventType string) (*eventTypeCosmos, error) {
+	var response eventTypeCosmosData
+
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), eventType)
+
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
 		ctx,
-		pk,
+		s.getPartitionKey(),
 		cosmosDocId,
 		&response)
 
@@ -281,20 +266,24 @@ func (s *eventTypeStatements) BulkSelectEventTypeNID(
 	// SELECT event_type, event_type_nid FROM roomserver_event_types
 	// WHERE event_type IN ($1)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventTypes,
 	}
 
-	response, err := queryEventTypes(s, ctx, s.bulkSelectEventTypeNIDStmt, params)
+	var rows []eventTypeCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectEventTypeNIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
-	for _, item := range response {
+	for _, item := range rows {
 		var eventType string
 		var eventTypeNID int64
 		eventType = item.EventType.EventType

@@ -41,7 +41,7 @@ import (
 // 	);
 // `
 
-type MembershipCosmos struct {
+type membershipCosmos struct {
 	RoomNID       int64 `json:"room_nid"`
 	TargetNID     int64 `json:"target_nid"`
 	SenderNID     int64 `json:"sender_nid"`
@@ -51,9 +51,9 @@ type MembershipCosmos struct {
 	Forgotten     bool  `json:"forgotten"`
 }
 
-type MembershipCosmosData struct {
+type membershipCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Membership MembershipCosmos `json:"mx_roomserver_membership"`
+	Membership membershipCosmos `json:"mx_roomserver_membership"`
 }
 
 type MembershipJoinedCountCosmosData struct {
@@ -199,29 +199,24 @@ type membershipStatements struct {
 	tableName string
 }
 
-func queryMembership(s *membershipStatements, ctx context.Context, qry string, params map[string]interface{}) ([]MembershipCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []MembershipCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *membershipStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getMembership(s *membershipStatements, ctx context.Context, pk string, docId string) (*MembershipCosmosData, error) {
-	response := MembershipCosmosData{}
+func (s *membershipStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func (s *membershipStatements) getCollectionEventStateKeys() string {
+	return "roomserver_event_state_keys"
+}
+
+func (s *membershipStatements) getPartitionKeyEventStateKeys() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionEventStateKeys())
+}
+
+func getMembership(s *membershipStatements, ctx context.Context, pk string, docId string) (*membershipCosmosData, error) {
+	response := membershipCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -237,7 +232,7 @@ func getMembership(s *membershipStatements, ctx context.Context, pk string, docI
 	return &response, err
 }
 
-func setMembership(s *membershipStatements, ctx context.Context, membership MembershipCosmosData) (*MembershipCosmosData, error) {
+func setMembership(s *membershipStatements, ctx context.Context, membership membershipCosmosData) (*membershipCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(membership.Pk, membership.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -284,15 +279,12 @@ func (s *membershipStatements) InsertMembership(
 	// " VALUES ($1, $2, $3)" +
 	// " ON CONFLICT DO NOTHING"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-
 	// 		UNIQUE (room_nid, target_nid)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// " ON CONFLICT DO NOTHING"
-	exists, _ := getMembership(s, ctx, pk, cosmosDocId)
+	exists, _ := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exists != nil {
 		exists.Membership.RoomNID = int64(roomNID)
 		exists.Membership.TargetNID = int64(targetUserNID)
@@ -302,7 +294,7 @@ func (s *membershipStatements) InsertMembership(
 		return errSet
 	}
 
-	data := MembershipCosmos{
+	data := membershipCosmos{
 		EventNID:      0,
 		Forgotten:     false,
 		MembershipNID: 1,
@@ -312,8 +304,8 @@ func (s *membershipStatements) InsertMembership(
 		TargetNID:     int64(targetUserNID),
 	}
 
-	var dbData = MembershipCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = membershipCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		Membership:     data,
 	}
 
@@ -336,11 +328,10 @@ func (s *membershipStatements) SelectMembershipForUpdate(
 	// "SELECT membership_nid FROM roomserver_membership" +
 	// " WHERE room_nid = $1 AND target_nid = $2"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	response, err := getMembership(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+
+	response, err := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if response != nil {
 		membership = tables.MembershipState(response.Membership.MembershipNID)
 	}
@@ -355,11 +346,9 @@ func (s *membershipStatements) SelectMembershipFromRoomAndTarget(
 	// 	"SELECT membership_nid, event_nid, forgotten FROM roomserver_membership" +
 	// 	" WHERE room_nid = $1 AND target_nid = $2"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	response, err := getMembership(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	response, err := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if response != nil {
 		eventNID = types.EventNID(response.Membership.EventNID)
 		forgotten = response.Membership.Forgotten
@@ -374,9 +363,8 @@ func (s *membershipStatements) SelectMembershipsFromRoom(
 ) (eventNIDs []types.EventNID, err error) {
 	var selectStmt string
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNID,
 	}
 	if localOnly {
@@ -390,12 +378,19 @@ func (s *membershipStatements) SelectMembershipsFromRoom(
 		// " WHERE room_nid = $1 and forgotten = false"
 		selectStmt = s.selectMembershipsFromRoomStmt
 	}
-	response, err := queryMembership(s, ctx, selectStmt, params)
+
+	var rows []membershipCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), selectStmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		eventNIDs = append(eventNIDs, types.EventNID(item.Membership.EventNID))
 	}
 	return
@@ -407,9 +402,8 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 ) (eventNIDs []types.EventNID, err error) {
 	var stmt string
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNID,
 		"@x3": membership,
 	}
@@ -423,12 +417,18 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 		// " WHERE room_nid = $1 AND membership_nid = $2 and forgotten = false"
 		stmt = s.selectMembershipsFromRoomAndMembershipStmt
 	}
-	response, err := queryMembership(s, ctx, stmt, params)
+	var rows []membershipCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), stmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		eventNIDs = append(eventNIDs, types.EventNID(item.Membership.EventNID))
 	}
 	return
@@ -443,11 +443,9 @@ func (s *membershipStatements) UpdateMembership(
 	// "UPDATE roomserver_membership SET sender_nid = $1, membership_nid = $2, event_nid = $3, forgotten = $4" +
 	// " WHERE room_nid = $5 AND target_nid = $6"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	dbData, err := getMembership(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	dbData, err := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return err
@@ -468,18 +466,23 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 
 	// "SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2 and forgotten = false"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": membershipState,
 		"@x3": userID,
 	}
-	response, err := queryMembership(s, ctx, s.selectRoomsWithMembershipStmt, params)
+	var rows []membershipCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectRoomsWithMembershipStmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}
 	var roomNIDs []types.RoomNID
-	for _, item := range response {
+	for _, item := range rows {
 		roomNIDs = append(roomNIDs, types.RoomNID(item.Membership.RoomNID))
 	}
 	return roomNIDs, nil
@@ -495,30 +498,24 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context,
 	// " membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
 	// " GROUP BY target_nid"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNIDs,
 	}
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []MembershipJoinedCountCosmosData
 
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectJoinedUsersSetForRoomsSQL, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
+	var rows []MembershipJoinedCountCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
+		s.getPartitionKey(), selectJoinedUsersSetForRoomsSQL, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[types.EventStateKeyNID]int)
-	for _, item := range response {
+	for _, item := range rows {
 		userID := types.EventStateKeyNID(item.TargetNID)
 		count := item.RoomCount
 		result[userID] = count
@@ -532,20 +529,25 @@ func (s *membershipStatements) SelectLocalServerInRoom(ctx context.Context, room
 	var nid types.RoomNID
 	// err := s.selectLocalServerInRoomStmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID).Scan(&nid)
 	//
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": tables.MembershipStateJoin,
 		"@x3": roomNID,
 	}
-	response, err := queryMembership(s, ctx, s.selectLocalServerInRoomStmt, params)
-	if len(response) == 0 {
+	var rows []membershipCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectLocalServerInRoomStmt, params, &rows)
+
+	if len(rows) == 0 {
 		if err == cosmosdbutil.ErrNoRows {
 			return false, nil
 		}
 		return false, err
 	}
-	nid = types.RoomNID(response[0].Membership.RoomNID)
+	nid = types.RoomNID(rows[0].Membership.RoomNID)
 
 	found := nid > 0
 	return found, nil
@@ -564,27 +566,20 @@ func (s *membershipStatements) SelectServerInRoom(ctx context.Context, roomNID t
 		"select * from c where c._cn = @x1 " +
 		"and (endswith(c.mx_roomserver_event_state_keys.event_state_key, \":\") or c.mx_roomserver_event_state_keys.event_state_key = @x2) "
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionEventStateKeys(),
 		"@x2": serverName,
 	}
 
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var eventStateKeys []EventStateKeysCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectEventStateKeyNIDSQL, params) //
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
+	var rowsEventsStateKeys []eventStateKeysCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		query,
-		&eventStateKeys,
-		optionsQry)
+		s.getPartitionKeyEventStateKeys(), selectEventStateKeyNIDSQL, params, &rowsEventsStateKeys)
 
 	eventStateKeyNids := []int64{}
-	for _, item := range eventStateKeys {
+	for _, item := range rowsEventsStateKeys {
 		eventStateKeyNids = append(eventStateKeyNids, item.EventStateKeys.EventStateKeyNID)
 	}
 
@@ -595,19 +590,25 @@ func (s *membershipStatements) SelectServerInRoom(ctx context.Context, roomNID t
 
 	// err := s.selectServerInRoomStmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID, serverName).Scan(&nid)
 	params = map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": tables.MembershipStateJoin,
 		"@x3": roomNID,
 		"@x4": eventStateKeyNids,
 	}
-	response, err := queryMembership(s, ctx, s.selectServerInRoomStmt, params)
-	if len(response) == 0 {
+	var rows []membershipCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectServerInRoomStmt, params, &rows)
+
+	if len(rows) == 0 {
 		if err == cosmosdbutil.ErrNoRows {
 			return false, nil
 		}
 		return false, err
 	}
-	nid = types.RoomNID(response[0].Membership.RoomNID)
+	nid = types.RoomNID(rows[0].Membership.RoomNID)
 	return roomNID == nid, nil
 }
 
@@ -616,33 +617,26 @@ func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID type
 	// "  SELECT DISTINCT room_nid FROM roomserver_membership WHERE target_nid=$1 AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
 	// ") AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " AND event_state_key LIKE $2 LIMIT $3"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": searchString,
 		"@x4": limit,
 	}
 
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var responseDistinctRoom []MembershipCosmos
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(selectKnownUsersSQLDistinctRoom, params) //
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
+	var rowsDistinctRoom []membershipCosmos
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		query,
-		&responseDistinctRoom,
-		optionsQry)
+		s.getPartitionKey(), selectKnownUsersSQLDistinctRoom, params, &rowsDistinctRoom)
 
 	if err != nil {
 		return nil, err
 	}
 
 	rooms := []int64{}
-	for _, item := range responseDistinctRoom {
+	for _, item := range rowsDistinctRoom {
 		rooms = append(rooms, item.RoomNID)
 	}
 
@@ -651,47 +645,40 @@ func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID type
 	// " WHERE room_nid IN (" +
 
 	params = map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": rooms,
 	}
 
-	var responseRooms []MembershipCosmos
-	query = cosmosdbapi.GetQuery(selectKnownUsersSQLRooms, params)
-	_, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
+	var rows []membershipCosmos
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		query,
-		&responseRooms,
-		optionsQry)
+		s.getPartitionKey(), selectKnownUsersSQLRooms, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	targetNIDs := []int64{}
-	for _, item := range responseRooms {
+	for _, item := range rows {
 		targetNIDs = append(targetNIDs, item.TargetNID)
 	}
 
 	// HACK: Joined table
-	var dbCollectionNameEventStateKeys = cosmosdbapi.GetCollectionName(s.db.databaseName, "event_state_keys")
 	params = map[string]interface{}{
-		"@x1": dbCollectionNameEventStateKeys,
+		"@x1": s.getCollectionEventStateKeys(),
 		"@x2": targetNIDs,
 	}
 
 	bulkSelectEventStateKeyStmt := "select * from c where c._cn = @x1 and ARRAY_CONTAINS(@x2, c.mx_roomserver_event_state_keys.event_state_key_nid)"
 
-	var responseEventStateKeys []EventStateKeysCosmos
-	query = cosmosdbapi.GetQuery(bulkSelectEventStateKeyStmt, params)
-	_, err = cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
+	var rowsEventStateKeys []eventStateKeysCosmos
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		query,
-		&responseEventStateKeys,
-		optionsQry)
+		s.getPartitionKeyEventStateKeys(), bulkSelectEventStateKeyStmt, params, &rowsEventStateKeys)
 
 	if err != nil {
 		return nil, err
@@ -700,7 +687,7 @@ func (s *membershipStatements) SelectKnownUsers(ctx context.Context, userID type
 	// SELECT DISTINCT event_state_key
 
 	result := []string{}
-	for _, item := range responseEventStateKeys {
+	for _, item := range rowsEventStateKeys {
 		userID := item.EventStateKey
 		result = append(result, userID)
 	}
@@ -716,11 +703,9 @@ func (s *membershipStatements) UpdateForgetMembership(
 	// "UPDATE roomserver_membership SET forgotten = $1" +
 	// " WHERE room_nid = $2 AND target_nid = $3"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	dbData, err := getMembership(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	dbData, err := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return err

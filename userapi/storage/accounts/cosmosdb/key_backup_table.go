@@ -40,12 +40,7 @@ import (
 // CREATE INDEX IF NOT EXISTS e2e_room_keys_versions_idx ON account_e2e_room_keys(user_id, version);
 // `
 
-type KeyBackupCosmosData struct {
-	cosmosdbapi.CosmosDocument
-	KeyBackup KeyBackupCosmos `json:"mx_userapi_account_e2e_room_keys"`
-}
-
-type KeyBackupCosmos struct {
+type keyBackupCosmos struct {
 	UserId            string `json:"user_id"`
 	RoomId            string `json:"room_id"`
 	SessionId         string `json:"session_id"`
@@ -56,7 +51,12 @@ type KeyBackupCosmos struct {
 	SessionData       []byte `json:"session_data"`
 }
 
-type KeyBackupCosmosNumber struct {
+type keyBackupCosmosData struct {
+	cosmosdbapi.CosmosDocument
+	KeyBackup keyBackupCosmos `json:"mx_userapi_account_e2e_room_keys"`
+}
+
+type keyBackupCosmosNumber struct {
 	Number int64 `json:"number"`
 }
 
@@ -110,50 +110,16 @@ type keyBackupStatements struct {
 	serverName                         gomatrixserverlib.ServerName
 }
 
-func queryKeyBackup(s *keyBackupStatements, ctx context.Context, qry string, params map[string]interface{}) ([]KeyBackupCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []KeyBackupCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *keyBackupStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func queryKeyBackupNumber(s *keyBackupStatements, ctx context.Context, qry string, params map[string]interface{}) ([]KeyBackupCosmosNumber, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []KeyBackupCosmosNumber
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *keyBackupStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
-func getKeyBackup(s *keyBackupStatements, ctx context.Context, pk string, docId string) (*KeyBackupCosmosData, error) {
-	response := KeyBackupCosmosData{}
+func getKeyBackup(s *keyBackupStatements, ctx context.Context, pk string, docId string) (*keyBackupCosmosData, error) {
+	response := keyBackupCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -169,7 +135,7 @@ func getKeyBackup(s *keyBackupStatements, ctx context.Context, pk string, docId 
 	return &response, err
 }
 
-func setKeyBackup(s *keyBackupStatements, ctx context.Context, keyBackup KeyBackupCosmosData) (*KeyBackupCosmosData, error) {
+func setKeyBackup(s *keyBackupStatements, ctx context.Context, keyBackup keyBackupCosmosData) (*keyBackupCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(keyBackup.Pk, keyBackup.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -200,13 +166,17 @@ func (s keyBackupStatements) countKeys(
 	// "SELECT COUNT(*) FROM account_e2e_room_keys WHERE user_id = $1 AND version = $2"
 	// err = txn.Stmt(s.countKeysStmt).QueryRowContext(ctx, userID, version).Scan(&count)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": version,
 	}
-	rows, err := queryKeyBackupNumber(&s, ctx, s.countKeysStmt, params)
+	var rows []keyBackupCosmosNumber
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.countKeysStmt, params, &rows)
 
 	if err != nil {
 		return -1, err
@@ -228,13 +198,11 @@ func (s *keyBackupStatements) insertBackupKey(
 	// _, err = txn.Stmt(s.insertBackupKeyStmt).ExecContext(
 	// 	ctx, userID, key.RoomID, key.SessionID, version, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData),
 	// )
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON account_e2e_room_keys(user_id, room_id, session_id, version);
 	docId := fmt.Sprintf("%s_%s_%s_%s", userID, key.RoomID, key.SessionID, version)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	data := KeyBackupCosmos{
+	data := keyBackupCosmos{
 		UserId:            userID,
 		RoomId:            key.RoomID,
 		SessionId:         key.SessionID,
@@ -245,8 +213,8 @@ func (s *keyBackupStatements) insertBackupKey(
 		SessionData:       key.SessionData,
 	}
 
-	dbData := &KeyBackupCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	dbData := &keyBackupCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		KeyBackup:      data,
 	}
 
@@ -270,13 +238,11 @@ func (s *keyBackupStatements) updateBackupKey(
 	// 	ctx, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData), userID, key.RoomID, key.SessionID, version,
 	// )
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON account_e2e_room_keys(user_id, room_id, session_id, version);
 	docId := fmt.Sprintf("%s_%s_%s_%s", userID, key.RoomID, key.SessionID, version)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackup(s, ctx, pk, cosmosDocId)
+	res, err := getKeyBackup(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return
@@ -302,13 +268,17 @@ func (s *keyBackupStatements) selectKeys(
 ) (map[string]map[string]api.KeyBackupSession, error) {
 	// "SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
 	// "WHERE user_id = $1 AND version = $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": version,
 	}
-	rows, err := queryKeyBackup(s, ctx, s.selectKeysStmt, params)
+	var rows []keyBackupCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectKeysStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -327,14 +297,18 @@ func (s *keyBackupStatements) selectKeysByRoomID(
 ) (map[string]map[string]api.KeyBackupSession, error) {
 	// "SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
 	// "WHERE user_id = $1 AND version = $2 AND room_id = $3"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": version,
 		"@x4": roomID,
 	}
-	rows, err := queryKeyBackup(s, ctx, s.selectKeysByRoomIDStmt, params)
+	var rows []keyBackupCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectKeysByRoomIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -355,15 +329,19 @@ func (s *keyBackupStatements) selectKeysByRoomIDAndSessionID(
 ) (map[string]map[string]api.KeyBackupSession, error) {
 	// "SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
 	// "WHERE user_id = $1 AND version = $2 AND room_id = $3 AND session_id = $4"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.openIDTokens.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": version,
 		"@x4": roomID,
 		"@x5": sessionID,
 	}
-	rows, err := queryKeyBackup(s, ctx, s.selectKeysByRoomIDAndSessionIDStmt, params)
+	var rows []keyBackupCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectKeysByRoomIDAndSessionIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -379,7 +357,7 @@ func (s *keyBackupStatements) selectKeysByRoomIDAndSessionID(
 	return unpackKeys(ctx, &rows)
 }
 
-func unpackKeys(ctx context.Context, rows *[]KeyBackupCosmosData) (map[string]map[string]api.KeyBackupSession, error) {
+func unpackKeys(ctx context.Context, rows *[]keyBackupCosmosData) (map[string]map[string]api.KeyBackupSession, error) {
 	result := make(map[string]map[string]api.KeyBackupSession)
 	for _, item := range *rows {
 		var key api.InternalKeyBackupSession

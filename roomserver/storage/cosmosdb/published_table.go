@@ -34,14 +34,14 @@ import (
 // );
 // `
 
-type PublishCosmos struct {
+type publishCosmos struct {
 	RoomID    string `json:"room_id"`
 	Published bool   `json:"published"`
 }
 
-type PublishCosmosData struct {
+type publishCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Publish PublishCosmos `json:"mx_roomserver_publish"`
+	Publish publishCosmos `json:"mx_roomserver_publish"`
 }
 
 // const upsertPublishedSQL = "" +
@@ -64,29 +64,16 @@ type publishedStatements struct {
 	tableName string
 }
 
-func queryPublish(s *publishedStatements, ctx context.Context, qry string, params map[string]interface{}) ([]PublishCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []PublishCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *publishedStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getPublish(s *publishedStatements, ctx context.Context, pk string, docId string) (*PublishCosmosData, error) {
-	response := PublishCosmosData{}
+func (s *publishedStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getPublish(s *publishedStatements, ctx context.Context, pk string, docId string) (*publishCosmosData, error) {
+	response := publishCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -125,24 +112,21 @@ func (s *publishedStatements) UpsertRoomPublished(
 
 	// 	"INSERT OR REPLACE INTO roomserver_published (room_id, published) VALUES ($1, $2)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     room_id TEXT NOT NULL PRIMARY KEY,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-
-	dbData, _ := getPublish(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	dbData, _ := getPublish(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.Publish.Published = published
 	} else {
-		data := PublishCosmos{
+		data := publishCosmos{
 			RoomID:    roomID,
 			Published: false,
 		}
 
-		dbData = &PublishCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &publishCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			Publish:        data,
 		}
 	}
@@ -161,13 +145,10 @@ func (s *publishedStatements) SelectPublishedFromRoomID(
 ) (published bool, err error) {
 
 	// 	"SELECT published FROM roomserver_published WHERE room_id = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     room_id TEXT NOT NULL PRIMARY KEY,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-
-	response, err := getPublish(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	response, err := getPublish(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		return false, err
 	}
@@ -179,19 +160,24 @@ func (s *publishedStatements) SelectAllPublishedRooms(
 ) ([]string, error) {
 
 	// "SELECT room_id FROM roomserver_published WHERE published = $1 ORDER BY room_id ASC"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": published,
 	}
 
-	response, err := queryPublish(s, ctx, s.selectAllPublishedStmt, params)
+	var rows []publishCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectAllPublishedStmt, params, &rows)
+
 	if err != nil {
 		return nil, err
 	}
 
 	var roomIDs []string
-	for _, item := range response {
+	for _, item := range rows {
 		roomIDs = append(roomIDs, item.Publish.RoomID)
 	}
 	return roomIDs, nil

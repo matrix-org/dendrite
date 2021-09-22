@@ -38,7 +38,7 @@ import (
 // );
 // `
 
-type OutboundPeekCosmos struct {
+type outboundPeekCosmos struct {
 	RoomID            string `json:"room_id"`
 	ServerName        string `json:"server_name"`
 	PeekID            string `json:"peek_id"`
@@ -47,9 +47,9 @@ type OutboundPeekCosmos struct {
 	RenewalInterval   int64  `json:"renewal_interval"`
 }
 
-type OutboundPeekCosmosData struct {
+type outboundPeekCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	OutboundPeek OutboundPeekCosmos `json:"mx_federationsender_outbound_peek"`
+	OutboundPeek outboundPeekCosmos `json:"mx_federationsender_outbound_peek"`
 }
 
 // const insertOutboundPeekSQL = "" +
@@ -85,29 +85,16 @@ type outboundPeeksStatements struct {
 	tableName               string
 }
 
-func queryOutboundPeek(s *outboundPeeksStatements, ctx context.Context, qry string, params map[string]interface{}) ([]OutboundPeekCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []OutboundPeekCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *outboundPeeksStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func getOutboundPeek(s *outboundPeeksStatements, ctx context.Context, pk string, docId string) (*OutboundPeekCosmosData, error) {
-	response := OutboundPeekCosmosData{}
+func (s *outboundPeeksStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getOutboundPeek(s *outboundPeeksStatements, ctx context.Context, pk string, docId string) (*outboundPeekCosmosData, error) {
+	response := outboundPeekCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -123,7 +110,7 @@ func getOutboundPeek(s *outboundPeeksStatements, ctx context.Context, pk string,
 	return &response, err
 }
 
-func setOutboundPeek(s *outboundPeeksStatements, ctx context.Context, outboundPeek OutboundPeekCosmosData) (*OutboundPeekCosmosData, error) {
+func setOutboundPeek(s *outboundPeeksStatements, ctx context.Context, outboundPeek outboundPeekCosmosData) (*outboundPeekCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(outboundPeek.Pk, outboundPeek.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -135,7 +122,7 @@ func setOutboundPeek(s *outboundPeeksStatements, ctx context.Context, outboundPe
 	return &outboundPeek, ex
 }
 
-func deleteOutboundPeek(s *outboundPeeksStatements, ctx context.Context, dbData OutboundPeekCosmosData) error {
+func deleteOutboundPeek(s *outboundPeeksStatements, ctx context.Context, dbData outboundPeekCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -168,20 +155,18 @@ func (s *outboundPeeksStatements) InsertOutboundPeek(
 
 	// stmt := sqlutil.TxStmt(txn, s.insertOutboundPeekStmt)
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (room_id, server_name, peek_id)
 	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getOutboundPeek(s, ctx, pk, cosmosDocId)
+	dbData, _ := getOutboundPeek(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.OutboundPeek.RenewalInterval = renewalInterval
 		dbData.OutboundPeek.RenewedTimestamp = nowMilli
 
 	} else {
-		data := OutboundPeekCosmos{
+		data := outboundPeekCosmos{
 			RoomID:            roomID,
 			ServerName:        string(serverName),
 			PeekID:            peekID,
@@ -190,8 +175,8 @@ func (s *outboundPeeksStatements) InsertOutboundPeek(
 			RenewalInterval:   renewalInterval,
 		}
 
-		dbData = &OutboundPeekCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &outboundPeekCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			OutboundPeek:   data,
 		}
 
@@ -215,14 +200,12 @@ func (s *outboundPeeksStatements) RenewOutboundPeek(
 	// "UPDATE federationsender_outbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
 
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (room_id, server_name, peek_id)
 	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// _, err = sqlutil.TxStmt(txn, s.renewOutboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
-	res, err := getOutboundPeek(s, ctx, pk, cosmosDocId)
+	res, err := getOutboundPeek(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return
@@ -245,14 +228,12 @@ func (s *outboundPeeksStatements) SelectOutboundPeek(
 
 	// "SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	// 	UNIQUE (room_id, server_name, peek_id)
 	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)
-	row, err := getOutboundPeek(s, ctx, pk, cosmosDocId)
+	row, err := getOutboundPeek(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return nil, err
@@ -280,14 +261,19 @@ func (s *outboundPeeksStatements) SelectOutboundPeeks(
 	if err != nil {
 		return
 	}
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
 
 	// rows, err := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryContext(ctx, roomID)
-	rows, err := queryOutboundPeek(s, ctx, s.selectOutboundPeeksStmt, params)
+	var rows []outboundPeekCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectOutboundPeeksStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -313,15 +299,19 @@ func (s *outboundPeeksStatements) DeleteOutboundPeek(
 
 	// "DELETE FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 		"@x3": serverName,
 	}
 
 	// _, err = sqlutil.TxStmt(txn, s.deleteOutboundPeekStmt).ExecContext(ctx, roomID, serverName, peekID)
-	rows, err := queryOutboundPeek(s, ctx, s.deleteOutboundPeekStmt, params)
+	var rows []outboundPeekCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteOutboundPeekStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -343,14 +333,18 @@ func (s *outboundPeeksStatements) DeleteOutboundPeeks(
 
 	// "DELETE FROM federationsender_inbound_peeks WHERE room_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 	}
 
 	// _, err = sqlutil.TxStmt(txn, s.deleteOutboundPeeksStmt).ExecContext(ctx, roomID)
-	rows, err := queryOutboundPeek(s, ctx, s.deleteOutboundPeeksStmt, params)
+	var rows []outboundPeekCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteOutboundPeeksStmt, params, &rows)
 
 	if err != nil {
 		return

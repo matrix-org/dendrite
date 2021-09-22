@@ -38,15 +38,15 @@ import (
 // `
 
 // Profile represents the profile for a Matrix account.
-type ProfileCosmos struct {
+type profileCosmos struct {
 	Localpart   string `json:"local_part"`
 	DisplayName string `json:"display_name"`
 	AvatarURL   string `json:"avatar_url"`
 }
 
-type ProfileCosmosData struct {
+type profileCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Profile ProfileCosmos `json:"mx_userapi_profile"`
+	Profile profileCosmos `json:"mx_userapi_profile"`
 }
 
 type profilesStatements struct {
@@ -59,7 +59,15 @@ type profilesStatements struct {
 	tableName                  string
 }
 
-func mapFromProfile(db ProfileCosmos) authtypes.Profile {
+func (s *profilesStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *profilesStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func mapFromProfile(db profileCosmos) authtypes.Profile {
 	return authtypes.Profile{
 		AvatarURL:   db.AvatarURL,
 		DisplayName: db.DisplayName,
@@ -67,8 +75,8 @@ func mapFromProfile(db ProfileCosmos) authtypes.Profile {
 	}
 }
 
-func mapToProfile(api authtypes.Profile) ProfileCosmos {
-	return ProfileCosmos{
+func mapToProfile(api authtypes.Profile) profileCosmos {
+	return profileCosmos{
 		AvatarURL:   api.AvatarURL,
 		DisplayName: api.DisplayName,
 		Localpart:   api.Localpart,
@@ -83,29 +91,8 @@ func (s *profilesStatements) prepare(db *Database) (err error) {
 	return
 }
 
-func queryProfile(s *profilesStatements, ctx context.Context, qry string, params map[string]interface{}) ([]ProfileCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []ProfileCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func getProfile(s *profilesStatements, ctx context.Context, pk string, docId string) (*ProfileCosmosData, error) {
-	response := ProfileCosmosData{}
+func getProfile(s *profilesStatements, ctx context.Context, pk string, docId string) (*profileCosmosData, error) {
+	response := profileCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -121,7 +108,7 @@ func getProfile(s *profilesStatements, ctx context.Context, pk string, docId str
 	return &response, err
 }
 
-func setProfile(s *profilesStatements, ctx context.Context, profile ProfileCosmosData) (*ProfileCosmosData, error) {
+func setProfile(s *profilesStatements, ctx context.Context, profile profileCosmosData) (*profileCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(profile.Pk, profile.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -142,14 +129,11 @@ func (s *profilesStatements) insertProfile(
 		Localpart: localpart,
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
-
 	docId := localpart
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	var dbData = ProfileCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+	var dbData = profileCosmosData{
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		Profile:        mapToProfile(*result),
 	}
 
@@ -169,27 +153,30 @@ func (s *profilesStatements) selectProfileByLocalpart(
 ) (*authtypes.Profile, error) {
 
 	// "SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart = $1"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": localpart,
 	}
-
-	response, err := queryProfile(s, ctx, s.selectProfileByLocalpartStmt, params)
+	var rows []profileCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectProfileByLocalpartStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(response) == 0 {
-		return nil, errors.New(fmt.Sprintf("Localpart %s not found", len(response)))
+	if len(rows) == 0 {
+		return nil, errors.New(fmt.Sprintf("Localpart %s not found", len(rows)))
 	}
 
-	if len(response) != 1 {
-		return nil, errors.New(fmt.Sprintf("Localpart %s has multiple entries", len(response)))
+	if len(rows) != 1 {
+		return nil, errors.New(fmt.Sprintf("Localpart %s has multiple entries", len(rows)))
 	}
 
-	var result = mapFromProfile(response[0].Profile)
+	var result = mapFromProfile(rows[0].Profile)
 	return &result, nil
 }
 
@@ -198,12 +185,10 @@ func (s *profilesStatements) setAvatarURL(
 ) (err error) {
 
 	// "UPDATE account_profiles SET avatar_url = $1 WHERE localpart = $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
 	docId := localpart
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	var response, exGet = getProfile(s, ctx, pk, cosmosDocId)
+	var response, exGet = getProfile(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
@@ -222,11 +207,9 @@ func (s *profilesStatements) setDisplayName(
 ) (err error) {
 
 	// "UPDATE account_profiles SET display_name = $1 WHERE localpart = $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
 	docId := localpart
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response, exGet = getProfile(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	var response, exGet = getProfile(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
@@ -246,21 +229,24 @@ func (s *profilesStatements) selectProfilesBySearch(
 	var profiles []authtypes.Profile
 
 	// "SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.db.profiles.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": searchString,
 		"@x3": limit,
 	}
-
-	response, err := queryProfile(s, ctx, s.selectProfilesBySearchStmt, params)
+	var rows []profileCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectProfilesBySearchStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
-	for i := 0; i < len(response); i++ {
-		var responseData = response[i]
+	for i := 0; i < len(rows); i++ {
+		var responseData = rows[i]
 		profiles = append(profiles, mapFromProfile(responseData.Profile))
 	}
 

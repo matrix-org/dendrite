@@ -45,20 +45,20 @@ import (
 // CREATE INDEX IF NOT EXISTS appservice_events_as_id ON appservice_events(as_id);
 // `
 
-type EventCosmos struct {
+type eventCosmos struct {
 	ID                int64  `json:"id"`
 	AppServiceID      string `json:"as_id"`
 	HeaderedEventJSON []byte `json:"headered_event_json"`
 	TXNID             int64  `json:"txn_id"`
 }
 
-type EventNumberCosmosData struct {
+type eventNumberCosmosData struct {
 	Number int `json:"number"`
 }
 
-type EventCosmosData struct {
+type eventCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Event EventCosmos `json:"mx_appservice_event"`
+	Event eventCosmos `json:"mx_appservice_event"`
 }
 
 // "SELECT id, headered_event_json, txn_id " +
@@ -119,50 +119,16 @@ func (s *eventsStatements) prepare(db *Database, writer sqlutil.Writer) (err err
 	return
 }
 
-func queryEvent(s *eventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []EventCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *eventsStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func queryEventEventNumber(s *eventsStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventNumberCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []EventNumberCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *eventsStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
-func getEvent(s *eventsStatements, ctx context.Context, pk string, docId string) (*EventCosmosData, error) {
-	response := EventCosmosData{}
+func getEvent(s *eventsStatements, ctx context.Context, pk string, docId string) (*eventCosmosData, error) {
+	response := eventCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -178,7 +144,7 @@ func getEvent(s *eventsStatements, ctx context.Context, pk string, docId string)
 	return &response, err
 }
 
-func setEvent(s *eventsStatements, ctx context.Context, event EventCosmosData) (*EventCosmosData, error) {
+func setEvent(s *eventsStatements, ctx context.Context, event eventCosmosData) (*eventCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(event.Pk, event.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -190,7 +156,7 @@ func setEvent(s *eventsStatements, ctx context.Context, event EventCosmosData) (
 	return &event, ex
 }
 
-func deleteEvent(s *eventsStatements, ctx context.Context, event EventCosmosData) error {
+func deleteEvent(s *eventsStatements, ctx context.Context, event eventCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(event.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
 		ctx,
@@ -223,13 +189,17 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 	// "SELECT id, headered_event_json, txn_id " +
 	// "FROM appservice_events WHERE as_id = $1 ORDER BY txn_id DESC, id ASC"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": applicationServiceID,
 	}
 
-	eventRows, err := queryEvent(s, ctx, s.selectEventsByApplicationServiceIDStmt, params)
+	var rows []eventCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectEventsByApplicationServiceIDStmt, params, &rows)
 
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -237,7 +207,7 @@ func (s *eventsStatements) selectEventsByApplicationServiceID(
 		}).WithError(err).Fatalf("appservice unable to select new events to send")
 	}
 
-	events, maxID, txnID, eventsRemaining, err = retrieveEvents(eventRows, limit)
+	events, maxID, txnID, eventsRemaining, err = retrieveEvents(rows, limit)
 	if err != nil {
 		return
 	}
@@ -252,7 +222,7 @@ func checkNamedErr(fn func() error, err *error) {
 	}
 }
 
-func retrieveEvents(eventRows []EventCosmosData, limit int) (events []gomatrixserverlib.HeaderedEvent, maxID, txnID int, eventsRemaining bool, err error) {
+func retrieveEvents(eventRows []eventCosmosData, limit int) (events []gomatrixserverlib.HeaderedEvent, maxID, txnID int, eventsRemaining bool, err error) {
 	// Get current time for use in calculating event age
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 
@@ -318,18 +288,22 @@ func (s *eventsStatements) countEventsByApplicationServiceID(
 
 	// "SELECT COUNT(id) FROM appservice_events WHERE as_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": appServiceID,
 	}
 
-	response, err := queryEventEventNumber(s, ctx, s.countEventsByApplicationServiceIDStmt, params)
+	var rows []eventNumberCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectEventsByApplicationServiceIDStmt, params, &rows)
 
 	if err != nil && err != sql.ErrNoRows {
 		return 0, err
 	}
-	count = response[0].Number
+	count = rows[0].Number
 
 	return count, nil
 }
@@ -350,12 +324,10 @@ func (s *eventsStatements) insertEvent(
 	// "INSERT INTO appservice_events(as_id, headered_event_json, txn_id) " +
 	// "VALUES ($1, $2, $3)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	docId := fmt.Sprintf("%s", appServiceID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, err := getEvent(s, ctx, pk, cosmosDocId)
+	dbData, err := getEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.Event.HeaderedEventJSON = eventJSON
@@ -369,15 +341,15 @@ func (s *eventsStatements) insertEvent(
 		// appServiceID,
 		// eventJSON,
 		// -1, // No transaction ID yet
-		data := EventCosmos{
+		data := eventCosmos{
 			AppServiceID:      appServiceID,
 			HeaderedEventJSON: eventJSON,
 			ID:                idSeq,
 			TXNID:             -1,
 		}
 
-		dbData = &EventCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &eventCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			Event:          data,
 		}
 
@@ -401,19 +373,23 @@ func (s *eventsStatements) updateTxnIDForEvents(
 ) (err error) {
 	// "UPDATE appservice_events SET txn_id = $1 WHERE as_id = $2 AND id <= $3"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": appserviceID,
 		"@x3": maxID,
 	}
 
-	response, err := queryEvent(s, ctx, s.updateTxnIDForEventsStmt, params)
+	var rows []eventCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.updateTxnIDForEventsStmt, params, &rows)
 	if err != nil {
 		return err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		item.Event.TXNID = int64(txnID)
 		// _, err := s.updateTxnIDForEventsStmt.ExecContext(ctx, txnID, appserviceID, maxID)
 		_, err = setEvent(s, ctx, item)
@@ -430,19 +406,24 @@ func (s *eventsStatements) deleteEventsBeforeAndIncludingID(
 ) (err error) {
 	// "DELETE FROM appservice_events WHERE as_id = $1 AND id <= $2"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": appserviceID,
 		"@x3": eventTableID,
 	}
 
-	response, err := queryEvent(s, ctx, s.deleteEventsBeforeAndIncludingIDStmt, params)
+	var rows []eventCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteEventsBeforeAndIncludingIDStmt, params, &rows)
+
 	if err != nil {
 		return err
 	}
 
-	for _, item := range response {
+	for _, item := range rows {
 		// _, err := s.updateTxnIDForEventsStmt.ExecContext(ctx, txnID, appserviceID, maxID)
 		err = deleteEvent(s, ctx, item)
 	}

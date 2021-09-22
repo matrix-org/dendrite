@@ -42,7 +42,7 @@ import (
 // CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(user_id, device_id);
 // `
 
-type PeekCosmos struct {
+type peekCosmos struct {
 	ID       int64  `json:"id"`
 	RoomID   string `json:"room_id"`
 	UserID   string `json:"user_id"`
@@ -52,13 +52,13 @@ type PeekCosmos struct {
 	// creation_ts    int64  `json:"creation_ts"`
 }
 
-type PeekCosmosMaxNumber struct {
+type peekCosmosMaxNumber struct {
 	Max int64 `json:"number"`
 }
 
-type PeekCosmosData struct {
+type peekCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	Peek PeekCosmos `json:"mx_syncapi_peek"`
+	Peek peekCosmos `json:"mx_syncapi_peek"`
 }
 
 // const insertPeekSQL = "" +
@@ -115,50 +115,16 @@ type peekStatements struct {
 	tableName                string
 }
 
-func queryPeek(s *peekStatements, ctx context.Context, qry string, params map[string]interface{}) ([]PeekCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []PeekCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *peekStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func queryPeekMaxNumber(s *peekStatements, ctx context.Context, qry string, params map[string]interface{}) ([]PeekCosmosMaxNumber, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []PeekCosmosMaxNumber
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, nil
-	}
-	return response, nil
+func (s *peekStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
-func getPeek(s *peekStatements, ctx context.Context, pk string, docId string) (*PeekCosmosData, error) {
-	response := PeekCosmosData{}
+func getPeek(s *peekStatements, ctx context.Context, pk string, docId string) (*peekCosmosData, error) {
+	response := peekCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -174,7 +140,7 @@ func getPeek(s *peekStatements, ctx context.Context, pk string, docId string) (*
 	return &response, err
 }
 
-func setPeek(s *peekStatements, ctx context.Context, peek PeekCosmosData) (*PeekCosmosData, error) {
+func setPeek(s *peekStatements, ctx context.Context, peek peekCosmosData) (*peekCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(peek.Pk, peek.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -213,28 +179,26 @@ func (s *peekStatements) InsertPeek(
 	// " (id, room_id, user_id, device_id, creation_ts, deleted)" +
 	// " VALUES ($1, $2, $3, $4, $5, false)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     UNIQUE(room_id, user_id, device_id)
-	docId := fmt.Sprintf("%d_%s_%d", roomID, userID, deviceID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	docId := fmt.Sprintf("%s_%s_%s", roomID, userID, deviceID)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getPeek(s, ctx, pk, cosmosDocId)
+	dbData, _ := getPeek(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		// " (id, room_id, user_id, device_id, creation_ts, deleted)" +
 		// " VALUES ($1, $2, $3, $4, $5, false)"
 		dbData.SetUpdateTime()
 		dbData.Peek.Deleted = false
 	} else {
-		data := PeekCosmos{
+		data := peekCosmos{
 			ID:       int64(streamPos),
 			RoomID:   roomID,
 			UserID:   userID,
 			DeviceID: deviceID,
 		}
 
-		dbData = &PeekCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &peekCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			Peek:           data,
 		}
 	}
@@ -257,15 +221,20 @@ func (s *peekStatements) DeletePeek(
 
 	// "UPDATE syncapi_peeks SET deleted=true, id=$1 WHERE room_id = $2 AND user_id = $3 AND device_id = $4"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 		"@x3": userID,
 		"@x4": deviceID,
 	}
 
-	rows, err := queryPeek(s, ctx, s.deletePeekStmt, params)
+	var rows []peekCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deletePeekStmt, params, &rows)
+
 	// _, err = sqlutil.TxStmt(txn, s.deletePeekStmt).ExecContext(ctx, streamPos, roomID, userID, deviceID)
 
 	numAffected := len(rows)
@@ -295,14 +264,19 @@ func (s *peekStatements) DeletePeeks(
 ) (types.StreamPosition, error) {
 	// "UPDATE syncapi_peeks SET deleted=true, id=$1 WHERE room_id = $2 AND user_id = $3"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomID,
 		"@x3": userID,
 	}
 
-	rows, err := queryPeek(s, ctx, s.deletePeekStmt, params)
+	var rows []peekCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deletePeekStmt, params, &rows)
+
 	// result, err := sqlutil.TxStmt(txn, s.deletePeeksStmt).ExecContext(ctx, streamPos, roomID, userID)
 	if err != nil {
 		return 0, err
@@ -334,16 +308,20 @@ func (s *peekStatements) SelectPeeksInRange(
 ) (peeks []types.Peek, err error) {
 	// "SELECT id, room_id, deleted FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted=true) OR (id > $3 AND id <= $4))"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": deviceID,
 		"@x4": r.Low(),
 		"@x5": r.High(),
 	}
+	var rows []peekCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectPeeksInRangeStmt, params, &rows)
 
-	rows, err := queryPeek(s, ctx, s.selectPeeksInRangeStmt, params)
 	// rows, err := sqlutil.TxStmt(txn, s.selectPeeksInRangeStmt).QueryContext(ctx, userID, deviceID, r.Low(), r.High())
 	if err != nil {
 		return
@@ -371,12 +349,17 @@ func (s *peekStatements) SelectPeekingDevices(
 
 	// "SELECT room_id, user_id, device_id FROM syncapi_peeks WHERE deleted=false"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
 
-	rows, err := queryPeek(s, ctx, s.selectPeekingDevicesStmt, params)
+	var rows []peekCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectPeekingDevicesStmt, params, &rows)
+
 	// rows, err := s.selectPeekingDevicesStmt.QueryContext(ctx)
 	if err != nil {
 		return nil, err
@@ -405,12 +388,16 @@ func (s *peekStatements) SelectMaxPeekID(
 
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxPeekIDStmt)
 	var nullableID sql.NullInt64
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
+	var rows []peekCosmosMaxNumber
+	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.selectMaxPeekIDStmt, params, &rows)
 
-	rows, err := queryPeekMaxNumber(s, ctx, s.selectMaxPeekIDStmt, params)
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 
 	if rows != nil {

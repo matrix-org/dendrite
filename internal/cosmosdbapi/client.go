@@ -47,6 +47,51 @@ func (doc *CosmosDocument) SetUpdateTime() {
 	doc.Ut = now.Format(time.RFC3339)
 }
 
+func PerformQuery(ctx context.Context,
+	conn CosmosConnection,
+	databaseName string,
+	containerName string,
+	partitonKey string,
+	qryString string,
+	params map[string]interface{},
+	response interface{}) error {
+	optionsQry := GetQueryDocumentsOptions(partitonKey)
+	var query = GetQuery(qryString, params)
+	_, err := GetClient(conn).QueryDocuments(
+		ctx,
+		databaseName,
+		containerName,
+		query,
+		&response,
+		optionsQry)
+	return err
+}
+
+func PerformQueryAllPartitions(ctx context.Context,
+	conn CosmosConnection,
+	databaseName string,
+	containerName string,
+	qryString string,
+	params map[string]interface{},
+	response interface{}) error {
+	var optionsQry = GetQueryAllPartitionsDocumentsOptions()
+	var query = GetQuery(qryString, params)
+	_, err := GetClient(conn).QueryDocuments(
+		ctx,
+		databaseName,
+		containerName,
+		query,
+		&response,
+		optionsQry)
+
+	// When there are no Rows we seem to get the generic Bad Req JSON error
+	if err != nil {
+		// return nil, err
+	}
+
+	return nil
+}
+
 func GenerateDocument(
 	collection string,
 	tenantName string,

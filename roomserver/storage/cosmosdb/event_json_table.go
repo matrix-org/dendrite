@@ -33,14 +33,14 @@ import (
 //   );
 // `
 
-type EventJSONCosmos struct {
+type eventJSONCosmos struct {
 	EventNID  int64  `json:"event_nid"`
 	EventJSON []byte `json:"event_json"`
 }
 
-type EventJSONCosmosData struct {
+type eventJSONCosmosData struct {
 	cosmosdbapi.CosmosDocument
-	EventJSON EventJSONCosmos `json:"mx_roomserver_event_json"`
+	EventJSON eventJSONCosmos `json:"mx_roomserver_event_json"`
 }
 
 // const insertEventJSONSQL = `
@@ -65,8 +65,16 @@ type eventJSONStatements struct {
 	tableName               string
 }
 
-func getEventJSON(s *eventJSONStatements, ctx context.Context, pk string, docId string) (*EventJSONCosmosData, error) {
-	response := EventJSONCosmosData{}
+func (s *eventJSONStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *eventJSONStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
+func getEventJSON(s *eventJSONStatements, ctx context.Context, pk string, docId string) (*eventJSONCosmosData, error) {
+	response := eventJSONCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -80,27 +88,6 @@ func getEventJSON(s *eventJSONStatements, ctx context.Context, pk string, docId 
 	}
 
 	return &response, err
-}
-
-func queryEventJSON(s *eventJSONStatements, ctx context.Context, qry string, params map[string]interface{}) ([]EventJSONCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []EventJSONCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
 }
 
 func NewCosmosDBEventJSONTable(db *Database) (tables.EventJSON, error) {
@@ -126,24 +113,21 @@ func (s *eventJSONStatements) InsertEventJSON(
 	// _, err := sqlutil.TxStmt(txn, s.insertEventJSONStmt).ExecContext(ctx, int64(eventNID), eventJSON)
 	// INSERT OR REPLACE INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-
 	docId := fmt.Sprintf("%d", eventNID)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getEventJSON(s, ctx, pk, cosmosDocId)
+	dbData, _ := getEventJSON(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.EventJSON.EventJSON = eventJSON
 	} else {
-		data := EventJSONCosmos{
+		data := eventJSONCosmos{
 			EventNID:  int64(eventNID),
 			EventJSON: eventJSON,
 		}
 
-		dbData = &EventJSONCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &eventJSONCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			EventJSON:      data,
 		}
 	}
@@ -165,13 +149,17 @@ func (s *eventJSONStatements) BulkSelectEventJSON(
 	//   WHERE event_nid IN ($1)
 	//   ORDER BY event_nid ASC
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": eventNIDs,
 	}
 
-	response, err := queryEventJSON(s, ctx, s.bulkSelectEventJSONStmt, params)
+	var rows []eventJSONCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.bulkSelectEventJSONStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -183,7 +171,7 @@ func (s *eventJSONStatements) BulkSelectEventJSON(
 	// We might get fewer results than NIDs so we adjust the length of the slice before returning it.
 	results := make([]tables.EventJSONPair, len(eventNIDs))
 	i := 0
-	for _, item := range response {
+	for _, item := range rows {
 		result := &results[i]
 		result.EventNID = types.EventNID(item.EventJSON.EventNID)
 		result.EventJSON = item.EventJSON.EventJSON

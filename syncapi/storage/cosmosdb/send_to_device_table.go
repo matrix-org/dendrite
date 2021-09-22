@@ -94,46 +94,12 @@ type sendToDeviceStatements struct {
 	tableName                      string
 }
 
-func querySendToDevice(s *sendToDeviceStatements, ctx context.Context, qry string, params map[string]interface{}) ([]SendToDeviceCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []SendToDeviceCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+func (s *sendToDeviceStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func querySendToDeviceNumber(s *sendToDeviceStatements, ctx context.Context, qry string, params map[string]interface{}) ([]SendToDeviceCosmosMaxNumber, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []SendToDeviceCosmosMaxNumber
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, nil
-	}
-	return response, nil
+func (s *sendToDeviceStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
 func deleteSendToDevice(s *sendToDeviceStatements, ctx context.Context, dbData SendToDeviceCosmosData) error {
@@ -180,6 +146,10 @@ func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 	// INSERT INTO syncapi_send_to_device (user_id, device_id, content)
 	//   VALUES ($1, $2, $3)
 
+	// 	NO CONSTRAINT
+	docId := fmt.Sprintf("%d", pos)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+
 	data := SendToDeviceCosmos{
 		ID:       int64(pos),
 		UserID:   userID,
@@ -187,14 +157,8 @@ func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
 		Content:  content,
 	}
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	// 	NO CONSTRAINT
-	docId := fmt.Sprintf("%d", pos)
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-
 	var dbData = SendToDeviceCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		SendToDevice:   data,
 	}
 
@@ -217,16 +181,21 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 	// WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
 	// ORDER BY id DESC
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": deviceID,
 		"@x4": from,
 		"@x5": to,
 	}
 
-	rows, err := querySendToDevice(s, ctx, s.selectSendToDeviceMessagesStmt, params)
+	var rows []SendToDeviceCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectSendToDeviceMessagesStmt, params, &rows)
+
 	if err != nil {
 		return
 	}
@@ -268,16 +237,21 @@ func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
 	// DELETE FROM syncapi_send_to_device
 	// 	WHERE user_id = $1 AND device_id = $2 AND id < $3
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": userID,
 		"@x3": deviceID,
 		"@x4": pos,
 	}
 
 	// _, err = sqlutil.TxStmt(txn, s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, userID, deviceID, pos)
-	rows, err := querySendToDevice(s, ctx, s.deleteSendToDeviceMessagesStmt, params)
+	var rows []SendToDeviceCosmosData
+	err = cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.deleteSendToDeviceMessagesStmt, params, &rows)
+
 	if err != nil {
 		return err
 	}
@@ -297,12 +271,16 @@ func (s *sendToDeviceStatements) SelectMaxSendToDeviceMessageID(
 	var nullableID sql.NullInt64
 	// "SELECT MAX(id) FROM syncapi_send_to_device"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
+	var rows []SendToDeviceCosmosMaxNumber
+	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.selectMaxSendToDeviceIDStmt, params, &rows)
 
-	rows, err := querySendToDeviceNumber(s, ctx, s.selectMaxSendToDeviceIDStmt, params)
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxSendToDeviceIDStmt)
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 

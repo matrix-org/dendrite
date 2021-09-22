@@ -40,18 +40,18 @@ import (
 //   );
 // `
 
-type RoomCosmosData struct {
-	cosmosdbapi.CosmosDocument
-	Room RoomCosmos `json:"mx_roomserver_room"`
-}
-
-type RoomCosmos struct {
+type roomCosmos struct {
 	RoomNID          int64   `json:"room_nid"`
 	RoomID           string  `json:"room_id"`
 	LatestEventNIDs  []int64 `json:"latest_event_nids"`
 	LastEventSentNID int64   `json:"last_event_sent_nid"`
 	StateSnapshotNID int64   `json:"state_snapshot_nid"`
 	RoomVersion      string  `json:"room_version"`
+}
+
+type roomCosmosData struct {
+	cosmosdbapi.CosmosDocument
+	Room roomCosmos `json:"mx_roomserver_room"`
 }
 
 // Same as insertEventTypeNIDSQL
@@ -113,6 +113,14 @@ type roomStatements struct {
 	tableName         string
 }
 
+func (s *roomStatements) getCollectionName() string {
+	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
+}
+
+func (s *roomStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+}
+
 func NewCosmosDBRoomsTable(db *Database) (tables.Rooms, error) {
 	s := &roomStatements{
 		db: db,
@@ -139,29 +147,8 @@ func mapToRoomEventNIDArray(eventNIDs []int64) []types.EventNID {
 	return result
 }
 
-func queryRoom(s *roomStatements, ctx context.Context, qry string, params map[string]interface{}) ([]RoomCosmosData, error) {
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-	var pk = cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	var response []RoomCosmosData
-
-	var optionsQry = cosmosdbapi.GetQueryDocumentsOptions(pk)
-	var query = cosmosdbapi.GetQuery(qry, params)
-	_, err := cosmosdbapi.GetClient(s.db.connection).QueryDocuments(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		query,
-		&response,
-		optionsQry)
-
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func getRoom(s *roomStatements, ctx context.Context, pk string, docId string) (*RoomCosmosData, error) {
-	response := RoomCosmosData{}
+func getRoom(s *roomStatements, ctx context.Context, pk string, docId string) (*roomCosmosData, error) {
+	response := roomCosmosData{}
 	err := cosmosdbapi.GetDocumentOrNil(
 		s.db.connection,
 		s.db.cosmosConfig,
@@ -177,7 +164,7 @@ func getRoom(s *roomStatements, ctx context.Context, pk string, docId string) (*
 	return &response, err
 }
 
-func setRoom(s *roomStatements, ctx context.Context, room RoomCosmosData) (*RoomCosmosData, error) {
+func setRoom(s *roomStatements, ctx context.Context, room roomCosmosData) (*roomCosmosData, error) {
 	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(room.Pk, room.ETag)
 	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
 		ctx,
@@ -193,19 +180,23 @@ func (s *roomStatements) SelectRoomIDs(ctx context.Context) ([]string, error) {
 
 	// "SELECT room_id FROM roomserver_rooms"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 	}
 
-	response, err := queryRoom(s, ctx, s.selectRoomIDsStmt, params)
+	var rows []roomCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectRoomIDsStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	var roomIDs []string
-	for _, item := range response {
+	for _, item := range rows {
 		roomIDs = append(roomIDs, item.Room.RoomID)
 	}
 	return roomIDs, nil
@@ -216,12 +207,10 @@ func (s *roomStatements) SelectRoomInfo(ctx context.Context, roomID string) (*ty
 
 	// 	"SELECT room_version, room_nid, state_snapshot_nid, latest_event_nids FROM roomserver_rooms WHERE room_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     room_id TEXT NOT NULL UNIQUE,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	room, err := getRoom(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	room, err := getRoom(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		if err == cosmosdbutil.ErrNoRows {
@@ -242,16 +231,13 @@ func (s *roomStatements) InsertRoomNID(
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (roomNID types.RoomNID, err error) {
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
-
 	// INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)
 	//   ON CONFLICT DO NOTHING;
 	//     room_id TEXT NOT NULL UNIQUE,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, errGet := getRoom(s, ctx, pk, cosmosDocId)
+	dbData, errGet := getRoom(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if errGet == cosmosdbutil.ErrNoRows {
 		//     room_nid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -260,14 +246,14 @@ func (s *roomStatements) InsertRoomNID(
 			return 0, seqErr
 		}
 
-		data := RoomCosmos{
+		data := roomCosmos{
 			RoomNID:     int64(roomNIDSeq),
 			RoomID:      roomID,
 			RoomVersion: string(roomVersion),
 		}
 
-		dbData = &RoomCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(dbCollectionName, s.db.cosmosConfig.TenantName, pk, cosmosDocId),
+		dbData = &roomCosmosData{
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 			Room:           data,
 		}
 	} else {
@@ -298,12 +284,10 @@ func (s *roomStatements) SelectRoomNID(
 
 	// "SELECT room_nid FROM roomserver_rooms WHERE room_id = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	//     room_id TEXT NOT NULL UNIQUE,
 	docId := roomID
-	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, dbCollectionName, docId)
-	pk := cosmosdbapi.GetPartitionKey(s.db.cosmosConfig.TenantName, dbCollectionName)
-	room, err := getRoom(s, ctx, pk, cosmosDocId)
+	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
+	room, err := getRoom(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return 0, err
@@ -321,25 +305,29 @@ func (s *roomStatements) SelectLatestEventNIDs(
 
 	// 	"SELECT latest_event_nids, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNID,
 	}
 
-	response, err := queryRoom(s, ctx, s.selectLatestEventNIDsStmt, params)
+	var rows []roomCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectLatestEventNIDsStmt, params, &rows)
 
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// TODO: Check the error handling
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return nil, 0, cosmosdbutil.ErrNoRows
 	}
 
 	//Assume 1 per RoomNID
-	room := response[0]
+	room := rows[0]
 	return mapToRoomEventNIDArray(room.Room.LatestEventNIDs), types.StateSnapshotNID(room.Room.StateSnapshotNID), nil
 }
 
@@ -349,25 +337,29 @@ func (s *roomStatements) SelectLatestEventsNIDsForUpdate(
 
 	// "SELECT latest_event_nids, last_event_sent_nid, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNID,
 	}
 
-	response, err := queryRoom(s, ctx, s.selectLatestEventNIDsForUpdateStmt, params)
+	var rows []roomCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectLatestEventNIDsForUpdateStmt, params, &rows)
 
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
 	// TODO: Check the error handling
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return nil, 0, 0, cosmosdbutil.ErrNoRows
 	}
 
 	//Assume 1 per RoomNID
-	room := response[0]
+	room := rows[0]
 	return mapToRoomEventNIDArray(room.Room.LatestEventNIDs), types.EventNID(room.Room.LastEventSentNID), types.StateSnapshotNID(room.Room.StateSnapshotNID), nil
 }
 
@@ -382,25 +374,29 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 
 	// "UPDATE roomserver_rooms SET latest_event_nids = $1, last_event_sent_nid = $2, state_snapshot_nid = $3 WHERE room_nid = $4"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNID,
 	}
 
-	response, err := queryRoom(s, ctx, s.selectLatestEventNIDsForUpdateStmt, params)
+	var rows []roomCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectLatestEventNIDsForUpdateStmt, params, &rows)
 
 	if err != nil {
 		return err
 	}
 
 	// TODO: Check the error handling
-	if len(response) == 0 {
+	if len(rows) == 0 {
 		return cosmosdbutil.ErrNoRows
 	}
 
 	//Assume 1 per RoomNID
-	room := response[0]
+	room := rows[0]
 
 	room.Room.LatestEventNIDs = mapFromEventNIDArray(eventNIDs)
 	room.Room.LastEventSentNID = int64(lastEventSentNID)
@@ -419,20 +415,24 @@ func (s *roomStatements) SelectRoomVersionsForRoomNIDs(
 
 	// 	"SELECT room_nid, room_version FROM roomserver_rooms WHERE room_nid IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNIDs,
 	}
 
-	response, err := queryRoom(s, ctx, selectRoomVersionsForRoomNIDsSQL, params)
+	var rows []roomCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), s.selectRoomVersionForRoomNIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[types.RoomNID]gomatrixserverlib.RoomVersion)
-	for _, item := range response {
+	for _, item := range rows {
 		result[types.RoomNID(item.Room.RoomNID)] = gomatrixserverlib.RoomVersion(item.Room.RoomVersion)
 	}
 	return result, nil
@@ -445,20 +445,24 @@ func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, roomNIDs []types
 
 	// "SELECT room_id FROM roomserver_rooms WHERE room_nid IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomNIDs,
 	}
 
-	response, err := queryRoom(s, ctx, bulkSelectRoomIDsSQL, params)
+	var rows []roomCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), bulkSelectRoomIDsSQL, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	var roomIDs []string
-	for _, item := range response {
+	for _, item := range rows {
 		roomIDs = append(roomIDs, item.Room.RoomID)
 	}
 	return roomIDs, nil
@@ -471,20 +475,24 @@ func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, roomIDs []strin
 
 	// "SELECT room_nid FROM roomserver_rooms WHERE room_id IN ($1)"
 
-	var dbCollectionName = cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 	params := map[string]interface{}{
-		"@x1": dbCollectionName,
+		"@x1": s.getCollectionName(),
 		"@x2": roomIDs,
 	}
 
-	response, err := queryRoom(s, ctx, bulkSelectRoomNIDsSQL, params)
+	var rows []roomCosmosData
+	err := cosmosdbapi.PerformQuery(ctx,
+		s.db.connection,
+		s.db.cosmosConfig.DatabaseName,
+		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(), bulkSelectRoomNIDsSQL, params, &rows)
 
 	if err != nil {
 		return nil, err
 	}
 
 	var roomNIDs []types.RoomNID
-	for _, item := range response {
+	for _, item := range rows {
 		roomNIDs = append(roomNIDs, types.RoomNID(item.Room.RoomNID))
 	}
 	return roomNIDs, nil
