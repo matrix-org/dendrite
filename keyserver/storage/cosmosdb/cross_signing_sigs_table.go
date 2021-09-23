@@ -78,8 +78,9 @@ func (s *crossSigningSigsStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *crossSigningSigsStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *crossSigningSigsStatements) getPartitionKey(targetUserId string) string {
+	uniqueId := targetUserId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getCrossSigningSigs(s *crossSigningSigsStatements, ctx context.Context, pk string, docId string) (*crossSigningSigsCosmosData, error) {
@@ -145,7 +146,7 @@ func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectCrossSigningSigsForTargetStmt, params, &rows)
+		s.getPartitionKey(targetUserID), s.selectCrossSigningSigsForTargetStmt, params, &rows)
 
 	// rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningSigsForTargetStmt).QueryContext(ctx, targetUserID, targetKeyID)
 	if err != nil {
@@ -185,7 +186,7 @@ func (s *crossSigningSigsStatements) UpsertCrossSigningSigsForTarget(
 	docId := fmt.Sprintf("%s_%s_%s", originUserID, targetUserID, targetKeyID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getCrossSigningSigs(s, ctx, s.getPartitionKey(), cosmosDocId)
+	dbData, _ := getCrossSigningSigs(s, ctx, s.getPartitionKey(targetUserID), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.CrossSigningSigs.OriginKeyId = string(originKeyID)
@@ -200,7 +201,7 @@ func (s *crossSigningSigsStatements) UpsertCrossSigningSigsForTarget(
 		}
 
 		dbData = &crossSigningSigsCosmosData{
-			CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+			CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(targetUserID), cosmosDocId),
 			CrossSigningSigs: data,
 		}
 	}
@@ -230,7 +231,7 @@ func (s *crossSigningSigsStatements) DeleteCrossSigningSigsForTarget(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectCrossSigningSigsForTargetStmt, params, &rows)
+		s.getPartitionKey(targetUserID), s.selectCrossSigningSigsForTargetStmt, params, &rows)
 
 	// if _, err := sqlutil.TxStmt(txn, s.deleteCrossSigningSigsForTargetStmt).ExecContext(ctx, targetUserID, targetKeyID); err != nil {
 	// 	return fmt.Errorf("s.deleteCrossSigningSigsForTargetStmt: %w", err)

@@ -114,8 +114,9 @@ func (s *keyBackupStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *keyBackupStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *keyBackupStatements) getPartitionKey(userId string) string {
+	uniqueId := userId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getKeyBackup(s *keyBackupStatements, ctx context.Context, pk string, docId string) (*keyBackupCosmosData, error) {
@@ -176,7 +177,7 @@ func (s keyBackupStatements) countKeys(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.countKeysStmt, params, &rows)
+		s.getPartitionKey(userID), s.countKeysStmt, params, &rows)
 
 	if err != nil {
 		return -1, err
@@ -214,7 +215,7 @@ func (s *keyBackupStatements) insertBackupKey(
 	}
 
 	dbData := &keyBackupCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(userID), cosmosDocId),
 		KeyBackup:      data,
 	}
 
@@ -242,7 +243,7 @@ func (s *keyBackupStatements) updateBackupKey(
 	docId := fmt.Sprintf("%s_%s_%s_%s", userID, key.RoomID, key.SessionID, version)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackup(s, ctx, s.getPartitionKey(), cosmosDocId)
+	res, err := getKeyBackup(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return
@@ -278,7 +279,7 @@ func (s *keyBackupStatements) selectKeys(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectKeysStmt, params, &rows)
+		s.getPartitionKey(userID), s.selectKeysStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -308,7 +309,7 @@ func (s *keyBackupStatements) selectKeysByRoomID(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectKeysByRoomIDStmt, params, &rows)
+		s.getPartitionKey(userID), s.selectKeysByRoomIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -341,7 +342,7 @@ func (s *keyBackupStatements) selectKeysByRoomIDAndSessionID(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectKeysByRoomIDAndSessionIDStmt, params, &rows)
+		s.getPartitionKey(userID), s.selectKeysByRoomIDAndSessionIDStmt, params, &rows)
 
 	if err != nil {
 		return nil, err

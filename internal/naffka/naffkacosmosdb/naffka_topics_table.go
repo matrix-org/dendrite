@@ -116,8 +116,9 @@ func (s *topicsStatements) getCollectionNameMessages() string {
 	return cosmosdbapi.GetCollectionName(s.DB.databaseName, s.tableNameMessages)
 }
 
-func (s *topicsStatements) getPartitionKeyMessages() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.DB.cosmosConfig.TenantName, s.getCollectionNameMessages())
+func (s *topicsStatements) getPartitionKeyMessages(topicNid int64) string {
+	uniqueId := fmt.Sprintf("%d", topicNid)
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.DB.cosmosConfig.TenantName, s.getCollectionNameMessages(), uniqueId)
 }
 
 func getTopic(s *topicsStatements, ctx context.Context, pk string, docId string) (*topicCosmosData, error) {
@@ -310,7 +311,7 @@ func (t *topicsStatements) InsertTopics(
 	}
 
 	dbData := &messageCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(t.getCollectionNameMessages(), t.DB.cosmosConfig.TenantName, t.getPartitionKeyMessages(), cosmosDocId),
+		CosmosDocument: cosmosdbapi.GenerateDocument(t.getCollectionNameMessages(), t.DB.cosmosConfig.TenantName, t.getPartitionKeyMessages(topicNID), cosmosDocId),
 		Message:        data,
 	}
 
@@ -348,7 +349,7 @@ func (t *topicsStatements) SelectMessages(
 		t.DB.connection,
 		t.DB.cosmosConfig.DatabaseName,
 		t.DB.cosmosConfig.ContainerName,
-		t.getPartitionKeyMessages(), t.selectMessagesStmt, params, &rows)
+		t.getPartitionKeyMessages(topicNID), t.selectMessagesStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -387,7 +388,7 @@ func (t *topicsStatements) SelectMaxOffset(
 		t.DB.connection,
 		t.DB.cosmosConfig.DatabaseName,
 		t.DB.cosmosConfig.ContainerName,
-		t.getPartitionKeyMessages(), t.selectMaxOffsetStmt, params, &rows)
+		t.getPartitionKeyMessages(topicNID), t.selectMaxOffsetStmt, params, &rows)
 
 	if err != nil {
 		return 0, err

@@ -66,8 +66,9 @@ func (s *crossSigningKeysStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *crossSigningKeysStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *crossSigningKeysStatements) getPartitionKey(userId string) string {
+	uniqueId := userId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getCrossSigningKeys(s *crossSigningKeysStatements, ctx context.Context, pk string, docId string) (*crossSigningKeysCosmosData, error) {
@@ -112,7 +113,7 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectCrossSigningKeysForUserStmt, params, &rows)
+		s.getPartitionKey(userID), s.selectCrossSigningKeysForUserStmt, params, &rows)
 
 	// rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningKeysForUserStmt).QueryContext(ctx, userID)
 	if err != nil {
@@ -151,7 +152,7 @@ func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 	docId := fmt.Sprintf("%s_%s", userID, keyType)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getCrossSigningKeys(s, ctx, s.getPartitionKey(), cosmosDocId)
+	dbData, _ := getCrossSigningKeys(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.CrossSigningKeys.KeyData = keyData
@@ -163,7 +164,7 @@ func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 		}
 
 		dbData = &crossSigningKeysCosmosData{
-			CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+			CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(userID), cosmosDocId),
 			CrossSigningKeys: data,
 		}
 	}

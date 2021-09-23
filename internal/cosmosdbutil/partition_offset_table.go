@@ -90,8 +90,9 @@ func (s PartitionOffsetStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.DatabaseName, tableName)
 }
 
-func (s *PartitionOffsetStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.CosmosConfig.TenantName, s.getCollectionName())
+func (s *PartitionOffsetStatements) getPartitionKey(topic string) string {
+	uniqueId := topic
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.CosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getPartitionOffset(s *PartitionOffsetStatements, ctx context.Context, pk string, docId string) (*partitionOffsetCosmosData, error) {
@@ -154,7 +155,7 @@ func (s *PartitionOffsetStatements) selectPartitionOffsets(
 		s.db.Connection,
 		s.db.CosmosConfig.DatabaseName,
 		s.db.CosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectPartitionOffsetsStmt, params, &rows)
+		s.getPartitionKey(topic), s.selectPartitionOffsetsStmt, params, &rows)
 
 	// rows, err := s.selectPartitionOffsetsStmt.QueryContext(ctx, topic)
 	if err != nil {
@@ -195,7 +196,7 @@ func (s *PartitionOffsetStatements) upsertPartitionOffset(
 		docId := fmt.Sprintf("%s_%d", topic, partition)
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.CosmosConfig.TenantName, s.getCollectionName(), docId)
 
-		dbData, _ := getPartitionOffset(s, ctx, s.getPartitionKey(), cosmosDocId)
+		dbData, _ := getPartitionOffset(s, ctx, s.getPartitionKey(topic), cosmosDocId)
 		if dbData != nil {
 			dbData.SetUpdateTime()
 			dbData.PartitionOffset.PartitionOffset = offset
@@ -207,7 +208,7 @@ func (s *PartitionOffsetStatements) upsertPartitionOffset(
 			}
 
 			dbData = &partitionOffsetCosmosData{
-				CosmosDocument:  cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.CosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+				CosmosDocument:  cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.CosmosConfig.TenantName, s.getPartitionKey(topic), cosmosDocId),
 				PartitionOffset: data,
 			}
 

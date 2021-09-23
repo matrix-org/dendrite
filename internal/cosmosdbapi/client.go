@@ -2,6 +2,8 @@ package cosmosdbapi
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	cosmosapi "github.com/vippsas/go-cosmosdb/cosmosapi"
@@ -55,9 +57,13 @@ func PerformQuery(ctx context.Context,
 	qryString string,
 	params map[string]interface{},
 	response interface{}) error {
+	err := validateQuery(qryString)
+	if err != nil {
+		return err
+	}
 	optionsQry := GetQueryDocumentsOptions(partitonKey)
 	var query = GetQuery(qryString, params)
-	_, err := GetClient(conn).QueryDocuments(
+	_, err = GetClient(conn).QueryDocuments(
 		ctx,
 		databaseName,
 		containerName,
@@ -74,9 +80,13 @@ func PerformQueryAllPartitions(ctx context.Context,
 	qryString string,
 	params map[string]interface{},
 	response interface{}) error {
+	err := validateQueryAllPartitions(qryString)
+	if err != nil {
+		return err
+	}
 	var optionsQry = GetQueryAllPartitionsDocumentsOptions()
 	var query = GetQuery(qryString, params)
-	_, err := GetClient(conn).QueryDocuments(
+	_, err = GetClient(conn).QueryDocuments(
 		ctx,
 		databaseName,
 		containerName,
@@ -128,5 +138,32 @@ func GetDocumentOrNil(connection CosmosConnection, config CosmosConfig, ctx cont
 		return err
 	}
 
+	return nil
+}
+
+func validateQuery(qryString string) error {
+	if len(qryString) == 0 {
+		return errors.New("qryString was nil")
+	}
+	if !strings.Contains(qryString, " c._cn = ") {
+		return errors.New("qryString must contain [ c._cn = ] ")
+	}
+	return nil
+}
+
+func validateQueryAllPartitions(qryString string) error {
+	err := validateQuery(qryString)
+	if err != nil {
+		return err
+	}
+	if strings.Contains(qryString, " top ") {
+		return errors.New("qryString contains [ top ] ")
+	}
+	if strings.Contains(qryString, " order by ") {
+		return errors.New("qryString contains [ order by ] ")
+	}
+	if !strings.Contains(qryString, " c._sid = ") {
+		return errors.New("qryString must contain [ c._sid = ] ")
+	}
 	return nil
 }

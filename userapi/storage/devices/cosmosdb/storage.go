@@ -122,9 +122,6 @@ func (d *Database) CreateDevice(
 			var err error
 			dev, err = d.devices.insertDevice(ctx, newDeviceID, localpart, accessToken, displayName, ipAddr, userAgent)
 			return dev, err
-			if returnErr == nil {
-				return
-			}
 		}
 	}
 	return

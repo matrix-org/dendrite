@@ -106,8 +106,9 @@ func (s *oneTimeKeysStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *oneTimeKeysStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *oneTimeKeysStatements) getPartitionKey(userId string) string {
+	uniqueId := userId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getOneTimeKey(s *oneTimeKeysStatements, ctx context.Context, pk string, docId string) (*oneTimeKeyCosmosData, error) {
@@ -194,7 +195,7 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectKeyByAlgorithmStmt, params, &rows)
+		s.getPartitionKey(userID), s.selectKeyByAlgorithmStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -239,7 +240,7 @@ func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, de
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectKeysCountStmt, params, &rows)
+		s.getPartitionKey(counts.UserID), s.selectKeysCountStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -286,7 +287,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 		}
 
 		dbData := &oneTimeKeyCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(counts.UserID), cosmosDocId),
 			OneTimeKey:     data,
 		}
 
@@ -309,7 +310,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectKeysCountStmt, params, &rows)
+		s.getPartitionKey(keys.UserID), s.selectKeysCountStmt, params, &rows)
 
 	if err != nil {
 		return nil, err
@@ -346,7 +347,7 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectKeyByAlgorithmStmt, params, &rows)
+		s.getPartitionKey(userID), s.selectKeyByAlgorithmStmt, params, &rows)
 
 	if err != nil {
 		if err == cosmosdbutil.ErrNoRows {

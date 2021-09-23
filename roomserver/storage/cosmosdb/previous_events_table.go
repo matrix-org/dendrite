@@ -89,8 +89,9 @@ func (s *previousEventStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *previousEventStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *previousEventStatements) getPartitionKey(previousEventId string) string {
+	uniqueId := previousEventId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getPreviousEvent(s *previousEventStatements, ctx context.Context, pk string, docId string) (*previousEventCosmosData, error) {
@@ -141,7 +142,7 @@ func (s *previousEventStatements) InsertPreviousEvent(
 
 	// SELECT 1 FROM roomserver_previous_events
 	//   WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
-	existing, err := getPreviousEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
+	existing, err := getPreviousEvent(s, ctx, s.getPartitionKey(previousEventID), cosmosDocId)
 
 	if err != nil {
 		if err != cosmosdbutil.ErrNoRows {
@@ -159,7 +160,7 @@ func (s *previousEventStatements) InsertPreviousEvent(
 		}
 
 		dbData = previousEventCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(previousEventID), cosmosDocId),
 			PreviousEvent:  data,
 		}
 	} else {
@@ -206,7 +207,7 @@ func (s *previousEventStatements) SelectPreviousEventExists(
 
 	// SELECT 1 FROM roomserver_previous_events
 	//   WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
-	dbData, err := getPreviousEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
+	dbData, err := getPreviousEvent(s, ctx, s.getPartitionKey(eventID), cosmosDocId)
 	if err != nil {
 		return err
 	}

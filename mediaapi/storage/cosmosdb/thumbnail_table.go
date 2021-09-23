@@ -89,8 +89,9 @@ func (s *thumbnailStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *thumbnailStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *thumbnailStatements) getPartitionKey(mediaId string) string {
+	uniqueId := mediaId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getThumbnail(s *thumbnailStatements, ctx context.Context, pk string, docId string) (*thumbnailCosmosData, error) {
@@ -163,7 +164,7 @@ func (s *thumbnailStatements) insertThumbnail(
 	}
 
 	dbData := &thumbnailCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(data.MediaID), cosmosDocId),
 		Thumbnail:      data,
 	}
 
@@ -209,7 +210,7 @@ func (s *thumbnailStatements) selectThumbnail(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)
-	row, err := getThumbnail(s, ctx, s.getPartitionKey(), cosmosDocId)
+	row, err := getThumbnail(s, ctx, s.getPartitionKey(string(mediaID)), cosmosDocId)
 
 	if err != nil {
 		return nil, err
@@ -250,7 +251,7 @@ func (s *thumbnailStatements) selectThumbnails(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectThumbnailsStmt, params, &rows)
+		s.getPartitionKey(string(mediaID)), s.selectThumbnailsStmt, params, &rows)
 
 	if err != nil {
 		return nil, err

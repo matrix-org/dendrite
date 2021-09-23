@@ -18,6 +18,7 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
 	"github.com/matrix-org/dendrite/internal/cosmosdbutil"
@@ -97,8 +98,9 @@ func (s *inviteStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *inviteStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *inviteStatements) getPartitionKey(roomNId int64) string {
+	uniqueId := fmt.Sprintf("%d", roomNId)
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getInvite(s *inviteStatements, ctx context.Context, pk string, docId string) (*inviteCosmosData, error) {
@@ -169,7 +171,7 @@ func (s *inviteStatements) InsertInviteEvent(
 	}
 
 	var dbData = inviteCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(int64(roomNID)), cosmosDocId),
 		Invite:         data,
 	}
 
@@ -211,7 +213,7 @@ func (s *inviteStatements) UpdateInviteRetired(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectInvitesAboutToRetireStmt, params, &rows)
+		s.getPartitionKey(int64(roomNID)), s.selectInvitesAboutToRetireStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -248,7 +250,7 @@ func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectInviteActiveForUserInRoomStmt, params, &rows)
+		s.getPartitionKey(int64(roomNID)), s.selectInviteActiveForUserInRoomStmt, params, &rows)
 
 	if err != nil {
 		return nil, nil, err

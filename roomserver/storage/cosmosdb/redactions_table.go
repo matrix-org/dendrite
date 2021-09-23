@@ -180,7 +180,6 @@ func (s *redactionStatements) SelectRedactionInfoByRedactionEventID(
 	response, err := getRedaction(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		info = nil
-		err = err
 		return
 	}
 

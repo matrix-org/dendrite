@@ -82,8 +82,9 @@ func (s *backwardExtremitiesStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *backwardExtremitiesStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *backwardExtremitiesStatements) getPartitionKey(roomId string) string {
+	uniqueId := roomId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getBackwardExtremity(s *backwardExtremitiesStatements, ctx context.Context, pk string, docId string) (*backwardExtremityCosmosData, error) {
@@ -143,7 +144,7 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 	docId := fmt.Sprintf("%s_%s_%s", roomID, eventID, prevEventID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getBackwardExtremity(s, ctx, s.getPartitionKey(), cosmosDocId)
+	dbData, _ := getBackwardExtremity(s, ctx, s.getPartitionKey(roomID), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 	} else {
@@ -154,7 +155,7 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 		}
 
 		dbData = &backwardExtremityCosmosData{
-			CosmosDocument:    cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+			CosmosDocument:    cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(roomID), cosmosDocId),
 			BackwardExtremity: data,
 		}
 	}
@@ -185,7 +186,7 @@ func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectBackwardExtremitiesForRoomStmt, params, &rows)
+		s.getPartitionKey(roomID), s.selectBackwardExtremitiesForRoomStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -221,7 +222,7 @@ func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.deleteBackwardExtremityStmt, params, &rows)
+		s.getPartitionKey(roomID), s.deleteBackwardExtremityStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -251,7 +252,7 @@ func (s *backwardExtremitiesStatements) DeleteBackwardExtremitiesForRoom(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.deleteBackwardExtremitiesForRoomStmt, params, &rows)
+		s.getPartitionKey(roomID), s.deleteBackwardExtremitiesForRoomStmt, params, &rows)
 
 	if err != nil {
 		return

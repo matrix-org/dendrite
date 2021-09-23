@@ -95,8 +95,9 @@ func (s *keyBackupVersionStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *keyBackupVersionStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *keyBackupVersionStatements) getPartitionKey(userId string) string {
+	uniqueId := userId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getKeyBackupVersion(s *keyBackupVersionStatements, ctx context.Context, pk string, docId string) (*keyBackupVersionCosmosData, error) {
@@ -168,7 +169,7 @@ func (s *keyBackupVersionStatements) insertKeyBackup(
 	}
 
 	dbData := &keyBackupVersionCosmosData{
-		CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+		CosmosDocument:   cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(userID), cosmosDocId),
 		KeyBackupVersion: data,
 	}
 
@@ -195,7 +196,7 @@ func (s *keyBackupVersionStatements) updateKeyBackupAuthData(
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(), cosmosDocId)
+	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return err
@@ -225,7 +226,7 @@ func (s *keyBackupVersionStatements) updateKeyBackupETag(
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(), cosmosDocId)
+	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return err
@@ -255,7 +256,7 @@ func (s *keyBackupVersionStatements) deleteKeyBackup(
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(), cosmosDocId)
+	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return false, err
@@ -324,7 +325,7 @@ func (s *keyBackupVersionStatements) selectKeyBackup(
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(), cosmosDocId)
+	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return

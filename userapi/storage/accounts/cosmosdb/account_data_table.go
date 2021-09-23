@@ -62,8 +62,9 @@ func (s *accountDataStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *accountDataStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *accountDataStatements) getPartitionKey(localPart string) string {
+	uniqueId := localPart
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func (s *accountDataStatements) prepare(db *Database) (err error) {
@@ -107,7 +108,7 @@ func (s *accountDataStatements) insertAccountData(
 	docId := id
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getAccountData(s, ctx, s.getPartitionKey(), cosmosDocId)
+	dbData, _ := getAccountData(s, ctx, s.getPartitionKey(localpart), cosmosDocId)
 	if dbData != nil {
 		// 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
 		dbData.SetUpdateTime()
@@ -121,7 +122,7 @@ func (s *accountDataStatements) insertAccountData(
 		}
 
 		dbData = &accountDataCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(localpart), cosmosDocId),
 			AccountData:    result,
 		}
 	}
@@ -151,7 +152,7 @@ func (s *accountDataStatements) selectAccountData(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectAccountDataStmt, params, &rows)
+		s.getPartitionKey(localpart), s.selectAccountDataStmt, params, &rows)
 
 	if err != nil {
 		return nil, nil, err
@@ -193,7 +194,7 @@ func (s *accountDataStatements) selectAccountDataByType(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectAccountDataByTypeStmt, params, &rows)
+		s.getPartitionKey(localpart), s.selectAccountDataByTypeStmt, params, &rows)
 
 	if err != nil {
 		return nil, err

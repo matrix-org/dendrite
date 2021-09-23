@@ -72,7 +72,8 @@ const selectAccountDataInRangeSQL = "" +
 
 // "SELECT MAX(id) FROM syncapi_account_data_type"
 const selectMaxAccountDataIDSQL = "" +
-	"select max(c.mx_syncapi_account_data_type.id) as number from c where c._cn = @x1 "
+	"select max(c.mx_syncapi_account_data_type.id) as number from c where c._cn = @x1 " +
+	"and c._sid = @x2 "
 
 type accountDataStatements struct {
 	db                           *SyncServerDatasource
@@ -88,6 +89,7 @@ func (s *accountDataStatements) getCollectionName() string {
 }
 
 func (s *accountDataStatements) getPartitionKey() string {
+	//No easy PK, so just use the collection
 	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
@@ -245,6 +247,7 @@ func (s *accountDataStatements) SelectMaxAccountDataID(
 	// err = sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt).QueryRowContext(ctx).Scan(&nullableID)
 	params := map[string]interface{}{
 		"@x1": s.getCollectionName(),
+		"@x2": s.db.cosmosConfig.TenantName,
 	}
 
 	var rows []AccountDataTypeNumberCosmosData

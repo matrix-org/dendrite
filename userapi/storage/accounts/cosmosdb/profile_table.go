@@ -169,11 +169,11 @@ func (s *profilesStatements) selectProfileByLocalpart(
 	}
 
 	if len(rows) == 0 {
-		return nil, errors.New(fmt.Sprintf("Localpart %s not found", len(rows)))
+		return nil, errors.New(fmt.Sprintf("Localpart %d not found", len(rows)))
 	}
 
 	if len(rows) != 1 {
-		return nil, errors.New(fmt.Sprintf("Localpart %s has multiple entries", len(rows)))
+		return nil, errors.New(fmt.Sprintf("Localpart %d has multiple entries", len(rows)))
 	}
 
 	var result = mapFromProfile(rows[0].Profile)

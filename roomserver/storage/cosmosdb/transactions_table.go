@@ -68,8 +68,9 @@ func (s *transactionStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *transactionStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *transactionStatements) getPartitionKey(transactionID string) string {
+	uniqueId := transactionID
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getTransaction(s *transactionStatements, ctx context.Context, pk string, docId string) (*transactionCosmosData, error) {
@@ -124,7 +125,7 @@ func (s *transactionStatements) InsertTransaction(
 	}
 
 	var dbData = transactionCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(transactionID), cosmosDocId),
 		Transaction:    data,
 	}
 
@@ -153,7 +154,7 @@ func (s *transactionStatements) SelectTransactionEventID(
 	docId := fmt.Sprintf("%s_%d_%s", transactionID, sessionID, userID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	response, err := getTransaction(s, ctx, s.getPartitionKey(), cosmosDocId)
+	response, err := getTransaction(s, ctx, s.getPartitionKey(transactionID), cosmosDocId)
 
 	if err != nil {
 		return "", err

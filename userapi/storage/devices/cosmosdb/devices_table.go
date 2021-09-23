@@ -95,6 +95,7 @@ func (s *devicesStatements) getCollectionName() string {
 }
 
 func (s *devicesStatements) getPartitionKey() string {
+	//No easy PK, so just use the collection
 	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 

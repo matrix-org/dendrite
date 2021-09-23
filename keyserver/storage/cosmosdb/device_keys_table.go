@@ -168,8 +168,9 @@ func (s *deviceKeysStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *deviceKeysStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *deviceKeysStatements) getPartitionKey(userId string) string {
+	uniqueId := userId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func NewCosmosDBDeviceKeysTable(db *Database) (tables.DeviceKeys, error) {
@@ -212,7 +213,7 @@ func (s *deviceKeysStatements) DeleteDeviceKeys(ctx context.Context, txn *sql.Tx
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), selectAllDeviceKeysSQL, params, &rows)
+		s.getPartitionKey(userID), selectAllDeviceKeysSQL, params, &rows)
 
 	if err != nil {
 		return err
@@ -242,7 +243,7 @@ func (s *deviceKeysStatements) DeleteAllDeviceKeys(ctx context.Context, txn *sql
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), selectAllDeviceKeysSQL, params, &rows)
+		s.getPartitionKey(userID), selectAllDeviceKeysSQL, params, &rows)
 
 	if err != nil {
 		return err
@@ -275,7 +276,7 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectBatchDeviceKeysStmt, params, &rows)
+		s.getPartitionKey(userID), s.selectBatchDeviceKeysStmt, params, &rows)
 
 	// rows, err := s.selectBatchDeviceKeysStmt.QueryContext(ctx, userID)
 	if err != nil {
@@ -327,7 +328,7 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 		docId := fmt.Sprintf("%s_%s", key.UserID, key.DeviceID)
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-		response, err := getDeviceKey(s, ctx, s.getPartitionKey(), cosmosDocId)
+		response, err := getDeviceKey(s, ctx, s.getPartitionKey(key.UserID), cosmosDocId)
 
 		if err != nil && err != cosmosdbutil.ErrNoRows {
 			return err
@@ -366,7 +367,7 @@ func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), selectMaxStreamForUserSQL, params, &rows)
+		s.getPartitionKey(userID), selectMaxStreamForUserSQL, params, &rows)
 
 	if err != nil {
 		if err == cosmosdbutil.ErrNoRows {
@@ -413,7 +414,7 @@ func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), countStreamIDsForUserSQL, params, &rows)
+		s.getPartitionKey(userID), countStreamIDsForUserSQL, params, &rows)
 
 	if err != nil {
 		return 0, err
@@ -440,7 +441,7 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 		dbData := &deviceKeyCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(key.UserID), cosmosDocId),
 			DeviceKey:      mapFromDeviceKeyMessage(key),
 		}
 

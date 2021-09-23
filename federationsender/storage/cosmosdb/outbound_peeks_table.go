@@ -89,8 +89,9 @@ func (s *outboundPeeksStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *outboundPeeksStatements) getPartitionKey() string {
-	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
+func (s *outboundPeeksStatements) getPartitionKey(roomId string) string {
+	uniqueId := roomId
+	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
 }
 
 func getOutboundPeek(s *outboundPeeksStatements, ctx context.Context, pk string, docId string) (*outboundPeekCosmosData, error) {
@@ -159,7 +160,7 @@ func (s *outboundPeeksStatements) InsertOutboundPeek(
 	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	dbData, _ := getOutboundPeek(s, ctx, s.getPartitionKey(), cosmosDocId)
+	dbData, _ := getOutboundPeek(s, ctx, s.getPartitionKey(roomID), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
 		dbData.OutboundPeek.RenewalInterval = renewalInterval
@@ -176,7 +177,7 @@ func (s *outboundPeeksStatements) InsertOutboundPeek(
 		}
 
 		dbData = &outboundPeekCosmosData{
-			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
+			CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(roomID), cosmosDocId),
 			OutboundPeek:   data,
 		}
 
@@ -205,7 +206,7 @@ func (s *outboundPeeksStatements) RenewOutboundPeek(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// _, err = sqlutil.TxStmt(txn, s.renewOutboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
-	res, err := getOutboundPeek(s, ctx, s.getPartitionKey(), cosmosDocId)
+	res, err := getOutboundPeek(s, ctx, s.getPartitionKey(roomID), cosmosDocId)
 
 	if err != nil {
 		return
@@ -233,7 +234,7 @@ func (s *outboundPeeksStatements) SelectOutboundPeek(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)
-	row, err := getOutboundPeek(s, ctx, s.getPartitionKey(), cosmosDocId)
+	row, err := getOutboundPeek(s, ctx, s.getPartitionKey(roomID), cosmosDocId)
 
 	if err != nil {
 		return nil, err
@@ -273,7 +274,7 @@ func (s *outboundPeeksStatements) SelectOutboundPeeks(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.selectOutboundPeeksStmt, params, &rows)
+		s.getPartitionKey(roomID), s.selectOutboundPeeksStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -311,7 +312,7 @@ func (s *outboundPeeksStatements) DeleteOutboundPeek(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.deleteOutboundPeekStmt, params, &rows)
+		s.getPartitionKey(roomID), s.deleteOutboundPeekStmt, params, &rows)
 
 	if err != nil {
 		return
@@ -344,7 +345,7 @@ func (s *outboundPeeksStatements) DeleteOutboundPeeks(
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
-		s.getPartitionKey(), s.deleteOutboundPeeksStmt, params, &rows)
+		s.getPartitionKey(roomID), s.deleteOutboundPeeksStmt, params, &rows)
 
 	if err != nil {
 		return
