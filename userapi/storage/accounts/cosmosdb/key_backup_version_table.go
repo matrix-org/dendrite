@@ -117,18 +117,6 @@ func getKeyBackupVersion(s *keyBackupVersionStatements, ctx context.Context, pk 
 	return &response, err
 }
 
-func setKeyBackupVersion(s *keyBackupVersionStatements, ctx context.Context, keyBackup keyBackupVersionCosmosData) (*keyBackupVersionCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(keyBackup.Pk, keyBackup.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		keyBackup.Id,
-		&keyBackup,
-		optionsReplace)
-	return &keyBackup, ex
-}
-
 func (s *keyBackupVersionStatements) prepare(db *Database, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
 	// s.insertKeyBackupStmt = insertKeyBackupSQL
@@ -196,20 +184,21 @@ func (s *keyBackupVersionStatements) updateKeyBackupAuthData(
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
+	item, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return err
 	}
 
-	if res == nil {
+	if item == nil {
 		return err
 	}
 
 	// _, err = txn.Stmt(s.updateKeyBackupAuthDataStmt).ExecContext(ctx, string(authData), userID, versionInt)
-	res.KeyBackupVersion.AuthData = authData
+	item.SetUpdateTime()
+	item.KeyBackupVersion.AuthData = authData
 
-	_, err = setKeyBackupVersion(s, ctx, *res)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 
 	return err
 }
@@ -226,20 +215,21 @@ func (s *keyBackupVersionStatements) updateKeyBackupETag(
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
+	item, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return err
 	}
 
-	if res == nil {
+	if item == nil {
 		return err
 	}
 
 	// _, err = txn.Stmt(s.updateKeyBackupETagStmt).ExecContext(ctx, etag, userID, versionInt)
-	res.KeyBackupVersion.Etag = etag
+	item.SetUpdateTime()
+	item.KeyBackupVersion.Etag = etag
 
-	_, err = setKeyBackupVersion(s, ctx, *res)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 
 	return err
 }
@@ -256,20 +246,21 @@ func (s *keyBackupVersionStatements) deleteKeyBackup(
 	docId := fmt.Sprintf("%s_%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
+	item, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return false, err
 	}
 
-	if res == nil {
+	if item == nil {
 		return false, err
 	}
 
 	// result, err := txn.Stmt(s.deleteKeyBackupStmt).ExecContext(ctx, userID, versionInt)
-	res.KeyBackupVersion.Deleted = 1
+	item.SetUpdateTime()
+	item.KeyBackupVersion.Deleted = 1
 
-	_, err = setKeyBackupVersion(s, ctx, *res)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 
 	if err != nil {
 		return false, err

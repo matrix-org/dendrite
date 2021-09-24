@@ -114,18 +114,6 @@ func getInboundPeek(s *inboundPeeksStatements, ctx context.Context, pk string, d
 	return &response, err
 }
 
-func setInboundPeek(s *inboundPeeksStatements, ctx context.Context, inboundPeek inboundPeekCosmosData) (*inboundPeekCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(inboundPeek.Pk, inboundPeek.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		inboundPeek.Id,
-		&inboundPeek,
-		optionsReplace)
-	return &inboundPeek, ex
-}
-
 func deleteInboundPeek(s *inboundPeeksStatements, ctx context.Context, dbData inboundPeekCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
@@ -209,20 +197,21 @@ func (s *inboundPeeksStatements) RenewInboundPeek(
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// _, err = sqlutil.TxStmt(txn, s.renewInboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
-	res, err := getInboundPeek(s, ctx, s.getPartitionKey(roomID), cosmosDocId)
+	item, err := getInboundPeek(s, ctx, s.getPartitionKey(roomID), cosmosDocId)
 
 	if err != nil {
 		return
 	}
 
-	if res == nil {
+	if item == nil {
 		return
 	}
 
-	res.InboundPeek.RenewedTimestamp = nowMilli
-	res.InboundPeek.RenewalInterval = renewalInterval
+	item.SetUpdateTime()
+	item.InboundPeek.RenewedTimestamp = nowMilli
+	item.InboundPeek.RenewalInterval = renewalInterval
 
-	_, err = setInboundPeek(s, ctx, *res)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 
 	return
 }

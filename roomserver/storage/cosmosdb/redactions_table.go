@@ -99,18 +99,6 @@ func getRedaction(s *redactionStatements, ctx context.Context, pk string, docId 
 	return &response, err
 }
 
-func setRedaction(s *redactionStatements, ctx context.Context, redaction redactionCosmosData) (*redactionCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(redaction.Pk, redaction.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		redaction.Id,
-		&redaction,
-		optionsReplace)
-	return &redaction, ex
-}
-
 func NewCosmosDBRedactionsTable(db *Database) (tables.Redactions, error) {
 	s := &redactionStatements{
 		db: db,
@@ -242,13 +230,14 @@ func (s *redactionStatements) MarkRedactionValidated(
 	docId := redactionEventID
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	response, err := getRedaction(s, ctx, s.getPartitionKey(), cosmosDocId)
+	item, err := getRedaction(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if err != nil {
 		return err
 	}
 
-	response.Redaction.Validated = validated
+	item.SetUpdateTime()
+	item.Redaction.Validated = validated
 
-	_, err = setRedaction(s, ctx, *response)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 	return err
 }

@@ -232,18 +232,6 @@ func getMembership(s *membershipStatements, ctx context.Context, pk string, docI
 	return &response, err
 }
 
-func setMembership(s *membershipStatements, ctx context.Context, membership membershipCosmosData) (*membershipCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(membership.Pk, membership.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		membership.Id,
-		&membership,
-		optionsReplace)
-	return &membership, ex
-}
-
 func NewCosmosDBMembershipTable(db *Database) (tables.Membership, error) {
 	s := &membershipStatements{
 		db: db,
@@ -290,7 +278,8 @@ func (s *membershipStatements) InsertMembership(
 		exists.Membership.TargetNID = int64(targetUserNID)
 		exists.Membership.TargetLocal = localTarget
 		exists.SetUpdateTime()
-		_, errSet := setMembership(s, ctx, *exists)
+		exists.SetUpdateTime()
+		_, errSet := cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, exists.Pk, exists.ETag, exists.Id, exists)
 		return errSet
 	}
 
@@ -455,8 +444,9 @@ func (s *membershipStatements) UpdateMembership(
 	dbData.Membership.MembershipNID = int64(membership)
 	dbData.Membership.EventNID = int64(eventNID)
 	dbData.Membership.Forgotten = forgotten
+	dbData.SetUpdateTime()
 
-	_, err = setMembership(s, ctx, *dbData)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, dbData.Pk, dbData.ETag, dbData.Id, dbData)
 	return err
 }
 
@@ -711,8 +701,9 @@ func (s *membershipStatements) UpdateForgetMembership(
 		return err
 	}
 
+	dbData.SetUpdateTime()
 	dbData.Membership.Forgotten = forget
 
-	_, err = setMembership(s, ctx, *dbData)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, dbData.Pk, dbData.ETag, dbData.Id, dbData)
 	return err
 }

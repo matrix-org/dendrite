@@ -109,19 +109,6 @@ func getAccount(s *accountsStatements, ctx context.Context, pk string, docId str
 	return &response, err
 }
 
-func setAccount(s *accountsStatements, ctx context.Context, account accountCosmosData) (*accountCosmosData, error) {
-	response := accountCosmosData{}
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(account.Pk, account.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		account.Id,
-		&account,
-		optionsReplace)
-	return &response, ex
-}
-
 func mapFromAccount(db accountCosmos) api.Account {
 	return api.Account{
 		AppServiceID: db.AppServiceID,
@@ -193,16 +180,17 @@ func (s *accountsStatements) updatePassword(
 	docId := localpart
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	var response, exGet = getAccount(s, ctx, s.getPartitionKey(), cosmosDocId)
+	var item, exGet = getAccount(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
 
-	response.Account.PasswordHash = passwordHash
+	item.SetUpdateTime()
+	item.Account.PasswordHash = passwordHash
 
-	var _, exReplace = setAccount(s, ctx, *response)
-	if exReplace != nil {
-		return exReplace
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
+	if err != nil {
+		return err
 	}
 	return
 }
@@ -215,16 +203,17 @@ func (s *accountsStatements) deactivateAccount(
 	docId := localpart
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	var response, exGet = getAccount(s, ctx, s.getPartitionKey(), cosmosDocId)
+	var item, exGet = getAccount(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
 
-	response.Account.IsDeactivated = true
+	item.SetUpdateTime()
+	item.Account.IsDeactivated = true
 
-	var _, exReplace = setAccount(s, ctx, *response)
-	if exReplace != nil {
-		return exReplace
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
+	if err != nil {
+		return err
 	}
 	return
 }

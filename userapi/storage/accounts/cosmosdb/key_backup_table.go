@@ -136,18 +136,6 @@ func getKeyBackup(s *keyBackupStatements, ctx context.Context, pk string, docId 
 	return &response, err
 }
 
-func setKeyBackup(s *keyBackupStatements, ctx context.Context, keyBackup keyBackupCosmosData) (*keyBackupCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(keyBackup.Pk, keyBackup.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		keyBackup.Id,
-		&keyBackup,
-		optionsReplace)
-	return &keyBackup, ex
-}
-
 func (s *keyBackupStatements) prepare(db *Database, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
 	// s.insertBackupKeyStmt = insertBackupKeySQL
@@ -243,23 +231,24 @@ func (s *keyBackupStatements) updateBackupKey(
 	docId := fmt.Sprintf("%s_%s_%s_%s", userID, key.RoomID, key.SessionID, version)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	res, err := getKeyBackup(s, ctx, s.getPartitionKey(userID), cosmosDocId)
+	item, err := getKeyBackup(s, ctx, s.getPartitionKey(userID), cosmosDocId)
 
 	if err != nil {
 		return
 	}
 
-	if res == nil {
+	if item == nil {
 		return
 	}
 
 	// 	ctx, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData), userID, key.RoomID, key.SessionID, version,
-	res.KeyBackup.FirstMessageIndex = key.FirstMessageIndex
-	res.KeyBackup.ForwardedCount = key.ForwardedCount
-	res.KeyBackup.IsVerified = key.IsVerified
-	res.KeyBackup.SessionData = key.SessionData
+	item.SetUpdateTime()
+	item.KeyBackup.FirstMessageIndex = key.FirstMessageIndex
+	item.KeyBackup.ForwardedCount = key.ForwardedCount
+	item.KeyBackup.IsVerified = key.IsVerified
+	item.KeyBackup.SessionData = key.SessionData
 
-	_, err = setKeyBackup(s, ctx, *res)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 
 	return
 }

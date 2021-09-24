@@ -18,7 +18,7 @@ func getUpsertDocumentOptions(pk string) cosmosapi.CreateDocumentOptions {
 	}
 }
 
-func GetQueryDocumentsOptions(pk string) cosmosapi.QueryDocumentsOptions {
+func getQueryDocumentsOptions(pk string) cosmosapi.QueryDocumentsOptions {
 	return cosmosapi.QueryDocumentsOptions{
 		PartitionKeyValue: pk,
 		IsQuery:           true,
@@ -26,7 +26,7 @@ func GetQueryDocumentsOptions(pk string) cosmosapi.QueryDocumentsOptions {
 	}
 }
 
-func GetQueryAllPartitionsDocumentsOptions() cosmosapi.QueryDocumentsOptions {
+func getQueryAllPartitionsDocumentsOptions() cosmosapi.QueryDocumentsOptions {
 	return cosmosapi.QueryDocumentsOptions{
 		IsQuery:              true,
 		EnableCrossPartition: true,
@@ -40,7 +40,7 @@ func GetGetDocumentOptions(pk string) cosmosapi.GetDocumentOptions {
 	}
 }
 
-func GetReplaceDocumentOptions(pk string, etag string) cosmosapi.ReplaceDocumentOptions {
+func getReplaceDocumentOptions(pk string, etag string) cosmosapi.ReplaceDocumentOptions {
 	return cosmosapi.ReplaceDocumentOptions{
 		PartitionKeyValue: pk,
 		IfMatch:           etag,

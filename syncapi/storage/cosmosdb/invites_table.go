@@ -121,18 +121,6 @@ func getInviteEvent(s *inviteEventsStatements, ctx context.Context, pk string, d
 	return &response, err
 }
 
-func setInviteEvent(s *inviteEventsStatements, ctx context.Context, invite inviteEventCosmosData) (*inviteEventCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(invite.Pk, invite.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		invite.Id,
-		&invite,
-		optionsReplace)
-	return &invite, ex
-}
-
 func NewCosmosDBInvitesTable(db *SyncServerDatasource, streamID *streamIDStatements) (tables.Invites, error) {
 	s := &inviteEventsStatements{
 		db:                 db,
@@ -225,9 +213,10 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 		s.getPartitionKey(), s.deleteInviteEventStmt, params, &rows)
 
 	for _, item := range rows {
+		item.SetUpdateTime()
 		item.InviteEvent.Deleted = true
 		item.InviteEvent.ID = int64(streamPos)
-		setInviteEvent(s, ctx, item)
+		_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 	}
 	return streamPos, err
 }

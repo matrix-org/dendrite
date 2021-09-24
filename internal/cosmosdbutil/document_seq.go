@@ -53,15 +53,8 @@ func GetNextSequence(
 		}
 	} else {
 		dbData.Value++
-		var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(dbData.Pk, dbData.ETag)
-		var _, _, err = cosmosdbapi.GetClient(connection).ReplaceDocument(
-			ctx,
-			config.DatabaseName,
-			config.ContainerName,
-			cosmosDocId,
-			dbData,
-			optionsReplace,
-		)
+		dbData.SetUpdateTime()
+		_, err := cosmosdbapi.UpdateDocument(ctx, connection, config.DatabaseName, config.ContainerName, dbData.Pk, dbData.ETag, dbData.Id, dbData)
 		if err != nil {
 			return -1, err
 		}

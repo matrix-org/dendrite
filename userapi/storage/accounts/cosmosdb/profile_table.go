@@ -108,18 +108,6 @@ func getProfile(s *profilesStatements, ctx context.Context, pk string, docId str
 	return &response, err
 }
 
-func setProfile(s *profilesStatements, ctx context.Context, profile profileCosmosData) (*profileCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(profile.Pk, profile.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		profile.Id,
-		&profile,
-		optionsReplace)
-	return &profile, ex
-}
-
 func (s *profilesStatements) insertProfile(
 	ctx context.Context, localpart string,
 ) error {
@@ -188,16 +176,17 @@ func (s *profilesStatements) setAvatarURL(
 	docId := localpart
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	var response, exGet = getProfile(s, ctx, s.getPartitionKey(), cosmosDocId)
+	var item, exGet = getProfile(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
 
-	response.Profile.AvatarURL = avatarURL
+	item.SetUpdateTime()
+	item.Profile.AvatarURL = avatarURL
 
-	var _, exReplace = setProfile(s, ctx, *response)
-	if exReplace != nil {
-		return exReplace
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
+	if err != nil {
+		return err
 	}
 	return
 }
@@ -209,16 +198,17 @@ func (s *profilesStatements) setDisplayName(
 	// "UPDATE account_profiles SET display_name = $1 WHERE localpart = $2"
 	docId := localpart
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
-	var response, exGet = getProfile(s, ctx, s.getPartitionKey(), cosmosDocId)
+	var item, exGet = getProfile(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
 
-	response.Profile.DisplayName = displayName
+	item.SetUpdateTime()
+	item.Profile.DisplayName = displayName
 
-	var _, exReplace = setProfile(s, ctx, *response)
-	if exReplace != nil {
-		return exReplace
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
+	if err != nil {
+		return err
 	}
 	return
 }

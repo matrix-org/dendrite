@@ -107,18 +107,6 @@ func getStateBlock(s *stateBlockStatements, ctx context.Context, pk string, docI
 	return &response, err
 }
 
-func setStateBlock(s *stateBlockStatements, ctx context.Context, item stateBlockCosmosData) (*stateBlockCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(item.Pk, item.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		item.Id,
-		&item,
-		optionsReplace)
-	return &item, ex
-}
-
 func NewCosmosDBStateBlockTable(db *Database) (tables.StateBlock, error) {
 	s := &stateBlockStatements{
 		db: db,
@@ -168,9 +156,10 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	}
 	if existing != nil {
 		//if exists, just update and dont create a new seq
+		existing.SetUpdateTime()
 		existing.StateBlock.EventNIDs = ids
 		existing.SetUpdateTime()
-		_, err = setStateBlock(s, ctx, *existing)
+		_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, existing.Pk, existing.ETag, existing.Id, existing)
 		if err != nil {
 			return 0, err
 		}

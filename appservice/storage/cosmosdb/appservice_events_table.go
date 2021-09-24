@@ -144,18 +144,6 @@ func getEvent(s *eventsStatements, ctx context.Context, pk string, docId string)
 	return &response, err
 }
 
-func setEvent(s *eventsStatements, ctx context.Context, event eventCosmosData) (*eventCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(event.Pk, event.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		event.Id,
-		&event,
-		optionsReplace)
-	return &event, ex
-}
-
 func deleteEvent(s *eventsStatements, ctx context.Context, event eventCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(event.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
@@ -392,7 +380,8 @@ func (s *eventsStatements) updateTxnIDForEvents(
 	for _, item := range rows {
 		item.Event.TXNID = int64(txnID)
 		// _, err := s.updateTxnIDForEventsStmt.ExecContext(ctx, txnID, appserviceID, maxID)
-		_, err = setEvent(s, ctx, item)
+		item.SetUpdateTime()
+		_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 	}
 
 	return err

@@ -233,18 +233,6 @@ func getEvent(s *eventStatements, ctx context.Context, pk string, docId string) 
 	return &response, err
 }
 
-func setEvent(s *eventStatements, ctx context.Context, event eventCosmosData) (*eventCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(event.Pk, event.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		event.Id,
-		&event,
-		optionsReplace)
-	return &event, ex
-}
-
 func isEventAuthEventNIDsSame(
 	ids []int64,
 	authEventNIDs []types.EventNID,
@@ -634,9 +622,10 @@ func (s *eventStatements) UpdateEventState(
 	}
 
 	item := rows[0]
+	item.SetUpdateTime()
 	item.Event.StateSnapshotNID = int64(stateNID)
 
-	var _, exReplace = setEvent(s, ctx, item)
+	_, exReplace := cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 	if exReplace != nil {
 		return exReplace
 	}
@@ -691,9 +680,10 @@ func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.
 	}
 
 	item := rows[0]
+	item.SetUpdateTime()
 	item.Event.SentToOutput = true
 
-	var _, exReplace = setEvent(s, ctx, item)
+	_, exReplace := cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 	if exReplace != nil {
 		return exReplace
 	}

@@ -140,18 +140,6 @@ func getPeek(s *peekStatements, ctx context.Context, pk string, docId string) (*
 	return &response, err
 }
 
-func setPeek(s *peekStatements, ctx context.Context, peek peekCosmosData) (*peekCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(peek.Pk, peek.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		peek.Id,
-		&peek,
-		optionsReplace)
-	return &peek, ex
-}
-
 func NewCosmosDBPeeksTable(db *SyncServerDatasource, streamID *streamIDStatements) (tables.Peeks, error) {
 	s := &peekStatements{
 		db:                 db,
@@ -249,9 +237,10 @@ func (s *peekStatements) DeletePeek(
 	}
 
 	for _, item := range rows {
+		item.SetUpdateTime()
 		item.Peek.Deleted = true
 		item.Peek.ID = int64(streamPos)
-		_, err = setPeek(s, ctx, item)
+		_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 		if err != nil {
 			return
 		}
@@ -293,9 +282,10 @@ func (s *peekStatements) DeletePeeks(
 	}
 
 	for _, item := range rows {
+		item.SetUpdateTime()
 		item.Peek.Deleted = true
 		item.Peek.ID = int64(streamPos)
-		_, err = setPeek(s, ctx, item)
+		_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 		if err != nil {
 			return 0, err
 		}

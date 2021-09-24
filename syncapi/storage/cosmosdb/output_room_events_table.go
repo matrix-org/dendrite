@@ -160,18 +160,6 @@ func (s *outputRoomEventsStatements) getPartitionKey() string {
 	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
-func setOutputRoomEvent(s *outputRoomEventsStatements, ctx context.Context, outputRoomEvent outputRoomEventCosmosData) (*outputRoomEventCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(outputRoomEvent.Pk, outputRoomEvent.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		outputRoomEvent.Id,
-		&outputRoomEvent,
-		optionsReplace)
-	return &outputRoomEvent, ex
-}
-
 func deleteOutputRoomEvent(s *outputRoomEventsStatements, ctx context.Context, dbData outputRoomEventCosmosData) error {
 	var options = cosmosdbapi.GetDeleteDocumentOptions(dbData.Pk)
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
@@ -227,8 +215,9 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 	}
 
 	for _, item := range rows {
+		item.SetUpdateTime()
 		item.OutputRoomEvent.HeaderedEventJSON = headeredJSON
-		_, err = setOutputRoomEvent(s, ctx, item)
+		_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 	}
 
 	return err

@@ -61,8 +61,8 @@ func PerformQuery(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	optionsQry := GetQueryDocumentsOptions(partitonKey)
-	var query = GetQuery(qryString, params)
+	optionsQry := getQueryDocumentsOptions(partitonKey)
+	var query = getQuery(qryString, params)
 	_, err = GetClient(conn).QueryDocuments(
 		ctx,
 		databaseName,
@@ -84,8 +84,8 @@ func PerformQueryAllPartitions(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	var optionsQry = GetQueryAllPartitionsDocumentsOptions()
-	var query = GetQuery(qryString, params)
+	var optionsQry = getQueryAllPartitionsDocumentsOptions()
+	var query = getQuery(qryString, params)
 	_, err = GetClient(conn).QueryDocuments(
 		ctx,
 		databaseName,
@@ -139,6 +139,26 @@ func GetDocumentOrNil(connection CosmosConnection, config CosmosConfig, ctx cont
 	}
 
 	return nil
+}
+
+func UpdateDocument(ctx context.Context,
+	conn CosmosConnection,
+	databaseName string,
+	containerName string,
+	partitionKey string,
+	eTag string,
+	docId string,
+	document interface{},
+) (*interface{}, error) {
+	optionsReplace := getReplaceDocumentOptions(partitionKey, eTag)
+	_, _, err := GetClient(conn).ReplaceDocument(
+		ctx,
+		databaseName,
+		containerName,
+		docId,
+		&document,
+		optionsReplace)
+	return &document, err
 }
 
 func validateQuery(qryString string) error {

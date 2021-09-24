@@ -120,18 +120,6 @@ func getInvite(s *inviteStatements, ctx context.Context, pk string, docId string
 	return &response, err
 }
 
-func setInvite(s *inviteStatements, ctx context.Context, invite inviteCosmosData) (*inviteCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(invite.Pk, invite.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		invite.Id,
-		&invite,
-		optionsReplace)
-	return &invite, ex
-}
-
 func NewCosmosDBInvitesTable(db *Database) (tables.Invites, error) {
 	s := &inviteStatements{
 		db: db,
@@ -224,8 +212,9 @@ func (s *inviteStatements) UpdateInviteRetired(
 		// 	UPDATE roomserver_invites SET retired = TRUE WHERE room_nid = $1 AND target_nid = $2 AND NOT retired
 
 		// now retire the invites
+		item.SetUpdateTime()
 		item.Invite.Retired = true
-		_, err = setInvite(s, ctx, item)
+		_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
 	}
 
 	return

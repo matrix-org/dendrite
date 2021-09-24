@@ -164,18 +164,6 @@ func getRoom(s *roomStatements, ctx context.Context, pk string, docId string) (*
 	return &response, err
 }
 
-func setRoom(s *roomStatements, ctx context.Context, room roomCosmosData) (*roomCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(room.Pk, room.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		room.Id,
-		&room,
-		optionsReplace)
-	return &room, ex
-}
-
 func (s *roomStatements) SelectRoomIDs(ctx context.Context) ([]string, error) {
 
 	// "SELECT room_id FROM roomserver_rooms"
@@ -398,11 +386,12 @@ func (s *roomStatements) UpdateLatestEventNIDs(
 	//Assume 1 per RoomNID
 	room := rows[0]
 
+	room.SetUpdateTime()
 	room.Room.LatestEventNIDs = mapFromEventNIDArray(eventNIDs)
 	room.Room.LastEventSentNID = int64(lastEventSentNID)
 	room.Room.StateSnapshotNID = int64(stateSnapshotNID)
 
-	_, err = setRoom(s, ctx, room)
+	_, err = cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, room.Pk, room.ETag, room.Id, room)
 	return err
 }
 

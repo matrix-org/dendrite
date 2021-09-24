@@ -144,18 +144,6 @@ func getDevice(s *devicesStatements, ctx context.Context, pk string, docId strin
 	return &response, err
 }
 
-func setDevice(s *devicesStatements, ctx context.Context, device deviceCosmosData) (*deviceCosmosData, error) {
-	var optionsReplace = cosmosdbapi.GetReplaceDocumentOptions(device.Pk, device.ETag)
-	var _, _, ex = cosmosdbapi.GetClient(s.db.connection).ReplaceDocument(
-		ctx,
-		s.db.cosmosConfig.DatabaseName,
-		s.db.cosmosConfig.ContainerName,
-		device.Id,
-		&device,
-		optionsReplace)
-	return &device, ex
-}
-
 func (s *devicesStatements) prepare(db *Database, server gomatrixserverlib.ServerName) (err error) {
 	s.db = db
 	s.selectDevicesCountStmt = "select count(c._ts) as sessioncount from c where c._cn = @x1"
@@ -315,18 +303,19 @@ func (s *devicesStatements) updateDeviceName(
 	// "UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
 	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
-	var response, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
+	var item, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
 
-	response.Device.DisplayName = *displayName
+	item.SetUpdateTime()
+	item.Device.DisplayName = *displayName
 
-	var _, exReplace = setDevice(s, ctx, *response)
-	if exReplace != nil {
-		return exReplace
+	_, err := cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
+	if err != nil {
+		return err
 	}
-	return exReplace
+	return err
 }
 
 func (s *devicesStatements) selectDeviceByToken(
@@ -435,17 +424,18 @@ func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, localpart,
 	// "UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
 	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
-	var response, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
+	var item, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
 		return exGet
 	}
 
-	response.Device.LastSeenTS = lastSeenTs
-	response.Device.LastSeenIP = ipAddr
+	item.SetUpdateTime()
+	item.Device.LastSeenTS = lastSeenTs
+	item.Device.LastSeenIP = ipAddr
 
-	var _, exReplace = setDevice(s, ctx, *response)
-	if exReplace != nil {
-		return exReplace
+	_, err := cosmosdbapi.UpdateDocument(ctx, s.db.connection, s.db.cosmosConfig.DatabaseName, s.db.cosmosConfig.ContainerName, item.Pk, item.ETag, item.Id, item)
+	if err != nil {
+		return err
 	}
-	return exReplace
+	return err
 }
