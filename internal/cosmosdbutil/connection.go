@@ -1,6 +1,7 @@
 package cosmosdbutil
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal/cosmosdbapi"
@@ -12,10 +13,10 @@ const accountKeyName = "AccountKey"
 const databaseName = "DatabaseName"
 const containerName = "ContainerName"
 const tenantName = "TenantName"
+const disableCertificateValidationName = "DisableCertificateValidation"
 
 func getConnectionString(d *config.DataSource) config.DataSource {
-	var connString string
-	connString = string(*d)
+	connString := string(*d)
 	return config.DataSource(strings.Replace(connString, "cosmosdb:", "", 1))
 }
 
@@ -36,7 +37,15 @@ func GetCosmosConnection(d *config.DataSource) cosmosdbapi.CosmosConnection {
 	connMap := getConnectionProperties(string(connString))
 	accountEndpoint := connMap[accountEndpointName]
 	accountKey := connMap[accountKeyName]
-	return cosmosdbapi.GetCosmosConnection(accountEndpoint, accountKey)
+	value, ok := connMap[disableCertificateValidationName]
+	disableCertificateValidation := false
+	if ok {
+		valueBool, err := strconv.ParseBool(value)
+		if err == nil {
+			disableCertificateValidation = valueBool
+		}
+	}
+	return cosmosdbapi.GetCosmosConnection(accountEndpoint, accountKey, disableCertificateValidation)
 }
 
 func GetCosmosConfig(d *config.DataSource) cosmosdbapi.CosmosConfig {

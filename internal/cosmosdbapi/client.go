@@ -2,7 +2,9 @@ package cosmosdbapi
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
@@ -10,20 +12,29 @@ import (
 )
 
 type CosmosConnection struct {
-	Url string
-	Key string
+	Url                          string
+	Key                          string
+	DisableCertificateValidation bool
 }
 
-func GetCosmosConnection(accountEndpoint string, accountKey string) CosmosConnection {
+func GetCosmosConnection(accountEndpoint string, accountKey string, disableCertificateValidation bool) CosmosConnection {
 	return CosmosConnection{
-		Url: accountEndpoint,
-		Key: accountKey,
+		Url:                          accountEndpoint,
+		Key:                          accountKey,
+		DisableCertificateValidation: disableCertificateValidation,
 	}
+}
+
+func disableCertificateValidation() {
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 }
 
 func GetClient(conn CosmosConnection) *cosmosapi.Client {
 	cfg := cosmosapi.Config{
 		MasterKey: conn.Key,
+	}
+	if conn.DisableCertificateValidation {
+		disableCertificateValidation()
 	}
 	return cosmosapi.New(conn.Url, cfg, nil, nil)
 }
