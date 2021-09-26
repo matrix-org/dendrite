@@ -10,5 +10,6 @@ const (
 	LoginTypeSharedSecret       = "org.matrix.login.shared_secret"
 	LoginTypeRecaptcha          = "m.login.recaptcha"
 	LoginTypeApplicationService = "m.login.application_service"
+	LoginTypeSSO                = "m.login.sso"
 	LoginTypeToken              = "m.login.token"
 )

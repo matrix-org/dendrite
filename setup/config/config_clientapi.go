@@ -42,6 +42,8 @@ type ClientAPI struct {
 	// was successful
 	RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
 
+	Login Login `yaml:"login"`
+
 	// TURN options
 	TURN TURN `yaml:"turn"`
 
@@ -64,9 +66,11 @@ func (c *ClientAPI) Defaults(generate bool) {
 	c.RegistrationDisabled = true
 	c.OpenRegistrationWithoutVerificationEnabled = false
 	c.RateLimiting.Defaults()
+	c.Login.SSO.Enabled = false
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	c.Login.Verify(configErrs)
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
 	if c.RecaptchaEnabled {
@@ -94,6 +98,125 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkURL(configErrs, "client_api.internal_api.connect", string(c.InternalAPI.Connect))
 	checkURL(configErrs, "client_api.external_api.listen", string(c.ExternalAPI.Listen))
 }
+
+type Login struct {
+	SSO SSO `yaml:"sso"`
+}
+
+func (l *Login) Verify(configErrs *ConfigErrors) {
+	l.SSO.Verify(configErrs)
+}
+
+type SSO struct {
+	// Enabled determines whether SSO should be allowed.
+	Enabled bool `yaml:"enabled"`
+
+	// Providers list the identity providers this server is capable of confirming an
+	// identity with.
+	Providers []IdentityProvider `yaml:"providers"`
+
+	// DefaultProviderID is the provider to use when the client doesn't indicate one.
+	// This is legacy support. If empty, the first provider listed is used.
+	DefaultProviderID string `yaml:"default_provider"`
+}
+
+func (sso *SSO) Verify(configErrs *ConfigErrors) {
+	var foundDefaultProvider bool
+	seenPIDs := make(map[string]bool, len(sso.Providers))
+	for _, p := range sso.Providers {
+		p.Verify(configErrs)
+		if p.ID == sso.DefaultProviderID {
+			foundDefaultProvider = true
+		}
+		if seenPIDs[p.ID] {
+			configErrs.Add(fmt.Sprintf("duplicate identity provider for config key %q: %s", "client_api.sso.providers", p.ID))
+		}
+		seenPIDs[p.ID] = true
+	}
+	if sso.DefaultProviderID != "" && !foundDefaultProvider {
+		configErrs.Add(fmt.Sprintf("identity provider ID not found for config key %q: %s", "client_api.sso.default_provider", sso.DefaultProviderID))
+	}
+
+	if sso.Enabled {
+		if len(sso.Providers) == 0 {
+			configErrs.Add(fmt.Sprintf("empty list for config key %q", "client_api.sso.providers"))
+		}
+	}
+}
+
+// See https://github.com/matrix-org/matrix-doc/blob/old_master/informal/idp-brands.md.
+type IdentityProvider struct {
+	// ID is the unique identifier of this IdP. We use the brand identifiers as provider
+	// identifiers for simplicity.
+	ID string `yaml:"id"`
+
+	// Name is a human-friendly name of the provider.
+	Name string `yaml:"name"`
+
+	// Brand is a hint on how to display the IdP to the user. If this is empty, a default
+	// based on the type is used.
+	Brand string `yaml:"brand"`
+
+	// Icon is an MXC URI describing how to display the IdP to the user. Prefer using `brand`.
+	Icon string `yaml:"icon"`
+
+	// Type describes how this provider is implemented. It must match "github". If this is
+	// empty, the ID is used, which means there is a weak expectation that ID is also a
+	// valid type, unless you have a complicated setup.
+	Type string `yaml:"type"`
+
+	// OIDC contains settings for providers based on OpenID Connect (OAuth 2).
+	OIDC struct {
+		ClientID     string `yaml:"client_id"`
+		ClientSecret string `yaml:"client_secret"`
+	} `yaml:"oidc"`
+}
+
+func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "client_api.sso.providers.id", idp.ID)
+	if !checkIdentityProviderBrand(idp.ID) {
+		configErrs.Add(fmt.Sprintf("unrecognized ID config key %q: %s", "client_api.sso.providers", idp.ID))
+	}
+	checkNotEmpty(configErrs, "client_api.sso.providers.name", idp.Name)
+	if idp.Brand != "" && !checkIdentityProviderBrand(idp.Brand) {
+		configErrs.Add(fmt.Sprintf("unrecognized brand in identity provider %q for config key %q: %s", idp.ID, "client_api.sso.providers", idp.Brand))
+	}
+	if idp.Icon != "" {
+		checkURL(configErrs, "client_api.sso.providers.icon", idp.Icon)
+	}
+	typ := idp.Type
+	if idp.Type == "" {
+		typ = idp.ID
+	}
+
+	switch typ {
+	case "github":
+		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_id", idp.OIDC.ClientID)
+		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_secret", idp.OIDC.ClientSecret)
+
+	default:
+		configErrs.Add(fmt.Sprintf("unrecognized type in identity provider %q for config key %q: %s", idp.ID, "client_api.sso.providers", typ))
+	}
+}
+
+// See https://github.com/matrix-org/matrix-doc/blob/old_master/informal/idp-brands.md.
+func checkIdentityProviderBrand(s string) bool {
+	switch s {
+	case SSOBrandApple, SSOBrandFacebook, SSOBrandGitHub, SSOBrandGitLab, SSOBrandGoogle, SSOBrandTwitter:
+		return true
+	default:
+		return false
+	}
+}
+
+const (
+	SSOBrandApple    = "apple"
+	SSOBrandFacebook = "facebook"
+	SSOBrandGitHub   = "github"
+	SSOBrandGitLab   = "gitlab"
+	SSOBrandGoogle   = "google"
+	SSOBrandTwitter  = "twitter"
+)
 
 type TURN struct {
 	// TODO Guest Support

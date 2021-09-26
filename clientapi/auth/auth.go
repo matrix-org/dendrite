@@ -43,6 +43,7 @@ type AccountDatabase interface {
 	// Look up the account matching the given localpart.
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
 	GetAccountByPassword(ctx context.Context, localpart, password string) (*api.Account, error)
+	GetLocalpartForThreePID(ctx context.Context, address, medium string) (string, error)
 }
 
 // VerifyUserFromRequest authenticates the HTTP request,

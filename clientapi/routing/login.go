@@ -19,6 +19,8 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/auth/sso"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -35,20 +37,54 @@ type loginResponse struct {
 }
 
 type flows struct {
-	Flows []flow `json:"flows"`
+	Flows []stage `json:"flows"`
 }
 
-type flow struct {
-	Type string `json:"type"`
+type stage struct {
+	Type              string             `json:"type"`
+	IdentityProviders []identityProvider `json:"identity_providers,omitempty"`
 }
 
-func passwordLogin() flows {
-	f := flows{}
-	s := flow{
-		Type: "m.login.password",
+type identityProvider struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Brand string `json:"brand,omitempty"`
+	Icon  string `json:"icon,omitempty"`
+}
+
+func passwordLogin() []stage {
+	return []stage{
+		{Type: authtypes.LoginTypePassword},
 	}
-	f.Flows = append(f.Flows, s)
-	return f
+}
+
+func ssoLogin(cfg *config.ClientAPI) []stage {
+	var idps []identityProvider
+	for _, idp := range cfg.Login.SSO.Providers {
+		brand := idp.Brand
+		if brand == "" {
+			typ := idp.Type
+			if typ == "" {
+				typ = idp.ID
+			}
+			idpType := sso.GetIdentityProvider(sso.IdentityProviderType(typ))
+			if idpType != nil {
+				brand = idpType.DefaultBrand()
+			}
+		}
+		idps = append(idps, identityProvider{
+			ID:    idp.ID,
+			Name:  idp.Name,
+			Brand: brand,
+			Icon:  idp.Icon,
+		})
+	}
+	return []stage{
+		{
+			Type:              authtypes.LoginTypeSSO,
+			IdentityProviders: idps,
+		},
+	}
 }
 
 // Login implements GET and POST /login
@@ -57,10 +93,13 @@ func Login(
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
-		// TODO: support other forms of login other than password, depending on config options
+		allFlows := passwordLogin()
+		if cfg.Login.SSO.Enabled {
+			allFlows = append(allFlows, ssoLogin(cfg)...)
+		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: passwordLogin(),
+			JSON: flows{Flows: allFlows},
 		}
 	} else if req.Method == http.MethodPost {
 		login, cleanup, authErr := auth.LoginFromJSONReader(req.Context(), req.Body, userAPI, userAPI, cfg)
@@ -72,6 +111,7 @@ func Login(
 		cleanup(req.Context(), &authErr2)
 		return authErr2
 	}
+
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),

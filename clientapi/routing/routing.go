@@ -563,6 +563,25 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
+	v3mux.Handle("/login/sso/callback",
+		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
+			return SSOCallback(req, userAPI, cfg)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/login/sso/redirect",
+		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
+			return SSORedirect(req, "", cfg)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/login/sso/redirect/{idpID}",
+		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
+			vars := mux.Vars(req)
+			return SSORedirect(req, vars["idpID"], cfg)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	v3mux.Handle("/auth/{authType}/fallback/web",
 		httputil.MakeHTMLAPI("auth_fallback", func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
 			vars := mux.Vars(req)
