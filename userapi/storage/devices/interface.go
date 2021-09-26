@@ -38,4 +38,15 @@ type Database interface {
 	RemoveDevices(ctx context.Context, localpart string, devices []string) error
 	// RemoveAllDevices deleted all devices for this user. Returns the devices deleted.
 	RemoveAllDevices(ctx context.Context, localpart, exceptDeviceID string) (devices []api.Device, err error)
+
+	// CreateLoginToken generates a token, stores and returns it. The lifetime is
+	// determined by the loginTokenLifetime given to the Database constructor.
+	CreateLoginToken(ctx context.Context, data *api.LoginTokenData) (*api.LoginTokenMetadata, error)
+
+	// RemoveLoginToken removes the named token (and may clean up other expired tokens).
+	RemoveLoginToken(ctx context.Context, token string) error
+
+	// GetLoginTokenByToken returns the data associated with the given token.
+	// May return sql.ErrNoRows.
+	GetLoginTokenByToken(ctx context.Context, token string) (*api.LoginTokenData, error)
 }

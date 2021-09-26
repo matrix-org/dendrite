@@ -19,6 +19,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -27,30 +28,41 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// The length of generated device IDs
-var deviceIDByteLength = 6
+const (
+	// The length of generated device IDs
+	deviceIDByteLength = 6
+
+	loginTokenByteLength = 32
+)
 
 // Database represents a device database.
 type Database struct {
-	db      *sql.DB
-	writer  sqlutil.Writer
-	devices devicesStatements
+	db                 *sql.DB
+	writer             sqlutil.Writer
+	devices            devicesStatements
+	loginTokens        loginTokenStatements
+	loginTokenLifetime time.Duration
 }
 
 // NewDatabase creates a new device database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, loginTokenLifetime time.Duration) (*Database, error) {
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
 	}
 	writer := sqlutil.NewExclusiveWriter()
-	d := devicesStatements{}
+	var d devicesStatements
+	var lt loginTokenStatements
 
 	// Create tables before executing migrations so we don't fail if the table is missing,
 	// and THEN prepare statements so we don't fail due to referencing new columns
 	if err = d.execSchema(db); err != nil {
 		return nil, err
 	}
+	if err = lt.execSchema(db); err != nil {
+		return nil, err
+	}
+
 	m := sqlutil.NewMigrations()
 	deltas.LoadLastSeenTSIP(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
@@ -59,7 +71,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err = d.prepare(db, writer, serverName); err != nil {
 		return nil, err
 	}
-	return &Database{db, writer, d}, nil
+	if err = lt.prepare(db); err != nil {
+		return nil, err
+	}
+	return &Database{db, writer, d, lt, loginTokenLifetime}, nil
 }
 
 // GetDeviceByAccessToken returns the device matching the given access token.
@@ -209,4 +224,48 @@ func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID
 	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
 		return d.devices.updateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr)
 	})
+}
+
+// CreateLoginToken generates a token, stores and returns it. The lifetime is
+// determined by the loginTokenLifetime given to the Database constructor.
+func (d *Database) CreateLoginToken(ctx context.Context, data *api.LoginTokenData) (*api.LoginTokenMetadata, error) {
+	tok, err := generateLoginToken()
+	if err != nil {
+		return nil, err
+	}
+	meta := &api.LoginTokenMetadata{
+		Token:      tok,
+		Expiration: time.Now().Add(d.loginTokenLifetime),
+	}
+
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		return d.loginTokens.insert(ctx, txn, meta, data)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return meta, nil
+}
+
+func generateLoginToken() (string, error) {
+	b := make([]byte, loginTokenByteLength)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// RemoveLoginToken removes the named token (and may clean up other expired tokens).
+func (d *Database) RemoveLoginToken(ctx context.Context, token string) error {
+	return d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		return d.loginTokens.deleteByToken(ctx, txn, token)
+	})
+}
+
+// GetLoginTokenByToken returns the data associated with the given token.
+// May return sql.ErrNoRows.
+func (d *Database) GetLoginTokenByToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
+	return d.loginTokens.selectByToken(ctx, token)
 }
