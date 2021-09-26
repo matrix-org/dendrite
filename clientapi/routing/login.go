@@ -16,14 +16,13 @@ package routing
 
 import (
 	"context"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -55,7 +54,7 @@ func passwordLogin() flows {
 
 // Login implements GET and POST /login
 func Login(
-	req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
+	req *http.Request, accountDB accounts.Database, userAPI uapi.UserInternalAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
@@ -65,18 +64,7 @@ func Login(
 			JSON: passwordLogin(),
 		}
 	} else if req.Method == http.MethodPost {
-		typePassword := auth.LoginTypePassword{
-			GetAccountByPassword: accountDB.GetAccountByPassword,
-			Config:               cfg,
-		}
-		body, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON("Reading request body failed: " + err.Error()),
-			}
-		}
-		login, cleanup, authErr := typePassword.LoginFromJSON(req.Context(), body)
+		login, cleanup, authErr := auth.LoginFromJSONReader(req.Context(), req.Body, accountDB, userAPI, cfg)
 		if authErr != nil {
 			return *authErr
 		}
@@ -92,7 +80,7 @@ func Login(
 }
 
 func completeAuth(
-	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI userapi.UserInternalAPI, login *auth.Login,
+	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI uapi.UserInternalAPI, login *auth.Login,
 	ipAddr, userAgent string,
 ) util.JSONResponse {
 	token, err := auth.GenerateAccessToken()
@@ -107,8 +95,8 @@ func completeAuth(
 		return jsonerror.InternalServerError()
 	}
 
-	var performRes userapi.PerformDeviceCreationResponse
-	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
+	var performRes uapi.PerformDeviceCreationResponse
+	err = userAPI.PerformDeviceCreation(ctx, &uapi.PerformDeviceCreationRequest{
 		DeviceDisplayName: login.InitialDisplayName,
 		DeviceID:          login.DeviceID,
 		AccessToken:       token,

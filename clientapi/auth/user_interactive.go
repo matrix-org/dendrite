@@ -63,11 +63,8 @@ type LoginIdentifier struct {
 
 // Login represents the shared fields used in all forms of login/sudo endpoints.
 type Login struct {
-	Type       string          `json:"type"`
-	Identifier LoginIdentifier `json:"identifier"`
-	User       string          `json:"user"`    // deprecated in favour of identifier
-	Medium     string          `json:"medium"`  // deprecated in favour of identifier
-	Address    string          `json:"address"` // deprecated in favour of identifier
+	LoginIdentifier                 // Flat fields deprecated in favour of `identifier`.
+	Identifier      LoginIdentifier `json:"identifier"`
 
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
