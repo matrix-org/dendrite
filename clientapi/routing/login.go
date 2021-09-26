@@ -16,10 +16,10 @@ package routing
 
 import (
 	"context"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -69,17 +69,21 @@ func Login(
 			GetAccountByPassword: accountDB.GetAccountByPassword,
 			Config:               cfg,
 		}
-		r := typePassword.Request()
-		resErr := httputil.UnmarshalJSONRequest(req, r)
-		if resErr != nil {
-			return *resErr
+		body, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("Reading request body failed: " + err.Error()),
+			}
 		}
-		login, authErr := typePassword.Login(req.Context(), r)
+		login, cleanup, authErr := typePassword.LoginFromJSON(req.Context(), body)
 		if authErr != nil {
 			return *authErr
 		}
 		// make a device/access token
-		return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		authzErr := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		cleanup(req.Context(), &authzErr)
+		return authzErr
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
