@@ -92,6 +92,7 @@ type BaseDendrite struct {
 const NoListener = ""
 
 const HTTPServerTimeout = time.Minute * 5
+const HTTPServerRequestTimeout = HTTPServerTimeout
 const HTTPClientTimeout = time.Second * 30
 
 type BaseDendriteOptions int
@@ -384,6 +385,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalAddr, _ := externalHTTPAddr.Address()
 
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
+	externalRouter.Use(timeoutMiddleware)
 	internalRouter := externalRouter
 
 	externalServ := &http.Server{
@@ -519,6 +521,15 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	_ = internalServ.Shutdown(context.Background())
 	_ = externalServ.Shutdown(context.Background())
 	logrus.Infof("Stopped HTTP listeners")
+}
+
+// timeoutMiddleware is a Gorilla middleware that adds a timeout to all request contexts.
+func timeoutMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), HTTPServerRequestTimeout)
+		defer cancel()
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func (b *BaseDendrite) WaitForShutdown() {
