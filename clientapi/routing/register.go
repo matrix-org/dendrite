@@ -232,7 +232,7 @@ func validatePassword(password string, cfg config.PasswordRequirements) *util.JS
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.WeakPassword(fmt.Sprintf("'password' >%d characters", cfg.MaxPasswordLength)),
 		}
-	} else if len(password) >= 0 && len(password) < cfg.MinPasswordLength {
+	} else if len(password) > 0 && len(password) < cfg.MinPasswordLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", cfg.MinPasswordLength)),
@@ -541,9 +541,9 @@ func Register(
 		if resErr = validateUsername(r.Username); resErr != nil {
 			return *resErr
 		}
-	}
-	if resErr = validatePassword(r.Password, cfg.PasswordRequirements); resErr != nil {
-		return *resErr
+		if resErr = validatePassword(r.Password, cfg.PasswordRequirements); resErr != nil {
+			return *resErr
+		}
 	}
 
 	logger := util.GetLogger(req.Context())
