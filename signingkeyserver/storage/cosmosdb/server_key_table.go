@@ -204,7 +204,7 @@ func (s *serverKeyStatements) upsertServerKeys(
 	// stmt := sqlutil.TxStmt(txn, s.upsertServerKeysStmt)
 
 	// 	UNIQUE (server_name, server_key_id)
-	docId := fmt.Sprintf("%s_%s", string(request.ServerName), string(request.KeyID))
+	docId := fmt.Sprintf("%s,%s", string(request.ServerName), string(request.KeyID))
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getServerKey(s, ctx, s.getPartitionKey(), cosmosDocId)

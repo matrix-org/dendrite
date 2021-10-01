@@ -145,7 +145,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 
 	// CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
 	//     ON federationsender_queue_edus (json_nid, server_name);
-	docId := fmt.Sprintf("%d_%s", nid, eduType)
+	docId := fmt.Sprintf("%d,%s", nid, eduType)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	data := queueEDUCosmos{

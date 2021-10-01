@@ -86,7 +86,7 @@ type PartitionOffsetStatements struct {
 
 func (s PartitionOffsetStatements) getCollectionName() string {
 	// Include the Prefix
-	tableName := fmt.Sprintf("%s_%s", s.prefix, s.tableName)
+	tableName := fmt.Sprintf("%s,%s", s.prefix, s.tableName)
 	return cosmosdbapi.GetCollectionName(s.db.DatabaseName, tableName)
 }
 
@@ -193,7 +193,7 @@ func (s *PartitionOffsetStatements) upsertPartitionOffset(
 		// stmt := TxStmt(txn, s.upsertPartitionOffsetStmt)
 
 		//     UNIQUE (topic, partition)
-		docId := fmt.Sprintf("%s_%d", topic, partition)
+		docId := fmt.Sprintf("%s,%d", topic, partition)
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.CosmosConfig.TenantName, s.getCollectionName(), docId)
 
 		dbData, _ := getPartitionOffset(s, ctx, s.getPartitionKey(topic), cosmosDocId)

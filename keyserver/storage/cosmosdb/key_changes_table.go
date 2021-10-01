@@ -120,7 +120,7 @@ func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, partition in
 	// " DO UPDATE SET user_id = $3"
 
 	// 	UNIQUE (partition, offset)
-	docId := fmt.Sprintf("%d_%d", partition, offset)
+	docId := fmt.Sprintf("%d,%d", partition, offset)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getKeyChangeUser(s, ctx, s.getPartitionKey(), cosmosDocId)

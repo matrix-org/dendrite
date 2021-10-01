@@ -139,7 +139,7 @@ func (s *mediaStatements) insertMedia(
 	// VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
-	docId := fmt.Sprintf("%s_%s", mediaMetadata.MediaID, mediaMetadata.Origin)
+	docId := fmt.Sprintf("%s,%s", mediaMetadata.MediaID, mediaMetadata.Origin)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	data := mediaRepositoryCosmos{
@@ -194,7 +194,7 @@ func (s *mediaStatements) selectMedia(
 	// SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM mediaapi_media_repository WHERE media_id = $1 AND media_origin = $2
 
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
-	docId := fmt.Sprintf("%s_%s", mediaMetadata.MediaID, mediaMetadata.Origin)
+	docId := fmt.Sprintf("%s,%s", mediaMetadata.MediaID, mediaMetadata.Origin)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// err := s.selectMediaStmt.QueryRowContext(

@@ -117,7 +117,7 @@ func (s *filterStatements) SelectFilter(
 	// err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
 
 	// 	UNIQUE (id, localpart)
-	docId := fmt.Sprintf("%s_%s", localpart, filterID)
+	docId := fmt.Sprintf("%s,%s", localpart, filterID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	var response, err = getFilter(s, ctx, s.getPartitionKey(), cosmosDocId)
 
@@ -208,7 +208,7 @@ func (s *filterStatements) InsertFilter(
 	}
 
 	// 	UNIQUE (id, localpart)
-	docId := fmt.Sprintf("%s_%d", localpart, seqID)
+	docId := fmt.Sprintf("%s,%d", localpart, seqID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	var dbData = filterCosmosData{

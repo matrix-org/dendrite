@@ -192,7 +192,7 @@ func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
 	// 	" ON CONFLICT DO NOTHING"
 
 	// 	UNIQUE(topological_position, room_id, stream_position)
-	docId := fmt.Sprintf("%d_%s_%d", event.Depth(), event.RoomID(), pos)
+	docId := fmt.Sprintf("%d,%s,%d", event.Depth(), event.RoomID(), pos)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	var err error

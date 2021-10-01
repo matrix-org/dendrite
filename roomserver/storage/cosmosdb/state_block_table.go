@@ -18,7 +18,7 @@ package cosmosdb
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
 	"sort"
 
@@ -144,7 +144,7 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	// ).Scan(&id)
 
 	// 	state_block_hash BLOB UNIQUE,
-	docId := hex.EncodeToString(nids.Hash())
+	docId := base64.StdEncoding.EncodeToString(nids.Hash())
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	//See if it exists

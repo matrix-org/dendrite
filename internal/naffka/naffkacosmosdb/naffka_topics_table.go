@@ -299,7 +299,7 @@ func (t *topicsStatements) InsertTopics(
 	// stmt := sqlutil.TxStmt(txn, t.insertTopicsStmt)
 
 	// 	UNIQUE (topic_nid, message_offset)
-	docId := fmt.Sprintf("%d_%d", topicNID, messageOffset)
+	docId := fmt.Sprintf("%d,%d", topicNID, messageOffset)
 	cosmosDocId := cosmosdbapi.GetDocumentId(t.DB.cosmosConfig.ContainerName, t.getCollectionNameMessages(), docId)
 
 	data := messageCosmos{

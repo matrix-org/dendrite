@@ -149,7 +149,7 @@ func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 		return fmt.Errorf("unknown key purpose %q", keyType)
 	}
 	// 	PRIMARY KEY (user_id, key_type)
-	docId := fmt.Sprintf("%s_%s", userID, keyType)
+	docId := fmt.Sprintf("%s,%s", userID, keyType)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getCrossSigningKeys(s, ctx, s.getPartitionKey(userID), cosmosDocId)

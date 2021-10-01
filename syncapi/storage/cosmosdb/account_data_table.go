@@ -137,7 +137,7 @@ func (s *accountDataStatements) InsertAccountData(
 	}
 
 	//     UNIQUE (user_id, room_id, type)
-	docId := fmt.Sprintf("%s_%s_%s", userID, roomID, dataType)
+	docId := fmt.Sprintf("%s,%s,%s", userID, roomID, dataType)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getAccountDataType(s, ctx, s.getPartitionKey(), cosmosDocId)

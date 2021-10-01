@@ -268,7 +268,7 @@ func (s *membershipStatements) InsertMembership(
 	// " ON CONFLICT DO NOTHING"
 
 	// 		UNIQUE (room_nid, target_nid)
-	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
+	docId := fmt.Sprintf("%d,%d", roomNID, targetUserNID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// " ON CONFLICT DO NOTHING"
@@ -317,7 +317,7 @@ func (s *membershipStatements) SelectMembershipForUpdate(
 	// "SELECT membership_nid FROM roomserver_membership" +
 	// " WHERE room_nid = $1 AND target_nid = $2"
 
-	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
+	docId := fmt.Sprintf("%d,%d", roomNID, targetUserNID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	response, err := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
@@ -335,7 +335,7 @@ func (s *membershipStatements) SelectMembershipFromRoomAndTarget(
 	// 	"SELECT membership_nid, event_nid, forgotten FROM roomserver_membership" +
 	// 	" WHERE room_nid = $1 AND target_nid = $2"
 
-	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
+	docId := fmt.Sprintf("%d,%d", roomNID, targetUserNID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	response, err := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if response != nil {
@@ -432,7 +432,7 @@ func (s *membershipStatements) UpdateMembership(
 	// "UPDATE roomserver_membership SET sender_nid = $1, membership_nid = $2, event_nid = $3, forgotten = $4" +
 	// " WHERE room_nid = $5 AND target_nid = $6"
 
-	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
+	docId := fmt.Sprintf("%d,%d", roomNID, targetUserNID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	dbData, err := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
 
@@ -693,7 +693,7 @@ func (s *membershipStatements) UpdateForgetMembership(
 	// "UPDATE roomserver_membership SET forgotten = $1" +
 	// " WHERE room_nid = $2 AND target_nid = $3"
 
-	docId := fmt.Sprintf("%d_%d", roomNID, targetUserNID)
+	docId := fmt.Sprintf("%d,%d", roomNID, targetUserNID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	dbData, err := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
 

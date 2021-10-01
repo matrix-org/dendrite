@@ -131,7 +131,7 @@ func (s *thumbnailStatements) insertThumbnail(
 	// stmt := sqlutil.TxStmt(txn, s.insertThumbnailStmt)
 
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
-	docId := fmt.Sprintf("%s_%s_%d_%d_%s",
+	docId := fmt.Sprintf("%s,%s,%d,%d,%s",
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.ThumbnailSize.Width,
@@ -200,7 +200,7 @@ func (s *thumbnailStatements) selectThumbnail(
 	// SELECT content_type, file_size_bytes, creation_ts FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2 AND width = $3 AND height = $4 AND resize_method = $5
 
 	// CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
-	docId := fmt.Sprintf("%s_%s_%d_%d_%s",
+	docId := fmt.Sprintf("%s,%s,%d,%d,%s",
 		mediaID,
 		mediaOrigin,
 		width,

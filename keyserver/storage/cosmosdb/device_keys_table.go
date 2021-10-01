@@ -325,7 +325,7 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 		// err := s.selectDeviceKeysStmt.QueryRowContext(ctx, key.UserID, key.DeviceID).Scan(&keyJSONStr, &streamID, &displayName)
 
 		//     UNIQUE (user_id, device_id)
-		docId := fmt.Sprintf("%s_%s", key.UserID, key.DeviceID)
+		docId := fmt.Sprintf("%s,%s", key.UserID, key.DeviceID)
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 		response, err := getDeviceKey(s, ctx, s.getPartitionKey(key.UserID), cosmosDocId)
@@ -437,7 +437,7 @@ func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx
 
 	for _, key := range keys {
 		//     UNIQUE (user_id, device_id)
-		docId := fmt.Sprintf("%s_%s", key.UserID, key.DeviceID)
+		docId := fmt.Sprintf("%s,%s", key.UserID, key.DeviceID)
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 		dbData := &deviceKeyCosmosData{

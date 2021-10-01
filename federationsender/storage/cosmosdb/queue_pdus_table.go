@@ -157,7 +157,7 @@ func (s *queuePDUsStatements) InsertQueuePDU(
 
 	// CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_pdus_pdus_json_nid_idx
 	//     ON federationsender_queue_pdus (json_nid, server_name);
-	docId := fmt.Sprintf("%d_%s", nid, serverName)
+	docId := fmt.Sprintf("%d,%s", nid, serverName)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	data := queuePDUCosmos{

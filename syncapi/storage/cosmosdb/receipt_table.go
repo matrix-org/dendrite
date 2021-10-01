@@ -120,7 +120,7 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 	// " DO UPDATE SET id = $7, event_id = $8, receipt_ts = $9"
 
 	// 	CONSTRAINT syncapi_receipts_unique UNIQUE (room_id, receipt_type, user_id)
-	docId := fmt.Sprintf("%s_%s_%s", roomId, receiptType, userId)
+	docId := fmt.Sprintf("%s,%s,%s", roomId, receiptType, userId)
 	cosmosDocId := cosmosdbapi.GetDocumentId(r.db.cosmosConfig.ContainerName, r.getCollectionName(), docId)
 
 	data := receiptCosmos{

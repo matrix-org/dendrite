@@ -146,7 +146,7 @@ func (s *threepidStatements) insertThreePID(
 		ThreePID:  threepid,
 	}
 
-	docId := fmt.Sprintf("%s_%s", threepid, medium)
+	docId := fmt.Sprintf("%s,%s", threepid, medium)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	var dbData = threePIDCosmosData{
 		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
@@ -171,7 +171,7 @@ func (s *threepidStatements) deleteThreePID(
 	ctx context.Context, threepid string, medium string) (err error) {
 
 	// "DELETE FROM account_threepid WHERE threepid = $1 AND medium = $2"
-	docId := fmt.Sprintf("%s_%s", threepid, medium)
+	docId := fmt.Sprintf("%s,%s", threepid, medium)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	var options = cosmosdbapi.GetDeleteDocumentOptions(s.getPartitionKey())
 	_, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(

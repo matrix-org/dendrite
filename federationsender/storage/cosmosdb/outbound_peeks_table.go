@@ -145,7 +145,7 @@ func (s *outboundPeeksStatements) InsertOutboundPeek(
 	// stmt := sqlutil.TxStmt(txn, s.insertOutboundPeekStmt)
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 	// 	UNIQUE (room_id, server_name, peek_id)
-	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
+	docId := fmt.Sprintf("%s,%s,%s", roomID, serverName, peekID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getOutboundPeek(s, ctx, s.getPartitionKey(roomID), cosmosDocId)
@@ -190,7 +190,7 @@ func (s *outboundPeeksStatements) RenewOutboundPeek(
 
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 	// 	UNIQUE (room_id, server_name, peek_id)
-	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
+	docId := fmt.Sprintf("%s,%s,%s", roomID, serverName, peekID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// _, err = sqlutil.TxStmt(txn, s.renewOutboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
@@ -219,7 +219,7 @@ func (s *outboundPeeksStatements) SelectOutboundPeek(
 	// "SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
 	// 	UNIQUE (room_id, server_name, peek_id)
-	docId := fmt.Sprintf("%s_%s_%s", roomID, serverName, peekID)
+	docId := fmt.Sprintf("%s,%s,%s", roomID, serverName, peekID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	// row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)

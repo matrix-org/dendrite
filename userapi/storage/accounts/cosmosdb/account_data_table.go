@@ -100,9 +100,9 @@ func (s *accountDataStatements) insertAccountData(
 	// 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
 	id := ""
 	if roomID == "" {
-		id = fmt.Sprintf("%s_%s", localpart, dataType)
+		id = fmt.Sprintf("%s,%s", localpart, dataType)
 	} else {
-		id = fmt.Sprintf("%s_%s_%s", localpart, roomID, dataType)
+		id = fmt.Sprintf("%s,%s,%s", localpart, roomID, dataType)
 	}
 
 	docId := id

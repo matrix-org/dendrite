@@ -144,7 +144,7 @@ func (s *keyBackupVersionStatements) insertKeyBackup(
 	}
 	// err = txn.Stmt(s.insertKeyBackupStmt).QueryRowContext(ctx, userID, algorithm, string(authData), etag).Scan(&versionInt)
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
-	docId := fmt.Sprintf("%s_%d", userID, versionInt)
+	docId := fmt.Sprintf("%s,%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	data := keyBackupVersionCosmos{
@@ -181,7 +181,7 @@ func (s *keyBackupVersionStatements) updateKeyBackupAuthData(
 		return fmt.Errorf("invalid version")
 	}
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
-	docId := fmt.Sprintf("%s_%d", userID, versionInt)
+	docId := fmt.Sprintf("%s,%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	item, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
@@ -212,7 +212,7 @@ func (s *keyBackupVersionStatements) updateKeyBackupETag(
 		return fmt.Errorf("invalid version")
 	}
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
-	docId := fmt.Sprintf("%s_%d", userID, versionInt)
+	docId := fmt.Sprintf("%s,%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	item, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
@@ -243,7 +243,7 @@ func (s *keyBackupVersionStatements) deleteKeyBackup(
 		return false, fmt.Errorf("invalid version")
 	}
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
-	docId := fmt.Sprintf("%s_%d", userID, versionInt)
+	docId := fmt.Sprintf("%s,%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	item, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)
@@ -313,7 +313,7 @@ func (s *keyBackupVersionStatements) selectKeyBackup(
 		return
 	}
 	// CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
-	docId := fmt.Sprintf("%s_%d", userID, versionInt)
+	docId := fmt.Sprintf("%s,%d", userID, versionInt)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	res, err := getKeyBackupVersion(s, ctx, s.getPartitionKey(userID), cosmosDocId)

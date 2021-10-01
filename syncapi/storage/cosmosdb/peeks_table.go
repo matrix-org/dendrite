@@ -168,7 +168,7 @@ func (s *peekStatements) InsertPeek(
 	// " VALUES ($1, $2, $3, $4, $5, false)"
 
 	//     UNIQUE(room_id, user_id, device_id)
-	docId := fmt.Sprintf("%s_%s_%s", roomID, userID, deviceID)
+	docId := fmt.Sprintf("%s,%s,%s", roomID, userID, deviceID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getPeek(s, ctx, s.getPartitionKey(), cosmosDocId)

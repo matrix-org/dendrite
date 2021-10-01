@@ -188,7 +188,7 @@ func (s *keyBackupStatements) insertBackupKey(
 	// 	ctx, userID, key.RoomID, key.SessionID, version, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData),
 	// )
 	// CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON account_e2e_room_keys(user_id, room_id, session_id, version);
-	docId := fmt.Sprintf("%s_%s_%s_%s", userID, key.RoomID, key.SessionID, version)
+	docId := fmt.Sprintf("%s,%s,%s,%s", userID, key.RoomID, key.SessionID, version)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	data := keyBackupCosmos{
@@ -228,7 +228,7 @@ func (s *keyBackupStatements) updateBackupKey(
 	// )
 
 	// CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON account_e2e_room_keys(user_id, room_id, session_id, version);
-	docId := fmt.Sprintf("%s_%s_%s_%s", userID, key.RoomID, key.SessionID, version)
+	docId := fmt.Sprintf("%s,%s,%s,%s", userID, key.RoomID, key.SessionID, version)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	item, err := getKeyBackup(s, ctx, s.getPartitionKey(userID), cosmosDocId)

@@ -183,7 +183,7 @@ func (s *crossSigningSigsStatements) UpsertCrossSigningSigsForTarget(
 	// 	" VALUES($1, $2, $3, $4, $5)"
 
 	// 	PRIMARY KEY (origin_user_id, target_user_id, target_key_id)
-	docId := fmt.Sprintf("%s_%s_%s", originUserID, targetUserID, targetKeyID)
+	docId := fmt.Sprintf("%s,%s,%s", originUserID, targetUserID, targetKeyID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getCrossSigningSigs(s, ctx, s.getPartitionKey(targetUserID), cosmosDocId)

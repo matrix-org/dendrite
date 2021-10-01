@@ -68,9 +68,8 @@ func (s *transactionStatements) getCollectionName() string {
 	return cosmosdbapi.GetCollectionName(s.db.databaseName, s.tableName)
 }
 
-func (s *transactionStatements) getPartitionKey(transactionID string) string {
-	uniqueId := transactionID
-	return cosmosdbapi.GetPartitionKeyByUniqueId(s.db.cosmosConfig.TenantName, s.getCollectionName(), uniqueId)
+func (s *transactionStatements) getPartitionKey() string {
+	return cosmosdbapi.GetPartitionKeyByCollection(s.db.cosmosConfig.TenantName, s.getCollectionName())
 }
 
 func getTransaction(s *transactionStatements, ctx context.Context, pk string, docId string) (*transactionCosmosData, error) {
@@ -114,7 +113,7 @@ func (s *transactionStatements) InsertTransaction(
 	// VALUES ($1, $2, $3, $4)
 
 	// 		PRIMARY KEY (transaction_id, session_id, user_id)
-	docId := fmt.Sprintf("%s_%d_%s", transactionID, sessionID, userID)
+	docId := fmt.Sprintf("%s,%d,%s", transactionID, sessionID, userID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	data := transactionCosmos{
@@ -125,7 +124,7 @@ func (s *transactionStatements) InsertTransaction(
 	}
 
 	var dbData = transactionCosmosData{
-		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(transactionID), cosmosDocId),
+		CosmosDocument: cosmosdbapi.GenerateDocument(s.getCollectionName(), s.db.cosmosConfig.TenantName, s.getPartitionKey(), cosmosDocId),
 		Transaction:    data,
 	}
 
@@ -151,10 +150,10 @@ func (s *transactionStatements) SelectTransactionEventID(
 	// WHERE transaction_id = $1 AND session_id = $2 AND user_id = $3
 
 	// 		PRIMARY KEY (transaction_id, session_id, user_id)
-	docId := fmt.Sprintf("%s_%d_%s", transactionID, sessionID, userID)
+	docId := fmt.Sprintf("%s,%d,%s", transactionID, sessionID, userID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
-	response, err := getTransaction(s, ctx, s.getPartitionKey(transactionID), cosmosDocId)
+	response, err := getTransaction(s, ctx, s.getPartitionKey(), cosmosDocId)
 
 	if err != nil {
 		return "", err

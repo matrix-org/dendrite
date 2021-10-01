@@ -188,7 +188,7 @@ func (s *devicesStatements) insertDevice(
 	//     access_token TEXT PRIMARY KEY,
 	// 		UNIQUE (localpart, device_id)
 	// HACK: check for duplicate PK as we are using the UNIQUE key for the DocId
-	docId := fmt.Sprintf("%s_%s", localpart, id)
+	docId := fmt.Sprintf("%s,%s", localpart, id)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	data := deviceCosmos{
@@ -227,7 +227,7 @@ func (s *devicesStatements) deleteDevice(
 	ctx context.Context, id, localpart string,
 ) error {
 	// "DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
-	docId := fmt.Sprintf("%s_%s", localpart, id)
+	docId := fmt.Sprintf("%s,%s", localpart, id)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	var options = cosmosdbapi.GetDeleteDocumentOptions(s.getPartitionKey())
 	var _, err = cosmosdbapi.GetClient(s.db.connection).DeleteDocument(
@@ -301,7 +301,7 @@ func (s *devicesStatements) updateDeviceName(
 	ctx context.Context, localpart, deviceID string, displayName *string,
 ) error {
 	// "UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
-	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
+	docId := fmt.Sprintf("%s,%s", localpart, deviceID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	var item, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
@@ -354,7 +354,7 @@ func (s *devicesStatements) selectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
 ) (*api.Device, error) {
 	// "SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
-	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
+	docId := fmt.Sprintf("%s,%s", localpart, deviceID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	var response, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {
@@ -422,7 +422,7 @@ func (s *devicesStatements) updateDeviceLastSeen(ctx context.Context, localpart,
 	lastSeenTs := time.Now().UnixNano() / 1000000
 
 	// "UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
-	docId := fmt.Sprintf("%s_%s", localpart, deviceID)
+	docId := fmt.Sprintf("%s,%s", localpart, deviceID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	var item, exGet = getDevice(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if exGet != nil {

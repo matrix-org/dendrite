@@ -141,7 +141,7 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 	// _, err = sqlutil.TxStmt(txn, s.insertBackwardExtremityStmt).ExecContext(ctx, roomID, eventID, prevEventID)
 
 	// 	PRIMARY KEY(room_id, event_id, prev_event_id)
-	docId := fmt.Sprintf("%s_%s_%s", roomID, eventID, prevEventID)
+	docId := fmt.Sprintf("%s,%s,%s", roomID, eventID, prevEventID)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getBackwardExtremity(s, ctx, s.getPartitionKey(roomID), cosmosDocId)

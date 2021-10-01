@@ -275,7 +275,7 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(
 		algo, keyID := keys.Split(keyIDWithAlgo)
 
 		//     UNIQUE (user_id, device_id, key_id, algorithm)
-		docId := fmt.Sprintf("%s_%s_%s_%s", keys.UserID, keys.DeviceID, keyID, algo)
+		docId := fmt.Sprintf("%s,%s,%s,%s", keys.UserID, keys.DeviceID, keyID, algo)
 		cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 		data := oneTimeKeyCosmos{

@@ -146,7 +146,7 @@ func (s *membershipsStatements) UpsertMembership(
 	// )
 
 	// 	UNIQUE (room_id, user_id, membership)
-	docId := fmt.Sprintf("%s_%s_%s", event.RoomID(), *event.StateKey(), membership)
+	docId := fmt.Sprintf("%s,%s,%s", event.RoomID(), *event.StateKey(), membership)
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	dbData, _ := getMembership(s, ctx, s.getPartitionKey(), cosmosDocId)
