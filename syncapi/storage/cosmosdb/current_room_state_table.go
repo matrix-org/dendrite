@@ -391,7 +391,8 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 	// )
 
 	// " ON CONFLICT (room_id, type, state_key)" +
-	docId := fmt.Sprintf("%s,%s,%s", event.RoomID(), event.Type(), *event.StateKey())
+	//StateKey can be NULL
+	docId := fmt.Sprintf("%s,%s,%s", event.RoomID(), event.Type(), cosmosdbapi.EnsureIdPart(*event.StateKey()))
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	membershipData := ""
@@ -556,7 +557,7 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 	var res []byte
 
 	// " ON CONFLICT (room_id, type, state_key)" +
-	docId := fmt.Sprintf("%s,%s,%s", roomID, evType, stateKey)
+	docId := fmt.Sprintf("%s,%s,%s", roomID, evType, cosmosdbapi.EnsureIdPart(stateKey))
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 	var response, err = getEvent(s, ctx, s.getPartitionKey(), cosmosDocId)
 

@@ -16,6 +16,8 @@ type CosmosDocument struct {
 	Timestamp int64  `json:"_ts"`
 }
 
+var DocumentIdPartNullString string = "$$NULL$$"
+
 func removeSpecialChars(docId string) string {
 	// The following characters are restricted and cannot be used in the Id property: '/', '\', '?', '#'
 	invalidChars := [4]string{"/", "\\", "?", "#"}
@@ -25,6 +27,13 @@ func removeSpecialChars(docId string) string {
 		result = strings.ReplaceAll(result, invalidChar, replaceChar)
 	}
 	return result
+}
+
+func EnsureIdPart(idPart string) string {
+	if len(idPart) == 0 {
+		return DocumentIdPartNullString
+	}
+	return idPart
 }
 
 func GetDocumentId(tenantName string, collectionName string, id string) string {

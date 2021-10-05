@@ -132,7 +132,7 @@ func ensureEventStateKeys(s *eventStateKeyStatements, ctx context.Context) {
 	// ON CONFLICT DO NOTHING;
 
 	//     event_state_key TEXT NOT NULL UNIQUE
-	docId := ""
+	docId := cosmosdbapi.EnsureIdPart("")
 	cosmosDocId := cosmosdbapi.GetDocumentId(s.db.cosmosConfig.TenantName, s.getCollectionName(), docId)
 
 	data := eventStateKeysCosmos{
