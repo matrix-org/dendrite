@@ -65,6 +65,7 @@ func (c *Global) Defaults() {
 	_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
 	c.KeyID = "ed25519:auto"
 	c.KeyValidityPeriod = time.Hour * 24 * 7
+	c.PresenceEnabled = true
 
 	c.Kafka.Defaults()
 	c.Metrics.Defaults()
