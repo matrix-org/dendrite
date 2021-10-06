@@ -17,12 +17,12 @@ func TestSendVerification(t *testing.T) {
 	err := dut.Send(
 		&Mail{
 			To:    "kevil11378@186site.com",
-			Link:  "my",
+			Link:  "http://my",
 			Token: "foo",
 			Extra: []string{
 				"bar",
 			},
-		}, api.Verification)
+		}, api.Register)
 	is.NoErr(err)
 }
 

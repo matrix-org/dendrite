@@ -103,11 +103,17 @@ func NewMailer(c *config.UserAPI) (Mailer, error) {
 	}
 	sessionTypes := api.ThreepidSessionTypes()
 	templates := make([]*template.Template, len(sessionTypes))
-	for _, t := range sessionTypes {
+	for i, t := range sessionTypes {
 		name := t.Name()
-		templateRaw, err := ioutil.ReadFile(fmt.Sprintf("%s/%s.eml", c.Email.TemplatesPath, name))
-		if err != nil {
-			return nil, err
+		var templateRaw []byte
+		var err error
+		if c.Email.TemplatesPath != "" {
+			templateRaw, err = ioutil.ReadFile(fmt.Sprintf("%s/%s.eml", c.Email.TemplatesPath, name))
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			templateRaw = []byte(defaults[i])
 		}
 		template, err := template.New(name).Parse(string(templateRaw))
 		if err != nil {
@@ -159,3 +165,50 @@ func validateLine(line string) error {
 	}
 	return nil
 }
+
+var (
+	defaults = []string{
+		`Date: {{.Date}}
+From: noreply@example.com
+To: {{.To}}
+Message-ID: <{{.MessageId}}>
+Subject: Confirm your email address for Matrix
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Disposition: inline
+
+We have received request to reset password for you Matrix account. Please click following link to confirm your email:
+{{.Link}}
+Alternatively pass following token to your Matrix client:
+{{.Token}}
+`,
+		`Date: {{.Date}}
+From: noreply@example.com
+To: {{.To}}
+Message-ID: <{{.MessageId}}>
+Subject: Confirm your email address for Matrix
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Disposition: inline
+
+We have received request to add this email to your Matrix account. Please click following link to confirm your email:
+{{.Link}}
+Alternatively pass following token to your Matrix client:
+{{.Token}}
+`,
+		`Date: {{.Date}}
+From: noreply@example.com
+To: {{.To}}
+Message-ID: <{{.MessageId}}>
+Subject: Confirm your email address for Matrix
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Disposition: inline
+
+We have received request to register account in Matrix server using this email. Please click following link to finish registration:
+{{.Link}}
+Alternatively pass following token to your Matrix client:
+{{.Token}}
+`,
+	}
+)
