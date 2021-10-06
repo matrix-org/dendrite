@@ -94,9 +94,10 @@ func RequestEmailToken(req *http.Request, accountDB accounts.Database, userAPI u
 			util.GetLogger(req.Context()).WithError(err).Error("userAPI.CreateSession failed")
 			return jsonerror.InternalServerError()
 		}
+		resp.SID = strconv.Itoa(int(createSessionResp.Sid))
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: createSessionResp,
+			JSON: resp,
 		}
 	} else {
 		resp.SID, err = threepid.CreateSession(req.Context(), body, cfg)
