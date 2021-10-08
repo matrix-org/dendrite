@@ -152,7 +152,7 @@ jon Joining room twice is idempotent
 syn New room members see their own join event
 v1s New room members see existing users' presence in room initialSync 
 syn Existing members see new members' join events
-syn Existing members see new members' presence 
+syn,pre Existing members see new members' presence
 v1s All room members see all room members' presence in global initialSync 
 f,jon Remote users can join room by alias 
 syn New room members see their own join event 
@@ -363,7 +363,7 @@ syn A prev_batch token can be used in the v1 messages API
 syn A next_batch token can be used in the v1 messages API
 syn A prev_batch token from incremental sync can be used in the v1 messages API
 syn,pre User sees their own presence in a sync
-syn User is offline if they set_presence=offline in their sync
+syn,pre User is offline if they set_presence=offline in their sync
 syn,pre User sees updates to presence from other users in the incremental sync.
 syn State is included in the timeline in the initial sync 
 f,syn State from remote users is included in the state in the initial sync 
