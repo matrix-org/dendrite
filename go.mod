@@ -33,7 +33,7 @@ require (
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20210817115641-f9416ac1a723
 	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
-	github.com/matrix-org/pinecone v0.0.0-20210920152116-4f07afaed998
+	github.com/matrix-org/pinecone v0.0.0-20211008142213-06dcf8511285
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/morikuni/aec v1.0.0 // indirect
@@ -53,10 +53,9 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.4.1-0.20210715083903-52309d094c00
 	go.uber.org/atomic v1.9.0
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/mobile v0.0.0-20210716004757-34ab1303b554
-	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985
-	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
+	golang.org/x/net v0.0.0-20210927181540-4e4d966f7476
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0

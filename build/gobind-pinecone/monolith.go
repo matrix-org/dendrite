@@ -105,7 +105,7 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 func (m *DendriteMonolith) DisconnectType(peertype int) {
 	for _, p := range m.PineconeRouter.Peers() {
 		if peertype == p.PeerType {
-			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
+			m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
 		}
 	}
 }
@@ -113,13 +113,13 @@ func (m *DendriteMonolith) DisconnectType(peertype int) {
 func (m *DendriteMonolith) DisconnectZone(zone string) {
 	for _, p := range m.PineconeRouter.Peers() {
 		if zone == p.Zone {
-			_ = m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
+			m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
 		}
 	}
 }
 
-func (m *DendriteMonolith) DisconnectPort(port int) error {
-	return m.PineconeRouter.Disconnect(types.SwitchPortID(port), nil)
+func (m *DendriteMonolith) DisconnectPort(port int) {
+	m.PineconeRouter.Disconnect(types.SwitchPortID(port), nil)
 }
 
 func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) {
@@ -253,7 +253,7 @@ func (m *DendriteMonolith) Start() {
 	logrus.SetOutput(BindLogger{})
 
 	logger := log.New(os.Stdout, "PINECONE: ", 0)
-	m.PineconeRouter = pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
+	m.PineconeRouter = pineconeRouter.NewRouter(logger, sk, "dendrite", nil)
 	m.PineconeQUIC = pineconeSessions.NewSessions(logger, m.PineconeRouter)
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
 

@@ -91,7 +91,7 @@ func main() {
 	}
 
 	logger := log.New(os.Stdout, "", 0)
-	pRouter := pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
+	pRouter := pineconeRouter.NewRouter(logger, sk, "dendrite", nil)
 
 	go func() {
 		listener, err := net.Listen("tcp", *instanceListen)
