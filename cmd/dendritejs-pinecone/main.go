@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build wasm
 // +build wasm
 
 package main
@@ -155,7 +156,7 @@ func startup() {
 	pk := sk.Public().(ed25519.PublicKey)
 
 	logger := log.New(os.Stdout, "", 0)
-	pRouter := pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
+	pRouter := pineconeRouter.NewRouter(logger, sk, "dendrite", nil)
 	pSessions := pineconeSessions.NewSessions(logger, pRouter)
 
 	cfg := &config.Dendrite{}
