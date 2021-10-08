@@ -115,8 +115,7 @@ const selectEarlyEventsSQL = "" +
 
 // "SELECT MAX(id) FROM syncapi_output_room_events"
 const selectMaxEventIDSQL = "" +
-	"select max(c.mx_syncapi_output_room_event.id) as number from c where c._cn = @x1 " +
-	"and c._sid = @x2 "
+	"select max(c.mx_syncapi_output_room_event.id) as number from c where c._cn = @x1 "
 
 // "UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
 const updateEventJSONSQL = "" +
@@ -336,29 +335,25 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 func (s *outputRoomEventsStatements) SelectMaxEventID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
-	var nullableID sql.NullInt64
 
 	params := map[string]interface{}{
 		"@x1": s.getCollectionName(),
-		"@x2": s.db.cosmosConfig.TenantName,
 	}
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxEventIDStmt)
 	var rows []outputRoomEventCosmosMaxNumber
-	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+	err = cosmosdbapi.PerformQuery(ctx,
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(),
 		s.selectMaxEventIDStmt, params, &rows)
 
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 
-	if rows != nil {
-		nullableID.Int64 = rows[0].Max
+	if len(rows) > 0 {
+		id = rows[0].Max
 	}
 
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
 	return
 }
 

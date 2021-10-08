@@ -83,8 +83,7 @@ const deleteSendToDeviceMessagesSQL = "" +
 
 // "SELECT MAX(id) FROM syncapi_send_to_device"
 const selectMaxSendToDeviceIDSQL = "" +
-	"select max(c.mx_syncapi_send_to_device.id) as number from c where c._cn = @x1 " +
-	"and c._sid = @x2 "
+	"select max(c.mx_syncapi_send_to_device.id) as number from c where c._cn = @x1 "
 
 type sendToDeviceStatements struct {
 	db *SyncServerDatasource
@@ -274,13 +273,13 @@ func (s *sendToDeviceStatements) SelectMaxSendToDeviceMessageID(
 
 	params := map[string]interface{}{
 		"@x1": s.getCollectionName(),
-		"@x2": s.db.cosmosConfig.TenantName,
 	}
 	var rows []SendToDeviceCosmosMaxNumber
-	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+	err = cosmosdbapi.PerformQuery(ctx,
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(),
 		s.selectMaxSendToDeviceIDStmt, params, &rows)
 
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxSendToDeviceIDStmt)

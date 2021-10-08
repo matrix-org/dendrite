@@ -83,8 +83,7 @@ const selectInviteEventsInRangeSQL = "" +
 
 // "SELECT MAX(id) FROM syncapi_invite_events"
 const selectMaxInviteIDSQL = "" +
-	"select max(c.mx_syncapi_invite_event.id) from c where c._cn = @x1 " +
-	"and c._sid = @x2 "
+	"select max(c.mx_syncapi_invite_event.id) from c where c._cn = @x1 "
 
 type inviteEventsStatements struct {
 	db                 *SyncServerDatasource
@@ -296,14 +295,14 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	params := map[string]interface{}{
 		"@x1": s.getCollectionName(),
-		"@x2": s.db.cosmosConfig.TenantName,
 	}
 
 	var rows []inviteEventCosmosMaxNumber
-	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+	err = cosmosdbapi.PerformQuery(ctx,
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(),
 		s.selectMaxInviteIDStmt, params, &rows)
 
 	if len(rows) > 0 {

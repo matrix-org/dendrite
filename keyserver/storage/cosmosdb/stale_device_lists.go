@@ -55,9 +55,9 @@ type staleDeviceListCosmosData struct {
 
 // "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2"
 const selectStaleDeviceListsWithDomainsSQL = "" +
-	"select * from c where c._sid = @x1 and c._cn = @x2 " +
-	"and c.mx_keyserver_stale_device_list.is_stale = @x3 " +
-	"and c.mx_keyserver_stale_device_list.domain = @x4 "
+	"select * from c where c._cn = @x1 " +
+	"and c.mx_keyserver_stale_device_list.is_stale = @x2 " +
+	"and c.mx_keyserver_stale_device_list.domain = @x3 "
 
 // "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
 const selectStaleDeviceListsSQL = "" +
@@ -156,9 +156,8 @@ func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx conte
 		// "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
 		// rows, err := s.selectStaleDeviceListsStmt.QueryContext(ctx, true)
 		params := map[string]interface{}{
-			"@x1": s.db.cosmosConfig.TenantName,
-			"@x2": s.getCollectionName(),
-			"@x3": true,
+			"@x1": s.getCollectionName(),
+			"@x2": true,
 		}
 
 		var rows []staleDeviceListCosmosData

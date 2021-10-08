@@ -84,35 +84,6 @@ func PerformQuery(ctx context.Context,
 	return err
 }
 
-func PerformQueryAllPartitions(ctx context.Context,
-	conn CosmosConnection,
-	databaseName string,
-	containerName string,
-	qryString string,
-	params map[string]interface{},
-	response interface{}) error {
-	err := validateQueryAllPartitions(qryString)
-	if err != nil {
-		return err
-	}
-	var optionsQry = getQueryAllPartitionsDocumentsOptions()
-	var query = getQuery(qryString, params)
-	_, err = GetClient(conn).QueryDocuments(
-		ctx,
-		databaseName,
-		containerName,
-		query,
-		&response,
-		optionsQry)
-
-	// When there are no Rows we seem to get the generic Bad Req JSON error
-	if err != nil {
-		// return nil, err
-	}
-
-	return nil
-}
-
 func GenerateDocument(
 	collection string,
 	tenantName string,
@@ -178,23 +149,6 @@ func validateQuery(qryString string) error {
 	}
 	if !strings.Contains(qryString, " c._cn = ") {
 		return errors.New("qryString must contain [ c._cn = ] ")
-	}
-	return nil
-}
-
-func validateQueryAllPartitions(qryString string) error {
-	err := validateQuery(qryString)
-	if err != nil {
-		return err
-	}
-	if strings.Contains(qryString, " top ") {
-		return errors.New("qryString contains [ top ] ")
-	}
-	if strings.Contains(qryString, " order by ") {
-		return errors.New("qryString contains [ order by ] ")
-	}
-	if !strings.Contains(qryString, " c._sid = ") {
-		return errors.New("qryString must contain [ c._sid = ] ")
 	}
 	return nil
 }

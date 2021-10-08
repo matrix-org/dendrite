@@ -382,10 +382,11 @@ func (s *peekStatements) SelectMaxPeekID(
 		"@x1": s.getCollectionName(),
 	}
 	var rows []peekCosmosMaxNumber
-	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+	err = cosmosdbapi.PerformQuery(ctx,
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(),
 		s.selectMaxPeekIDStmt, params, &rows)
 
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)

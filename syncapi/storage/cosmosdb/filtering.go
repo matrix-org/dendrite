@@ -69,9 +69,9 @@ func prepareWithFilters(
 	}
 	switch order {
 	case FilterOrderAsc:
-		sql += fmt.Sprintf("order by c.%s.event_id asc ", collectionName)
+		sql += fmt.Sprintf("order by c.%s.id asc ", collectionName)
 	case FilterOrderDesc:
-		sql += fmt.Sprintf("order by c.%s.event_id desc ", collectionName)
+		sql += fmt.Sprintf("order by c.%s.id desc ", collectionName)
 	}
 	// query += fmt.Sprintf(" LIMIT $%d", offset+1)
 	return

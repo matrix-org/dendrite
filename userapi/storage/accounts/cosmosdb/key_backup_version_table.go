@@ -76,8 +76,8 @@ type keyBackupVersionCosmosNumber struct {
 
 // 	"SELECT MAX(version) FROM account_e2e_room_keys_versions WHERE user_id = $1"
 const selectLatestVersionSQL = "" +
-	"select max(c.mx_userapi_account_e2e_room_keys_versions.version) as number from c where c._sid = @x1 and c._cn = @x2 " +
-	"and c.mx_userapi_account_e2e_room_keys_versions.user_id = @x3 "
+	"select max(c.mx_userapi_account_e2e_room_keys_versions.version) as number from c where c._cn = @x1 " +
+	"and c.mx_userapi_account_e2e_room_keys_versions.user_id = @x2 "
 
 type keyBackupVersionStatements struct {
 	db *Database
@@ -276,17 +276,17 @@ func (s *keyBackupVersionStatements) selectKeyBackup(
 	if version == "" {
 		// var v *int64 // allows nulls
 		params := map[string]interface{}{
-			"@x1": s.db.cosmosConfig.TenantName,
-			"@x2": s.getCollectionName(),
-			"@x3": userID,
+			"@x1": s.getCollectionName(),
+			"@x2": userID,
 		}
 
 		// err = sqlutil.TxStmt(txn, s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
 		var rows []keyBackupVersionCosmosNumber
-		err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+		err = cosmosdbapi.PerformQuery(ctx,
 			s.db.connection,
 			s.db.cosmosConfig.DatabaseName,
 			s.db.cosmosConfig.ContainerName,
+			s.getPartitionKey(userID),
 			s.selectLatestVersionStmt, params, &rows)
 
 		if err != nil {
@@ -303,6 +303,11 @@ func (s *keyBackupVersionStatements) selectKeyBackup(
 			return
 		}
 		versionInt = rows[0].Number
+		if versionInt == 0 {
+			err = cosmosdbutil.ErrNoRows
+			return
+		}
+
 	} else {
 		if versionInt, err = strconv.ParseInt(version, 10, 64); err != nil {
 			return

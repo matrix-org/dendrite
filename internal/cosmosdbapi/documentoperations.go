@@ -26,14 +26,6 @@ func getQueryDocumentsOptions(pk string) cosmosapi.QueryDocumentsOptions {
 	}
 }
 
-func getQueryAllPartitionsDocumentsOptions() cosmosapi.QueryDocumentsOptions {
-	return cosmosapi.QueryDocumentsOptions{
-		IsQuery:              true,
-		EnableCrossPartition: true,
-		ContentType:          cosmosapi.QUERY_CONTENT_TYPE,
-	}
-}
-
 func GetGetDocumentOptions(pk string) cosmosapi.GetDocumentOptions {
 	return cosmosapi.GetDocumentOptions{
 		PartitionKeyValue: pk,

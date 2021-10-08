@@ -75,14 +75,14 @@ const selectBatchDeviceKeysSQL = "" +
 
 // "SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id=$1"
 const selectMaxStreamForUserSQL = "" +
-	"select max(c.mx_keyserver_device_key.stream_id) as number from c where c._sid = @x1 and c._cn = @x2 " +
-	"and c.mx_keyserver_device_key.user_id = @x3 "
+	"select max(c.mx_keyserver_device_key.stream_id) as number from c where c._cn = @x1 " +
+	"and c.mx_keyserver_device_key.user_id = @x2 "
 
 // "SELECT COUNT(*) FROM keyserver_device_keys WHERE user_id=$1 AND stream_id IN ($2)"
 const countStreamIDsForUserSQL = "" +
-	"select count(c._ts) as number from c where c._sid = @x1 and c._cn = @x2 " +
-	"and c.mx_keyserver_device_key.user_id = @x3 " +
-	"and ARRAY_CONTAINS(@x4, c.mx_keyserver_device_key.stream_id) "
+	"select count(c._ts) as number from c where c._cn = @x1 " +
+	"and c.mx_keyserver_device_key.user_id = @x2 " +
+	"and ARRAY_CONTAINS(@x3, c.mx_keyserver_device_key.stream_id) "
 
 const selectAllDeviceKeysSQL = "" +
 	"select * from c where c._cn = @x1 " +
@@ -356,9 +356,8 @@ func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn
 	// "SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id=$1"
 
 	params := map[string]interface{}{
-		"@x1": s.db.cosmosConfig.TenantName,
-		"@x2": s.getCollectionName(),
-		"@x3": userID,
+		"@x1": s.getCollectionName(),
+		"@x2": userID,
 	}
 
 	// err = sqlutil.TxStmt(txn, s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
@@ -398,10 +397,9 @@ func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID
 	}
 
 	params := map[string]interface{}{
-		"@x1": s.db.cosmosConfig.TenantName,
-		"@x2": s.getCollectionName(),
-		"@x3": userID,
-		"@x4": iStreamIDs,
+		"@x1": s.getCollectionName(),
+		"@x2": userID,
+		"@x3": iStreamIDs,
 	}
 
 	// query := strings.Replace(countStreamIDsForUserSQL, "($2)", sqlutil.QueryVariadicOffset(len(streamIDs), 1), 1)

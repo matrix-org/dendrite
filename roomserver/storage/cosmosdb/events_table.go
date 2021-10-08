@@ -146,9 +146,8 @@ const bulkSelectEventNIDSQL = "" +
 
 // 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
 const selectMaxEventDepthSQL = "" +
-	"select sub.maxinner != null ? sub.maxinner + 1 : 0 as maxdepth from " +
-	"(select MAX(c.mx_roomserver_event.depth) maxinner from c where c._sid = @x1 and c._cn = @x2 " +
-	" and ARRAY_CONTAINS(@x3, c.mx_roomserver_event.event_nid)) sub"
+	"select MAX(c.mx_roomserver_event.depth) maxdepth from c where c._cn = @x1 " +
+	" and ARRAY_CONTAINS(@x2, c.mx_roomserver_event.event_nid)"
 
 // 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid IN ($1)"
 const selectRoomNIDsForEventNIDsSQL = "" +
@@ -877,22 +876,29 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 
 	// "SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
 	params := map[string]interface{}{
-		"@x1": s.db.cosmosConfig.TenantName,
-		"@x2": s.getCollectionName(),
-		"@x3": eventNIDs,
+		"@x1": s.getCollectionName(),
+		"@x2": eventNIDs,
 	}
 
 	var rows []eventCosmosMaxDepth
-	err := cosmosdbapi.PerformQueryAllPartitions(ctx,
+	err := cosmosdbapi.PerformQuery(ctx,
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(),
 		selectMaxEventDepthSQL, params, &rows)
 
 	if err != nil {
 		return 0, fmt.Errorf("sqlutil.TxStmt.QueryRowContext: %w", err)
 	}
-	return rows[0].Max, nil
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	result := rows[0].Max
+	if result == 0 {
+		return 0, nil
+	}
+	return result + 1, nil
 }
 
 func (s *eventStatements) SelectRoomNIDsForEventNIDs(

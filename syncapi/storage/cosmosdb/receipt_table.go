@@ -76,8 +76,7 @@ const selectRoomReceipts = "" +
 
 // "SELECT MAX(id) FROM syncapi_receipts"
 const selectMaxReceiptIDSQL = "" +
-	"select max(c.mx_syncapi_receipt.id) as number from c where c._cn = @x1 " +
-	"and c._sid = @x2 "
+	"select max(c.mx_syncapi_receipt.id) as number from c where c._cn = @x1 "
 
 type receiptStatements struct {
 	db                 *SyncServerDatasource
@@ -210,13 +209,13 @@ func (s *receiptStatements) SelectMaxReceiptID(
 
 	params := map[string]interface{}{
 		"@x1": s.getCollectionName(),
-		"@x2": s.db.cosmosConfig.TenantName,
 	}
 	var rows []receiptCosmosMaxNumber
-	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+	err = cosmosdbapi.PerformQuery(ctx,
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(),
 		s.selectMaxReceiptID, params, &rows)
 
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)

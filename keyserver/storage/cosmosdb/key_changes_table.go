@@ -65,10 +65,10 @@ type keyChangeCosmosData struct {
 // "SELECT user_id, MAX(offset) FROM keyserver_key_changes WHERE partition = $1 AND offset > $2 AND offset <= $3 GROUP BY user_id"
 const selectKeyChangesSQL = "" +
 	"select c.mx_keyserver_key_change.user_id as user_id, max(c.mx_keyserver_key_change._offset) as max_offset " +
-	"from c where c._sid = @x1 and c._cn = @x2 " +
-	"and c.mx_keyserver_key_change.partition = @x3 " +
-	"and c.mx_keyserver_key_change._offset > @x4 " +
-	"and c.mx_keyserver_key_change._offset < @x5 " +
+	"from c where c._cn = @x1 " +
+	"and c.mx_keyserver_key_change.partition = @x2 " +
+	"and c.mx_keyserver_key_change._offset > @x3 " +
+	"and c.mx_keyserver_key_change._offset < @x4 " +
 	"group by c.mx_keyserver_key_change.user_id "
 
 type keyChangesStatements struct {
@@ -161,18 +161,18 @@ func (s *keyChangesStatements) SelectKeyChanges(
 	// rows, err := s.selectKeyChangesStmt.QueryContext(ctx, partition, fromOffset, toOffset)
 
 	params := map[string]interface{}{
-		"@x1": s.db.cosmosConfig.TenantName,
-		"@x2": s.getCollectionName(),
-		"@x3": partition,
-		"@x4": fromOffset,
-		"@x5": toOffset,
+		"@x1": s.getCollectionName(),
+		"@x2": partition,
+		"@x3": fromOffset,
+		"@x4": toOffset,
 	}
 
 	var rows []keyChangeUserMaxCosmosData
-	err = cosmosdbapi.PerformQueryAllPartitions(ctx,
+	err = cosmosdbapi.PerformQuery(ctx,
 		s.db.connection,
 		s.db.cosmosConfig.DatabaseName,
 		s.db.cosmosConfig.ContainerName,
+		s.getPartitionKey(),
 		s.selectKeyChangesStmt, params, &rows)
 
 	if err != nil {
