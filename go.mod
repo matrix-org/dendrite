@@ -12,6 +12,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.11.0
 	github.com/gologme/log v1.2.0
+	github.com/google/go-cmp v0.5.5
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.1 // indirect
