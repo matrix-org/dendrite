@@ -18,19 +18,24 @@ import (
 	"net/http"
 	"strings"
 
-	userapi "github.com/matrix-org/dendrite/userapi/api"
-
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/mediaapi/storage"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// configResponse is the response to GET /_matrix/media/r0/config
+// https://matrix.org/docs/spec/client_server/latest#get-matrix-media-r0-config
+type configResponse struct {
+	UploadSize config.FileSizeBytes `json:"m.upload.size"`
+}
 
 // Setup registers the media API HTTP handlers
 //
@@ -58,7 +63,15 @@ func Setup(
 		},
 	)
 
+	configHandler := httputil.MakeAuthAPI("config", userAPI, func(request *http.Request, device *userapi.Device) util.JSONResponse {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: configResponse{UploadSize: *cfg.MaxFileSizeBytes},
+		}
+	})
+
 	r0mux.Handle("/upload", uploadHandler).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/config", configHandler).Methods(http.MethodGet, http.MethodOptions)
 	v1mux.Handle("/upload", uploadHandler).Methods(http.MethodPost, http.MethodOptions)
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
