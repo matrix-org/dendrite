@@ -1,4 +1,4 @@
-package routing
+package httputil
 
 import (
 	"net/http"
@@ -10,7 +10,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-type rateLimits struct {
+type RateLimits struct {
 	limits           map[string]chan struct{}
 	limitsMutex      sync.RWMutex
 	cleanMutex       sync.RWMutex
@@ -19,8 +19,8 @@ type rateLimits struct {
 	cooloffDuration  time.Duration
 }
 
-func newRateLimits(cfg *config.RateLimiting) *rateLimits {
-	l := &rateLimits{
+func NewRateLimits(cfg *config.RateLimiting) *RateLimits {
+	l := &RateLimits{
 		limits:           make(map[string]chan struct{}),
 		enabled:          cfg.Enabled,
 		requestThreshold: cfg.Threshold,
@@ -32,7 +32,7 @@ func newRateLimits(cfg *config.RateLimiting) *rateLimits {
 	return l
 }
 
-func (l *rateLimits) clean() {
+func (l *RateLimits) clean() {
 	for {
 		// On a 30 second interval, we'll take an exclusive write
 		// lock of the entire map and see if any of the channels are
@@ -52,7 +52,7 @@ func (l *rateLimits) clean() {
 	}
 }
 
-func (l *rateLimits) rateLimit(req *http.Request) *util.JSONResponse {
+func (l *RateLimits) Limit(req *http.Request) *util.JSONResponse {
 	// If rate limiting is disabled then do nothing.
 	if !l.enabled {
 		return nil
@@ -74,23 +74,23 @@ func (l *rateLimits) rateLimit(req *http.Request) *util.JSONResponse {
 
 	// Look up the caller's channel, if they have one.
 	l.limitsMutex.RLock()
-	rateLimit, ok := l.limits[caller]
+	RateLimit, ok := l.limits[caller]
 	l.limitsMutex.RUnlock()
 
 	// If the caller doesn't have a channel, create one and write it
 	// back to the map.
 	if !ok {
-		rateLimit = make(chan struct{}, l.requestThreshold)
+		RateLimit = make(chan struct{}, l.requestThreshold)
 
 		l.limitsMutex.Lock()
-		l.limits[caller] = rateLimit
+		l.limits[caller] = RateLimit
 		l.limitsMutex.Unlock()
 	}
 
 	// Check if the user has got free resource slots for this request.
 	// If they don't then we'll return an error.
 	select {
-	case rateLimit <- struct{}{}:
+	case RateLimit <- struct{}{}:
 	default:
 		// We hit the rate limit. Tell the client to back off.
 		return &util.JSONResponse{
@@ -103,7 +103,7 @@ func (l *rateLimits) rateLimit(req *http.Request) *util.JSONResponse {
 	// channel. This will free up space in the channel for new requests.
 	go func() {
 		<-time.After(l.cooloffDuration)
-		<-rateLimit
+		<-RateLimit
 	}()
 	return nil
 }

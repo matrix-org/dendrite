@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -45,10 +46,13 @@ type configResponse struct {
 func Setup(
 	publicAPIMux *mux.Router,
 	cfg *config.MediaAPI,
+	rateLimit *config.RateLimiting,
 	db storage.Database,
 	userAPI userapi.UserInternalAPI,
 	client *gomatrixserverlib.Client,
 ) {
+	rateLimits := httputil.NewRateLimits(rateLimit)
+
 	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
 	v1mux := publicAPIMux.PathPrefix("/v1").Subrouter()
 
@@ -59,11 +63,17 @@ func Setup(
 	uploadHandler := httputil.MakeAuthAPI(
 		"upload", userAPI,
 		func(req *http.Request, dev *userapi.Device) util.JSONResponse {
+			if r := rateLimits.Limit(req); r != nil {
+				return *r
+			}
 			return Upload(req, cfg, dev, db, activeThumbnailGeneration)
 		},
 	)
 
-	configHandler := httputil.MakeAuthAPI("config", userAPI, func(request *http.Request, device *userapi.Device) util.JSONResponse {
+	configHandler := httputil.MakeAuthAPI("config", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		if r := rateLimits.Limit(req); r != nil {
+			return *r
+		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: configResponse{UploadSize: *cfg.MaxFileSizeBytes},
@@ -78,20 +88,21 @@ func Setup(
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
 
-	downloadHandler := makeDownloadAPI("download", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration)
+	downloadHandler := makeDownloadAPI("download", cfg, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration)
 	r0mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
 	r0mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
 	v1mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)                // TODO: remove when synapse is fixed
 	v1mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions) // TODO: remove when synapse is fixed
 
 	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
-		makeDownloadAPI("thumbnail", cfg, db, client, activeRemoteRequests, activeThumbnailGeneration),
+		makeDownloadAPI("thumbnail", cfg, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration),
 	).Methods(http.MethodGet, http.MethodOptions)
 }
 
 func makeDownloadAPI(
 	name string,
 	cfg *config.MediaAPI,
+	rateLimits *httputil.RateLimits,
 	db storage.Database,
 	client *gomatrixserverlib.Client,
 	activeRemoteRequests *types.ActiveRemoteRequests,
@@ -111,6 +122,16 @@ func makeDownloadAPI(
 		util.SetCORSHeaders(w)
 		// Content-Type will be overridden in case of returning file data, else we respond with JSON-formatted errors
 		w.Header().Set("Content-Type", "application/json")
+
+		// Ratelimit requests
+		if r := rateLimits.Limit(req); r != nil {
+			rw := json.NewEncoder(w)
+			w.WriteHeader(http.StatusTooManyRequests)
+			if err := rw.Encode(r); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			return
+		}
 
 		vars, _ := httputil.URLDecodeMapValues(mux.Vars(req))
 		serverName := gomatrixserverlib.ServerName(vars["serverName"])
