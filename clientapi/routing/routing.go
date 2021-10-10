@@ -604,7 +604,7 @@ func Setup(
 
 	r0mux.Handle("/pushrules/{scope}/{kind}/{ruleID}",
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.rateLimit(req); r != nil {
+			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))

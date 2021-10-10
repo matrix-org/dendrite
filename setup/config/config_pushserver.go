@@ -6,6 +6,11 @@ type PushServer struct {
 	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 
 	Database DatabaseOptions `yaml:"database"`
+
+	// DisableTLSValidation disables the validation of X.509 TLS certs
+	// on remote Push gateway endpoints. This is not recommended in
+	// production!
+	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 }
 
 func (c *PushServer) Defaults() {

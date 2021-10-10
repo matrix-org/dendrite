@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/pushserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -172,6 +173,9 @@ func main() {
 		base, keyRing,
 	)
 
+	pgClient := base.Base.PushGatewayHTTPClient()
+	psAPI := pushserver.NewInternalAPI(&cfg.PushServer, base.Base.ProcessContext, pgClient, rsAPI, userAPI)
+
 	monolith := setup.Monolith{
 		Config:    base.Base.Cfg,
 		AccountDB: accountDB,
@@ -182,6 +186,7 @@ func main() {
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,
 		FederationAPI:          fsAPI,
+		PushserverAPI:          psAPI,
 		RoomserverAPI:          rsAPI,
 		UserAPI:                userAPI,
 		KeyAPI:                 keyAPI,

@@ -22,11 +22,11 @@ type PushserverInternalAPI struct {
 	Cfg          *config.PushServer
 	DB           storage.Database
 	userAPI      uapi.UserInternalAPI
-	syncProducer *producers.SyncAPIProducer
+	syncProducer *producers.SyncAPI
 }
 
 func NewPushserverAPI(
-	cfg *config.PushServer, pushserverDB storage.Database, userAPI uapi.UserInternalAPI, syncProducer *producers.SyncAPIProducer,
+	cfg *config.PushServer, pushserverDB storage.Database, userAPI uapi.UserInternalAPI, syncProducer *producers.SyncAPI,
 ) *PushserverInternalAPI {
 	a := &PushserverInternalAPI{
 		Cfg:          cfg,
