@@ -74,23 +74,23 @@ func (l *RateLimits) Limit(req *http.Request) *util.JSONResponse {
 
 	// Look up the caller's channel, if they have one.
 	l.limitsMutex.RLock()
-	RateLimit, ok := l.limits[caller]
+	rateLimit, ok := l.limits[caller]
 	l.limitsMutex.RUnlock()
 
 	// If the caller doesn't have a channel, create one and write it
 	// back to the map.
 	if !ok {
-		RateLimit = make(chan struct{}, l.requestThreshold)
+		rateLimit = make(chan struct{}, l.requestThreshold)
 
 		l.limitsMutex.Lock()
-		l.limits[caller] = RateLimit
+		l.limits[caller] = rateLimit
 		l.limitsMutex.Unlock()
 	}
 
 	// Check if the user has got free resource slots for this request.
 	// If they don't then we'll return an error.
 	select {
-	case RateLimit <- struct{}{}:
+	case rateLimit <- struct{}{}:
 	default:
 		// We hit the rate limit. Tell the client to back off.
 		return &util.JSONResponse{
@@ -103,7 +103,7 @@ func (l *RateLimits) Limit(req *http.Request) *util.JSONResponse {
 	// channel. This will free up space in the channel for new requests.
 	go func() {
 		<-time.After(l.cooloffDuration)
-		<-RateLimit
+		<-rateLimit
 	}()
 	return nil
 }
