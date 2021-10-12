@@ -125,11 +125,11 @@ func makeDownloadAPI(
 
 		// Ratelimit requests
 		if r := rateLimits.Limit(req); r != nil {
-			rw := json.NewEncoder(w)
-			w.WriteHeader(http.StatusTooManyRequests)
-			if err := rw.Encode(r); err != nil {
+			if err := json.NewEncoder(w).Encode(r); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
+			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
 
