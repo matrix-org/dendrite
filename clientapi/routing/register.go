@@ -121,9 +121,10 @@ var (
 // previous parameters with the ones supplied. This mean you cannot "build up" request params.
 type registerRequest struct {
 	// registration parameters
-	Password string `json:"password"`
-	Username string `json:"username"`
-	Admin    bool   `json:"admin"`
+	Password            string `json:"password"`
+	Username            string `json:"username"`
+	B64encodedPublicKey string `json:"b64PublicKey"`
+	Admin               bool   `json:"admin"`
 	// user-interactive auth params
 	Auth authDict `json:"auth"`
 
@@ -517,9 +518,10 @@ func Register(
 
 	logger := util.GetLogger(req.Context())
 	logger.WithFields(log.Fields{
-		"username":   r.Username,
-		"auth.type":  r.Auth.Type,
-		"session_id": r.Auth.Session,
+		"username":     r.Username,
+		"b64PublicKey": r.B64encodedPublicKey,
+		"auth.type":    r.Auth.Type,
+		"session_id":   r.Auth.Session,
 	}).Info("Processing registration request")
 
 	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
@@ -700,7 +702,7 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(),
+		req.Context(), userAPI, r.Username, "", "", appserviceID, req.RemoteAddr, req.UserAgent(),
 		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 	)
 }
@@ -719,7 +721,7 @@ func checkAndCompleteFlow(
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(),
+			req.Context(), userAPI, r.Username, r.Password, r.B64encodedPublicKey, "", req.RemoteAddr, req.UserAgent(),
 			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 		)
 	}
@@ -739,13 +741,7 @@ func checkAndCompleteFlow(
 // registerRequest, as this function serves requests encoded as both
 // registerRequests and legacyRegisterRequests, which share some attributes but
 // not all
-func completeRegistration(
-	ctx context.Context,
-	userAPI userapi.UserInternalAPI,
-	username, password, appserviceID, ipAddr, userAgent string,
-	inhibitLogin eventutil.WeakBoolean,
-	displayName, deviceID *string,
-) util.JSONResponse {
+func completeRegistration(ctx context.Context, userAPI userapi.UserInternalAPI, username, password, b64encodedPublicKey, appserviceID, ipAddr, userAgent string, inhibitLogin eventutil.WeakBoolean, displayName, deviceID *string) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -762,11 +758,12 @@ func completeRegistration(
 
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
-		AppServiceID: appserviceID,
-		Localpart:    username,
-		Password:     password,
-		AccountType:  userapi.AccountTypeUser,
-		OnConflict:   userapi.ConflictAbort,
+		AppServiceID:        appserviceID,
+		Localpart:           username,
+		Password:            password,
+		B64encodedPublicKey: b64encodedPublicKey,
+		AccountType:         userapi.AccountTypeUser,
+		OnConflict:          userapi.ConflictAbort,
 	}, &accRes)
 	if err != nil {
 		if _, ok := err.(*userapi.ErrorConflict); ok { // user already exists
@@ -963,5 +960,5 @@ func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedS
 		return *resErr
 	}
 	deviceID := "shared_secret_registration"
-	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID)
+	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID)
 }

@@ -17,14 +17,15 @@ package auth
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-
+	"fmt"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	"net/http"
+	"time"
 )
 
 // Type represents an auth type
@@ -43,7 +44,7 @@ type Type interface {
 	// "If the homeserver decides that an attempt on a stage was unsuccessful, but the
 	// client may make a second attempt, it returns the same HTTP status 401 response as above,
 	// with the addition of the standard errcode and error fields describing the error."
-	Login(ctx context.Context, req interface{}) (login *Login, errRes *util.JSONResponse)
+	Login(ctx context.Context, req interface{}, challenge string) (login *Login, errRes *util.JSONResponse)
 	// TODO: Extend to support Register() flow
 	// Register(ctx context.Context, sessionID string, req interface{})
 }
@@ -108,13 +109,18 @@ type UserInteractive struct {
 	// Map of login type to implementation
 	Types map[string]Type
 	// Map of session ID to completed login types, will need to be extended in future
-	Sessions map[string][]string
+	Sessions      map[string][]string
+	SessionParams map[string]map[string]string
 }
 
-func NewUserInteractive(getAccByPass GetAccountByPassword, cfg *config.ClientAPI) *UserInteractive {
+func NewUserInteractive(getAccByPass GetAccountByPassword, getAccByChallengeResponse GetAccountByChallengeResponse, cfg *config.ClientAPI) *UserInteractive {
 	typePassword := &LoginTypePassword{
 		GetAccountByPassword: getAccByPass,
 		Config:               cfg,
+	}
+	typeChallengeResponse := &LoginTypeChallengeResponse{
+		GetAccountByChallengeResponse: getAccByChallengeResponse,
+		Config:                        cfg,
 	}
 	// TODO: Add SSO login
 	return &UserInteractive{
@@ -123,11 +129,16 @@ func NewUserInteractive(getAccByPass GetAccountByPassword, cfg *config.ClientAPI
 			{
 				Stages: []string{typePassword.Name()},
 			},
+			{
+				Stages: []string{typeChallengeResponse.Name()},
+			},
 		},
 		Types: map[string]Type{
-			typePassword.Name(): typePassword,
+			typePassword.Name():          typePassword,
+			typeChallengeResponse.Name(): typeChallengeResponse,
 		},
-		Sessions: make(map[string][]string),
+		Sessions:      make(map[string][]string),
+		SessionParams: make(map[string]map[string]string),
 	}
 }
 
@@ -148,6 +159,9 @@ func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
 
 // Challenge returns an HTTP 401 with the supported flows for authenticating
 func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
+	params := make(map[string]string)
+	params["challenge"] = fmt.Sprintf("%d%s", time.Now().Unix(), sessionID)
+	u.SessionParams[sessionID] = params
 	return &util.JSONResponse{
 		Code: 401,
 		JSON: struct {
@@ -155,18 +169,18 @@ func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
 			Flows     []userInteractiveFlow `json:"flows"`
 			Session   string                `json:"session"`
 			// TODO: Return any additional `params`
-			Params map[string]interface{} `json:"params"`
+			Params map[string]string `json:"params"`
 		}{
 			u.Completed,
 			u.Flows,
 			sessionID,
-			make(map[string]interface{}),
+			params,
 		},
 	}
 }
 
 // NewSession returns a challenge with a new session ID and remembers the session ID
-func (u *UserInteractive) NewSession() *util.JSONResponse {
+func (u *UserInteractive) NewSession(authType string) *util.JSONResponse {
 	sessionID, err := GenerateAccessToken()
 	if err != nil {
 		logrus.WithError(err).Error("failed to generate session ID")
@@ -207,15 +221,16 @@ func (u *UserInteractive) ResponseWithChallenge(sessionID string, response inter
 func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) (*Login, *util.JSONResponse) {
 	// TODO: rate limit
 
+	// extract the type so we know which login type to use
+	authType := gjson.GetBytes(bodyBytes, "auth.type").Str
+
 	// "A client should first make a request with no auth parameter. The homeserver returns an HTTP 401 response, with a JSON body"
 	// https://matrix.org/docs/spec/client_server/r0.6.1#user-interactive-api-in-the-rest-api
 	hasResponse := gjson.GetBytes(bodyBytes, "auth").Exists()
 	if !hasResponse {
-		return nil, u.NewSession()
+		return nil, u.NewSession(authType)
 	}
 
-	// extract the type so we know which login type to use
-	authType := gjson.GetBytes(bodyBytes, "auth.type").Str
 	loginType, ok := u.Types[authType]
 	if !ok {
 		return nil, &util.JSONResponse{
@@ -237,13 +252,13 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	}
 
 	r := loginType.Request()
-	if err := json.Unmarshal([]byte(gjson.GetBytes(bodyBytes, "auth").Raw), r); err != nil {
+	if err := json.Unmarshal(bodyBytes, r); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
-	login, resErr := loginType.Login(ctx, r)
+	login, resErr := loginType.Login(ctx, r, u.SessionParams[sessionID]["challenge"])
 	if resErr == nil {
 		u.AddCompletedStage(sessionID, authType)
 		// TODO: Check if there's more stages to go and return an error

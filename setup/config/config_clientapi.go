@@ -12,6 +12,10 @@ type ClientAPI struct {
 	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
 
+	// What authentication mechanisms shall be supported
+	// by this server
+	LoginTypes []string `yaml:"login_types"`
+
 	// If set disables new users from registering (except via shared
 	// secrets)
 	RegistrationDisabled bool `yaml:"registration_disabled"`
@@ -45,6 +49,7 @@ func (c *ClientAPI) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7771"
 	c.InternalAPI.Connect = "http://localhost:7771"
 	c.ExternalAPI.Listen = "http://[::]:8071"
+	c.LoginTypes = []string{"m.login.password"}
 	c.RegistrationSharedSecret = ""
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""

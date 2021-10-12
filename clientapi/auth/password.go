@@ -47,7 +47,7 @@ func (t *LoginTypePassword) Request() interface{} {
 	return &PasswordRequest{}
 }
 
-func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
+func (t *LoginTypePassword) Login(ctx context.Context, req interface{}, challenge string) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
 	// Squash username to all lowercase letters
 	username := strings.ToLower(r.Username())

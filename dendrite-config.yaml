@@ -145,6 +145,11 @@ client_api:
   external_api:
     listen: http://[::]:8071
 
+  # Which of the authentication flows to support on this server
+  login_types:
+    - m.login.password
+    - m.login.challenge_response
+
   # Prevents new users from being able to register on this homeserver, except when
   # using the registration shared secret below.
   registration_disabled: false

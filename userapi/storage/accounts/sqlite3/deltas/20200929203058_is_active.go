@@ -23,6 +23,7 @@ CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
     created_ts BIGINT NOT NULL,
     password_hash TEXT,
+    b64_public_key TEXT,
     appservice_id TEXT,
     is_deactivated BOOLEAN DEFAULT 0
 );
@@ -47,6 +48,7 @@ CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
     created_ts BIGINT NOT NULL,
     password_hash TEXT,
+    b64_public_key TEXT,
     appservice_id TEXT
 );
 INSERT

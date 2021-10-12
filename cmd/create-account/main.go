@@ -16,6 +16,9 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io"
@@ -39,6 +42,8 @@ Example:
 
 	# provide password by parameter
   	%s --config dendrite.yaml -username alice -password foobarbaz
+	# auto generate keypair
+  	%s --config dendrite.yaml -username alice -password foobarbaz -udk NuJ7J4BsaE8QZT1ULNTc3s8ZjLFmDPh91l1i0Urf/ls=
 	# use password from file
   	%s --config dendrite.yaml -username alice -passwordfile my.pass
 	# ask user to provide password
@@ -52,17 +57,18 @@ Arguments:
 `
 
 var (
-	username = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
-	password = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
-	pwdFile  = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
-	pwdStdin = flag.Bool("passwordstdin", false, "Reads the password from stdin")
-	askPass  = flag.Bool("ask-pass", false, "Ask for the password to use")
+	username      = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
+	password      = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
+	createKeypair = flag.Bool("create-keypair", false, "Whether to create an Ed25519 keypair for the account to create (optional)")
+	pwdFile       = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
+	pwdStdin      = flag.Bool("passwordstdin", false, "Reads the password from stdin")
+	askPass       = flag.Bool("ask-pass", false, "Ask for the password to use")
 )
 
 func main() {
 	name := os.Args[0]
 	flag.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, usage, name, name, name, name, name, name)
+		_, _ = fmt.Fprintf(os.Stderr, usage, name, name, name, name, name, name, name)
 		flag.PrintDefaults()
 	}
 	cfg := setup.ParseFlags(true)
@@ -81,7 +87,32 @@ func main() {
 		logrus.Fatalln("Failed to connect to the database:", err.Error())
 	}
 
-	_, err = accountDB.CreateAccount(context.Background(), *username, pass, "")
+	var pub64 string
+	if *createKeypair {
+		pub, priv, err2 := ed25519.GenerateKey(rand.Reader)
+		pub64 = base64.StdEncoding.EncodeToString(priv.Public().(ed25519.PublicKey))
+		if err2 != nil {
+			logrus.Fatalln(err2)
+		}
+		err2 = os.WriteFile("private.key", priv, 0644)
+		if err2 != nil {
+			logrus.Fatalln(err2)
+		}
+		err2 = os.WriteFile("private.key.seed", priv.Seed(), 0644)
+		if err2 != nil {
+			logrus.Fatalln(err2)
+		}
+		err2 = os.WriteFile("./public.key", pub, 0644)
+		if err2 != nil {
+			logrus.Fatalln(err2)
+		}
+		err2 = os.WriteFile("./public.key.b64", []byte(pub64), 0644)
+		if err2 != nil {
+			logrus.Fatalln(err2)
+		}
+	}
+
+	_, err = accountDB.CreateAccount(context.Background(), *username, pass, pub64, "")
 	if err != nil {
 		logrus.Fatalln("Failed to create the account:", err.Error())
 	}

@@ -16,7 +16,9 @@ package sqlite3
 
 import (
 	"context"
+	"crypto/ed25519"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -125,6 +127,29 @@ func (d *Database) GetAccountByPassword(
 	return d.accounts.selectAccountByLocalpart(ctx, localpart)
 }
 
+// GetAccountByChallengeResponse returns the account associated with the given localpart and public key
+// if the given signature can be traced back to the public key.
+// Returns sql.ErrNoRows if no account exists which matches the given localpart.
+func (d *Database) GetAccountByChallengeResponse(ctx context.Context, localpart, b64encodedSignature, challenge string) (*api.Account, error) {
+	b64PubKey, err := d.accounts.selectb64PubKey(ctx, localpart)
+	if err != nil {
+		return nil, err
+	}
+	pubKey, err := base64.StdEncoding.DecodeString(b64PubKey)
+	if err != nil {
+		return nil, err
+	}
+	sig, err := base64.StdEncoding.DecodeString(b64encodedSignature)
+	if err != nil {
+		return nil, err
+	}
+	verified := ed25519.Verify(pubKey, []byte(challenge), sig)
+	if !verified {
+		return nil, errors.New("Authentication error: Invalid signature")
+	}
+	return d.accounts.selectAccountByLocalpart(ctx, localpart)
+}
+
 // GetProfileByLocalpart returns the profile associated with the given localpart.
 // Returns sql.ErrNoRows if no profile exists which matches the given localpart.
 func (d *Database) GetProfileByLocalpart(
@@ -191,7 +216,7 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, er
 			return err
 		}
 		localpart := strconv.FormatInt(numLocalpart, 10)
-		acc, err = d.createAccount(ctx, txn, localpart, "", "")
+		acc, err = d.createAccount(ctx, txn, localpart, "", "", "")
 		return err
 	})
 	return acc, err
@@ -200,9 +225,7 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, er
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, ErrUserExists.
-func (d *Database) CreateAccount(
-	ctx context.Context, localpart, plaintextPassword, appserviceID string,
-) (acc *api.Account, err error) {
+func (d *Database) CreateAccount(ctx context.Context, localpart, plaintextPassword, b64encodedPublicKey, appserviceID string) (acc *api.Account, err error) {
 	// Create one account at a time else we can get 'database is locked'.
 	d.profilesMu.Lock()
 	d.accountDatasMu.Lock()
@@ -211,7 +234,7 @@ func (d *Database) CreateAccount(
 	defer d.accountDatasMu.Unlock()
 	defer d.accountsMu.Unlock()
 	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
+		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, b64encodedPublicKey, appserviceID)
 		return err
 	})
 	return
@@ -219,9 +242,7 @@ func (d *Database) CreateAccount(
 
 // WARNING! This function assumes that the relevant mutexes have already
 // been taken out by the caller (e.g. CreateAccount or CreateGuestAccount).
-func (d *Database) createAccount(
-	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
-) (*api.Account, error) {
+func (d *Database) createAccount(ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, publicKey, appserviceID string) (*api.Account, error) {
 	var err error
 	var account *api.Account
 	// Generate a password hash if this is not a password-less user
@@ -232,7 +253,7 @@ func (d *Database) createAccount(
 			return nil, err
 		}
 	}
-	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID); err != nil {
+	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, publicKey, appserviceID); err != nil {
 		return nil, sqlutil.ErrUserExists
 	}
 	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {

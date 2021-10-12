@@ -48,7 +48,7 @@ func TestQueryProfile(t *testing.T) {
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
 	userAPI, accountDB := MustMakeInternalAPI(t)
-	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "")
+	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", "")
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
 	}

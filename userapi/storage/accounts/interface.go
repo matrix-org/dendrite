@@ -27,6 +27,7 @@ import (
 type Database interface {
 	internal.PartitionStorer
 	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
+	GetAccountByChallengeResponse(ctx context.Context, localpart, b64encodedSignature, challenge string) (*api.Account, error)
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
 	SetPassword(ctx context.Context, localpart string, plaintextPassword string) error
 	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
@@ -34,7 +35,7 @@ type Database interface {
 	// CreateAccount makes a new account with the given login name and password, and creates an empty profile
 	// for this account. If no password is supplied, the account will be a passwordless account. If the
 	// account already exists, it will return nil, ErrUserExists.
-	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*api.Account, error)
+	CreateAccount(ctx context.Context, localpart, plaintextPassword, b64encodedPublicKey, appserviceID string) (*api.Account, error)
 	CreateGuestAccount(ctx context.Context) (*api.Account, error)
 	SaveAccountData(ctx context.Context, localpart, roomID, dataType string, content json.RawMessage) error
 	GetAccountData(ctx context.Context, localpart string) (global map[string]json.RawMessage, rooms map[string]map[string]json.RawMessage, err error)

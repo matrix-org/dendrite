@@ -32,13 +32,21 @@ func getAccountByPassword(ctx context.Context, localpart, plaintextPassword stri
 	return acc, nil
 }
 
+func getAccountByChallengeResponse(ctx context.Context, localpart, b64encodedSignature, challenge string) (*api.Account, error) {
+	acc, ok := lookup[localpart+" "+b64encodedSignature+" "+challenge]
+	if !ok {
+		return nil, fmt.Errorf("unknown user/pubkey")
+	}
+	return acc, nil
+}
+
 func setup() *UserInteractive {
 	cfg := &config.ClientAPI{
 		Matrix: &config.Global{
 			ServerName: serverName,
 		},
 	}
-	return NewUserInteractive(getAccountByPassword, cfg)
+	return NewUserInteractive(getAccountByPassword, getAccountByChallengeResponse, cfg)
 }
 
 func TestUserInteractiveChallenge(t *testing.T) {

@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     created_ts BIGINT NOT NULL,
     -- The password hash for this account. Can be NULL if this is a passwordless account.
     password_hash TEXT,
+    -- The public key for this account, base64 encoded.
+    b64_public_key TEXT,
     -- Identifies which application service this account belongs to, if any.
     appservice_id TEXT,
     -- If the account is currently active
@@ -48,7 +50,7 @@ CREATE SEQUENCE IF NOT EXISTS numeric_username_seq START 1;
 `
 
 const insertAccountSQL = "" +
-	"INSERT INTO account_accounts(localpart, created_ts, password_hash, appservice_id) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO account_accounts(localpart, created_ts, password_hash, b64_public_key, appservice_id) VALUES ($1, $2, $3, $4)"
 
 const updatePasswordSQL = "" +
 	"UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
@@ -62,6 +64,9 @@ const selectAccountByLocalpartSQL = "" +
 const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = FALSE"
 
+const selectb64PubKeySQL = "" +
+	"SELECT b64_public_key FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
+
 const selectNewNumericLocalpartSQL = "" +
 	"SELECT nextval('numeric_username_seq')"
 
@@ -71,6 +76,7 @@ type accountsStatements struct {
 	deactivateAccountStmt         *sql.Stmt
 	selectAccountByLocalpartStmt  *sql.Stmt
 	selectPasswordHashStmt        *sql.Stmt
+	selectb64PubKeyStmt           *sql.Stmt
 	selectNewNumericLocalpartStmt *sql.Stmt
 	serverName                    gomatrixserverlib.ServerName
 }
@@ -88,6 +94,7 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 		{&s.deactivateAccountStmt, deactivateAccountSQL},
 		{&s.selectAccountByLocalpartStmt, selectAccountByLocalpartSQL},
 		{&s.selectPasswordHashStmt, selectPasswordHashSQL},
+		{&s.selectb64PubKeyStmt, selectb64PubKeySQL},
 		{&s.selectNewNumericLocalpartStmt, selectNewNumericLocalpartSQL},
 	}.Prepare(db)
 }
@@ -95,17 +102,15 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // insertAccount creates a new account. 'hash' should be the password hash for this account. If it is missing,
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
-func (s *accountsStatements) insertAccount(
-	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string,
-) (*api.Account, error) {
+func (s *accountsStatements) insertAccount(ctx context.Context, txn *sql.Tx, localpart, hash, b64PubKey, appserviceID string) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := sqlutil.TxStmt(txn, s.insertAccountStmt)
 
 	var err error
 	if appserviceID == "" {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil)
+		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, b64PubKey, nil)
 	} else {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID)
+		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil, appserviceID)
 	}
 	if err != nil {
 		return nil, err
@@ -137,6 +142,13 @@ func (s *accountsStatements) selectPasswordHash(
 	ctx context.Context, localpart string,
 ) (hash string, err error) {
 	err = s.selectPasswordHashStmt.QueryRowContext(ctx, localpart).Scan(&hash)
+	return
+}
+
+func (s *accountsStatements) selectb64PubKey(
+	ctx context.Context, localpart string,
+) (b64PubKey string, err error) {
+	err = s.selectb64PubKeyStmt.QueryRowContext(ctx, localpart).Scan(&b64PubKey)
 	return
 }
 

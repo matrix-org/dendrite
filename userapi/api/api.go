@@ -243,9 +243,10 @@ type PerformAccountCreationRequest struct {
 	AccountType AccountType // Required: whether this is a guest or user account
 	Localpart   string      // Required: The localpart for this account. Ignored if account type is guest.
 
-	AppServiceID string // optional: the application service ID (not user ID) creating this account, if any.
-	Password     string // optional: if missing then this account will be a passwordless account
-	OnConflict   Conflict
+	AppServiceID        string // optional: the application service ID (not user ID) creating this account, if any.
+	Password            string // optional: if missing then this account will be a passwordless account
+	B64encodedPublicKey string // optional: if missing then this account will not allow digital signature login until a public key is added
+	OnConflict          Conflict
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation

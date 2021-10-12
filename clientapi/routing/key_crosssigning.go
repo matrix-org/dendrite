@@ -67,7 +67,7 @@ func UploadCrossSigningDeviceKeys(
 		GetAccountByPassword: accountDB.GetAccountByPassword,
 		Config:               cfg,
 	}
-	if _, authErr := typePassword.Login(req.Context(), &uploadReq.Auth.PasswordRequest); authErr != nil {
+	if _, authErr := typePassword.Login(req.Context(), &uploadReq.Auth.PasswordRequest, ""); authErr != nil {
 		return *authErr
 	}
 	AddCompletedSessionStage(sessionID, authtypes.LoginTypePassword)

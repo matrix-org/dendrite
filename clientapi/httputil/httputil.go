@@ -15,7 +15,9 @@
 package httputil
 
 import (
+	"bytes"
 	"encoding/json"
+	"github.com/matrix-org/dendrite/clientapi/auth"
 	"io/ioutil"
 	"net/http"
 	"unicode/utf8"
@@ -53,4 +55,20 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 		}
 	}
 	return nil
+}
+
+func GetLoginType(req *http.Request) (string, *util.JSONResponse) {
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		resp := jsonerror.InternalServerError()
+		return "", &resp
+	}
+	req.Body = ioutil.NopCloser(bytes.NewReader(body))
+	r := &auth.Login{}
+	jsonErr := UnmarshalJSONRequest(req, r)
+	if jsonErr != nil {
+		return "", jsonErr
+	}
+	req.Body = ioutil.NopCloser(bytes.NewReader(body))
+	return r.Type, nil
 }

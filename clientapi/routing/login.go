@@ -16,6 +16,9 @@ package routing
 
 import (
 	"context"
+	"fmt"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -44,42 +47,70 @@ type flow struct {
 	Type string `json:"type"`
 }
 
-func passwordLogin() flows {
+func enabledLoginTypes(cfg *config.ClientAPI) flows {
 	f := flows{}
-	s := flow{
-		Type: "m.login.password",
+	for _, loginType := range cfg.LoginTypes {
+		s := flow{
+			Type: loginType,
+		}
+		f.Flows = append(f.Flows, s)
 	}
-	f.Flows = append(f.Flows, s)
 	return f
 }
 
 // Login implements GET and POST /login
 func Login(
 	req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
-	cfg *config.ClientAPI,
+	cfg *config.ClientAPI, userInteractiveAuth *auth.UserInteractive,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
-		// TODO: support other forms of login other than password, depending on config options
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: passwordLogin(),
+			JSON: enabledLoginTypes(cfg),
 		}
 	} else if req.Method == http.MethodPost {
-		typePassword := auth.LoginTypePassword{
-			GetAccountByPassword: accountDB.GetAccountByPassword,
-			Config:               cfg,
+		loginType, err := httputil.GetLoginType(req)
+		if err != nil {
+			return *err
 		}
-		r := typePassword.Request()
-		resErr := httputil.UnmarshalJSONRequest(req, r)
-		if resErr != nil {
-			return *resErr
+		switch loginType {
+		case authtypes.LoginTypePassword:
+			typePassword := auth.LoginTypePassword{
+				GetAccountByPassword: accountDB.GetAccountByPassword,
+				Config:               cfg,
+			}
+			r := typePassword.Request()
+			resErr := httputil.UnmarshalJSONRequest(req, r)
+			if resErr != nil {
+				return *resErr
+			}
+			login, authErr := typePassword.Login(req.Context(), r, "")
+			if authErr != nil {
+				return *authErr
+			}
+			// make a device/access token
+			return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		case authtypes.LoginTypeChallengeResponse:
+			defer req.Body.Close() // nolint:errcheck
+			bodyBytes, err := ioutil.ReadAll(req.Body)
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
+				}
+			}
+			login, resErr := userInteractiveAuth.Verify(req.Context(), bodyBytes, nil)
+			if resErr != nil {
+				return *resErr
+			}
+			// create a device/access token
+			return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		default:
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidParam(fmt.Sprintf("Unsupported login type: %s", loginType)),
+			}
 		}
-		login, authErr := typePassword.Login(req.Context(), r)
-		if authErr != nil {
-			return *authErr
-		}
-		// make a device/access token
-		return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
