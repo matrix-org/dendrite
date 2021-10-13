@@ -556,3 +556,4 @@ Fails to upload self-signing key without master key
 can fetch self-signing keys over federation
 Changing master key notifies local users
 Changing user-signing key notifies local users
+Inbound federation correctly handles soft failed events as extremities
