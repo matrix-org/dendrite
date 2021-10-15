@@ -560,3 +560,8 @@ can fetch self-signing keys over federation
 Changing master key notifies local users
 Changing user-signing key notifies local users
 Inbound federation correctly handles soft failed events as extremities
+Existing members see new members' presence
+Presence changes are reported to local room members
+Presence changes are also reported to remote room members
+Presence changes to UNAVAILABLE are reported to local room members
+Presence changes to UNAVAILABLE are reported to remote room members
