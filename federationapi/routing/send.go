@@ -352,7 +352,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	}
 
 	if c := len(results); c > 0 {
-		util.GetLogger(ctx).Infof("Processed %d PDUs from transaction %q", c, t.TransactionID)
+		util.GetLogger(ctx).Infof("Processed %d PDUs from %v in transaction %q", c, t.Origin, t.TransactionID)
 	}
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
@@ -737,7 +737,7 @@ withNextEvent:
 	}
 
 	if missing := len(missingAuthEvents); missing > 0 {
-		return fmt.Errorf("Event refers to %d auth_events which we failed to fetch", missing)
+		return fmt.Errorf("event refers to %d auth_events which we failed to fetch", missing)
 	}
 	return nil
 }
