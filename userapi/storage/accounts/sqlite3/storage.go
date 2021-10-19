@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -238,15 +239,12 @@ func (d *Database) createAccount(
 	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {
 		return nil, err
 	}
-	if err = d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(`{
-		"global": {
-			"content": [],
-			"override": [],
-			"room": [],
-			"sender": [],
-			"underride": []
-		}
-	}`)); err != nil {
+	pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, d.serverName)
+	prbs, err := json.Marshal(pushRuleSets)
+	if err != nil {
+		return nil, err
+	}
+	if err = d.accountDatas.insertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(prbs)); err != nil {
 		return nil, err
 	}
 	return account, nil
