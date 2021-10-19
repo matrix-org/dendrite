@@ -148,7 +148,7 @@ func main() {
 		eduInputAPI = base.EDUServerClient()
 	}
 
-	psAPI := pushserver.NewInternalAPI(&base.Cfg.PushServer, rsAPI)
+	psAPI := pushserver.NewInternalAPI(&base.Cfg.PushServer, rsAPI, userAPI)
 	if base.UseHTTPAPIs {
 		pushserver.AddInternalRoutes(base.InternalAPIMux, psAPI)
 		psAPI = base.PushServerHTTPClient()

@@ -41,4 +41,45 @@ func AddRoutes(r api.PushserverInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 
+	internalAPIMux.Handle(QueryPushRulesPath,
+		httputil.MakeInternalAPI("queryPushRules", func(req *http.Request) util.JSONResponse {
+			request := api.QueryPushRulesRequest{}
+			response := api.QueryPushRulesResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QueryPushRules(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+
+	internalAPIMux.Handle(PerformPusherDeletionPath,
+		httputil.MakeInternalAPI("performPusherDeletion", func(req *http.Request) util.JSONResponse {
+			request := api.PerformPushRulesPutRequest{}
+			response := struct{}{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.PerformPushRulesPut(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+
+	internalAPIMux.Handle(QueryPushRulesPath,
+		httputil.MakeInternalAPI("queryPushRules", func(req *http.Request) util.JSONResponse {
+			request := api.QueryPushRulesRequest{}
+			response := api.QueryPushRulesResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QueryPushRules(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

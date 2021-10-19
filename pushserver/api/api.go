@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -10,6 +11,9 @@ type PushserverInternalAPI interface {
 	PerformPusherSet(ctx context.Context, req *PerformPusherSetRequest, res *struct{}) error
 	PerformPusherDeletion(ctx context.Context, req *PerformPusherDeletionRequest, res *struct{}) error
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
+
+	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
+	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
 }
 
 type QueryPushersRequest struct {
@@ -51,3 +55,16 @@ const (
 	EmailKind PusherKind = "email"
 	HTTPKind  PusherKind = "http"
 )
+
+type PerformPushRulesPutRequest struct {
+	UserID   string                     `json:"user_id"`
+	RuleSets *pushrules.AccountRuleSets `json:"rule_sets"`
+}
+
+type QueryPushRulesRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type QueryPushRulesResponse struct {
+	RuleSets *pushrules.AccountRuleSets `json:"rule_sets"`
+}

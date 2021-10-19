@@ -68,3 +68,23 @@ func (h *httpPushserverInternalAPI) QueryPushers(ctx context.Context, req *api.Q
 	apiURL := h.pushserverURL + QueryPushersPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
+
+func (h *httpPushserverInternalAPI) PerformPushRulesPut(
+	ctx context.Context,
+	request *api.PerformPushRulesPutRequest,
+	response *struct{},
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPushRulesPut")
+	defer span.Finish()
+
+	apiURL := h.pushserverURL + PerformPushRulesPutPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpPushserverInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPushRulesRequest, res *api.QueryPushRulesResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPushRules")
+	defer span.Finish()
+
+	apiURL := h.pushserverURL + QueryPushRulesPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
