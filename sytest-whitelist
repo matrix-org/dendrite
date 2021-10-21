@@ -557,3 +557,11 @@ can fetch self-signing keys over federation
 Changing master key notifies local users
 Changing user-signing key notifies local users
 Inbound federation correctly handles soft failed events as extremities
+User can create and send/receive messages in a room with version 7
+local user can join room with version 7
+User can invite local user to room with version 7
+remote user can join room with version 7
+User can invite remote user to room with version 7
+Remote user can backfill in a room with version 7
+Can reject invites over federation for rooms with version 7
+Can receive redactions from regular users over federation in room version 7
