@@ -152,13 +152,13 @@ jon Joining room twice is idempotent
 syn New room members see their own join event
 v1s New room members see existing users' presence in room initialSync 
 syn Existing members see new members' join events
-syn,pre Existing members see new members' presence
+pre Existing members see new members' presence
 v1s All room members see all room members' presence in global initialSync 
 f,jon Remote users can join room by alias 
 syn New room members see their own join event 
 v1s New room members see existing members' presence in room initialSync 
 syn Existing members see new members' join events 
-syn,pre Existing members see new member's presence
+pre Existing members see new member's presence
 v1s New room members see first user's profile information in global initialSync
 v1s New room members see first user's profile information in per-room initialSync
 f,jon Remote users may not join unfederated rooms
@@ -351,8 +351,8 @@ syn Can sync a joined room
 syn Full state sync includes joined rooms
 syn Newly joined room is included in an incremental sync
 syn Newly joined room has correct timeline in incremental sync
-syn,pre Newly joined room includes presence in incremental sync
-syn,pre Get presence for newly joined members in incremental sync
+pre Newly joined room includes presence in incremental sync
+pre Get presence for newly joined members in incremental sync
 syn Can sync a room with a single message
 syn Can sync a room with a message with a transaction id
 syn A message sent after an initial sync appears in the timeline of an incremental sync.
@@ -362,9 +362,9 @@ syn A full_state incremental update returns only recent timeline
 syn A prev_batch token can be used in the v1 messages API
 syn A next_batch token can be used in the v1 messages API
 syn A prev_batch token from incremental sync can be used in the v1 messages API
-syn,pre User sees their own presence in a sync
-syn,pre User is offline if they set_presence=offline in their sync
-syn,pre User sees updates to presence from other users in the incremental sync.
+pre User sees their own presence in a sync
+pre User is offline if they set_presence=offline in their sync
+pre User sees updates to presence from other users in the incremental sync.
 syn State is included in the timeline in the initial sync 
 f,syn State from remote users is included in the state in the initial sync 
 syn Changes to state are included in an incremental sync
