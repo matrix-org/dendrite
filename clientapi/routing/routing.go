@@ -951,6 +951,12 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
+	unstableMux.Handle("/notifications",
+		httputil.MakeAuthAPI("get_notifications", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return GetNotifications(req, device, psAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	r0mux.Handle("/pushers",
 		httputil.MakeAuthAPI("get_pushers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetPushers(req, device, psAPI)

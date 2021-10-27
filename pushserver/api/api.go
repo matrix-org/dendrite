@@ -14,6 +14,8 @@ type PushserverInternalAPI interface {
 
 	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
 	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
+
+	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 }
 
 type QueryPushersRequest struct {
@@ -67,6 +69,18 @@ type QueryPushRulesRequest struct {
 
 type QueryPushRulesResponse struct {
 	RuleSets *pushrules.AccountRuleSets `json:"rule_sets"`
+}
+
+type QueryNotificationsRequest struct {
+	Localpart string `json:"localpart"` // Required.
+	From      string `json:"from,omitempty"`
+	Limit     int    `json:"limit,omitempty"`
+	Only      string `json:"only,omitempty"`
+}
+
+type QueryNotificationsResponse struct {
+	NextToken     string          `json:"next_token"`
+	Notifications []*Notification `json:"notifications"` // Required.
 }
 
 type Notification struct {

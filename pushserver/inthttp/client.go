@@ -41,6 +41,13 @@ func NewPushserverClient(
 	}, nil
 }
 
+func (h *httpPushserverInternalAPI) QueryNotifications(ctx context.Context, req *api.QueryNotificationsRequest, res *api.QueryNotificationsResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryNotifications")
+	defer span.Finish()
+
+	return httputil.PostJSON(ctx, span, h.httpClient, h.pushserverURL+QueryNotificationsPath, req, res)
+}
+
 func (h *httpPushserverInternalAPI) PerformPusherSet(
 	ctx context.Context,
 	request *api.PerformPusherSetRequest,

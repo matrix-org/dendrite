@@ -13,6 +13,19 @@ import (
 // AddRoutes adds the PushserverInternalAPI handlers to the http.ServeMux.
 // nolint: gocyclo
 func AddRoutes(r api.PushserverInternalAPI, internalAPIMux *mux.Router) {
+	internalAPIMux.Handle(QueryNotificationsPath,
+		httputil.MakeInternalAPI("queryNotifications", func(req *http.Request) util.JSONResponse {
+			var request api.QueryNotificationsRequest
+			var response api.QueryNotificationsResponse
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := r.QueryNotifications(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 
 	internalAPIMux.Handle(PerformPusherSetPath,
 		httputil.MakeInternalAPI("performPusherSet", func(req *http.Request) util.JSONResponse {

@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/pushserver/api"
 	"github.com/matrix-org/dendrite/pushserver/producers"
 	"github.com/matrix-org/dendrite/pushserver/storage"
+	"github.com/matrix-org/dendrite/pushserver/storage/tables"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -35,6 +37,38 @@ func NewPushserverAPI(
 		syncProducer: syncProducer,
 	}
 	return a
+}
+
+func (a *PushserverInternalAPI) QueryNotifications(ctx context.Context, req *api.QueryNotificationsRequest, res *api.QueryNotificationsResponse) error {
+	if req.Limit == 0 || req.Limit > 1000 {
+		req.Limit = 1000
+	}
+
+	var fromID int64
+	var err error
+	if req.From != "" {
+		fromID, err = strconv.ParseInt(req.From, 10, 64)
+		if err != nil {
+			return fmt.Errorf("QueryNotifications: parsing 'from': %w", err)
+		}
+	}
+	var filter storage.NotificationFilter = tables.AllNotifications
+	if req.Only == "highlight" {
+		filter = tables.HighlightNotifications
+	}
+	notifs, lastID, err := a.DB.GetNotifications(ctx, req.Localpart, fromID, req.Limit, filter)
+	if err != nil {
+		return err
+	}
+	if notifs == nil {
+		// This ensures empty is JSON-encoded as [] instead of null.
+		notifs = []*api.Notification{}
+	}
+	res.Notifications = notifs
+	if lastID >= 0 {
+		res.NextToken = strconv.FormatInt(lastID+1, 10)
+	}
+	return nil
 }
 
 func (a *PushserverInternalAPI) PerformPusherSet(ctx context.Context, req *api.PerformPusherSetRequest, res *struct{}) error {
