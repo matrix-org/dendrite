@@ -5,20 +5,60 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/pushserver/api"
 	"github.com/matrix-org/dendrite/pushserver/storage/tables"
 )
 
 type Database struct {
-	DB      *sql.DB
-	Writer  sqlutil.Writer
-	pushers tables.Pusher
+	DB            *sql.DB
+	Writer        sqlutil.Writer
+	notifications tables.Notifications
+	pushers       tables.Pusher
 }
 
 func (d *Database) Prepare() (err error) {
+	d.notifications, err = prepareNotificationsTable(d.DB)
+	if err != nil {
+		return
+	}
 	d.pushers, err = preparePushersTable(d.DB)
 	return
+}
+
+func (d *Database) InsertNotification(ctx context.Context, localpart, eventID string, tweaks map[string]interface{}, n *api.Notification) error {
+	return d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+		return d.notifications.Insert(ctx, localpart, eventID, pushrules.BoolTweakOr(tweaks, pushrules.HighlightTweak, false), n)
+	})
+}
+
+func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart, roomID, upToEventID string) (affected bool, err error) {
+	err = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+		affected, err = d.notifications.DeleteUpTo(ctx, localpart, roomID, upToEventID)
+		return err
+	})
+	return
+}
+
+func (d *Database) SetNotificationsRead(ctx context.Context, localpart, roomID, upToEventID string, b bool) (affected bool, err error) {
+	err = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+		affected, err = d.notifications.UpdateRead(ctx, localpart, roomID, upToEventID, b)
+		return err
+	})
+	return
+}
+
+func (d *Database) GetNotifications(ctx context.Context, localpart string, fromID int64, limit int, filter tables.NotificationFilter) ([]*api.Notification, int64, error) {
+	return d.notifications.Select(ctx, localpart, fromID, limit, filter)
+}
+
+func (d *Database) GetNotificationCount(ctx context.Context, localpart string, filter tables.NotificationFilter) (int64, error) {
+	return d.notifications.SelectCount(ctx, localpart, filter)
+}
+
+func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart, roomID string) (total int64, highlight int64, _ error) {
+	return d.notifications.SelectRoomCounts(ctx, localpart, roomID)
 }
 
 func (d *Database) CreatePusher(

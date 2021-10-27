@@ -68,3 +68,12 @@ type QueryPushRulesRequest struct {
 type QueryPushRulesResponse struct {
 	RuleSets *pushrules.AccountRuleSets `json:"rule_sets"`
 }
+
+type Notification struct {
+	Actions    []*pushrules.Action           `json:"actions"`     // Required.
+	Event      gomatrixserverlib.ClientEvent `json:"event"`       // Required.
+	ProfileTag string                        `json:"profile_tag"` // Required by Sytest, but actually optional.
+	Read       bool                          `json:"read"`        // Required.
+	RoomID     string                        `json:"room_id"`     // Required.
+	TS         gomatrixserverlib.Timestamp   `json:"ts"`          // Required.
+}
