@@ -49,7 +49,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
-	"github.com/matrix-org/pinecone/router"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 
@@ -92,7 +91,7 @@ func main() {
 	}
 
 	logger := log.New(os.Stdout, "", 0)
-	pRouter := pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
+	pRouter := pineconeRouter.NewRouter(logger, sk, false)
 
 	go func() {
 		listener, err := net.Listen("tcp", *instanceListen)
@@ -109,7 +108,7 @@ func main() {
 				continue
 			}
 
-			port, err := pRouter.AuthenticatedConnect(conn, "", pineconeRouter.PeerTypeRemote)
+			port, err := pRouter.AuthenticatedConnect(conn, "", pineconeRouter.PeerTypeRemote, true)
 			if err != nil {
 				logrus.WithError(err).Error("pSwitch.AuthenticatedConnect failed")
 				continue
@@ -125,7 +124,7 @@ func main() {
 
 	connectToStaticPeer := func() {
 		attempt := func() {
-			if pRouter.PeerCount(router.PeerTypeRemote) == 0 {
+			if pRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
 				uri := *instancePeer
 				if uri == "" {
 					return
@@ -211,6 +210,7 @@ func main() {
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
+		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
 	)
@@ -231,7 +231,7 @@ func main() {
 			return
 		}
 		conn := conn.WrapWebSocketConn(c)
-		if _, err = pRouter.AuthenticatedConnect(conn, "websocket", pineconeRouter.PeerTypeRemote); err != nil {
+		if _, err = pRouter.AuthenticatedConnect(conn, "websocket", pineconeRouter.PeerTypeRemote, true); err != nil {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
 	})

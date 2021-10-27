@@ -57,7 +57,7 @@ func Enable(
 ) error {
 	db, err := NewDatabase(&base.Cfg.MSCs.Database)
 	if err != nil {
-		return fmt.Errorf("Cannot enable MSC2946: %w", err)
+		return fmt.Errorf("cannot enable MSC2946: %w", err)
 	}
 	hooks.Enable()
 	hooks.Attach(hooks.KindNewEventPersisted, func(headeredEvent interface{}) {

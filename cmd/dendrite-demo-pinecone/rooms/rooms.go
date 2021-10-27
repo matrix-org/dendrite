@@ -50,11 +50,9 @@ func NewPineconeRoomProvider(
 }
 
 func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
-	known := p.r.KnownNodes()
-	//known = append(known, p.s.Sessions()...)
 	list := []gomatrixserverlib.ServerName{}
-	for _, k := range known {
-		list = append(list, gomatrixserverlib.ServerName(k.String()))
+	for _, k := range p.r.Peers() {
+		list = append(list, gomatrixserverlib.ServerName(k.PublicKey))
 	}
 	return bulkFetchPublicRoomsFromServers(context.Background(), p.fedClient, list)
 }

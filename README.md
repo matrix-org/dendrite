@@ -89,7 +89,7 @@ We are prioritising features that will benefit single-user homeservers first (e.
 than features that massive deployments may be interested in (User Directory, OpenID, Guests, Admin APIs, AS API).
 This means Dendrite supports amongst others:
  - Core room functionality (creating rooms, invites, auth rules)
- - Federation in rooms v1-v6
+ - Federation in rooms v1-v7
  - Backfilling locally and via federation
  - Accounts, Profiles and Devices
  - Published room lists
