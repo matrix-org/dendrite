@@ -183,7 +183,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
 		}
 	} else {
-		syncReq.Log.Debugln("Responding to sync immediately")
+		syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
 	}
 
 	if syncReq.Since.IsEmpty() {
@@ -205,6 +205,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				syncReq.Context, syncReq,
 			),
 			AccountDataPosition: rp.streams.AccountDataStreamProvider.CompleteSync(
+				syncReq.Context, syncReq,
+			),
+			NotificationDataPosition: rp.streams.NotificationDataStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
 			DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
@@ -237,6 +240,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			AccountDataPosition: rp.streams.AccountDataStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
 				syncReq.Since.AccountDataPosition, currentPos.AccountDataPosition,
+			),
+			NotificationDataPosition: rp.streams.NotificationDataStreamProvider.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.NotificationDataPosition, currentPos.NotificationDataPosition,
 			),
 			DeviceListPosition: rp.streams.DeviceListStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,

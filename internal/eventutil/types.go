@@ -30,6 +30,22 @@ type AccountData struct {
 	Type   string `json:"type"`
 }
 
+// NotificationData contains statistics about notifications, sent from
+// the Push Server to the Sync API server.
+type NotificationData struct {
+	// RoomID identifies the scope of the statistics, together with
+	// MXID (which is encoded in the Kafka key).
+	RoomID string `json:"room_id"`
+
+	// HighlightCount is the number of unread notifications with the
+	// highlight tweak.
+	UnreadHighlightCount int `json:"unread_highlight_count"`
+
+	// UnreadNotificationCount is the total number of unread
+	// notifications.
+	UnreadNotificationCount int `json:"unread_notification_count"`
+}
+
 // ProfileResponse is a struct containing all known user profile data
 type ProfileResponse struct {
 	AvatarURL   string `json:"avatar_url"`

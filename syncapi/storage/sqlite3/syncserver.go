@@ -100,6 +100,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	notificationData, err := NewSqliteNotificationDataTable(d.db)
+	if err != nil {
+		return err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -120,6 +124,7 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
 		Memberships:         memberships,
+		NotificationData:    notificationData,
 	}
 	return nil
 }

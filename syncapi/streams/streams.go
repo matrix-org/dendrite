@@ -12,13 +12,14 @@ import (
 )
 
 type Streams struct {
-	PDUStreamProvider          types.StreamProvider
-	TypingStreamProvider       types.StreamProvider
-	ReceiptStreamProvider      types.StreamProvider
-	InviteStreamProvider       types.StreamProvider
-	SendToDeviceStreamProvider types.StreamProvider
-	AccountDataStreamProvider  types.StreamProvider
-	DeviceListStreamProvider   types.PartitionedStreamProvider
+	PDUStreamProvider              types.StreamProvider
+	TypingStreamProvider           types.StreamProvider
+	ReceiptStreamProvider          types.StreamProvider
+	InviteStreamProvider           types.StreamProvider
+	SendToDeviceStreamProvider     types.StreamProvider
+	AccountDataStreamProvider      types.StreamProvider
+	NotificationDataStreamProvider types.StreamProvider
+	DeviceListStreamProvider       types.PartitionedStreamProvider
 }
 
 func NewSyncStreamProviders(
@@ -47,6 +48,9 @@ func NewSyncStreamProviders(
 			StreamProvider: StreamProvider{DB: d},
 			userAPI:        userAPI,
 		},
+		NotificationDataStreamProvider: &NotificationDataStreamProvider{
+			StreamProvider: StreamProvider{DB: d},
+		},
 		DeviceListStreamProvider: &DeviceListStreamProvider{
 			PartitionedStreamProvider: PartitionedStreamProvider{DB: d},
 			rsAPI:                     rsAPI,
@@ -60,6 +64,7 @@ func NewSyncStreamProviders(
 	streams.InviteStreamProvider.Setup()
 	streams.SendToDeviceStreamProvider.Setup()
 	streams.AccountDataStreamProvider.Setup()
+	streams.NotificationDataStreamProvider.Setup()
 	streams.DeviceListStreamProvider.Setup()
 
 	return streams
@@ -67,12 +72,13 @@ func NewSyncStreamProviders(
 
 func (s *Streams) Latest(ctx context.Context) types.StreamingToken {
 	return types.StreamingToken{
-		PDUPosition:          s.PDUStreamProvider.LatestPosition(ctx),
-		TypingPosition:       s.TypingStreamProvider.LatestPosition(ctx),
-		ReceiptPosition:      s.PDUStreamProvider.LatestPosition(ctx),
-		InvitePosition:       s.InviteStreamProvider.LatestPosition(ctx),
-		SendToDevicePosition: s.SendToDeviceStreamProvider.LatestPosition(ctx),
-		AccountDataPosition:  s.AccountDataStreamProvider.LatestPosition(ctx),
-		DeviceListPosition:   s.DeviceListStreamProvider.LatestPosition(ctx),
+		PDUPosition:              s.PDUStreamProvider.LatestPosition(ctx),
+		TypingPosition:           s.TypingStreamProvider.LatestPosition(ctx),
+		ReceiptPosition:          s.PDUStreamProvider.LatestPosition(ctx),
+		InvitePosition:           s.InviteStreamProvider.LatestPosition(ctx),
+		SendToDevicePosition:     s.SendToDeviceStreamProvider.LatestPosition(ctx),
+		AccountDataPosition:      s.AccountDataStreamProvider.LatestPosition(ctx),
+		NotificationDataPosition: s.NotificationDataStreamProvider.LatestPosition(ctx),
+		DeviceListPosition:       s.DeviceListStreamProvider.LatestPosition(ctx),
 	}
 }

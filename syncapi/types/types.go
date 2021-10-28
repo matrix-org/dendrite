@@ -118,13 +118,14 @@ const (
 )
 
 type StreamingToken struct {
-	PDUPosition          StreamPosition
-	TypingPosition       StreamPosition
-	ReceiptPosition      StreamPosition
-	SendToDevicePosition StreamPosition
-	InvitePosition       StreamPosition
-	AccountDataPosition  StreamPosition
-	DeviceListPosition   LogPosition
+	PDUPosition              StreamPosition
+	TypingPosition           StreamPosition
+	ReceiptPosition          StreamPosition
+	SendToDevicePosition     StreamPosition
+	InvitePosition           StreamPosition
+	AccountDataPosition      StreamPosition
+	NotificationDataPosition StreamPosition
+	DeviceListPosition       LogPosition
 }
 
 // This will be used as a fallback by json.Marshal.
@@ -140,10 +141,11 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
 		t.InvitePosition, t.AccountDataPosition,
+		t.NotificationDataPosition,
 	)
 	if dl := t.DeviceListPosition; !dl.IsEmpty() {
 		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
@@ -166,6 +168,8 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.AccountDataPosition > other.AccountDataPosition:
 		return true
+	case t.NotificationDataPosition > other.NotificationDataPosition:
+		return true
 	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
 		return true
 	}
@@ -173,7 +177,7 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition == 0 && t.DeviceListPosition.IsEmpty()
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.NotificationDataPosition == 0 && t.DeviceListPosition.IsEmpty()
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -207,6 +211,9 @@ func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	}
 	if other.AccountDataPosition > t.AccountDataPosition {
 		t.AccountDataPosition = other.AccountDataPosition
+	}
+	if other.NotificationDataPosition > t.NotificationDataPosition {
+		t.NotificationDataPosition = other.NotificationDataPosition
 	}
 	if other.DeviceListPosition.IsAfter(&t.DeviceListPosition) {
 		t.DeviceListPosition = other.DeviceListPosition
@@ -301,7 +308,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	}
 	categories := strings.Split(tok[1:], ".")
 	parts := strings.Split(categories[0], "_")
-	var positions [6]StreamPosition
+	var positions [7]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -314,12 +321,13 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		positions[i] = StreamPosition(pos)
 	}
 	token = StreamingToken{
-		PDUPosition:          positions[0],
-		TypingPosition:       positions[1],
-		ReceiptPosition:      positions[2],
-		SendToDevicePosition: positions[3],
-		InvitePosition:       positions[4],
-		AccountDataPosition:  positions[5],
+		PDUPosition:              positions[0],
+		TypingPosition:           positions[1],
+		ReceiptPosition:          positions[2],
+		SendToDevicePosition:     positions[3],
+		InvitePosition:           positions[4],
+		AccountDataPosition:      positions[5],
+		NotificationDataPosition: positions[6],
 	}
 	// dl-0-1234
 	// $log_name-$partition-$offset
@@ -430,6 +438,10 @@ type JoinResponse struct {
 	AccountData struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"account_data"`
+	UnreadNotifications struct {
+		HighlightCount    int `json:"highlight_count"`
+		NotificationCount int `json:"notification_count"`
+	} `json:"unread_notifications"`
 }
 
 // NewJoinResponse creates an empty response with initialised arrays.

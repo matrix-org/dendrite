@@ -48,6 +48,7 @@ type Database struct {
 	Filter              tables.Filter
 	Receipts            tables.Receipts
 	Memberships         tables.Memberships
+	NotificationData    tables.NotificationData
 }
 
 func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
@@ -98,6 +99,14 @@ func (d *Database) MaxStreamPositionForAccountData(ctx context.Context) (types.S
 	id, err := d.AccountData.SelectMaxAccountDataID(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("d.Invites.SelectMaxAccountDataID: %w", err)
+	}
+	return types.StreamPosition(id), nil
+}
+
+func (d *Database) MaxStreamPositionForNotificationData(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.NotificationData.SelectMaxID(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("d.NotificationData.SelectMaxID: %w", err)
 	}
 	return types.StreamPosition(id), nil
 }
@@ -954,4 +963,16 @@ func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId
 func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error) {
 	_, receipts, err := d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
 	return receipts, err
+}
+
+func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
+	err = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+		pos, err = d.NotificationData.UpsertRoomUnreadCounts(ctx, userID, roomID, notificationCount, highlightCount)
+		return err
+	})
+	return
+}
+
+func (d *Database) GetUserUnreadNotificationCounts(ctx context.Context, userID string, from, to types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
+	return d.NotificationData.SelectUserUnreadCounts(ctx, userID, from, to)
 }
