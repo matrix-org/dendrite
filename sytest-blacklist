@@ -1,51 +1,8 @@
-# Blacklisted due to flakiness
-Remote users can join room by alias
-
-# Blacklisted due to flakiness
-POST /login can log in as a user with just the local part of the id
-
-# Blacklisted due to flakiness
-avatar_url updates affect room member events
-
-# Blacklisted due to flakiness
-displayname updates affect room member events
-
-# Blacklisted due to flakiness
-Room members can override their displayname on a room-specific basis
-
-# Blacklisted due to flakiness
-Alias creators can delete alias with no ops
-
-# Blacklisted because matrix-org/dendrite#847 might have broken it but we're not
-# really sure and we need it pretty badly anyway
-Real non-joined users can get individual state for world_readable rooms after leaving
-
 # Blacklisted until matrix-org/dendrite#862 is reverted due to Riot bug
 Latest account data appears in v2 /sync
 
-# Blacklisted due to flakiness
-Outbound federation can backfill events
-
-# Blacklisted due to alias work on Synapse
-Alias creators can delete canonical alias with no ops
-
-# Blacklisted because we need to implement v2 invite endpoints for room versions
-# to be supported (currently fails with M_UNSUPPORTED_ROOM_VERSION) 
-Inbound federation rejects invites which are not signed by the sender
-
 # Blacklisted because we don't support ignores yet
 Ignore invite in incremental sync
-
-# Blacklisted because this test calls /r0/events which we don't implement
-New room members see their own join event
-Existing members see new members' join events
-
-# See https://github.com/matrix-org/sytest/pull/901
-Remote invited user can see room metadata
-
-# We don't implement soft-failed events yet, but because the /send response is vague,
-# this test thinks it's all fine...
-Inbound federation accepts a second soft-failed event
 
 # Relies on a rejected PL event which will never be accepted into the DAG
 # Caused by https://github.com/matrix-org/sytest/pull/911
@@ -60,13 +17,7 @@ Invited user can reject invite for empty room
 If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
 
 # Blacklisted due to flakiness
-A prev_batch token from incremental sync can be used in the v1 messages API
-
-# Blacklisted due to flakiness
 Forgotten room messages cannot be paginated
-
-# Blacklisted due to flakiness
-Can re-join room if re-invited
 
 # Blacklisted due to flakiness after #1774
 Local device key changes get to remote servers with correct prev_id
