@@ -136,7 +136,6 @@ query for user with no keys returns empty key dict
 Can claim one time key using POST
 Can claim remote one time key using POST
 Local device key changes appear in v2 /sync
-Local device key changes appear in /keys/changes
 New users appear in /keys/changes
 Local delete device changes appear in v2 /sync
 Local new device changes appear in v2 /sync
@@ -566,3 +565,7 @@ Remote user can backfill in a room with version 7
 Can reject invites over federation for rooms with version 7
 Can receive redactions from regular users over federation in room version 7
 Federation publicRoom Name/topic keys are correct
+Remote invited user can see room metadata
+Can re-join room if re-invited
+A prev_batch token from incremental sync can be used in the v1 messages API
+Inbound federation rejects invites which are not signed by the sender
