@@ -565,3 +565,4 @@ User can invite remote user to room with version 7
 Remote user can backfill in a room with version 7
 Can reject invites over federation for rooms with version 7
 Can receive redactions from regular users over federation in room version 7
+Federation publicRoom Name/topic keys are correct
