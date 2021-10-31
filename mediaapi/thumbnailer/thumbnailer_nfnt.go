@@ -27,6 +27,10 @@ import (
 
 	// Imported for png codec
 	_ "image/png"
+
+	// Imported for webp codec
+	_ "golang.org/x/image/webp"
+
 	"os"
 	"time"
 
