@@ -146,7 +146,7 @@ func main() {
 
 	accountDB := base.Base.CreateAccountsDB()
 	federation := createFederationClient(base)
-	keyAPI := keyserver.NewInternalAPI(&base.Base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(&base.Base, &base.Base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -197,6 +197,7 @@ func main() {
 		base.Base.PublicClientAPIMux,
 		base.Base.PublicFederationAPIMux,
 		base.Base.PublicKeyAPIMux,
+		base.Base.PublicWellKnownAPIMux,
 		base.Base.PublicMediaAPIMux,
 		base.Base.SynapseAdminMux,
 	)

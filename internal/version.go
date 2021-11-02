@@ -16,7 +16,7 @@ var build string
 
 const (
 	VersionMajor = 0
-	VersionMinor = 4
+	VersionMinor = 5
 	VersionPatch = 0
 	VersionTag   = "" // example: "rc1"
 )

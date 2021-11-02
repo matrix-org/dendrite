@@ -118,7 +118,7 @@ func (m *DendriteMonolith) Start() {
 		base, federation, rsAPI, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -155,6 +155,7 @@ func (m *DendriteMonolith) Start() {
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
+		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
 	)

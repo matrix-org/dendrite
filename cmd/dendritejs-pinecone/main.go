@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build wasm
 // +build wasm
 
 package main
@@ -155,7 +156,7 @@ func startup() {
 	pk := sk.Public().(ed25519.PublicKey)
 
 	logger := log.New(os.Stdout, "", 0)
-	pRouter := pineconeRouter.NewRouter(logger, "dendrite", sk, pk, nil)
+	pRouter := pineconeRouter.NewRouter(logger, sk, false)
 	pSessions := pineconeSessions.NewSessions(logger, pRouter)
 
 	cfg := &config.Dendrite{}
@@ -183,7 +184,7 @@ func startup() {
 
 	accountDB := base.CreateAccountsDB()
 	federation := conn.CreateFederationClient(base, pSessions)
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
@@ -220,6 +221,7 @@ func startup() {
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
+		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
 	)

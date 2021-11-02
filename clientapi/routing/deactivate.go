@@ -33,7 +33,7 @@ func Deactivate(
 		return *errRes
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', login.User)
+	localpart, _, err := gomatrixserverlib.SplitID('@', login.Username())
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()

@@ -306,7 +306,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			}
 			continue
 		}
-		if err = gomatrixserverlib.VerifyAllEventSignatures(ctx, []*gomatrixserverlib.Event{event}, t.keys); err != nil {
+		if err = event.VerifyEventSignatures(ctx, t.keys); err != nil {
 			util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
@@ -345,7 +345,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	}
 
 	if c := len(results); c > 0 {
-		util.GetLogger(ctx).Infof("Processed %d PDUs from transaction %q", c, t.TransactionID)
+		util.GetLogger(ctx).Infof("Processed %d PDUs from %v in transaction %q", c, t.Origin, t.TransactionID)
 	}
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
@@ -501,6 +501,22 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 						continue
 					}
 				}
+			}
+		case eduserverAPI.MSigningKeyUpdate:
+			var updatePayload eduserverAPI.CrossSigningKeyUpdate
+			if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
+				util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+					"user_id": updatePayload.UserID,
+				}).Error("Failed to send signing key update to edu server")
+				continue
+			}
+			inputReq := &eduserverAPI.InputCrossSigningKeyUpdateRequest{
+				CrossSigningKeyUpdate: updatePayload,
+			}
+			inputRes := &eduserverAPI.InputCrossSigningKeyUpdateResponse{}
+			if err := t.eduAPI.InputCrossSigningKeyUpdate(ctx, inputReq, inputRes); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal cross-signing update")
+				continue
 			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
@@ -695,7 +711,7 @@ withNextEvent:
 	}
 
 	if missing := len(missingAuthEvents); missing > 0 {
-		return fmt.Errorf("Event refers to %d auth_events which we failed to fetch", missing)
+		return fmt.Errorf("event refers to %d auth_events which we failed to fetch", missing)
 	}
 	return nil
 }
@@ -1342,7 +1358,7 @@ func (t *txnReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.
 		util.GetLogger(ctx).WithField("event_id", missingEventID).Warnf("Failed to get missing /event for event ID from %d server(s)", len(servers))
 		return nil, fmt.Errorf("wasn't able to find event via %d server(s)", len(servers))
 	}
-	if err := gomatrixserverlib.VerifyAllEventSignatures(ctx, []*gomatrixserverlib.Event{event}, t.keys); err != nil {
+	if err := event.VerifyEventSignatures(ctx, t.keys); err != nil {
 		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}

@@ -62,16 +62,11 @@ func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
 	if err != nil {
 		return
 	}
-	if s.insertAccountDataStmt, err = db.Prepare(insertAccountDataSQL); err != nil {
-		return
-	}
-	if s.selectAccountDataStmt, err = db.Prepare(selectAccountDataSQL); err != nil {
-		return
-	}
-	if s.selectAccountDataByTypeStmt, err = db.Prepare(selectAccountDataByTypeSQL); err != nil {
-		return
-	}
-	return
+	return sqlutil.StatementList{
+		{&s.insertAccountDataStmt, insertAccountDataSQL},
+		{&s.selectAccountDataStmt, selectAccountDataSQL},
+		{&s.selectAccountDataByTypeStmt, selectAccountDataByTypeSQL},
+	}.Prepare(db)
 }
 
 func (s *accountDataStatements) insertAccountData(

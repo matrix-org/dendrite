@@ -106,34 +106,6 @@ func SetupStdLogging() {
 	})
 }
 
-// SetupHookLogging configures the logging hooks defined in the configuration.
-// If something fails here it means that the logging was improperly configured,
-// so we just exit with the error
-func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
-	logrus.SetReportCaller(true)
-	for _, hook := range hooks {
-		// Check we received a proper logging level
-		level, err := logrus.ParseLevel(hook.Level)
-		if err != nil {
-			logrus.Fatalf("Unrecognised logging level %s: %q", hook.Level, err)
-		}
-
-		// Perform a first filter on the logs according to the lowest level of all
-		// (Eg: If we have hook for info and above, prevent logrus from processing debug logs)
-		if logrus.GetLevel() < level {
-			logrus.SetLevel(level)
-		}
-
-		switch hook.Type {
-		case "file":
-			checkFileHookParams(hook.Params)
-			setupFileHook(hook, level, componentName)
-		default:
-			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
-		}
-	}
-}
-
 // File type hooks should be provided a path to a directory to store log files
 func checkFileHookParams(params map[string]interface{}) {
 	path, ok := params["path"]

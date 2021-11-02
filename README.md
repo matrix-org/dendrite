@@ -31,7 +31,7 @@ If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or j
 
 ## Requirements
 
-To build Dendrite, you will need Go 1.13 or later. 
+To build Dendrite, you will need Go 1.15 or later. 
 
 For a usable federating Dendrite deployment, you will also need:
 - A domain name (or subdomain) 
@@ -89,7 +89,7 @@ We are prioritising features that will benefit single-user homeservers first (e.
 than features that massive deployments may be interested in (User Directory, OpenID, Guests, Admin APIs, AS API).
 This means Dendrite supports amongst others:
  - Core room functionality (creating rooms, invites, auth rules)
- - Federation in rooms v1-v6
+ - Federation in rooms v1-v7
  - Backfilling locally and via federation
  - Accounts, Profiles and Devices
  - Published room lists

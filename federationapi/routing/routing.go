@@ -30,6 +30,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -41,7 +42,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	fedMux, keyMux *mux.Router,
+	fedMux, keyMux, wkMux *mux.Router,
 	cfg *config.FederationAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
@@ -84,6 +85,21 @@ func Setup(
 		}
 		return NotaryKeys(req, cfg, fsAPI, pkReq)
 	})
+
+	if cfg.Matrix.WellKnownServerName != "" {
+		logrus.Infof("Setting m.server as %s at /.well-known/matrix/server", cfg.Matrix.WellKnownServerName)
+		wkMux.Handle("/server", httputil.MakeExternalAPI("wellknown", func(req *http.Request) util.JSONResponse {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: struct {
+					ServerName string `json:"m.server"`
+				}{
+					ServerName: cfg.Matrix.WellKnownServerName,
+				},
+			}
+		}),
+		).Methods(http.MethodGet, http.MethodOptions)
+	}
 
 	// Ignore the {keyID} argument as we only have a single server key so we always
 	// return that key.
@@ -449,7 +465,7 @@ func Setup(
 		httputil.MakeExternalAPI("federation_public_rooms", func(req *http.Request) util.JSONResponse {
 			return GetPostPublicRooms(req, rsAPI)
 		}),
-	).Methods(http.MethodGet)
+	).Methods(http.MethodGet, http.MethodPost)
 
 	v1fedmux.Handle("/user/keys/claim", httputil.MakeFedAPI(
 		"federation_keys_claim", cfg.Matrix.ServerName, keys, wakeup,

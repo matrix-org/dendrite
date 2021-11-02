@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build wasm
 // +build wasm
 
 package main
@@ -191,7 +192,7 @@ func main() {
 
 	accountDB := base.CreateAccountsDB()
 	federation := createFederationClient(cfg, node)
-	keyAPI := keyserver.NewInternalAPI(&base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 

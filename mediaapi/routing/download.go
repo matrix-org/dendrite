@@ -737,7 +737,7 @@ func (r *downloadRequest) fetchRemoteFile(
 		return "", false, parseErr
 	}
 
-	if contentLength > int64(maxFileSizeBytes) {
+	if maxFileSizeBytes > 0 && contentLength > int64(maxFileSizeBytes) {
 		// TODO: Bubble up this as a 413
 		return "", false, fmt.Errorf("remote file is too large (%v > %v bytes)", contentLength, maxFileSizeBytes)
 	}

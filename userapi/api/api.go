@@ -33,6 +33,8 @@ type UserInternalAPI interface {
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
+	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse)
+	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
@@ -40,6 +42,84 @@ type UserInternalAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
+}
+
+type PerformKeyBackupRequest struct {
+	UserID       string
+	Version      string // optional if modifying a key backup
+	AuthData     json.RawMessage
+	Algorithm    string
+	DeleteBackup bool // if true will delete the backup based on 'Version'.
+
+	// The keys to upload, if any. If blank, creates/updates/deletes key version metadata only.
+	Keys struct {
+		Rooms map[string]struct {
+			Sessions map[string]KeyBackupSession `json:"sessions"`
+		} `json:"rooms"`
+	}
+}
+
+// KeyBackupData in https://spec.matrix.org/unstable/client-server-api/#get_matrixclientr0room_keyskeysroomidsessionid
+type KeyBackupSession struct {
+	FirstMessageIndex int             `json:"first_message_index"`
+	ForwardedCount    int             `json:"forwarded_count"`
+	IsVerified        bool            `json:"is_verified"`
+	SessionData       json.RawMessage `json:"session_data"`
+}
+
+func (a *KeyBackupSession) ShouldReplaceRoomKey(newKey *KeyBackupSession) bool {
+	// https://spec.matrix.org/unstable/client-server-api/#backup-algorithm-mmegolm_backupv1curve25519-aes-sha2
+	// "if the keys have different values for is_verified, then it will keep the key that has is_verified set to true"
+	if newKey.IsVerified && !a.IsVerified {
+		return true
+	} else if newKey.FirstMessageIndex < a.FirstMessageIndex {
+		// "if they have the same values for is_verified, then it will keep the key with a lower first_message_index"
+		return true
+	} else if newKey.ForwardedCount < a.ForwardedCount {
+		// "and finally, is is_verified and first_message_index are equal, then it will keep the key with a lower forwarded_count"
+		return true
+	}
+	return false
+}
+
+// Internal KeyBackupData for passing to/from the storage layer
+type InternalKeyBackupSession struct {
+	KeyBackupSession
+	RoomID    string
+	SessionID string
+}
+
+type PerformKeyBackupResponse struct {
+	Error    string // set if there was a problem performing the request
+	BadInput bool   // if set, the Error was due to bad input (HTTP 400)
+
+	Exists  bool   // set to true if the Version exists
+	Version string // the newly created version
+
+	KeyCount int64  // only set if Keys were given in the request
+	KeyETag  string // only set if Keys were given in the request
+}
+
+type QueryKeyBackupRequest struct {
+	UserID  string
+	Version string // the version to query, if blank it means the latest
+
+	ReturnKeys       bool   // whether to return keys in the backup response or just the metadata
+	KeysForRoomID    string // optional string to return keys which belong to this room
+	KeysForSessionID string // optional string to return keys which belong to this (room, session)
+}
+
+type QueryKeyBackupResponse struct {
+	Error  string
+	Exists bool
+
+	Algorithm string          `json:"algorithm"`
+	AuthData  json.RawMessage `json:"auth_data"`
+	Count     int64           `json:"count"`
+	ETag      string          `json:"etag"`
+	Version   string          `json:"version"`
+
+	Keys map[string]map[string]KeyBackupSession // the keys if ReturnKeys=true
 }
 
 // InputAccountDataRequest is the request for InputAccountData

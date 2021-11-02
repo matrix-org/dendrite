@@ -36,7 +36,9 @@ const (
 	PerformDeviceUpdatePath        = "/userapi/performDeviceUpdate"
 	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
 	PerformOpenIDTokenCreationPath = "/userapi/performOpenIDTokenCreation"
+	PerformKeyBackupPath           = "/userapi/performKeyBackup"
 
+	QueryKeyBackupPath      = "/userapi/queryKeyBackup"
 	QueryProfilePath        = "/userapi/queryProfile"
 	QueryAccessTokenPath    = "/userapi/queryAccessToken"
 	QueryDevicesPath        = "/userapi/queryDevices"
@@ -224,4 +226,25 @@ func (h *httpUserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.Que
 
 	apiURL := h.apiURL + QueryOpenIDTokenPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformKeyBackup")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformKeyBackupPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = err.Error()
+	}
+}
+func (h *httpUserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryKeyBackupPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = err.Error()
+	}
 }
