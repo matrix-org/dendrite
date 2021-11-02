@@ -177,10 +177,10 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 		DeviceKeys: deviceKeys,
 	}, &uploadRes)
 	if uploadRes.Error != nil {
-		return fmt.Errorf("Failed to delete device keys: %v", uploadRes.Error)
+		return fmt.Errorf("failed to delete device keys: %v", uploadRes.Error)
 	}
 	if len(uploadRes.KeyErrors) > 0 {
-		return fmt.Errorf("Failed to delete device keys, key errors: %+v", uploadRes.KeyErrors)
+		return fmt.Errorf("failed to delete device keys, key errors: %+v", uploadRes.KeyErrors)
 	}
 	return nil
 }
@@ -242,10 +242,10 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 			OnlyDisplayNameUpdates: true,
 		}, &uploadRes)
 		if uploadRes.Error != nil {
-			return fmt.Errorf("Failed to update device key display name: %v", uploadRes.Error)
+			return fmt.Errorf("failed to update device key display name: %v", uploadRes.Error)
 		}
 		if len(uploadRes.KeyErrors) > 0 {
-			return fmt.Errorf("Failed to update device key display name, key errors: %+v", uploadRes.KeyErrors)
+			return fmt.Errorf("failed to update device key display name, key errors: %+v", uploadRes.KeyErrors)
 		}
 	}
 	return nil

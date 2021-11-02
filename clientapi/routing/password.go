@@ -9,7 +9,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -29,7 +28,7 @@ type newPasswordAuth struct {
 
 func Password(
 	req *http.Request,
-	userAPI userapi.UserInternalAPI,
+	userAPI api.UserInternalAPI,
 	accountDB accounts.Database,
 	device *api.Device,
 	cfg *config.ClientAPI,
@@ -90,11 +89,11 @@ func Password(
 	}
 
 	// Ask the user API to perform the password change.
-	passwordReq := &userapi.PerformPasswordUpdateRequest{
+	passwordReq := &api.PerformPasswordUpdateRequest{
 		Localpart: localpart,
 		Password:  r.NewPassword,
 	}
-	passwordRes := &userapi.PerformPasswordUpdateResponse{}
+	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
 		return jsonerror.InternalServerError()
@@ -107,12 +106,12 @@ func Password(
 	// If the request asks us to log out all other devices then
 	// ask the user API to do that.
 	if r.LogoutDevices {
-		logoutReq := &userapi.PerformDeviceDeletionRequest{
+		logoutReq := &api.PerformDeviceDeletionRequest{
 			UserID:         device.UserID,
 			DeviceIDs:      nil,
 			ExceptDeviceID: device.ID,
 		}
-		logoutRes := &userapi.PerformDeviceDeletionResponse{}
+		logoutRes := &api.PerformDeviceDeletionResponse{}
 		if err := userAPI.PerformDeviceDeletion(req.Context(), logoutReq, logoutRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 			return jsonerror.InternalServerError()

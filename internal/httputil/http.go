@@ -77,9 +77,9 @@ func PostJSON(
 			return nil
 		}
 		if msgerr := json.NewDecoder(res.Body).Decode(&errorBody); msgerr == nil {
-			return fmt.Errorf("Internal API: %d from %s: %s", res.StatusCode, apiURL, errorBody.Message)
+			return fmt.Errorf("internal API: %d from %s: %s", res.StatusCode, apiURL, errorBody.Message)
 		}
-		return fmt.Errorf("Internal API: %d from %s", res.StatusCode, apiURL)
+		return fmt.Errorf("internal API: %d from %s", res.StatusCode, apiURL)
 	}
 	return json.NewDecoder(res.Body).Decode(response)
 }
