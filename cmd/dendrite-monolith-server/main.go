@@ -109,22 +109,15 @@ func main() {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationSenderHTTPClient()
 	}
-	// The underlying roomserver implementation needs to be able to call the fedsender.
-	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsImpl.SetFederationSenderAPI(fsAPI)
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
-
-	// The appservice might try to create a new service account on startup, which will fail if running in httpapi mode
-	// since there won't be an userapi endpoint yet, so move this before switching to httpapi mode.
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyImpl
 	if base.UseHTTPAPIs {
-		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
-		asAPI = base.AppserviceHTTPClient()
+		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI)
+		keyAPI = base.KeyServerHTTPClient()
 	}
-	rsAPI.SetAppserviceAPI(asAPI)
 
+	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	if base.UseHTTPAPIs {
 		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
 		userAPI = base.UserAPIClient()
@@ -134,13 +127,19 @@ func main() {
 			Impl: userAPI,
 		}
 	}
-	keyAPI.SetUserAPI(userAPI)
 
-	// needs to be after the SetUserAPI call above
+	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	if base.UseHTTPAPIs {
-		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI)
-		keyAPI = base.KeyServerHTTPClient()
+		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
+		asAPI = base.AppserviceHTTPClient()
 	}
+
+	// The underlying roomserver implementation needs to be able to call the fedsender.
+	// This is different to rsAPI which can be the http client which doesn't need this
+	// dependency. Other components also need updating after their dependencies are up.
+	rsImpl.SetFederationSenderAPI(fsAPI)
+	rsImpl.SetAppserviceAPI(asAPI)
+	keyImpl.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,
