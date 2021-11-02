@@ -91,7 +91,7 @@ func main() {
 	}
 
 	logger := log.New(os.Stdout, "", 0)
-	pRouter := pineconeRouter.NewRouter(logger, sk, "dendrite", nil)
+	pRouter := pineconeRouter.NewRouter(logger, sk, false)
 
 	go func() {
 		listener, err := net.Listen("tcp", *instanceListen)
@@ -108,7 +108,7 @@ func main() {
 				continue
 			}
 
-			port, err := pRouter.AuthenticatedConnect(conn, "", pineconeRouter.PeerTypeRemote)
+			port, err := pRouter.AuthenticatedConnect(conn, "", pineconeRouter.PeerTypeRemote, true)
 			if err != nil {
 				logrus.WithError(err).Error("pSwitch.AuthenticatedConnect failed")
 				continue
@@ -231,7 +231,7 @@ func main() {
 			return
 		}
 		conn := conn.WrapWebSocketConn(c)
-		if _, err = pRouter.AuthenticatedConnect(conn, "websocket", pineconeRouter.PeerTypeRemote); err != nil {
+		if _, err = pRouter.AuthenticatedConnect(conn, "websocket", pineconeRouter.PeerTypeRemote, true); err != nil {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
 	})

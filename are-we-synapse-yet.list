@@ -152,219 +152,219 @@ jon Joining room twice is idempotent
 syn New room members see their own join event
 v1s New room members see existing users' presence in room initialSync 
 syn Existing members see new members' join events
-syn Existing members see new members' presence 
+pre Existing members see new members' presence
 v1s All room members see all room members' presence in global initialSync 
 f,jon Remote users can join room by alias 
 syn New room members see their own join event 
 v1s New room members see existing members' presence in room initialSync 
 syn Existing members see new members' join events 
-syn Existing members see new member's presence 
-v1s New room members see first user's profile information in global initialSync 
-v1s New room members see first user's profile information in per-room initialSync 
-f,jon Remote users may not join unfederated rooms 
+pre Existing members see new member's presence
+v1s New room members see first user's profile information in global initialSync
+v1s New room members see first user's profile information in per-room initialSync
+f,jon Remote users may not join unfederated rooms
 syn Local room members see posted message events
 v1s Fetching eventstream a second time doesn't yield the message again
 syn Local non-members don't see posted message events
-get Local room members can get room messages 
+get Local room members can get room messages
 f,syn Remote room members also see posted message events
-f,get Remote room members can get room messages 
+f,get Remote room members can get room messages
 get Message history can be paginated
 f,get Message history can be paginated over federation
-eph Ephemeral messages received from clients are correctly expired 
+eph Ephemeral messages received from clients are correctly expired
 ali Room aliases can contain Unicode
 f,ali Remote room alias queries can handle Unicode
-ali Canonical alias can be set 
-ali Canonical alias can include alt_aliases 
+ali Canonical alias can be set
+ali Canonical alias can include alt_aliases
 ali Regular users can add and delete aliases in the default room configuration
 ali Regular users can add and delete aliases when m.room.aliases is restricted
 ali Deleting a non-existent alias should return a 404
 ali Users can't delete other's aliases
-ali Users with sufficient power-level can delete other's aliases 
-ali Can delete canonical alias 
-ali Alias creators can delete alias with no ops 
-ali Alias creators can delete canonical alias with no ops 
-msc Only room members can list aliases of a room 
-inv Can invite users to invite-only rooms 
-inv Uninvited users cannot join the room 
-inv Invited user can reject invite 
-f,inv Invited user can reject invite over federation 
-f,inv Invited user can reject invite over federation several times 
-inv Invited user can reject invite for empty room 
-f,inv Invited user can reject invite over federation for empty room 
-inv Invited user can reject local invite after originator leaves 
-inv Invited user can see room metadata 
-f,inv Remote invited user can see room metadata 
-inv Users cannot invite themselves to a room 
-inv Users cannot invite a user that is already in the room 
-ban Banned user is kicked and may not rejoin until unbanned 
-f,ban Remote banned user is kicked and may not rejoin until unbanned 
-ban 'ban' event respects room powerlevel 
-plv setting 'm.room.name' respects room powerlevel 
+ali Users with sufficient power-level can delete other's aliases
+ali Can delete canonical alias
+ali Alias creators can delete alias with no ops
+ali Alias creators can delete canonical alias with no ops
+msc Only room members can list aliases of a room
+inv Can invite users to invite-only rooms
+inv Uninvited users cannot join the room
+inv Invited user can reject invite
+f,inv Invited user can reject invite over federation
+f,inv Invited user can reject invite over federation several times
+inv Invited user can reject invite for empty room
+f,inv Invited user can reject invite over federation for empty room
+inv Invited user can reject local invite after originator leaves
+inv Invited user can see room metadata
+f,inv Remote invited user can see room metadata
+inv Users cannot invite themselves to a room
+inv Users cannot invite a user that is already in the room
+ban Banned user is kicked and may not rejoin until unbanned
+f,ban Remote banned user is kicked and may not rejoin until unbanned
+ban 'ban' event respects room powerlevel
+plv setting 'm.room.name' respects room powerlevel
 plv setting 'm.room.power_levels' respects room powerlevel (2 subtests)
 plv Unprivileged users can set m.room.topic if it only needs level 0
 plv Users cannot set ban powerlevel higher than their own (2 subtests)
 plv Users cannot set kick powerlevel higher than their own (2 subtests)
 plv Users cannot set redact powerlevel higher than their own (2 subtests)
-v1s Check that event streams started after a client joined a room work (SYT-1) 
-v1s Event stream catches up fully after many messages 
-xxx POST /rooms/:room_id/redact/:event_id as power user redacts message 
-xxx POST /rooms/:room_id/redact/:event_id as original message sender redacts message 
-xxx POST /rooms/:room_id/redact/:event_id as random user does not redact message 
-xxx POST /redact disallows redaction of event in different room 
-xxx Redaction of a redaction redacts the redaction reason 
-v1s A departed room is still included in /initialSync (SPEC-216) 
-v1s Can get rooms/{roomId}/initialSync for a departed room (SPEC-216) 
-rst Can get rooms/{roomId}/state for a departed room (SPEC-216) 
+v1s Check that event streams started after a client joined a room work (SYT-1)
+v1s Event stream catches up fully after many messages
+xxx POST /rooms/:room_id/redact/:event_id as power user redacts message
+xxx POST /rooms/:room_id/redact/:event_id as original message sender redacts message
+xxx POST /rooms/:room_id/redact/:event_id as random user does not redact message
+xxx POST /redact disallows redaction of event in different room
+xxx Redaction of a redaction redacts the redaction reason
+v1s A departed room is still included in /initialSync (SPEC-216)
+v1s Can get rooms/{roomId}/initialSync for a departed room (SPEC-216)
+rst Can get rooms/{roomId}/state for a departed room (SPEC-216)
 mem Can get rooms/{roomId}/members for a departed room (SPEC-216)
-get Can get rooms/{roomId}/messages for a departed room (SPEC-216) 
-rst Can get 'm.room.name' state for a departed room (SPEC-216) 
+get Can get rooms/{roomId}/messages for a departed room (SPEC-216)
+rst Can get 'm.room.name' state for a departed room (SPEC-216)
 syn Getting messages going forward is limited for a departed room (SPEC-216)
-3pd Can invite existing 3pid 
-3pd Can invite existing 3pid with no ops into a private room 
-3pd Can invite existing 3pid in createRoom 
-3pd Can invite unbound 3pid 
-f,3pd Can invite unbound 3pid over federation 
-3pd Can invite unbound 3pid with no ops into a private room 
-f,3pd Can invite unbound 3pid over federation with no ops into a private room 
-f,3pd Can invite unbound 3pid over federation with users from both servers 
-3pd Can accept unbound 3pid invite after inviter leaves 
-3pd Can accept third party invite with /join 
+3pd Can invite existing 3pid
+3pd Can invite existing 3pid with no ops into a private room
+3pd Can invite existing 3pid in createRoom
+3pd Can invite unbound 3pid
+f,3pd Can invite unbound 3pid over federation
+3pd Can invite unbound 3pid with no ops into a private room
+f,3pd Can invite unbound 3pid over federation with no ops into a private room
+f,3pd Can invite unbound 3pid over federation with users from both servers
+3pd Can accept unbound 3pid invite after inviter leaves
+3pd Can accept third party invite with /join
 3pd 3pid invite join with wrong but valid signature are rejected
 3pd 3pid invite join valid signature but revoked keys are rejected
 3pd 3pid invite join valid signature but unreachable ID server are rejected
 gst Guest user cannot call /events globally
 gst Guest users can join guest_access rooms
-gst Guest users can send messages to guest_access rooms if joined 
-gst Guest user calling /events doesn't tightloop 
-gst Guest users are kicked from guest_access rooms on revocation of guest_access 
+gst Guest users can send messages to guest_access rooms if joined
+gst Guest user calling /events doesn't tightloop
+gst Guest users are kicked from guest_access rooms on revocation of guest_access
 gst Guest user can set display names
-gst Guest users are kicked from guest_access rooms on revocation of guest_access over federation 
-gst Guest user can upgrade to fully featured user 
+gst Guest users are kicked from guest_access rooms on revocation of guest_access over federation
+gst Guest user can upgrade to fully featured user
 gst Guest user cannot upgrade other users
-pub GET /publicRooms lists rooms 
-pub GET /publicRooms includes avatar URLs 
-gst Guest users can accept invites to private rooms over federation 
-gst Guest users denied access over federation if guest access prohibited 
-mem Room members can override their displayname on a room-specific basis 
+pub GET /publicRooms lists rooms
+pub GET /publicRooms includes avatar URLs
+gst Guest users can accept invites to private rooms over federation
+gst Guest users denied access over federation if guest access prohibited
+mem Room members can override their displayname on a room-specific basis
 mem Room members can join a room with an overridden displayname
-mem Users cannot kick users from a room they are not in 
-mem Users cannot kick users who have already left a room 
-typ Typing notification sent to local room members 
-f,typ Typing notifications also sent to remote room members 
-typ Typing can be explicitly stopped 
-rct Read receipts are visible to /initialSync 
-rct Read receipts are sent as events 
-rct Receipts must be m.read 
-pro displayname updates affect room member events 
-pro avatar_url updates affect room member events 
+mem Users cannot kick users from a room they are not in
+mem Users cannot kick users who have already left a room
+typ Typing notification sent to local room members
+f,typ Typing notifications also sent to remote room members
+typ Typing can be explicitly stopped
+rct Read receipts are visible to /initialSync
+rct Read receipts are sent as events
+rct Receipts must be m.read
+pro displayname updates affect room member events
+pro avatar_url updates affect room member events
 gst m.room.history_visibility == "world_readable" allows/forbids appropriately for Guest users
-gst m.room.history_visibility == "shared" allows/forbids appropriately for Guest users 
-gst m.room.history_visibility == "invited" allows/forbids appropriately for Guest users 
-gst m.room.history_visibility == "joined" allows/forbids appropriately for Guest users 
-gst m.room.history_visibility == "default" allows/forbids appropriately for Guest users 
+gst m.room.history_visibility == "shared" allows/forbids appropriately for Guest users
+gst m.room.history_visibility == "invited" allows/forbids appropriately for Guest users
+gst m.room.history_visibility == "joined" allows/forbids appropriately for Guest users
+gst m.room.history_visibility == "default" allows/forbids appropriately for Guest users
 gst Guest non-joined user cannot call /events on shared room
 gst Guest non-joined user cannot call /events on invited room
 gst Guest non-joined user cannot call /events on joined room
 gst Guest non-joined user cannot call /events on default room
-gst Guest non-joined user can call /events on world_readable room 
+gst Guest non-joined user can call /events on world_readable room
 gst Guest non-joined users can get state for world_readable rooms
 gst Guest non-joined users can get individual state for world_readable rooms
 gst Guest non-joined users cannot room initalSync for non-world_readable rooms
-gst Guest non-joined users can room initialSync for world_readable rooms 
+gst Guest non-joined users can room initialSync for world_readable rooms
 gst Guest non-joined users can get individual state for world_readable rooms after leaving
 gst Guest non-joined users cannot send messages to guest_access rooms if not joined
 gst Guest users can sync from world_readable guest_access rooms if joined
-gst Guest users can sync from shared guest_access rooms if joined 
-gst Guest users can sync from invited guest_access rooms if joined 
-gst Guest users can sync from joined guest_access rooms if joined 
+gst Guest users can sync from shared guest_access rooms if joined
+gst Guest users can sync from invited guest_access rooms if joined
+gst Guest users can sync from joined guest_access rooms if joined
 gst Guest users can sync from default guest_access rooms if joined
 ath m.room.history_visibility == "world_readable" allows/forbids appropriately for Real users
-ath m.room.history_visibility == "shared" allows/forbids appropriately for Real users 
-ath m.room.history_visibility == "invited" allows/forbids appropriately for Real users 
-ath m.room.history_visibility == "joined" allows/forbids appropriately for Real users 
-ath m.room.history_visibility == "default" allows/forbids appropriately for Real users 
+ath m.room.history_visibility == "shared" allows/forbids appropriately for Real users
+ath m.room.history_visibility == "invited" allows/forbids appropriately for Real users
+ath m.room.history_visibility == "joined" allows/forbids appropriately for Real users
+ath m.room.history_visibility == "default" allows/forbids appropriately for Real users
 ath Real non-joined user cannot call /events on shared room
 ath Real non-joined user cannot call /events on invited room
 ath Real non-joined user cannot call /events on joined room
 ath Real non-joined user cannot call /events on default room
-ath Real non-joined user can call /events on world_readable room 
+ath Real non-joined user can call /events on world_readable room
 ath Real non-joined users can get state for world_readable rooms
 ath Real non-joined users can get individual state for world_readable rooms
 ath Real non-joined users cannot room initalSync for non-world_readable rooms
-ath Real non-joined users can room initialSync for world_readable rooms 
-ath Real non-joined users can get individual state for world_readable rooms after leaving 
+ath Real non-joined users can room initialSync for world_readable rooms
+ath Real non-joined users can get individual state for world_readable rooms after leaving
 ath Real non-joined users cannot send messages to guest_access rooms if not joined
 ath Real users can sync from world_readable guest_access rooms if joined
-ath Real users can sync from shared guest_access rooms if joined 
-ath Real users can sync from invited guest_access rooms if joined 
-ath Real users can sync from joined guest_access rooms if joined 
+ath Real users can sync from shared guest_access rooms if joined
+ath Real users can sync from invited guest_access rooms if joined
+ath Real users can sync from joined guest_access rooms if joined
 ath Real users can sync from default guest_access rooms if joined
-ath Only see history_visibility changes on boundaries 
+ath Only see history_visibility changes on boundaries
 f,ath Backfill works correctly with history visibility set to joined
-fgt Forgotten room messages cannot be paginated 
-fgt Forgetting room does not show up in v2 /sync 
-fgt Can forget room you've been kicked from 
+fgt Forgotten room messages cannot be paginated
+fgt Forgetting room does not show up in v2 /sync
+fgt Can forget room you've been kicked from
 fgt Can't forget room you're still in
 fgt Can re-join room if re-invited
-ath Only original members of the room can see messages from erased users 
+ath Only original members of the room can see messages from erased users
 mem /joined_rooms returns only joined rooms
-mem /joined_members return joined members 
-ctx /context/ on joined room works 
-ctx /context/ on non world readable room does not work 
-ctx /context/ returns correct number of events 
-ctx /context/ with lazy_load_members filter works 
+mem /joined_members return joined members
+ctx /context/ on joined room works
+ctx /context/ on non world readable room does not work
+ctx /context/ returns correct number of events
+ctx /context/ with lazy_load_members filter works
 get /event/ on joined room works
 get /event/ on non world readable room does not work
 get /event/ does not allow access to events before the user joined
 mem Can get rooms/{roomId}/members
-mem Can get rooms/{roomId}/members at a given point 
-mem Can filter rooms/{roomId}/members 
-upg /upgrade creates a new room 
-upg /upgrade should preserve room visibility for public rooms 
-upg /upgrade should preserve room visibility for private rooms 
-upg /upgrade copies >100 power levels to the new room 
-upg /upgrade copies the power levels to the new room 
-upg /upgrade preserves the power level of the upgrading user in old and new rooms 
-upg /upgrade copies important state to the new room 
-upg /upgrade copies ban events to the new room 
-upg local user has push rules copied to upgraded room 
-f,upg remote user has push rules copied to upgraded room 
-upg /upgrade moves aliases to the new room 
-upg /upgrade moves remote aliases to the new room 
-upg /upgrade preserves direct room state 
-upg /upgrade preserves room federation ability 
-upg /upgrade restricts power levels in the old room 
-upg /upgrade restricts power levels in the old room when the old PLs are unusual 
-upg /upgrade to an unknown version is rejected 
-upg /upgrade is rejected if the user can't send state events 
-upg /upgrade of a bogus room fails gracefully 
-upg Cannot send tombstone event that points to the same room 
-f,upg Local and remote users' homeservers remove a room from their public directory on upgrade 
-rst Name/topic keys are correct 
+mem Can get rooms/{roomId}/members at a given point
+mem Can filter rooms/{roomId}/members
+upg /upgrade creates a new room
+upg /upgrade should preserve room visibility for public rooms
+upg /upgrade should preserve room visibility for private rooms
+upg /upgrade copies >100 power levels to the new room
+upg /upgrade copies the power levels to the new room
+upg /upgrade preserves the power level of the upgrading user in old and new rooms
+upg /upgrade copies important state to the new room
+upg /upgrade copies ban events to the new room
+upg local user has push rules copied to upgraded room
+f,upg remote user has push rules copied to upgraded room
+upg /upgrade moves aliases to the new room
+upg /upgrade moves remote aliases to the new room
+upg /upgrade preserves direct room state
+upg /upgrade preserves room federation ability
+upg /upgrade restricts power levels in the old room
+upg /upgrade restricts power levels in the old room when the old PLs are unusual
+upg /upgrade to an unknown version is rejected
+upg /upgrade is rejected if the user can't send state events
+upg /upgrade of a bogus room fails gracefully
+upg Cannot send tombstone event that points to the same room
+f,upg Local and remote users' homeservers remove a room from their public directory on upgrade
+rst Name/topic keys are correct
 f,pub Can get remote public room list
 pub Can paginate public room list
-pub Can search public room list 
+pub Can search public room list
 syn Can create filter
 syn Can download filter
 syn Can sync
 syn Can sync a joined room
 syn Full state sync includes joined rooms
 syn Newly joined room is included in an incremental sync
-syn Newly joined room has correct timeline in incremental sync 
-syn Newly joined room includes presence in incremental sync 
-syn Get presence for newly joined members in incremental sync 
-syn Can sync a room with a single message 
-syn Can sync a room with a message with a transaction id 
+syn Newly joined room has correct timeline in incremental sync
+pre Newly joined room includes presence in incremental sync
+pre Get presence for newly joined members in incremental sync
+syn Can sync a room with a single message
+syn Can sync a room with a message with a transaction id
 syn A message sent after an initial sync appears in the timeline of an incremental sync.
-syn A filtered timeline reaches its limit 
-syn Syncing a new room with a large timeline limit isn't limited 
-syn A full_state incremental update returns only recent timeline 
-syn A prev_batch token can be used in the v1 messages API 
-syn A next_batch token can be used in the v1 messages API 
+syn A filtered timeline reaches its limit
+syn Syncing a new room with a large timeline limit isn't limited
+syn A full_state incremental update returns only recent timeline
+syn A prev_batch token can be used in the v1 messages API
+syn A next_batch token can be used in the v1 messages API
 syn A prev_batch token from incremental sync can be used in the v1 messages API
-syn User sees their own presence in a sync 
-syn User is offline if they set_presence=offline in their sync
-syn User sees updates to presence from other users in the incremental sync. 
+pre User sees their own presence in a sync
+pre User is offline if they set_presence=offline in their sync
+pre User sees updates to presence from other users in the incremental sync.
 syn State is included in the timeline in the initial sync 
 f,syn State from remote users is included in the state in the initial sync 
 syn Changes to state are included in an incremental sync

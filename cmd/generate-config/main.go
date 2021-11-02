@@ -5,16 +5,35 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"
 )
 
 func main() {
 	defaultsForCI := flag.Bool("ci", false, "sane defaults for CI testing")
+	serverName := flag.String("server", "", "The domain name of the server if not 'localhost'")
+	dbURI := flag.String("db", "", "The DB URI to use for all components if not SQLite files")
 	flag.Parse()
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults()
+	if *serverName != "" {
+		cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
+	}
+	if *dbURI != "" {
+		cfg.Global.Kafka.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.FederationSender.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.KeyServer.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.MSCs.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.MediaAPI.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.RoomServer.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.SyncAPI.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(*dbURI)
+		cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(*dbURI)
+	}
 	cfg.Global.TrustedIDServers = []string{
 		"matrix.org",
 		"vector.im",

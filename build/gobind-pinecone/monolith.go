@@ -132,7 +132,7 @@ func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) 
 		for i := 1; i <= 10; i++ {
 			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
 			var err error
-			conduit.port, err = m.PineconeRouter.AuthenticatedConnect(l, zone, peertype)
+			conduit.port, err = m.PineconeRouter.AuthenticatedConnect(l, zone, peertype, true)
 			switch err {
 			case io.ErrClosedPipe:
 				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
@@ -253,7 +253,7 @@ func (m *DendriteMonolith) Start() {
 	logrus.SetOutput(BindLogger{})
 
 	logger := log.New(os.Stdout, "PINECONE: ", 0)
-	m.PineconeRouter = pineconeRouter.NewRouter(logger, sk, "dendrite", nil)
+	m.PineconeRouter = pineconeRouter.NewRouter(logger, sk, false)
 	m.PineconeQUIC = pineconeSessions.NewSessions(logger, m.PineconeRouter)
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
 

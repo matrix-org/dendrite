@@ -156,7 +156,7 @@ func startup() {
 	pk := sk.Public().(ed25519.PublicKey)
 
 	logger := log.New(os.Stdout, "", 0)
-	pRouter := pineconeRouter.NewRouter(logger, sk, "dendrite", nil)
+	pRouter := pineconeRouter.NewRouter(logger, sk, false)
 	pSessions := pineconeSessions.NewSessions(logger, pRouter)
 
 	cfg := &config.Dendrite{}
