@@ -53,6 +53,7 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.4.1-0.20210715083903-52309d094c00
 	go.uber.org/atomic v1.9.0
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
 	golang.org/x/mobile v0.0.0-20210716004757-34ab1303b554
 	golang.org/x/net v0.0.0-20210927181540-4e4d966f7476
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
