@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
@@ -140,9 +141,30 @@ func MakeJoin(
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = queryRes.StateEvents[i].Event
 	}
-
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
+
+	// Check the join rules. If it's a restricted join then there are special rules.
+	var joinRuleEvent *gomatrixserverlib.Event
+	var joinRules gomatrixserverlib.JoinRuleContent
+	if joinRuleEvent, err = provider.JoinRules(); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Room join rules do not exist"),
+		}
+	} else if err = json.Unmarshal(joinRuleEvent.Content(), &joinRules); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("Failed to unmarshal room join rules"),
+		}
+	}
+
 	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
+		if joinRules.JoinRule == gomatrixserverlib.Restricted {
+			return attemptMakeJoinForRestrictedMembership(
+				httpReq, cfg, rsAPI, &verRes,
+				provider, &builder, joinRules, userID,
+			)
+		}
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden(err.Error()),
@@ -155,6 +177,144 @@ func MakeJoin(
 			"event":        builder,
 			"room_version": verRes.RoomVersion,
 		},
+	}
+}
+
+func attemptMakeJoinForRestrictedMembership(
+	httpReq *http.Request,
+	cfg *config.FederationAPI,
+	rsAPI api.RoomserverInternalAPI,
+	verRes *api.QueryRoomVersionForRoomResponse,
+	provider gomatrixserverlib.AuthEvents,
+	builder *gomatrixserverlib.EventBuilder,
+	joinRules gomatrixserverlib.JoinRuleContent,
+	userID string,
+) util.JSONResponse {
+	// As a last effort, see if any of the restricted join rules match.
+	// If so, we might be able to modify and sign the event so that it
+	// does pass auth.
+	var powerLevels gomatrixserverlib.PowerLevelContent
+	if powerLevelsEvent, err := provider.PowerLevels(); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnableToAuthoriseJoin("Room power levels do not exist"),
+		}
+	} else if err := json.Unmarshal(powerLevelsEvent.Content(), &powerLevels); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnableToAuthoriseJoin("Failed to unmarshal room power levels"),
+		}
+	}
+
+	// Let's see if we can validate the user being in
+	// any of the allowed rooms.
+	for _, allowed := range joinRules.Allow {
+		// Skip types that we don't know about.
+		if allowed.Type != gomatrixserverlib.MRoomMembership {
+			continue
+		}
+
+		// Ask the room server if we know about the specified room ID.
+		queryReq := &api.QueryMembershipsForRoomRequest{
+			RoomID:     allowed.RoomID,
+			JoinedOnly: true,
+		}
+		queryRes := &api.QueryMembershipsForRoomResponse{}
+		if err := rsAPI.QueryMembershipsForRoom(httpReq.Context(), queryReq, queryRes); err != nil {
+			continue
+		}
+
+		// Now have a look and see if any of the joined users match the
+		// user who has initiated this join.
+		found := false
+		for _, member := range queryRes.JoinEvents {
+			if member.StateKey == nil {
+				continue // shouldn't ever happen
+			}
+			if *member.StateKey == userID {
+				found = true
+				break
+			}
+		}
+
+		// The user doesn't seem to exist in this room, try the next one.
+		if !found {
+			continue
+		}
+
+		// Now look through all of the join events of the other members. Our goal
+		// is to try and find a user from our own server that has a suitable power
+		// level to popuate into the `join_authorised_via_users_server` field.
+		for _, member := range queryRes.JoinEvents {
+			if member.StateKey == nil {
+				continue // shouldn't ever happen
+			}
+
+			// If the user doesn't come from our own server then it's no good, try
+			// the next one instead.
+			_, domain, err := gomatrixserverlib.SplitID('@', *member.StateKey)
+			if err != nil {
+				continue
+			}
+			if domain != cfg.Matrix.ServerName {
+				continue
+			}
+
+			// If the user has the ability to invite to the room then they are a
+			// suitable candidate for the `join_authorised_via_users_server`.
+			if powerLevels.UserLevel(*member.StateKey) >= powerLevels.Invite {
+				// We'll set the event content again, this time including the
+				// `join_authorised_via_users_server` field for the chosen user.
+				err := builder.SetContent(map[string]interface{}{
+					"membership":                       gomatrixserverlib.Join,
+					"join_authorised_via_users_server": *member.StateKey,
+				})
+				if err != nil {
+					util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
+					return jsonerror.InternalServerError()
+				}
+
+				// Then we'll build the event again. This is a second hit on the
+				// roomserver sadly, but it's a necessary evil.
+				queryRes := api.QueryLatestEventsAndStateResponse{
+					RoomVersion: verRes.RoomVersion,
+				}
+				event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
+				if err != nil {
+					util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
+					return jsonerror.InternalServerError()
+				}
+
+				// Sign the event. This is basically our seal of approval that
+				// other servers can use to verify that the user we put into the
+				// `join_authorised_via_users_server` field was actually checked
+				// and found by us.
+				signed := event.Sign(string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+
+				// Now, see if the join is valid with the new changes. If it isn't
+				// then something else is forbidding the join.
+				if err = gomatrixserverlib.Allowed(&signed, &provider); err != nil {
+					return util.JSONResponse{
+						Code: http.StatusForbidden,
+						JSON: jsonerror.Forbidden(err.Error()),
+					}
+				}
+
+				// Otherwise, the new join event looks good, so return it.
+				return util.JSONResponse{
+					Code: http.StatusOK,
+					JSON: map[string]interface{}{
+						"event":        signed,
+						"room_version": verRes.RoomVersion,
+					},
+				}
+			}
+		}
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusBadRequest,
+		JSON: jsonerror.UnableToAuthoriseJoin("You are not joined to any allowed rooms"),
 	}
 }
 
