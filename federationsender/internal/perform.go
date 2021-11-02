@@ -713,14 +713,8 @@ func federatedAuthProvider(
 				}
 
 				// Check the signatures of the event.
-				if res, err := gomatrixserverlib.VerifyEventSignatures(ctx, []*gomatrixserverlib.Event{ev}, keyRing); err != nil {
+				if err := ev.VerifyEventSignatures(ctx, keyRing); err != nil {
 					return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
-				} else {
-					for _, err := range res {
-						if err != nil {
-							return nil, fmt.Errorf("missingAuth VerifyEventSignatures: %w", err)
-						}
-					}
 				}
 
 				// If the event is OK then add it to the results and the retry map.

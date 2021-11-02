@@ -31,7 +31,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20210709140738-b0d1ba599a6d
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20210817115641-f9416ac1a723
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20211102101113-5e02b64e5312
 	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
 	github.com/matrix-org/pinecone v0.0.0-20211022090602-08a50945ac89
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
@@ -46,8 +46,7 @@ require (
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/tidwall/gjson v1.8.1
-	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/tidwall/gjson v1.9.3
 	github.com/tidwall/sjson v1.1.7
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
