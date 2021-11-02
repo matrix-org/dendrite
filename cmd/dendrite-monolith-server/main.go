@@ -117,7 +117,8 @@ func main() {
 		keyAPI = base.KeyServerHTTPClient()
 	}
 
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
+	userImpl := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
+	userAPI := userImpl
 	if base.UseHTTPAPIs {
 		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
 		userAPI = base.UserAPIClient()
@@ -128,7 +129,10 @@ func main() {
 		}
 	}
 
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
+	// TODO: This should use userAPI, not userImpl, but the appservice setup races with
+	// the listeners and panics at startup if it tries to create appservice accounts
+	// before the listeners are up.
+	asAPI := appservice.NewInternalAPI(base, userImpl, rsAPI)
 	if base.UseHTTPAPIs {
 		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
 		asAPI = base.AppserviceHTTPClient()
