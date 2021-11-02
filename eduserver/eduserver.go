@@ -48,10 +48,10 @@ func NewInternalAPI(
 		Cache:                        eduCache,
 		UserAPI:                      userAPI,
 		Producer:                     producer,
-		OutputTypingEventTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.TopicOutputTypingEvent),
-		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.TopicOutputSendToDeviceEvent),
-		OutputReceiptEventTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.TopicOutputReceiptEvent),
-		OutputKeyChangeEventTopic:    cfg.Matrix.JetStream.TopicFor(jetstream.TopicOutputKeyChangeEvent),
+		OutputTypingEventTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
+		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
+		OutputReceiptEventTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		OutputKeyChangeEventTopic:    cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
 		ServerName:                   cfg.Matrix.ServerName,
 	}
 }

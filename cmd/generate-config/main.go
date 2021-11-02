@@ -22,7 +22,6 @@ func main() {
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
 	}
 	if *dbURI != "" {
-		cfg.Global.Kafka.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.FederationSender.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(*dbURI)
