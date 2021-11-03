@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -51,6 +52,7 @@ func NewOutputTypingEventConsumer(
 ) *OutputTypingEventConsumer {
 	return &OutputTypingEventConsumer{
 		jetstream: js,
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 		eduCache:  eduCache,
 		notifier:  notifier,
 		stream:    stream,
