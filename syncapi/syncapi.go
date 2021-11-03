@@ -48,7 +48,7 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
-	consumer, _ := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
+	_, consumer, _ := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {

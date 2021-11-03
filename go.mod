@@ -6,6 +6,7 @@ replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.11.1-0
 
 require (
 	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
+	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1

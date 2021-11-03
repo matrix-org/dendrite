@@ -19,8 +19,8 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
-	"time"
 
+	"github.com/Arceliar/phony"
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal/hooks"
@@ -28,10 +28,10 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
-	"go.uber.org/atomic"
 )
 
 var keyContentFields = map[string]string{
@@ -42,48 +42,62 @@ var keyContentFields = map[string]string{
 
 type Inputer struct {
 	DB                   storage.Database
+	Consumer             nats.JetStreamContext
 	Producer             sarama.SyncProducer
 	ServerName           gomatrixserverlib.ServerName
 	ACLs                 *acls.ServerACLs
+	InputRoomEventTopic  string
 	OutputRoomEventTopic string
-	workers              sync.Map // room ID -> *inputWorker
+	workers              sync.Map // room ID -> *phony.Inbox
 }
 
-type inputTask struct {
-	ctx   context.Context
-	event *api.InputRoomEvent
-	wg    *sync.WaitGroup
-	err   error // written back by worker, only safe to read when all tasks are done
-}
-
-type inputWorker struct {
-	r       *Inputer
-	running atomic.Bool
-	input   *fifoQueue
-}
-
-// Guarded by a CAS on w.running
-func (w *inputWorker) start() {
-	defer w.running.Store(false)
-	for {
-		select {
-		case <-w.input.wait():
-			task, ok := w.input.pop()
-			if !ok {
-				continue
+// onMessage is called when a new event arrives in the roomserver input stream.
+func (r *Inputer) Start() error {
+	_, err := r.Consumer.Subscribe(
+		r.InputRoomEventTopic,
+		func(msg *nats.Msg) {
+			_ = msg.InProgress()
+			var inputRoomEvent api.InputRoomEvent
+			if err := json.Unmarshal(msg.Data, &inputRoomEvent); err != nil {
+				_ = msg.Nak()
+				return
 			}
-			roomserverInputBackpressure.With(prometheus.Labels{
-				"room_id": task.event.Event.RoomID(),
-			}).Dec()
-			hooks.Run(hooks.KindNewEventReceived, task.event.Event)
-			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
-			if task.err == nil {
-				hooks.Run(hooks.KindNewEventPersisted, task.event.Event)
-			} else {
-				sentry.CaptureException(task.err)
-			}
-			task.wg.Done()
-		case <-time.After(time.Second * 5):
+			inbox, _ := r.workers.LoadOrStore(msg.Header.Get("room_id"), &phony.Inbox{})
+			inbox.(*phony.Inbox).Act(nil, func() {
+				if _, err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
+					sentry.CaptureException(err)
+					_ = msg.Nak()
+				} else {
+					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
+					_ = msg.Ack()
+				}
+			})
+		},
+		nats.ManualAck(),
+	)
+	return err
+}
+
+// InputRoomEvents implements api.RoomserverInternalAPI
+func (r *Inputer) InputRoomEvents(
+	_ context.Context,
+	request *api.InputRoomEventsRequest,
+	response *api.InputRoomEventsResponse,
+) {
+	var err error
+	for _, e := range request.InputRoomEvents {
+		msg := &nats.Msg{
+			Subject: r.InputRoomEventTopic,
+			Header:  nats.Header{},
+		}
+		msg.Header.Set("room_id", e.Event.RoomID())
+		msg.Data, err = json.Marshal(e)
+		if err != nil {
+			response.ErrMsg = err.Error()
+			return
+		}
+		if _, err = r.Consumer.PublishMsg(msg); err != nil {
+			response.ErrMsg = err.Error()
 			return
 		}
 	}
@@ -156,67 +170,3 @@ var roomserverInputBackpressure = prometheus.NewGaugeVec(
 	},
 	[]string{"room_id"},
 )
-
-// InputRoomEvents implements api.RoomserverInternalAPI
-func (r *Inputer) InputRoomEvents(
-	_ context.Context,
-	request *api.InputRoomEventsRequest,
-	response *api.InputRoomEventsResponse,
-) {
-	// Create a wait group. Each task that we dispatch will call Done on
-	// this wait group so that we know when all of our events have been
-	// processed.
-	wg := &sync.WaitGroup{}
-	wg.Add(len(request.InputRoomEvents))
-	tasks := make([]*inputTask, len(request.InputRoomEvents))
-
-	for i, e := range request.InputRoomEvents {
-		// Work out if we are running per-room workers or if we're just doing
-		// it on a global basis (e.g. SQLite).
-		roomID := "global"
-		if r.DB.SupportsConcurrentRoomInputs() {
-			roomID = e.Event.RoomID()
-		}
-
-		// Look up the worker, or create it if it doesn't exist. This channel
-		// is buffered to reduce the chance that we'll be blocked by another
-		// room - the channel will be quite small as it's just pointer types.
-		w, _ := r.workers.LoadOrStore(roomID, &inputWorker{
-			r:     r,
-			input: newFIFOQueue(),
-		})
-		worker := w.(*inputWorker)
-
-		// Create a task. This contains the input event and a reference to
-		// the wait group, so that the worker can notify us when this specific
-		// task has been finished.
-		tasks[i] = &inputTask{
-			ctx:   context.Background(),
-			event: &request.InputRoomEvents[i],
-			wg:    wg,
-		}
-
-		// Send the task to the worker.
-		if worker.running.CAS(false, true) {
-			go worker.start()
-		}
-		worker.input.push(tasks[i])
-		roomserverInputBackpressure.With(prometheus.Labels{
-			"room_id": roomID,
-		}).Inc()
-	}
-
-	// Wait for all of the workers to return results about our tasks.
-	wg.Wait()
-
-	// If any of the tasks returned an error, we should probably report
-	// that back to the caller.
-	for _, task := range tasks {
-		if task.err != nil {
-			response.ErrMsg = task.err.Error()
-			_, rejected := task.err.(*gomatrixserverlib.NotAllowed)
-			response.NotAllowed = rejected
-			return
-		}
-	}
-}

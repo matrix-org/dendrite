@@ -41,7 +41,7 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
-	_, producer := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
+	js, _, producer := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
 
 	var perspectiveServerNames []gomatrixserverlib.ServerName
 	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {
@@ -54,7 +54,9 @@ func NewInternalAPI(
 	}
 
 	return internal.NewRoomserverAPI(
-		cfg, roomserverDB, producer, string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent)),
+		cfg, roomserverDB, js, producer,
+		cfg.Matrix.JetStream.TopicFor(jetstream.InputRoomEvent),
+		cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 		base.Caches, keyRing, perspectiveServerNames,
 	)
 }

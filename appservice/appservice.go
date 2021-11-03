@@ -58,7 +58,7 @@ func NewInternalAPI(
 			},
 		},
 	}
-	consumer, _ := jetstream.SetupConsumerProducer(&base.Cfg.Global.JetStream)
+	_, consumer, _ := jetstream.SetupConsumerProducer(&base.Cfg.Global.JetStream)
 
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(&base.Cfg.AppServiceAPI.Database)

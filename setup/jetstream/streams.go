@@ -7,6 +7,7 @@ import (
 )
 
 var (
+	InputRoomEvent          = "InputRoomEvent"
 	OutputRoomEvent         = "OutputRoomEvent"
 	OutputSendToDeviceEvent = "OutputSendToDeviceEvent"
 	OutputKeyChangeEvent    = "OutputKeyChangeEvent"
@@ -16,6 +17,11 @@ var (
 )
 
 var streams = []*nats.StreamConfig{
+	{
+		Name:      InputRoomEvent,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
 	{
 		Name:      OutputRoomEvent,
 		Retention: nats.InterestPolicy,

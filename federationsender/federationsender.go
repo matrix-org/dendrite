@@ -61,7 +61,7 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
-	consumer, _ := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
+	_, consumer, _ := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationSenderDB, base.ProcessContext,
