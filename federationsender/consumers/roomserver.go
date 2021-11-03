@@ -19,72 +19,64 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/federationsender/queue"
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	"github.com/matrix-org/dendrite/federationsender/types"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	cfg        *config.FederationSender
-	rsAPI      api.RoomserverInternalAPI
-	rsConsumer *internal.ContinualConsumer
-	db         storage.Database
-	queues     *queue.OutgoingQueues
+	cfg       *config.FederationSender
+	rsAPI     api.RoomserverInternalAPI
+	jetstream nats.JetStreamContext
+	db        storage.Database
+	queues    *queue.OutgoingQueues
+	topic     string
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.FederationSender,
-	kafkaConsumer sarama.Consumer,
+	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
-	consumer := internal.ContinualConsumer{
-		Process:        process,
-		ComponentName:  "federationsender/roomserver",
-		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent)),
-		Consumer:       kafkaConsumer,
-		PartitionStore: store,
+	return &OutputRoomEventConsumer{
+		cfg:       cfg,
+		jetstream: js,
+		db:        store,
+		queues:    queues,
+		rsAPI:     rsAPI,
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 	}
-	s := &OutputRoomEventConsumer{
-		cfg:        cfg,
-		rsConsumer: &consumer,
-		db:         store,
-		queues:     queues,
-		rsAPI:      rsAPI,
-	}
-	consumer.ProcessMessage = s.onMessage
-
-	return s
 }
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	return s.rsConsumer.Start()
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	return err
 }
 
 // onMessage is called when the federation server receives a new event from the room server output log.
 // It is unsafe to call this with messages for the same room in multiple gorountines
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
-func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 	// Parse out the event JSON
 	var output api.OutputEvent
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return nil
+		return
 	}
 
 	switch output.Type {
@@ -93,7 +85,8 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 
 		if output.NewRoomEvent.RewritesState {
 			if err := s.db.PurgeRoomState(context.TODO(), ev.RoomID()); err != nil {
-				return fmt.Errorf("s.db.PurgeRoom: %w", err)
+				log.WithError(err).Errorf("roomserver output log: purge room state failure")
+				return
 			}
 		}
 
@@ -113,7 +106,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 					log.ErrorKey: err,
 				}).Panicf("roomserver output log: write room event failure")
 			}
-			return nil
+			return
 		}
 	case api.OutputTypeNewInboundPeek:
 		if err := s.processInboundPeek(*output.NewInboundPeek); err != nil {
@@ -121,16 +114,14 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 				"event":      output.NewInboundPeek,
 				log.ErrorKey: err,
 			}).Panicf("roomserver output log: remote peek event failure")
-			return nil
+			return
 		}
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
-		return nil
+		return
 	}
-
-	return nil
 }
 
 // processInboundPeek starts tracking a new federated inbound peek (replacing the existing one if any)

@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 
-	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
@@ -35,7 +34,6 @@ type RoomserverInternalAPI struct {
 	*perform.Forgetter
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
-	Producer               sarama.SyncProducer
 	Cache                  caching.RoomServerCaches
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
@@ -47,8 +45,7 @@ type RoomserverInternalAPI struct {
 }
 
 func NewRoomserverAPI(
-	cfg *config.RoomServer, roomserverDB storage.Database,
-	consumer nats.JetStreamContext, producer sarama.SyncProducer,
+	cfg *config.RoomServer, roomserverDB storage.Database, consumer nats.JetStreamContext,
 	inputRoomEventTopic, outputRoomEventTopic string, caches caching.RoomServerCaches,
 	keyRing gomatrixserverlib.JSONVerifier, perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
@@ -70,8 +67,7 @@ func NewRoomserverAPI(
 			DB:                   roomserverDB,
 			InputRoomEventTopic:  inputRoomEventTopic,
 			OutputRoomEventTopic: outputRoomEventTopic,
-			Consumer:             consumer,
-			Producer:             producer,
+			JetStream:            consumer,
 			ServerName:           cfg.Matrix.ServerName,
 			ACLs:                 serverACLs,
 		},

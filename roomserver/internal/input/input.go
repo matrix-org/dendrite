@@ -21,12 +21,12 @@ import (
 	"sync"
 
 	"github.com/Arceliar/phony"
-	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
@@ -42,8 +42,7 @@ var keyContentFields = map[string]string{
 
 type Inputer struct {
 	DB                   storage.Database
-	Consumer             nats.JetStreamContext
-	Producer             sarama.SyncProducer
+	JetStream            nats.JetStreamContext
 	ServerName           gomatrixserverlib.ServerName
 	ACLs                 *acls.ServerACLs
 	InputRoomEventTopic  string
@@ -53,7 +52,7 @@ type Inputer struct {
 
 // onMessage is called when a new event arrives in the roomserver input stream.
 func (r *Inputer) Start() error {
-	_, err := r.Consumer.Subscribe(
+	_, err := r.JetStream.Subscribe(
 		r.InputRoomEventTopic,
 		func(msg *nats.Msg) {
 			_ = msg.InProgress()
@@ -99,7 +98,7 @@ func (r *Inputer) InputRoomEvents(
 			response.ErrMsg = err.Error()
 			return
 		}
-		if _, err = r.Consumer.PublishMsg(msg); err != nil {
+		if _, err = r.JetStream.PublishMsg(msg); err != nil {
 			response.ErrMsg = err.Error()
 			return
 		}
@@ -109,56 +108,51 @@ func (r *Inputer) InputRoomEvents(
 
 // WriteOutputEvents implements OutputRoomEventWriter
 func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
-	messages := make([]*sarama.ProducerMessage, len(updates))
-	for i := range updates {
-		value, err := json.Marshal(updates[i])
+	var err error
+	for _, update := range updates {
+		msg := &nats.Msg{}
+		msg.Header.Set(jetstream.RoomID, roomID)
+		msg.Data, err = json.Marshal(update)
 		if err != nil {
 			return err
 		}
 		logger := log.WithFields(log.Fields{
 			"room_id": roomID,
-			"type":    updates[i].Type,
+			"type":    update.Type,
 		})
-		if updates[i].NewRoomEvent != nil {
-			eventType := updates[i].NewRoomEvent.Event.Type()
+		if update.NewRoomEvent != nil {
+			eventType := update.NewRoomEvent.Event.Type()
 			logger = logger.WithFields(log.Fields{
 				"event_type":     eventType,
-				"event_id":       updates[i].NewRoomEvent.Event.EventID(),
-				"adds_state":     len(updates[i].NewRoomEvent.AddsStateEventIDs),
-				"removes_state":  len(updates[i].NewRoomEvent.RemovesStateEventIDs),
-				"send_as_server": updates[i].NewRoomEvent.SendAsServer,
-				"sender":         updates[i].NewRoomEvent.Event.Sender(),
+				"event_id":       update.NewRoomEvent.Event.EventID(),
+				"adds_state":     len(update.NewRoomEvent.AddsStateEventIDs),
+				"removes_state":  len(update.NewRoomEvent.RemovesStateEventIDs),
+				"send_as_server": update.NewRoomEvent.SendAsServer,
+				"sender":         update.NewRoomEvent.Event.Sender(),
 			})
-			if updates[i].NewRoomEvent.Event.StateKey() != nil {
-				logger = logger.WithField("state_key", *updates[i].NewRoomEvent.Event.StateKey())
+			if update.NewRoomEvent.Event.StateKey() != nil {
+				logger = logger.WithField("state_key", *update.NewRoomEvent.Event.StateKey())
 			}
 			contentKey := keyContentFields[eventType]
 			if contentKey != "" {
-				value := gjson.GetBytes(updates[i].NewRoomEvent.Event.Content(), contentKey)
+				value := gjson.GetBytes(update.NewRoomEvent.Event.Content(), contentKey)
 				if value.Exists() {
 					logger = logger.WithField("content_value", value.String())
 				}
 			}
 
-			if eventType == "m.room.server_acl" && updates[i].NewRoomEvent.Event.StateKeyEquals("") {
-				ev := updates[i].NewRoomEvent.Event.Unwrap()
+			if eventType == "m.room.server_acl" && update.NewRoomEvent.Event.StateKeyEquals("") {
+				ev := update.NewRoomEvent.Event.Unwrap()
 				defer r.ACLs.OnServerACLUpdate(ev)
 			}
 		}
-		logger.Infof("Producing to topic '%s'", r.OutputRoomEventTopic)
-		messages[i] = &sarama.ProducerMessage{
-			Topic: r.OutputRoomEventTopic,
-			Key:   sarama.StringEncoder(roomID),
-			Value: sarama.ByteEncoder(value),
+		logger.Tracef("Producing to topic '%s'", r.OutputRoomEventTopic)
+		if _, err := r.JetStream.PublishMsg(msg); err != nil {
+			logger.WithError(err).Errorf("Failed to produce to topic '%s': %s", r.OutputRoomEventTopic, err)
+			return err
 		}
 	}
-	errs := r.Producer.SendMessages(messages)
-	if errs != nil {
-		for _, err := range errs.(sarama.ProducerErrors) {
-			log.WithError(err).WithField("message_bytes", err.Msg.Value.Length()).Error("Write to kafka failed")
-		}
-	}
-	return errs
+	return nil
 }
 
 func init() {

@@ -61,7 +61,7 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
-	_, consumer, _ := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
+	js, consumer, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationSenderDB, base.ProcessContext,
@@ -75,19 +75,19 @@ func NewInternalAPI(
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, cfg, consumer, queues,
-		federationSenderDB, rsAPI,
+		base.ProcessContext, cfg, js, queues, federationSenderDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
 	}
 
 	tsConsumer := consumers.NewOutputEDUConsumer(
-		base.ProcessContext, cfg, consumer, queues, federationSenderDB,
+		base.ProcessContext, cfg, js, queues, federationSenderDB,
 	)
 	if err := tsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
+
 	keyConsumer := consumers.NewKeyChangeConsumer(
 		base.ProcessContext, &base.Cfg.KeyServer, consumer, queues, federationSenderDB, rsAPI,
 	)

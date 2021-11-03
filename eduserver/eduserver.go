@@ -42,12 +42,12 @@ func NewInternalAPI(
 ) api.EDUServerInputAPI {
 	cfg := &base.Cfg.EDUServer
 
-	_, _, producer := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
+	js, _, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	return &input.EDUServerInputAPI{
 		Cache:                        eduCache,
 		UserAPI:                      userAPI,
-		Producer:                     producer,
+		JetStream:                    js,
 		OutputTypingEventTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
 		OutputReceiptEventTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),

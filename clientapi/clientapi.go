@@ -49,11 +49,11 @@ func AddPublicRoutes(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
 ) {
-	_, _, producer := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
+	js, _, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
-		Producer: producer,
-		Topic:    cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
+		JetStream: js,
+		Topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
 	}
 
 	routing.Setup(

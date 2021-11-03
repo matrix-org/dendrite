@@ -58,7 +58,7 @@ func NewInternalAPI(
 			},
 		},
 	}
-	_, consumer, _ := jetstream.SetupConsumerProducer(&base.Cfg.Global.JetStream)
+	js, _, _ := jetstream.Prepare(&base.Cfg.Global.JetStream)
 
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(&base.Cfg.AppServiceAPI.Database)
@@ -97,7 +97,7 @@ func NewInternalAPI(
 	// We can't add ASes at runtime so this is safe to do.
 	if len(workerStates) > 0 {
 		consumer := consumers.NewOutputRoomEventConsumer(
-			base.ProcessContext, base.Cfg, consumer, appserviceDB,
+			base.ProcessContext, base.Cfg, js, appserviceDB,
 			rsAPI, workerStates,
 		)
 		if err := consumer.Start(); err != nil {

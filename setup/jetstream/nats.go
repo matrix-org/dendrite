@@ -18,7 +18,7 @@ import (
 var natsServer *natsserver.Server
 var natsServerMutex sync.Mutex
 
-func SetupConsumerProducer(cfg *config.JetStream) (nats.JetStreamContext, sarama.Consumer, sarama.SyncProducer) {
+func Prepare(cfg *config.JetStream) (nats.JetStreamContext, sarama.Consumer, sarama.SyncProducer) {
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {
 		return setupNATS(cfg, nil)

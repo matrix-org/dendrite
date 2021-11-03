@@ -6,6 +6,11 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
+const (
+	UserID = "user_id"
+	RoomID = "room_id"
+)
+
 var (
 	InputRoomEvent          = "InputRoomEvent"
 	OutputRoomEvent         = "OutputRoomEvent"
