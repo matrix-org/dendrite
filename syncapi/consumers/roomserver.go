@@ -83,6 +83,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 	if err = json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		_ = msg.Nak()
 		return
 	}
 
@@ -115,10 +116,15 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
+		_ = msg.Nak()
 	}
 	if err != nil {
 		log.WithError(err).Error("roomserver output log: failed to process event")
+		_ = msg.Nak()
+		return
 	}
+
+	_ = msg.Ack()
 }
 
 func (s *OutputRoomEventConsumer) onRedactEvent(

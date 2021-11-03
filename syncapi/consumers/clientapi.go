@@ -74,6 +74,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *nats.Msg) {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("client API server output log: message parse failure")
 		sentry.CaptureException(err)
+		_ = msg.Nak()
 		return
 	}
 
@@ -96,4 +97,6 @@ func (s *OutputClientDataConsumer) onMessage(msg *nats.Msg) {
 
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewAccountData(userID, types.StreamingToken{AccountDataPosition: streamPos})
+
+	_ = msg.Ack()
 }

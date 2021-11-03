@@ -74,15 +74,18 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *nats.Msg) {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
 		sentry.CaptureException(err)
+		_ = msg.Nak()
 		return
 	}
 
 	_, domain, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
 		sentry.CaptureException(err)
+		_ = msg.Nak()
 		return
 	}
 	if domain != s.serverName {
+		_ = msg.Nak()
 		return
 	}
 
@@ -108,4 +111,6 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(msg *nats.Msg) {
 		[]string{output.DeviceID},
 		types.StreamingToken{SendToDevicePosition: streamPos},
 	)
+
+	_ = msg.Ack()
 }

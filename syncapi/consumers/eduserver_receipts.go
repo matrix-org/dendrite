@@ -70,6 +70,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *nats.Msg) {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
 		sentry.CaptureException(err)
+		_ = msg.Nak()
 		return
 	}
 
@@ -88,4 +89,6 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *nats.Msg) {
 
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
+
+	_ = msg.Ack()
 }

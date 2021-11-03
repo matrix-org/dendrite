@@ -76,6 +76,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		_ = msg.Nak()
 		return
 	}
 
@@ -96,6 +97,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 				log.WithField("error", output.Type).Info(
 					err.Error(),
 				)
+				_ = msg.Nak()
 			default:
 				// panic rather than continue with an inconsistent database
 				log.WithFields(log.Fields{
@@ -108,6 +110,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 			}
 			return
 		}
+
+		_ = msg.Ack()
+
 	case api.OutputTypeNewInboundPeek:
 		if err := s.processInboundPeek(*output.NewInboundPeek); err != nil {
 			log.WithFields(log.Fields{
@@ -116,10 +121,13 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 			}).Panicf("roomserver output log: remote peek event failure")
 			return
 		}
+		_ = msg.Ack()
+
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
+		_ = msg.Ack()
 		return
 	}
 }

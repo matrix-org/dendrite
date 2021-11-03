@@ -74,10 +74,12 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		_ = msg.Nak()
 		return
 	}
 
 	if output.Type != api.OutputTypeNewRoomEvent {
+		_ = msg.Nak()
 		return
 	}
 
@@ -87,7 +89,11 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 	// Send event to any relevant application services
 	if err := s.filterRoomserverEvents(context.TODO(), events); err != nil {
 		log.WithError(err).Errorf("roomserver output log: filter error")
+		_ = msg.Nak()
+		return
 	}
+
+	_ = msg.Ack()
 }
 
 // filterRoomserverEvents takes in events and decides whether any of them need
