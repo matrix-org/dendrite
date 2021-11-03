@@ -111,7 +111,8 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 	var err error
 	for _, update := range updates {
 		msg := &nats.Msg{
-			Header: nats.Header{},
+			Subject: r.OutputRoomEventTopic,
+			Header:  nats.Header{},
 		}
 		msg.Header.Set(jetstream.RoomID, roomID)
 		msg.Data, err = json.Marshal(update)
