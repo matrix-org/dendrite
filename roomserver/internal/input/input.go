@@ -110,7 +110,9 @@ func (r *Inputer) InputRoomEvents(
 func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
 	var err error
 	for _, update := range updates {
-		msg := &nats.Msg{}
+		msg := &nats.Msg{
+			Header: nats.Header{},
+		}
 		msg.Header.Set(jetstream.RoomID, roomID)
 		msg.Data, err = json.Marshal(update)
 		if err != nil {
