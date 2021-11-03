@@ -11,18 +11,20 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/S7evinK/saramajetstream v0.0.0-20210709110708-de6efc8c4a32
-	github.com/Shopify/sarama v1.30.0
+	github.com/Shopify/sarama v1.29.0
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.7 // indirect
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.11.0
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/juju/testing v0.0.0-20210324180055-18c50b0c2098 // indirect
+	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/lib/pq v1.10.1
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
@@ -49,6 +51,7 @@ require (
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.11.0
@@ -64,6 +67,7 @@ require (
 	golang.org/x/mobile v0.0.0-20210716004757-34ab1303b554
 	golang.org/x/net v0.0.0-20210927181540-4e4d966f7476
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
+	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
 	nhooyr.io/websocket v1.8.7
