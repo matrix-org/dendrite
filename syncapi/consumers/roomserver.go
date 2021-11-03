@@ -83,7 +83,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 	if err = json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
@@ -96,6 +96,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 			// in the special case where the event redacts itself, just pass the message through because
 			// we will never see the other part of the pair
 			if event.Redacts() != event.EventID() {
+				_ = msg.Ack()
 				return
 			}
 		}
@@ -116,7 +117,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
-		_ = msg.Nak()
+		_ = msg.Ack()
 	}
 	if err != nil {
 		log.WithError(err).Error("roomserver output log: failed to process event")

@@ -60,18 +60,18 @@ func (r *Inputer) Start() error {
 			defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
 			var inputRoomEvent api.InputRoomEvent
 			if err := json.Unmarshal(msg.Data, &inputRoomEvent); err != nil {
-				_ = msg.Nak()
+				_ = msg.Ack()
 				return
 			}
 			inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
 			inbox.(*phony.Inbox).Act(nil, func() {
 				if _, err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
 					sentry.CaptureException(err)
-					_ = msg.Nak()
+
 				} else {
 					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
-					_ = msg.Ack()
 				}
+				_ = msg.Ack()
 			})
 		},
 		nats.ManualAck(),

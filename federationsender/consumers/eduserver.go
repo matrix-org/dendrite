@@ -81,7 +81,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *nats.Msg) {
 	var ote api.OutputSendToDeviceEvent
 	if err := json.Unmarshal(msg.Data, &ote); err != nil {
 		log.WithError(err).Errorf("eduserver output log: message parse failed (expected send-to-device)")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
@@ -89,19 +89,19 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *nats.Msg) {
 	_, originServerName, err := gomatrixserverlib.SplitID('@', ote.Sender)
 	if err != nil {
 		log.WithError(err).WithField("user_id", ote.Sender).Error("Failed to extract domain from send-to-device sender")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 	if originServerName != t.ServerName {
 		log.WithField("other_server", originServerName).Info("Suppressing send-to-device: originated elsewhere")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
 	_, destServerName, err := gomatrixserverlib.SplitID('@', ote.UserID)
 	if err != nil {
 		log.WithError(err).WithField("user_id", ote.UserID).Error("Failed to extract domain from send-to-device destination")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
@@ -122,7 +122,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *nats.Msg) {
 	}
 	if edu.Content, err = json.Marshal(tdm); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
@@ -142,7 +142,7 @@ func (t *OutputEDUConsumer) onTypingEvent(msg *nats.Msg) {
 	if err := json.Unmarshal(msg.Data, &ote); err != nil {
 		// Skip this msg but continue processing messages.
 		log.WithError(err).Errorf("eduserver output log: message parse failed (expected typing)")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
@@ -150,7 +150,7 @@ func (t *OutputEDUConsumer) onTypingEvent(msg *nats.Msg) {
 	_, typingServerName, err := gomatrixserverlib.SplitID('@', ote.Event.UserID)
 	if err != nil {
 		log.WithError(err).WithField("user_id", ote.Event.UserID).Error("Failed to extract domain from typing sender")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 	if typingServerName != t.ServerName {
@@ -175,7 +175,7 @@ func (t *OutputEDUConsumer) onTypingEvent(msg *nats.Msg) {
 		"typing":  ote.Event.Typing,
 	}); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
@@ -194,7 +194,7 @@ func (t *OutputEDUConsumer) onReceiptEvent(msg *nats.Msg) {
 	if err := json.Unmarshal(msg.Data, &receipt); err != nil {
 		// Skip this msg but continue processing messages.
 		log.WithError(err).Errorf("eduserver output log: message parse failed (expected receipt)")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
@@ -202,11 +202,11 @@ func (t *OutputEDUConsumer) onReceiptEvent(msg *nats.Msg) {
 	_, receiptServerName, err := gomatrixserverlib.SplitID('@', receipt.UserID)
 	if err != nil {
 		log.WithError(err).WithField("user_id", receipt.UserID).Error("failed to extract domain from receipt sender")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 	if receiptServerName != t.ServerName {
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return // don't log, very spammy as it logs for each remote receipt
 	}
 
@@ -239,7 +239,7 @@ func (t *OutputEDUConsumer) onReceiptEvent(msg *nats.Msg) {
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 

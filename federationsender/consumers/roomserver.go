@@ -76,7 +76,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		_ = msg.Nak()
+		_ = msg.Ack()
 		return
 	}
 
@@ -97,7 +97,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 				log.WithField("error", output.Type).Info(
 					err.Error(),
 				)
-				_ = msg.Nak()
+				_ = msg.Ack()
 			default:
 				// panic rather than continue with an inconsistent database
 				log.WithFields(log.Fields{
