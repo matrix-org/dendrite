@@ -177,6 +177,7 @@ func Send(
 	ch := make(chan util.JSONResponse, 1)
 	txnIDs.Store(index, ch)
 	defer close(ch)
+	defer txnIDs.Delete(index)
 
 	t := txnReq{
 		rsAPI:      rsAPI,
