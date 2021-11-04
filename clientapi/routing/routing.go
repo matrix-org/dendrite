@@ -751,7 +751,10 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetMemberships(req, device, vars["roomID"], false, cfg, rsAPI)
+			at := req.URL.Query().Get("at")
+			logrus.Info(req.URL)
+
+			return GetMemberships(req, device, vars["roomID"], false, at, cfg, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -761,7 +764,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetMemberships(req, device, vars["roomID"], true, cfg, rsAPI)
+			return GetMemberships(req, device, vars["roomID"], true, "", cfg, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

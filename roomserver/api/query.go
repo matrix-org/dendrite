@@ -155,6 +155,8 @@ type QueryMembershipsForRoomRequest struct {
 	// user is allowed to see the memberships. If not specified then all
 	// room memberships will be returned.
 	Sender string `json:"sender"`
+
+	At string `json:"at"`
 }
 
 // QueryMembershipsForRoomResponse is a response to QueryMembershipsForRoom

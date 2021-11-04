@@ -53,7 +53,7 @@ type databaseJoinedMember struct {
 
 // GetMemberships implements GET /rooms/{roomId}/members
 func GetMemberships(
-	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
+	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool, at string,
 	_ *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
@@ -61,6 +61,7 @@ func GetMemberships(
 		JoinedOnly: joinedOnly,
 		RoomID:     roomID,
 		Sender:     device.UserID,
+		At:         at,
 	}
 	var queryRes api.QueryMembershipsForRoomResponse
 	if err := rsAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
@@ -91,6 +92,14 @@ func GetMemberships(
 			JSON: res,
 		}
 	}
+
+	util.GetLogger(req.Context()).Info("SLOCKART")
+	for _, ev := range queryRes.JoinEvents {
+		util.GetLogger(req.Context()).Info(ev)
+		util.GetLogger(req.Context()).Info(at)
+	}
+	util.GetLogger(req.Context()).Error("SLOCKART")
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: getMembershipResponse{queryRes.JoinEvents},
