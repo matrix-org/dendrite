@@ -170,7 +170,8 @@ func Send(
 	// the transaction is still being worked on. The new client can wait
 	// for it to complete rather than creating more work.
 	index := string(request.Origin()) + "\000" + string(txnID)
-	ch, ok := inFlightTxnsPerOrigin.LoadOrStore(index, make(chan util.JSONResponse, 1))
+	v, ok := inFlightTxnsPerOrigin.LoadOrStore(index, make(chan util.JSONResponse, 1))
+	ch := v.(chan util.JSONResponse)
 	if ok {
 		// This origin already submitted this txn ID to us, and the work
 		// is still taking place, so we'll just wait for it to finish.
@@ -181,7 +182,7 @@ func Send(
 			// If the caller gives up then return straight away. We don't
 			// want to attempt to process what they sent us any further.
 			return util.JSONResponse{Code: http.StatusRequestTimeout}
-		case res := <-ch.(chan util.JSONResponse):
+		case res := <-ch:
 			// The original task just finished processing so let's return
 			// the result of it.
 			if res.Code == 0 {
@@ -192,7 +193,7 @@ func Send(
 	}
 	// Otherwise, store that we're currently working on this txn from
 	// this origin. When we're done processing, close the channel.
-	defer close(ch.(chan util.JSONResponse))
+	defer close(ch)
 	defer inFlightTxnsPerOrigin.Delete(index)
 
 	t := txnReq{
