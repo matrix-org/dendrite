@@ -65,9 +65,9 @@ func (r *Inputer) Start() error {
 			}
 			inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
 			inbox.(*phony.Inbox).Act(nil, func() {
+				_ = msg.InProgress()
 				if _, err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
 					sentry.CaptureException(err)
-
 				} else {
 					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
 				}
@@ -75,6 +75,7 @@ func (r *Inputer) Start() error {
 			})
 		},
 		nats.ManualAck(),
+		nats.MaxDeliver(0),
 	)
 	return err
 }
