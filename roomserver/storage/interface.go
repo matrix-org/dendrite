@@ -131,7 +131,7 @@ type Database interface {
 	// been members of a given room. Only lookup events of "join" membership if
 	// joinOnly is set to true.
 	// Returns an error if there was a problem talking to the database.
-	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool) ([]types.EventNID, error)
+	GetMembershipEventNIDsForRoom(ctx context.Context, roomNID types.RoomNID, requestAt string, joinOnly bool, localOnly bool) ([]types.EventNID, error)
 	// EventsFromIDs looks up the Events for a list of event IDs. Does not error if event was
 	// not found.
 	// Returns an error if the retrieval went wrong.

@@ -350,12 +350,16 @@ func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, req
 }
 
 func (d *Database) GetMembershipEventNIDsForRoom(
-	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
+	ctx context.Context, roomNID types.RoomNID, requestAt string, joinOnly bool, localOnly bool,
 ) ([]types.EventNID, error) {
 	if joinOnly {
 		return d.MembershipTable.SelectMembershipsFromRoomAndMembership(
 			ctx, roomNID, tables.MembershipStateJoin, localOnly,
 		)
+	}
+
+	if len(requestAt) > 0 {
+		panic("implement me")
 	}
 
 	return d.MembershipTable.SelectMembershipsFromRoom(ctx, roomNID, localOnly)

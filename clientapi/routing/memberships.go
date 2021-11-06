@@ -63,6 +63,7 @@ func GetMemberships(
 		Sender:     device.UserID,
 		At:         at,
 	}
+
 	var queryRes api.QueryMembershipsForRoomResponse
 	if err := rsAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
@@ -81,10 +82,12 @@ func GetMemberships(
 		res.Joined = make(map[string]joinedMember)
 		for _, ev := range queryRes.JoinEvents {
 			var content databaseJoinedMember
+
 			if err := json.Unmarshal(ev.Content, &content); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
 				return jsonerror.InternalServerError()
 			}
+
 			res.Joined[ev.Sender] = joinedMember(content)
 		}
 		return util.JSONResponse{
@@ -92,13 +95,6 @@ func GetMemberships(
 			JSON: res,
 		}
 	}
-
-	util.GetLogger(req.Context()).Info("SLOCKART")
-	for _, ev := range queryRes.JoinEvents {
-		util.GetLogger(req.Context()).Info(ev)
-		util.GetLogger(req.Context()).Info(at)
-	}
-	util.GetLogger(req.Context()).Error("SLOCKART")
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
