@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -359,7 +360,38 @@ func (d *Database) GetMembershipEventNIDsForRoom(
 	}
 
 	if len(requestAt) > 0 {
-		panic("implement me")
+		var eventNIDs []types.EventNID
+		var eventNIDsAt []types.EventNID
+		var err error
+		var depth int
+
+		depth, err = strconv.Atoi(string(requestAt[1]))
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("XXXXXX  %d  XXXXXX", depth)
+
+		eventNIDs, err = d.MembershipTable.SelectMembershipsFromRoom(ctx, roomNID, localOnly)
+		if err != nil {
+			return nil, err
+		}
+
+		var eventNIDString []string
+		for _, nid := range eventNIDs {
+			eventNIDString = append(eventNIDString, fmt.Sprint(nid))
+		}
+		events, err := d.EventsFromIDs(ctx, eventNIDString)
+		if err != nil {
+			return nil, err
+		}
+		for _, ev := range events {
+			fmt.Println(ev)
+			if ev.Depth() <= int64(depth) {
+				eventNIDsAt = append(eventNIDsAt, ev.EventNID)
+			}
+		}
+
+		return eventNIDsAt, nil
 	}
 
 	return d.MembershipTable.SelectMembershipsFromRoom(ctx, roomNID, localOnly)

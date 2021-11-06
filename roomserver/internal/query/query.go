@@ -287,7 +287,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	var stateEntries []types.StateEntry
 	if stillInRoom {
 		var eventNIDs []types.EventNID
-		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, "", request.JoinedOnly, false)
 		if err != nil {
 			return err
 		}

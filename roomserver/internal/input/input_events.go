@@ -256,7 +256,7 @@ func (r *Inputer) calculateAndSetState(
 		stateAtEvent.Overwrite = true
 		var joinEventNIDs []types.EventNID
 		// Request join memberships only for local users only.
-		if joinEventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true); err == nil {
+		if joinEventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, "", true, true); err == nil {
 			// If we have no local users that are joined to the room then any state about
 			// the room that we have is quite possibly out of date. Therefore in that case
 			// we should overwrite it rather than merge it.

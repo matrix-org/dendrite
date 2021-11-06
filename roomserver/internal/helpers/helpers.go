@@ -67,7 +67,7 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 		return db.GetLocalServerInRoom(ctx, info.RoomNID)
 	}
 
-	eventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
+	eventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, "", true, false)
 	if err != nil {
 		return false, err
 	}

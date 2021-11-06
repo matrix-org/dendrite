@@ -537,7 +537,7 @@ func joinEventsFromHistoryVisibility(
 	if err != nil {
 		return nil, err
 	}
-	joinEventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
+	joinEventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, "", true, false)
 	if err != nil {
 		return nil, err
 	}
