@@ -203,7 +203,7 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs
 func (s *receiptStatements) SelectMaxReceiptID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
-	var nullableID sql.NullInt64
+	// var nullableID sql.NullInt64
 
 	// "SELECT MAX(id) FROM syncapi_receipts"
 
@@ -221,11 +221,11 @@ func (s *receiptStatements) SelectMaxReceiptID(
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
 
 	if rows != nil {
-		nullableID.Int64 = rows[0].Max
+		id = rows[0].Max
 	}
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+	// if nullableID.Valid {
+	// 	id = nullableID.Int64
+	// }
 	return
 }

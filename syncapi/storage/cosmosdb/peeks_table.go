@@ -377,7 +377,7 @@ func (s *peekStatements) SelectMaxPeekID(
 	// "SELECT MAX(id) FROM syncapi_peeks"
 
 	// stmt := sqlutil.TxStmt(txn, s.selectMaxPeekIDStmt)
-	var nullableID sql.NullInt64
+	// var nullableID sql.NullInt64
 	params := map[string]interface{}{
 		"@x1": s.getCollectionName(),
 	}
@@ -392,11 +392,11 @@ func (s *peekStatements) SelectMaxPeekID(
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 
 	if rows != nil {
-		nullableID.Int64 = rows[0].Max
+		id = rows[0].Max
 	}
 
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+	// if nullableID.Valid {
+	// 	id = nullableID.Int64
+	// }
 	return
 }

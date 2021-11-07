@@ -287,7 +287,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 func (s *inviteEventsStatements) SelectMaxInviteID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
-	var nullableID sql.NullInt64
+	// var nullableID sql.NullInt64
 
 	// "SELECT MAX(id) FROM syncapi_invite_events"
 
@@ -306,11 +306,11 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 		s.selectMaxInviteIDStmt, params, &rows)
 
 	if len(rows) > 0 {
-		nullableID.Int64 = rows[0].Max
+		id = rows[0].Max
 	}
 
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+	// if nullableID.Valid {
+	// 	id = nullableID.Int64
+	// }
 	return
 }

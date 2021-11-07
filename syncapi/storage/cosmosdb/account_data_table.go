@@ -130,11 +130,6 @@ func (s *accountDataStatements) InsertAccountData(
 	// " ON CONFLICT (user_id, room_id, type) DO UPDATE" +
 	// " SET id = $5"
 
-	pos, err = s.streamIDStatements.nextAccountDataID(ctx, txn)
-	if err != nil {
-		return
-	}
-
 	//     UNIQUE (user_id, room_id, type)
 	// roomId can be NULL
 	docId := fmt.Sprintf("%s,%s,%s", userID, cosmosdbapi.EnsureIdPart(roomID), dataType)
@@ -143,8 +138,12 @@ func (s *accountDataStatements) InsertAccountData(
 	dbData, _ := getAccountDataType(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
 		dbData.SetUpdateTime()
-		dbData.AccountDataType.ID = int64(pos)
 	} else {
+		pos, err = s.streamIDStatements.nextAccountDataID(ctx, txn)
+		if err != nil {
+			return
+		}
+
 		data := accountDataTypeCosmos{
 			ID:       int64(pos),
 			UserID:   userID,
@@ -243,7 +242,7 @@ func (s *accountDataStatements) SelectMaxAccountDataID(
 
 	// "SELECT MAX(id) FROM syncapi_account_data_type"
 
-	var nullableID sql.NullInt64
+	// var nullableID sql.NullInt64
 	// err = sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt).QueryRowContext(ctx).Scan(&nullableID)
 	params := map[string]interface{}{
 		"@x1": s.getCollectionName(),
@@ -258,11 +257,12 @@ func (s *accountDataStatements) SelectMaxAccountDataID(
 		s.selectMaxAccountDataIDStmt, params, &rows)
 
 	if err != cosmosdbutil.ErrNoRows && len(rows) == 1 {
-		nullableID.Int64 = rows[0].Number
+		id = rows[0].Number
+
 	}
 
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+	// if nullableID.Valid {
+	// 	id = nullableID.Int64
+	// }
 	return
 }

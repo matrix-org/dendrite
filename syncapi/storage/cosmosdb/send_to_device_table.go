@@ -268,7 +268,7 @@ func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
 func (s *sendToDeviceStatements) SelectMaxSendToDeviceMessageID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
-	var nullableID sql.NullInt64
+	// var nullableID sql.NullInt64
 	// "SELECT MAX(id) FROM syncapi_send_to_device"
 
 	params := map[string]interface{}{
@@ -286,11 +286,11 @@ func (s *sendToDeviceStatements) SelectMaxSendToDeviceMessageID(
 	// err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 
 	if rows != nil {
-		nullableID.Int64 = rows[0].Max
+		id = rows[0].Max
 	}
 
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+	// if nullableID.Valid {
+	// 	id = nullableID.Int64
+	// }
 	return
 }
