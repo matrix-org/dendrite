@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !bimg
 // +build !bimg
 
 package thumbnailer
@@ -27,6 +28,10 @@ import (
 
 	// Imported for png codec
 	_ "image/png"
+
+	// Imported for webp codec
+	_ "golang.org/x/image/webp"
+
 	"os"
 	"time"
 

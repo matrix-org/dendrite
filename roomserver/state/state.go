@@ -778,7 +778,8 @@ func (v *StateResolution) resolveConflictsV2(
 	ctx context.Context,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	eventIDMap := make(map[string]types.StateEntry)
+	estimate := len(conflicted) + len(notConflicted)
+	eventIDMap := make(map[string]types.StateEntry, estimate)
 
 	// Load the conflicted events
 	conflictedEvents, conflictedEventMap, err := v.loadStateEvents(ctx, conflicted)
@@ -800,18 +801,20 @@ func (v *StateResolution) resolveConflictsV2(
 
 	// For each conflicted event, we will add a new set of auth events. Auth
 	// events may be duplicated across these sets but that's OK.
-	authSets := make(map[string][]*gomatrixserverlib.Event)
-	var authEvents []*gomatrixserverlib.Event
-	var authDifference []*gomatrixserverlib.Event
+	authSets := make(map[string][]*gomatrixserverlib.Event, len(conflicted))
+	authEvents := make([]*gomatrixserverlib.Event, 0, estimate*3)
+	authDifference := make([]*gomatrixserverlib.Event, 0, estimate)
 
 	// For each conflicted event, let's try and get the needed auth events.
+	neededStateKeys := make([]string, 16)
+	authEntries := make([]types.StateEntry, 16)
 	for _, conflictedEvent := range conflictedEvents {
 		// Work out which auth events we need to load.
 		key := conflictedEvent.EventID()
 		needed := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{conflictedEvent})
 
 		// Find the numeric IDs for the necessary state keys.
-		var neededStateKeys []string
+		neededStateKeys = neededStateKeys[:0]
 		neededStateKeys = append(neededStateKeys, needed.Member...)
 		neededStateKeys = append(neededStateKeys, needed.ThirdPartyInvite...)
 		stateKeyNIDMap, err := v.db.EventStateKeyNIDs(ctx, neededStateKeys)
@@ -821,7 +824,7 @@ func (v *StateResolution) resolveConflictsV2(
 
 		// Load the necessary auth events.
 		tuplesNeeded := v.stateKeyTuplesNeeded(stateKeyNIDMap, needed)
-		var authEntries []types.StateEntry
+		authEntries = authEntries[:0]
 		for _, tuple := range tuplesNeeded {
 			if eventNID, ok := stateEntryMap(notConflicted).lookup(tuple); ok {
 				authEntries = append(authEntries, types.StateEntry{
