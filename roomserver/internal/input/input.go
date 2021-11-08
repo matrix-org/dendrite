@@ -60,7 +60,7 @@ func (r *Inputer) Start() error {
 			defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
 			var inputRoomEvent api.InputRoomEvent
 			if err := json.Unmarshal(msg.Data, &inputRoomEvent); err != nil {
-				_ = msg.Ack()
+				_ = msg.Term()
 				return
 			}
 			inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
@@ -68,6 +68,7 @@ func (r *Inputer) Start() error {
 				_ = msg.InProgress()
 				if _, err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
 					sentry.CaptureException(err)
+					_ = msg.Respond([]byte(err.Error()))
 				} else {
 					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
 				}
@@ -82,28 +83,56 @@ func (r *Inputer) Start() error {
 
 // InputRoomEvents implements api.RoomserverInternalAPI
 func (r *Inputer) InputRoomEvents(
-	_ context.Context,
+	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) {
-	var err error
-	for _, e := range request.InputRoomEvents {
-		msg := &nats.Msg{
-			Subject: r.InputRoomEventTopic,
-			Header:  nats.Header{},
+	if request.Asynchronous {
+		var err error
+		for _, e := range request.InputRoomEvents {
+			msg := &nats.Msg{
+				Subject: r.InputRoomEventTopic,
+				Header:  nats.Header{},
+			}
+			roomID := e.Event.RoomID()
+			msg.Header.Set("room_id", roomID)
+			msg.Data, err = json.Marshal(e)
+			if err != nil {
+				response.ErrMsg = err.Error()
+				return
+			}
+			if _, err = r.JetStream.PublishMsg(msg); err != nil {
+				return
+			}
+			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 		}
-		roomID := e.Event.RoomID()
-		msg.Header.Set("room_id", roomID)
-		msg.Data, err = json.Marshal(e)
-		if err != nil {
-			response.ErrMsg = err.Error()
-			return
+	} else {
+		responses := make(chan error, len(request.InputRoomEvents))
+		defer close(responses)
+		for _, e := range request.InputRoomEvents {
+			inputRoomEvent := e
+			inbox, _ := r.workers.LoadOrStore(inputRoomEvent.Event.RoomID(), &phony.Inbox{})
+			inbox.(*phony.Inbox).Act(nil, func() {
+				_, err := r.processRoomEvent(context.TODO(), &inputRoomEvent)
+				if err != nil {
+					sentry.CaptureException(err)
+				} else {
+					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
+				}
+				responses <- err
+			})
 		}
-		if _, err = r.JetStream.PublishMsg(msg); err != nil {
-			response.ErrMsg = err.Error()
-			return
+		for i := 0; i < len(request.InputRoomEvents); i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case err := <-responses:
+				if err != nil {
+					response.ErrMsg = err.Error()
+					return
+				}
+			}
 		}
-		roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 	}
 }
 
