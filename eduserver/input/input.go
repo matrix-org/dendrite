@@ -190,7 +190,7 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 		}
 
 		if _, err = t.JetStream.PublishMsg(&nats.Msg{
-			Subject: t.OutputTypingEventTopic,
+			Subject: t.OutputSendToDeviceEventTopic,
 			Data:    eventJSON,
 		}); err != nil {
 			logrus.WithError(err).Error("sendToDevice failed t.Producer.SendMessage")
