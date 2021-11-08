@@ -571,3 +571,19 @@ A prev_batch token from incremental sync can be used in the v1 messages API
 Inbound federation rejects invites which are not signed by the sender
 Invited user can reject invite over federation several times
 Test that we can be reinvited to a room we created
+User can create and send/receive messages in a room with version 8
+local user can join room with version 8
+User can invite local user to room with version 8
+remote user can join room with version 8
+User can invite remote user to room with version 8
+Remote user can backfill in a room with version 8
+Can reject invites over federation for rooms with version 8
+Can receive redactions from regular users over federation in room version 8
+User can create and send/receive messages in a room with version 9
+local user can join room with version 9
+User can invite local user to room with version 9
+remote user can join room with version 9
+User can invite remote user to room with version 9
+Remote user can backfill in a room with version 9
+Can reject invites over federation for rooms with version 9
+Can receive redactions from regular users over federation in room version 9
