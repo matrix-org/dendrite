@@ -23,7 +23,6 @@ import (
 	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -115,7 +114,7 @@ func DirectoryRoom(
 // SetLocalAlias implements PUT /directory/room/{roomAlias}
 func SetLocalAlias(
 	req *http.Request,
-	device *api.Device,
+	device *userapi.Device,
 	alias string,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
@@ -192,7 +191,7 @@ func SetLocalAlias(
 // RemoveLocalAlias implements DELETE /directory/room/{roomAlias}
 func RemoveLocalAlias(
 	req *http.Request,
-	device *api.Device,
+	device *userapi.Device,
 	alias string,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {

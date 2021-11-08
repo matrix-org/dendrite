@@ -148,7 +148,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 		// add top level Dockerfile
 		err = ioutil.WriteFile(path.Join(*flagHead, "Dockerfile"), []byte(Dockerfile), os.ModePerm)
 		if err != nil {
-			return "", fmt.Errorf("Custom HEAD: failed to inject /Dockerfile: %w", err)
+			return "", fmt.Errorf("custom HEAD: failed to inject /Dockerfile: %w", err)
 		}
 		// now tarball it
 		var buffer bytes.Buffer

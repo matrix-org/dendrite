@@ -32,7 +32,7 @@ func ParseTSParam(req *http.Request) (time.Time, error) {
 	// The parameter exists, parse into a Time object
 	ts, err := strconv.ParseInt(tsStr, 10, 64)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("Param 'ts' is no valid int (%s)", err.Error())
+		return time.Time{}, fmt.Errorf("param 'ts' is no valid int (%s)", err.Error())
 	}
 
 	return time.Unix(ts/1000, 0), nil

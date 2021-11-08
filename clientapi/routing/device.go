@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -50,18 +49,18 @@ type devicesDeleteJSON struct {
 
 // GetDeviceByID handles /devices/{deviceID}
 func GetDeviceByID(
-	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
-	var queryRes userapi.QueryDevicesResponse
-	err := userAPI.QueryDevices(req.Context(), &userapi.QueryDevicesRequest{
+	var queryRes api.QueryDevicesResponse
+	err := userAPI.QueryDevices(req.Context(), &api.QueryDevicesRequest{
 		UserID: device.UserID,
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
 		return jsonerror.InternalServerError()
 	}
-	var targetDevice *userapi.Device
+	var targetDevice *api.Device
 	for _, device := range queryRes.Devices {
 		if device.ID == deviceID {
 			targetDevice = &device
@@ -88,10 +87,10 @@ func GetDeviceByID(
 
 // GetDevicesByLocalpart handles /devices
 func GetDevicesByLocalpart(
-	req *http.Request, userAPI userapi.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 ) util.JSONResponse {
-	var queryRes userapi.QueryDevicesResponse
-	err := userAPI.QueryDevices(req.Context(), &userapi.QueryDevicesRequest{
+	var queryRes api.QueryDevicesResponse
+	err := userAPI.QueryDevices(req.Context(), &api.QueryDevicesRequest{
 		UserID: device.UserID,
 	}, &queryRes)
 	if err != nil {

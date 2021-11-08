@@ -215,7 +215,9 @@ func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI Roomserver
 			case topicTuple:
 				pub.Topic = contentVal
 			case canonicalTuple:
-				pub.CanonicalAlias = contentVal
+				if _, _, err := gomatrixserverlib.SplitID('#', contentVal); err == nil {
+					pub.CanonicalAlias = contentVal
+				}
 			case visibilityTuple:
 				pub.WorldReadable = contentVal == "world_readable"
 			// need both of these to determine whether guests can join
