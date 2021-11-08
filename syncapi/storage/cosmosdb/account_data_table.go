@@ -67,7 +67,7 @@ const selectAccountDataInRangeSQL = "" +
 	"select * from c where c._cn = @x1 " +
 	"and c.mx_syncapi_account_data_type.user_id = @x2 " +
 	"and c.mx_syncapi_account_data_type.id > @x3 " +
-	"and c.mx_syncapi_account_data_type.id < @x4 " +
+	"and c.mx_syncapi_account_data_type.id <= @x4 " +
 	"order by c.mx_syncapi_account_data_type.id "
 
 // "SELECT MAX(id) FROM syncapi_account_data_type"
@@ -137,6 +137,7 @@ func (s *accountDataStatements) InsertAccountData(
 
 	dbData, _ := getAccountDataType(s, ctx, s.getPartitionKey(), cosmosDocId)
 	if dbData != nil {
+		pos = types.StreamPosition(dbData.AccountDataType.ID)
 		dbData.SetUpdateTime()
 	} else {
 		pos, err = s.streamIDStatements.nextAccountDataID(ctx, txn)
