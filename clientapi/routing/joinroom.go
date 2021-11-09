@@ -102,6 +102,10 @@ func JoinRoomByIDOrAlias(
 			JSON: jsonerror.Unknown("The room join will continue in the background."),
 		}
 	case result := <-done:
+		if !result.Is2xx() {
+			// The only error code in the spec for CS /join is 403.
+			result.Code = http.StatusForbidden
+		}
 		return result
 	}
 }
