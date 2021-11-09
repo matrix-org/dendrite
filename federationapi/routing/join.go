@@ -204,13 +204,13 @@ func attemptMakeJoinForRestrictedMembership(
 	if powerLevelsEvent, err := provider.PowerLevels(); err != nil {
 		logger.WithError(err).Error("Failed to get power levels from auth events")
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
+			Code: http.StatusForbidden, // TODO: StatusBadRequest
 			JSON: jsonerror.UnableToAuthoriseJoin("Room power levels do not exist"),
 		}
 	} else if err := json.Unmarshal(powerLevelsEvent.Content(), &powerLevels); err != nil {
 		logger.WithError(err).Error("Failed to unmarshal power levels")
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
+			Code: http.StatusForbidden, // TODO:  StatusBadRequest
 			JSON: jsonerror.UnableToAuthoriseJoin("Failed to unmarshal room power levels"),
 		}
 	}
@@ -328,7 +328,7 @@ func attemptMakeJoinForRestrictedMembership(
 		// users had a suitable power level to invite other users, so we
 		// don't have the ability to grant joins.
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
+			Code: http.StatusForbidden, // TODO: StatusBadRequest
 			JSON: jsonerror.UnableToGrantJoin("None of the users from this homeserver have the power to invite"),
 		}
 	case ableToAuthoriseJoin && !foundUserInAnyRoom:
@@ -342,7 +342,7 @@ func attemptMakeJoinForRestrictedMembership(
 		// We don't seem to be joined to any of the allowed rooms, so we
 		// can't even check if the join is supposed to be allowed or not.
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
+			Code: http.StatusForbidden, // TODO: StatusBadRequest
 			JSON: jsonerror.UnableToAuthoriseJoin("This homeserver isn't joined to any of the allowed rooms"),
 		}
 	}
