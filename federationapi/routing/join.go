@@ -235,6 +235,8 @@ func attemptMakeJoinForRestrictedMembership(
 			continue
 		}
 
+		logrus.Info("Inspecting room", allowed.RoomID)
+
 		// Now have a look and see if any of the joined users match the
 		// user who has initiated this join.
 		found := false
@@ -251,6 +253,8 @@ func attemptMakeJoinForRestrictedMembership(
 			continue
 		}
 
+		logrus.Info("Found user", userID, "in room")
+
 		// Now look through all of the join events of the other members. Our goal
 		// is to try and find a user from our own server that has a suitable power
 		// level to popuate into the `join_authorised_via_users_server` field.
@@ -266,6 +270,8 @@ func attemptMakeJoinForRestrictedMembership(
 				continue
 			}
 
+			logrus.Info("Found possibly authorising member", *member.StateKey)
+
 			// We have a user who is joined to the room, so we can authorise joins.
 			// We will only be able to "grant" joins if any of our users have the
 			// power to invite other users — this flag helps us to return the right
@@ -275,6 +281,8 @@ func attemptMakeJoinForRestrictedMembership(
 			// If the user has the ability to invite to the room then they are a
 			// suitable candidate for the `join_authorised_via_users_server`.
 			if powerLevels.UserLevel(*member.StateKey) >= powerLevels.Invite {
+				logrus.Info("Found member", *member.StateKey, "with sufficient invite power")
+
 				// We'll set the event content again, this time including the
 				// `join_authorised_via_users_server` field for the chosen user.
 				err := builder.SetContent(map[string]interface{}{
