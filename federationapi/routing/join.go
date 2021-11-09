@@ -160,10 +160,13 @@ func MakeJoin(
 
 	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
 		if joinRules.JoinRule == gomatrixserverlib.Restricted {
-			return attemptMakeJoinForRestrictedMembership(
+			res := attemptMakeJoinForRestrictedMembership(
 				httpReq, cfg, rsAPI, &verRes,
 				provider, &builder, joinRules, userID,
 			)
+			j, _ := json.Marshal(res)
+			logrus.Info("restricted make_join response:", string(j))
+			return res
 		}
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
