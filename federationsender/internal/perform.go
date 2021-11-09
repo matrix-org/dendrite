@@ -152,7 +152,7 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		// A well-formed HTTP error response that isn't in the 500s isn't fatal,
 		// so we shouldn't punish the server by backing off.
 		if httpErr, ok := err.(gomatrix.HTTPError); ok && httpErr.Code < 500 {
-			return fmt.Errorf("HTTP error %d: %s", httpErr.Code, httpErr.Message)
+			return httpErr
 		}
 		// TODO: Check if the user was not allowed to join the room.
 		r.statistics.ForServer(serverName).Failure()
