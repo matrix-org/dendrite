@@ -190,16 +190,20 @@ func attemptMakeJoinForRestrictedMembership(
 	joinRules gomatrixserverlib.JoinRuleContent,
 	userID string,
 ) util.JSONResponse {
+	logger := util.GetLogger(httpReq.Context()).WithField("restricted_join", userID)
+
 	// As a last effort, see if any of the restricted join rules match.
 	// If so, we might be able to modify and sign the event so that it
 	// does pass auth.
 	var powerLevels gomatrixserverlib.PowerLevelContent
 	if powerLevelsEvent, err := provider.PowerLevels(); err != nil {
+		logger.WithError(err).Error("Failed to get power levels from auth events")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnableToAuthoriseJoin("Room power levels do not exist"),
 		}
 	} else if err := json.Unmarshal(powerLevelsEvent.Content(), &powerLevels); err != nil {
+		logger.WithError(err).Error("Failed to unmarshal power levels")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnableToAuthoriseJoin("Failed to unmarshal room power levels"),
@@ -211,6 +215,7 @@ func attemptMakeJoinForRestrictedMembership(
 	for _, allowed := range joinRules.Allow {
 		// Skip types that we don't know about.
 		if allowed.Type != gomatrixserverlib.MRoomMembership {
+			logger.Infof("Skipping unknown join rule type %q", allowed.Type)
 			continue
 		}
 
@@ -221,6 +226,7 @@ func attemptMakeJoinForRestrictedMembership(
 		}
 		queryRes := &api.QueryMembershipsForRoomResponse{}
 		if err := rsAPI.QueryMembershipsForRoom(httpReq.Context(), queryReq, queryRes); err != nil {
+			logger.WithError(err).Errorf("Failed to query membership for room %q", queryReq.RoomID)
 			continue
 		}
 
@@ -239,6 +245,7 @@ func attemptMakeJoinForRestrictedMembership(
 
 		// The user doesn't seem to exist in this room, try the next one.
 		if !found {
+			logger.Infof("User %q is not in room %q", userID, queryReq.RoomID)
 			continue
 		}
 
@@ -270,7 +277,7 @@ func attemptMakeJoinForRestrictedMembership(
 					"join_authorised_via_users_server": *member.StateKey,
 				})
 				if err != nil {
-					util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
+					logger.WithError(err).Error("builder.SetContent failed")
 					return jsonerror.InternalServerError()
 				}
 
@@ -281,7 +288,7 @@ func attemptMakeJoinForRestrictedMembership(
 				}
 				event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
 				if err != nil {
-					util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
+					logger.WithError(err).Error("builder.SetContent failed")
 					return jsonerror.InternalServerError()
 				}
 
@@ -294,6 +301,7 @@ func attemptMakeJoinForRestrictedMembership(
 				// Now, see if the join is valid with the new changes. If it isn't
 				// then something else is forbidding the join.
 				if err = gomatrixserverlib.Allowed(&signed, &provider); err != nil {
+					logger.WithError(err).Error("Join is not allowed")
 					return util.JSONResponse{
 						Code: http.StatusForbidden,
 						JSON: jsonerror.Forbidden(err.Error()),
@@ -312,6 +320,7 @@ func attemptMakeJoinForRestrictedMembership(
 		}
 	}
 
+	logger.Error("No room matching join rule memberships found")
 	return util.JSONResponse{
 		Code: http.StatusBadRequest,
 		JSON: jsonerror.UnableToAuthoriseJoin("You are not joined to any allowed rooms"),
