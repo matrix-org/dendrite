@@ -81,6 +81,7 @@ func JoinRoomByIDOrAlias(
 		defer close(done)
 		rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
 		if joinRes.Error != nil {
+			joinRes.Error.Code = roomserverAPI.PerformErrorNotAllowed
 			done <- joinRes.Error.JSONResponse()
 		} else {
 			done <- util.JSONResponse{
