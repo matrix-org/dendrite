@@ -296,11 +296,15 @@ func attemptMakeJoinForRestrictedMembership(
 				// other servers can use to verify that the user we put into the
 				// `join_authorised_via_users_server` field was actually checked
 				// and found by us.
-				signed := event.Sign(string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+				signed, err := event.Sign(string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
+				if err != nil {
+					logger.WithError(err).Error("Failed to sign event")
+					return jsonerror.InternalServerError()
+				}
 
 				// Now, see if the join is valid with the new changes. If it isn't
 				// then something else is forbidding the join.
-				if err = gomatrixserverlib.Allowed(&signed, &provider); err != nil {
+				if err = gomatrixserverlib.Allowed(signed, &provider); err != nil {
 					logger.WithError(err).Error("Join is not allowed")
 					return util.JSONResponse{
 						Code: http.StatusForbidden,
