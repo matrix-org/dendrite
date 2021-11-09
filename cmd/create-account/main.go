@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -121,13 +120,13 @@ func getPassword(password, pwdFile *string, pwdStdin, askPass *bool, r io.Reader
 	// ask the user to provide the password
 	if *askPass {
 		fmt.Print("Enter Password: ")
-		bytePassword, err := term.ReadPassword(syscall.Stdin)
+		bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
 			logrus.Fatalln("Unable to read password:", err)
 		}
 		fmt.Println()
 		fmt.Print("Confirm Password: ")
-		bytePassword2, err := term.ReadPassword(syscall.Stdin)
+		bytePassword2, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
 			logrus.Fatalln("Unable to read password:", err)
 		}
