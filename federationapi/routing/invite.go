@@ -161,16 +161,9 @@ func processInvite(
 	}
 
 	// Sign the event so that other servers will know that we have received the invite.
-	signedEvent, err := event.Sign(
+	signedEvent := event.Sign(
 		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("event.Sign failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalServerError(),
-		}
-	}
 
 	// Add the invite event to the roomserver.
 	err = api.SendInvite(
@@ -185,12 +178,12 @@ func processInvite(
 		if isInviteV2 {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent},
+				JSON: gomatrixserverlib.RespInviteV2{Event: &signedEvent},
 			}
 		} else {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: gomatrixserverlib.RespInvite{Event: signedEvent},
+				JSON: gomatrixserverlib.RespInvite{Event: &signedEvent},
 			}
 		}
 	default:
