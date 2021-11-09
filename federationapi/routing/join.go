@@ -191,6 +191,8 @@ func attemptMakeJoinForRestrictedMembership(
 	userID string,
 ) util.JSONResponse {
 	logger := util.GetLogger(httpReq.Context()).WithField("restricted_join", userID)
+	foundUserInAnyRoom := false
+	ableToAuthoriseJoin := false
 
 	// As a last effort, see if any of the restricted join rules match.
 	// If so, we might be able to modify and sign the event so that it
@@ -234,9 +236,6 @@ func attemptMakeJoinForRestrictedMembership(
 		// user who has initiated this join.
 		found := false
 		for _, member := range queryRes.JoinEvents {
-			if member.StateKey == nil {
-				continue // shouldn't ever happen
-			}
 			if *member.StateKey == userID {
 				found = true
 				break
@@ -252,11 +251,8 @@ func attemptMakeJoinForRestrictedMembership(
 		// Now look through all of the join events of the other members. Our goal
 		// is to try and find a user from our own server that has a suitable power
 		// level to popuate into the `join_authorised_via_users_server` field.
+		foundUserInAnyRoom = true
 		for _, member := range queryRes.JoinEvents {
-			if member.StateKey == nil {
-				continue // shouldn't ever happen
-			}
-
 			// If the user doesn't come from our own server then it's no good, try
 			// the next one instead.
 			_, domain, err := gomatrixserverlib.SplitID('@', *member.StateKey)
@@ -266,6 +262,12 @@ func attemptMakeJoinForRestrictedMembership(
 			if domain != cfg.Matrix.ServerName {
 				continue
 			}
+
+			// We have a user who is joined to the room, so we can authorise joins.
+			// We will only be able to "grant" joins if any of our users have the
+			// power to invite other users — this flag helps us to return the right
+			// error code if not.
+			ableToAuthoriseJoin = true
 
 			// If the user has the ability to invite to the room then they are a
 			// suitable candidate for the `join_authorised_via_users_server`.
@@ -292,17 +294,16 @@ func attemptMakeJoinForRestrictedMembership(
 					return jsonerror.InternalServerError()
 				}
 
-				// Sign the event. This is basically our seal of approval that
-				// other servers can use to verify that the user we put into the
+				// Sign and return the event. This is basically our seal of approval
+				// that other servers can use to verify that the user we put into the
 				// `join_authorised_via_users_server` field was actually checked
 				// and found by us.
-				signed := event.Sign(string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey)
-
-				// Otherwise, the new join event looks good, so return it.
 				return util.JSONResponse{
 					Code: http.StatusOK,
 					JSON: map[string]interface{}{
-						"event":        signed,
+						"event": event.Sign(
+							string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+						),
 						"room_version": verRes.RoomVersion,
 					},
 				}
@@ -310,10 +311,29 @@ func attemptMakeJoinForRestrictedMembership(
 		}
 	}
 
-	logger.Error("No room matching join rule memberships found")
-	return util.JSONResponse{
-		Code: http.StatusForbidden,
-		JSON: jsonerror.Forbidden("You are not joined to any allowed rooms"),
+	switch {
+	case ableToAuthoriseJoin && foundUserInAnyRoom:
+		// We found ourselves in some of the allowed rooms, but none of our
+		// users had a suitable power level to invite other users, so we
+		// don't have the ability to grant joins.
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnableToGrantJoin("None of the users from this homeserver have the power to invite"),
+		}
+	case ableToAuthoriseJoin && !foundUserInAnyRoom:
+		// We found ourselves in some of the allowed rooms, but none of them
+		// seemed to contain the joining user.
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("You are not joined to any allowed rooms"),
+		}
+	default:
+		// We don't seem to be joined to any of the allowed rooms, so we
+		// can't even check if the join is supposed to be allowed or not.
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnableToAuthoriseJoin("This homeserver isn't joined to any of the allowed rooms"),
+		}
 	}
 }
 

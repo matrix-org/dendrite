@@ -155,6 +155,12 @@ func UnableToAuthoriseJoin(msg string) *MatrixError {
 	return &MatrixError{"M_UNABLE_TO_AUTHORISE_JOIN", msg}
 }
 
+// UnableToGrantJoin is an error that is returned when a server that we
+// are trying to join via doesn't have a user with power to invite.
+func UnableToGrantJoin(msg string) *MatrixError {
+	return &MatrixError{"M_UNABLE_TO_GRANT_JOIN", msg}
+}
+
 type IncompatibleRoomVersionError struct {
 	RoomVersion string `json:"room_version"`
 	Error       string `json:"error"`
