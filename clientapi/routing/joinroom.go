@@ -81,7 +81,6 @@ func JoinRoomByIDOrAlias(
 		defer close(done)
 		rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes)
 		if joinRes.Error != nil {
-			joinRes.Error.RemoteCode = http.StatusForbidden
 			done <- joinRes.Error.JSONResponse()
 		} else {
 			done <- util.JSONResponse{

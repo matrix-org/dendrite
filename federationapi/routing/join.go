@@ -322,8 +322,8 @@ func attemptMakeJoinForRestrictedMembership(
 
 	logger.Error("No room matching join rule memberships found")
 	return util.JSONResponse{
-		Code: http.StatusBadRequest,
-		JSON: jsonerror.UnableToAuthoriseJoin("You are not joined to any allowed rooms"),
+		Code: http.StatusForbidden,
+		JSON: jsonerror.Forbidden("You are not joined to any allowed rooms"),
 	}
 }
 
