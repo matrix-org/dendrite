@@ -162,20 +162,27 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 
 	// Set all the fields to be what they should be, this should be a no-op
 	// but it's possible that the remote server returned us something "odd"
-	respMakeJoin.JoinEvent.Type = gomatrixserverlib.MRoomMember
-	respMakeJoin.JoinEvent.Sender = userID
-	respMakeJoin.JoinEvent.StateKey = &userID
-	respMakeJoin.JoinEvent.RoomID = roomID
-	respMakeJoin.JoinEvent.Redacts = ""
-	if content == nil {
-		content = map[string]interface{}{}
+	switch {
+	case respMakeJoin.JoinEvent.Type != gomatrixserverlib.MRoomMember:
+		fallthrough
+	case respMakeJoin.JoinEvent.Sender != userID:
+		fallthrough
+	case respMakeJoin.JoinEvent.StateKey == nil:
+		fallthrough
+	case *respMakeJoin.JoinEvent.StateKey != userID:
+		fallthrough
+	case respMakeJoin.JoinEvent.RoomID != roomID:
+		fallthrough
+	case respMakeJoin.JoinEvent.Redacts != "":
+		fallthrough
+	case len(respMakeJoin.JoinEvent.Content) == 0:
+		return fmt.Errorf("respMakeJoin.JoinEvent contains invalid values")
 	}
-	content["membership"] = "join"
+	if err = json.Unmarshal(respMakeJoin.JoinEvent.Content, &content); err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
+	}
 	if err = respMakeJoin.JoinEvent.SetContent(content); err != nil {
 		return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
-	}
-	if err = respMakeJoin.JoinEvent.SetUnsigned(struct{}{}); err != nil {
-		return fmt.Errorf("respMakeJoin.JoinEvent.SetUnsigned: %w", err)
 	}
 
 	// Work out if we support the room version that has been supplied in
