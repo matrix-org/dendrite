@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/api"
@@ -115,6 +116,12 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		// Clear the wrapped error, else serialising to JSON (in polylith mode) will fail
 		httpErr.WrappedError = nil
 		response.LastError = &httpErr
+	} else if na, ok := lastErr.(*gomatrixserverlib.NotAllowed); ok {
+		response.LastError = &gomatrix.HTTPError{
+			Code:         http.StatusForbidden,
+			WrappedError: na,
+			Message:      na.Message,
+		}
 	} else {
 		response.LastError = &gomatrix.HTTPError{
 			Code:         0,
