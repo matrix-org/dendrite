@@ -239,7 +239,9 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// to complete, but if the client does give up waiting, we'll
 	// still continue to process the join anyway so that we don't
 	// waste the effort.
+	waiterr := make(chan error, 1)
 	go func() {
+		defer close(waiterr)
 		defer cancel()
 
 		// TODO: Can we expand Check here to return a list of missing auth
@@ -250,6 +252,7 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 				"room_id": roomID,
 				"user_id": userID,
 			}).WithError(err).Error("Failed to process room join response")
+			waiterr <- err
 			return
 		}
 
@@ -267,12 +270,17 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 				"room_id": roomID,
 				"user_id": userID,
 			}).WithError(err).Error("Failed to send room join response to roomserver")
+			waiterr <- err
 			return
 		}
 	}()
 
-	<-ctx.Done()
-	return nil
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-waiterr:
+		return err
+	}
 }
 
 // PerformOutboundPeekRequest implements api.FederationSenderInternalAPI
