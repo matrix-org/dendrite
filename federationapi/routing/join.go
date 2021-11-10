@@ -144,17 +144,22 @@ func MakeJoin(
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 
 	// Check the join rules. If it's a restricted join then there are special rules.
-	var joinRuleEvent *gomatrixserverlib.Event
-	var joinRules gomatrixserverlib.JoinRuleContent
-	if joinRuleEvent, err = provider.JoinRules(); err != nil {
+	joinRules := gomatrixserverlib.JoinRuleContent{
+		JoinRule: gomatrixserverlib.Public, // Default join rule if not specified.
+	}
+	joinRuleEvent, err := provider.JoinRules()
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Room join rules do not exist"),
+			JSON: jsonerror.NotFound("Failed to retrieve join rules"),
 		}
-	} else if err = json.Unmarshal(joinRuleEvent.Content(), &joinRules); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("Failed to unmarshal room join rules"),
+	}
+	if joinRuleEvent != nil {
+		if err = json.Unmarshal(joinRuleEvent.Content(), &joinRules); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.Unknown("Failed to unmarshal room join rules"),
+			}
 		}
 	}
 
