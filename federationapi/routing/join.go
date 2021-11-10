@@ -225,7 +225,9 @@ func attemptMakeJoinForRestrictedMembership(
 	for _, allowed := range joinRules.Allow {
 		// Skip types that we don't know about.
 		if allowed.Type != gomatrixserverlib.MRoomMembership {
-			logger.Infof("Skipping unknown join rule type %q", allowed.Type)
+			continue
+		}
+		if _, _, err := gomatrixserverlib.SplitID('!', allowed.RoomID); err != nil {
 			continue
 		}
 
@@ -240,7 +242,7 @@ func attemptMakeJoinForRestrictedMembership(
 			continue
 		}
 
-		logrus.Info("Inspecting room", allowed.RoomID)
+		logrus.Info("Inspecting room ", allowed.RoomID)
 
 		// Now have a look and see if any of the joined users match the
 		// user who has initiated this join.
