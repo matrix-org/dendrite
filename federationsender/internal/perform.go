@@ -116,11 +116,11 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		// Clear the wrapped error, else serialising to JSON (in polylith mode) will fail
 		httpErr.WrappedError = nil
 		response.LastError = &httpErr
-	} else if na, ok := lastErr.(*gomatrixserverlib.NotAllowed); ok {
+	} else if errors.Is(lastErr, &gomatrixserverlib.NotAllowed{}) {
 		response.LastError = &gomatrix.HTTPError{
 			Code:         http.StatusForbidden,
-			WrappedError: na,
-			Message:      na.Message,
+			WrappedError: lastErr,
+			Message:      lastErr.Error(),
 		}
 	} else {
 		response.LastError = &gomatrix.HTTPError{
