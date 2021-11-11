@@ -249,17 +249,9 @@ func (r *Joiner) performJoinRoomByID(
 			Msg:  rerr.Error(),
 		}
 	} else if restricted {
-		found := false
 		for _, roomID := range roomIDs {
 			if err = r.attemptRestrictedJoinUsingRoomID(ctx, req, roomID, &eb); err == nil {
-				found = true
 				break
-			}
-		}
-		if !found {
-			return "", "", &rsAPI.PerformError{
-				Code: rsAPI.PerformErrorNotAllowed,
-				Msg:  "You do not have permission to join this restricted room.",
 			}
 		}
 	}
@@ -305,7 +297,7 @@ func (r *Joiner) performJoinRoomByID(
 			if err = inputRes.Err(); err != nil {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNotAllowed,
-					Msg:  fmt.Sprintf("InputRoomEvents auth failed: %s", err),
+					Msg:  fmt.Sprintf("Failed to join the room %q: %s", req.RoomIDOrAlias, err),
 				}
 			}
 		}
@@ -321,7 +313,7 @@ func (r *Joiner) performJoinRoomByID(
 			if len(req.ServerNames) == 0 {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNoRoom,
-					Msg:  fmt.Sprintf("room ID %q does not exist", req.RoomIDOrAlias),
+					Msg:  fmt.Sprintf("Room ID %q does not exist!", req.RoomIDOrAlias),
 				}
 			}
 		}
@@ -332,7 +324,10 @@ func (r *Joiner) performJoinRoomByID(
 
 	default:
 		// Something else went wrong.
-		return "", "", fmt.Errorf("error joining local room: %q", err)
+		return "", "", &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorNotAllowed,
+			Msg:  fmt.Sprintf("Failed to join the room %q: %s", req.RoomIDOrAlias, err),
+		}
 	}
 
 	// By this point, if req.RoomIDOrAlias contained an alias, then
