@@ -246,15 +246,10 @@ func (r *Joiner) performJoinRoomByID(
 	if restricted, roomIDs, rerr := r.checkIfRestrictedJoin(ctx, req); rerr != nil {
 		return "", "", fmt.Errorf("r.performRestrictedJoinChecks: %w", rerr)
 	} else if restricted {
-		success := false
 		for _, roomID := range roomIDs {
-			if err = r.attemptRestrictedJoinUsingRoomID(ctx, req, roomID, &eb); err != nil {
-				continue
+			if err = r.attemptRestrictedJoinUsingRoomID(ctx, req, roomID, &eb); err == nil {
+				break
 			}
-			success = true
-		}
-		if !success {
-			return "", "", fmt.Errorf("restricted join failed")
 		}
 	}
 
