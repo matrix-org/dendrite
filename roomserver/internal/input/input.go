@@ -214,8 +214,7 @@ func (r *Inputer) InputRoomEvents(
 	for _, task := range tasks {
 		if task.err != nil {
 			response.ErrMsg = task.err.Error()
-			_, rejected := task.err.(*gomatrixserverlib.NotAllowed)
-			response.NotAllowed = rejected
+			_, response.NotAllowed = task.err.(*gomatrixserverlib.NotAllowed)
 			return
 		}
 	}
