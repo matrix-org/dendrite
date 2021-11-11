@@ -347,23 +347,43 @@ func (r *Joiner) checkIfRestrictedJoin(
 			Msg:  fmt.Sprintf("Unable to retrieve the join rules: %s", err),
 		}
 	}
-	joinRuleContent := &gomatrixserverlib.JoinRuleContent{
+	// First unmarshal the join rule itself. It might seem strange that this is
+	// a two-step process, but the Complement tests specifically populate the
+	// 'allow' field with a nonsense value that won't unmarshal and therefore
+	// trying to unmarshal a gomatrixserverlib.JoinRuleContent fails entirely.
+	// We need to get the join rule first to check if the room is restricted
+	// though, regardless of what the 'allow' key contains.
+	joinRule := struct {
+		JoinRule string `json:"join_rule"`
+	}{
 		JoinRule: gomatrixserverlib.Public,
 	}
-	if err = json.Unmarshal(joinRuleEvent.Content(), &joinRuleContent); err != nil {
+	if err = json.Unmarshal(joinRuleEvent.Content(), &joinRule); err != nil {
 		return false, nil, &rsAPI.PerformError{
 			Code: rsAPI.PerformErrorNotAllowed,
 			Msg:  fmt.Sprintf("The room join rules are invalid: %s", err),
 		}
 	}
-	roomIDs := make([]string, 0, len(joinRuleContent.Allow))
-	for _, allowed := range joinRuleContent.Allow {
+	if joinRule.JoinRule != gomatrixserverlib.Restricted {
+		return false, nil, nil
+	}
+	// Then try and extract the join rule 'allow' key. It's possible that this
+	// step can fail but we need to be OK with that — if we do, we will just
+	// treat it as if it is an empty list.
+	var joinRuleAllow struct {
+		Allow []gomatrixserverlib.JoinRuleContentAllowRule `json:"allow"`
+	}
+	_ = json.Unmarshal(joinRuleEvent.Content(), &joinRuleAllow)
+	// Now create a list of room IDs that we can check in order to validate
+	// that the restricted join can be completed.
+	roomIDs := make([]string, 0, len(joinRuleAllow.Allow))
+	for _, allowed := range joinRuleAllow.Allow {
 		if allowed.Type != gomatrixserverlib.MRoomMembership {
 			continue
 		}
 		roomIDs = append(roomIDs, allowed.RoomID)
 	}
-	return joinRuleContent.JoinRule == gomatrixserverlib.Restricted, roomIDs, nil
+	return true, roomIDs, nil
 }
 
 func (r *Joiner) attemptRestrictedJoinUsingRoomID(
