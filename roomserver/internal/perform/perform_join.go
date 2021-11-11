@@ -25,6 +25,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
@@ -60,7 +61,8 @@ func (r *Joiner) PerformJoin(
 			res.Error = perr
 		} else {
 			res.Error = &rsAPI.PerformError{
-				Msg: err.Error(),
+				Code: api.PerformErrorNotAllowed, // TODO: fix this when cross-boundary handling is better.
+				Msg:  err.Error(),
 			}
 		}
 	}
