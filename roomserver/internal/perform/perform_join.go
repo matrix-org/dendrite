@@ -244,11 +244,22 @@ func (r *Joiner) performJoinRoomByID(
 	// Check if the room is a restricted room. If so, update the event
 	// builder content.
 	if restricted, roomIDs, rerr := r.checkIfRestrictedJoin(ctx, req); rerr != nil {
-		return "", "", fmt.Errorf("r.performRestrictedJoinChecks: %w", rerr)
+		return "", "", &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorBadRequest,
+			Msg:  rerr.Error(),
+		}
 	} else if restricted {
+		found := false
 		for _, roomID := range roomIDs {
 			if err = r.attemptRestrictedJoinUsingRoomID(ctx, req, roomID, &eb); err == nil {
+				found = true
 				break
+			}
+		}
+		if !found {
+			return "", "", &rsAPI.PerformError{
+				Code: rsAPI.PerformErrorNotAllowed,
+				Msg:  "You do not have permission to join this restricted room.",
 			}
 		}
 	}
@@ -354,7 +365,7 @@ func (r *Joiner) checkIfRestrictedJoin(
 		}
 		roomIDs = append(roomIDs, allowed.RoomID)
 	}
-	return joinRuleContent.JoinRule != gomatrixserverlib.Restricted, roomIDs, nil
+	return joinRuleContent.JoinRule == gomatrixserverlib.Restricted, roomIDs, nil
 }
 
 func (r *Joiner) attemptRestrictedJoinUsingRoomID(
@@ -383,6 +394,17 @@ func (r *Joiner) attemptRestrictedJoinUsingRoomID(
 	if err != nil {
 		return fmt.Errorf("r.DB.Events: %w", err)
 	}
+	foundInAllowedRoom := false
+	for _, event := range events {
+		userID := *event.StateKey()
+		if userID == req.UserID {
+			foundInAllowedRoom = true
+			break
+		}
+	}
+	if !foundInAllowedRoom {
+		return fmt.Errorf("the user is not joined to this room")
+	}
 	for _, event := range events {
 		userID := *event.StateKey()
 		if userID == req.UserID {
@@ -403,7 +425,7 @@ func (r *Joiner) attemptRestrictedJoinUsingRoomID(
 		}
 		return nil
 	}
-	return fmt.Errorf("no suitable users found in the room")
+	return fmt.Errorf("no suitable power level users found in the room")
 }
 
 func (r *Joiner) performFederatedJoinRoomByID(
