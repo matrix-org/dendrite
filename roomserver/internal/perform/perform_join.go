@@ -245,7 +245,7 @@ func (r *Joiner) performJoinRoomByID(
 	// builder content.
 	if restricted, roomIDs, rerr := r.checkIfRestrictedJoin(ctx, req); rerr != nil {
 		return "", "", &rsAPI.PerformError{
-			Code: rsAPI.PerformErrorBadRequest,
+			Code: rsAPI.PerformErrorNotAllowed,
 			Msg:  rerr.Error(),
 		}
 	} else if restricted {
