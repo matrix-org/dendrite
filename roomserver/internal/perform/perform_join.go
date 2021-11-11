@@ -244,10 +244,7 @@ func (r *Joiner) performJoinRoomByID(
 	// Check if the room is a restricted room. If so, update the event
 	// builder content.
 	if restricted, roomIDs, rerr := r.checkIfRestrictedJoin(ctx, req); rerr != nil {
-		return "", "", &rsAPI.PerformError{
-			Code: rsAPI.PerformErrorNotAllowed,
-			Msg:  rerr.Error(),
-		}
+		return "", "", err
 	} else if restricted {
 		for _, roomID := range roomIDs {
 			if err = r.attemptRestrictedJoinUsingRoomID(ctx, req, roomID, &eb); err == nil {
@@ -345,13 +342,19 @@ func (r *Joiner) checkIfRestrictedJoin(
 	// restricted room or not.
 	joinRuleEvent, err := r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomJoinRules, "")
 	if err != nil {
-		return false, nil, fmt.Errorf("r.DB.GetStateEvent: %w", err)
+		return false, nil, &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorNotAllowed,
+			Msg:  fmt.Sprintf("Unable to retrieve the join rules: %s", err),
+		}
 	}
 	joinRuleContent := &gomatrixserverlib.JoinRuleContent{
 		JoinRule: gomatrixserverlib.Public,
 	}
 	if err = json.Unmarshal(joinRuleEvent.Content(), &joinRuleContent); err != nil {
-		return false, nil, fmt.Errorf("json.Unmarshal: %w", err)
+		return false, nil, &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorNotAllowed,
+			Msg:  fmt.Sprintf("The room join rules are invalid: %s", err),
+		}
 	}
 	roomIDs := make([]string, 0, len(joinRuleContent.Allow))
 	for _, allowed := range joinRuleContent.Allow {
