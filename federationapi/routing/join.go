@@ -144,9 +144,11 @@ func MakeJoin(
 	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
 
 	// Check the join rules. If it's a restricted join then there are special rules.
-	joinRules := gomatrixserverlib.JoinRuleContent{
-		JoinRule: gomatrixserverlib.Public, // Default join rule if not specified.
-	}
+	// We have to do this in two steps in order to satisfy the Complement tests. The
+	// first is to get the join rule itself, and the second is to unmarshal the 'allow'
+	// key. The tests deliberately set the 'allow' key to some nonsense values, but if
+	// we try to unmarshal that all in one go, the entire unmarshalling step fails,
+	// incorrectly leaving the room as the default join rule of 'public'.
 	joinRuleEvent, err := provider.JoinRules()
 	if err != nil {
 		return util.JSONResponse{
@@ -154,23 +156,34 @@ func MakeJoin(
 			JSON: jsonerror.NotFound("Failed to retrieve join rules"),
 		}
 	}
+	joinRule := struct {
+		JoinRule string `json:"join_rule"`
+	}{
+		JoinRule: gomatrixserverlib.Public, // Default join rule if not specified.
+	}
 	if joinRuleEvent != nil {
-		if err = json.Unmarshal(joinRuleEvent.Content(), &joinRules); err != nil {
+		if err = json.Unmarshal(joinRuleEvent.Content(), &joinRule); err != nil {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
-				JSON: jsonerror.Unknown("Failed to unmarshal room join rules"),
+				JSON: jsonerror.Unknown("Failed to unmarshal room join rule"),
 			}
 		}
 	}
+	var joinRuleAllow struct {
+		Allow []gomatrixserverlib.JoinRuleContentAllowRule `json:"allow"`
+	}
+	_ = json.Unmarshal(joinRuleEvent.Content(), &joinRuleAllow)
 
 	if err = gomatrixserverlib.Allowed(event.Event, &provider); err != nil {
-		if joinRules.JoinRule == gomatrixserverlib.Restricted {
+		if joinRule.JoinRule == gomatrixserverlib.Restricted {
 			res := attemptMakeJoinForRestrictedMembership(
-				httpReq, cfg, rsAPI, &verRes,
-				provider, &builder, joinRules, userID,
+				httpReq, cfg, rsAPI, &verRes, provider, &builder,
+				gomatrixserverlib.JoinRuleContent{
+					JoinRule: joinRule.JoinRule,
+					Allow:    joinRuleAllow.Allow,
+				},
+				userID,
 			)
-			j, _ := json.Marshal(res)
-			logrus.Info("restricted make_join response:", string(j))
 			return res
 		}
 		return util.JSONResponse{
