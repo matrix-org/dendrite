@@ -242,7 +242,10 @@ func (r *Joiner) performJoinRoomByID(
 	}
 
 	// Check if the room is a restricted room. If so, update the event
-	// builder content.
+	// builder content. If we can validate that we have a user in one of
+	// the restricted rooms then populate 'join_authorised_via_users_server',
+	// which will allow the event to pass event auth. If we can't then we
+	// leave the event as it is, which will fail auth.
 	if restricted, roomIDs, rerr := r.checkIfRestrictedJoin(ctx, req); rerr != nil {
 		return "", "", err
 	} else if restricted {
@@ -294,7 +297,7 @@ func (r *Joiner) performJoinRoomByID(
 			if err = inputRes.Err(); err != nil {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNotAllowed,
-					Msg:  fmt.Sprintf("Failed to join the room %q: %s", req.RoomIDOrAlias, err),
+					Msg:  fmt.Sprintf("Failed to join the room: %s", err),
 				}
 			}
 		}
@@ -323,7 +326,7 @@ func (r *Joiner) performJoinRoomByID(
 		// Something else went wrong.
 		return "", "", &rsAPI.PerformError{
 			Code: rsAPI.PerformErrorNotAllowed,
-			Msg:  fmt.Sprintf("Failed to join the room %q: %s", req.RoomIDOrAlias, err),
+			Msg:  fmt.Sprintf("Failed to join the room: %s", err),
 		}
 	}
 
@@ -347,6 +350,7 @@ func (r *Joiner) checkIfRestrictedJoin(
 			Msg:  fmt.Sprintf("Unable to retrieve the join rules: %s", err),
 		}
 	}
+
 	// First unmarshal the join rule itself. It might seem strange that this is
 	// a two-step process, but the Complement tests specifically populate the
 	// 'allow' field with a nonsense value that won't unmarshal and therefore
@@ -367,6 +371,7 @@ func (r *Joiner) checkIfRestrictedJoin(
 	if joinRule.JoinRule != gomatrixserverlib.Restricted {
 		return false, nil, nil
 	}
+
 	// Then try and extract the join rule 'allow' key. It's possible that this
 	// step can fail but we need to be OK with that — if we do, we will just
 	// treat it as if it is an empty list.
@@ -374,6 +379,7 @@ func (r *Joiner) checkIfRestrictedJoin(
 		Allow []gomatrixserverlib.JoinRuleContentAllowRule `json:"allow"`
 	}
 	_ = json.Unmarshal(joinRuleEvent.Content(), &joinRuleAllow)
+
 	// Now create a list of room IDs that we can check in order to validate
 	// that the restricted join can be completed.
 	roomIDs := make([]string, 0, len(joinRuleAllow.Allow))
@@ -392,6 +398,8 @@ func (r *Joiner) attemptRestrictedJoinUsingRoomID(
 	roomID string,
 	eb *gomatrixserverlib.EventBuilder,
 ) error {
+	// Dig out information from the room, including the power levels and
+	// our local members joined to that room.
 	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
@@ -412,6 +420,10 @@ func (r *Joiner) attemptRestrictedJoinUsingRoomID(
 	if err != nil {
 		return fmt.Errorf("r.DB.Events: %w", err)
 	}
+
+	// First of all, look and see if the joining user is joined to the
+	// allowed room. If they aren't then there's no point in doing anything
+	// else.
 	foundInAllowedRoom := false
 	for _, event := range events {
 		userID := *event.StateKey()
@@ -423,6 +435,12 @@ func (r *Joiner) attemptRestrictedJoinUsingRoomID(
 	if !foundInAllowedRoom {
 		return fmt.Errorf("the user is not joined to this room")
 	}
+
+	// Now that we've confirmed that the user is joined to the allowed
+	// room, we now need to try and find an authorising user. This needs
+	// to be one of our own users with a power level sufficient to issue
+	// invites. If we find one then we can place that user ID into the
+	// `join_authorised_via_users_server` field.
 	for _, event := range events {
 		userID := *event.StateKey()
 		if userID == req.UserID {
@@ -443,6 +461,10 @@ func (r *Joiner) attemptRestrictedJoinUsingRoomID(
 		}
 		return nil
 	}
+
+	// If we've reached this point then we don't have any of our own
+	// users in the room able to issue invites, so we need to give up
+	// and hope that we have a suitable user in another room (if any).
 	return fmt.Errorf("no suitable power level users found in the room")
 }
 

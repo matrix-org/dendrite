@@ -525,7 +525,7 @@ func SendJoin(
 			util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).Error("SendEvents failed")
 			if response.NotAllowed {
 				return util.JSONResponse{
-					Code: http.StatusBadRequest,
+					Code: http.StatusForbidden,
 					JSON: jsonerror.Forbidden(response.ErrMsg),
 				}
 			}
