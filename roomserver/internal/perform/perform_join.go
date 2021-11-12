@@ -177,8 +177,8 @@ func (r *Joiner) performJoinRoomByID(
 
 	// If the server name in the room ID isn't ours then it's a
 	// possible candidate for finding the room via federation. Add
-	// it to the list of servers to try.
-	if domain != r.Cfg.Matrix.ServerName {
+	// it to the list of servers to try if we have no better ideas.
+	if len(req.ServerNames) == 0 && domain != r.Cfg.Matrix.ServerName {
 		req.ServerNames = append(req.ServerNames, domain)
 	}
 
