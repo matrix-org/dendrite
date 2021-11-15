@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender/storage"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -21,6 +22,7 @@ type FederationSenderInternalAPI struct {
 	cfg        *config.FederationSender
 	statistics *statistics.Statistics
 	rsAPI      roomserverAPI.RoomserverInternalAPI
+	userAPI    userAPI.UserInternalAPI
 	federation *gomatrixserverlib.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
 	queues     *queue.OutgoingQueues
@@ -30,6 +32,7 @@ type FederationSenderInternalAPI struct {
 func NewFederationSenderInternalAPI(
 	db storage.Database, cfg *config.FederationSender,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
+	userAPI userAPI.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing *gomatrixserverlib.KeyRing,
 	statistics *statistics.Statistics,
@@ -39,11 +42,16 @@ func NewFederationSenderInternalAPI(
 		db:         db,
 		cfg:        cfg,
 		rsAPI:      rsAPI,
+		userAPI:    userAPI,
 		federation: federation,
 		keyRing:    keyRing,
 		statistics: statistics,
 		queues:     queues,
 	}
+}
+
+func (f *FederationSenderInternalAPI) SetUserAPI(userAPI userAPI.UserInternalAPI) {
+	f.userAPI = userAPI
 }
 
 func (a *FederationSenderInternalAPI) isBlacklistedOrBackingOff(s gomatrixserverlib.ServerName) (*statistics.ServerStatistics, error) {

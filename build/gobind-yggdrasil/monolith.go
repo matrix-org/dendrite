@@ -115,13 +115,13 @@ func (m *DendriteMonolith) Start() {
 		base, keyRing,
 	)
 
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
-	)
-
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
+
+	fsAPI := federationsender.NewInternalAPI(
+		base, federation, rsAPI, userAPI, keyRing, true,
+	)
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,

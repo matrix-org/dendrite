@@ -295,7 +295,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
+		base, federation, rsAPI, m.userAPI, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)

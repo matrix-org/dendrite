@@ -7,6 +7,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
@@ -50,6 +51,8 @@ type httpFederationSenderInternalAPI struct {
 	federationSenderURL string
 	httpClient          *http.Client
 }
+
+func (f *httpFederationSenderInternalAPI) SetUserAPI(userAPI userAPI.UserInternalAPI) {}
 
 // Handle an instruction to make_leave & send_leave with a remote server.
 func (h *httpFederationSenderInternalAPI) PerformLeave(

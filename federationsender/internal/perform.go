@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationsender/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -103,6 +105,11 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 			continue
 		}
 
+		// once we successfully joined a remote room, send available presence data to it
+		if err := r.sendPresenceData(ctx, request.RoomID, serverName); err != nil {
+			lastErr = err
+		}
+
 		// We're all good.
 		response.JoinedVia = serverName
 		return
@@ -130,6 +137,62 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 		"failed to join user %q to room %q through %d server(s): last error %s",
 		request.UserID, request.RoomID, len(request.ServerNames), lastErr,
 	)
+}
+
+// sendPresenceData sends presence data for a given roomID
+func (r *FederationSenderInternalAPI) sendPresenceData(
+	ctx context.Context, roomID string, serverName gomatrixserverlib.ServerName,
+) (err error) {
+	// query current presence for users
+	memberShip := roomserverAPI.QueryMembershipsForRoomResponse{}
+	if err := r.rsAPI.QueryMembershipsForRoom(ctx, &roomserverAPI.QueryMembershipsForRoomRequest{RoomID: roomID, JoinedOnly: true}, &memberShip); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"server_name": serverName,
+			"room_id":     roomID,
+		}).Warnf("Failed to query membership for room")
+		return err
+	}
+
+	content := eduserverAPI.FederationPresenceData{}
+	for _, event := range memberShip.JoinEvents {
+		// only send presence events which originated from us
+		_, senderServerName, err := gomatrixserverlib.SplitID('@', event.Sender)
+		if err != nil {
+			continue
+		}
+		if senderServerName != r.cfg.Matrix.ServerName {
+			continue
+		}
+		var presence userAPI.QueryPresenceForUserResponse
+		if err := r.userAPI.QueryPresenceForUser(ctx, &userAPI.QueryPresenceForUserRequest{UserID: event.Sender}, &presence); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"server_name": serverName,
+				"room_id":     roomID,
+			}).Warnf("Failed query presence for user")
+			continue
+		}
+
+		lastActiveTS := time.Since(presence.LastActiveTS.Time())
+		ev := eduserverAPI.FederationPresenceSingle{
+			CurrentlyActive: lastActiveTS < time.Minute*5,
+			LastActiveAgo:   int(lastActiveTS.Milliseconds()),
+			Presence:        presence.Presence,
+			UserID:          presence.UserID,
+			StatusMsg:       presence.StatusMsg,
+		}
+		content.Push = append(content.Push, ev)
+	}
+
+	edu := &gomatrixserverlib.EDU{
+		Type:   gomatrixserverlib.MPresence,
+		Origin: string(r.cfg.Matrix.ServerName),
+	}
+
+	if edu.Content, err = json.Marshal(content); err != nil {
+		return err
+	}
+
+	return r.queues.SendEDU(edu, r.cfg.Matrix.ServerName, []gomatrixserverlib.ServerName{serverName})
 }
 
 func (r *FederationSenderInternalAPI) performJoinUsingServer(

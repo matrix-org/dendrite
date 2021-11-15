@@ -26,6 +26,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/kafka"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
@@ -42,6 +43,7 @@ func NewInternalAPI(
 	base *setup.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
+	userAPI userAPI.UserInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
 ) api.FederationSenderInternalAPI {
@@ -95,5 +97,5 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
-	return internal.NewFederationSenderInternalAPI(federationSenderDB, cfg, rsAPI, federation, keyRing, stats, queues)
+	return internal.NewFederationSenderInternalAPI(federationSenderDB, cfg, rsAPI, userAPI, federation, keyRing, stats, queues)
 }

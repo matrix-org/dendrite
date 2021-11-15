@@ -175,12 +175,13 @@ func main() {
 	)
 	rsAPI := rsComponent
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
+		base, federation, rsAPI, nil, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
+	fsAPI.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,

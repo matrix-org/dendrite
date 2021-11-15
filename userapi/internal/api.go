@@ -495,6 +495,7 @@ func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.Que
 	res.PresenceStatus = p.Presence
 	res.StatusMsg = p.StatusMsg
 	res.LastActiveTS = p.LastActiveTS
+	res.UserID = p.UserID
 
 	maxLastSeen := gomatrixserverlib.Timestamp(maxLastSeenTS)
 	if maxLastSeen.Time().After(p.LastActiveTS.Time()) {

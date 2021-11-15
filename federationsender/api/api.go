@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/federationsender/types"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -39,6 +40,8 @@ func (e *FederationClientError) Error() string {
 // FederationSenderInternalAPI is used to query information from the federation sender.
 type FederationSenderInternalAPI interface {
 	FederationClient
+
+	SetUserAPI(api userAPI.UserInternalAPI)
 
 	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
 

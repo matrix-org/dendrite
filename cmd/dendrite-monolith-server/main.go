@@ -102,7 +102,7 @@ func main() {
 	}
 
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, false,
+		base, federation, rsAPI, nil, keyRing, false,
 	)
 	if base.UseHTTPAPIs {
 		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
@@ -115,6 +115,8 @@ func main() {
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
+	fsAPI.SetUserAPI(userAPI)
+
 	if traceInternal {
 		userAPI = &uapi.UserInternalAPITrace{
 			Impl: userAPI,
