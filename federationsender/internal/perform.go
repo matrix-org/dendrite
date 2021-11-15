@@ -132,6 +132,7 @@ func (r *FederationSenderInternalAPI) PerformJoin(
 	)
 }
 
+// nolint:gocyclo
 func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	ctx context.Context,
 	roomID, userID string,
@@ -149,6 +150,11 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 		supportedVersions,
 	)
 	if err != nil {
+		// A well-formed HTTP error response that isn't in the 500s isn't fatal,
+		// so we shouldn't punish the server by backing off.
+		if httpErr, ok := err.(gomatrix.HTTPError); ok && httpErr.Code < 500 {
+			return httpErr
+		}
 		// TODO: Check if the user was not allowed to join the room.
 		r.statistics.ForServer(serverName).Failure()
 		return fmt.Errorf("r.federation.MakeJoin: %w", err)
@@ -157,20 +163,27 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 
 	// Set all the fields to be what they should be, this should be a no-op
 	// but it's possible that the remote server returned us something "odd"
-	respMakeJoin.JoinEvent.Type = gomatrixserverlib.MRoomMember
-	respMakeJoin.JoinEvent.Sender = userID
-	respMakeJoin.JoinEvent.StateKey = &userID
-	respMakeJoin.JoinEvent.RoomID = roomID
-	respMakeJoin.JoinEvent.Redacts = ""
-	if content == nil {
-		content = map[string]interface{}{}
+	switch {
+	case respMakeJoin.JoinEvent.Type != gomatrixserverlib.MRoomMember:
+		fallthrough
+	case respMakeJoin.JoinEvent.Sender != userID:
+		fallthrough
+	case respMakeJoin.JoinEvent.StateKey == nil:
+		fallthrough
+	case *respMakeJoin.JoinEvent.StateKey != userID:
+		fallthrough
+	case respMakeJoin.JoinEvent.RoomID != roomID:
+		fallthrough
+	case respMakeJoin.JoinEvent.Redacts != "":
+		fallthrough
+	case len(respMakeJoin.JoinEvent.Content) == 0:
+		return fmt.Errorf("respMakeJoin.JoinEvent contains invalid values")
 	}
-	content["membership"] = "join"
+	if err = json.Unmarshal(respMakeJoin.JoinEvent.Content, &content); err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
+	}
 	if err = respMakeJoin.JoinEvent.SetContent(content); err != nil {
 		return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
-	}
-	if err = respMakeJoin.JoinEvent.SetUnsigned(struct{}{}); err != nil {
-		return fmt.Errorf("respMakeJoin.JoinEvent.SetUnsigned: %w", err)
 	}
 
 	// Work out if we support the room version that has been supplied in
@@ -227,8 +240,17 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 	// to complete, but if the client does give up waiting, we'll
 	// still continue to process the join anyway so that we don't
 	// waste the effort.
+	waiterr := make(chan error, 1)
 	go func() {
+		defer close(waiterr)
 		defer cancel()
+
+		// If the remote server returned a signed membership event then
+		// we will use that instead. That is necessary for restricted
+		// joins to work.
+		if respSendJoin.Event != nil {
+			event = respSendJoin.Event
+		}
 
 		// TODO: Can we expand Check here to return a list of missing auth
 		// events rather than failing one at a time?
@@ -238,6 +260,7 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 				"room_id": roomID,
 				"user_id": userID,
 			}).WithError(err).Error("Failed to process room join response")
+			waiterr <- err
 			return
 		}
 
@@ -255,12 +278,17 @@ func (r *FederationSenderInternalAPI) performJoinUsingServer(
 				"room_id": roomID,
 				"user_id": userID,
 			}).WithError(err).Error("Failed to send room join response to roomserver")
+			waiterr <- err
 			return
 		}
 	}()
 
-	<-ctx.Done()
-	return nil
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-waiterr:
+		return err
+	}
 }
 
 // PerformOutboundPeekRequest implements api.FederationSenderInternalAPI

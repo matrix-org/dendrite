@@ -149,6 +149,18 @@ func MissingParam(msg string) *MatrixError {
 	return &MatrixError{"M_MISSING_PARAM", msg}
 }
 
+// UnableToAuthoriseJoin is an error that is returned when a server that we
+// are trying to join via doesn't know enough to authorise a restricted join.
+func UnableToAuthoriseJoin(msg string) *MatrixError {
+	return &MatrixError{"M_UNABLE_TO_AUTHORISE_JOIN", msg}
+}
+
+// UnableToGrantJoin is an error that is returned when a server that we
+// are trying to join via doesn't have a user with power to invite.
+func UnableToGrantJoin(msg string) *MatrixError {
+	return &MatrixError{"M_UNABLE_TO_GRANT_JOIN", msg}
+}
+
 type IncompatibleRoomVersionError struct {
 	RoomVersion string `json:"room_version"`
 	Error       string `json:"error"`
@@ -161,7 +173,7 @@ func IncompatibleRoomVersion(roomVersion gomatrixserverlib.RoomVersion) *Incompa
 	return &IncompatibleRoomVersionError{
 		Code:        "M_INCOMPATIBLE_ROOM_VERSION",
 		RoomVersion: string(roomVersion),
-		Error:       "Your homeserver does not support the features required to join this room",
+		Error:       fmt.Sprintf("Your homeserver does not support the features required to join this version %q room", roomVersion),
 	}
 }
 

@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -150,6 +151,7 @@ func (r *Joiner) performJoinRoomByAlias(
 }
 
 // TODO: Break this function up a bit
+// nolint:gocyclo
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
@@ -175,8 +177,8 @@ func (r *Joiner) performJoinRoomByID(
 
 	// If the server name in the room ID isn't ours then it's a
 	// possible candidate for finding the room via federation. Add
-	// it to the list of servers to try.
-	if domain != r.Cfg.Matrix.ServerName {
+	// it to the list of servers to try if we have no better ideas.
+	if len(req.ServerNames) == 0 && domain != r.Cfg.Matrix.ServerName {
 		req.ServerNames = append(req.ServerNames, domain)
 	}
 
@@ -240,6 +242,76 @@ func (r *Joiner) performJoinRoomByID(
 		return req.RoomIDOrAlias, joinedVia, err
 	}
 
+	// Check if the room is a restricted room. If so, update the event
+	// builder content. If we can validate that we have a user in one of
+	// the restricted rooms then populate 'join_authorised_via_users_server',
+	// which will allow the event to pass event auth. If we can't then we
+	// leave the event as it is, which will fail auth.
+	if restricted, roomIDs, rerr := r.checkIfRestrictedJoin(ctx, req); rerr != nil {
+		return "", "", err
+	} else if restricted {
+		// Try to satisfy the join using our own users. This only works if
+		// we have users that are joined to the rooms with suitable power levels
+		// to issue invites.
+		success := false
+		for _, roomID := range roomIDs {
+			if err = r.attemptRestrictedJoinUsingRoomID(ctx, req, roomID, &eb); err == nil {
+				success = true
+				break
+			}
+		}
+
+		// If we don't, then we need to resort to doing a federated join.
+		// We'll use the users from the power level event to work out which
+		// servers are suitable candidates to join via. Only servers that have
+		// the power to issue invites are any help to us.
+		if !success {
+			var powerLevelsEvent *gomatrixserverlib.HeaderedEvent
+			var powerLevelsContent gomatrixserverlib.PowerLevelContent
+			powerLevelsEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomPowerLevels, "")
+			if err != nil {
+				return "", "", &rsAPI.PerformError{
+					Code: rsAPI.PerformErrorNotAllowed,
+					Msg:  fmt.Sprintf("Unable to retrieve the power levels: %s", err),
+				}
+			}
+			if err = json.Unmarshal(powerLevelsEvent.Content(), &powerLevelsContent); err != nil {
+				return "", "", &rsAPI.PerformError{
+					Code: rsAPI.PerformErrorNotAllowed,
+					Msg:  fmt.Sprintf("Unable to parse the power levels: %s", err),
+				}
+			}
+
+			// Don't use any of the server names from the request - they are
+			// no longer relevant.
+			var serverName gomatrixserverlib.ServerName
+			req.ServerNames = req.ServerNames[:0]
+		joinEvents:
+			for userID, pl := range powerLevelsContent.Users {
+				if pl <= powerLevelsContent.Invite {
+					continue
+				}
+				_, serverName, err = gomatrixserverlib.SplitID('@', userID)
+				if err != nil {
+					continue
+				}
+				for _, s := range req.ServerNames {
+					if s == r.Cfg.Matrix.ServerName {
+						continue
+					}
+					if s == serverName {
+						continue joinEvents
+					}
+				}
+				req.ServerNames = append(req.ServerNames, serverName)
+			}
+
+			// Attempt a federated join via the found servers.
+			joinedVia, err = r.performFederatedJoinRoomByID(ctx, req)
+			return req.RoomIDOrAlias, joinedVia, err
+		}
+	}
+
 	// Try to construct an actual join event from the template.
 	// If this succeeds then it is a sign that the room already exists
 	// locally on the homeserver.
@@ -281,7 +353,7 @@ func (r *Joiner) performJoinRoomByID(
 			if err = inputRes.Err(); err != nil {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNotAllowed,
-					Msg:  fmt.Sprintf("InputRoomEvents auth failed: %s", err),
+					Msg:  fmt.Sprintf("Failed to join the room: %s", err),
 				}
 			}
 		}
@@ -297,7 +369,7 @@ func (r *Joiner) performJoinRoomByID(
 			if len(req.ServerNames) == 0 {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNoRoom,
-					Msg:  fmt.Sprintf("room ID %q does not exist", req.RoomIDOrAlias),
+					Msg:  fmt.Sprintf("Room ID %q does not exist!", req.RoomIDOrAlias),
 				}
 			}
 		}
@@ -308,7 +380,10 @@ func (r *Joiner) performJoinRoomByID(
 
 	default:
 		// Something else went wrong.
-		return "", "", fmt.Errorf("error joining local room: %q", err)
+		return "", "", &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorNotAllowed,
+			Msg:  fmt.Sprintf("Failed to join the room: %s", err),
+		}
 	}
 
 	// By this point, if req.RoomIDOrAlias contained an alias, then
@@ -316,6 +391,137 @@ func (r *Joiner) performJoinRoomByID(
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
 	return req.RoomIDOrAlias, r.Cfg.Matrix.ServerName, nil
+}
+
+func (r *Joiner) checkIfRestrictedJoin(
+	ctx context.Context,
+	req *rsAPI.PerformJoinRequest,
+) (bool, []string, error) {
+	// Look up the join rules event for the room, so we can check if it is a
+	// restricted room or not.
+	joinRuleEvent, err := r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomJoinRules, "")
+	if err != nil {
+		return false, nil, &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorNotAllowed,
+			Msg:  fmt.Sprintf("Unable to retrieve the join rules: %s", err),
+		}
+	}
+
+	// First unmarshal the join rule itself. It might seem strange that this is
+	// a two-step process, but the Complement tests specifically populate the
+	// 'allow' field with a nonsense value that won't unmarshal and therefore
+	// trying to unmarshal a gomatrixserverlib.JoinRuleContent fails entirely.
+	// We need to get the join rule first to check if the room is restricted
+	// though, regardless of what the 'allow' key contains.
+	joinRule := struct {
+		JoinRule string `json:"join_rule"`
+	}{
+		JoinRule: gomatrixserverlib.Public,
+	}
+	if err = json.Unmarshal(joinRuleEvent.Content(), &joinRule); err != nil {
+		return false, nil, &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorNotAllowed,
+			Msg:  fmt.Sprintf("The room join rules are invalid: %s", err),
+		}
+	}
+	if joinRule.JoinRule != gomatrixserverlib.Restricted {
+		return false, nil, nil
+	}
+
+	// Then try and extract the join rule 'allow' key. It's possible that this
+	// step can fail but we need to be OK with that — if we do, we will just
+	// treat it as if it is an empty list.
+	var joinRuleAllow struct {
+		Allow []gomatrixserverlib.JoinRuleContentAllowRule `json:"allow"`
+	}
+	_ = json.Unmarshal(joinRuleEvent.Content(), &joinRuleAllow)
+
+	// Now create a list of room IDs that we can check in order to validate
+	// that the restricted join can be completed.
+	roomIDs := make([]string, 0, len(joinRuleAllow.Allow))
+	for _, allowed := range joinRuleAllow.Allow {
+		if allowed.Type != gomatrixserverlib.MRoomMembership {
+			continue
+		}
+		roomIDs = append(roomIDs, allowed.RoomID)
+	}
+	return true, roomIDs, nil
+}
+
+func (r *Joiner) attemptRestrictedJoinUsingRoomID(
+	ctx context.Context,
+	req *rsAPI.PerformJoinRequest,
+	roomID string,
+	eb *gomatrixserverlib.EventBuilder,
+) error {
+	// Dig out information from the room, including the power levels and
+	// our local members joined to that room.
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
+	if err != nil {
+		return fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	powerLevelEvent, err := r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomPowerLevels, "")
+	if err != nil {
+		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
+	}
+	powerLevels, err := powerLevelEvent.PowerLevels()
+	if err != nil {
+		return fmt.Errorf("powerLevelEvent.PowerLevels: %w", err)
+	}
+	eventNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
+	if err != nil {
+		return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
+	}
+	events, err := r.DB.Events(ctx, eventNIDs)
+	if err != nil {
+		return fmt.Errorf("r.DB.Events: %w", err)
+	}
+
+	// First of all, look and see if the joining user is joined to the
+	// allowed room. If they aren't then there's no point in doing anything
+	// else.
+	foundInAllowedRoom := false
+	for _, event := range events {
+		userID := *event.StateKey()
+		if userID == req.UserID {
+			foundInAllowedRoom = true
+			break
+		}
+	}
+	if !foundInAllowedRoom {
+		return fmt.Errorf("the user is not joined to this room")
+	}
+
+	// Now that we've confirmed that the user is joined to the allowed
+	// room, we now need to try and find an authorising user. This needs
+	// to be one of our own users with a power level sufficient to issue
+	// invites. If we find one then we can place that user ID into the
+	// `join_authorised_via_users_server` field.
+	for _, event := range events {
+		userID := *event.StateKey()
+		if userID == req.UserID {
+			continue
+		}
+		_, domain, err := gomatrixserverlib.SplitID('@', userID)
+		if err != nil || domain != r.ServerName {
+			continue
+		}
+		if powerLevels.UserLevel(userID) < powerLevels.Invite {
+			continue
+		}
+		if err := eb.SetContent(map[string]string{
+			"membership":                       gomatrixserverlib.Join,
+			"join_authorised_via_users_server": userID,
+		}); err != nil {
+			return fmt.Errorf("eb.SetContent: %w", err)
+		}
+		return nil
+	}
+
+	// If we've reached this point then we don't have any of our own
+	// users in the room able to issue invites, so we need to give up
+	// and hope that we have a suitable user in another room (if any).
+	return fmt.Errorf("no suitable power level users found in the room")
 }
 
 func (r *Joiner) performFederatedJoinRoomByID(
