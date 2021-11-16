@@ -95,6 +95,12 @@ func (t *KeyChangeConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 }
 
 func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) error {
+	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
+		// This probably shouldn't happen but stops us from panicking if we come
+		// across an update that doesn't satisfy either types.
+		return nil
+	}
+
 	logger := logrus.WithField("user_id", m.UserID)
 
 	// only send key change events which originated from us
