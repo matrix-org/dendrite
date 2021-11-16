@@ -1,3 +1,4 @@
+//go:build elementweb
 // +build elementweb
 
 package embed
