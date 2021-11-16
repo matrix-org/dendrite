@@ -1,5 +1,26 @@
 # Changelog
 
+## Dendrite 0.5.1 (2021-11-16)
+
+### Features
+
+* Experimental (although incomplete) support for joining version 8 and 9 rooms
+* State resolution v2 optimisations (close to 20% speed improvement thanks to reduced allocations)
+* Optimisations made to the federation `/send` endpoint which avoids duplicate work, reduces CPU usage and smooths out incoming federation
+* The sync API now consumes less CPU when generating sync responses (optimised `SelectStateInRange`)
+* Support for serving the `.well-known/matrix/server` endpoint from within Dendrite itself (contributed by [twentybit](https://github.com/twentybit))
+* Support for thumbnailing WebP media (contributed by [hacktivista](https://github.com/hacktivista))
+
+### Fixes
+
+* The `/publicRooms` handler now handles `POST` requests in addition to `GET` correctly
+* Only valid canonical aliases will be returned in the `/publicRooms` response
+* The media API now correctly handles `max_file_size_bytes` being configured to `0` (contributed by [database64128](https://github.com/database64128))
+* Unverifiable auth events in `/send_join` responses no longer result in a panic
+* Build issues on Windows are now resolved (contributed by [S7evinK](https://github.com/S7evinK))
+* The default power levels in a room now set the invite level to 50, as per the spec
+* A panic has been fixed when malformed messages are received in the key change consumers
+
 ## Dendrite 0.5.0 (2021-08-24)
 
 ### Features
