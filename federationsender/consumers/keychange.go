@@ -101,6 +101,9 @@ func (t *KeyChangeConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 }
 
 func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) error {
+	if m.DeviceKeys == nil {
+		return nil
+	}
 	logger := logrus.WithField("user_id", m.UserID)
 
 	// only send key change events which originated from us

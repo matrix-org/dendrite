@@ -40,7 +40,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 func NewInternalAPI(
 	base *setup.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.FederationClient,
 ) api.KeyInternalAPI {
-	consumer, producer := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
+	_, consumer, producer := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	db, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {

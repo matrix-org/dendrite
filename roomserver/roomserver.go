@@ -41,8 +41,6 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
-	_, producer := jetstream.SetupConsumerProducer(&cfg.Matrix.JetStream)
-
 	var perspectiveServerNames []gomatrixserverlib.ServerName
 	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
@@ -53,8 +51,12 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
+	js, _, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
+
 	return internal.NewRoomserverAPI(
-		cfg, roomserverDB, producer, string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent)),
+		cfg, roomserverDB, js,
+		cfg.Matrix.JetStream.TopicFor(jetstream.InputRoomEvent),
+		cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 		base.Caches, keyRing, perspectiveServerNames,
 	)
 }

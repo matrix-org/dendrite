@@ -18,9 +18,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -28,60 +26,56 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
-	clientAPIConsumer *internal.ContinualConsumer
-	db                storage.Database
-	stream            types.StreamProvider
-	notifier          *notifier.Notifier
+	jetstream nats.JetStreamContext
+	topic     string
+	db        storage.Database
+	stream    types.StreamProvider
+	notifier  *notifier.Notifier
 }
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
 func NewOutputClientDataConsumer(
 	process *process.ProcessContext,
 	cfg *config.SyncAPI,
-	kafkaConsumer sarama.Consumer,
+	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
 ) *OutputClientDataConsumer {
-	consumer := internal.ContinualConsumer{
-		Process:        process,
-		ComponentName:  "syncapi/clientapi",
-		Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData)),
-		Consumer:       kafkaConsumer,
-		PartitionStore: store,
+	return &OutputClientDataConsumer{
+		jetstream: js,
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
+		db:        store,
+		notifier:  notifier,
+		stream:    stream,
 	}
-	s := &OutputClientDataConsumer{
-		clientAPIConsumer: &consumer,
-		db:                store,
-		notifier:          notifier,
-		stream:            stream,
-	}
-	consumer.ProcessMessage = s.onMessage
-
-	return s
 }
 
 // Start consuming from room servers
 func (s *OutputClientDataConsumer) Start() error {
-	return s.clientAPIConsumer.Start()
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	return err
 }
 
 // onMessage is called when the sync server receives a new event from the client API server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+func (s *OutputClientDataConsumer) onMessage(msg *nats.Msg) {
 	// Parse out the event JSON
+	userID := msg.Header.Get(jetstream.UserID)
 	var output eventutil.AccountData
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("client API server output log: message parse failure")
 		sentry.CaptureException(err)
-		return nil
+		_ = msg.Ack()
+		return
 	}
 
 	log.WithFields(log.Fields{
@@ -90,7 +84,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 	}).Info("received data from client API server")
 
 	streamPos, err := s.db.UpsertAccountData(
-		context.TODO(), string(msg.Key), output.RoomID, output.Type,
+		context.TODO(), userID, output.RoomID, output.Type,
 	)
 	if err != nil {
 		sentry.CaptureException(err)
@@ -102,7 +96,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 	}
 
 	s.stream.Advance(streamPos)
-	s.notifier.OnNewAccountData(string(msg.Key), types.StreamingToken{AccountDataPosition: streamPos})
+	s.notifier.OnNewAccountData(userID, types.StreamingToken{AccountDataPosition: streamPos})
 
-	return nil
+	_ = msg.Ack()
 }

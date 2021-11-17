@@ -18,7 +18,7 @@ import (
 var natsServer *natsserver.Server
 var natsServerMutex sync.Mutex
 
-func SetupConsumerProducer(cfg *config.JetStream) (sarama.Consumer, sarama.SyncProducer) {
+func Prepare(cfg *config.JetStream) (nats.JetStreamContext, sarama.Consumer, sarama.SyncProducer) {
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {
 		return setupNATS(cfg, nil)
@@ -51,30 +51,30 @@ func SetupConsumerProducer(cfg *config.JetStream) (sarama.Consumer, sarama.SyncP
 	return setupNATS(cfg, nc)
 }
 
-func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (sarama.Consumer, sarama.SyncProducer) {
+func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (nats.JetStreamContext, sarama.Consumer, sarama.SyncProducer) {
 	if nc == nil {
 		var err error
 		nc, err = nats.Connect(strings.Join(cfg.Addresses, ","))
 		if err != nil {
 			logrus.WithError(err).Panic("Unable to connect to NATS")
-			return nil, nil
+			return nil, nil, nil
 		}
 	}
 
 	s, err := nc.JetStream()
 	if err != nil {
 		logrus.WithError(err).Panic("Unable to get JetStream context")
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	for _, stream := range streams {
-		stream.Name = cfg.TopicFor(stream.Name)
-		info, err := s.StreamInfo(stream.Name)
+		name := cfg.TopicFor(stream.Name)
+		info, err := s.StreamInfo(name)
 		if err != nil && err != natsclient.ErrStreamNotFound {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
 		if info == nil {
-			stream.Subjects = []string{stream.Name}
+			stream.Subjects = []string{name}
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
 			if cfg.InMemory {
@@ -82,12 +82,12 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (sarama.Consumer, sar
 			}
 
 			if _, err = s.AddStream(stream); err != nil {
-				logrus.WithError(err).WithField("stream", stream.Name).Fatal("Unable to add stream")
+				logrus.WithError(err).WithField("stream", name).Fatal("Unable to add stream")
 			}
 		}
 	}
 
 	consumer := saramajs.NewJetStreamConsumer(nc, s, "")
 	producer := saramajs.NewJetStreamProducer(nc, s, "")
-	return consumer, producer
+	return s, consumer, producer
 }

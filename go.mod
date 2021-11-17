@@ -6,22 +6,25 @@ replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.11.1-0
 
 require (
 	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
+	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/S7evinK/saramajetstream v0.0.0-20210709110708-de6efc8c4a32
-	github.com/Shopify/sarama v1.29.1
+	github.com/Shopify/sarama v1.29.0
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.7 // indirect
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.11.0
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/juju/testing v0.0.0-20210324180055-18c50b0c2098 // indirect
+	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/lib/pq v1.10.1
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
@@ -64,6 +67,7 @@ require (
 	golang.org/x/mobile v0.0.0-20210716004757-34ab1303b554
 	golang.org/x/net v0.0.0-20210927181540-4e4d966f7476
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
+	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
 	nhooyr.io/websocket v1.8.7

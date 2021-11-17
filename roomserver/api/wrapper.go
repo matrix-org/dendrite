@@ -27,6 +27,7 @@ func SendEvents(
 	ctx context.Context, rsAPI RoomserverInternalAPI,
 	kind Kind, events []*gomatrixserverlib.HeaderedEvent,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
+	async bool,
 ) error {
 	ires := make([]InputRoomEvent, len(events))
 	for i, event := range events {
@@ -38,7 +39,7 @@ func SendEvents(
 			TransactionID: txnID,
 		}
 	}
-	return SendInputRoomEvents(ctx, rsAPI, ires)
+	return SendInputRoomEvents(ctx, rsAPI, ires, async)
 }
 
 // SendEventWithState writes an event with the specified kind to the roomserver
@@ -47,7 +48,7 @@ func SendEvents(
 func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, kind Kind,
 	state *gomatrixserverlib.RespState, event *gomatrixserverlib.HeaderedEvent,
-	haveEventIDs map[string]bool,
+	haveEventIDs map[string]bool, async bool,
 ) error {
 	outliers, err := state.Events()
 	if err != nil {
@@ -79,14 +80,18 @@ func SendEventWithState(
 		StateEventIDs: stateEventIDs,
 	})
 
-	return SendInputRoomEvents(ctx, rsAPI, ires)
+	return SendInputRoomEvents(ctx, rsAPI, ires, async)
 }
 
 // SendInputRoomEvents to the roomserver.
 func SendInputRoomEvents(
-	ctx context.Context, rsAPI RoomserverInternalAPI, ires []InputRoomEvent,
+	ctx context.Context, rsAPI RoomserverInternalAPI,
+	ires []InputRoomEvent, async bool,
 ) error {
-	request := InputRoomEventsRequest{InputRoomEvents: ires}
+	request := InputRoomEventsRequest{
+		InputRoomEvents: ires,
+		Asynchronous:    async,
+	}
 	var response InputRoomEventsResponse
 	rsAPI.InputRoomEvents(ctx, &request, &response)
 	return response.Err()
