@@ -31,10 +31,11 @@ func ClientAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
 	eduInputAPI := base.EDUServerClient()
 	userAPI := base.UserAPIClient()
 	keyAPI := base.KeyServerHTTPClient()
+	psAPI := base.PushServerHTTPClient()
 
 	clientapi.AddPublicRoutes(
 		base.PublicClientAPIMux, base.SynapseAdminMux, &base.Cfg.ClientAPI, accountDB, federation,
-		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI, keyAPI, nil,
+		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI, keyAPI, psAPI, nil,
 		&cfg.MSCs,
 	)
 

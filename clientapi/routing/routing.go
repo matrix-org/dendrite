@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
+	pushserverAPI "github.com/matrix-org/dendrite/pushserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -58,6 +59,7 @@ func Setup(
 	transactionsCache *transactions.Cache,
 	federationSender federationSenderAPI.FederationSenderInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
+	psAPI pushserverAPI.PushserverInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
 ) {
@@ -478,7 +480,7 @@ func Setup(
 			if r := rateLimits.rateLimit(req); r != nil {
 				return *r
 			}
-			return Password(req, userAPI, accountDB, device, cfg)
+			return Password(req, psAPI, userAPI, accountDB, device, cfg)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -830,6 +832,21 @@ func Setup(
 	r0mux.Handle("/delete_devices",
 		httputil.MakeAuthAPI("delete_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return DeleteDevices(req, userAPI, device)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	r0mux.Handle("/pushers",
+		httputil.MakeAuthAPI("get_pushers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return GetPushers(req, device, psAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	r0mux.Handle("/pushers/set",
+		httputil.MakeAuthAPI("set_pushers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if r := rateLimits.rateLimit(req); r != nil {
+				return *r
+			}
+			return SetPusher(req, device, psAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

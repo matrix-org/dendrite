@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/federationsender"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/pushserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -174,6 +175,7 @@ func main() {
 	cfg.SigningKeyServer.Database.ConnectionString = "file:/idb/dendritejs_signingkeyserver.db"
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
+	cfg.PushServer.Database.ConnectionString = "file:/idb/dendritejs_pushserver.db"
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.Global.Kafka.Database.ConnectionString = "file:/idb/dendritejs_naffka.db"
 	cfg.Global.TrustedIDServers = []string{
@@ -215,6 +217,8 @@ func main() {
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
 
+	psAPI := pushserver.NewInternalAPI(base)
+
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
@@ -228,6 +232,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
+		PushserverAPI:       psAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}
