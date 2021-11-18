@@ -38,6 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 
@@ -180,7 +181,7 @@ func startup() {
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
-	base := setup.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith", false)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -208,12 +209,12 @@ func startup() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:       asQuery,
-		EDUInternalAPI:      eduInputAPI,
-		FederationSenderAPI: fedSenderAPI,
-		RoomserverAPI:       rsAPI,
-		UserAPI:             userAPI,
-		KeyAPI:              keyAPI,
+		AppserviceAPI:  asQuery,
+		EDUInternalAPI: eduInputAPI,
+		FederationAPI:  fedSenderAPI,
+		RoomserverAPI:  rsAPI,
+		UserAPI:        userAPI,
+		KeyAPI:         keyAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pSessions, fedSenderAPI, federation),
 	}

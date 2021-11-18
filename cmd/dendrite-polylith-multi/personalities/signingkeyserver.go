@@ -15,12 +15,12 @@
 package personalities
 
 import (
-	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/signingkeyserver"
 )
 
-func SigningKeyServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
+func SigningKeyServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	federation := base.CreateFederationClient()
 
 	intAPI := signingkeyserver.NewInternalAPI(&base.Cfg.SigningKeyServer, federation, base.Caches)
@@ -28,7 +28,7 @@ func SigningKeyServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
 
 	base.SetupAndServeHTTP(
 		base.Cfg.SigningKeyServer.InternalAPI.Listen,
-		setup.NoListener,
+		basepkg.NoListener,
 		nil, nil,
 	)
 }

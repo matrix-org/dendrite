@@ -186,7 +186,7 @@ func main() {
 
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,
-		FederationSenderAPI:    fsAPI,
+		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
 		ServerKeyAPI:           serverKeyAPI,
 		UserAPI:                userAPI,

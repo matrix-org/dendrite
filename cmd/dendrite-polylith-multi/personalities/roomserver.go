@@ -16,11 +16,11 @@ package personalities
 
 import (
 	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func RoomServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
+func RoomServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	serverKeyAPI := base.SigningKeyServerHTTPClient()
 	keyRing := serverKeyAPI.KeyRing()
 
@@ -33,7 +33,7 @@ func RoomServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
 
 	base.SetupAndServeHTTP(
 		base.Cfg.RoomServer.InternalAPI.Listen, // internal listener
-		setup.NoListener,                       // external listener
+		basepkg.NoListener,                     // external listener
 		nil, nil,
 	)
 }
