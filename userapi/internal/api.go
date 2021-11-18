@@ -119,6 +119,9 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	}
 	res.DeviceCreated = true
 	res.Device = dev
+	if req.NoDeviceListUpdate {
+		return nil
+	}
 	// create empty device keys and upload them to trigger device list changes
 	return a.deviceListUpdate(dev.UserID, []string{dev.ID})
 }

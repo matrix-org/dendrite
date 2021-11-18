@@ -290,6 +290,10 @@ type PerformDeviceCreationRequest struct {
 	IPAddr string
 	// Useragent for this device
 	UserAgent string
+	// NoDeviceListUpdate determines whether we should avoid sending a device list
+	// update for this account. Generally the only reason to do this is if the account
+	// is an appservice account.
+	NoDeviceListUpdate bool
 }
 
 // PerformDeviceCreationResponse is the response for PerformDeviceCreation

@@ -131,10 +131,11 @@ func generateAppServiceAccount(
 	}
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(context.Background(), &userapi.PerformDeviceCreationRequest{
-		Localpart:         as.SenderLocalpart,
-		AccessToken:       as.ASToken,
-		DeviceID:          &as.SenderLocalpart,
-		DeviceDisplayName: &as.SenderLocalpart,
+		Localpart:          as.SenderLocalpart,
+		AccessToken:        as.ASToken,
+		DeviceID:           &as.SenderLocalpart,
+		DeviceDisplayName:  &as.SenderLocalpart,
+		NoDeviceListUpdate: true,
 	}, &devRes)
 	return err
 }
