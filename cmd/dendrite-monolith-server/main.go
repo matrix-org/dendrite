@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/signingkeyserver"
@@ -71,7 +72,7 @@ func main() {
 		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
 	}
 
-	base := setup.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
+	base := basepkg.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -148,13 +149,13 @@ func main() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:       asAPI,
-		EDUInternalAPI:      eduInputAPI,
-		FederationSenderAPI: fsAPI,
-		RoomserverAPI:       rsAPI,
-		ServerKeyAPI:        skAPI,
-		UserAPI:             userAPI,
-		KeyAPI:              keyAPI,
+		AppserviceAPI:  asAPI,
+		EDUInternalAPI: eduInputAPI,
+		FederationAPI:  fsAPI,
+		RoomserverAPI:  rsAPI,
+		ServerKeyAPI:   skAPI,
+		UserAPI:        userAPI,
+		KeyAPI:         keyAPI,
 	}
 	monolith.AddAllPublicRoutes(
 		base.ProcessContext,
@@ -184,9 +185,9 @@ func main() {
 	if *certFile != "" && *keyFile != "" {
 		go func() {
 			base.SetupAndServeHTTP(
-				setup.NoListener,  // internal API
-				httpsAddr,         // external API
-				certFile, keyFile, // TLS settings
+				basepkg.NoListener, // internal API
+				httpsAddr,          // external API
+				certFile, keyFile,  // TLS settings
 			)
 		}()
 	}

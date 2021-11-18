@@ -16,7 +16,7 @@ type RoomserverInternalAPITrace struct {
 	Impl RoomserverInternalAPI
 }
 
-func (t *RoomserverInternalAPITrace) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
+func (t *RoomserverInternalAPITrace) SetFederationSenderAPI(fsAPI fsAPI.FederationInternalAPI) {
 	t.Impl.SetFederationSenderAPI(fsAPI)
 }
 

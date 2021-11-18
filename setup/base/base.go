@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package setup
+package base
 
 import (
 	"context"
@@ -47,7 +47,7 @@ import (
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	eduinthttp "github.com/matrix-org/dendrite/eduserver/inthttp"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationapi/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	fsinthttp "github.com/matrix-org/dendrite/federationapi/inthttp"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
@@ -89,10 +89,10 @@ type BaseDendrite struct {
 	//	KafkaProducer          sarama.SyncProducer
 }
 
+const NoListener = ""
+
 const HTTPServerTimeout = time.Minute * 5
 const HTTPClientTimeout = time.Second * 30
-
-const NoListener = ""
 
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
@@ -250,7 +250,7 @@ func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
 
 // FederationSenderHTTPClient returns FederationInternalAPI for hitting
 // the federation sender over HTTP
-func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationInternalAPI {
+func (b *BaseDendrite) FederationSenderHTTPClient() federationAPI.FederationInternalAPI {
 	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.apiHttpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.apiHttpClient)

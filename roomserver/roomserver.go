@@ -22,7 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/kafka"
 	"github.com/sirupsen/logrus"
@@ -37,7 +37,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.RoomserverInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *setup.BaseDendrite,
+	base *base.BaseDendrite,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
