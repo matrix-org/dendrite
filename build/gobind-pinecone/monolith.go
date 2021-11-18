@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
@@ -281,7 +282,7 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	base := setup.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith", false)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -321,7 +322,7 @@ func (m *DendriteMonolith) Start() {
 
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,
-		FederationSenderAPI:    fsAPI,
+		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
 		UserAPI:                m.userAPI,
 		KeyAPI:                 keyAPI,

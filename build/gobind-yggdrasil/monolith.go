@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -102,7 +103,7 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	base := setup.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith", false)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -141,12 +142,12 @@ func (m *DendriteMonolith) Start() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:       asAPI,
-		EDUInternalAPI:      eduInputAPI,
-		FederationSenderAPI: fsAPI,
-		RoomserverAPI:       rsAPI,
-		UserAPI:             userAPI,
-		KeyAPI:              keyAPI,
+		AppserviceAPI:  asAPI,
+		EDUInternalAPI: eduInputAPI,
+		FederationAPI:  fsAPI,
+		RoomserverAPI:  rsAPI,
+		UserAPI:        userAPI,
+		KeyAPI:         keyAPI,
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,
 		),

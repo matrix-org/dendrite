@@ -17,7 +17,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -172,7 +172,7 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	if err != nil {
 		t.Fatalf("failed to make caches: %s", err)
 	}
-	base := &setup.BaseDendrite{
+	base := &base.BaseDendrite{
 		Caches: cache,
 		Cfg:    cfg,
 	}

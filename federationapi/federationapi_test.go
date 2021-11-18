@@ -8,7 +8,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/test"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -26,7 +26,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource("file::memory:")
 	cfg.FederationSender.Database.ConnectionString = config.DataSource("file::memory:")
-	base := setup.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith", false)
 	keyRing := &test.NopJSONVerifier{}
 	fsAPI := base.FederationSenderHTTPClient()
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
