@@ -20,7 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -47,7 +47,7 @@ func DirectoryRoom(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	fedSenderAPI federationSenderAPI.FederationSenderInternalAPI,
+	fedSenderAPI federationSenderAPI.FederationInternalAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {

@@ -58,7 +58,7 @@ services:
   federation_sender:
     hostname: federation_sender
     image: matrixdotorg/dendrite-polylith:latest
-    command: federationsender
+    command: federationapi
     volumes:
       - ./config:/etc/dendrite
     networks:

@@ -24,8 +24,8 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -272,7 +272,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
 	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-signingkeyserver.db", m.StorageDirectory, prefix))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
+	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationapi.db", m.StorageDirectory, prefix))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
@@ -294,7 +294,7 @@ func (m *DendriteMonolith) Start() {
 		base, keyRing,
 	)
 
-	fsAPI := federationsender.NewInternalAPI(
+	fsAPI := federationapi.NewInternalAPI(
 		base, federation, rsAPI, keyRing, true,
 	)
 

@@ -21,7 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/api"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/mediaapi"
@@ -46,7 +46,7 @@ type Monolith struct {
 
 	AppserviceAPI       appserviceAPI.AppServiceQueryAPI
 	EDUInternalAPI      eduServerAPI.EDUServerInputAPI
-	FederationSenderAPI federationSenderAPI.FederationSenderInternalAPI
+	FederationSenderAPI federationSenderAPI.FederationInternalAPI
 	RoomserverAPI       roomserverAPI.RoomserverInternalAPI
 	ServerKeyAPI        serverKeyAPI.SigningKeyServerAPI
 	UserAPI             userapi.UserInternalAPI

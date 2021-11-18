@@ -33,7 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -198,7 +198,7 @@ func startup() {
 		base, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
-	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, keyRing, true)
+	fedSenderAPI := federationapi.NewInternalAPI(base, federation, rsAPI, keyRing, true)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 
 	monolith := setup.Monolith{

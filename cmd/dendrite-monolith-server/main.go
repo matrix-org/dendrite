@@ -21,7 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -101,11 +101,11 @@ func main() {
 		}
 	}
 
-	fsAPI := federationsender.NewInternalAPI(
+	fsAPI := federationapi.NewInternalAPI(
 		base, federation, rsAPI, keyRing, false,
 	)
 	if base.UseHTTPAPIs {
-		federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
+		federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationSenderHTTPClient()
 	}
 	// The underlying roomserver implementation needs to be able to call the fedsender.

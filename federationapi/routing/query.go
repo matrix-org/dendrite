@@ -19,7 +19,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
@@ -33,7 +33,7 @@ func RoomAliasToID(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.FederationAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	senderAPI federationSenderAPI.FederationSenderInternalAPI,
+	senderAPI federationSenderAPI.FederationInternalAPI,
 ) util.JSONResponse {
 	roomAlias := httpReq.FormValue("room_alias")
 	if roomAlias == "" {

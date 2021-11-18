@@ -44,7 +44,7 @@ func main() {
 		"clientapi":        personalities.ClientAPI,
 		"eduserver":        personalities.EDUServer,
 		"federationapi":    personalities.FederationAPI,
-		"federationsender": personalities.FederationSender,
+		"federationapi": personalities.FederationSender,
 		"keyserver":        personalities.KeyServer,
 		"mediaapi":         personalities.MediaAPI,
 		"roomserver":       personalities.RoomServer,

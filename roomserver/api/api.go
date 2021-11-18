@@ -4,7 +4,7 @@ import (
 	"context"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 )
 
 // RoomserverInputAPI is used to write events to the room server.

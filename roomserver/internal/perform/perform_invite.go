@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
@@ -33,7 +33,7 @@ import (
 type Inviter struct {
 	DB      storage.Database
 	Cfg     *config.RoomServer
-	FSAPI   federationSenderAPI.FederationSenderInternalAPI
+	FSAPI   federationSenderAPI.FederationInternalAPI
 	Inputer *input.Inputer
 }
 

@@ -47,8 +47,8 @@ import (
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	eduinthttp "github.com/matrix-org/dendrite/eduserver/inthttp"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
-	fsinthttp "github.com/matrix-org/dendrite/federationsender/inthttp"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationapi/api"
+	fsinthttp "github.com/matrix-org/dendrite/federationapi/inthttp"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -248,9 +248,9 @@ func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
 	return e
 }
 
-// FederationSenderHTTPClient returns FederationSenderInternalAPI for hitting
+// FederationSenderHTTPClient returns FederationInternalAPI for hitting
 // the federation sender over HTTP
-func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationSenderInternalAPI {
+func (b *BaseDendrite) FederationSenderHTTPClient() federationSenderAPI.FederationInternalAPI {
 	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.apiHttpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.apiHttpClient)

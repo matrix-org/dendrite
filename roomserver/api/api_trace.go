@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/util"
 )
 

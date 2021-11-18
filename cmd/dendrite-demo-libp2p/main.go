@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
 	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -132,7 +132,7 @@ func main() {
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
 	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-signingkeyserver.db", *instanceName))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
+	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
@@ -167,7 +167,7 @@ func main() {
 	)
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
-	fsAPI := federationsender.NewInternalAPI(
+	fsAPI := federationapi.NewInternalAPI(
 		&base.Base, federation, rsAPI, keyRing, true,
 	)
 	rsAPI.SetFederationSenderAPI(fsAPI)

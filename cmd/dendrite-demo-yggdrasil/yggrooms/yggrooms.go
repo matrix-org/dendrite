@@ -20,19 +20,19 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
-	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 type YggdrasilRoomProvider struct {
 	node      *yggconn.Node
-	fedSender api.FederationSenderInternalAPI
+	fedSender api.FederationInternalAPI
 	fedClient *gomatrixserverlib.FederationClient
 }
 
 func NewYggdrasilRoomProvider(
-	node *yggconn.Node, fedSender api.FederationSenderInternalAPI, fedClient *gomatrixserverlib.FederationClient,
+	node *yggconn.Node, fedSender api.FederationInternalAPI, fedClient *gomatrixserverlib.FederationClient,
 ) *YggdrasilRoomProvider {
 	p := &YggdrasilRoomProvider{
 		node:      node,

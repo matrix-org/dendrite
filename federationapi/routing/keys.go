@@ -21,7 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationSenderAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -179,7 +179,7 @@ func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserver
 
 func NotaryKeys(
 	httpReq *http.Request, cfg *config.FederationAPI,
-	fsAPI federationSenderAPI.FederationSenderInternalAPI,
+	fsAPI federationSenderAPI.FederationInternalAPI,
 	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
 ) util.JSONResponse {
 	if req == nil {

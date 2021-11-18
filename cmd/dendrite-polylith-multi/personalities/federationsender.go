@@ -15,7 +15,7 @@
 package personalities
 
 import (
-	"github.com/matrix-org/dendrite/federationsender"
+	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -27,10 +27,10 @@ func FederationSender(base *setup.BaseDendrite, cfg *config.Dendrite) {
 	keyRing := serverKeyAPI.KeyRing()
 
 	rsAPI := base.RoomserverHTTPClient()
-	fsAPI := federationsender.NewInternalAPI(
+	fsAPI := federationapi.NewInternalAPI(
 		base, federation, rsAPI, keyRing, false,
 	)
-	federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
+	federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.FederationSender.InternalAPI.Listen, // internal listener

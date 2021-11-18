@@ -16,7 +16,7 @@ package keyserver
 
 import (
 	"github.com/gorilla/mux"
-	fedsenderapi "github.com/matrix-org/dendrite/federationsender/api"
+	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/consumers"
 	"github.com/matrix-org/dendrite/keyserver/internal"

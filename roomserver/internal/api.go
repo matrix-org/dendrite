@@ -6,7 +6,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -37,7 +37,7 @@ type RoomserverInternalAPI struct {
 	Cache                  caching.RoomServerCaches
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
-	fsAPI                  fsAPI.FederationSenderInternalAPI
+	fsAPI                  fsAPI.FederationInternalAPI
 	asAPI                  asAPI.AppServiceQueryAPI
 	OutputRoomEventTopic   string // Kafka topic for new output room events
 	PerspectiveServerNames []gomatrixserverlib.ServerName
@@ -77,7 +77,7 @@ func NewRoomserverAPI(
 // SetFederationSenderInputAPI passes in a federation sender input API reference
 // so that we can avoid the chicken-and-egg problem of both the roomserver input API
 // and the federation sender input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
+func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationInternalAPI) {
 	r.fsAPI = fsAPI
 
 	r.Inviter = &perform.Inviter{

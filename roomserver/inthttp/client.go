@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
-	fsInputAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsInputAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -83,7 +83,7 @@ func NewRoomserverClient(
 }
 
 // SetFederationSenderInputAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsInputAPI.FederationSenderInternalAPI) {
+func (h *httpRoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsInputAPI.FederationInternalAPI) {
 }
 
 // SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario

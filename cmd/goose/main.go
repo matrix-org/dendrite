@@ -20,7 +20,7 @@ import (
 
 const (
 	AppService       = "appservice"
-	FederationSender = "federationsender"
+	FederationSender = "federationapi"
 	KeyServer        = "keyserver"
 	MediaAPI         = "mediaapi"
 	RoomServer       = "roomserver"
