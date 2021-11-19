@@ -25,7 +25,8 @@ type Database interface {
 	// UpsertPresence creates/updates the presence status of a user.
 	UpsertPresence(
 		ctx context.Context,
-		userID, statusMsg string,
+		userID string,
+		statusMsg *string,
 		presence types.PresenceStatus,
 		lastActiveTS int64,
 	) (pos int64, err error)

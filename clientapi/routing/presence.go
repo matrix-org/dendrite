@@ -32,8 +32,8 @@ import (
 )
 
 type presenceRequest struct {
-	Presence  string `json:"presence"`
-	StatusMsg string `json:"status_msg"`
+	Presence  string  `json:"presence"`
+	StatusMsg *string `json:"status_msg"`
 }
 
 // SetPresence updates the users presence status
@@ -145,7 +145,7 @@ func GetPresence(req *http.Request,
 	resp := presenceResponse{}
 	lastActive := time.Since(presence.LastActiveTS.Time())
 	resp.LastActiveAgo = lastActive.Milliseconds()
-	resp.StatusMsg = presence.StatusMsg
+	resp.StatusMsg = *presence.StatusMsg
 	resp.CurrentlyActive = lastActive <= time.Minute*5
 	if !resp.CurrentlyActive {
 		presence.PresenceStatus = types.Unavailable

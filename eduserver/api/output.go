@@ -62,18 +62,18 @@ type OutputCrossSigningKeyUpdate struct {
 type OutputPresenceData struct {
 	UserID        string                      `json:"user_id"`
 	Presence      types.PresenceStatus        `json:"presence"`
-	StatusMsg     string                      `json:"status_msg,omitempty"`
+	StatusMsg     *string                     `json:"status_msg,omitempty"`
 	LastActiveTS  gomatrixserverlib.Timestamp `json:"last_active_ts"`
 	LastActiveAgo int64                       `json:"last_active_ago,omitempty"`
 	StreamPos     types2.StreamPosition       `json:"stream_pos"`
 }
 
 type FederationPresenceSingle struct {
-	CurrentlyActive bool   `json:"currently_active"`
-	LastActiveAgo   int    `json:"last_active_ago"`
-	Presence        string `json:"presence"`
-	UserID          string `json:"user_id"`
-	StatusMsg       string `json:"status_msg"`
+	CurrentlyActive bool    `json:"currently_active"`
+	LastActiveAgo   int     `json:"last_active_ago"`
+	Presence        string  `json:"presence"`
+	UserID          string  `json:"user_id"`
+	StatusMsg       *string `json:"status_msg"`
 }
 
 type FederationPresenceData struct {

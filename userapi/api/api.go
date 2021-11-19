@@ -340,7 +340,7 @@ type InputPresenceRequest struct {
 	DisplayName  string
 	AvatarURL    string
 	Presence     types.PresenceStatus
-	StatusMsg    string
+	StatusMsg    *string
 	LastActiveTS int64
 }
 
@@ -359,7 +359,7 @@ type QueryPresenceForUserResponse struct {
 	UserID          string                      `json:"user_id"`
 	PresenceStatus  types.PresenceStatus        `json:"presence_status"`
 	Presence        string                      `json:"presence"`
-	StatusMsg       string                      `json:"status_msg"`
+	StatusMsg       *string                     `json:"status_msg"`
 	LastActiveTS    gomatrixserverlib.Timestamp `json:"last_active_ts"`
 	LastActiveAgo   int64                       `json:"last_active_ago"`
 	CurrentlyActive bool                        `json:"currently_active"`

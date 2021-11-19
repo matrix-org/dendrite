@@ -43,12 +43,12 @@ CREATE INDEX IF NOT EXISTS presence_presences_user_id ON presence_presences(user
 `
 
 const upsertPresenceSQL = "" +
-	"INSERT INTO presence_presences" +
+	"INSERT INTO presence_presences AS p" +
 	" (user_id, presence, status_msg, last_active_ts)" +
 	" VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (user_id)" +
 	" DO UPDATE SET id = (select max(id) from presence_presences)+1," +
-	" presence = $5, status_msg = $6, last_active_ts = $7" +
+	" presence = $5, status_msg = COALESCE($6, p.status_msg), last_active_ts = $7" +
 	" RETURNING id"
 
 const selectPresenceForUserSQL = "" +
@@ -95,8 +95,9 @@ func (p *presenceStatements) prepare(db *sql.DB) (err error) {
 // UpsertPresence creates/updates a presence status.
 func (p *presenceStatements) UpsertPresence(
 	ctx context.Context,
-	txn *sql.Tx, userID,
-	statusMsg string,
+	txn *sql.Tx,
+	userID string,
+	statusMsg *string,
 	presence types.PresenceStatus,
 	lastActiveTS int64,
 ) (pos int64, err error) {

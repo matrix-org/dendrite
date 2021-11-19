@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	types2 "github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -149,6 +150,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	activeSyncRequests.Inc()
 	defer activeSyncRequests.Dec()
 
+	rp.updatePresence(req, device)
 	rp.updateLastSeen(req, device)
 
 	waitingSyncRequests.Inc()
@@ -256,6 +258,23 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		Code: http.StatusOK,
 		JSON: syncReq.Response,
 	}
+}
+
+// updatePresence updates/sets the presence if user asks for it
+func (rp *RequestPool) updatePresence(req *http.Request, device *userapi.Device) {
+	presence := req.URL.Query().Get("set_presence")
+
+	// If this parameter is omitted then the client is automatically marked as online when it uses this API.
+	if presence == "" {
+		presence = "online"
+	}
+	pReq := &userapi.InputPresenceRequest{
+		UserID:       device.UserID,
+		Presence:     types2.ToPresenceStatus(presence),
+		LastActiveTS: time.Now().Unix(),
+	}
+	go rp.userAPI.InputPresenceData(req.Context(), pReq, &userapi.InputPresenceResponse{}) // nolint:errcheck
+
 }
 
 func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *userapi.Device) util.JSONResponse {

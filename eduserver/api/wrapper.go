@@ -95,7 +95,7 @@ func SetPresence(
 	ctx context.Context,
 	eduAPI EDUServerInputAPI,
 	userAPI userapi.UserInternalAPI,
-	userID, statusMsg string,
+	userID string, statusMsg *string,
 	presence types.PresenceStatus,
 	lastActiveTS gomatrixserverlib.Timestamp,
 ) error {

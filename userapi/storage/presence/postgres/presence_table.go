@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS presence_presences (
 	-- The actual presence
 	presence INT NOT NULL,
 	-- The status message
-	status_msg TEXT NOT NULL,
+	status_msg TEXT,
 	-- The last time an action was received by this user
 	last_active_ts BIGINT NOT NULL,
 	CONSTRAINT presence_presences_unique UNIQUE (user_id)
@@ -96,8 +96,9 @@ func (p *presenceStatements) prepare(db *sql.DB) (err error) {
 // UpsertPresence creates/updates a presence status.
 func (p *presenceStatements) UpsertPresence(
 	ctx context.Context,
-	txn *sql.Tx, userID,
-	statusMsg string,
+	txn *sql.Tx,
+	userID string,
+	statusMsg *string,
 	presence types.PresenceStatus,
 	lastActiveTS int64,
 ) (pos int64, err error) {

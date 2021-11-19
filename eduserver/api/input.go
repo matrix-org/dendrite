@@ -81,7 +81,7 @@ type InputReceiptEventResponse struct{}
 type InputPresenceRequest struct {
 	UserID       string                      `json:"user_id"`
 	Presence     types.PresenceStatus        `json:"status"`
-	StatusMsg    string                      `json:"status_msg"`
+	StatusMsg    *string                     `json:"status_msg"`
 	LastActiveTS gomatrixserverlib.Timestamp `json:"last_active_ts"`
 	StreamPos    types2.StreamPosition       `json:"stream_pos"`
 }

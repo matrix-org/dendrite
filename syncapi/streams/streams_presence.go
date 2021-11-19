@@ -30,11 +30,11 @@ func (p *PresenceStreamProvider) CompleteSync(ctx context.Context, req *types.Sy
 }
 
 type outputPresence struct {
-	AvatarUrl       string `json:"avatar_url,omitempty"`
-	CurrentlyActive bool   `json:"currently_active,omitempty"`
-	LastActiveAgo   int64  `json:"last_active_ago,omitempty"`
-	Presence        string `json:"presence,omitempty"`
-	StatusMsg       string `json:"status_msg,omitempty"`
+	AvatarUrl       string  `json:"avatar_url,omitempty"`
+	CurrentlyActive bool    `json:"currently_active,omitempty"`
+	LastActiveAgo   int64   `json:"last_active_ago,omitempty"`
+	Presence        string  `json:"presence,omitempty"`
+	StatusMsg       *string `json:"status_msg,omitempty"`
 }
 
 func (p *PresenceStreamProvider) IncrementalSync(ctx context.Context, req *types.SyncRequest, from, to types.StreamPosition) types.StreamPosition {

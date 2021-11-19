@@ -56,7 +56,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
 
 func (d *Database) UpsertPresence(
 	ctx context.Context,
-	userID, statusMsg string,
+	userID string,
+	statusMsg *string,
 	presence types.PresenceStatus,
 	lastActiveTS int64,
 ) (pos int64, err error) {
