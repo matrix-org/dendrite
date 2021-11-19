@@ -18,7 +18,7 @@ type Streams struct {
 	InviteStreamProvider       types.StreamProvider
 	SendToDeviceStreamProvider types.StreamProvider
 	AccountDataStreamProvider  types.StreamProvider
-	PresenceDataStreamProdiver types.StreamProvider
+	PresenceDataStreamProvider types.StreamProvider
 	DeviceListStreamProvider   types.PartitionedStreamProvider
 }
 
@@ -48,7 +48,7 @@ func NewSyncStreamProviders(
 			StreamProvider: StreamProvider{DB: d},
 			userAPI:        userAPI,
 		},
-		PresenceDataStreamProdiver: &PresenceStreamProvider{
+		PresenceDataStreamProvider: &PresenceStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
 			UserAPI:        userAPI,
 		},
@@ -66,7 +66,7 @@ func NewSyncStreamProviders(
 	streams.SendToDeviceStreamProvider.Setup()
 	streams.AccountDataStreamProvider.Setup()
 	streams.DeviceListStreamProvider.Setup()
-	streams.PresenceDataStreamProdiver.Setup()
+	streams.PresenceDataStreamProvider.Setup()
 
 	return streams
 }
@@ -80,6 +80,6 @@ func (s *Streams) Latest(ctx context.Context) types.StreamingToken {
 		SendToDevicePosition: s.SendToDeviceStreamProvider.LatestPosition(ctx),
 		AccountDataPosition:  s.AccountDataStreamProvider.LatestPosition(ctx),
 		DeviceListPosition:   s.DeviceListStreamProvider.LatestPosition(ctx),
-		PresenceDataPosition: s.PresenceDataStreamProdiver.LatestPosition(ctx),
+		PresenceDataPosition: s.PresenceDataStreamProvider.LatestPosition(ctx),
 	}
 }

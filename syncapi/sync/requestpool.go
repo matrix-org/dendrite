@@ -210,7 +210,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
-			PresenceDataPosition: rp.streams.PresenceDataStreamProdiver.CompleteSync(
+			PresenceDataPosition: rp.streams.PresenceDataStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
 		}
@@ -245,7 +245,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				syncReq.Context, syncReq,
 				syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
 			),
-			PresenceDataPosition: rp.streams.PresenceDataStreamProdiver.IncrementalSync(
+			PresenceDataPosition: rp.streams.PresenceDataStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
 				syncReq.Since.PresenceDataPosition, currentPos.PresenceDataPosition,
 			),
