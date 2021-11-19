@@ -198,7 +198,7 @@ func startup() {
 		base, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
-	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, keyRing, true)
+	fedSenderAPI := federationsender.NewInternalAPI(base, federation, rsAPI, userAPI, keyRing, true)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
 
 	monolith := setup.Monolith{
