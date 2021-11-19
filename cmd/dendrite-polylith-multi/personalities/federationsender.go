@@ -28,7 +28,7 @@ func FederationSender(base *setup.BaseDendrite, cfg *config.Dendrite) {
 
 	rsAPI := base.RoomserverHTTPClient()
 	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, false,
+		base, federation, rsAPI, nil, keyRing, false,
 	)
 	federationsender.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 
