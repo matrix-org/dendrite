@@ -74,7 +74,7 @@ const selectRoomInfoSQL = "" +
 	"SELECT room_version, room_nid, state_snapshot_nid, latest_event_nids FROM roomserver_rooms WHERE room_id = $1"
 
 const selectRoomIDsSQL = "" +
-	"SELECT room_id FROM roomserver_rooms"
+	"SELECT room_id FROM roomserver_rooms WHERE array_length(latest_event_nids, 1) > 0"
 
 const bulkSelectRoomIDsSQL = "" +
 	"SELECT room_id FROM roomserver_rooms WHERE room_nid = ANY($1)"

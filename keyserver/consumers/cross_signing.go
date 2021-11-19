@@ -77,6 +77,11 @@ func (t *OutputCrossSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMess
 		logrus.WithError(err).Errorf("failed to read device message from key change topic")
 		return nil
 	}
+	if m.OutputCrossSigningKeyUpdate == nil {
+		// This probably shouldn't happen but stops us from panicking if we come
+		// across an update that doesn't satisfy either types.
+		return nil
+	}
 	switch m.Type {
 	case api.TypeCrossSigningUpdate:
 		return t.onCrossSigningMessage(m)
