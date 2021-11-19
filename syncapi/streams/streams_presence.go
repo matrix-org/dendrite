@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -12,14 +13,15 @@ import (
 
 type PresenceStreamProvider struct {
 	StreamProvider
-	UserAPI userapi.UserInternalAPI
+	userAPI userapi.UserInternalAPI
+	rsAPI   api.RoomserverInternalAPI
 }
 
 func (p *PresenceStreamProvider) Setup() {
 	p.StreamProvider.Setup()
 
 	res := userapi.QueryMaxPresenceIDResponse{}
-	if err := p.UserAPI.QueryMaxPresenceID(context.Background(), &userapi.QueryMaxPresenceIDRequest{}, &res); err != nil {
+	if err := p.userAPI.QueryMaxPresenceID(context.Background(), &userapi.QueryMaxPresenceIDRequest{}, &res); err != nil {
 		panic(err)
 	}
 	p.latest = types.StreamPosition(res.ID)
@@ -39,7 +41,7 @@ type outputPresence struct {
 
 func (p *PresenceStreamProvider) IncrementalSync(ctx context.Context, req *types.SyncRequest, from, to types.StreamPosition) types.StreamPosition {
 	res := userapi.QueryPresenceAfterResponse{}
-	if err := p.UserAPI.QueryPresenceAfter(ctx, &userapi.QueryPresenceAfterRequest{StreamPos: int64(from)}, &res); err != nil {
+	if err := p.userAPI.QueryPresenceAfter(ctx, &userapi.QueryPresenceAfterRequest{StreamPos: int64(from)}, &res); err != nil {
 		req.Log.WithError(err).Error("unable to fetch presence after")
 		return from
 	}

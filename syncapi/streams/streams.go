@@ -50,7 +50,8 @@ func NewSyncStreamProviders(
 		},
 		PresenceDataStreamProvider: &PresenceStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
-			UserAPI:        userAPI,
+			userAPI:        userAPI,
+			rsAPI:          rsAPI,
 		},
 		DeviceListStreamProvider: &DeviceListStreamProvider{
 			PartitionedStreamProvider: PartitionedStreamProvider{DB: d},

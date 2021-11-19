@@ -150,7 +150,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	activeSyncRequests.Inc()
 	defer activeSyncRequests.Dec()
 
-	rp.updatePresence(req, device)
+	defer rp.updatePresence(req, device)
 	rp.updateLastSeen(req, device)
 
 	waitingSyncRequests.Inc()
@@ -273,7 +273,7 @@ func (rp *RequestPool) updatePresence(req *http.Request, device *userapi.Device)
 		Presence:     types2.ToPresenceStatus(presence),
 		LastActiveTS: time.Now().Unix(),
 	}
-	go rp.userAPI.InputPresenceData(req.Context(), pReq, &userapi.InputPresenceResponse{}) // nolint:errcheck
+	rp.userAPI.InputPresenceData(req.Context(), pReq, &userapi.InputPresenceResponse{}) // nolint:errcheck
 
 }
 
