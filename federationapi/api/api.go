@@ -40,7 +40,6 @@ func (e *FederationClientError) Error() string {
 type FederationInternalAPI interface {
 	FederationClient
 	gomatrixserverlib.KeyDatabase
-	gomatrixserverlib.KeyFetcher
 
 	KeyRing() *gomatrixserverlib.KeyRing
 
