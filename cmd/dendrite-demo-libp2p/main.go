@@ -37,7 +37,6 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs"
-	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -125,14 +124,13 @@ func main() {
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))
 	cfg.Global.Kafka.UseNaffka = true
-	cfg.FederationSender.FederationMaxRetries = 6
+	cfg.FederationAPI.FederationMaxRetries = 6
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-signingkeyserver.db", *instanceName))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-e2ekey.db", *instanceName))
@@ -151,16 +149,8 @@ func main() {
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
 	keyAPI.SetUserAPI(userAPI)
 
-	serverKeyAPI := signingkeyserver.NewInternalAPI(
-		&base.Base.Cfg.SigningKeyServer, federation, base.Base.Caches,
-	)
-	keyRing := serverKeyAPI.KeyRing()
-	createKeyDB(
-		base, serverKeyAPI,
-	)
-
 	rsAPI := roomserver.NewInternalAPI(
-		&base.Base, keyRing,
+		&base.Base,
 	)
 	eduInputAPI := eduserver.NewInternalAPI(
 		&base.Base, cache.New(), userAPI,
@@ -168,14 +158,21 @@ func main() {
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
-		&base.Base, federation, rsAPI, keyRing, true,
+		&base.Base, federation, rsAPI, base.Base.Caches, true,
 	)
+	keyRing := fsAPI.KeyRing()
 	rsAPI.SetFederationSenderAPI(fsAPI)
 	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI)
 	err = provider.Start()
 	if err != nil {
 		panic("failed to create new public rooms provider: " + err.Error())
 	}
+
+	/*
+		createKeyDB(
+			base, keyRing,
+		)
+	*/
 
 	monolith := setup.Monolith{
 		Config:    base.Base.Cfg,
@@ -188,7 +185,6 @@ func main() {
 		EDUInternalAPI:         eduInputAPI,
 		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
-		ServerKeyAPI:           serverKeyAPI,
 		UserAPI:                userAPI,
 		KeyAPI:                 keyAPI,
 		ExtPublicRoomsProvider: provider,

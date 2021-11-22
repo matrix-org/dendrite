@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -80,6 +81,10 @@ func NewRoomserverClient(
 		httpClient:    httpClient,
 		cache:         cache,
 	}, nil
+}
+
+// SetKeyring no-ops in HTTP client mode as there is no chicken/egg scenario
+func (h *httpRoomserverInternalAPI) SetKeyring(keyRing *gomatrixserverlib.KeyRing) {
 }
 
 // SetFederationSenderInputAPI no-ops in HTTP client mode as there is no chicken/egg scenario

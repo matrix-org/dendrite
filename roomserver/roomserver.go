@@ -38,14 +38,13 @@ func AddInternalRoutes(router *mux.Router, intAPI api.RoomserverInternalAPI) {
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
-	keyRing gomatrixserverlib.JSONVerifier,
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
 	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
 	var perspectiveServerNames []gomatrixserverlib.ServerName
-	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {
+	for _, kp := range base.Cfg.FederationAPI.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
 
@@ -56,6 +55,6 @@ func NewInternalAPI(
 
 	return internal.NewRoomserverAPI(
 		cfg, roomserverDB, producer, string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
-		base.Caches, keyRing, perspectiveServerNames,
+		base.Caches, perspectiveServerNames,
 	)
 }

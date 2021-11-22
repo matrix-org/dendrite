@@ -7,6 +7,7 @@ import (
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -14,6 +15,10 @@ import (
 // complete request/response/error
 type RoomserverInternalAPITrace struct {
 	Impl RoomserverInternalAPI
+}
+
+func (t *RoomserverInternalAPITrace) SetKeyring(keyRing *gomatrixserverlib.KeyRing) {
+	t.Impl.SetKeyring(keyRing)
 }
 
 func (t *RoomserverInternalAPITrace) SetFederationSenderAPI(fsAPI fsAPI.FederationInternalAPI) {

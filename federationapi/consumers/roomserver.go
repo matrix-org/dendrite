@@ -33,7 +33,7 @@ import (
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	cfg        *config.FederationSender
+	cfg        *config.FederationAPI
 	rsAPI      api.RoomserverInternalAPI
 	rsConsumer *internal.ContinualConsumer
 	db         storage.Database
@@ -43,7 +43,7 @@ type OutputRoomEventConsumer struct {
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
-	cfg *config.FederationSender,
+	cfg *config.FederationAPI,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store storage.Database,

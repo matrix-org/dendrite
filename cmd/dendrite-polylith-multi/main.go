@@ -41,16 +41,15 @@ func main() {
 	}
 
 	components := map[string]entrypoint{
-		"appservice":       personalities.Appservice,
-		"clientapi":        personalities.ClientAPI,
-		"eduserver":        personalities.EDUServer,
-		"federationapi":    personalities.FederationAPI,
-		"keyserver":        personalities.KeyServer,
-		"mediaapi":         personalities.MediaAPI,
-		"roomserver":       personalities.RoomServer,
-		"signingkeyserver": personalities.SigningKeyServer,
-		"syncapi":          personalities.SyncAPI,
-		"userapi":          personalities.UserAPI,
+		"appservice":    personalities.Appservice,
+		"clientapi":     personalities.ClientAPI,
+		"eduserver":     personalities.EDUServer,
+		"federationapi": personalities.FederationAPI,
+		"keyserver":     personalities.KeyServer,
+		"mediaapi":      personalities.MediaAPI,
+		"roomserver":    personalities.RoomServer,
+		"syncapi":       personalities.SyncAPI,
+		"userapi":       personalities.UserAPI,
 	}
 
 	start, ok := components[component]

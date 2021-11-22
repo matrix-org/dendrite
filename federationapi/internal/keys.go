@@ -6,26 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
-type ServerKeyAPI struct {
-	api.SigningKeyServerAPI
-
-	ServerName        gomatrixserverlib.ServerName
-	ServerPublicKey   ed25519.PublicKey
-	ServerKeyID       gomatrixserverlib.KeyID
-	ServerKeyValidity time.Duration
-	OldServerKeys     []config.OldVerifyKeys
-
-	OurKeyRing gomatrixserverlib.KeyRing
-	FedClient  gomatrixserverlib.KeyClient
-}
-
-func (s *ServerKeyAPI) KeyRing() *gomatrixserverlib.KeyRing {
+func (s *FederationInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
 	// Return a keyring that forces requests to be proxied through the
 	// below functions. That way we can enforce things like validity
 	// and keeping the cache up-to-date.
@@ -35,7 +20,7 @@ func (s *ServerKeyAPI) KeyRing() *gomatrixserverlib.KeyRing {
 	}
 }
 
-func (s *ServerKeyAPI) StoreKeys(
+func (s *FederationInternalAPI) StoreKeys(
 	_ context.Context,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
@@ -44,10 +29,10 @@ func (s *ServerKeyAPI) StoreKeys(
 	ctx := context.Background()
 
 	// Store any keys that we were given in our database.
-	return s.OurKeyRing.KeyDatabase.StoreKeys(ctx, results)
+	return s.keyRing.KeyDatabase.StoreKeys(ctx, results)
 }
 
-func (s *ServerKeyAPI) FetchKeys(
+func (s *FederationInternalAPI) FetchKeys(
 	_ context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
@@ -75,7 +60,7 @@ func (s *ServerKeyAPI) FetchKeys(
 	// For any key requests that we still have outstanding, next try to
 	// fetch them directly. We'll go through each of the key fetchers to
 	// ask for the remaining keys
-	for _, fetcher := range s.OurKeyRing.KeyFetchers {
+	for _, fetcher := range s.keyRing.KeyFetchers {
 		// If there are no more keys to look up then stop.
 		if len(requests) == 0 {
 			break
@@ -105,22 +90,22 @@ func (s *ServerKeyAPI) FetchKeys(
 	return results, nil
 }
 
-func (s *ServerKeyAPI) FetcherName() string {
-	return fmt.Sprintf("ServerKeyAPI (wrapping %q)", s.OurKeyRing.KeyDatabase.FetcherName())
+func (s *FederationInternalAPI) FetcherName() string {
+	return fmt.Sprintf("FederationInternalAPI (wrapping %q)", s.keyRing.KeyDatabase.FetcherName())
 }
 
 // handleLocalKeys handles cases where the key request contains
 // a request for our own server keys, either current or old.
-func (s *ServerKeyAPI) handleLocalKeys(
+func (s *FederationInternalAPI) handleLocalKeys(
 	_ context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) {
 	for req := range requests {
-		if req.ServerName != s.ServerName {
+		if req.ServerName != s.cfg.Matrix.ServerName {
 			continue
 		}
-		if req.KeyID == s.ServerKeyID {
+		if req.KeyID == s.cfg.Matrix.KeyID {
 			// We found a key request that is supposed to be for our own
 			// keys. Remove it from the request list so we don't hit the
 			// database or the fetchers for it.
@@ -129,15 +114,15 @@ func (s *ServerKeyAPI) handleLocalKeys(
 			// Insert our own key into the response.
 			results[req] = gomatrixserverlib.PublicKeyLookupResult{
 				VerifyKey: gomatrixserverlib.VerifyKey{
-					Key: gomatrixserverlib.Base64Bytes(s.ServerPublicKey),
+					Key: gomatrixserverlib.Base64Bytes(s.cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)),
 				},
 				ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-				ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(s.ServerKeyValidity)),
+				ValidUntilTS: gomatrixserverlib.AsTimestamp(time.Now().Add(s.cfg.Matrix.KeyValidityPeriod)),
 			}
 		} else {
 			// The key request doesn't match our current key. Let's see
 			// if it matches any of our old verify keys.
-			for _, oldVerifyKey := range s.OldServerKeys {
+			for _, oldVerifyKey := range s.cfg.Matrix.OldVerifyKeys {
 				if req.KeyID == oldVerifyKey.KeyID {
 					// We found a key request that is supposed to be an expired
 					// key.
@@ -162,14 +147,14 @@ func (s *ServerKeyAPI) handleLocalKeys(
 
 // handleDatabaseKeys handles cases where the key requests can be
 // satisfied from our local database/cache.
-func (s *ServerKeyAPI) handleDatabaseKeys(
+func (s *FederationInternalAPI) handleDatabaseKeys(
 	ctx context.Context,
 	now gomatrixserverlib.Timestamp,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
 	// Ask the database/cache for the keys.
-	dbResults, err := s.OurKeyRing.KeyDatabase.FetchKeys(ctx, requests)
+	dbResults, err := s.keyRing.KeyDatabase.FetchKeys(ctx, requests)
 	if err != nil {
 		return err
 	}
@@ -196,7 +181,7 @@ func (s *ServerKeyAPI) handleDatabaseKeys(
 
 // handleFetcherKeys handles cases where a fetcher can satisfy
 // the remaining requests.
-func (s *ServerKeyAPI) handleFetcherKeys(
+func (s *FederationInternalAPI) handleFetcherKeys(
 	ctx context.Context,
 	_ gomatrixserverlib.Timestamp,
 	fetcher gomatrixserverlib.KeyFetcher,
@@ -248,10 +233,10 @@ func (s *ServerKeyAPI) handleFetcherKeys(
 	}
 
 	// Store the keys from our store map.
-	if err = s.OurKeyRing.KeyDatabase.StoreKeys(context.Background(), storeResults); err != nil {
+	if err = s.keyRing.KeyDatabase.StoreKeys(context.Background(), storeResults); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"fetcher_name":  fetcher.FetcherName(),
-			"database_name": s.OurKeyRing.KeyDatabase.FetcherName(),
+			"database_name": s.keyRing.KeyDatabase.FetcherName(),
 		}).Errorf("Failed to store keys in the database")
 		return fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 	}

@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/dendrite/internal/caching"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -71,29 +72,29 @@ func NewInternalAPI(
 	base *base.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	keyRing *gomatrixserverlib.KeyRing,
+	caches *caching.Caches,
 	resetBlacklist bool,
 ) api.FederationInternalAPI {
-	cfg := &base.Cfg.FederationSender
+	cfg := &base.Cfg.FederationAPI
 
-	federationSenderDB, err := storage.NewDatabase(&cfg.Database, base.Caches)
+	federationDB, err := storage.NewDatabase(&cfg.Database, base.Caches)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
 	if resetBlacklist {
-		_ = federationSenderDB.RemoveAllServersFromBlacklist()
+		_ = federationDB.RemoveAllServersFromBlacklist()
 	}
 
 	stats := &statistics.Statistics{
-		DB:                     federationSenderDB,
+		DB:                     federationDB,
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
 	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
 
 	queues := queue.NewOutgoingQueues(
-		federationSenderDB, base.ProcessContext,
+		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
 		cfg.Matrix.ServerName, federation, rsAPI, stats,
 		&queue.SigningInfo{
@@ -105,24 +106,24 @@ func NewInternalAPI(
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, consumer, queues,
-		federationSenderDB, rsAPI,
+		federationDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
 	}
 
 	tsConsumer := consumers.NewOutputEDUConsumer(
-		base.ProcessContext, cfg, consumer, queues, federationSenderDB,
+		base.ProcessContext, cfg, consumer, queues, federationDB,
 	)
 	if err := tsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
-		base.ProcessContext, &base.Cfg.KeyServer, consumer, queues, federationSenderDB, rsAPI,
+		base.ProcessContext, &base.Cfg.KeyServer, consumer, queues, federationDB, rsAPI,
 	)
 	if err := keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
-	return internal.NewFederationInternalAPI(federationSenderDB, cfg, rsAPI, federation, keyRing, stats, queues)
+	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues)
 }

@@ -28,7 +28,6 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
-	serverKeyAPI "github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -48,7 +47,6 @@ type Monolith struct {
 	EDUInternalAPI eduServerAPI.EDUServerInputAPI
 	FederationAPI  federationAPI.FederationInternalAPI
 	RoomserverAPI  roomserverAPI.RoomserverInternalAPI
-	ServerKeyAPI   serverKeyAPI.SigningKeyServerAPI
 	UserAPI        userapi.UserInternalAPI
 	KeyAPI         keyAPI.KeyInternalAPI
 

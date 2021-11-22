@@ -48,14 +48,12 @@ import (
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	eduinthttp "github.com/matrix-org/dendrite/eduserver/inthttp"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	fsinthttp "github.com/matrix-org/dendrite/federationapi/inthttp"
+	federationIntHTTP "github.com/matrix-org/dendrite/federationapi/inthttp"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/setup/config"
-	skapi "github.com/matrix-org/dendrite/signingkeyserver/api"
-	skinthttp "github.com/matrix-org/dendrite/signingkeyserver/inthttp"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/sirupsen/logrus"
@@ -168,10 +166,10 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		},
 	}
 	client := http.Client{Timeout: HTTPClientTimeout}
-	if cfg.FederationSender.Proxy.Enabled {
+	if cfg.FederationAPI.Proxy.Enabled {
 		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
-			Scheme: cfg.FederationSender.Proxy.Protocol,
-			Host:   fmt.Sprintf("%s:%d", cfg.FederationSender.Proxy.Host, cfg.FederationSender.Proxy.Port),
+			Scheme: cfg.FederationAPI.Proxy.Protocol,
+			Host:   fmt.Sprintf("%s:%d", cfg.FederationAPI.Proxy.Host, cfg.FederationAPI.Proxy.Port),
 		})}
 	}
 
@@ -248,25 +246,12 @@ func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
 	return e
 }
 
-// FederationSenderHTTPClient returns FederationInternalAPI for hitting
-// the federation sender over HTTP
-func (b *BaseDendrite) FederationSenderHTTPClient() federationAPI.FederationInternalAPI {
-	f, err := fsinthttp.NewFederationSenderClient(b.Cfg.FederationSenderURL(), b.apiHttpClient)
+// FederationAPIHTTPClient returns FederationInternalAPI for hitting
+// the federation API server over HTTP
+func (b *BaseDendrite) FederationAPIHTTPClient() federationAPI.FederationInternalAPI {
+	f, err := federationIntHTTP.NewFederationAPIClient(b.Cfg.FederationAPIURL(), b.apiHttpClient, b.Caches)
 	if err != nil {
-		logrus.WithError(err).Panic("FederationSenderHTTPClient failed", b.apiHttpClient)
-	}
-	return f
-}
-
-// SigningKeyServerHTTPClient returns SigningKeyServer for hitting the signing key server over HTTP
-func (b *BaseDendrite) SigningKeyServerHTTPClient() skapi.SigningKeyServerAPI {
-	f, err := skinthttp.NewSigningKeyServerClient(
-		b.Cfg.SigningKeyServerURL(),
-		b.apiHttpClient,
-		b.Caches,
-	)
-	if err != nil {
-		logrus.WithError(err).Panic("SigningKeyServerHTTPClient failed", b.httpClient)
+		logrus.WithError(err).Panic("FederationAPIHTTPClient failed", b.apiHttpClient)
 	}
 	return f
 }
@@ -300,7 +285,7 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 		)
 	}
 	opts := []gomatrixserverlib.ClientOption{
-		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationSender.DisableTLSValidation),
+		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationAPI.DisableTLSValidation),
 	}
 	if b.Cfg.Global.DNSCache.Enabled {
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
@@ -321,7 +306,7 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	}
 	opts := []gomatrixserverlib.ClientOption{
 		gomatrixserverlib.WithTimeout(time.Minute * 5),
-		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationSender.DisableTLSValidation),
+		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationAPI.DisableTLSValidation),
 	}
 	if b.Cfg.Global.DNSCache.Enabled {
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))

@@ -1,5 +1,6 @@
-package signingkeyserver
+package federationapi
 
+/*
 import (
 	"bytes"
 	"context"
@@ -13,21 +14,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type server struct {
 	name      gomatrixserverlib.ServerName        // server name
 	validity  time.Duration                       // key validity duration from now
-	config    *config.SigningKeyServer            // skeleton config, from TestMain
-	fedconfig *config.FederationAPI               //
+	config    *config.FederationAPI               // skeleton config, from TestMain
 	fedclient *gomatrixserverlib.FederationClient // uses MockRoundTripper
 	cache     *caching.Caches                     // server-specific cache
-	api       api.SigningKeyServerAPI             // server-specific server key API
+	api       api.FederationInternalAPI           // server-specific server key API
 }
 
 func (s *server) renew() {
@@ -76,9 +76,8 @@ func TestMain(m *testing.M) {
 		cfg.Global.PrivateKey = testPriv
 		cfg.Global.KeyID = serverKeyID
 		cfg.Global.KeyValidityPeriod = s.validity
-		cfg.SigningKeyServer.Database.ConnectionString = config.DataSource("file::memory:")
-		s.config = &cfg.SigningKeyServer
-		s.fedconfig = &cfg.FederationAPI
+		cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
+		s.config = &cfg.FederationAPI
 
 		// Create a transport which redirects federation requests to
 		// the mock round tripper. Since we're not *really* listening for
@@ -93,7 +92,7 @@ func TestMain(m *testing.M) {
 		)
 
 		// Finally, build the server key APIs.
-		s.api = NewInternalAPI(s.config, s.fedclient, s.cache)
+		s.api = NewInternalAPI(s.config, s.fedclient, s.cache, true)
 	}
 
 	// Now that we have built our server key APIs, start the
@@ -119,7 +118,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	}
 
 	// Get the keys and JSON-ify them.
-	keys := routing.LocalKeys(s.fedconfig)
+	keys := routing.LocalKeys(s.config)
 	body, err := json.MarshalIndent(keys.JSON, "", "  ")
 	if err != nil {
 		return nil, err
@@ -317,3 +316,4 @@ func TestRenewalBehaviour(t *testing.T) {
 	}
 	t.Log(res)
 }
+*/

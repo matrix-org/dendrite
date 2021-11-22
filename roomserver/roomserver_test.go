@@ -13,7 +13,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -182,7 +181,7 @@ func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyPro
 	}
 	return internal.NewRoomserverAPI(
 		&cfg.RoomServer, roomserverDB, dp, string(cfg.Global.Kafka.TopicFor(config.TopicOutputRoomEvent)),
-		base.Caches, &test.NopJSONVerifier{}, nil,
+		base.Caches, nil,
 	), dp
 }
 

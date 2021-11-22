@@ -27,7 +27,7 @@ func ClientAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 
 	asQuery := base.AppserviceHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
-	fsAPI := base.FederationSenderHTTPClient()
+	fsAPI := base.FederationAPIHTTPClient()
 	eduInputAPI := base.EDUServerClient()
 	userAPI := base.UserAPIClient()
 	keyAPI := base.KeyServerHTTPClient()

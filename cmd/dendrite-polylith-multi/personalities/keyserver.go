@@ -21,7 +21,7 @@ import (
 )
 
 func KeyServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
-	fsAPI := base.FederationSenderHTTPClient()
+	fsAPI := base.FederationAPIHTTPClient()
 	intAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	intAPI.SetUserAPI(base.UserAPIClient())
 

@@ -46,7 +46,7 @@ type OutputEDUConsumer struct {
 // NewOutputEDUConsumer creates a new OutputEDUConsumer. Call Start() to begin consuming from EDU servers.
 func NewOutputEDUConsumer(
 	process *process.ProcessContext,
-	cfg *config.FederationSender,
+	cfg *config.FederationAPI,
 	kafkaConsumer sarama.Consumer,
 	queues *queue.OutgoingQueues,
 	store storage.Database,

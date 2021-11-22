@@ -39,6 +39,10 @@ func (e *FederationClientError) Error() string {
 // FederationInternalAPI is used to query information from the federation sender.
 type FederationInternalAPI interface {
 	FederationClient
+	gomatrixserverlib.KeyDatabase
+	gomatrixserverlib.KeyFetcher
+
+	KeyRing() *gomatrixserverlib.KeyRing
 
 	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
 
@@ -114,6 +118,14 @@ type QueryServerKeysResponse struct {
 	ServerKeys []gomatrixserverlib.ServerKeys
 }
 
+type QueryPublicKeysRequest struct {
+	Requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp `json:"requests"`
+}
+
+type QueryPublicKeysResponse struct {
+	Results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult `json:"results"`
+}
+
 type PerformDirectoryLookupRequest struct {
 	RoomAlias  string                       `json:"room_alias"`
 	ServerName gomatrixserverlib.ServerName `json:"server_name"`
@@ -187,4 +199,11 @@ type PerformBroadcastEDURequest struct {
 }
 
 type PerformBroadcastEDUResponse struct {
+}
+
+type InputPublicKeysRequest struct {
+	Keys map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult `json:"keys"`
+}
+
+type InputPublicKeysResponse struct {
 }

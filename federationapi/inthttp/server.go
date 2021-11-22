@@ -14,7 +14,7 @@ import (
 // nolint:gocyclo
 func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(
-		FederationSenderQueryJoinedHostServerNamesInRoomPath,
+		FederationAPIQueryJoinedHostServerNamesInRoomPath,
 		httputil.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
 			var request api.QueryJoinedHostServerNamesInRoomRequest
 			var response api.QueryJoinedHostServerNamesInRoomResponse
@@ -28,7 +28,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderPerformJoinRequestPath,
+		FederationAPIPerformJoinRequestPath,
 		httputil.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformJoinRequest
 			var response api.PerformJoinResponse
@@ -40,7 +40,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderPerformLeaveRequestPath,
+		FederationAPIPerformLeaveRequestPath,
 		httputil.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformLeaveRequest
 			var response api.PerformLeaveResponse
@@ -54,7 +54,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderPerformInviteRequestPath,
+		FederationAPIPerformInviteRequestPath,
 		httputil.MakeInternalAPI("PerformInviteRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformInviteRequest
 			var response api.PerformInviteResponse
@@ -68,7 +68,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderPerformDirectoryLookupRequestPath,
+		FederationAPIPerformDirectoryLookupRequestPath,
 		httputil.MakeInternalAPI("PerformDirectoryLookupRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformDirectoryLookupRequest
 			var response api.PerformDirectoryLookupResponse
@@ -82,7 +82,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderPerformServersAlivePath,
+		FederationAPIPerformServersAlivePath,
 		httputil.MakeInternalAPI("PerformServersAliveRequest", func(req *http.Request) util.JSONResponse {
 			var request api.PerformServersAliveRequest
 			var response api.PerformServersAliveResponse
@@ -96,7 +96,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderPerformBroadcastEDUPath,
+		FederationAPIPerformBroadcastEDUPath,
 		httputil.MakeInternalAPI("PerformBroadcastEDU", func(req *http.Request) util.JSONResponse {
 			var request api.PerformBroadcastEDURequest
 			var response api.PerformBroadcastEDUResponse
@@ -110,7 +110,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderGetUserDevicesPath,
+		FederationAPIGetUserDevicesPath,
 		httputil.MakeInternalAPI("GetUserDevices", func(req *http.Request) util.JSONResponse {
 			var request getUserDevices
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -132,7 +132,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderClaimKeysPath,
+		FederationAPIClaimKeysPath,
 		httputil.MakeInternalAPI("ClaimKeys", func(req *http.Request) util.JSONResponse {
 			var request claimKeys
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -154,7 +154,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderQueryKeysPath,
+		FederationAPIQueryKeysPath,
 		httputil.MakeInternalAPI("QueryKeys", func(req *http.Request) util.JSONResponse {
 			var request queryKeys
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -176,7 +176,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderBackfillPath,
+		FederationAPIBackfillPath,
 		httputil.MakeInternalAPI("Backfill", func(req *http.Request) util.JSONResponse {
 			var request backfill
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -198,7 +198,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderLookupStatePath,
+		FederationAPILookupStatePath,
 		httputil.MakeInternalAPI("LookupState", func(req *http.Request) util.JSONResponse {
 			var request lookupState
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -220,7 +220,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderLookupStateIDsPath,
+		FederationAPILookupStateIDsPath,
 		httputil.MakeInternalAPI("LookupStateIDs", func(req *http.Request) util.JSONResponse {
 			var request lookupStateIDs
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -242,7 +242,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderGetEventPath,
+		FederationAPIGetEventPath,
 		httputil.MakeInternalAPI("GetEvent", func(req *http.Request) util.JSONResponse {
 			var request getEvent
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -264,7 +264,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderQueryServerKeysPath,
+		FederationAPIQueryServerKeysPath,
 		httputil.MakeInternalAPI("QueryServerKeys", func(req *http.Request) util.JSONResponse {
 			var request api.QueryServerKeysRequest
 			var response api.QueryServerKeysResponse
@@ -278,7 +278,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderLookupServerKeysPath,
+		FederationAPILookupServerKeysPath,
 		httputil.MakeInternalAPI("LookupServerKeys", func(req *http.Request) util.JSONResponse {
 			var request lookupServerKeys
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -300,7 +300,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderEventRelationshipsPath,
+		FederationAPIEventRelationshipsPath,
 		httputil.MakeInternalAPI("MSC2836EventRelationships", func(req *http.Request) util.JSONResponse {
 			var request eventRelationships
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -322,7 +322,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		FederationSenderSpacesSummaryPath,
+		FederationAPISpacesSummaryPath,
 		httputil.MakeInternalAPI("MSC2946SpacesSummary", func(req *http.Request) util.JSONResponse {
 			var request spacesReq
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -341,6 +341,34 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 			}
 			request.Res = res
 			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(FederationAPIQueryPublicKeyPath,
+		httputil.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
+			request := api.QueryPublicKeysRequest{}
+			response := api.QueryPublicKeysResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			keys, err := intAPI.FetchKeys(req.Context(), request.Requests)
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			response.Results = keys
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(FederationAPIInputPublicKeyPath,
+		httputil.MakeInternalAPI("inputPublicKeys", func(req *http.Request) util.JSONResponse {
+			request := api.InputPublicKeysRequest{}
+			response := api.InputPublicKeysResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := intAPI.StoreKeys(req.Context(), request.Keys); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
 }

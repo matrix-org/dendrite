@@ -23,9 +23,8 @@ import (
 func FederationAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
 	federation := base.CreateFederationClient()
-	serverKeyAPI := base.SigningKeyServerHTTPClient()
-	keyRing := serverKeyAPI.KeyRing()
-	fsAPI := base.FederationSenderHTTPClient()
+	fsAPI := base.FederationAPIHTTPClient()
+	keyRing := fsAPI.KeyRing()
 	rsAPI := base.RoomserverHTTPClient()
 	keyAPI := base.KeyServerHTTPClient()
 

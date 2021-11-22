@@ -29,7 +29,6 @@ import (
 	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs"
-	"github.com/matrix-org/dendrite/signingkeyserver"
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
@@ -64,11 +63,9 @@ func main() {
 		cfg.ClientAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.EDUServer.InternalAPI.Connect = httpAPIAddr
 		cfg.FederationAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.FederationSender.InternalAPI.Connect = httpAPIAddr
 		cfg.KeyServer.InternalAPI.Connect = httpAPIAddr
 		cfg.MediaAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.RoomServer.InternalAPI.Connect = httpAPIAddr
-		cfg.SigningKeyServer.InternalAPI.Connect = httpAPIAddr
 		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
 	}
 
@@ -78,18 +75,7 @@ func main() {
 	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
-	skAPI := signingkeyserver.NewInternalAPI(
-		&base.Cfg.SigningKeyServer, federation, base.Caches,
-	)
-	if base.UseHTTPAPIs {
-		signingkeyserver.AddInternalRoutes(base.InternalAPIMux, skAPI, base.Caches)
-		skAPI = base.SigningKeyServerHTTPClient()
-	}
-	keyRing := skAPI.KeyRing()
-
-	rsImpl := roomserver.NewInternalAPI(
-		base, keyRing,
-	)
+	rsImpl := roomserver.NewInternalAPI(base)
 	// call functions directly on the impl unless running in HTTP mode
 	rsAPI := rsImpl
 	if base.UseHTTPAPIs {
@@ -103,12 +89,14 @@ func main() {
 	}
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, keyRing, false,
+		base, federation, rsAPI, base.Caches, false,
 	)
 	if base.UseHTTPAPIs {
 		federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)
-		fsAPI = base.FederationSenderHTTPClient()
+		fsAPI = base.FederationAPIHTTPClient()
 	}
+	keyRing := fsAPI.KeyRing()
+
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsImpl.SetFederationSenderAPI(fsAPI)
@@ -153,7 +141,6 @@ func main() {
 		EDUInternalAPI: eduInputAPI,
 		FederationAPI:  fsAPI,
 		RoomserverAPI:  rsAPI,
-		ServerKeyAPI:   skAPI,
 		UserAPI:        userAPI,
 		KeyAPI:         keyAPI,
 	}

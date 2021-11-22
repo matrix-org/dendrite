@@ -25,10 +25,10 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource("file::memory:")
-	cfg.FederationSender.Database.ConnectionString = config.DataSource("file::memory:")
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
 	base := base.NewBaseDendrite(cfg, "Monolith", false)
 	keyRing := &test.NopJSONVerifier{}
-	fsAPI := base.FederationSenderHTTPClient()
+	fsAPI := base.FederationAPIHTTPClient()
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
 	federationapi.AddPublicRoutes(base.PublicFederationAPIMux, base.PublicKeyAPIMux, base.PublicWellKnownAPIMux, &cfg.FederationAPI, nil, nil, keyRing, nil, fsAPI, nil, nil, &cfg.MSCs, nil)

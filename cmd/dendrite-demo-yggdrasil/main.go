@@ -83,9 +83,8 @@ func main() {
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-signingkeyserver.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.MSCs.MSCs = []string{"msc2836"}
@@ -108,7 +107,7 @@ func main() {
 	keyAPI.SetUserAPI(userAPI)
 
 	rsComponent := roomserver.NewInternalAPI(
-		base, keyRing,
+		base,
 	)
 	rsAPI := rsComponent
 
@@ -119,10 +118,11 @@ func main() {
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
+		base, federation, rsAPI, base.Caches, true,
 	)
 
 	rsComponent.SetFederationSenderAPI(fsAPI)
+	rsComponent.SetKeyring(keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

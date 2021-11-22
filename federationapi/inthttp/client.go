@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -14,41 +15,45 @@ import (
 
 // HTTP paths for the internal HTTP API
 const (
-	FederationSenderQueryJoinedHostServerNamesInRoomPath = "/federationapi/queryJoinedHostServerNamesInRoom"
-	FederationSenderQueryServerKeysPath                  = "/federationapi/queryServerKeys"
+	FederationAPIQueryJoinedHostServerNamesInRoomPath = "/federationapi/queryJoinedHostServerNamesInRoom"
+	FederationAPIQueryServerKeysPath                  = "/federationapi/queryServerKeys"
 
-	FederationSenderPerformDirectoryLookupRequestPath = "/federationapi/performDirectoryLookup"
-	FederationSenderPerformJoinRequestPath            = "/federationapi/performJoinRequest"
-	FederationSenderPerformLeaveRequestPath           = "/federationapi/performLeaveRequest"
-	FederationSenderPerformInviteRequestPath          = "/federationapi/performInviteRequest"
-	FederationSenderPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
-	FederationSenderPerformServersAlivePath           = "/federationapi/performServersAlive"
-	FederationSenderPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
+	FederationAPIPerformDirectoryLookupRequestPath = "/federationapi/performDirectoryLookup"
+	FederationAPIPerformJoinRequestPath            = "/federationapi/performJoinRequest"
+	FederationAPIPerformLeaveRequestPath           = "/federationapi/performLeaveRequest"
+	FederationAPIPerformInviteRequestPath          = "/federationapi/performInviteRequest"
+	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
+	FederationAPIPerformServersAlivePath           = "/federationapi/performServersAlive"
+	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
 
-	FederationSenderGetUserDevicesPath     = "/federationapi/client/getUserDevices"
-	FederationSenderClaimKeysPath          = "/federationapi/client/claimKeys"
-	FederationSenderQueryKeysPath          = "/federationapi/client/queryKeys"
-	FederationSenderBackfillPath           = "/federationapi/client/backfill"
-	FederationSenderLookupStatePath        = "/federationapi/client/lookupState"
-	FederationSenderLookupStateIDsPath     = "/federationapi/client/lookupStateIDs"
-	FederationSenderGetEventPath           = "/federationapi/client/getEvent"
-	FederationSenderLookupServerKeysPath   = "/federationapi/client/lookupServerKeys"
-	FederationSenderEventRelationshipsPath = "/federationapi/client/msc2836eventRelationships"
-	FederationSenderSpacesSummaryPath      = "/federationapi/client/msc2946spacesSummary"
+	FederationAPIGetUserDevicesPath     = "/federationapi/client/getUserDevices"
+	FederationAPIClaimKeysPath          = "/federationapi/client/claimKeys"
+	FederationAPIQueryKeysPath          = "/federationapi/client/queryKeys"
+	FederationAPIBackfillPath           = "/federationapi/client/backfill"
+	FederationAPILookupStatePath        = "/federationapi/client/lookupState"
+	FederationAPILookupStateIDsPath     = "/federationapi/client/lookupStateIDs"
+	FederationAPIGetEventPath           = "/federationapi/client/getEvent"
+	FederationAPILookupServerKeysPath   = "/federationapi/client/lookupServerKeys"
+	FederationAPIEventRelationshipsPath = "/federationapi/client/msc2836eventRelationships"
+	FederationAPISpacesSummaryPath      = "/federationapi/client/msc2946spacesSummary"
+
+	FederationAPIInputPublicKeyPath = "/federationapi/inputPublicKey"
+	FederationAPIQueryPublicKeyPath = "/federationapi/queryPublicKey"
 )
 
-// NewFederationSenderClient creates a FederationInternalAPI implemented by talking to a HTTP POST API.
+// NewFederationAPIClient creates a FederationInternalAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil an error is returned
-func NewFederationSenderClient(federationSenderURL string, httpClient *http.Client) (api.FederationInternalAPI, error) {
+func NewFederationAPIClient(federationSenderURL string, httpClient *http.Client, cache caching.ServerKeyCache) (api.FederationInternalAPI, error) {
 	if httpClient == nil {
 		return nil, errors.New("NewFederationInternalAPIHTTP: httpClient is <nil>")
 	}
-	return &httpFederationInternalAPI{federationSenderURL, httpClient}, nil
+	return &httpFederationInternalAPI{federationSenderURL, httpClient, cache}, nil
 }
 
 type httpFederationInternalAPI struct {
-	federationSenderURL string
-	httpClient          *http.Client
+	federationAPIURL string
+	httpClient       *http.Client
+	cache            caching.ServerKeyCache
 }
 
 // Handle an instruction to make_leave & send_leave with a remote server.
@@ -60,7 +65,7 @@ func (h *httpFederationInternalAPI) PerformLeave(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformLeaveRequest")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderPerformLeaveRequestPath
+	apiURL := h.federationAPIURL + FederationAPIPerformLeaveRequestPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
@@ -73,7 +78,7 @@ func (h *httpFederationInternalAPI) PerformInvite(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInviteRequest")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderPerformInviteRequestPath
+	apiURL := h.federationAPIURL + FederationAPIPerformInviteRequestPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
@@ -86,7 +91,7 @@ func (h *httpFederationInternalAPI) PerformOutboundPeek(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformOutboundPeekRequest")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderPerformOutboundPeekRequestPath
+	apiURL := h.federationAPIURL + FederationAPIPerformOutboundPeekRequestPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
@@ -98,7 +103,7 @@ func (h *httpFederationInternalAPI) PerformServersAlive(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformServersAlive")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderPerformServersAlivePath
+	apiURL := h.federationAPIURL + FederationAPIPerformServersAlivePath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
@@ -111,7 +116,7 @@ func (h *httpFederationInternalAPI) QueryJoinedHostServerNamesInRoom(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryJoinedHostServerNamesInRoom")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderQueryJoinedHostServerNamesInRoomPath
+	apiURL := h.federationAPIURL + FederationAPIQueryJoinedHostServerNamesInRoomPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
@@ -124,7 +129,7 @@ func (h *httpFederationInternalAPI) PerformJoin(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformJoinRequest")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderPerformJoinRequestPath
+	apiURL := h.federationAPIURL + FederationAPIPerformJoinRequestPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.LastError = &gomatrix.HTTPError{
@@ -144,7 +149,7 @@ func (h *httpFederationInternalAPI) PerformDirectoryLookup(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformDirectoryLookup")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderPerformDirectoryLookupRequestPath
+	apiURL := h.federationAPIURL + FederationAPIPerformDirectoryLookupRequestPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
@@ -157,7 +162,7 @@ func (h *httpFederationInternalAPI) PerformBroadcastEDU(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformBroadcastEDU")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderPerformBroadcastEDUPath
+	apiURL := h.federationAPIURL + FederationAPIPerformBroadcastEDUPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
@@ -180,7 +185,7 @@ func (h *httpFederationInternalAPI) GetUserDevices(
 		UserID: userID,
 	}
 	var response getUserDevices
-	apiURL := h.federationSenderURL + FederationSenderGetUserDevicesPath
+	apiURL := h.federationAPIURL + FederationAPIGetUserDevicesPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return result, err
@@ -210,7 +215,7 @@ func (h *httpFederationInternalAPI) ClaimKeys(
 		OneTimeKeys: oneTimeKeys,
 	}
 	var response claimKeys
-	apiURL := h.federationSenderURL + FederationSenderClaimKeysPath
+	apiURL := h.federationAPIURL + FederationAPIClaimKeysPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return result, err
@@ -240,7 +245,7 @@ func (h *httpFederationInternalAPI) QueryKeys(
 		Keys: keys,
 	}
 	var response queryKeys
-	apiURL := h.federationSenderURL + FederationSenderQueryKeysPath
+	apiURL := h.federationAPIURL + FederationAPIQueryKeysPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return result, err
@@ -273,7 +278,7 @@ func (h *httpFederationInternalAPI) Backfill(
 		EventIDs: eventIDs,
 	}
 	var response backfill
-	apiURL := h.federationSenderURL + FederationSenderBackfillPath
+	apiURL := h.federationAPIURL + FederationAPIBackfillPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return gomatrixserverlib.Transaction{}, err
@@ -306,7 +311,7 @@ func (h *httpFederationInternalAPI) LookupState(
 		RoomVersion: roomVersion,
 	}
 	var response lookupState
-	apiURL := h.federationSenderURL + FederationSenderLookupStatePath
+	apiURL := h.federationAPIURL + FederationAPILookupStatePath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return gomatrixserverlib.RespState{}, err
@@ -337,7 +342,7 @@ func (h *httpFederationInternalAPI) LookupStateIDs(
 		EventID: eventID,
 	}
 	var response lookupStateIDs
-	apiURL := h.federationSenderURL + FederationSenderLookupStateIDsPath
+	apiURL := h.federationAPIURL + FederationAPILookupStateIDsPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return gomatrixserverlib.RespStateIDs{}, err
@@ -366,7 +371,7 @@ func (h *httpFederationInternalAPI) GetEvent(
 		EventID: eventID,
 	}
 	var response getEvent
-	apiURL := h.federationSenderURL + FederationSenderGetEventPath
+	apiURL := h.federationAPIURL + FederationAPIGetEventPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return gomatrixserverlib.Transaction{}, err
@@ -383,7 +388,7 @@ func (h *httpFederationInternalAPI) QueryServerKeys(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerKeys")
 	defer span.Finish()
 
-	apiURL := h.federationSenderURL + FederationSenderQueryServerKeysPath
+	apiURL := h.federationAPIURL + FederationAPIQueryServerKeysPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
@@ -405,7 +410,7 @@ func (h *httpFederationInternalAPI) LookupServerKeys(
 		KeyRequests: keyRequests,
 	}
 	var response lookupServerKeys
-	apiURL := h.federationSenderURL + FederationSenderLookupServerKeysPath
+	apiURL := h.federationAPIURL + FederationAPILookupServerKeysPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return []gomatrixserverlib.ServerKeys{}, err
@@ -437,7 +442,7 @@ func (h *httpFederationInternalAPI) MSC2836EventRelationships(
 		RoomVer: roomVersion,
 	}
 	var response eventRelationships
-	apiURL := h.federationSenderURL + FederationSenderEventRelationshipsPath
+	apiURL := h.federationAPIURL + FederationAPIEventRelationshipsPath
 	err = httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return res, err
@@ -468,7 +473,7 @@ func (h *httpFederationInternalAPI) MSC2946Spaces(
 		RoomID: roomID,
 	}
 	var response spacesReq
-	apiURL := h.federationSenderURL + FederationSenderSpacesSummaryPath
+	apiURL := h.federationAPIURL + FederationAPISpacesSummaryPath
 	err = httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
 	if err != nil {
 		return res, err
@@ -477,4 +482,94 @@ func (h *httpFederationInternalAPI) MSC2946Spaces(
 		return res, response.Err
 	}
 	return response.Res, nil
+}
+
+func (s *httpFederationInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
+	// This is a bit of a cheat - we tell gomatrixserverlib that this API is
+	// both the key database and the key fetcher. While this does have the
+	// rather unfortunate effect of preventing gomatrixserverlib from handling
+	// key fetchers directly, we can at least reimplement this behaviour on
+	// the other end of the API.
+	return &gomatrixserverlib.KeyRing{
+		KeyDatabase: s,
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{},
+	}
+}
+
+func (s *httpFederationInternalAPI) FetcherName() string {
+	return "httpServerKeyInternalAPI"
+}
+
+func (s *httpFederationInternalAPI) StoreKeys(
+	_ context.Context,
+	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
+) error {
+	// Run in a background context - we don't want to stop this work just
+	// because the caller gives up waiting.
+	ctx := context.Background()
+	request := api.InputPublicKeysRequest{
+		Keys: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
+	}
+	response := api.InputPublicKeysResponse{}
+	for req, res := range results {
+		request.Keys[req] = res
+		s.cache.StoreServerKey(req, res)
+	}
+	return s.InputPublicKeys(ctx, &request, &response)
+}
+
+func (s *httpFederationInternalAPI) FetchKeys(
+	_ context.Context,
+	requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp,
+) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
+	// Run in a background context - we don't want to stop this work just
+	// because the caller gives up waiting.
+	ctx := context.Background()
+	result := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
+	request := api.QueryPublicKeysRequest{
+		Requests: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp),
+	}
+	response := api.QueryPublicKeysResponse{
+		Results: make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult),
+	}
+	for req, ts := range requests {
+		if res, ok := s.cache.GetServerKey(req, ts); ok {
+			result[req] = res
+			continue
+		}
+		request.Requests[req] = ts
+	}
+	err := s.QueryPublicKeys(ctx, &request, &response)
+	if err != nil {
+		return nil, err
+	}
+	for req, res := range response.Results {
+		result[req] = res
+		s.cache.StoreServerKey(req, res)
+	}
+	return result, nil
+}
+
+func (h *httpFederationInternalAPI) InputPublicKeys(
+	ctx context.Context,
+	request *api.InputPublicKeysRequest,
+	response *api.InputPublicKeysResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "InputPublicKey")
+	defer span.Finish()
+
+	apiURL := h.federationAPIURL + FederationAPIInputPublicKeyPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpFederationInternalAPI) QueryPublicKeys(
+	ctx context.Context,
+	request *api.QueryPublicKeysRequest,
+	response *api.QueryPublicKeysResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPublicKey")
+	defer span.Finish()
+
+	apiURL := h.federationAPIURL + FederationAPIQueryPublicKeyPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

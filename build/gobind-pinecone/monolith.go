@@ -271,9 +271,8 @@ func (m *DendriteMonolith) Start() {
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-mediaapi.db", m.CacheDirectory, prefix))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-syncapi.db", m.StorageDirectory, prefix))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-signingkeyserver.db", m.StorageDirectory, prefix))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationapi.db", m.StorageDirectory, prefix))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationapi.db", m.StorageDirectory, prefix))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
@@ -291,12 +290,10 @@ func (m *DendriteMonolith) Start() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsAPI := roomserver.NewInternalAPI(
-		base, keyRing,
-	)
+	rsAPI := roomserver.NewInternalAPI(base)
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
+		base, federation, rsAPI, base.Caches, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
@@ -312,6 +309,7 @@ func (m *DendriteMonolith) Start() {
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsAPI.SetFederationSenderAPI(fsAPI)
+	rsAPI.SetKeyring(keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

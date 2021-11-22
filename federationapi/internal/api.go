@@ -2,6 +2,8 @@ package internal
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"sync"
 	"time"
 
@@ -9,16 +11,19 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/dendrite/federationapi/storage/cache"
+	"github.com/matrix-org/dendrite/internal/caching"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 // FederationInternalAPI is an implementation of api.FederationInternalAPI
 type FederationInternalAPI struct {
 	db         storage.Database
-	cfg        *config.FederationSender
+	cfg        *config.FederationAPI
 	statistics *statistics.Statistics
 	rsAPI      roomserverAPI.RoomserverInternalAPI
 	federation *gomatrixserverlib.FederationClient
@@ -28,19 +33,72 @@ type FederationInternalAPI struct {
 }
 
 func NewFederationInternalAPI(
-	db storage.Database, cfg *config.FederationSender,
+	db storage.Database, cfg *config.FederationAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	keyRing *gomatrixserverlib.KeyRing,
 	statistics *statistics.Statistics,
+	caches *caching.Caches,
 	queues *queue.OutgoingQueues,
 ) *FederationInternalAPI {
+	serverKeyDB, err := cache.NewKeyDatabase(db, caches)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to set up caching wrapper for server key database")
+	}
+
+	keyRing := &gomatrixserverlib.KeyRing{
+		KeyFetchers: []gomatrixserverlib.KeyFetcher{},
+		KeyDatabase: serverKeyDB,
+	}
+
+	addDirectFetcher := func() {
+		keyRing.KeyFetchers = append(
+			keyRing.KeyFetchers,
+			&gomatrixserverlib.DirectKeyFetcher{
+				Client: federation,
+			},
+		)
+	}
+
+	if cfg.PreferDirectFetch {
+		addDirectFetcher()
+	} else {
+		defer addDirectFetcher()
+	}
+
+	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
+	for _, ps := range cfg.KeyPerspectives {
+		perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
+			PerspectiveServerName: ps.ServerName,
+			PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},
+			Client:                federation,
+		}
+
+		for _, key := range ps.Keys {
+			rawkey, err := b64e.DecodeString(key.PublicKey)
+			if err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"server_name": ps.ServerName,
+					"public_key":  key.PublicKey,
+				}).Warn("Couldn't parse perspective key")
+				continue
+			}
+			perspective.PerspectiveServerKeys[key.KeyID] = rawkey
+		}
+
+		keyRing.KeyFetchers = append(keyRing.KeyFetchers, perspective)
+
+		logrus.WithFields(logrus.Fields{
+			"server_name":     ps.ServerName,
+			"num_public_keys": len(ps.Keys),
+		}).Info("Enabled perspective key fetcher")
+	}
+
 	return &FederationInternalAPI{
 		db:         db,
 		cfg:        cfg,
 		rsAPI:      rsAPI,
-		federation: federation,
 		keyRing:    keyRing,
+		federation: federation,
 		statistics: statistics,
 		queues:     queues,
 	}
