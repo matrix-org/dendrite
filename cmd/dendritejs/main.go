@@ -168,10 +168,9 @@ func main() {
 	cfg.UserAPI.AccountDatabase.ConnectionString = "file:/idb/dendritejs_account.db"
 	cfg.AppServiceAPI.Database.ConnectionString = "file:/idb/dendritejs_appservice.db"
 	cfg.UserAPI.DeviceDatabase.ConnectionString = "file:/idb/dendritejs_device.db"
-	cfg.FederationSender.Database.ConnectionString = "file:/idb/dendritejs_fedsender.db"
+	cfg.FederationAPI.Database.ConnectionString = "file:/idb/dendritejs_fedsender.db"
 	cfg.MediaAPI.Database.ConnectionString = "file:/idb/dendritejs_mediaapi.db"
 	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"
-	cfg.SigningKeyServer.Database.ConnectionString = "file:/idb/dendritejs_signingkeyserver.db"
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
 	cfg.Global.Kafka.UseNaffka = true
@@ -205,14 +204,15 @@ func main() {
 		KeyDatabase: fetcher,
 	}
 
-	rsAPI := roomserver.NewInternalAPI(base, keyRing)
+	rsAPI := roomserver.NewInternalAPI(base)
 	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
-	fedSenderAPI := federationapi.NewInternalAPI(base, federation, rsAPI, &keyRing, true)
+	fedSenderAPI := federationapi.NewInternalAPI(base, federation, rsAPI, base.Caches, true)
 	rsAPI.SetFederationSenderAPI(fedSenderAPI)
+	rsAPI.SetKeyring(keyRing)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
 
 	monolith := setup.Monolith{
