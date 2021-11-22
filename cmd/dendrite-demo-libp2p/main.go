@@ -49,7 +49,7 @@ import (
 
 func createKeyDB(
 	base *P2PDendrite,
-	db gomatrixserverlib.KeyDatabase,
+	db *gomatrixserverlib.KeyRing,
 ) {
 	mdns := mDNSListener{
 		host:  base.LibP2P,
@@ -168,11 +168,9 @@ func main() {
 		panic("failed to create new public rooms provider: " + err.Error())
 	}
 
-	/*
-		createKeyDB(
-			base, keyRing,
-		)
-	*/
+	createKeyDB(
+		base, keyRing,
+	)
 
 	monolith := setup.Monolith{
 		Config:    base.Base.Cfg,

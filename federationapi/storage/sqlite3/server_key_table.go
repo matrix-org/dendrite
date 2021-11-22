@@ -67,7 +67,9 @@ type serverSigningKeyStatements struct {
 }
 
 func NewSQLiteServerSigningKeysTable(db *sql.DB) (s *serverSigningKeyStatements, err error) {
-	s = &serverSigningKeyStatements{}
+	s = &serverSigningKeyStatements{
+		db: db,
+	}
 	_, err = db.Exec(serverSigningKeysSchema)
 	if err != nil {
 		return
