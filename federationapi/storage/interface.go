@@ -25,6 +25,8 @@ import (
 
 type Database interface {
 	internal.PartitionStorer
+	gomatrixserverlib.KeyDatabase
+	gomatrixserverlib.KeyFetcher
 
 	UpdateRoom(ctx context.Context, roomID, oldEventID, newEventID string, addHosts []types.JoinedHost, removeHosts []string) (joinedHosts []types.JoinedHost, err error)
 

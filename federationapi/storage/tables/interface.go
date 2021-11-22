@@ -104,3 +104,8 @@ type FederationSenderNotaryServerKeysMetadata interface {
 	// DeleteOldJSONResponses removes all responses which are not referenced in FederationSenderNotaryServerKeysMetadata
 	DeleteOldJSONResponses(ctx context.Context, txn *sql.Tx) error
 }
+
+type FederationSenderServerSigningKeys interface {
+	BulkSelectServerKeys(ctx context.Context, txn *sql.Tx, requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error)
+	UpsertServerKeys(ctx context.Context, txn *sql.Tx, request gomatrixserverlib.PublicKeyLookupRequest, key gomatrixserverlib.PublicKeyLookupResult) error
+}

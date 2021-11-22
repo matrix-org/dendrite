@@ -40,6 +40,7 @@ type Database struct {
 	FederationSenderInboundPeeks  tables.FederationSenderInboundPeeks
 	NotaryServerKeysJSON          tables.FederationSenderNotaryServerKeysJSON
 	NotaryServerKeysMetadata      tables.FederationSenderNotaryServerKeysMetadata
+	ServerSigningKeys             tables.FederationSenderServerSigningKeys
 }
 
 // An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
