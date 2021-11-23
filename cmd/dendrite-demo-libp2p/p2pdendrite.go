@@ -54,7 +54,7 @@ type P2PDendrite struct {
 // The componentName is used for logging purposes, and should be a friendly name
 // of the component running, e.g. SyncAPI.
 func NewP2PDendrite(cfg *config.Dendrite, componentName string) *P2PDendrite {
-	baseDendrite := base.NewBaseDendrite(cfg, componentName, false)
+	baseDendrite := base.NewBaseDendrite(cfg, componentName)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

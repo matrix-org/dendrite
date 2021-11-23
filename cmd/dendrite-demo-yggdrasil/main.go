@@ -93,7 +93,7 @@ func main() {
 		panic(err)
 	}
 
-	base := base.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()

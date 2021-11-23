@@ -51,7 +51,7 @@ func main() {
 	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
 	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
 	httpAPIAddr := httpAddr
-
+	options := []basepkg.BaseDendriteOptions{}
 	if *enableHTTPAPIs {
 		logrus.Warnf("DANGER! The -api option is enabled, exposing internal APIs on %q!", *apiBindAddr)
 		httpAPIAddr = config.HTTPAddress("http://" + *apiBindAddr)
@@ -67,9 +67,10 @@ func main() {
 		cfg.MediaAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.RoomServer.InternalAPI.Connect = httpAPIAddr
 		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
+		options = append(options, basepkg.UseHTTPAPIs)
 	}
 
-	base := basepkg.NewBaseDendrite(cfg, "Monolith", *enableHTTPAPIs)
+	base := basepkg.NewBaseDendrite(cfg, "Monolith", options...)
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()

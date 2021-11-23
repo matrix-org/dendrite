@@ -92,10 +92,28 @@ const NoListener = ""
 const HTTPServerTimeout = time.Minute * 5
 const HTTPClientTimeout = time.Second * 30
 
+type BaseDendriteOptions int
+
+const (
+	NoCacheMetrics BaseDendriteOptions = iota
+	UseHTTPAPIs
+)
+
 // NewBaseDendrite creates a new instance to be used by a component.
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
-func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs bool) *BaseDendrite {
+func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...BaseDendriteOptions) *BaseDendrite {
+	useHTTPAPIs := false
+	cacheMetrics := true
+	for _, opt := range options {
+		switch opt {
+		case NoCacheMetrics:
+			cacheMetrics = false
+		case UseHTTPAPIs:
+			useHTTPAPIs = true
+		}
+	}
+
 	configErrors := &config.ConfigErrors{}
 	cfg.Verify(configErrors, componentName == "Monolith") // TODO: better way?
 	if len(*configErrors) > 0 {
@@ -131,7 +149,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, useHTTPAPIs boo
 		}
 	}
 
-	cache, err := caching.NewInMemoryLRUCache(true)
+	cache, err := caching.NewInMemoryLRUCache(cacheMetrics)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}

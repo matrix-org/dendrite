@@ -1,6 +1,5 @@
 package federationapi
 
-/*
 import (
 	"bytes"
 	"context"
@@ -17,6 +16,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -74,6 +74,7 @@ func TestMain(m *testing.M) {
 		cfg.Defaults()
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
 		cfg.Global.PrivateKey = testPriv
+		cfg.Global.Kafka.UseNaffka = true
 		cfg.Global.KeyID = serverKeyID
 		cfg.Global.KeyValidityPeriod = s.validity
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
@@ -92,7 +93,8 @@ func TestMain(m *testing.M) {
 		)
 
 		// Finally, build the server key APIs.
-		s.api = NewInternalAPI(s.config, s.fedclient, s.cache, true)
+		sbase := base.NewBaseDendrite(cfg, "Monolith", base.NoCacheMetrics)
+		s.api = NewInternalAPI(sbase, s.fedclient, nil, s.cache, true)
 	}
 
 	// Now that we have built our server key APIs, start the
@@ -316,4 +318,3 @@ func TestRenewalBehaviour(t *testing.T) {
 	}
 	t.Log(res)
 }
-*/
