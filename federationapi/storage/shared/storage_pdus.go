@@ -34,7 +34,7 @@ func (d *Database) AssociatePDUWithDestination(
 	receipt *Receipt,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationSenderQueuePDUs.InsertQueuePDU(
+		if err := d.FederationQueuePDUs.InsertQueuePDU(
 			ctx,           // context
 			txn,           // SQL transaction
 			transactionID, // transaction ID
@@ -64,21 +64,21 @@ func (d *Database) GetPendingPDUs(
 	// the database.
 	events = make(map[*Receipt]*gomatrixserverlib.HeaderedEvent)
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nids, err := d.FederationSenderQueuePDUs.SelectQueuePDUs(ctx, txn, serverName, limit)
+		nids, err := d.FederationQueuePDUs.SelectQueuePDUs(ctx, txn, serverName, limit)
 		if err != nil {
 			return fmt.Errorf("SelectQueuePDUs: %w", err)
 		}
 
 		retrieve := make([]int64, 0, len(nids))
 		for _, nid := range nids {
-			if event, ok := d.Cache.GetFederationSenderQueuedPDU(nid); ok {
+			if event, ok := d.Cache.GetFederationQueuedPDU(nid); ok {
 				events[&Receipt{nid}] = event
 			} else {
 				retrieve = append(retrieve, nid)
 			}
 		}
 
-		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
+		blobs, err := d.FederationQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
 		if err != nil {
 			return fmt.Errorf("SelectQueueJSON: %w", err)
 		}
@@ -89,7 +89,7 @@ func (d *Database) GetPendingPDUs(
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
 			events[&Receipt{nid}] = &event
-			d.Cache.StoreFederationSenderQueuedPDU(nid, &event)
+			d.Cache.StoreFederationQueuedPDU(nid, &event)
 		}
 
 		return nil
@@ -115,24 +115,24 @@ func (d *Database) CleanPDUs(
 	}
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationSenderQueuePDUs.DeleteQueuePDUs(ctx, txn, serverName, nids); err != nil {
+		if err := d.FederationQueuePDUs.DeleteQueuePDUs(ctx, txn, serverName, nids); err != nil {
 			return err
 		}
 
 		var deleteNIDs []int64
 		for _, nid := range nids {
-			count, err := d.FederationSenderQueuePDUs.SelectQueuePDUReferenceJSONCount(ctx, txn, nid)
+			count, err := d.FederationQueuePDUs.SelectQueuePDUReferenceJSONCount(ctx, txn, nid)
 			if err != nil {
 				return fmt.Errorf("SelectQueuePDUReferenceJSONCount: %w", err)
 			}
 			if count == 0 {
 				deleteNIDs = append(deleteNIDs, nid)
-				d.Cache.EvictFederationSenderQueuedPDU(nid)
+				d.Cache.EvictFederationQueuedPDU(nid)
 			}
 		}
 
 		if len(deleteNIDs) > 0 {
-			if err := d.FederationSenderQueueJSON.DeleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
+			if err := d.FederationQueueJSON.DeleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
 				return fmt.Errorf("DeleteQueueJSON: %w", err)
 			}
 		}
@@ -147,7 +147,7 @@ func (d *Database) GetPendingPDUCount(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 ) (int64, error) {
-	return d.FederationSenderQueuePDUs.SelectQueuePDUCount(ctx, nil, serverName)
+	return d.FederationQueuePDUs.SelectQueuePDUCount(ctx, nil, serverName)
 }
 
 // GetPendingServerNames returns the server names that have PDUs
@@ -155,5 +155,5 @@ func (d *Database) GetPendingPDUCount(
 func (d *Database) GetPendingPDUServerNames(
 	ctx context.Context,
 ) ([]gomatrixserverlib.ServerName, error) {
-	return d.FederationSenderQueuePDUs.SelectQueuePDUServerNames(ctx, nil)
+	return d.FederationQueuePDUs.SelectQueuePDUServerNames(ctx, nil)
 }

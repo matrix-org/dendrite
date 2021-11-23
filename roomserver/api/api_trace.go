@@ -21,8 +21,8 @@ func (t *RoomserverInternalAPITrace) SetKeyring(keyRing *gomatrixserverlib.KeyRi
 	t.Impl.SetKeyring(keyRing)
 }
 
-func (t *RoomserverInternalAPITrace) SetFederationSenderAPI(fsAPI fsAPI.FederationInternalAPI) {
-	t.Impl.SetFederationSenderAPI(fsAPI)
+func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI) {
+	t.Impl.SetFederationAPI(fsAPI)
 }
 
 func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {

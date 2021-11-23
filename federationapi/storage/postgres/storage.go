@@ -35,7 +35,7 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationSenderCache) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationCache) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
@@ -88,19 +88,19 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationS
 		return nil, err
 	}
 	d.Database = shared.Database{
-		DB:                            d.db,
-		Cache:                         cache,
-		Writer:                        d.writer,
-		FederationSenderJoinedHosts:   joinedHosts,
-		FederationSenderQueuePDUs:     queuePDUs,
-		FederationSenderQueueEDUs:     queueEDUs,
-		FederationSenderQueueJSON:     queueJSON,
-		FederationSenderBlacklist:     blacklist,
-		FederationSenderInboundPeeks:  inboundPeeks,
-		FederationSenderOutboundPeeks: outboundPeeks,
-		NotaryServerKeysJSON:          notaryJSON,
-		NotaryServerKeysMetadata:      notaryMetadata,
-		ServerSigningKeys:             serverSigningKeys,
+		DB:                       d.db,
+		Cache:                    cache,
+		Writer:                   d.writer,
+		FederationJoinedHosts:    joinedHosts,
+		FederationQueuePDUs:      queuePDUs,
+		FederationQueueEDUs:      queueEDUs,
+		FederationQueueJSON:      queueJSON,
+		FederationBlacklist:      blacklist,
+		FederationInboundPeeks:   inboundPeeks,
+		FederationOutboundPeeks:  outboundPeeks,
+		NotaryServerKeysJSON:     notaryJSON,
+		NotaryServerKeysMetadata: notaryMetadata,
+		ServerSigningKeys:        serverSigningKeys,
 	}
 	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationapi"); err != nil {
 		return nil, err

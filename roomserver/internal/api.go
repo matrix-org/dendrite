@@ -79,10 +79,10 @@ func (r *RoomserverInternalAPI) SetKeyring(keyRing *gomatrixserverlib.KeyRing) {
 	r.KeyRing = keyRing
 }
 
-// SetFederationSenderInputAPI passes in a federation sender input API reference
-// so that we can avoid the chicken-and-egg problem of both the roomserver input API
-// and the federation sender input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationInternalAPI) {
+// SetFederationInputAPI passes in a federation input API reference so that we can
+// avoid the chicken-and-egg problem of both the roomserver input API and the
+// federation input API being interdependent.
+func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI) {
 	r.fsAPI = fsAPI
 	r.SetKeyring(fsAPI.KeyRing())
 

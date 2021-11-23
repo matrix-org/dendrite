@@ -27,7 +27,7 @@ import (
 )
 
 // NewDatabase opens a new database
-func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationSenderCache) (Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationCache) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties, cache)

@@ -186,7 +186,7 @@ func main() {
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
-	rsComponent.SetFederationSenderAPI(fsAPI)
+	rsComponent.SetFederationAPI(fsAPI)
 	rsComponent.SetKeyring(keyRing)
 
 	monolith := setup.Monolith{

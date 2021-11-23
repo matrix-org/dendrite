@@ -211,7 +211,7 @@ func main() {
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
 	fedSenderAPI := federationapi.NewInternalAPI(base, federation, rsAPI, base.Caches, true)
-	rsAPI.SetFederationSenderAPI(fedSenderAPI)
+	rsAPI.SetFederationAPI(fedSenderAPI)
 	rsAPI.SetKeyring(keyRing)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
 

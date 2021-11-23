@@ -121,7 +121,7 @@ func main() {
 		base, federation, rsAPI, base.Caches, true,
 	)
 
-	rsComponent.SetFederationSenderAPI(fsAPI)
+	rsComponent.SetFederationAPI(fsAPI)
 	rsComponent.SetKeyring(keyRing)
 
 	monolith := setup.Monolith{

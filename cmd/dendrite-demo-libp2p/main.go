@@ -161,7 +161,7 @@ func main() {
 		&base.Base, federation, rsAPI, base.Base.Caches, true,
 	)
 	keyRing := fsAPI.KeyRing()
-	rsAPI.SetFederationSenderAPI(fsAPI)
+	rsAPI.SetFederationAPI(fsAPI)
 	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI)
 	err = provider.Start()
 	if err != nil {

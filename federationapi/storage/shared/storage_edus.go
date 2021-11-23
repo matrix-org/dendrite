@@ -33,7 +33,7 @@ func (d *Database) AssociateEDUWithDestination(
 	receipt *Receipt,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationSenderQueueEDUs.InsertQueueEDU(
+		if err := d.FederationQueueEDUs.InsertQueueEDU(
 			ctx,         // context
 			txn,         // SQL transaction
 			"",          // TODO: EDU type for coalescing
@@ -58,21 +58,21 @@ func (d *Database) GetPendingEDUs(
 ) {
 	edus = make(map[*Receipt]*gomatrixserverlib.EDU)
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nids, err := d.FederationSenderQueueEDUs.SelectQueueEDUs(ctx, txn, serverName, limit)
+		nids, err := d.FederationQueueEDUs.SelectQueueEDUs(ctx, txn, serverName, limit)
 		if err != nil {
 			return fmt.Errorf("SelectQueueEDUs: %w", err)
 		}
 
 		retrieve := make([]int64, 0, len(nids))
 		for _, nid := range nids {
-			if edu, ok := d.Cache.GetFederationSenderQueuedEDU(nid); ok {
+			if edu, ok := d.Cache.GetFederationQueuedEDU(nid); ok {
 				edus[&Receipt{nid}] = edu
 			} else {
 				retrieve = append(retrieve, nid)
 			}
 		}
 
-		blobs, err := d.FederationSenderQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
+		blobs, err := d.FederationQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
 		if err != nil {
 			return fmt.Errorf("SelectQueueJSON: %w", err)
 		}
@@ -107,24 +107,24 @@ func (d *Database) CleanEDUs(
 	}
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationSenderQueueEDUs.DeleteQueueEDUs(ctx, txn, serverName, nids); err != nil {
+		if err := d.FederationQueueEDUs.DeleteQueueEDUs(ctx, txn, serverName, nids); err != nil {
 			return err
 		}
 
 		var deleteNIDs []int64
 		for _, nid := range nids {
-			count, err := d.FederationSenderQueueEDUs.SelectQueueEDUReferenceJSONCount(ctx, txn, nid)
+			count, err := d.FederationQueueEDUs.SelectQueueEDUReferenceJSONCount(ctx, txn, nid)
 			if err != nil {
 				return fmt.Errorf("SelectQueueEDUReferenceJSONCount: %w", err)
 			}
 			if count == 0 {
 				deleteNIDs = append(deleteNIDs, nid)
-				d.Cache.EvictFederationSenderQueuedEDU(nid)
+				d.Cache.EvictFederationQueuedEDU(nid)
 			}
 		}
 
 		if len(deleteNIDs) > 0 {
-			if err := d.FederationSenderQueueJSON.DeleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
+			if err := d.FederationQueueJSON.DeleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
 				return fmt.Errorf("DeleteQueueJSON: %w", err)
 			}
 		}
@@ -139,7 +139,7 @@ func (d *Database) GetPendingEDUCount(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 ) (int64, error) {
-	return d.FederationSenderQueueEDUs.SelectQueueEDUCount(ctx, nil, serverName)
+	return d.FederationQueueEDUs.SelectQueueEDUCount(ctx, nil, serverName)
 }
 
 // GetPendingServerNames returns the server names that have EDUs
@@ -147,5 +147,5 @@ func (d *Database) GetPendingEDUCount(
 func (d *Database) GetPendingEDUServerNames(
 	ctx context.Context,
 ) ([]gomatrixserverlib.ServerName, error) {
-	return d.FederationSenderQueueEDUs.SelectQueueEDUServerNames(ctx, nil)
+	return d.FederationQueueEDUs.SelectQueueEDUServerNames(ctx, nil)
 }
