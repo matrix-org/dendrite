@@ -14,10 +14,7 @@ func (s *FederationInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
 	// Return a keyring that forces requests to be proxied through the
 	// below functions. That way we can enforce things like validity
 	// and keeping the cache up-to-date.
-	return &gomatrixserverlib.KeyRing{
-		KeyDatabase: s,
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{},
-	}
+	return s.keyRing
 }
 
 func (s *FederationInternalAPI) StoreKeys(
