@@ -17,17 +17,17 @@ package personalities
 import (
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func EDUServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
+func EDUServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	intAPI := eduserver.NewInternalAPI(base, cache.New(), base.UserAPIClient())
 	eduserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.EDUServer.InternalAPI.Listen, // internal listener
-		setup.NoListener,                      // external listener
+		basepkg.NoListener,                    // external listener
 		nil, nil,
 	)
 }

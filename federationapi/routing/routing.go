@@ -21,7 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
@@ -46,7 +45,7 @@ func Setup(
 	cfg *config.FederationAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduAPI eduserverAPI.EDUServerInputAPI,
-	fsAPI federationSenderAPI.FederationSenderInternalAPI,
+	fsAPI federationAPI.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	userAPI userapi.UserInternalAPI,

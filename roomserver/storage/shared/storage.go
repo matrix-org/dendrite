@@ -9,7 +9,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -35,7 +34,6 @@ type Database struct {
 	EventTypesTable            tables.EventTypes
 	EventStateKeysTable        tables.EventStateKeys
 	RoomsTable                 tables.Rooms
-	TransactionsTable          tables.Transactions
 	StateSnapshotTable         tables.StateSnapshot
 	StateBlockTable            tables.StateBlock
 	RoomAliasesTable           tables.RoomAliases
@@ -426,17 +424,6 @@ func (d *Database) Events(
 	return results, nil
 }
 
-func (d *Database) GetTransactionEventID(
-	ctx context.Context, transactionID string,
-	sessionID int64, userID string,
-) (string, error) {
-	eventID, err := d.TransactionsTable.SelectTransactionEventID(ctx, transactionID, sessionID, userID)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return eventID, err
-}
-
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
@@ -473,7 +460,7 @@ func (d *Database) GetLatestEventsForUpdate(
 
 func (d *Database) StoreEvent(
 	ctx context.Context, event *gomatrixserverlib.Event,
-	txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID, isRejected bool,
+	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
 	var (
 		roomNID          types.RoomNID
@@ -487,15 +474,6 @@ func (d *Database) StoreEvent(
 	)
 
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if txnAndSessionID != nil {
-			if err = d.TransactionsTable.InsertTransaction(
-				ctx, txn, txnAndSessionID.TransactionID,
-				txnAndSessionID.SessionID, event.Sender(), event.EventID(),
-			); err != nil {
-				return fmt.Errorf("d.TransactionsTable.InsertTransaction: %w", err)
-			}
-		}
-
 		// TODO: Here we should aim to have two different code paths for new rooms
 		// vs existing ones.
 

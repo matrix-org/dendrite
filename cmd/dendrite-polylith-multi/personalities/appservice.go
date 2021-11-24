@@ -16,11 +16,12 @@ package personalities
 
 import (
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func Appservice(base *setup.BaseDendrite, cfg *config.Dendrite) {
+func Appservice(base *base.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
 	rsAPI := base.RoomserverHTTPClient()
 
@@ -29,7 +30,7 @@ func Appservice(base *setup.BaseDendrite, cfg *config.Dendrite) {
 
 	base.SetupAndServeHTTP(
 		base.Cfg.AppServiceAPI.InternalAPI.Listen, // internal listener
-		setup.NoListener, // external listener
+		basepkg.NoListener,                        // external listener
 		nil, nil,
 	)
 }

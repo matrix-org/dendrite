@@ -22,7 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/sirupsen/logrus"
 )
@@ -36,13 +36,12 @@ func AddInternalRoutes(router *mux.Router, intAPI api.RoomserverInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *setup.BaseDendrite,
-	keyRing gomatrixserverlib.JSONVerifier,
+	base *base.BaseDendrite,
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
 	var perspectiveServerNames []gomatrixserverlib.ServerName
-	for _, kp := range base.Cfg.SigningKeyServer.KeyPerspectives {
+	for _, kp := range base.Cfg.FederationAPI.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
 
@@ -57,6 +56,6 @@ func NewInternalAPI(
 		cfg, roomserverDB, js,
 		cfg.Matrix.JetStream.TopicFor(jetstream.InputRoomEvent),
 		cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
-		base.Caches, keyRing, perspectiveServerNames,
+		base.Caches, perspectiveServerNames,
 	)
 }

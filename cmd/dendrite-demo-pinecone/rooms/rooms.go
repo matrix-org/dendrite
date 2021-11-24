@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 
@@ -30,14 +30,14 @@ import (
 type PineconeRoomProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
-	fedSender api.FederationSenderInternalAPI
+	fedSender api.FederationInternalAPI
 	fedClient *gomatrixserverlib.FederationClient
 }
 
 func NewPineconeRoomProvider(
 	r *pineconeRouter.Router,
 	s *pineconeSessions.Sessions,
-	fedSender api.FederationSenderInternalAPI,
+	fedSender api.FederationInternalAPI,
 	fedClient *gomatrixserverlib.FederationClient,
 ) *PineconeRoomProvider {
 	p := &PineconeRoomProvider{

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/gomatrixserverlib"
 	"nhooyr.io/websocket"
 
@@ -70,7 +70,7 @@ func createTransport(s *pineconeSessions.Sessions) *http.Transport {
 }
 
 func CreateClient(
-	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
+	base *base.BaseDendrite, s *pineconeSessions.Sessions,
 ) *gomatrixserverlib.Client {
 	return gomatrixserverlib.NewClient(
 		gomatrixserverlib.WithTransport(createTransport(s)),
@@ -78,7 +78,7 @@ func CreateClient(
 }
 
 func CreateFederationClient(
-	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
+	base *base.BaseDendrite, s *pineconeSessions.Sessions,
 ) *gomatrixserverlib.FederationClient {
 	return gomatrixserverlib.NewFederationClient(
 		base.Cfg.Global.ServerName,

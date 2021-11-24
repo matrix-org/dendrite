@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -30,13 +30,13 @@ import (
 type Unpeeker struct {
 	ServerName gomatrixserverlib.ServerName
 	Cfg        *config.RoomServer
-	FSAPI      fsAPI.FederationSenderInternalAPI
+	FSAPI      fsAPI.FederationInternalAPI
 	DB         storage.Database
 
 	Inputer *input.Inputer
 }
 
-// PerformPeek handles peeking into matrix rooms, including over federation by talking to the federationsender.
+// PerformPeek handles peeking into matrix rooms, including over federation by talking to the federationapi.
 func (r *Unpeeker) PerformUnpeek(
 	ctx context.Context,
 	req *api.PerformUnpeekRequest,

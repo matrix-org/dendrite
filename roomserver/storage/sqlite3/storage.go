@@ -90,9 +90,6 @@ func (d *Database) create(db *sql.DB) error {
 	if err := createRoomsTable(db); err != nil {
 		return err
 	}
-	if err := createTransactionsTable(db); err != nil {
-		return err
-	}
 	if err := createStateBlockTable(db); err != nil {
 		return err
 	}
@@ -142,10 +139,6 @@ func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
 	if err != nil {
 		return err
 	}
-	transactions, err := prepareTransactionsTable(db)
-	if err != nil {
-		return err
-	}
 	stateBlock, err := prepareStateBlockTable(db)
 	if err != nil {
 		return err
@@ -187,7 +180,6 @@ func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
 		EventStateKeysTable:        eventStateKeys,
 		EventJSONTable:             eventJSON,
 		RoomsTable:                 rooms,
-		TransactionsTable:          transactions,
 		StateBlockTable:            stateBlock,
 		StateSnapshotTable:         stateSnapshot,
 		PrevEventsTable:            prevEvents,
