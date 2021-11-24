@@ -164,7 +164,7 @@ func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http
 
 func main() {
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.UserAPI.AccountDatabase.ConnectionString = "file:/idb/dendritejs_account.db"
 	cfg.AppServiceAPI.Database.ConnectionString = "file:/idb/dendritejs_appservice.db"
 	cfg.UserAPI.DeviceDatabase.ConnectionString = "file:/idb/dendritejs_device.db"
