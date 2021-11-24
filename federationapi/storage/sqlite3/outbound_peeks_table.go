@@ -26,7 +26,7 @@ import (
 )
 
 const outboundPeeksSchema = `
-CREATE TABLE IF NOT EXISTS federationapi_outbound_peeks (
+CREATE TABLE IF NOT EXISTS federationsender_outbound_peeks (
 	room_id TEXT NOT NULL,
 	server_name TEXT NOT NULL,
 	peek_id TEXT NOT NULL,
@@ -38,22 +38,22 @@ CREATE TABLE IF NOT EXISTS federationapi_outbound_peeks (
 `
 
 const insertOutboundPeekSQL = "" +
-	"INSERT INTO federationapi_outbound_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
+	"INSERT INTO federationsender_outbound_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
 
 const selectOutboundPeekSQL = "" +
-	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationapi_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
 const selectOutboundPeeksSQL = "" +
-	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationapi_outbound_peeks WHERE room_id = $1"
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1"
 
 const renewOutboundPeekSQL = "" +
-	"UPDATE federationapi_outbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
+	"UPDATE federationsender_outbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
 
 const deleteOutboundPeekSQL = "" +
-	"DELETE FROM federationapi_outbound_peeks WHERE room_id = $1 and server_name = $2"
+	"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2"
 
 const deleteOutboundPeeksSQL = "" +
-	"DELETE FROM federationapi_outbound_peeks WHERE room_id = $1"
+	"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1"
 
 type outboundPeeksStatements struct {
 	db                      *sql.DB

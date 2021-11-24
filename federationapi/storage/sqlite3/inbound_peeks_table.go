@@ -26,7 +26,7 @@ import (
 )
 
 const inboundPeeksSchema = `
-CREATE TABLE IF NOT EXISTS federationapi_inbound_peeks (
+CREATE TABLE IF NOT EXISTS federationsender_inbound_peeks (
 	room_id TEXT NOT NULL,
 	server_name TEXT NOT NULL,
 	peek_id TEXT NOT NULL,
@@ -38,22 +38,22 @@ CREATE TABLE IF NOT EXISTS federationapi_inbound_peeks (
 `
 
 const insertInboundPeekSQL = "" +
-	"INSERT INTO federationapi_inbound_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
+	"INSERT INTO federationsender_inbound_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
 
 const selectInboundPeekSQL = "" +
-	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationapi_inbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
 const selectInboundPeeksSQL = "" +
-	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationapi_inbound_peeks WHERE room_id = $1"
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1"
 
 const renewInboundPeekSQL = "" +
-	"UPDATE federationapi_inbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
+	"UPDATE federationsender_inbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
 
 const deleteInboundPeekSQL = "" +
-	"DELETE FROM federationapi_inbound_peeks WHERE room_id = $1 and server_name = $2"
+	"DELETE FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2"
 
 const deleteInboundPeeksSQL = "" +
-	"DELETE FROM federationapi_inbound_peeks WHERE room_id = $1"
+	"DELETE FROM federationsender_inbound_peeks WHERE room_id = $1"
 
 type inboundPeeksStatements struct {
 	db                     *sql.DB

@@ -30,7 +30,7 @@ const joinedHostsSchema = `
 -- The joined_hosts table stores a list of m.room.member event ids in the
 -- current state for each room where the membership is "join".
 -- There will be an entry for every user that is joined to the room.
-CREATE TABLE IF NOT EXISTS federationapi_joined_hosts (
+CREATE TABLE IF NOT EXISTS federationsender_joined_hosts (
     -- The string ID of the room.
     room_id TEXT NOT NULL,
     -- The event ID of the m.room.member join event.
@@ -40,31 +40,31 @@ CREATE TABLE IF NOT EXISTS federationapi_joined_hosts (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS federatonsender_joined_hosts_event_id_idx
-    ON federationapi_joined_hosts (event_id);
+    ON federationsender_joined_hosts (event_id);
 
 CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
-    ON federationapi_joined_hosts (room_id)
+    ON federationsender_joined_hosts (room_id)
 `
 
 const insertJoinedHostsSQL = "" +
-	"INSERT OR IGNORE INTO federationapi_joined_hosts (room_id, event_id, server_name)" +
+	"INSERT OR IGNORE INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
 	" VALUES ($1, $2, $3)"
 
 const deleteJoinedHostsSQL = "" +
-	"DELETE FROM federationapi_joined_hosts WHERE event_id = $1"
+	"DELETE FROM federationsender_joined_hosts WHERE event_id = $1"
 
 const deleteJoinedHostsForRoomSQL = "" +
-	"DELETE FROM federationapi_joined_hosts WHERE room_id = $1"
+	"DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
 
 const selectJoinedHostsSQL = "" +
-	"SELECT event_id, server_name FROM federationapi_joined_hosts" +
+	"SELECT event_id, server_name FROM federationsender_joined_hosts" +
 	" WHERE room_id = $1"
 
 const selectAllJoinedHostsSQL = "" +
-	"SELECT DISTINCT server_name FROM federationapi_joined_hosts"
+	"SELECT DISTINCT server_name FROM federationsender_joined_hosts"
 
 const selectJoinedHostsForRoomsSQL = "" +
-	"SELECT DISTINCT server_name FROM federationapi_joined_hosts WHERE room_id IN ($1)"
+	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
 
 type joinedHostsStatements struct {
 	db                           *sql.DB

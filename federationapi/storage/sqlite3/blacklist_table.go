@@ -23,7 +23,7 @@ import (
 )
 
 const blacklistSchema = `
-CREATE TABLE IF NOT EXISTS federationapi_blacklist (
+CREATE TABLE IF NOT EXISTS federationsender_blacklist (
     -- The blacklisted server name
 	server_name TEXT NOT NULL,
 	UNIQUE (server_name)
@@ -31,17 +31,17 @@ CREATE TABLE IF NOT EXISTS federationapi_blacklist (
 `
 
 const insertBlacklistSQL = "" +
-	"INSERT INTO federationapi_blacklist (server_name) VALUES ($1)" +
+	"INSERT INTO federationsender_blacklist (server_name) VALUES ($1)" +
 	" ON CONFLICT DO NOTHING"
 
 const selectBlacklistSQL = "" +
-	"SELECT server_name FROM federationapi_blacklist WHERE server_name = $1"
+	"SELECT server_name FROM federationsender_blacklist WHERE server_name = $1"
 
 const deleteBlacklistSQL = "" +
-	"DELETE FROM federationapi_blacklist WHERE server_name = $1"
+	"DELETE FROM federationsender_blacklist WHERE server_name = $1"
 
 const deleteAllBlacklistSQL = "" +
-	"DELETE FROM federationapi_blacklist"
+	"DELETE FROM federationsender_blacklist"
 
 type blacklistStatements struct {
 	db                     *sql.DB

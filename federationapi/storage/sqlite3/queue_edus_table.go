@@ -26,41 +26,41 @@ import (
 )
 
 const queueEDUsSchema = `
-CREATE TABLE IF NOT EXISTS federationapi_queue_edus (
+CREATE TABLE IF NOT EXISTS federationsender_queue_edus (
 	-- The type of the event (informational).
 	edu_type TEXT NOT NULL,
     -- The domain part of the user ID the EDU event is for.
 	server_name TEXT NOT NULL,
-	-- The JSON NID from the federationapi_queue_edus_json table.
+	-- The JSON NID from the federationsender_queue_edus_json table.
 	json_nid BIGINT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS federationapi_queue_edus_json_nid_idx
-    ON federationapi_queue_edus (json_nid, server_name);
+CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
+    ON federationsender_queue_edus (json_nid, server_name);
 `
 
 const insertQueueEDUSQL = "" +
-	"INSERT INTO federationapi_queue_edus (edu_type, server_name, json_nid)" +
+	"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
 const deleteQueueEDUsSQL = "" +
-	"DELETE FROM federationapi_queue_edus WHERE server_name = $1 AND json_nid IN ($2)"
+	"DELETE FROM federationsender_queue_edus WHERE server_name = $1 AND json_nid IN ($2)"
 
 const selectQueueEDUSQL = "" +
-	"SELECT json_nid FROM federationapi_queue_edus" +
+	"SELECT json_nid FROM federationsender_queue_edus" +
 	" WHERE server_name = $1" +
 	" LIMIT $2"
 
 const selectQueueEDUReferenceJSONCountSQL = "" +
-	"SELECT COUNT(*) FROM federationapi_queue_edus" +
+	"SELECT COUNT(*) FROM federationsender_queue_edus" +
 	" WHERE json_nid = $1"
 
 const selectQueueEDUCountSQL = "" +
-	"SELECT COUNT(*) FROM federationapi_queue_edus" +
+	"SELECT COUNT(*) FROM federationsender_queue_edus" +
 	" WHERE server_name = $1"
 
 const selectQueueServerNamesSQL = "" +
-	"SELECT DISTINCT server_name FROM federationapi_queue_edus"
+	"SELECT DISTINCT server_name FROM federationsender_queue_edus"
 
 type queueEDUsStatements struct {
 	db                                   *sql.DB

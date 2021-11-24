@@ -26,7 +26,7 @@ import (
 )
 
 const notaryServerKeysMetadataSchema = `
-CREATE TABLE IF NOT EXISTS federationapi_notary_server_keys_metadata (
+CREATE TABLE IF NOT EXISTS federationsender_notary_server_keys_metadata (
     notary_id BIGINT NOT NULL,
 	server_name TEXT NOT NULL,
 	key_id TEXT NOT NULL,
@@ -35,41 +35,41 @@ CREATE TABLE IF NOT EXISTS federationapi_notary_server_keys_metadata (
 `
 
 const upsertServerKeysSQL = "" +
-	"INSERT INTO federationapi_notary_server_keys_metadata (notary_id, server_name, key_id) VALUES ($1, $2, $3)" +
+	"INSERT INTO federationsender_notary_server_keys_metadata (notary_id, server_name, key_id) VALUES ($1, $2, $3)" +
 	" ON CONFLICT (server_name, key_id) DO UPDATE SET notary_id = $1"
 
 // for a given (server_name, key_id), find the existing notary ID and valid until. Used to check if we will replace it
 // JOINs with the json table
 const selectNotaryKeyMetadataSQL = `
-	SELECT federationapi_notary_server_keys_metadata.notary_id, valid_until FROM federationapi_notary_server_keys_json
-	JOIN federationapi_notary_server_keys_metadata ON
-	federationapi_notary_server_keys_metadata.notary_id = federationapi_notary_server_keys_json.notary_id
-	WHERE federationapi_notary_server_keys_metadata.server_name = $1 AND federationapi_notary_server_keys_metadata.key_id = $2
+	SELECT federationsender_notary_server_keys_metadata.notary_id, valid_until FROM federationsender_notary_server_keys_json
+	JOIN federationsender_notary_server_keys_metadata ON
+	federationsender_notary_server_keys_metadata.notary_id = federationsender_notary_server_keys_json.notary_id
+	WHERE federationsender_notary_server_keys_metadata.server_name = $1 AND federationsender_notary_server_keys_metadata.key_id = $2
 `
 
 // select the response which has the highest valid_until value
 // JOINs with the json table
 const selectNotaryKeyResponsesSQL = `
-	SELECT response_json FROM federationapi_notary_server_keys_json
+	SELECT response_json FROM federationsender_notary_server_keys_json
 	WHERE server_name = $1 AND valid_until = (
-		SELECT MAX(valid_until) FROM federationapi_notary_server_keys_json WHERE server_name = $1
+		SELECT MAX(valid_until) FROM federationsender_notary_server_keys_json WHERE server_name = $1
 	)
 `
 
 // select the responses which have the given key IDs
 // JOINs with the json table
 const selectNotaryKeyResponsesWithKeyIDsSQL = `
-	SELECT response_json FROM federationapi_notary_server_keys_json
-	JOIN federationapi_notary_server_keys_metadata ON
-	federationapi_notary_server_keys_metadata.notary_id = federationapi_notary_server_keys_json.notary_id
-	WHERE federationapi_notary_server_keys_json.server_name = $1 AND federationapi_notary_server_keys_metadata.key_id = ANY ($2)
-	GROUP BY federationapi_notary_server_keys_json.notary_id
+	SELECT response_json FROM federationsender_notary_server_keys_json
+	JOIN federationsender_notary_server_keys_metadata ON
+	federationsender_notary_server_keys_metadata.notary_id = federationsender_notary_server_keys_json.notary_id
+	WHERE federationsender_notary_server_keys_json.server_name = $1 AND federationsender_notary_server_keys_metadata.key_id = ANY ($2)
+	GROUP BY federationsender_notary_server_keys_json.notary_id
 `
 
 // JOINs with the metadata table
 const deleteUnusedServerKeysJSONSQL = `
-	DELETE FROM federationapi_notary_server_keys_json WHERE federationapi_notary_server_keys_json.notary_id NOT IN (
-		SELECT DISTINCT notary_id FROM federationapi_notary_server_keys_metadata
+	DELETE FROM federationsender_notary_server_keys_json WHERE federationsender_notary_server_keys_json.notary_id NOT IN (
+		SELECT DISTINCT notary_id FROM federationsender_notary_server_keys_metadata
 	)
 `
 

@@ -25,41 +25,41 @@ import (
 )
 
 const queuePDUsSchema = `
-CREATE TABLE IF NOT EXISTS federationapi_queue_pdus (
+CREATE TABLE IF NOT EXISTS federationsender_queue_pdus (
     -- The transaction ID that was generated before persisting the event.
 	transaction_id TEXT NOT NULL,
     -- The destination server that we will send the event to.
 	server_name TEXT NOT NULL,
-	-- The JSON NID from the federationapi_queue_pdus_json table.
+	-- The JSON NID from the federationsender_queue_pdus_json table.
 	json_nid BIGINT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS federationapi_queue_pdus_pdus_json_nid_idx
-    ON federationapi_queue_pdus (json_nid, server_name);
+CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_pdus_pdus_json_nid_idx
+    ON federationsender_queue_pdus (json_nid, server_name);
 `
 
 const insertQueuePDUSQL = "" +
-	"INSERT INTO federationapi_queue_pdus (transaction_id, server_name, json_nid)" +
+	"INSERT INTO federationsender_queue_pdus (transaction_id, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
 const deleteQueuePDUSQL = "" +
-	"DELETE FROM federationapi_queue_pdus WHERE server_name = $1 AND json_nid = ANY($2)"
+	"DELETE FROM federationsender_queue_pdus WHERE server_name = $1 AND json_nid = ANY($2)"
 
 const selectQueuePDUsSQL = "" +
-	"SELECT json_nid FROM federationapi_queue_pdus" +
+	"SELECT json_nid FROM federationsender_queue_pdus" +
 	" WHERE server_name = $1" +
 	" LIMIT $2"
 
 const selectQueuePDUReferenceJSONCountSQL = "" +
-	"SELECT COUNT(*) FROM federationapi_queue_pdus" +
+	"SELECT COUNT(*) FROM federationsender_queue_pdus" +
 	" WHERE json_nid = $1"
 
 const selectQueuePDUsCountSQL = "" +
-	"SELECT COUNT(*) FROM federationapi_queue_pdus" +
+	"SELECT COUNT(*) FROM federationsender_queue_pdus" +
 	" WHERE server_name = $1"
 
 const selectQueuePDUServerNamesSQL = "" +
-	"SELECT DISTINCT server_name FROM federationapi_queue_pdus"
+	"SELECT DISTINCT server_name FROM federationsender_queue_pdus"
 
 type queuePDUsStatements struct {
 	db                                   *sql.DB

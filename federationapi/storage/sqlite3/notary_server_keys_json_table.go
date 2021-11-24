@@ -23,7 +23,7 @@ import (
 )
 
 const notaryServerKeysJSONSchema = `
-CREATE TABLE IF NOT EXISTS federationapi_notary_server_keys_json (
+CREATE TABLE IF NOT EXISTS federationsender_notary_server_keys_json (
     notary_id INTEGER PRIMARY KEY AUTOINCREMENT,
 	response_json TEXT NOT NULL,
 	server_name TEXT NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS federationapi_notary_server_keys_json (
 `
 
 const insertServerKeysJSONSQL = "" +
-	"INSERT INTO federationapi_notary_server_keys_json (response_json, server_name, valid_until) VALUES ($1, $2, $3)" +
+	"INSERT INTO federationsender_notary_server_keys_json (response_json, server_name, valid_until) VALUES ($1, $2, $3)" +
 	" RETURNING notary_id"
 
 type notaryServerKeysStatements struct {
