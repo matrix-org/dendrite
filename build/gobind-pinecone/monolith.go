@@ -260,7 +260,7 @@ func (m *DendriteMonolith) Start() {
 
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)

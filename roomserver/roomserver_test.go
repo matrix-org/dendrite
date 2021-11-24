@@ -158,7 +158,7 @@ func mustLoadRawEvents(t *testing.T, ver gomatrixserverlib.RoomVersion, events [
 func mustCreateRoomserverAPI(t *testing.T) (api.RoomserverInternalAPI, *dummyProducer) {
 	t.Helper()
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.ServerName = testOrigin
 	cfg.Global.Kafka.UseNaffka = true
 	cfg.RoomServer.Database = config.DatabaseOptions{

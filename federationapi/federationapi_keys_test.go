@@ -71,7 +71,7 @@ func TestMain(m *testing.M) {
 		// Draw up just enough Dendrite config for the server key
 		// API to work.
 		cfg := &config.Dendrite{}
-		cfg.Defaults()
+		cfg.Defaults(true)
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
 		cfg.Global.PrivateKey = testPriv
 		cfg.Global.Kafka.UseNaffka = true

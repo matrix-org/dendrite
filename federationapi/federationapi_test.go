@@ -19,7 +19,7 @@ import (
 func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	_, privKey, _ := ed25519.GenerateKey(nil)
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
 	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey

@@ -119,7 +119,7 @@ func main() {
 	}
 
 	cfg := config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.ServerName = "p2p"
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(fmt.Sprintf("ed25519:%s", *instanceName))

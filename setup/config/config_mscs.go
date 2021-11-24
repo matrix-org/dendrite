@@ -13,9 +13,11 @@ type MSCs struct {
 	Database DatabaseOptions `yaml:"database"`
 }
 
-func (c *MSCs) Defaults() {
+func (c *MSCs) Defaults(generate bool) {
 	c.Database.Defaults(5)
-	c.Database.ConnectionString = "file:mscs.db"
+	if generate {
+		c.Database.ConnectionString = "file:mscs.db"
+	}
 }
 
 // Enabled returns true if the given msc is enabled. Should in the form 'msc12345'.
