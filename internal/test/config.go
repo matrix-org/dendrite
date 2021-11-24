@@ -50,7 +50,7 @@ const (
 // Generates new matrix and TLS keys for the server.
 func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*config.Dendrite, int, error) {
 	var cfg config.Dendrite
-	cfg.Defaults()
+	cfg.Defaults(true)
 
 	port := startPort
 	assignAddress := func() config.HTTPAddress {

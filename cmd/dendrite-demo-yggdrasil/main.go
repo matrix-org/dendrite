@@ -73,7 +73,7 @@ func main() {
 	*/
 
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Global.PrivateKey = ygg.PrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)

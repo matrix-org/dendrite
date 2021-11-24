@@ -411,7 +411,7 @@ func (r *testRoomserverAPI) QueryCurrentState(ctx context.Context, req *roomserv
 func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*gomatrixserverlib.HeaderedEvent) *mux.Router {
 	t.Helper()
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.Database.ConnectionString = "file:msc2946_test.db"
 	cfg.MSCs.MSCs = []string{"msc2946"}
