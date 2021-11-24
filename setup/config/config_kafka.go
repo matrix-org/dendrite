@@ -34,11 +34,13 @@ func (k *Kafka) TopicFor(name string) string {
 	return fmt.Sprintf("%s%s", k.TopicPrefix, name)
 }
 
-func (c *Kafka) Defaults() {
+func (c *Kafka) Defaults(generate bool) {
 	c.UseNaffka = true
 	c.Database.Defaults(10)
-	c.Addresses = []string{"localhost:2181"}
-	c.Database.ConnectionString = DataSource("file:naffka.db")
+	if generate {
+		c.Addresses = []string{"localhost:2181"}
+		c.Database.ConnectionString = DataSource("file:naffka.db")
+	}
 	c.TopicPrefix = "Dendrite"
 
 	maxBytes := 1024 * 1024 * 8 // about 8MB

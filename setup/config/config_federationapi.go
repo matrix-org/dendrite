@@ -39,12 +39,14 @@ type FederationAPI struct {
 	PreferDirectFetch bool `yaml:"prefer_direct_fetch"`
 }
 
-func (c *FederationAPI) Defaults() {
+func (c *FederationAPI) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7772"
 	c.InternalAPI.Connect = "http://localhost:7772"
 	c.ExternalAPI.Listen = "http://[::]:8072"
 	c.Database.Defaults(10)
-	c.Database.ConnectionString = "file:federationapi.db"
+	if generate {
+		c.Database.ConnectionString = "file:federationapi.db"
+	}
 
 	c.FederationMaxRetries = 16
 	c.DisableTLSValidation = false

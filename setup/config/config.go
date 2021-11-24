@@ -210,7 +210,7 @@ func loadConfig(
 	monolithic bool,
 ) (*Dendrite, error) {
 	var c Dendrite
-	c.Defaults()
+	c.Defaults(false)
 
 	var err error
 	if err = yaml.Unmarshal(configData, &c); err != nil {
@@ -291,20 +291,20 @@ func (config *Dendrite) Derive() error {
 }
 
 // SetDefaults sets default config values if they are not explicitly set.
-func (c *Dendrite) Defaults() {
+func (c *Dendrite) Defaults(generate bool) {
 	c.Version = 1
 
-	c.Global.Defaults()
-	c.ClientAPI.Defaults()
-	c.EDUServer.Defaults()
-	c.FederationAPI.Defaults()
-	c.KeyServer.Defaults()
-	c.MediaAPI.Defaults()
-	c.RoomServer.Defaults()
-	c.SyncAPI.Defaults()
-	c.UserAPI.Defaults()
-	c.AppServiceAPI.Defaults()
-	c.MSCs.Defaults()
+	c.Global.Defaults(generate)
+	c.ClientAPI.Defaults(generate)
+	c.EDUServer.Defaults(generate)
+	c.FederationAPI.Defaults(generate)
+	c.KeyServer.Defaults(generate)
+	c.MediaAPI.Defaults(generate)
+	c.RoomServer.Defaults(generate)
+	c.SyncAPI.Defaults(generate)
+	c.UserAPI.Defaults(generate)
+	c.AppServiceAPI.Defaults(generate)
+	c.MSCs.Defaults(generate)
 
 	c.Wiring()
 }

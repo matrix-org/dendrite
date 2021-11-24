@@ -23,13 +23,15 @@ type UserAPI struct {
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
 
-func (c *UserAPI) Defaults() {
+func (c *UserAPI) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7781"
 	c.InternalAPI.Connect = "http://localhost:7781"
 	c.AccountDatabase.Defaults(10)
 	c.DeviceDatabase.Defaults(10)
-	c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
-	c.DeviceDatabase.ConnectionString = "file:userapi_devices.db"
+	if generate {
+		c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
+		c.DeviceDatabase.ConnectionString = "file:userapi_devices.db"
+	}
 	c.BCryptCost = bcrypt.DefaultCost
 	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
 }
