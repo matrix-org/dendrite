@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
@@ -33,7 +33,7 @@ import (
 type Inviter struct {
 	DB      storage.Database
 	Cfg     *config.RoomServer
-	FSAPI   federationSenderAPI.FederationSenderInternalAPI
+	FSAPI   federationAPI.FederationInternalAPI
 	Inputer *input.Inputer
 }
 
@@ -146,12 +146,12 @@ func (r *Inviter) PerformInvite(
 		// that the remote user doesn't exist, in which case we can give up
 		// processing here.
 		if req.SendAsServer != api.DoNotSendToOtherServers && !isTargetLocal {
-			fsReq := &federationSenderAPI.PerformInviteRequest{
+			fsReq := &federationAPI.PerformInviteRequest{
 				RoomVersion:     req.RoomVersion,
 				Event:           event,
 				InviteRoomState: inviteState,
 			}
-			fsRes := &federationSenderAPI.PerformInviteResponse{}
+			fsRes := &federationAPI.PerformInviteResponse{}
 			if err = r.FSAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
 				res.Error = &api.PerformError{
 					Msg:  err.Error(),

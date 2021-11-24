@@ -21,14 +21,13 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/api"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/mediaapi"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
-	serverKeyAPI "github.com/matrix-org/dendrite/signingkeyserver/api"
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
@@ -44,13 +43,12 @@ type Monolith struct {
 	Client    *gomatrixserverlib.Client
 	FedClient *gomatrixserverlib.FederationClient
 
-	AppserviceAPI       appserviceAPI.AppServiceQueryAPI
-	EDUInternalAPI      eduServerAPI.EDUServerInputAPI
-	FederationSenderAPI federationSenderAPI.FederationSenderInternalAPI
-	RoomserverAPI       roomserverAPI.RoomserverInternalAPI
-	ServerKeyAPI        serverKeyAPI.SigningKeyServerAPI
-	UserAPI             userapi.UserInternalAPI
-	KeyAPI              keyAPI.KeyInternalAPI
+	AppserviceAPI  appserviceAPI.AppServiceQueryAPI
+	EDUInternalAPI eduServerAPI.EDUServerInputAPI
+	FederationAPI  federationAPI.FederationInternalAPI
+	RoomserverAPI  roomserverAPI.RoomserverInternalAPI
+	UserAPI        userapi.UserInternalAPI
+	KeyAPI         keyAPI.KeyInternalAPI
 
 	// Optional
 	ExtPublicRoomsProvider api.ExtraPublicRoomsProvider
@@ -62,12 +60,12 @@ func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ss
 		csMux, synapseMux, &m.Config.ClientAPI, m.AccountDB,
 		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
-		m.FederationSenderAPI, m.UserAPI, m.KeyAPI, m.ExtPublicRoomsProvider,
+		m.FederationAPI, m.UserAPI, m.KeyAPI, m.ExtPublicRoomsProvider,
 		&m.Config.MSCs,
 	)
 	federationapi.AddPublicRoutes(
 		ssMux, keyMux, wkMux, &m.Config.FederationAPI, m.UserAPI, m.FedClient,
-		m.KeyRing, m.RoomserverAPI, m.FederationSenderAPI,
+		m.KeyRing, m.RoomserverAPI, m.FederationAPI,
 		m.EDUInternalAPI, m.KeyAPI, &m.Config.MSCs, nil,
 	)
 	mediaapi.AddPublicRoutes(mediaMux, &m.Config.MediaAPI, m.UserAPI, m.Client)

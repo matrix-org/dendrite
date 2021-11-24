@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
@@ -37,7 +37,7 @@ import (
 type Joiner struct {
 	ServerName gomatrixserverlib.ServerName
 	Cfg        *config.RoomServer
-	FSAPI      fsAPI.FederationSenderInternalAPI
+	FSAPI      fsAPI.FederationInternalAPI
 	RSAPI      rsAPI.RoomserverInternalAPI
 	DB         storage.Database
 
@@ -45,7 +45,7 @@ type Joiner struct {
 	Queryer *query.Queryer
 }
 
-// PerformJoin handles joining matrix rooms, including over federation by talking to the federationsender.
+// PerformJoin handles joining matrix rooms, including over federation by talking to the federationapi.
 func (r *Joiner) PerformJoin(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,

@@ -33,7 +33,7 @@ func Peek(
 	roomID, peekID string,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
-	// TODO: check if we're just refreshing an existing peek by querying the federationsender
+	// TODO: check if we're just refreshing an existing peek by querying the federationapi
 
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}

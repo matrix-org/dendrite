@@ -76,11 +76,6 @@ type Rooms interface {
 	BulkSelectRoomNIDs(ctx context.Context, roomIDs []string) ([]types.RoomNID, error)
 }
 
-type Transactions interface {
-	InsertTransaction(ctx context.Context, txn *sql.Tx, transactionID string, sessionID int64, userID string, eventID string) error
-	SelectTransactionEventID(ctx context.Context, transactionID string, sessionID int64, userID string) (eventID string, err error)
-}
-
 type StateSnapshot interface {
 	InsertState(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs types.StateBlockNIDs) (stateNID types.StateSnapshotNID, err error)
 	BulkSelectStateBlockNIDs(ctx context.Context, stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)

@@ -23,10 +23,12 @@ func (c *JetStream) TopicFor(name string) string {
 	return fmt.Sprintf("%s%s", c.TopicPrefix, name)
 }
 
-func (c *JetStream) Defaults() {
+func (c *JetStream) Defaults(generate bool) {
 	c.Addresses = []string{}
 	c.TopicPrefix = "Dendrite"
-	c.StoragePath = Path("./")
+	if generate {
+		c.StoragePath = Path("./")
+	}
 }
 
 func (c *JetStream) Verify(configErrs *ConfigErrors, isMonolith bool) {

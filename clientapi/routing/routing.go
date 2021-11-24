@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
@@ -56,7 +56,7 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
-	federationSender federationSenderAPI.FederationSenderInternalAPI,
+	federationSender federationAPI.FederationInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,

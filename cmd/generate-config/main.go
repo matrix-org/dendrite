@@ -17,18 +17,17 @@ func main() {
 	flag.Parse()
 
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	if *serverName != "" {
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
 	}
 	if *dbURI != "" {
 		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.FederationSender.Database.ConnectionString = config.DataSource(*dbURI)
+		cfg.FederationAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.MSCs.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.MediaAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.SyncAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(*dbURI)
 		cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(*dbURI)
@@ -46,7 +45,7 @@ func main() {
 			},
 		},
 	}
-	cfg.SigningKeyServer.KeyPerspectives = config.KeyPerspectives{
+	cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{
 		{
 			ServerName: "matrix.org",
 			Keys: []config.KeyPerspectiveTrustKey{
@@ -82,11 +81,11 @@ func main() {
 	if *defaultsForCI {
 		cfg.AppServiceAPI.DisableTLSValidation = true
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		cfg.FederationSender.DisableTLSValidation = true
+		cfg.FederationAPI.DisableTLSValidation = true
+		// don't hit matrix.org when running tests!!!
+		cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}
 		cfg.MSCs.MSCs = []string{"msc2836", "msc2946", "msc2444", "msc2753"}
 		cfg.Logging[0].Level = "trace"
-		// don't hit matrix.org when running tests!!!
-		cfg.SigningKeyServer.KeyPerspectives = config.KeyPerspectives{}
 		cfg.UserAPI.BCryptCost = bcrypt.MinCost
 		cfg.Global.JetStream.InMemory = true
 	}

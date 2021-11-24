@@ -121,20 +121,8 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	// If we don't have a transaction ID then get one.
-	if input.TransactionID != nil {
-		tdID := input.TransactionID
-		eventID, err = r.DB.GetTransactionEventID(
-			ctx, tdID.TransactionID, tdID.SessionID, event.Sender(),
-		)
-		// On error OR event with the transaction already processed/processesing
-		if err != nil || eventID != "" {
-			return
-		}
-	}
-
 	// Store the event.
-	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, input.TransactionID, authEventNIDs, isRejected)
+	_, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
 	if err != nil {
 		return "", fmt.Errorf("r.DB.StoreEvent: %w", err)
 	}
