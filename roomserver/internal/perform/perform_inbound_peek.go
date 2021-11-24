@@ -34,7 +34,7 @@ type InboundPeeker struct {
 }
 
 // PerformInboundPeek handles peeking into matrix rooms, including over
-// federation by talking to the federationsender. called when a remote server
+// federation by talking to the federationapi. called when a remote server
 // initiates a /peek over federation.
 //
 // It should atomically figure out the current state of the room (for the

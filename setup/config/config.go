@@ -53,18 +53,16 @@ type Dendrite struct {
 	// been a breaking change to the config file format.
 	Version int `yaml:"version"`
 
-	Global           Global           `yaml:"global"`
-	AppServiceAPI    AppServiceAPI    `yaml:"app_service_api"`
-	ClientAPI        ClientAPI        `yaml:"client_api"`
-	EDUServer        EDUServer        `yaml:"edu_server"`
-	FederationAPI    FederationAPI    `yaml:"federation_api"`
-	FederationSender FederationSender `yaml:"federation_sender"`
-	KeyServer        KeyServer        `yaml:"key_server"`
-	MediaAPI         MediaAPI         `yaml:"media_api"`
-	RoomServer       RoomServer       `yaml:"room_server"`
-	SigningKeyServer SigningKeyServer `yaml:"signing_key_server"`
-	SyncAPI          SyncAPI          `yaml:"sync_api"`
-	UserAPI          UserAPI          `yaml:"user_api"`
+	Global        Global        `yaml:"global"`
+	AppServiceAPI AppServiceAPI `yaml:"app_service_api"`
+	ClientAPI     ClientAPI     `yaml:"client_api"`
+	EDUServer     EDUServer     `yaml:"edu_server"`
+	FederationAPI FederationAPI `yaml:"federation_api"`
+	KeyServer     KeyServer     `yaml:"key_server"`
+	MediaAPI      MediaAPI      `yaml:"media_api"`
+	RoomServer    RoomServer    `yaml:"room_server"`
+	SyncAPI       SyncAPI       `yaml:"sync_api"`
+	UserAPI       UserAPI       `yaml:"user_api"`
 
 	MSCs MSCs `yaml:"mscs"`
 
@@ -300,11 +298,9 @@ func (c *Dendrite) Defaults() {
 	c.ClientAPI.Defaults()
 	c.EDUServer.Defaults()
 	c.FederationAPI.Defaults()
-	c.FederationSender.Defaults()
 	c.KeyServer.Defaults()
 	c.MediaAPI.Defaults()
 	c.RoomServer.Defaults()
-	c.SigningKeyServer.Defaults()
 	c.SyncAPI.Defaults()
 	c.UserAPI.Defaults()
 	c.AppServiceAPI.Defaults()
@@ -319,9 +315,9 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	}
 	for _, c := range []verifiable{
 		&c.Global, &c.ClientAPI,
-		&c.EDUServer, &c.FederationAPI, &c.FederationSender,
+		&c.EDUServer, &c.FederationAPI,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
-		&c.SigningKeyServer, &c.SyncAPI, &c.UserAPI,
+		&c.SyncAPI, &c.UserAPI,
 		&c.AppServiceAPI, &c.MSCs,
 	} {
 		c.Verify(configErrs, isMonolith)
@@ -332,11 +328,9 @@ func (c *Dendrite) Wiring() {
 	c.ClientAPI.Matrix = &c.Global
 	c.EDUServer.Matrix = &c.Global
 	c.FederationAPI.Matrix = &c.Global
-	c.FederationSender.Matrix = &c.Global
 	c.KeyServer.Matrix = &c.Global
 	c.MediaAPI.Matrix = &c.Global
 	c.RoomServer.Matrix = &c.Global
-	c.SigningKeyServer.Matrix = &c.Global
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
@@ -493,6 +487,15 @@ func (config *Dendrite) AppServiceURL() string {
 	return string(config.AppServiceAPI.InternalAPI.Connect)
 }
 
+// FederationAPIURL returns an HTTP URL for where the federation API is listening.
+func (config *Dendrite) FederationAPIURL() string {
+	// Hard code the federationapi to talk HTTP for now.
+	// If we support HTTPS we need to think of a practical way to do certificate validation.
+	// People setting up servers shouldn't need to get a certificate valid for the public
+	// internet for an internal API.
+	return string(config.FederationAPI.InternalAPI.Connect)
+}
+
 // RoomServerURL returns an HTTP URL for where the roomserver is listening.
 func (config *Dendrite) RoomServerURL() string {
 	// Hard code the roomserver to talk HTTP for now.
@@ -518,24 +521,6 @@ func (config *Dendrite) EDUServerURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return string(config.EDUServer.InternalAPI.Connect)
-}
-
-// FederationSenderURL returns an HTTP URL for where the federation sender is listening.
-func (config *Dendrite) FederationSenderURL() string {
-	// Hard code the federation sender server to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.FederationSender.InternalAPI.Connect)
-}
-
-// SigningKeyServerURL returns an HTTP URL for where the signing key server is listening.
-func (config *Dendrite) SigningKeyServerURL() string {
-	// Hard code the signing key server to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.SigningKeyServer.InternalAPI.Connect)
 }
 
 // KeyServerURL returns an HTTP URL for where the key server is listening.

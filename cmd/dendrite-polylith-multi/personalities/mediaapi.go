@@ -16,11 +16,11 @@ package personalities
 
 import (
 	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func MediaAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
+func MediaAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
 	client := base.CreateClient()
 

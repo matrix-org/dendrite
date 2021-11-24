@@ -24,12 +24,13 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
@@ -270,9 +271,8 @@ func (m *DendriteMonolith) Start() {
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-mediaapi.db", m.CacheDirectory, prefix))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-syncapi.db", m.StorageDirectory, prefix))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-signingkeyserver.db", m.StorageDirectory, prefix))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationapi.db", m.StorageDirectory, prefix))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
@@ -281,7 +281,7 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	base := setup.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -290,12 +290,10 @@ func (m *DendriteMonolith) Start() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsAPI := roomserver.NewInternalAPI(
-		base, keyRing,
-	)
+	rsAPI := roomserver.NewInternalAPI(base)
 
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
+	fsAPI := federationapi.NewInternalAPI(
+		base, federation, rsAPI, base.Caches, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
@@ -310,7 +308,8 @@ func (m *DendriteMonolith) Start() {
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsAPI.SetFederationSenderAPI(fsAPI)
+	rsAPI.SetFederationAPI(fsAPI)
+	rsAPI.SetKeyring(keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
@@ -321,7 +320,7 @@ func (m *DendriteMonolith) Start() {
 
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,
-		FederationSenderAPI:    fsAPI,
+		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
 		UserAPI:                m.userAPI,
 		KeyAPI:                 keyAPI,

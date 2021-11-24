@@ -37,13 +37,14 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -151,9 +152,8 @@ func main() {
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-signingkeyserver.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
@@ -161,7 +161,7 @@ func main() {
 		panic(err)
 	}
 
-	base := setup.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -170,12 +170,10 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsComponent := roomserver.NewInternalAPI(
-		base, keyRing,
-	)
+	rsComponent := roomserver.NewInternalAPI(base)
 	rsAPI := rsComponent
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
+	fsAPI := federationapi.NewInternalAPI(
+		base, federation, rsAPI, base.Caches, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
@@ -188,7 +186,8 @@ func main() {
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
-	rsComponent.SetFederationSenderAPI(fsAPI)
+	rsComponent.SetFederationAPI(fsAPI)
+	rsComponent.SetKeyring(keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
@@ -199,7 +198,7 @@ func main() {
 
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,
-		FederationSenderAPI:    fsAPI,
+		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
 		UserAPI:                userAPI,
 		KeyAPI:                 keyAPI,

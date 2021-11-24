@@ -54,15 +54,6 @@ services:
       - ./config:/etc/dendrite
     networks:
       - internal
-
-  federation_sender:
-    hostname: federation_sender
-    image: matrixdotorg/dendrite-polylith:latest
-    command: federationsender
-    volumes:
-      - ./config:/etc/dendrite
-    networks:
-      - internal
       
   key_server:
     hostname: key_server
@@ -72,16 +63,7 @@ services:
       - ./config:/etc/dendrite
     networks:
       - internal
-
-  signing_key_server:
-    hostname: signing_key_server
-    image: matrixdotorg/dendrite-polylith:latest
-    command: signingkeyserver
-    volumes:
-      - ./config:/etc/dendrite
-    networks:
-      - internal
-
+      
   user_api:
     hostname: user_api
     image: matrixdotorg/dendrite-polylith:latest

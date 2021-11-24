@@ -20,7 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -47,7 +47,7 @@ func DirectoryRoom(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	fedSenderAPI federationSenderAPI.FederationSenderInternalAPI,
+	fedSenderAPI federationAPI.FederationInternalAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
@@ -96,8 +96,8 @@ func DirectoryRoom(
 			}
 		}
 	} else {
-		joinedHostsReq := federationSenderAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: res.RoomID}
-		var joinedHostsRes federationSenderAPI.QueryJoinedHostServerNamesInRoomResponse
+		joinedHostsReq := federationAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: res.RoomID}
+		var joinedHostsRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 		if err = fedSenderAPI.QueryJoinedHostServerNamesInRoom(req.Context(), &joinedHostsReq, &joinedHostsRes); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("fedSenderAPI.QueryJoinedHostServerNamesInRoom failed")
 			return jsonerror.InternalServerError()

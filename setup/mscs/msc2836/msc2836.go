@@ -28,11 +28,11 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	fs "github.com/matrix-org/dendrite/federationsender/api"
+	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -93,7 +93,7 @@ func toClientResponse(res *gomatrixserverlib.MSC2836EventRelationshipsResponse) 
 
 // Enable this MSC
 func Enable(
-	base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
+	base *base.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
 	db, err := NewDatabase(&base.Cfg.MSCs.Database)
@@ -148,10 +148,10 @@ type reqCtx struct {
 	// federated request args
 	isFederatedRequest bool
 	serverName         gomatrixserverlib.ServerName
-	fsAPI              fs.FederationSenderInternalAPI
+	fsAPI              fs.FederationInternalAPI
 }
 
-func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
+func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		relation, err := NewEventRelationshipRequest(req.Body)
 		if err != nil {
@@ -183,7 +183,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 }
 
 func federatedEventRelationship(
-	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
+	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 ) util.JSONResponse {
 	relation, err := NewEventRelationshipRequest(bytes.NewBuffer(fedReq.Content()))
 	if err != nil {
