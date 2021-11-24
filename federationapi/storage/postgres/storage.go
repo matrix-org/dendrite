@@ -102,7 +102,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationC
 		NotaryServerKeysMetadata: notaryMetadata,
 		ServerSigningKeys:        serverSigningKeys,
 	}
-	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationapi"); err != nil {
+	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
 		return nil, err
 	}
 	return &d, nil
