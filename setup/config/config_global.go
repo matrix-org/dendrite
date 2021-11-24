@@ -59,15 +59,17 @@ type Global struct {
 	DNSCache DNSCacheOptions `yaml:"dns_cache"`
 }
 
-func (c *Global) Defaults() {
-	c.ServerName = "localhost"
-	c.PrivateKeyPath = "matrix_key.pem"
-	_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
-	c.KeyID = "ed25519:auto"
+func (c *Global) Defaults(generate bool) {
+	if generate {
+		c.ServerName = "localhost"
+		c.PrivateKeyPath = "matrix_key.pem"
+		_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
+		c.KeyID = "ed25519:auto"
+	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
 
-	c.Kafka.Defaults()
-	c.Metrics.Defaults()
+	c.Kafka.Defaults(generate)
+	c.Metrics.Defaults(generate)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
 }
@@ -110,10 +112,12 @@ type Metrics struct {
 	} `yaml:"basic_auth"`
 }
 
-func (c *Metrics) Defaults() {
+func (c *Metrics) Defaults(generate bool) {
 	c.Enabled = false
-	c.BasicAuth.Username = "metrics"
-	c.BasicAuth.Password = "metrics"
+	if generate {
+		c.BasicAuth.Username = "metrics"
+		c.BasicAuth.Password = "metrics"
+	}
 }
 
 func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {

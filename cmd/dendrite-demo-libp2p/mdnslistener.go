@@ -25,7 +25,7 @@ import (
 )
 
 type mDNSListener struct {
-	keydb gomatrixserverlib.KeyDatabase
+	keydb *gomatrixserverlib.KeyRing
 	host  host.Host
 }
 
@@ -35,7 +35,7 @@ func (n *mDNSListener) HandlePeerFound(p peer.AddrInfo) {
 	}
 	if pubkey, err := p.ID.ExtractPublicKey(); err == nil {
 		raw, _ := pubkey.Raw()
-		if err := n.keydb.StoreKeys(
+		if err := n.keydb.KeyDatabase.StoreKeys(
 			context.Background(),
 			map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{
 				{

@@ -50,7 +50,7 @@ const (
 // Generates new matrix and TLS keys for the server.
 func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*config.Dendrite, int, error) {
 	var cfg config.Dendrite
-	cfg.Defaults()
+	cfg.Defaults(true)
 
 	port := startPort
 	assignAddress := func() config.HTTPAddress {
@@ -88,11 +88,10 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	// the table names are globally unique. But we might not want to
 	// rely on that in the future.
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(database)
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(database)
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(database)
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(database)
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(database)
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(database)
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(database)
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(database)
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(database)
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(database)
@@ -100,22 +99,18 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.AppServiceAPI.InternalAPI.Listen = assignAddress()
 	cfg.EDUServer.InternalAPI.Listen = assignAddress()
 	cfg.FederationAPI.InternalAPI.Listen = assignAddress()
-	cfg.FederationSender.InternalAPI.Listen = assignAddress()
 	cfg.KeyServer.InternalAPI.Listen = assignAddress()
 	cfg.MediaAPI.InternalAPI.Listen = assignAddress()
 	cfg.RoomServer.InternalAPI.Listen = assignAddress()
-	cfg.SigningKeyServer.InternalAPI.Listen = assignAddress()
 	cfg.SyncAPI.InternalAPI.Listen = assignAddress()
 	cfg.UserAPI.InternalAPI.Listen = assignAddress()
 
 	cfg.AppServiceAPI.InternalAPI.Connect = cfg.AppServiceAPI.InternalAPI.Listen
 	cfg.EDUServer.InternalAPI.Connect = cfg.EDUServer.InternalAPI.Listen
 	cfg.FederationAPI.InternalAPI.Connect = cfg.FederationAPI.InternalAPI.Listen
-	cfg.FederationSender.InternalAPI.Connect = cfg.FederationSender.InternalAPI.Listen
 	cfg.KeyServer.InternalAPI.Connect = cfg.KeyServer.InternalAPI.Listen
 	cfg.MediaAPI.InternalAPI.Connect = cfg.MediaAPI.InternalAPI.Listen
 	cfg.RoomServer.InternalAPI.Connect = cfg.RoomServer.InternalAPI.Listen
-	cfg.SigningKeyServer.InternalAPI.Connect = cfg.SigningKeyServer.InternalAPI.Listen
 	cfg.SyncAPI.InternalAPI.Connect = cfg.SyncAPI.InternalAPI.Listen
 	cfg.UserAPI.InternalAPI.Connect = cfg.UserAPI.InternalAPI.Listen
 

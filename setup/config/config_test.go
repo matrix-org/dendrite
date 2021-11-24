@@ -112,7 +112,7 @@ federation_sender:
     listen: http://localhost:7775
     connect: http://localhost:7775
   database:
-    connection_string: file:federationsender.db
+    connection_string: file:federationapi.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
