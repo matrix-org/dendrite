@@ -37,7 +37,7 @@ func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) error {
 	_, err := pRouter.Connect(
 		parent,
 		pineconeRouter.ConnectionZone("static"),
-		pineconeRouter.PeerTypeRemote,
+		pineconeRouter.ConnectionPeerType(pineconeRouter.PeerTypeRemote),
 		pineconeRouter.ConnectionURI(peer),
 	)
 	return err

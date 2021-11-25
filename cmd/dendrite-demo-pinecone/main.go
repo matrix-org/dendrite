@@ -110,7 +110,10 @@ func main() {
 				continue
 			}
 
-			port, err := pRouter.Connect(conn, pineconeRouter.PeerTypeRemote)
+			port, err := pRouter.Connect(
+				conn,
+				pineconeRouter.ConnectionPeerType(pineconeRouter.PeerTypeRemote),
+			)
 			if err != nil {
 				logrus.WithError(err).Error("pSwitch.Connect failed")
 				continue
@@ -242,7 +245,7 @@ func main() {
 		if _, err = pRouter.Connect(
 			conn,
 			pineconeRouter.ConnectionZone("websocket"),
-			pineconeRouter.PeerTypeRemote,
+			pineconeRouter.ConnectionPeerType(pineconeRouter.PeerTypeRemote),
 		); err != nil {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
