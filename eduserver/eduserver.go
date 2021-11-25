@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/eduserver/input"
 	"github.com/matrix-org/dendrite/eduserver/inthttp"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/kafka"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -37,7 +37,7 @@ func AddInternalRoutes(internalMux *mux.Router, inputAPI api.EDUServerInputAPI) 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *setup.BaseDendrite,
+	base *base.BaseDendrite,
 	eduCache *cache.EDUCache,
 	userAPI userapi.UserInternalAPI,
 ) api.EDUServerInputAPI {

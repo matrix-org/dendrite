@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	fedsenderapi "github.com/matrix-org/dendrite/federationsender/api"
+	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"

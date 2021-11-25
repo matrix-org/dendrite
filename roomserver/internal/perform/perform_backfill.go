@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	federationSenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
@@ -38,7 +38,7 @@ const maxBackfillServers = 5
 type Backfiller struct {
 	ServerName gomatrixserverlib.ServerName
 	DB         storage.Database
-	FSAPI      federationSenderAPI.FederationSenderInternalAPI
+	FSAPI      federationAPI.FederationInternalAPI
 	KeyRing    gomatrixserverlib.JSONVerifier
 
 	// The servers which should be preferred above other servers when backfilling
@@ -224,7 +224,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 // backfillRequester implements gomatrixserverlib.BackfillRequester
 type backfillRequester struct {
 	db           storage.Database
-	fsAPI        federationSenderAPI.FederationSenderInternalAPI
+	fsAPI        federationAPI.FederationInternalAPI
 	thisServer   gomatrixserverlib.ServerName
 	preferServer map[gomatrixserverlib.ServerName]bool
 	bwExtrems    map[string][]string
@@ -236,7 +236,7 @@ type backfillRequester struct {
 }
 
 func newBackfillRequester(
-	db storage.Database, fsAPI federationSenderAPI.FederationSenderInternalAPI, thisServer gomatrixserverlib.ServerName,
+	db storage.Database, fsAPI federationAPI.FederationInternalAPI, thisServer gomatrixserverlib.ServerName,
 	bwExtrems map[string][]string, preferServers []gomatrixserverlib.ServerName,
 ) *backfillRequester {
 	preferServer := make(map[gomatrixserverlib.ServerName]bool)
@@ -562,7 +562,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 		var stateAtEvent types.StateAtEvent
 		var redactedEventID string
 		var redactionEvent *gomatrixserverlib.Event
-		roomNID, stateAtEvent, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), nil, authNids, false)
+		roomNID, stateAtEvent, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), authNids, false)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
 			continue

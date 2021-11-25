@@ -15,12 +15,12 @@
 package personalities
 
 import (
-	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 )
 
-func UserAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
+func UserAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	accountDB := base.CreateAccountsDB()
 
 	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, base.KeyServerHTTPClient())
@@ -29,7 +29,7 @@ func UserAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
 
 	base.SetupAndServeHTTP(
 		base.Cfg.UserAPI.InternalAPI.Listen, // internal listener
-		setup.NoListener,                    // external listener
+		basepkg.NoListener,                  // external listener
 		nil, nil,
 	)
 }

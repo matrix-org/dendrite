@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2946"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -411,11 +411,11 @@ func (r *testRoomserverAPI) QueryCurrentState(ctx context.Context, req *roomserv
 func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*gomatrixserverlib.HeaderedEvent) *mux.Router {
 	t.Helper()
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.Database.ConnectionString = "file:msc2946_test.db"
 	cfg.MSCs.MSCs = []string{"msc2946"}
-	base := &setup.BaseDendrite{
+	base := &base.BaseDendrite{
 		Cfg:                    cfg,
 		PublicClientAPIMux:     mux.NewRouter().PathPrefix(httputil.PublicClientPathPrefix).Subrouter(),
 		PublicFederationAPIMux: mux.NewRouter().PathPrefix(httputil.PublicFederationPathPrefix).Subrouter(),
