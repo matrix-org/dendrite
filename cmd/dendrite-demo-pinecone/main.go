@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -61,7 +62,7 @@ import (
 var (
 	instanceName   = flag.String("name", "dendrite-p2p-pinecone", "the name of this P2P demo instance")
 	instancePort   = flag.Int("port", 8008, "the port that the client API will listen on")
-	instancePeer   = flag.String("peer", "", "the static Pinecone peer to connect to")
+	instancePeer   = flag.String("peer", "", "the static Pinecone peers to connect to, comma separated-list")
 	instanceListen = flag.String("listen", ":0", "the port Pinecone peers can connect to")
 )
 
@@ -109,9 +110,9 @@ func main() {
 				continue
 			}
 
-			port, err := pRouter.AuthenticatedConnect(conn, "", pineconeRouter.PeerTypeRemote, true)
+			port, err := pRouter.Connect(conn, pineconeRouter.PeerTypeRemote)
 			if err != nil {
-				logrus.WithError(err).Error("pSwitch.AuthenticatedConnect failed")
+				logrus.WithError(err).Error("pSwitch.Connect failed")
 				continue
 			}
 
@@ -124,14 +125,22 @@ func main() {
 	pMulticast.Start()
 
 	connectToStaticPeer := func() {
+		connected := map[string]bool{} // URI -> connected?
+		for _, uri := range strings.Split(*instancePeer, ",") {
+			connected[strings.TrimSpace(uri)] = false
+		}
 		attempt := func() {
-			if pRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
-				uri := *instancePeer
-				if uri == "" {
-					return
-				}
-				if err := conn.ConnectToPeer(pRouter, uri); err != nil {
-					logrus.WithError(err).Error("Failed to connect to static peer")
+			for k := range connected {
+				connected[k] = false
+			}
+			for _, info := range pRouter.Peers() {
+				connected[info.URI] = true
+			}
+			for k, online := range connected {
+				if !online {
+					if err := conn.ConnectToPeer(pRouter, k); err != nil {
+						logrus.WithError(err).Error("Failed to connect to static peer")
+					}
 				}
 			}
 		}
@@ -230,7 +239,11 @@ func main() {
 			return
 		}
 		conn := conn.WrapWebSocketConn(c)
-		if _, err = pRouter.AuthenticatedConnect(conn, "websocket", pineconeRouter.PeerTypeRemote, true); err != nil {
+		if _, err = pRouter.Connect(
+			conn,
+			pineconeRouter.ConnectionZone("websocket"),
+			pineconeRouter.PeerTypeRemote,
+		); err != nil {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
 	})

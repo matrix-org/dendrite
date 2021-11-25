@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -75,7 +76,7 @@ func (m *DendriteMonolith) BaseURL() string {
 }
 
 func (m *DendriteMonolith) PeerCount(peertype int) int {
-	return m.PineconeRouter.PeerCount(peertype)
+	return m.PineconeRouter.PeerCount(pineconeRouter.ConnectionPeerType(peertype))
 }
 
 func (m *DendriteMonolith) SessionCount() int {
@@ -87,15 +88,15 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 		m.PineconeMulticast.Start()
 	} else {
 		m.PineconeMulticast.Stop()
-		m.DisconnectType(pineconeRouter.PeerTypeMulticast)
+		m.DisconnectType(int(pineconeRouter.PeerTypeMulticast))
 	}
 }
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.staticPeerMutex.Lock()
-	m.staticPeerURI = uri
+	m.staticPeerURI = strings.TrimSpace(uri)
 	m.staticPeerMutex.Unlock()
-	m.DisconnectType(pineconeRouter.PeerTypeRemote)
+	m.DisconnectType(int(pineconeRouter.PeerTypeRemote))
 	if uri != "" {
 		go func() {
 			m.staticPeerAttempt <- struct{}{}
@@ -105,7 +106,7 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
 	for _, p := range m.PineconeRouter.Peers() {
-		if peertype == p.PeerType {
+		if int(peertype) == p.PeerType {
 			m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
 		}
 	}
@@ -133,7 +134,11 @@ func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) 
 		for i := 1; i <= 10; i++ {
 			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
 			var err error
-			conduit.port, err = m.PineconeRouter.AuthenticatedConnect(l, zone, peertype, true)
+			conduit.port, err = m.PineconeRouter.Connect(
+				l,
+				pineconeRouter.ConnectionZone(zone),
+				pineconeRouter.ConnectionPeerType(peertype),
+			)
 			switch err {
 			case io.ErrClosedPipe:
 				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
@@ -195,16 +200,28 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 }
 
 func (m *DendriteMonolith) staticPeerConnect() {
+	connected := map[string]bool{} // URI -> connected?
 	attempt := func() {
-		if m.PineconeRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
-			m.staticPeerMutex.RLock()
-			uri := m.staticPeerURI
-			m.staticPeerMutex.RUnlock()
-			if uri == "" {
-				return
-			}
-			if err := conn.ConnectToPeer(m.PineconeRouter, uri); err != nil {
-				logrus.WithError(err).Error("Failed to connect to static peer")
+		m.staticPeerMutex.RLock()
+		uri := m.staticPeerURI
+		m.staticPeerMutex.RUnlock()
+		if uri == "" {
+			return
+		}
+		for k := range connected {
+			connected[k] = false
+		}
+		for _, uri := range strings.Split(uri, ",") {
+			connected[strings.TrimSpace(uri)] = false
+		}
+		for _, info := range m.PineconeRouter.Peers() {
+			connected[info.URI] = true
+		}
+		for k, online := range connected {
+			if !online {
+				if err := conn.ConnectToPeer(m.PineconeRouter, k); err != nil {
+					logrus.WithError(err).Error("Failed to connect to static peer")
+				}
 			}
 		}
 	}

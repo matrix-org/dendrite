@@ -34,7 +34,12 @@ func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) error {
 	if parent == nil {
 		return fmt.Errorf("failed to wrap connection")
 	}
-	_, err := pRouter.AuthenticatedConnect(parent, "static", pineconeRouter.PeerTypeRemote, true)
+	_, err := pRouter.Connect(
+		parent,
+		pineconeRouter.ConnectionZone("static"),
+		pineconeRouter.PeerTypeRemote,
+		pineconeRouter.ConnectionURI(peer),
+	)
 	return err
 }
 
