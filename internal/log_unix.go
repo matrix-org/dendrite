@@ -17,18 +17,31 @@
 package internal
 
 import (
+	"io/ioutil"
 	"log/syslog"
 
+	"github.com/MFAshby/stdemuxerhook"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
 )
 
-// SetupHookLogging configures the logging hooks defined in the configuration.
+// SetupLogging configures the logging hooks defined in the configuration.
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
-func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
+func SetupLogging(hooks []config.LogrusHook, componentName string) {
 	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&utcFormatter{
+		&logrus.TextFormatter{
+			TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
+			FullTimestamp:    true,
+			DisableColors:    false,
+			DisableTimestamp: false,
+			QuoteEmptyFields: true,
+			CallerPrettyfier: callerPrettyfier,
+		},
+	})
+	stdLogAdded := false
 	for _, hook := range hooks {
 		// Check we received a proper logging level
 		level, err := logrus.ParseLevel(hook.Level)
@@ -49,10 +62,19 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 		case "syslog":
 			checkSyslogHookParams(hook.Params)
 			setupSyslogHook(hook, level, componentName)
+		case "std":
+			setupStdLogHook(level)
+			stdLogAdded = true
 		default:
 			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
 		}
 	}
+	if !stdLogAdded {
+		logrus.Info("No std logger config found. Enabling at INFO level by default")
+		setupStdLogHook(logrus.InfoLevel)
+	}
+	// Hooks are now configured for stdout/err, so throw away the default logger output
+	logrus.SetOutput(ioutil.Discard)
 }
 
 func checkSyslogHookParams(params map[string]interface{}) {
@@ -74,6 +96,10 @@ func checkSyslogHookParams(params map[string]interface{}) {
 		logrus.Fatalf("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
 	}
 
+}
+
+func setupStdLogHook(level logrus.Level) {
+	logrus.AddHook(&logLevelHook{level, stdemuxerhook.New(logrus.StandardLogger())})
 }
 
 func setupSyslogHook(hook config.LogrusHook, level logrus.Level, componentName string) {
