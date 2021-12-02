@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/gomatrixserverlib"
 	"nhooyr.io/websocket"
 
@@ -34,7 +34,12 @@ func ConnectToPeer(pRouter *pineconeRouter.Router, peer string) error {
 	if parent == nil {
 		return fmt.Errorf("failed to wrap connection")
 	}
-	_, err := pRouter.AuthenticatedConnect(parent, "static", pineconeRouter.PeerTypeRemote, true)
+	_, err := pRouter.Connect(
+		parent,
+		pineconeRouter.ConnectionZone("static"),
+		pineconeRouter.ConnectionPeerType(pineconeRouter.PeerTypeRemote),
+		pineconeRouter.ConnectionURI(peer),
+	)
 	return err
 }
 
@@ -70,7 +75,7 @@ func createTransport(s *pineconeSessions.Sessions) *http.Transport {
 }
 
 func CreateClient(
-	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
+	base *base.BaseDendrite, s *pineconeSessions.Sessions,
 ) *gomatrixserverlib.Client {
 	return gomatrixserverlib.NewClient(
 		gomatrixserverlib.WithTransport(createTransport(s)),
@@ -78,7 +83,7 @@ func CreateClient(
 }
 
 func CreateFederationClient(
-	base *setup.BaseDendrite, s *pineconeSessions.Sessions,
+	base *base.BaseDendrite, s *pineconeSessions.Sessions,
 ) *gomatrixserverlib.FederationClient {
 	return gomatrixserverlib.NewFederationClient(
 		base.Cfg.Global.ServerName,

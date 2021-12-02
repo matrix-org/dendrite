@@ -29,7 +29,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	federationsenderAPI "github.com/matrix-org/dendrite/federationsender/api"
+	federationapiAPI "github.com/matrix-org/dendrite/federationapi/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -251,7 +251,7 @@ func MakeFedAPI(
 }
 
 type FederationWakeups struct {
-	FsAPI   federationsenderAPI.FederationSenderInternalAPI
+	FsAPI   federationapiAPI.FederationInternalAPI
 	origins sync.Map
 }
 
@@ -263,10 +263,10 @@ func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib
 			return
 		}
 	}
-	aliveReq := federationsenderAPI.PerformServersAliveRequest{
+	aliveReq := federationapiAPI.PerformServersAliveRequest{
 		Servers: []gomatrixserverlib.ServerName{origin},
 	}
-	aliveRes := federationsenderAPI.PerformServersAliveResponse{}
+	aliveRes := federationapiAPI.PerformServersAliveResponse{}
 	if err := f.FsAPI.PerformServersAlive(ctx, &aliveReq, &aliveRes); err != nil {
 		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 			"origin": origin,

@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,12 +25,13 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
@@ -86,15 +88,15 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 		m.PineconeMulticast.Start()
 	} else {
 		m.PineconeMulticast.Stop()
-		m.DisconnectType(pineconeRouter.PeerTypeMulticast)
+		m.DisconnectType(int(pineconeRouter.PeerTypeMulticast))
 	}
 }
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.staticPeerMutex.Lock()
-	m.staticPeerURI = uri
+	m.staticPeerURI = strings.TrimSpace(uri)
 	m.staticPeerMutex.Unlock()
-	m.DisconnectType(pineconeRouter.PeerTypeRemote)
+	m.DisconnectType(int(pineconeRouter.PeerTypeRemote))
 	if uri != "" {
 		go func() {
 			m.staticPeerAttempt <- struct{}{}
@@ -104,7 +106,7 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
 	for _, p := range m.PineconeRouter.Peers() {
-		if peertype == p.PeerType {
+		if int(peertype) == p.PeerType {
 			m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
 		}
 	}
@@ -132,7 +134,11 @@ func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) 
 		for i := 1; i <= 10; i++ {
 			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
 			var err error
-			conduit.port, err = m.PineconeRouter.AuthenticatedConnect(l, zone, peertype, true)
+			conduit.port, err = m.PineconeRouter.Connect(
+				l,
+				pineconeRouter.ConnectionZone(zone),
+				pineconeRouter.ConnectionPeerType(peertype),
+			)
 			switch err {
 			case io.ErrClosedPipe:
 				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
@@ -194,16 +200,28 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 }
 
 func (m *DendriteMonolith) staticPeerConnect() {
+	connected := map[string]bool{} // URI -> connected?
 	attempt := func() {
-		if m.PineconeRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
-			m.staticPeerMutex.RLock()
-			uri := m.staticPeerURI
-			m.staticPeerMutex.RUnlock()
-			if uri == "" {
-				return
-			}
-			if err := conn.ConnectToPeer(m.PineconeRouter, uri); err != nil {
-				logrus.WithError(err).Error("Failed to connect to static peer")
+		m.staticPeerMutex.RLock()
+		uri := m.staticPeerURI
+		m.staticPeerMutex.RUnlock()
+		if uri == "" {
+			return
+		}
+		for k := range connected {
+			delete(connected, k)
+		}
+		for _, uri := range strings.Split(uri, ",") {
+			connected[strings.TrimSpace(uri)] = false
+		}
+		for _, info := range m.PineconeRouter.Peers() {
+			connected[info.URI] = true
+		}
+		for k, online := range connected {
+			if !online {
+				if err := conn.ConnectToPeer(m.PineconeRouter, k); err != nil {
+					logrus.WithError(err).Error("Failed to connect to static peer")
+				}
 			}
 		}
 	}
@@ -259,7 +277,7 @@ func (m *DendriteMonolith) Start() {
 
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
@@ -270,9 +288,8 @@ func (m *DendriteMonolith) Start() {
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-mediaapi.db", m.CacheDirectory, prefix))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-syncapi.db", m.StorageDirectory, prefix))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-signingkeyserver.db", m.StorageDirectory, prefix))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
@@ -281,7 +298,7 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	base := setup.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -290,12 +307,10 @@ func (m *DendriteMonolith) Start() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsAPI := roomserver.NewInternalAPI(
-		base, keyRing,
-	)
+	rsAPI := roomserver.NewInternalAPI(base)
 
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
+	fsAPI := federationapi.NewInternalAPI(
+		base, federation, rsAPI, base.Caches, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
@@ -310,7 +325,8 @@ func (m *DendriteMonolith) Start() {
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsAPI.SetFederationSenderAPI(fsAPI)
+	rsAPI.SetFederationAPI(fsAPI)
+	rsAPI.SetKeyring(keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
@@ -321,7 +337,7 @@ func (m *DendriteMonolith) Start() {
 
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,
-		FederationSenderAPI:    fsAPI,
+		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
 		UserAPI:                m.userAPI,
 		KeyAPI:                 keyAPI,

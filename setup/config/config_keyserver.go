@@ -8,11 +8,13 @@ type KeyServer struct {
 	Database DatabaseOptions `yaml:"database"`
 }
 
-func (c *KeyServer) Defaults() {
+func (c *KeyServer) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7779"
 	c.InternalAPI.Connect = "http://localhost:7779"
 	c.Database.Defaults(10)
-	c.Database.ConnectionString = "file:keyserver.db"
+	if generate {
+		c.Database.ConnectionString = "file:keyserver.db"
+	}
 }
 
 func (c *KeyServer) Verify(configErrs *ConfigErrors, isMonolith bool) {

@@ -17,7 +17,6 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -69,7 +68,7 @@ type Database interface {
 	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
 	// Stores a matrix room event in the database. Returns the room NID, the state snapshot and the redacted event ID if any, or an error.
 	StoreEvent(
-		ctx context.Context, event *gomatrixserverlib.Event, txnAndSessionID *api.TransactionID, authEventNIDs []types.EventNID,
+		ctx context.Context, event *gomatrixserverlib.Event, authEventNIDs []types.EventNID,
 		isRejected bool,
 	) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
 	// Look up the state entries for a list of string event IDs
@@ -92,10 +91,6 @@ type Database interface {
 	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
 	// If this returns an error then no further action is required.
 	GetLatestEventsForUpdate(ctx context.Context, roomInfo types.RoomInfo) (*shared.LatestEventsUpdater, error)
-	// Look up event ID by transaction's info.
-	// This is used to determine if the room event is processed/processing already.
-	// Returns an empty string if no such event exists.
-	GetTransactionEventID(ctx context.Context, transactionID string, sessionID int64, userID string) (string, error)
 	// Look up event references for the latest events in the room and the current state snapshot.
 	// Returns the latest events, the current state and the maximum depth of the latest events plus 1.
 	// Returns an error if there was a problem talking to the database.

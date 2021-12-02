@@ -60,3 +60,6 @@ cmd/dendrite-demo-yggdrasil/embed/fs*.go
 
 # Test dependencies
 test/wasm/node_modules
+
+media_store/
+

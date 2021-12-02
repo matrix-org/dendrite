@@ -27,11 +27,11 @@ import (
 	"github.com/gorilla/mux"
 	chttputil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	fs "github.com/matrix-org/dendrite/federationsender/api"
+	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -52,8 +52,8 @@ func Defaults(r *gomatrixserverlib.MSC2946SpacesRequest) {
 
 // Enable this MSC
 func Enable(
-	base *setup.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI,
-	fsAPI fs.FederationSenderInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
+	base *base.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI,
+	fsAPI fs.FederationInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
 	db, err := NewDatabase(&base.Cfg.MSCs.Database)
 	if err != nil {
@@ -96,7 +96,7 @@ func Enable(
 
 func federatedSpacesHandler(
 	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, roomID string, db Database,
-	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
+	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	inMemoryBatchCache := make(map[string]set)
@@ -128,7 +128,7 @@ func federatedSpacesHandler(
 }
 
 func spacesHandler(
-	db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationSenderInternalAPI,
+	db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	thisServer gomatrixserverlib.ServerName,
 ) func(*http.Request, *userapi.Device) util.JSONResponse {
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -172,7 +172,7 @@ type walker struct {
 	thisServer gomatrixserverlib.ServerName
 	db         Database
 	rsAPI      roomserver.RoomserverInternalAPI
-	fsAPI      fs.FederationSenderInternalAPI
+	fsAPI      fs.FederationInternalAPI
 	ctx        context.Context
 
 	// user ID|device ID|batch_num => event/room IDs sent to client
