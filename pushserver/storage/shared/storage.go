@@ -61,7 +61,7 @@ func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart, roo
 	return d.notifications.SelectRoomCounts(ctx, localpart, roomID)
 }
 
-func (d *Database) CreatePusher(
+func (d *Database) UpsertPusher(
 	ctx context.Context, p api.Pusher, localpart string,
 ) error {
 	data, err := json.Marshal(p.Data)

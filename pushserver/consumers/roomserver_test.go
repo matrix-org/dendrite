@@ -33,7 +33,7 @@ func TestOutputRoomEventConsumer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDatabase failed: %v", err)
 	}
-	err = db.CreatePusher(ctx,
+	err = db.UpsertPusher(ctx,
 		api.Pusher{
 			PushKey: "apushkey",
 			Kind:    api.HTTPKind,
@@ -45,7 +45,7 @@ func TestOutputRoomEventConsumer(t *testing.T) {
 		},
 		"alice")
 	if err != nil {
-		t.Fatalf("CreatePusher failed: %v", err)
+		t.Fatalf("UpsertPusher failed: %v", err)
 	}
 
 	var rsAPI fakeRoomServerInternalAPI

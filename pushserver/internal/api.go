@@ -89,7 +89,7 @@ func (a *PushserverInternalAPI) PerformPusherSet(ctx context.Context, req *api.P
 	if req.Pusher.PushKeyTS == 0 {
 		req.Pusher.PushKeyTS = gomatrixserverlib.AsTimestamp(time.Now())
 	}
-	return a.DB.CreatePusher(ctx, req.Pusher, req.Localpart)
+	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart)
 }
 
 func (a *PushserverInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.PerformPusherDeletionRequest, res *struct{}) error {
