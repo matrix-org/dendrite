@@ -134,7 +134,7 @@ func main() {
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
 	// dependency. Other components also need updating after their dependencies are up.
-	rsImpl.SetFederationSenderAPI(fsAPI)
+	rsImpl.SetFederationAPI(fsAPI)
 	rsImpl.SetAppserviceAPI(asAPI)
 	keyImpl.SetUserAPI(userAPI)
 
