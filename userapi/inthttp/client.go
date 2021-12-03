@@ -274,7 +274,7 @@ func (h *httpUserInternalAPI) IsSessionValidated(ctx context.Context, req *api.S
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
-func (h *httpUserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+func (h *httpUserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformKeyBackup")
 	defer span.Finish()
 
@@ -283,6 +283,7 @@ func (h *httpUserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Per
 	if err != nil {
 		res.Error = err.Error()
 	}
+	return nil
 }
 func (h *httpUserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
