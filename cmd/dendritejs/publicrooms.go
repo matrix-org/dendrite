@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -31,12 +31,12 @@ import (
 type libp2pPublicRoomsProvider struct {
 	node      *go_http_js_libp2p.P2pLocalNode
 	providers []go_http_js_libp2p.PeerInfo
-	fedSender api.FederationSenderInternalAPI
+	fedSender api.FederationInternalAPI
 	fedClient *gomatrixserverlib.FederationClient
 }
 
 func NewLibP2PPublicRoomsProvider(
-	node *go_http_js_libp2p.P2pLocalNode, fedSender api.FederationSenderInternalAPI, fedClient *gomatrixserverlib.FederationClient,
+	node *go_http_js_libp2p.P2pLocalNode, fedSender api.FederationInternalAPI, fedClient *gomatrixserverlib.FederationClient,
 ) *libp2pPublicRoomsProvider {
 	p := &libp2pPublicRoomsProvider{
 		node:      node,

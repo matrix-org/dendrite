@@ -191,23 +191,17 @@ federation_api:
     connect: http://localhost:7772
   external_api:
     listen: http://[::]:8072
+  database:
+    connection_string: file:federationapi.db
+    max_open_conns: 10
+    max_idle_conns: 2
+    conn_max_lifetime: -1
 
   # List of paths to X.509 certificates to be used by the external federation listeners.
   # These certificates will be used to calculate the TLS fingerprints and other servers
   # will expect the certificate to match these fingerprints. Certificates must be in PEM
   # format.
   federation_certificates: []
-
-# Configuration for the Federation Sender.
-federation_sender:
-  internal_api:
-    listen: http://localhost:7775
-    connect: http://localhost:7775
-  database:
-    connection_string: file:federationsender.db
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
 
   # How many times we will try to resend a failed transaction to a specific server. The
   # backoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc.
@@ -223,6 +217,22 @@ federation_sender:
     protocol: http
     host: localhost
     port: 8080
+
+  # Perspective keyservers to use as a backup when direct key fetches fail. This may
+  # be required to satisfy key requests for servers that are no longer online when
+  # joining some rooms.
+  key_perspectives:
+  - server_name: matrix.org
+    keys:
+    - key_id: ed25519:auto
+      public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+    - key_id: ed25519:a_RXGa
+      public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+
+  # This option will control whether Dendrite will prefer to look up keys directly
+  # or whether it should try perspective servers first, using direct fetches as a
+  # last resort.
+  prefer_direct_fetch: false
 
 # Configuration for the Key Server (for end-to-end encryption).
 key_server:
@@ -297,33 +307,6 @@ room_server:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
-
-# Configuration for the Signing Key Server (for server signing keys).
-signing_key_server:
-  internal_api:
-    listen: http://localhost:7780
-    connect: http://localhost:7780
-  database:
-    connection_string: file:signingkeyserver.db
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
-  # Perspective keyservers to use as a backup when direct key fetches fail. This may
-  # be required to satisfy key requests for servers that are no longer online when
-  # joining some rooms.
-  key_perspectives:
-  - server_name: matrix.org
-    keys:
-    - key_id: ed25519:auto
-      public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
-    - key_id: ed25519:a_RXGa
-      public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
-
-  # This option will control whether Dendrite will prefer to look up keys directly
-  # or whether it should try perspective servers first, using direct fetches as a
-  # last resort.
-  prefer_direct_fetch: false
 
 # Configuration for the Sync API.
 sync_api:

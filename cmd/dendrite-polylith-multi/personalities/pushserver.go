@@ -17,18 +17,18 @@ package personalities
 import (
 	"github.com/matrix-org/dendrite/pushserver"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func PushServer(base *setup.BaseDendrite, cfg *config.Dendrite, rsAPI roomserverAPI.RoomserverInternalAPI) {
-	intAPI := pushserver.NewInternalAPI(base, rsAPI)
+func PushServer(base *basepkg.BaseDendrite, cfg *config.Dendrite, rsAPI roomserverAPI.RoomserverInternalAPI) {
+	intAPI := pushserver.NewInternalAPI(&cfg.PushServer, rsAPI)
 
 	pushserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.PushServer.InternalAPI.Listen, // internal listener
-		setup.NoListener,                       // external listener
+		basepkg.NoListener,                     // external listener
 		nil, nil,
 	)
 }

@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -37,13 +38,14 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	"github.com/matrix-org/dendrite/federationsender"
-	"github.com/matrix-org/dendrite/federationsender/api"
+	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -60,7 +62,7 @@ import (
 var (
 	instanceName   = flag.String("name", "dendrite-p2p-pinecone", "the name of this P2P demo instance")
 	instancePort   = flag.Int("port", 8008, "the port that the client API will listen on")
-	instancePeer   = flag.String("peer", "", "the static Pinecone peer to connect to")
+	instancePeer   = flag.String("peer", "", "the static Pinecone peers to connect to, comma separated-list")
 	instanceListen = flag.String("listen", ":0", "the port Pinecone peers can connect to")
 )
 
@@ -108,9 +110,12 @@ func main() {
 				continue
 			}
 
-			port, err := pRouter.AuthenticatedConnect(conn, "", pineconeRouter.PeerTypeRemote, true)
+			port, err := pRouter.Connect(
+				conn,
+				pineconeRouter.ConnectionPeerType(pineconeRouter.PeerTypeRemote),
+			)
 			if err != nil {
-				logrus.WithError(err).Error("pSwitch.AuthenticatedConnect failed")
+				logrus.WithError(err).Error("pSwitch.Connect failed")
 				continue
 			}
 
@@ -123,14 +128,22 @@ func main() {
 	pMulticast.Start()
 
 	connectToStaticPeer := func() {
+		connected := map[string]bool{} // URI -> connected?
+		for _, uri := range strings.Split(*instancePeer, ",") {
+			connected[strings.TrimSpace(uri)] = false
+		}
 		attempt := func() {
-			if pRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
-				uri := *instancePeer
-				if uri == "" {
-					return
-				}
-				if err := conn.ConnectToPeer(pRouter, uri); err != nil {
-					logrus.WithError(err).Error("Failed to connect to static peer")
+			for k := range connected {
+				connected[k] = false
+			}
+			for _, info := range pRouter.Peers() {
+				connected[info.URI] = true
+			}
+			for k, online := range connected {
+				if !online {
+					if err := conn.ConnectToPeer(pRouter, k); err != nil {
+						logrus.WithError(err).Error("Failed to connect to static peer")
+					}
 				}
 			}
 		}
@@ -141,7 +154,7 @@ func main() {
 	}
 
 	cfg := &config.Dendrite{}
-	cfg.Defaults()
+	cfg.Defaults(true)
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
@@ -151,9 +164,8 @@ func main() {
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.SigningKeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-signingkeyserver.db", *instanceName))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
-	cfg.FederationSender.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", *instanceName))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
@@ -161,7 +173,7 @@ func main() {
 		panic(err)
 	}
 
-	base := setup.NewBaseDendrite(cfg, "Monolith", false)
+	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -170,12 +182,10 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	rsComponent := roomserver.NewInternalAPI(
-		base, keyRing,
-	)
+	rsComponent := roomserver.NewInternalAPI(base)
 	rsAPI := rsComponent
-	fsAPI := federationsender.NewInternalAPI(
-		base, federation, rsAPI, keyRing, true,
+	fsAPI := federationapi.NewInternalAPI(
+		base, federation, rsAPI, base.Caches, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
@@ -188,7 +198,8 @@ func main() {
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
-	rsComponent.SetFederationSenderAPI(fsAPI)
+	rsComponent.SetFederationAPI(fsAPI)
+	rsComponent.SetKeyring(keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
@@ -199,7 +210,7 @@ func main() {
 
 		AppserviceAPI:          asAPI,
 		EDUInternalAPI:         eduInputAPI,
-		FederationSenderAPI:    fsAPI,
+		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
 		UserAPI:                userAPI,
 		KeyAPI:                 keyAPI,
@@ -231,7 +242,11 @@ func main() {
 			return
 		}
 		conn := conn.WrapWebSocketConn(c)
-		if _, err = pRouter.AuthenticatedConnect(conn, "websocket", pineconeRouter.PeerTypeRemote, true); err != nil {
+		if _, err = pRouter.Connect(
+			conn,
+			pineconeRouter.ConnectionZone("websocket"),
+			pineconeRouter.ConnectionPeerType(pineconeRouter.PeerTypeRemote),
+		); err != nil {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
 	})

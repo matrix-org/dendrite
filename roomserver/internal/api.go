@@ -6,7 +6,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -37,7 +37,7 @@ type RoomserverInternalAPI struct {
 	Cache                  caching.RoomServerCaches
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
-	fsAPI                  fsAPI.FederationSenderInternalAPI
+	fsAPI                  fsAPI.FederationInternalAPI
 	asAPI                  asAPI.AppServiceQueryAPI
 	OutputRoomEventTopic   string // Kafka topic for new output room events
 	PerspectiveServerNames []gomatrixserverlib.ServerName
@@ -46,7 +46,7 @@ type RoomserverInternalAPI struct {
 func NewRoomserverAPI(
 	cfg *config.RoomServer, roomserverDB storage.Database, producer sarama.SyncProducer,
 	outputRoomEventTopic string, caches caching.RoomServerCaches,
-	keyRing gomatrixserverlib.JSONVerifier, perspectiveServerNames []gomatrixserverlib.ServerName,
+	perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
 	a := &RoomserverInternalAPI{
@@ -55,7 +55,6 @@ func NewRoomserverAPI(
 		Cache:                  caches,
 		ServerName:             cfg.Matrix.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
-		KeyRing:                keyRing,
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
@@ -74,11 +73,18 @@ func NewRoomserverAPI(
 	return a
 }
 
-// SetFederationSenderInputAPI passes in a federation sender input API reference
-// so that we can avoid the chicken-and-egg problem of both the roomserver input API
-// and the federation sender input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationSenderAPI(fsAPI fsAPI.FederationSenderInternalAPI) {
+// SetKeyring sets the keyring to a given keyring. This is only useful for the P2P
+// demos and must be called after SetFederationSenderInputAPI.
+func (r *RoomserverInternalAPI) SetKeyring(keyRing *gomatrixserverlib.KeyRing) {
+	r.KeyRing = keyRing
+}
+
+// SetFederationInputAPI passes in a federation input API reference so that we can
+// avoid the chicken-and-egg problem of both the roomserver input API and the
+// federation input API being interdependent.
+func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI) {
 	r.fsAPI = fsAPI
+	r.SetKeyring(fsAPI.KeyRing())
 
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,

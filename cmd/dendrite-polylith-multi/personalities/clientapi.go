@@ -17,17 +17,17 @@ package personalities
 import (
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/internal/transactions"
-	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func ClientAPI(base *setup.BaseDendrite, cfg *config.Dendrite) {
+func ClientAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
 	asQuery := base.AppserviceHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
-	fsAPI := base.FederationSenderHTTPClient()
+	fsAPI := base.FederationAPIHTTPClient()
 	eduInputAPI := base.EDUServerClient()
 	userAPI := base.UserAPIClient()
 	keyAPI := base.KeyServerHTTPClient()

@@ -62,12 +62,14 @@ func CreateKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, 
 		return *resErr
 	}
 	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
+	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
 		UserID:    device.UserID,
 		Version:   "",
 		AuthData:  kb.AuthData,
 		Algorithm: kb.Algorithm,
-	}, &performKeyBackupResp)
+	}, &performKeyBackupResp); err != nil {
+		return jsonerror.InternalServerError()
+	}
 	if performKeyBackupResp.Error != "" {
 		if performKeyBackupResp.BadInput {
 			return util.JSONResponse{
@@ -123,12 +125,14 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.UserInter
 		return *resErr
 	}
 	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
+	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
 		UserID:    device.UserID,
 		Version:   version,
 		AuthData:  kb.AuthData,
 		Algorithm: kb.Algorithm,
-	}, &performKeyBackupResp)
+	}, &performKeyBackupResp); err != nil {
+		return jsonerror.InternalServerError()
+	}
 	if performKeyBackupResp.Error != "" {
 		if performKeyBackupResp.BadInput {
 			return util.JSONResponse{
@@ -157,11 +161,13 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.UserInter
 // Implements DELETE  /_matrix/client/r0/room_keys/version/{version}
 func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version string) util.JSONResponse {
 	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
+	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
 		UserID:       device.UserID,
 		Version:      version,
 		DeleteBackup: true,
-	}, &performKeyBackupResp)
+	}, &performKeyBackupResp); err != nil {
+		return jsonerror.InternalServerError()
+	}
 	if performKeyBackupResp.Error != "" {
 		if performKeyBackupResp.BadInput {
 			return util.JSONResponse{
@@ -191,11 +197,13 @@ func UploadBackupKeys(
 	req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version string, keys *keyBackupSessionRequest,
 ) util.JSONResponse {
 	var performKeyBackupResp userapi.PerformKeyBackupResponse
-	userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
+	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
 		UserID:  device.UserID,
 		Version: version,
 		Keys:    *keys,
-	}, &performKeyBackupResp)
+	}, &performKeyBackupResp); err != nil && performKeyBackupResp.Error == "" {
+		return jsonerror.InternalServerError()
+	}
 	if performKeyBackupResp.Error != "" {
 		if performKeyBackupResp.BadInput {
 			return util.JSONResponse{

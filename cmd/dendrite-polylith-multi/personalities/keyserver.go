@@ -16,12 +16,12 @@ package personalities
 
 import (
 	"github.com/matrix-org/dendrite/keyserver"
-	"github.com/matrix-org/dendrite/setup"
+	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func KeyServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
-	fsAPI := base.FederationSenderHTTPClient()
+func KeyServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
+	fsAPI := base.FederationAPIHTTPClient()
 	intAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	intAPI.SetUserAPI(base.UserAPIClient())
 
@@ -29,7 +29,7 @@ func KeyServer(base *setup.BaseDendrite, cfg *config.Dendrite) {
 
 	base.SetupAndServeHTTP(
 		base.Cfg.KeyServer.InternalAPI.Listen, // internal listener
-		setup.NoListener,                      // external listener
+		basepkg.NoListener,                    // external listener
 		nil, nil,
 	)
 }

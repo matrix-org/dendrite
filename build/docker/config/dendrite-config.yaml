@@ -174,23 +174,17 @@ federation_api:
     connect: http://federation_api:7772
   external_api:
     listen: http://0.0.0.0:8072
+  database:
+    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_federationapi?sslmode=disable
+    max_open_conns: 10
+    max_idle_conns: 2
+    conn_max_lifetime: -1
 
   # List of paths to X.509 certificates to be used by the external federation listeners.
   # These certificates will be used to calculate the TLS fingerprints and other servers
   # will expect the certificate to match these fingerprints. Certificates must be in PEM
   # format.
   federation_certificates: []
-
-# Configuration for the Federation Sender.
-federation_sender:
-  internal_api:
-    listen: http://0.0.0.0:7775
-    connect: http://federation_sender:7775
-  database:
-    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_federationsender?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
 
   # How many times we will try to resend a failed transaction to a specific server. The
   # backoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc.
@@ -206,6 +200,22 @@ federation_sender:
     protocol: http
     host: localhost
     port: 8080
+
+  # Perspective keyservers to use as a backup when direct key fetches fail. This may
+  # be required to satisfy key requests for servers that are no longer online when
+  # joining some rooms.
+  key_perspectives:
+  - server_name: matrix.org
+    keys:
+    - key_id: ed25519:auto
+      public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+    - key_id: ed25519:a_RXGa
+      public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+      
+  # This option will control whether Dendrite will prefer to look up keys directly
+  # or whether it should try perspective servers first, using direct fetches as a
+  # last resort.
+  prefer_direct_fetch: false
 
 # Configuration for the Key Server (for end-to-end encryption).
 key_server:
@@ -266,33 +276,6 @@ room_server:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
-
-# Configuration for the Server Key API (for server signing keys).
-signing_key_server:
-  internal_api:
-    listen: http://0.0.0.0:7780
-    connect: http://signing_key_server:7780
-  database:
-    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_signingkeyserver?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
-  # Perspective keyservers to use as a backup when direct key fetches fail. This may
-  # be required to satisfy key requests for servers that are no longer online when
-  # joining some rooms.
-  key_perspectives:
-  - server_name: matrix.org
-    keys:
-    - key_id: ed25519:auto
-      public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
-    - key_id: ed25519:a_RXGa
-      public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
-      
-  # This option will control whether Dendrite will prefer to look up keys directly
-  # or whether it should try perspective servers first, using direct fetches as a
-  # last resort.
-  prefer_direct_fetch: false
 
 # Configuration for the Sync API.
 sync_api:
