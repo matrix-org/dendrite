@@ -21,13 +21,14 @@ import (
 
 	"github.com/matrix-org/dendrite/cmd/dendrite-polylith-multi/personalities"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type entrypoint func(base *setup.BaseDendrite, cfg *config.Dendrite)
+type entrypoint func(base *base.BaseDendrite, cfg *config.Dendrite)
 
 func main() {
 	cfg := setup.ParseFlags(true)
@@ -40,17 +41,15 @@ func main() {
 	}
 
 	components := map[string]entrypoint{
-		"appservice":       personalities.Appservice,
-		"clientapi":        personalities.ClientAPI,
-		"eduserver":        personalities.EDUServer,
-		"federationapi":    personalities.FederationAPI,
-		"federationsender": personalities.FederationSender,
-		"keyserver":        personalities.KeyServer,
-		"mediaapi":         personalities.MediaAPI,
-		"roomserver":       personalities.RoomServer,
-		"signingkeyserver": personalities.SigningKeyServer,
-		"syncapi":          personalities.SyncAPI,
-		"userapi":          personalities.UserAPI,
+		"appservice":    personalities.Appservice,
+		"clientapi":     personalities.ClientAPI,
+		"eduserver":     personalities.EDUServer,
+		"federationapi": personalities.FederationAPI,
+		"keyserver":     personalities.KeyServer,
+		"mediaapi":      personalities.MediaAPI,
+		"roomserver":    personalities.RoomServer,
+		"syncapi":       personalities.SyncAPI,
+		"userapi":       personalities.UserAPI,
 	}
 
 	start, ok := components[component]
@@ -73,8 +72,8 @@ func main() {
 
 	logrus.Infof("Starting %q component", component)
 
-	base := setup.NewBaseDendrite(cfg, component, false) // TODO
-	defer base.Close()                                   // nolint: errcheck
+	base := base.NewBaseDendrite(cfg, component) // TODO
+	defer base.Close()                           // nolint: errcheck
 
 	go start(base, cfg)
 	base.WaitForShutdown()

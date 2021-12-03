@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	fsAPI "github.com/matrix-org/dendrite/federationsender/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
@@ -32,7 +32,7 @@ import (
 type Leaver struct {
 	Cfg   *config.RoomServer
 	DB    storage.Database
-	FSAPI fsAPI.FederationSenderInternalAPI
+	FSAPI fsAPI.FederationInternalAPI
 
 	Inputer *input.Inputer
 }

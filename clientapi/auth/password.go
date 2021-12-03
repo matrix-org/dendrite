@@ -17,6 +17,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -56,10 +57,9 @@ func (t *LoginTypePassword) Request() interface{} {
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-	var username string
 	var localpart string
 	var err error
-	username = r.Username()
+	username := strings.ToLower(r.Username())
 	if username != "" {
 		localpart, err = userutil.ParseUsernameParam(username, &t.Config.Matrix.ServerName)
 	} else {
