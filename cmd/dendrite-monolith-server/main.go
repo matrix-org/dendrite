@@ -67,6 +67,7 @@ func main() {
 		cfg.MediaAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.RoomServer.InternalAPI.Connect = httpAPIAddr
 		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
+		cfg.UserAPI.InternalAPI.Connect = httpAPIAddr
 		options = append(options, basepkg.UseHTTPAPIs)
 	}
 
@@ -102,19 +103,40 @@ func main() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsImpl.SetFederationAPI(fsAPI)
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
+	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyImpl
+	if base.UseHTTPAPIs {
+		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI)
+		keyAPI = base.KeyServerHTTPClient()
+	}
+
+	userImpl := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
+	userAPI := userImpl
+	if base.UseHTTPAPIs {
+		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
+		userAPI = base.UserAPIClient()
+	}
 	if traceInternal {
 		userAPI = &uapi.UserInternalAPITrace{
 			Impl: userAPI,
 		}
 	}
-	// needs to be after the SetUserAPI call above
+
+	// TODO: This should use userAPI, not userImpl, but the appservice setup races with
+	// the listeners and panics at startup if it tries to create appservice accounts
+	// before the listeners are up.
+	asAPI := appservice.NewInternalAPI(base, userImpl, rsAPI)
 	if base.UseHTTPAPIs {
-		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI)
-		keyAPI = base.KeyServerHTTPClient()
+		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
+		asAPI = base.AppserviceHTTPClient()
 	}
+
+	// The underlying roomserver implementation needs to be able to call the fedsender.
+	// This is different to rsAPI which can be the http client which doesn't need this
+	// dependency. Other components also need updating after their dependencies are up.
+	rsImpl.SetFederationAPI(fsAPI)
+	rsImpl.SetAppserviceAPI(asAPI)
+	keyImpl.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(
 		base, cache.New(), userAPI,
@@ -123,13 +145,6 @@ func main() {
 		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
 		eduInputAPI = base.EDUServerClient()
 	}
-
-	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	if base.UseHTTPAPIs {
-		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
-		asAPI = base.AppserviceHTTPClient()
-	}
-	rsAPI.SetAppserviceAPI(asAPI)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

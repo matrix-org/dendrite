@@ -19,7 +19,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -347,7 +346,7 @@ type testUserAPI struct {
 func (u *testUserAPI) QueryAccessToken(ctx context.Context, req *userapi.QueryAccessTokenRequest, res *userapi.QueryAccessTokenResponse) error {
 	dev, ok := u.accessTokens[req.AccessToken]
 	if !ok {
-		res.Err = fmt.Errorf("unknown token")
+		res.Err = "unknown token"
 		return nil
 	}
 	res.Device = &dev
