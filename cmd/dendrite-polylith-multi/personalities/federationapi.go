@@ -35,6 +35,9 @@ func FederationAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 		&base.Cfg.MSCs, nil,
 	)
 
+	intAPI := federationapi.NewInternalAPI(base, federation, rsAPI, base.Caches, true)
+	federationapi.AddInternalRoutes(base.InternalAPIMux, intAPI)
+
 	base.SetupAndServeHTTP(
 		base.Cfg.FederationAPI.InternalAPI.Listen,
 		base.Cfg.FederationAPI.ExternalAPI.Listen,
