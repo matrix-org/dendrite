@@ -26,10 +26,10 @@ import (
 	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
 )
 
-// SetupLogging configures the logging hooks defined in the configuration.
+// SetupHookLogging configures the logging hooks defined in the configuration.
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
-func SetupLogging(hooks []config.LogrusHook, componentName string) {
+func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&utcFormatter{
 		&logrus.TextFormatter{

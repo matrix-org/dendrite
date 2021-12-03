@@ -123,7 +123,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		logrus.Fatalf("Failed to start due to configuration errors")
 	}
 
-	internal.SetupLogging(cfg.Logging, componentName)
+	internal.SetupHookLogging(cfg.Logging, componentName)
 	internal.SetupPprof()
 
 	logrus.Infof("Dendrite version %s", internal.VersionString())
