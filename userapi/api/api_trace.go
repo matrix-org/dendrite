@@ -74,11 +74,14 @@ func (t *UserInternalAPITrace) PerformOpenIDTokenCreation(ctx context.Context, r
 	util.GetLogger(ctx).Infof("PerformOpenIDTokenCreation req=%+v res=%+v", js(req), js(res))
 	return err
 }
-func (t *UserInternalAPITrace) PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) {
-	t.Impl.PerformKeyBackup(ctx, req, res)
+func (t *UserInternalAPITrace) PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error {
+	err := t.Impl.PerformKeyBackup(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformKeyBackup req=%+v res=%+v", js(req), js(res))
+	return err
 }
 func (t *UserInternalAPITrace) QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse) {
 	t.Impl.QueryKeyBackup(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryKeyBackup req=%+v res=%+v", js(req), js(res))
 }
 func (t *UserInternalAPITrace) QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error {
 	err := t.Impl.QueryProfile(ctx, req, res)

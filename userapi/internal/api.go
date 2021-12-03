@@ -119,6 +119,9 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	}
 	res.DeviceCreated = true
 	res.Device = dev
+	if req.NoDeviceListUpdate {
+		return nil
+	}
 	// create empty device keys and upload them to trigger device list changes
 	return a.deviceListUpdate(dev.UserID, []string{dev.ID})
 }
@@ -358,8 +361,11 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAccessTokenRequest, res *api.QueryAccessTokenResponse) error {
 	if req.AppServiceUserID != "" {
 		appServiceDevice, err := a.queryAppServiceToken(ctx, req.AccessToken, req.AppServiceUserID)
+		if err != nil {
+			res.Err = err.Error()
+		}
 		res.Device = appServiceDevice
-		res.Err = err
+
 		return nil
 	}
 	device, err := a.DeviceDB.GetDeviceByAccessToken(ctx, req.AccessToken)
@@ -455,13 +461,16 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 	return nil
 }
 
-func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
+func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) error {
 	// Delete metadata
 	if req.DeleteBackup {
 		if req.Version == "" {
 			res.BadInput = true
 			res.Error = "must specify a version to delete"
-			return
+			if res.Error != "" {
+				return fmt.Errorf(res.Error)
+			}
+			return nil
 		}
 		exists, err := a.AccountDB.DeleteKeyBackup(ctx, req.UserID, req.Version)
 		if err != nil {
@@ -469,7 +478,10 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = exists
 		res.Version = req.Version
-		return
+		if res.Error != "" {
+			return fmt.Errorf(res.Error)
+		}
+		return nil
 	}
 	// Create metadata
 	if req.Version == "" {
@@ -479,7 +491,10 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = err == nil
 		res.Version = version
-		return
+		if res.Error != "" {
+			return fmt.Errorf(res.Error)
+		}
+		return nil
 	}
 	// Update metadata
 	if len(req.Keys.Rooms) == 0 {
@@ -489,10 +504,17 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = err == nil
 		res.Version = req.Version
-		return
+		if res.Error != "" {
+			return fmt.Errorf(res.Error)
+		}
+		return nil
 	}
 	// Upload Keys for a specific version metadata
 	a.uploadBackupKeys(ctx, req, res)
+	if res.Error != "" {
+		return fmt.Errorf(res.Error)
+	}
+	return nil
 }
 
 func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.PerformKeyBackupRequest, res *api.PerformKeyBackupResponse) {
