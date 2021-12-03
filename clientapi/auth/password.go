@@ -17,6 +17,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -48,7 +49,8 @@ func (t *LoginTypePassword) Request() interface{} {
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-	username := r.Username()
+	// Squash username to all lowercase letters
+	username := strings.ToLower(r.Username())
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
