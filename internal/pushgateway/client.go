@@ -48,6 +48,8 @@ func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest,
 	if err != nil {
 		return err
 	}
+
+	//nolint:errcheck
 	defer hresp.Body.Close()
 
 	if hresp.StatusCode == http.StatusOK {
