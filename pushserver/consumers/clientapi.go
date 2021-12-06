@@ -104,7 +104,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		DataType: mFullyRead,
 	}
 	var userRes uapi.QueryAccountDataResponse
-	if err := s.userAPI.QueryAccountData(ctx, &userReq, &userRes); err != nil {
+	if err = s.userAPI.QueryAccountData(ctx, &userReq, &userRes); err != nil {
 		log.WithFields(log.Fields{
 			"localpart":  localpart,
 			"room_id":    event.RoomID,
@@ -129,7 +129,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 		return nil
 	}
 	var data fullyReadAccountData
-	if err := json.Unmarshal([]byte(bs), &data); err != nil {
+	if err = json.Unmarshal([]byte(bs), &data); err != nil {
 		log.WithFields(log.Fields{
 			"localpart": localpart,
 			"room_id":   event.RoomID,

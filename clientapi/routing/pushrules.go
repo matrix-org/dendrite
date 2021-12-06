@@ -14,8 +14,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const pushRulesAccountDataType = "m.push_rules"
-
 func errorResponse(ctx context.Context, err error, msg string, args ...interface{}) util.JSONResponse {
 	if eerr, ok := err.(*jsonerror.MatrixError); ok {
 		var status int

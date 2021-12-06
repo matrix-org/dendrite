@@ -70,7 +70,7 @@ const (
 
 	// CoalesceAction tells the clients to show a notification, and
 	// tells both servers and clients that multiple events can be
-	// coalesced into a single notification. The behavior is
+	// coalesced into a single notification. The behaviour is
 	// implementation-specific.
 	CoalesceAction ActionKind = "coalesce"
 

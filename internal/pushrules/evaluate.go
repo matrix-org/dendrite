@@ -151,7 +151,7 @@ func patternMatches(key, pattern string, event *gomatrixserverlib.Event) (bool, 
 	}
 
 	var eventMap map[string]interface{}
-	if err := json.Unmarshal(event.JSON(), &eventMap); err != nil {
+	if err = json.Unmarshal(event.JSON(), &eventMap); err != nil {
 		return false, fmt.Errorf("parsing event: %w", err)
 	}
 	v, err := lookupMapPath(strings.Split(key, "."), eventMap)

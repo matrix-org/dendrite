@@ -226,14 +226,6 @@ func (c *fakePushGatewayClient) Notify(ctx context.Context, url string, req *pus
 	return nil
 }
 
-func mustMarshalJSON(v interface{}) []byte {
-	bs, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return bs
-}
-
 func mustParseClientEventJSON(s string) gomatrixserverlib.ClientEvent {
 	var ev gomatrixserverlib.ClientEvent
 	if err := json.Unmarshal([]byte(s), &ev); err != nil {

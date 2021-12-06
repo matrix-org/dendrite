@@ -197,7 +197,7 @@ func (s *notificationsStatements) SelectCount(ctx context.Context, localpart str
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "notifications.Select: rows.Close() failed")
 
-	for rows.Next() {
+	if rows.Next() {
 		var count int64
 		if err := rows.Scan(&count); err != nil {
 			return 0, err
@@ -225,7 +225,7 @@ func (s *notificationsStatements) SelectRoomCounts(ctx context.Context, localpar
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "notifications.Select: rows.Close() failed")
 
-	for rows.Next() {
+	if rows.Next() {
 		var total, highlight int64
 		if err := rows.Scan(&total, &highlight); err != nil {
 			return 0, 0, err

@@ -7,7 +7,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// A Client is how interactions iwth a Push Gateway is done.
+// A Client is how interactions with a Push Gateway is done.
 type Client interface {
 	// Notify sends a notification to the gateway at the given URL.
 	Notify(ctx context.Context, url string, req *NotifyRequest, resp *NotifyResponse) error

@@ -119,7 +119,8 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 
 	if event.Type() == gomatrixserverlib.MRoomMember {
 		cevent := gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll)
-		member, err := newLocalMembership(&cevent)
+		var member *localMembership
+		member, err = newLocalMembership(&cevent)
 		if err != nil {
 			return err
 		}
@@ -252,8 +253,8 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *gomatrixs
 		return "", err
 	}
 
-	if event := res.StateEvents[roomNameTuple]; event != nil {
-		return unmarshalRoomName(event)
+	if eventS := res.StateEvents[roomNameTuple]; eventS != nil {
+		return unmarshalRoomName(eventS)
 	}
 
 	if event.Type() == gomatrixserverlib.MRoomCanonicalAlias {
@@ -326,7 +327,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		Actions: actions,
 		// UNSPEC: the spec doesn't say this is a ClientEvent, but the
 		// fields seem to match. room_id should be missing, which
-		// matches the behavior of FormatSync.
+		// matches the behaviour of FormatSync.
 		Event: gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatSync),
 		// TODO: this is per-device, but it's not part of the primary
 		// key. So inserting one notification per profile tag doesn't
@@ -336,11 +337,11 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		RoomID:     event.RoomID(),
 		TS:         gomatrixserverlib.AsTimestamp(time.Now()),
 	}
-	if err := s.db.InsertNotification(ctx, mem.Localpart, event.EventID(), tweaks, n); err != nil {
+	if err = s.db.InsertNotification(ctx, mem.Localpart, event.EventID(), tweaks, n); err != nil {
 		return err
 	}
 
-	if err := s.syncProducer.GetAndSendNotificationData(ctx, mem.UserID, event.RoomID()); err != nil {
+	if err = s.syncProducer.GetAndSendNotificationData(ctx, mem.UserID, event.RoomID()); err != nil {
 		return err
 	}
 
@@ -398,12 +399,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		}
 
 		if len(rejected) > 0 {
-			if err := s.deleteRejectedPushers(ctx, rejected, mem.Localpart); err != nil {
-				log.WithFields(log.Fields{
-					"localpart":   mem.Localpart,
-					"num_pushers": len(rejected),
-				}).WithError(err).Errorf("Unable to delete rejected pushers")
-			}
+			s.deleteRejectedPushers(ctx, rejected, mem.Localpart)
 		}
 	}()
 
@@ -593,7 +589,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatri
 }
 
 // deleteRejectedPushers deletes the pushers associated with the given devices.
-func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, devices []*pushgateway.Device, localpart string) error {
+func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, devices []*pushgateway.Device, localpart string) {
 	log.WithFields(log.Fields{
 		"localpart":   localpart,
 		"app_id0":     devices[0].AppID,
@@ -607,23 +603,4 @@ func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, dev
 			}).WithError(err).Errorf("Unable to delete rejected pusher")
 		}
 	}
-
-	return nil
-}
-
-// mapWithout returns a shallow copy of the map, without the given
-// key. Returns nil if the resulting map is empty.
-func mapWithout(m map[string]interface{}, key string) map[string]interface{} {
-	ret := make(map[string]interface{}, len(m))
-	for k, v := range m {
-		// The specification says we do not send "url".
-		if k == key {
-			continue
-		}
-		ret[k] = v
-	}
-	if len(ret) == 0 {
-		return nil
-	}
-	return ret
 }
