@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !windows
 // +build !windows
 
 package internal
@@ -59,7 +60,6 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 		}
 	}
 	if !stdLogAdded {
-		logrus.Info("No std logger config found. Enabling at INFO level by default")
 		setupStdLogHook(logrus.InfoLevel)
 	}
 	// Hooks are now configured for stdout/err, so throw away the default logger output
