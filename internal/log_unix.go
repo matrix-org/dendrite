@@ -30,17 +30,6 @@ import (
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
 func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
-	logrus.SetReportCaller(true)
-	logrus.SetFormatter(&utcFormatter{
-		&logrus.TextFormatter{
-			TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
-			FullTimestamp:    true,
-			DisableColors:    false,
-			DisableTimestamp: false,
-			QuoteEmptyFields: true,
-			CallerPrettyfier: callerPrettyfier,
-		},
-	})
 	stdLogAdded := false
 	for _, hook := range hooks {
 		// Check we received a proper logging level

@@ -91,6 +91,21 @@ func SetupPprof() {
 	}
 }
 
+// SetupStdLogging configures the logging format to standard output. Typically, it is called when the config is not yet loaded.
+func SetupStdLogging() {
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&utcFormatter{
+		&logrus.TextFormatter{
+			TimestampFormat:  "2006-01-02T15:04:05.000000000Z07:00",
+			FullTimestamp:    true,
+			DisableColors:    false,
+			DisableTimestamp: false,
+			QuoteEmptyFields: true,
+			CallerPrettyfier: callerPrettyfier,
+		},
+	})
+}
+
 // File type hooks should be provided a path to a directory to store log files
 func checkFileHookParams(params map[string]interface{}) {
 	path, ok := params["path"]
