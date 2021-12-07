@@ -21,7 +21,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -79,7 +78,6 @@ type BaseDendrite struct {
 	SynapseAdminMux        *mux.Router
 	UseHTTPAPIs            bool
 	apiHttpClient          *http.Client
-	httpClient             *http.Client
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
 	DNSCache               *gomatrixserverlib.DNSCache
@@ -183,13 +181,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 			},
 		},
 	}
-	client := http.Client{Timeout: HTTPClientTimeout}
-	if cfg.FederationAPI.Proxy.Enabled {
-		client.Transport = &http.Transport{Proxy: http.ProxyURL(&url.URL{
-			Scheme: cfg.FederationAPI.Proxy.Protocol,
-			Host:   fmt.Sprintf("%s:%d", cfg.FederationAPI.Proxy.Host, cfg.FederationAPI.Proxy.Port),
-		})}
-	}
 
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
 	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.
@@ -219,7 +210,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix("/_synapse/").Subrouter().UseEncodedPath(),
 		apiHttpClient:          &apiClient,
-		httpClient:             &client,
 	}
 }
 
