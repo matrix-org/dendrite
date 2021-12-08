@@ -19,11 +19,12 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/matrix-org/gomatrixserverlib"
 	"net"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
