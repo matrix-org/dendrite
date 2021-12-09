@@ -461,7 +461,7 @@ func (d *Database) GetLatestEventsForUpdate(
 func (d *Database) StoreEvent(
 	ctx context.Context, event *gomatrixserverlib.Event,
 	authEventNIDs []types.EventNID, isRejected bool,
-) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
+) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
 	var (
 		roomNID          types.RoomNID
 		eventTypeNID     types.EventTypeNID
@@ -538,7 +538,7 @@ func (d *Database) StoreEvent(
 		return nil
 	})
 	if err != nil {
-		return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.Writer.Do: %w", err)
+		return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.Writer.Do: %w", err)
 	}
 
 	// We should attempt to update the previous events table with any
@@ -551,10 +551,10 @@ func (d *Database) StoreEvent(
 	if prevEvents := event.PrevEvents(); len(prevEvents) > 0 {
 		roomInfo, err = d.RoomInfo(ctx, event.RoomID())
 		if err != nil {
-			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
+			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
 		}
 		if roomInfo == nil && len(prevEvents) > 0 {
-			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("expected room %q to exist", event.RoomID())
+			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("expected room %q to exist", event.RoomID())
 		}
 		// Create an updater - NB: on sqlite this WILL create a txn as we are directly calling the shared DB form of
 		// GetLatestEventsForUpdate - not via the SQLiteDatabase form which has `nil` txns. This
@@ -563,7 +563,7 @@ func (d *Database) StoreEvent(
 		// to do writes however then this will need to go inside `Writer.Do`.
 		updater, err = d.GetLatestEventsForUpdate(ctx, *roomInfo)
 		if err != nil {
-			return 0, types.StateAtEvent{}, nil, "", fmt.Errorf("NewLatestEventsUpdater: %w", err)
+			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("NewLatestEventsUpdater: %w", err)
 		}
 		// Ensure that we atomically store prev events AND commit them. If we don't wrap StorePreviousEvents
 		// and EndTransaction in a writer then it's possible for a new write txn to be made between the two
@@ -580,11 +580,11 @@ func (d *Database) StoreEvent(
 			return err
 		})
 		if err != nil {
-			return 0, types.StateAtEvent{}, nil, "", err
+			return 0, 0, types.StateAtEvent{}, nil, "", err
 		}
 	}
 
-	return roomNID, types.StateAtEvent{
+	return eventNID, roomNID, types.StateAtEvent{
 		BeforeStateSnapshotNID: stateNID,
 		StateEntry: types.StateEntry{
 			StateKeyTuple: types.StateKeyTuple{
