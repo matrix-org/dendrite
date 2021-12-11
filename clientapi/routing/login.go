@@ -22,7 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	uapi "github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -54,7 +54,7 @@ func passwordLogin() flows {
 
 // Login implements GET and POST /login
 func Login(
-	req *http.Request, accountDB accounts.Database, userAPI uapi.UserInternalAPI,
+	req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
@@ -69,9 +69,9 @@ func Login(
 			return *authErr
 		}
 		// make a device/access token
-		authzErr := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
-		cleanup(req.Context(), &authzErr)
-		return authzErr
+		authErr2 := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		cleanup(req.Context(), &authErr2)
+		return authErr2
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
@@ -80,7 +80,7 @@ func Login(
 }
 
 func completeAuth(
-	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI uapi.UserInternalAPI, login *auth.Login,
+	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI userapi.UserInternalAPI, login *auth.Login,
 	ipAddr, userAgent string,
 ) util.JSONResponse {
 	token, err := auth.GenerateAccessToken()
@@ -95,8 +95,8 @@ func completeAuth(
 		return jsonerror.InternalServerError()
 	}
 
-	var performRes uapi.PerformDeviceCreationResponse
-	err = userAPI.PerformDeviceCreation(ctx, &uapi.PerformDeviceCreationRequest{
+	var performRes userapi.PerformDeviceCreationResponse
+	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
 		DeviceDisplayName: login.InitialDisplayName,
 		DeviceID:          login.DeviceID,
 		AccessToken:       token,

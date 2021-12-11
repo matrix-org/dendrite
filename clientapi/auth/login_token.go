@@ -45,17 +45,6 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 		return nil, nil, err
 	}
 
-	return t.login(ctx, &r)
-}
-
-// loginTokenRequest struct to hold the possible parameters from an HTTP request.
-type loginTokenRequest struct {
-	Login
-	Token string `json:"token"`
-}
-
-// login parses and validates the login token. It returns basic user information.
-func (t *LoginTypeToken) login(ctx context.Context, r *loginTokenRequest) (*Login, LoginCleanupFunc, *util.JSONResponse) {
 	var res uapi.QueryLoginTokenResponse
 	if err := t.UserAPI.QueryLoginToken(ctx, &uapi.QueryLoginTokenRequest{Token: r.Token}, &res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("UserAPI.QueryLoginToken failed")
@@ -73,7 +62,11 @@ func (t *LoginTypeToken) login(ctx context.Context, r *loginTokenRequest) (*Logi
 	r.Login.Identifier.User = res.Data.UserID
 
 	cleanup := func(ctx context.Context, authRes *util.JSONResponse) {
-		if authRes == nil || authRes.Code == http.StatusOK {
+		if authRes == nil {
+			util.GetLogger(ctx).Error("No JSONResponse provided to LoginTokenType cleanup function")
+			return
+		}
+		if authRes.Code == http.StatusOK {
 			var res uapi.PerformLoginTokenDeletionResponse
 			if err := t.UserAPI.PerformLoginTokenDeletion(ctx, &uapi.PerformLoginTokenDeletionRequest{Token: r.Token}, &res); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("UserAPI.PerformLoginTokenDeletion failed")
@@ -81,4 +74,10 @@ func (t *LoginTypeToken) login(ctx context.Context, r *loginTokenRequest) (*Logi
 		}
 	}
 	return &r.Login, cleanup, nil
+}
+
+// loginTokenRequest struct to hold the possible parameters from an HTTP request.
+type loginTokenRequest struct {
+	Login
+	Token string `json:"token"`
 }

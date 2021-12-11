@@ -46,7 +46,7 @@ type Database interface {
 	// RemoveLoginToken removes the named token (and may clean up other expired tokens).
 	RemoveLoginToken(ctx context.Context, token string) error
 
-	// GetLoginTokenByToken returns the data associated with the given token.
+	// GetLoginTokenDataByToken returns the data associated with the given token.
 	// May return sql.ErrNoRows.
-	GetLoginTokenByToken(ctx context.Context, token string) (*api.LoginTokenData, error)
+	GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error)
 }

@@ -23,7 +23,8 @@ type LoginTokenInternalAPI interface {
 	// PerformLoginTokenCreation creates a new login token and associates it with the provided data.
 	PerformLoginTokenCreation(ctx context.Context, req *PerformLoginTokenCreationRequest, res *PerformLoginTokenCreationResponse) error
 
-	// PerformLoginTokenDeletion ensures the token doesn't exist.
+	// PerformLoginTokenDeletion ensures the token doesn't exist. Success
+	// is returned even if the token didn't exist, or was already deleted.
 	PerformLoginTokenDeletion(ctx context.Context, req *PerformLoginTokenDeletionRequest, res *PerformLoginTokenDeletionResponse) error
 
 	// QueryLoginToken returns the data associated with a login token. If

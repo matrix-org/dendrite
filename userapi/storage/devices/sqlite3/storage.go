@@ -264,8 +264,8 @@ func (d *Database) RemoveLoginToken(ctx context.Context, token string) error {
 	})
 }
 
-// GetLoginTokenByToken returns the data associated with the given token.
+// GetLoginTokenDataByToken returns the data associated with the given token.
 // May return sql.ErrNoRows.
-func (d *Database) GetLoginTokenByToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
+func (d *Database) GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
 	return d.loginTokens.selectByToken(ctx, token)
 }

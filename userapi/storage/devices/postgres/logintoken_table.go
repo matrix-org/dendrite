@@ -25,9 +25,9 @@ import (
 )
 
 type loginTokenStatements struct {
-	insertStmt *sql.Stmt
-	deleteStmt *sql.Stmt
-	selectStmt *sql.Stmt
+	insertStmt        *sql.Stmt
+	deleteStmt        *sql.Stmt
+	selectByTokenStmt *sql.Stmt
 }
 
 // execSchema ensures tables and indices exist.
@@ -54,7 +54,7 @@ func (s *loginTokenStatements) prepare(db *sql.DB) error {
 	return sqlutil.StatementList{
 		{&s.insertStmt, "INSERT INTO login_tokens(token, token_expires_at, user_id) VALUES ($1, $2, $3)"},
 		{&s.deleteStmt, "DELETE FROM login_tokens WHERE token = $1 OR token_expires_at <= $2"},
-		{&s.selectStmt, "SELECT user_id FROM login_tokens WHERE token = $1 AND token_expires_at > $2"},
+		{&s.selectByTokenStmt, "SELECT user_id FROM login_tokens WHERE token = $1 AND token_expires_at > $2"},
 	}.Prepare(db)
 }
 
@@ -76,7 +76,7 @@ func (s *loginTokenStatements) deleteByToken(ctx context.Context, txn *sql.Tx, t
 		return err
 	}
 	if n, err := res.RowsAffected(); err == nil && n > 1 {
-		util.GetLogger(ctx).WithField("num_deleted", n).Infof("Deleted %d login tokens (%d likely garbage collected)", n, n-1)
+		util.GetLogger(ctx).WithField("num_deleted", n).Infof("Deleted %d login tokens (%d likely additional expired token)", n, n-1)
 	}
 	return nil
 }
@@ -84,7 +84,7 @@ func (s *loginTokenStatements) deleteByToken(ctx context.Context, txn *sql.Tx, t
 // selectByToken returns the data associated with the given token. May return sql.ErrNoRows.
 func (s *loginTokenStatements) selectByToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
 	var data api.LoginTokenData
-	err := s.selectStmt.QueryRowContext(ctx, token, time.Now().UTC()).Scan(&data.UserID)
+	err := s.selectByTokenStmt.QueryRowContext(ctx, token, time.Now().UTC()).Scan(&data.UserID)
 	if err != nil {
 		return nil, err
 	}

@@ -16,6 +16,8 @@ package auth
 
 import (
 	"context"
+	"database/sql"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -23,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/util"
 )
 
 func TestLoginFromJSONReader(t *testing.T) {
@@ -32,12 +35,10 @@ func TestLoginFromJSONReader(t *testing.T) {
 		Name string
 		Body string
 
-		WantErrCode       string
 		WantUsername      string
 		WantDeviceID      string
 		WantDeletedTokens []string
 	}{
-		{Name: "empty", WantErrCode: "M_BAD_JSON"},
 		{
 			Name: "passwordWorks",
 			Body: `{
@@ -70,20 +71,11 @@ func TestLoginFromJSONReader(t *testing.T) {
 					ServerName: serverName,
 				},
 			}
-			login, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &accountDB, &userAPI, cfg)
-			if tst.WantErrCode == "" {
-				if errRes != nil {
-					t.Fatalf("LoginFromJSONReader failed: %+v", errRes)
-				}
-				cleanup(ctx, nil)
-			} else {
-				if errRes == nil {
-					t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
-				} else if merr, ok := errRes.JSON.(*jsonerror.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
-					t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
-				}
-				return
+			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &accountDB, &userAPI, cfg)
+			if err != nil {
+				t.Fatalf("LoginFromJSONReader failed: %+v", err)
 			}
+			cleanup(ctx, &util.JSONResponse{Code: http.StatusOK})
 
 			if login.Username() != tst.WantUsername {
 				t.Errorf("Username: got %q, want %q", login.Username(), tst.WantUsername)
@@ -106,11 +98,78 @@ func TestLoginFromJSONReader(t *testing.T) {
 	}
 }
 
+func TestBadLoginFromJSONReader(t *testing.T) {
+	ctx := context.Background()
+
+	tsts := []struct {
+		Name string
+		Body string
+
+		WantErrCode string
+	}{
+		{Name: "empty", WantErrCode: "M_BAD_JSON"},
+		{
+			Name:        "badUnmarshal",
+			Body:        `badsyntaxJSON`,
+			WantErrCode: "M_BAD_JSON",
+		},
+		{
+			Name: "badPassword",
+			Body: `{
+				"type": "m.login.password",
+				"identifier": { "type": "m.id.user", "user": "alice" },
+				"password": "invalidpassword",
+				"device_id": "adevice"
+            }`,
+			WantErrCode: "M_FORBIDDEN",
+		},
+		{
+			Name: "badToken",
+			Body: `{
+				"type": "m.login.token",
+				"token": "invalidtoken",
+				"device_id": "adevice"
+            }`,
+			WantErrCode: "M_FORBIDDEN",
+		},
+		{
+			Name: "badType",
+			Body: `{
+				"type": "m.login.invalid",
+				"device_id": "adevice"
+            }`,
+			WantErrCode: "M_INVALID_ARGUMENT_VALUE",
+		},
+	}
+	for _, tst := range tsts {
+		t.Run(tst.Name, func(t *testing.T) {
+			var accountDB fakeAccountDB
+			var userAPI fakeUserInternalAPI
+			cfg := &config.ClientAPI{
+				Matrix: &config.Global{
+					ServerName: serverName,
+				},
+			}
+			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &accountDB, &userAPI, cfg)
+			if errRes == nil {
+				cleanup(ctx, nil)
+				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
+			} else if merr, ok := errRes.JSON.(*jsonerror.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
+				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
+			}
+		})
+	}
+}
+
 type fakeAccountDB struct {
 	AccountDatabase
 }
 
 func (*fakeAccountDB) GetAccountByPassword(ctx context.Context, localpart, password string) (*uapi.Account, error) {
+	if password == "invalidpassword" {
+		return nil, sql.ErrNoRows
+	}
+
 	return &uapi.Account{}, nil
 }
 
@@ -126,6 +185,10 @@ func (ua *fakeUserInternalAPI) PerformLoginTokenDeletion(ctx context.Context, re
 }
 
 func (*fakeUserInternalAPI) QueryLoginToken(ctx context.Context, req *uapi.QueryLoginTokenRequest, res *uapi.QueryLoginTokenResponse) error {
+	if req.Token == "invalidtoken" {
+		return nil
+	}
+
 	res.Data = &uapi.LoginTokenData{UserID: "@auser:example.com"}
 	return nil
 }

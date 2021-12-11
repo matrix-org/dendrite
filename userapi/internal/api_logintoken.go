@@ -51,7 +51,7 @@ func (a *UserInternalAPI) PerformLoginTokenDeletion(ctx context.Context, req *ap
 // QueryLoginToken returns the data associated with a login token. If
 // the token is not valid, success is returned, but res.Data == nil.
 func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLoginTokenRequest, res *api.QueryLoginTokenResponse) error {
-	tokenData, err := a.DeviceDB.GetLoginTokenByToken(ctx, req.Token)
+	tokenData, err := a.DeviceDB.GetLoginTokenDataByToken(ctx, req.Token)
 	if err != nil {
 		res.Data = nil
 		if err == sql.ErrNoRows {
@@ -59,9 +59,12 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 		}
 		return err
 	}
-	localpart, _, err := gomatrixserverlib.SplitID('@', tokenData.UserID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', tokenData.UserID)
 	if err != nil {
 		return err
+	}
+	if domain != a.ServerName {
+		return fmt.Errorf("cannot return a login token for a remote user: got %s want %s", domain, a.ServerName)
 	}
 	if _, err := a.AccountDB.GetAccountByLocalpart(ctx, localpart); err != nil {
 		res.Data = nil
