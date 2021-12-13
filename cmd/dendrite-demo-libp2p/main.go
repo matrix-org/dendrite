@@ -158,10 +158,10 @@ func main() {
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
-		&base.Base, federation, rsAPI, base.Base.Caches, true,
+		&base.Base, federation, rsAPI, base.Base.Caches, nil, true,
 	)
 	keyRing := fsAPI.KeyRing()
-	rsAPI.SetFederationAPI(fsAPI)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
 	provider := newPublicRoomsProvider(base.LibP2PPubsub, rsAPI)
 	err = provider.Start()
 	if err != nil {
