@@ -73,6 +73,7 @@ func NewInternalAPI(
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	caches *caching.Caches,
+	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
 ) api.FederationInternalAPI {
 	cfg := &base.Cfg.FederationAPI
@@ -125,5 +126,5 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
-	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues)
+	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues, keyRing)
 }

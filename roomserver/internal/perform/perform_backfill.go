@@ -546,6 +546,7 @@ func joinEventsFromHistoryVisibility(
 
 func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (types.RoomNID, map[string]types.Event) {
 	var roomNID types.RoomNID
+	var eventNID types.EventNID
 	backfilledEventMap := make(map[string]types.Event)
 	for j, ev := range events {
 		nidMap, err := db.EventNIDs(ctx, ev.AuthEventIDs())
@@ -559,10 +560,9 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			authNids[i] = nid
 			i++
 		}
-		var stateAtEvent types.StateAtEvent
 		var redactedEventID string
 		var redactionEvent *gomatrixserverlib.Event
-		roomNID, stateAtEvent, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), authNids, false)
+		eventNID, roomNID, _, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), authNids, false)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
 			continue
@@ -581,7 +581,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			events[j] = ev
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{
-			EventNID: stateAtEvent.StateEntry.EventNID,
+			EventNID: eventNID,
 			Event:    ev.Unwrap(),
 		}
 	}
