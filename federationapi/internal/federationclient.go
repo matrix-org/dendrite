@@ -10,6 +10,20 @@ import (
 // Functions here are "proxying" calls to the gomatrixserverlib federation
 // client.
 
+func (a *FederationInternalAPI) GetEventAuth(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string,
+) (res gomatrixserverlib.RespEventAuth, err error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.GetEventAuth(ctx, s, roomID, eventID)
+	})
+	if err != nil {
+		return gomatrixserverlib.RespEventAuth{}, err
+	}
+	return ires.(gomatrixserverlib.RespEventAuth), nil
+}
+
 func (a *FederationInternalAPI) GetUserDevices(
 	ctx context.Context, s gomatrixserverlib.ServerName, userID string,
 ) (gomatrixserverlib.RespUserDevices, error) {

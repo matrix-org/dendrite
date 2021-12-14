@@ -37,6 +37,7 @@ type RoomserverInternalAPI struct {
 	Cache                  caching.RoomServerCaches
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
+	ServerACLs             *acls.ServerACLs
 	fsAPI                  fsAPI.FederationInternalAPI
 	asAPI                  asAPI.AppServiceQueryAPI
 	OutputRoomEventTopic   string // Kafka topic for new output room events
@@ -55,6 +56,9 @@ func NewRoomserverAPI(
 		Cache:                  caches,
 		ServerName:             cfg.Matrix.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
+		OutputRoomEventTopic:   outputRoomEventTopic,
+		Producer:               producer,
+		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
@@ -80,6 +84,15 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 
+	r.Inputer = &input.Inputer{
+		DB:                   r.DB,
+		OutputRoomEventTopic: r.OutputRoomEventTopic,
+		Producer:             r.Producer,
+		ServerName:           r.Cfg.Matrix.ServerName,
+		FSAPI:                fsAPI,
+		KeyRing:              keyRing,
+		ACLs:                 r.ServerACLs,
+	}
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,
 		Cfg:     r.Cfg,

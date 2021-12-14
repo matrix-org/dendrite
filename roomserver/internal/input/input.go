@@ -23,6 +23,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
+	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -44,6 +45,8 @@ type Inputer struct {
 	DB                   storage.Database
 	Producer             sarama.SyncProducer
 	ServerName           gomatrixserverlib.ServerName
+	FSAPI                fedapi.FederationInternalAPI
+	KeyRing              gomatrixserverlib.JSONVerifier
 	ACLs                 *acls.ServerACLs
 	OutputRoomEventTopic string
 	workers              sync.Map // room ID -> *inputWorker

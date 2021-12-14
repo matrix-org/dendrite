@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
@@ -98,13 +99,28 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	// Check that the event passes authentication checks and work out
-	// the numeric IDs for the auth events.
+	// First of all, check that the auth events of the event are known.
+	// If they aren't then we will ask the federation API for them.
 	isRejected := false
-	authEventNIDs, rejectionErr := helpers.CheckAuthEvents(ctx, r.DB, headered, input.AuthEventIDs)
-	if rejectionErr != nil {
-		logrus.WithError(rejectionErr).WithField("event_id", event.EventID()).WithField("auth_event_ids", input.AuthEventIDs).Error("helpers.CheckAuthEvents failed for event, rejecting event")
+	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	knownAuthEvents := map[string]types.Event{}
+	if err = r.checkForMissingAuthEvents(ctx, input.Event, &authEvents, knownAuthEvents); err != nil {
+		return "", fmt.Errorf("r.checkForMissingAuthEvents: %w", err)
+	}
+
+	// Check if the event is allowed by its auth events. If it isn't then
+	// we consider the event to be "rejected" — it will still be persisted.
+	var rejectionErr error
+	if rejectionErr = gomatrixserverlib.Allowed(event, &authEvents); rejectionErr != nil {
 		isRejected = true
+		logrus.WithError(rejectionErr).Warnf("Event %s rejected", event.EventID())
+	}
+
+	// Accumulate the auth event NIDs.
+	authEventIDs := event.AuthEventIDs()
+	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
+	for _, authEventID := range authEventIDs {
+		authEventNIDs = append(authEventNIDs, knownAuthEvents[authEventID].EventNID)
 	}
 
 	var softfail bool
@@ -226,6 +242,116 @@ func (r *Inputer) processRoomEvent(
 
 	// Update the extremities of the event graph for the room
 	return event.EventID(), nil
+}
+
+func (r *Inputer) checkForMissingAuthEvents(
+	ctx context.Context,
+	event *gomatrixserverlib.HeaderedEvent,
+	auth *gomatrixserverlib.AuthEvents,
+	known map[string]types.Event,
+) error {
+	authEventIDs := event.AuthEventIDs()
+	if len(authEventIDs) == 0 {
+		return nil
+	}
+
+	unknown := map[string]struct{}{}
+
+	authEvents, err := r.DB.EventsFromIDs(ctx, authEventIDs)
+	if err != nil {
+		return fmt.Errorf("r.DB.EventsFromIDs: %w", err)
+	}
+	for _, event := range authEvents {
+		if event.Event != nil {
+			known[event.EventID()] = event
+			if err = auth.AddEvent(event.Event); err != nil {
+				return fmt.Errorf("auth.AddEvent: %w", err)
+			}
+		} else {
+			unknown[event.EventID()] = struct{}{}
+		}
+	}
+
+	if len(unknown) > 0 {
+		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
+			RoomID: event.RoomID(),
+		}
+		serverRes := &fedapi.QueryJoinedHostServerNamesInRoomResponse{}
+		if err = r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
+			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
+		}
+
+		var res gomatrixserverlib.RespEventAuth
+		var found bool
+		for _, serverName := range serverRes.ServerNames {
+			res, err = r.FSAPI.GetEventAuth(ctx, serverName, event.RoomID(), event.EventID())
+			if err != nil {
+				logrus.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
+				continue
+			}
+			found = true
+		}
+		if !found {
+			return fmt.Errorf("no servers provided event auth")
+		}
+
+		for _, event := range gomatrixserverlib.ReverseTopologicalOrdering(
+			res.AuthEvents,
+			gomatrixserverlib.TopologicalOrderByAuthEvents,
+		) {
+			// If we already know about this event then we don't need to store
+			// it or do anything further with it.
+			if _, ok := known[event.EventID()]; ok {
+				continue
+			}
+
+			// Check the signatures of the event.
+			// TODO: It really makes sense for the federation API to be doing this,
+			// because then it can attempt another server if one serves up an event
+			// with an invalid signature. For now this will do.
+			if err := event.VerifyEventSignatures(ctx, r.FSAPI.KeyRing()); err != nil {
+				return fmt.Errorf("event.VerifyEventSignatures: %w", err)
+			}
+
+			// Otherwise, we need to store, and that means we need to know the
+			// auth event NIDs. Let's see if we can find those.
+			authEventNIDs := make([]types.EventNID, 0, len(event.AuthEventIDs()))
+			for _, eventID := range event.AuthEventIDs() {
+				knownEvent, ok := known[eventID]
+				if !ok {
+					return fmt.Errorf("missing auth event %s for %s", eventID, event.EventID())
+				}
+				authEventNIDs = append(authEventNIDs, knownEvent.EventNID)
+			}
+
+			// Let's take a note of the fact that we now know about this event.
+			known[event.EventID()] = types.Event{}
+			if err := auth.AddEvent(event); err != nil {
+				return fmt.Errorf("auth.AddEvent: %w", err)
+			}
+
+			// Check if the auth event should be rejected.
+			isRejected := false
+			if err := gomatrixserverlib.Allowed(event, auth); err != nil {
+				isRejected = true
+				logrus.WithError(err).Warnf("Auth event %s rejected", event.EventID())
+			}
+
+			// Finally, store the event in the database.
+			eventNID, _, _, _, _, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
+			if err != nil {
+				return fmt.Errorf("r.DB.StoreEvent: %w", err)
+			}
+
+			// Now we know about this event, too.
+			known[event.EventID()] = types.Event{
+				EventNID: eventNID,
+				Event:    event,
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r *Inputer) calculateAndSetState(

@@ -36,6 +36,7 @@ const (
 	FederationAPILookupServerKeysPath   = "/federationapi/client/lookupServerKeys"
 	FederationAPIEventRelationshipsPath = "/federationapi/client/msc2836eventRelationships"
 	FederationAPISpacesSummaryPath      = "/federationapi/client/msc2946spacesSummary"
+	FederationAPIGetEventAuthPath       = "/federationapi/client/getEventAuth"
 
 	FederationAPIInputPublicKeyPath = "/federationapi/inputPublicKey"
 	FederationAPIQueryPublicKeyPath = "/federationapi/queryPublicKey"
@@ -378,6 +379,37 @@ func (h *httpFederationInternalAPI) GetEvent(
 	}
 	if response.Err != nil {
 		return gomatrixserverlib.Transaction{}, response.Err
+	}
+	return *response.Res, nil
+}
+
+type getEventAuth struct {
+	S       gomatrixserverlib.ServerName
+	RoomID  string
+	EventID string
+	Res     *gomatrixserverlib.RespEventAuth
+	Err     *api.FederationClientError
+}
+
+func (h *httpFederationInternalAPI) GetEventAuth(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string,
+) (gomatrixserverlib.RespEventAuth, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetEventAuth")
+	defer span.Finish()
+
+	request := getEventAuth{
+		S:       s,
+		RoomID:  roomID,
+		EventID: eventID,
+	}
+	var response getEventAuth
+	apiURL := h.federationAPIURL + FederationAPIGetEventAuthPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return gomatrixserverlib.RespEventAuth{}, err
+	}
+	if response.Err != nil {
+		return gomatrixserverlib.RespEventAuth{}, response.Err
 	}
 	return *response.Res, nil
 }
