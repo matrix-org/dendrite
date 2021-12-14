@@ -273,6 +273,8 @@ func (r *Inputer) checkForMissingAuthEvents(
 	}
 
 	if len(unknown) > 0 {
+		logrus.Printf("XXX: There are %d missing auth events", len(unknown))
+
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
 			RoomID: event.RoomID(),
 		}
@@ -280,6 +282,8 @@ func (r *Inputer) checkForMissingAuthEvents(
 		if err = r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
 			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
 		}
+
+		logrus.Printf("XXX: Asking servers %+v", serverRes.ServerNames)
 
 		var res gomatrixserverlib.RespEventAuth
 		var found bool
@@ -289,9 +293,12 @@ func (r *Inputer) checkForMissingAuthEvents(
 				logrus.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
 				continue
 			}
+			logrus.Printf("XXX: Server %q provided us with %d auth events", serverName, len(res.AuthEvents))
 			found = true
+			break
 		}
 		if !found {
+			logrus.Printf("XXX: None of the %d servers provided us with auth events", len(serverRes.ServerNames))
 			return fmt.Errorf("no servers provided event auth")
 		}
 
