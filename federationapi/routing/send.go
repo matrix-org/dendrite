@@ -136,7 +136,7 @@ func (q *sendFIFOQueue) pop() (*inputTask, bool) {
 type inputTask struct {
 	ctx      context.Context
 	t        *txnReq
-	event    *gomatrixserverlib.Event
+	event    *gomatrixserverlib.HeaderedEvent
 	wg       *sync.WaitGroup
 	err      error         // written back by worker, only safe to read when all tasks are done
 	duration time.Duration // written back by worker, only safe to read when all tasks are done
@@ -338,7 +338,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		task := &inputTask{
 			ctx:   ctx,
 			t:     t,
-			event: event,
+			event: event.Headered(verRes.RoomVersion),
 			wg:    &wg,
 		}
 		tasks = append(tasks, task)
@@ -419,12 +419,6 @@ func (t *inputWorker) run() {
 		}()
 	}
 }
-
-type roomNotFoundError struct {
-	roomID string
-}
-
-func (e roomNotFoundError) Error() string { return fmt.Sprintf("room %q not found", e.roomID) }
 
 func (t *txnReq) processEDUs(ctx context.Context) {
 	for _, e := range t.EDUs {
@@ -568,41 +562,43 @@ func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverli
 	}
 }
 
-func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) error {
+func (t *txnReq) processEvent(_ context.Context, e *gomatrixserverlib.HeaderedEvent) error {
 	t.work = "" // reset from previous event
 
-	// Ask the roomserver if we know about the room and/or if we're joined
-	// to it. If we aren't then we won't bother processing the event.
-	joinedReq := api.QueryServerJoinedToRoomRequest{
-		RoomID: e.RoomID(),
-	}
-	var joinedRes api.QueryServerJoinedToRoomResponse
-	if err := t.rsAPI.QueryServerJoinedToRoom(ctx, &joinedReq, &joinedRes); err != nil {
-		return fmt.Errorf("t.rsAPI.QueryServerJoinedToRoom: %w", err)
-	}
+	/*
+		// Ask the roomserver if we know about the room and/or if we're joined
+		// to it. If we aren't then we won't bother processing the event.
+		joinedReq := api.QueryServerJoinedToRoomRequest{
+			RoomID: e.RoomID(),
+		}
+		var joinedRes api.QueryServerJoinedToRoomResponse
+		if err := t.rsAPI.QueryServerJoinedToRoom(ctx, &joinedReq, &joinedRes); err != nil {
+			return fmt.Errorf("t.rsAPI.QueryServerJoinedToRoom: %w", err)
+		}
 
-	if !joinedRes.RoomExists || !joinedRes.IsInRoom {
-		// We don't believe we're a member of this room, therefore there's
-		// no point in wasting work trying to figure out what to do with
-		// missing auth or prev events. Drop the event.
-		return roomNotFoundError{e.RoomID()}
-	}
+		if !joinedRes.RoomExists || !joinedRes.IsInRoom {
+			// We don't believe we're a member of this room, therefore there's
+			// no point in wasting work trying to figure out what to do with
+			// missing auth or prev events. Drop the event.
+			return roomNotFoundError{e.RoomID()}
+		}
 
-	// Work out if the roomserver knows everything it needs to know to auth
-	// the event. This includes the prev_events and auth_events.
-	// NOTE! This is going to include prev_events that have an empty state
-	// snapshot. This is because we will need to re-request the event, and
-	// it's /state_ids, in order for it to exist in the roomserver correctly
-	// before the roomserver tries to work out
-	stateReq := api.QueryMissingAuthPrevEventsRequest{
-		RoomID:       e.RoomID(),
-		AuthEventIDs: nil, //e.AuthEventIDs(),
-		PrevEventIDs: nil, //e.PrevEventIDs(),
-	}
-	var stateResp api.QueryMissingAuthPrevEventsResponse
-	if err := t.rsAPI.QueryMissingAuthPrevEvents(ctx, &stateReq, &stateResp); err != nil {
-		return fmt.Errorf("t.rsAPI.QueryMissingAuthPrevEvents: %w", err)
-	}
+		// Work out if the roomserver knows everything it needs to know to auth
+		// the event. This includes the prev_events and auth_events.
+		// NOTE! This is going to include prev_events that have an empty state
+		// snapshot. This is because we will need to re-request the event, and
+		// it's /state_ids, in order for it to exist in the roomserver correctly
+		// before the roomserver tries to work out
+		stateReq := api.QueryMissingAuthPrevEventsRequest{
+			RoomID:       e.RoomID(),
+			AuthEventIDs: nil, //e.AuthEventIDs(),
+			PrevEventIDs: nil, //e.PrevEventIDs(),
+		}
+		var stateResp api.QueryMissingAuthPrevEventsResponse
+		if err := t.rsAPI.QueryMissingAuthPrevEvents(ctx, &stateReq, &stateResp); err != nil {
+			return fmt.Errorf("t.rsAPI.QueryMissingAuthPrevEvents: %w", err)
+		}
+	*/
 
 	// pass the event to the roomserver which will do auth checks
 	// If the event fail auth checks, gmsl.NotAllowed error will be returned which we be silently
@@ -611,9 +607,7 @@ func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) e
 		context.Background(),
 		t.rsAPI,
 		api.KindNew,
-		[]*gomatrixserverlib.HeaderedEvent{
-			e.Headered(stateResp.RoomVersion),
-		},
+		[]*gomatrixserverlib.HeaderedEvent{e},
 		t.Origin,
 		api.DoNotSendToOtherServers,
 		nil,

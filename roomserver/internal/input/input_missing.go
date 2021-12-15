@@ -146,37 +146,39 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	t.hadEventsMutex.Unlock()
 
-	err = api.SendEventWithState(
-		context.Background(),
-		t.inputer,
-		api.KindOld,
-		resolvedState,
-		backwardsExtremity.Headered(roomVersion),
-		t.origin,
-		hadEvents,
-	)
+	stateIDs := make([]string, len(resolvedState.StateEvents))
+	for _, event := range resolvedState.StateEvents {
+		stateIDs = append(stateIDs, event.EventID())
+	}
+
+	_, err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
+		Kind:          api.KindOld,
+		Event:         backwardsExtremity.Headered(roomVersion),
+		Origin:        t.origin,
+		AuthEventIDs:  backwardsExtremity.AuthEventIDs(),
+		HasState:      true,
+		StateEventIDs: stateIDs,
+		SendAsServer:  api.DoNotSendToOtherServers,
+	})
 	if err != nil {
-		return fmt.Errorf("api.SendEventWithState: %w", err)
+		return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
 	}
 
 	// Then send all of the newer backfilled events, of which will all be newer
 	// than the backward extremity, into the roomserver without state. This way
 	// they will automatically fast-forward based on the room state at the
 	// extremity in the last step.
-	headeredNewEvents := make([]*gomatrixserverlib.HeaderedEvent, len(newEvents))
-	for i, newEvent := range newEvents {
-		headeredNewEvents[i] = newEvent.Headered(roomVersion)
-	}
-	if err = api.SendEvents(
-		context.Background(),
-		t.inputer,
-		api.KindOld,
-		append(headeredNewEvents, e.Headered(roomVersion)),
-		t.origin,
-		api.DoNotSendToOtherServers,
-		nil,
-	); err != nil {
-		return fmt.Errorf("api.SendEvents: %w", err)
+	for _, newEvent := range newEvents {
+		_, err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
+			Kind:         api.KindOld,
+			Event:        newEvent.Headered(roomVersion),
+			Origin:       t.origin,
+			AuthEventIDs: backwardsExtremity.AuthEventIDs(),
+			SendAsServer: api.DoNotSendToOtherServers,
+		})
+		if err != nil {
+			return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+		}
 	}
 
 	return nil
@@ -627,7 +629,7 @@ func (t *missingStateReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib
 	return &respState, nil
 }
 
-func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, missingEventID string, localFirst bool) (*gomatrixserverlib.HeaderedEvent, error) {
+func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, _, missingEventID string, localFirst bool) (*gomatrixserverlib.HeaderedEvent, error) {
 	if localFirst {
 		// fetch from the roomserver
 		queryReq := api.QueryEventsByIDRequest{
