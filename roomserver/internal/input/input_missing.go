@@ -250,7 +250,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, room
 		// set the event from the haveEvents cache - this means we will share pointers with other prev_event branches for this
 		// processEvent request, which is better for memory.
 		stateEvents[i] = t.cacheAndReturn(ev)
-		t.hadEvent(ev.EventID(), true)
+		t.hadEvent(ev.EventID())
 	}
 	// we should never access res.StateEvents again so we delete it here to make GC faster
 	res.StateEvents = nil
@@ -285,7 +285,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, room
 		}
 		for i, ev := range queryRes.Events {
 			authEvents = append(authEvents, t.cacheAndReturn(queryRes.Events[i]).Unwrap())
-			t.hadEvent(ev.EventID(), true)
+			t.hadEvent(ev.EventID())
 		}
 		queryRes.Events = nil
 	}
@@ -362,7 +362,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	latestEvents := make([]string, len(res.LatestEvents))
 	for i, ev := range res.LatestEvents {
 		latestEvents[i] = res.LatestEvents[i].EventID
-		t.hadEvent(ev.EventID, true)
+		t.hadEvent(ev.EventID)
 	}
 
 	var missingResp *gomatrixserverlib.RespMissingEvents
@@ -497,7 +497,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 	}
 	for i, ev := range queryRes.Events {
 		queryRes.Events[i] = t.cacheAndReturn(queryRes.Events[i])
-		t.hadEvent(ev.EventID(), true)
+		t.hadEvent(ev.EventID())
 		evID := queryRes.Events[i].EventID()
 		if missing[evID] {
 			delete(missing, evID)
@@ -681,15 +681,12 @@ func checkAllowedByState(e *gomatrixserverlib.Event, stateEvents []*gomatrixserv
 	return gomatrixserverlib.Allowed(e, &authUsingState)
 }
 
-func (t *missingStateReq) hadEvent(eventID string, had bool) {
+func (t *missingStateReq) hadEvent(eventID string) {
 	t.hadEventsMutex.Lock()
 	defer t.hadEventsMutex.Unlock()
-	t.hadEvents[eventID] = had
+	t.hadEvents[eventID] = true
 }
 
-type roomNotFoundError struct {
-	roomID string
-}
 type verifySigError struct {
 	eventID string
 	err     error
@@ -699,7 +696,6 @@ type missingPrevEventsError struct {
 	err     error
 }
 
-func (e roomNotFoundError) Error() string { return fmt.Sprintf("room %q not found", e.roomID) }
 func (e verifySigError) Error() string {
 	return fmt.Sprintf("unable to verify signature of event %q: %s", e.eventID, e.err)
 }

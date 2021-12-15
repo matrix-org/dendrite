@@ -183,7 +183,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	if input.Origin == "" {
-		return "", fmt.Errorf("expected an origin")
+		input.Origin = event.Origin()
 	}
 
 	if len(missingRes.MissingPrevEventIDs) > 0 {
