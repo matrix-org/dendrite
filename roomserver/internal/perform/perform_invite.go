@@ -172,6 +172,7 @@ func (r *Inviter) PerformInvite(
 				{
 					Kind:         api.KindNew,
 					Event:        event,
+					Origin:       event.Origin(),
 					AuthEventIDs: event.AuthEventIDs(),
 					SendAsServer: req.SendAsServer,
 				},

@@ -26,17 +26,18 @@ const (
 	FederationAPIPerformServersAlivePath           = "/federationapi/performServersAlive"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
 
-	FederationAPIGetUserDevicesPath     = "/federationapi/client/getUserDevices"
-	FederationAPIClaimKeysPath          = "/federationapi/client/claimKeys"
-	FederationAPIQueryKeysPath          = "/federationapi/client/queryKeys"
-	FederationAPIBackfillPath           = "/federationapi/client/backfill"
-	FederationAPILookupStatePath        = "/federationapi/client/lookupState"
-	FederationAPILookupStateIDsPath     = "/federationapi/client/lookupStateIDs"
-	FederationAPIGetEventPath           = "/federationapi/client/getEvent"
-	FederationAPILookupServerKeysPath   = "/federationapi/client/lookupServerKeys"
-	FederationAPIEventRelationshipsPath = "/federationapi/client/msc2836eventRelationships"
-	FederationAPISpacesSummaryPath      = "/federationapi/client/msc2946spacesSummary"
-	FederationAPIGetEventAuthPath       = "/federationapi/client/getEventAuth"
+	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
+	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
+	FederationAPIQueryKeysPath           = "/federationapi/client/queryKeys"
+	FederationAPIBackfillPath            = "/federationapi/client/backfill"
+	FederationAPILookupStatePath         = "/federationapi/client/lookupState"
+	FederationAPILookupStateIDsPath      = "/federationapi/client/lookupStateIDs"
+	FederationAPILookupMissingEventsPath = "/federationapi/client/lookupMissingEvents"
+	FederationAPIGetEventPath            = "/federationapi/client/getEvent"
+	FederationAPILookupServerKeysPath    = "/federationapi/client/lookupServerKeys"
+	FederationAPIEventRelationshipsPath  = "/federationapi/client/msc2836eventRelationships"
+	FederationAPISpacesSummaryPath       = "/federationapi/client/msc2946spacesSummary"
+	FederationAPIGetEventAuthPath        = "/federationapi/client/getEventAuth"
 
 	FederationAPIInputPublicKeyPath = "/federationapi/inputPublicKey"
 	FederationAPIQueryPublicKeyPath = "/federationapi/queryPublicKey"
@@ -350,6 +351,40 @@ func (h *httpFederationInternalAPI) LookupStateIDs(
 	}
 	if response.Err != nil {
 		return gomatrixserverlib.RespStateIDs{}, response.Err
+	}
+	return *response.Res, nil
+}
+
+type lookupMissingEvents struct {
+	S           gomatrixserverlib.ServerName
+	RoomID      string
+	Missing     gomatrixserverlib.MissingEvents
+	RoomVersion gomatrixserverlib.RoomVersion
+	Res         *gomatrixserverlib.RespMissingEvents
+	Err         *api.FederationClientError
+}
+
+func (h *httpFederationInternalAPI) LookupMissingEvents(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID string,
+	missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion,
+) (gomatrixserverlib.RespMissingEvents, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LookupMissingEvents")
+	defer span.Finish()
+
+	request := lookupMissingEvents{
+		S:           s,
+		RoomID:      roomID,
+		Missing:     missing,
+		RoomVersion: roomVersion,
+	}
+	var response lookupMissingEvents
+	apiURL := h.federationAPIURL + FederationAPILookupMissingEventsPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return gomatrixserverlib.RespMissingEvents{}, err
+	}
+	if response.Err != nil {
+		return gomatrixserverlib.RespMissingEvents{}, response.Err
 	}
 	return *response.Res, nil
 }

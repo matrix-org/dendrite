@@ -462,6 +462,7 @@ func createRoom(
 				AuthEvents:  accumulated,
 			},
 			ev.Headered(roomVersion),
+			cfg.Matrix.ServerName,
 			nil,
 		); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("SendEventWithState failed")

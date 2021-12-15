@@ -244,8 +244,6 @@ func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederat
 		eduAPI:     &testEDUProducer{},
 		keys:       &test.NopJSONVerifier{},
 		federation: fedClient,
-		haveEvents: make(map[string]*gomatrixserverlib.HeaderedEvent),
-		hadEvents:  make(map[string]bool),
 		roomsMu:    internal.NewMutexByRoom(),
 	}
 	t.PDUs = pdus

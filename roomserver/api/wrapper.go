@@ -22,10 +22,15 @@ import (
 	"github.com/matrix-org/util"
 )
 
+type RoomEventInputter interface {
+	InputRoomEvents(context.Context, *InputRoomEventsRequest, *InputRoomEventsResponse)
+}
+
 // SendEvents to the roomserver The events are written with KindNew.
 func SendEvents(
-	ctx context.Context, rsAPI RoomserverInternalAPI,
+	ctx context.Context, rsAPI RoomEventInputter,
 	kind Kind, events []*gomatrixserverlib.HeaderedEvent,
+	origin gomatrixserverlib.ServerName,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
 ) error {
 	ires := make([]InputRoomEvent, len(events))
@@ -33,6 +38,7 @@ func SendEvents(
 		ires[i] = InputRoomEvent{
 			Kind:          kind,
 			Event:         event,
+			Origin:        origin,
 			AuthEventIDs:  event.AuthEventIDs(),
 			SendAsServer:  string(sendAsServer),
 			TransactionID: txnID,
@@ -45,9 +51,9 @@ func SendEvents(
 // with the state at the event as KindOutlier before it. Will not send any event that is
 // marked as `true` in haveEventIDs.
 func SendEventWithState(
-	ctx context.Context, rsAPI RoomserverInternalAPI, kind Kind,
+	ctx context.Context, rsAPI RoomEventInputter, kind Kind,
 	state *gomatrixserverlib.RespState, event *gomatrixserverlib.HeaderedEvent,
-	haveEventIDs map[string]bool,
+	origin gomatrixserverlib.ServerName, haveEventIDs map[string]bool,
 ) error {
 	outliers, err := state.Events()
 	if err != nil {
@@ -62,6 +68,7 @@ func SendEventWithState(
 		ires = append(ires, InputRoomEvent{
 			Kind:         KindOutlier,
 			Event:        outlier.Headered(event.RoomVersion),
+			Origin:       origin,
 			AuthEventIDs: outlier.AuthEventIDs(),
 		})
 	}
@@ -74,6 +81,7 @@ func SendEventWithState(
 	ires = append(ires, InputRoomEvent{
 		Kind:          kind,
 		Event:         event,
+		Origin:        origin,
 		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateEventIDs,
@@ -84,7 +92,7 @@ func SendEventWithState(
 
 // SendInputRoomEvents to the roomserver.
 func SendInputRoomEvents(
-	ctx context.Context, rsAPI RoomserverInternalAPI, ires []InputRoomEvent,
+	ctx context.Context, rsAPI RoomEventInputter, ires []InputRoomEvent,
 ) error {
 	request := InputRoomEventsRequest{InputRoomEvents: ires}
 	var response InputRoomEventsResponse

@@ -106,6 +106,21 @@ func (a *FederationInternalAPI) LookupStateIDs(
 	return ires.(gomatrixserverlib.RespStateIDs), nil
 }
 
+func (a *FederationInternalAPI) LookupMissingEvents(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID string,
+	missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion,
+) (res gomatrixserverlib.RespMissingEvents, err error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	ires, err := a.doRequest(s, func() (interface{}, error) {
+		return a.federation.LookupMissingEvents(ctx, s, roomID, missing, roomVersion)
+	})
+	if err != nil {
+		return gomatrixserverlib.RespMissingEvents{}, err
+	}
+	return ires.(gomatrixserverlib.RespMissingEvents), nil
+}
+
 func (a *FederationInternalAPI) GetEvent(
 	ctx context.Context, s gomatrixserverlib.ServerName, eventID string,
 ) (res gomatrixserverlib.Transaction, err error) {

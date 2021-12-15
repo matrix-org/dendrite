@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
@@ -50,6 +51,8 @@ type Inputer struct {
 	ACLs                 *acls.ServerACLs
 	OutputRoomEventTopic string
 	workers              sync.Map // room ID -> *inputWorker
+
+	Queryer *query.Queryer
 }
 
 type inputTask struct {

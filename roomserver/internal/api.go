@@ -92,6 +92,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 		FSAPI:                fsAPI,
 		KeyRing:              keyRing,
 		ACLs:                 r.ServerACLs,
+		Queryer:              r.Queryer,
 	}
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,

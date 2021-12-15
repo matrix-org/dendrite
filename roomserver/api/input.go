@@ -54,6 +54,8 @@ type InputRoomEvent struct {
 	Kind Kind `json:"kind"`
 	// The event JSON for the event to add.
 	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
+	// Which server told us about this event.
+	Origin gomatrixserverlib.ServerName `json:"origin"`
 	// List of state event IDs that authenticate this event.
 	// These are likely derived from the "auth_events" JSON key of the event.
 	// But can be different because the "auth_events" key can be incomplete or wrong.

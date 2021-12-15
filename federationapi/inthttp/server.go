@@ -242,6 +242,28 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
+		FederationAPILookupMissingEventsPath,
+		httputil.MakeInternalAPI("LookupMissingEvents", func(req *http.Request) util.JSONResponse {
+			var request lookupMissingEvents
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.LookupMissingEvents(req.Context(), request.S, request.RoomID, request.Missing, request.RoomVersion)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
 		FederationAPIGetEventPath,
 		httputil.MakeInternalAPI("GetEvent", func(req *http.Request) util.JSONResponse {
 			var request getEvent
