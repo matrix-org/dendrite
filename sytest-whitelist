@@ -631,3 +631,15 @@ Trying to get push rules with unknown scope fails with 400
 Trying to get push rules with unknown template fails with 400
 Trying to get push rules with unknown attribute fails with 400
 Getting push rules doesn't corrupt the cache SYN-390
+Test that a message is pushed
+Invites are pushed
+Rooms with names are correctly named in pushes
+Rooms with canonical alias are correctly named in pushed
+Rooms with many users are correctly pushed
+Don't get pushed for rooms you've muted
+Rejected events are not pushed
+Test that rejected pushers are removed.
+Notifications can be viewed with GET /notifications
+Trying to add push rule with no scope fails with 400
+Trying to add push rule with invalid scope fails with 400
+Messages that highlight from another user increment unread highlight count
