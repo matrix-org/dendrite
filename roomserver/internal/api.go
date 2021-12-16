@@ -73,18 +73,12 @@ func NewRoomserverAPI(
 	return a
 }
 
-// SetKeyring sets the keyring to a given keyring. This is only useful for the P2P
-// demos and must be called after SetFederationSenderInputAPI.
-func (r *RoomserverInternalAPI) SetKeyring(keyRing *gomatrixserverlib.KeyRing) {
-	r.KeyRing = keyRing
-}
-
 // SetFederationInputAPI passes in a federation input API reference so that we can
 // avoid the chicken-and-egg problem of both the roomserver input API and the
 // federation input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI) {
+func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
 	r.fsAPI = fsAPI
-	r.SetKeyring(fsAPI.KeyRing())
+	r.KeyRing = keyRing
 
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,

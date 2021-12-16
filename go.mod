@@ -33,7 +33,7 @@ require (
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20211115192839-15a64d244aa2
 	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
-	github.com/matrix-org/pinecone v0.0.0-20211125101824-cc7886682cfd
+	github.com/matrix-org/pinecone v0.0.0-20211213132835-aa2808d77947
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/morikuni/aec v1.0.0 // indirect

@@ -12,9 +12,8 @@ import (
 type RoomserverInternalAPI interface {
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
-	SetFederationAPI(fsAPI fsAPI.FederationInternalAPI)
+	SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing)
 	SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI)
-	SetKeyring(keyRing *gomatrixserverlib.KeyRing)
 
 	InputRoomEvents(
 		ctx context.Context,
