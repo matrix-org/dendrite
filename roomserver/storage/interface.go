@@ -70,7 +70,7 @@ type Database interface {
 	StoreEvent(
 		ctx context.Context, event *gomatrixserverlib.Event, authEventNIDs []types.EventNID,
 		isRejected bool,
-	) (types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
+	) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error)
 	// Look up the state entries for a list of string event IDs
 	// Returns an error if the there is an error talking to the database
 	// Returns a types.MissingEventError if the event IDs aren't in the database.
