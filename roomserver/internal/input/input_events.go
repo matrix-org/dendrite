@@ -209,6 +209,7 @@ func (r *Inputer) processRoomEvent(
 			queryer:    r.Queryer,
 			db:         r.DB,
 			federation: r.FSAPI,
+			keys:       r.KeyRing,
 			roomsMu:    internal.NewMutexByRoom(),
 			servers:    []gomatrixserverlib.ServerName{input.Origin},
 			hadEvents:  map[string]bool{},
