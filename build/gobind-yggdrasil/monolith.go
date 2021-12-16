@@ -93,7 +93,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-syncapi.db", m.StorageDirectory))
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-roomserver.db", m.StorageDirectory))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-keyserver.db", m.StorageDirectory))
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-federationapi.db", m.StorageDirectory))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-federationsender.db", m.StorageDirectory))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-appservice.db", m.StorageDirectory))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
@@ -113,7 +113,7 @@ func (m *DendriteMonolith) Start() {
 	rsAPI := roomserver.NewInternalAPI(base)
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, base.Caches, true,
+		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
@@ -129,8 +129,7 @@ func (m *DendriteMonolith) Start() {
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsAPI.SetFederationAPI(fsAPI)
-	rsAPI.SetKeyring(keyRing)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
