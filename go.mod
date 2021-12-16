@@ -4,6 +4,7 @@ require (
 	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
+	github.com/MFAshby/stdemuxerhook v1.0.0 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Shopify/sarama v1.29.1
 	github.com/codeclysm/extract v2.2.0+incompatible

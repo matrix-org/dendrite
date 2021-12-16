@@ -370,9 +370,10 @@ tracing:
     baggage_restrictions: null
     throttler: null
 
-# Logging configuration, in addition to the standard logging that is sent to
-# stdout by Dendrite.
+# Logging configuration
 logging:
+- type: std
+  level: info
 - type: file
   level: info
   params:
