@@ -66,7 +66,7 @@ func (r *Inputer) Start() error {
 			inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
 			inbox.(*phony.Inbox).Act(nil, func() {
 				_ = msg.InProgress()
-				if _, err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
+				if err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
 					sentry.CaptureException(err)
 					_ = msg.Respond([]byte(err.Error()))
 				} else {
@@ -113,7 +113,7 @@ func (r *Inputer) InputRoomEvents(
 			inputRoomEvent := e
 			inbox, _ := r.workers.LoadOrStore(inputRoomEvent.Event.RoomID(), &phony.Inbox{})
 			inbox.(*phony.Inbox).Act(nil, func() {
-				_, err := r.processRoomEvent(context.TODO(), &inputRoomEvent)
+				err := r.processRoomEvent(context.TODO(), &inputRoomEvent)
 				if err != nil {
 					sentry.CaptureException(err)
 				} else {

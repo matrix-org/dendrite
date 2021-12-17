@@ -100,9 +100,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 				return
 			}
 		}
-		s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
+		err = s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
 	case api.OutputTypeOldRoomEvent:
-		s.onOldRoomEvent(context.TODO(), *output.OldRoomEvent)
+		err = s.onOldRoomEvent(context.TODO(), *output.OldRoomEvent)
 	case api.OutputTypeNewInviteEvent:
 		s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
@@ -112,7 +112,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 	case api.OutputTypeRetirePeek:
 		s.onRetirePeek(context.TODO(), *output.RetirePeek)
 	case api.OutputTypeRedactedEvent:
-		s.onRedactEvent(context.TODO(), *output.RedactedEvent)
+		err = s.onRedactEvent(context.TODO(), *output.RedactedEvent)
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
