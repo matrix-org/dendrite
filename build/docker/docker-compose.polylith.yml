@@ -1,11 +1,43 @@
 version: "3.4"
 services:
+  postgres:
+    hostname: postgres
+    image: postgres:14
+    restart: always
+    volumes:
+      - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
+      # To persist your PostgreSQL databases outside of the Docker image, 
+      # to prevent data loss, modify the following ./path_to path:
+      - ./path_to/postgresql:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: itsasecret
+      POSTGRES_USER: dendrite
+    networks:
+      - internal
+
+  jetstream:
+    hostname: jetstream
+    image: nats:latest
+    command: |
+      --jetstream
+      --store_dir /var/lib/nats
+      --cluster_name Dendrite
+    volumes:
+      # To persist your NATS JetStream streams outside of the Docker image,
+      # prevent data loss, modify the following ./path_to path:
+      - ./path_to/nats:/var/lib/nats
+    networks:
+      - internal
+
   client_api:
     hostname: client_api
     image: matrixdotorg/dendrite-polylith:latest
     command: clientapi
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
 
@@ -25,6 +57,9 @@ services:
     command: syncapi
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
 
@@ -34,6 +69,9 @@ services:
     command: roomserver
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
 
@@ -43,6 +81,8 @@ services:
     command: eduserver
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
     networks:
       - internal
 
@@ -52,6 +92,9 @@ services:
     command: federationapi
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
       
@@ -61,6 +104,9 @@ services:
     command: keyserver
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
       
@@ -70,6 +116,9 @@ services:
     command: userapi
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
 
@@ -82,6 +131,8 @@ services:
     networks:
       - internal
     depends_on:
+      - jetstream
+      - postgres
       - room_server
       - user_api
 
