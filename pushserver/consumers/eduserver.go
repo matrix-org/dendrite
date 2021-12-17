@@ -95,6 +95,15 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 	}
 
 	if updated {
+		if err := s.syncProducer.GetAndSendNotificationData(ctx, event.UserID, event.RoomID); err != nil {
+			log.WithFields(log.Fields{
+				"localpart": localpart,
+				"room_id":   event.RoomID,
+				"event_id":  event.EventID,
+			}).WithError(err).Error("pushserver EDU consumer: GetAndSendNotificationData failed")
+			return nil
+		}
+
 		if err := util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
 			log.WithFields(log.Fields{
 				"localpart": localpart,
@@ -104,14 +113,6 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 			return nil
 		}
 
-		if err := s.syncProducer.GetAndSendNotificationData(ctx, event.UserID, event.RoomID); err != nil {
-			log.WithFields(log.Fields{
-				"localpart": localpart,
-				"room_id":   event.RoomID,
-				"event_id":  event.EventID,
-			}).WithError(err).Error("pushserver EDU consumer: GetAndSendNotificationData failed")
-			return nil
-		}
 	}
 
 	return nil
