@@ -19,7 +19,6 @@ not contain the Go toolchain etc.
 
 There are three sample `docker-compose` files:
 
-- `docker-compose.deps.yml` which runs the Postgres and Kafka prerequisites
 - `docker-compose.monolith.yml` which runs a monolith Dendrite deployment
 - `docker-compose.polylith.yml` which runs a polylith Dendrite deployment
 
