@@ -70,15 +70,20 @@ global:
 
   # Configuration for NATS JetStream
   jetstream:
-    # A list of NATS addresses to connect to. If none are specified, an
-    # internal NATS server will be used when running in monolith mode only.
+    # A list of NATS Server addresses to connect to. If none are specified, an
+    # internal NATS server will be started automatically when running Dendrite
+    # in monolith mode. It is required to specify the address of at least one
+    # NATS Server node if running in polylith mode.
     addresses:
       # - localhost:4222
 
-    # Keep all storage in memory. This is mostly useful for unit tests.
+    # Keep all NATS streams in memory, rather than persisting it to the storage
+    # path below. This option is present primarily for integration testing and
+    # should not be used on a real world Dendrite deployment.
     in_memory: false
 
-    # Persistent directory to store JetStream streams in.
+    # Persistent directory to store JetStream streams in. This directory 
+    # should be preserved across Dendrite restarts.
     storage_path: ./
 
     # The prefix to use for stream names for this homeserver - really only
