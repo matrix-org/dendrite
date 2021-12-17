@@ -12,6 +12,11 @@ services:
     environment:
       POSTGRES_PASSWORD: itsasecret
       POSTGRES_USER: dendrite
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dendrite"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - internal
 
@@ -32,6 +37,7 @@ services:
       - postgres
     networks:
       - internal
+    restart: unless-stopped
 
 networks:
   internal:

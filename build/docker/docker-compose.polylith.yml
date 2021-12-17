@@ -12,6 +12,11 @@ services:
     environment:
       POSTGRES_PASSWORD: itsasecret
       POSTGRES_USER: dendrite
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dendrite"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - internal
 
@@ -40,6 +45,7 @@ services:
       - postgres
     networks:
       - internal
+    restart: unless-stopped
 
   media_api:
     hostname: media_api
@@ -50,6 +56,7 @@ services:
       - ./media:/var/dendrite/media
     networks:
       - internal
+    restart: unless-stopped
 
   sync_api:
     hostname: sync_api
@@ -62,6 +69,7 @@ services:
       - postgres
     networks:
       - internal
+    restart: unless-stopped
 
   room_server:
     hostname: room_server
@@ -74,6 +82,7 @@ services:
       - postgres
     networks:
       - internal
+    restart: unless-stopped
 
   edu_server:
     hostname: edu_server
@@ -85,6 +94,7 @@ services:
       - jetstream
     networks:
       - internal
+    restart: unless-stopped
 
   federation_api:
     hostname: federation_api
@@ -97,6 +107,7 @@ services:
       - postgres
     networks:
       - internal
+    restart: unless-stopped
       
   key_server:
     hostname: key_server
@@ -109,6 +120,7 @@ services:
       - postgres
     networks:
       - internal
+    restart: unless-stopped
       
   user_api:
     hostname: user_api
@@ -121,6 +133,7 @@ services:
       - postgres
     networks:
       - internal
+    restart: unless-stopped
 
   appservice_api:
     hostname: appservice_api
@@ -135,6 +148,7 @@ services:
       - postgres
       - room_server
       - user_api
+    restart: unless-stopped
 
 networks:
   internal:
