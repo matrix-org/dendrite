@@ -89,9 +89,6 @@ func main() {
 		cfg = setup.ParseFlags(true)
 	} else {
 		cfg.Defaults(true)
-		cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
-		cfg.Global.PrivateKey = ygg.PrivateKey()
-		cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 		cfg.Global.Kafka.UseNaffka = true
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 		cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
@@ -108,6 +105,11 @@ func main() {
 			panic(err)
 		}
 	}
+
+	// always override ServerName, PrivateKey and KeyID
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
+	cfg.Global.PrivateKey = ygg.PrivateKey()
+	cfg.Global.KeyID = signing.KeyID
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
