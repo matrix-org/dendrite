@@ -614,20 +614,6 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	// Element logs get flooded unless this is handled
-	r0mux.Handle("/presence/{userID}/status",
-		httputil.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
-				return *r
-			}
-			// TODO: Set presence (probably the responsibility of a presence server not clientapi)
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: struct{}{},
-			}
-		}),
-	).Methods(http.MethodPut, http.MethodOptions)
-
 	r0mux.Handle("/voip/turnServer",
 		httputil.MakeAuthAPI("turn_server", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {

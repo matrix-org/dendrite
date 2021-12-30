@@ -25,7 +25,7 @@ func FederationAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	federation := base.CreateFederationClient()
 	rsAPI := base.RoomserverHTTPClient()
 	keyAPI := base.KeyServerHTTPClient()
-	fsAPI := federationapi.NewInternalAPI(base, federation, rsAPI, base.Caches, nil, true)
+	fsAPI := federationapi.NewInternalAPI(base, federation, rsAPI, userAPI, base.Caches, nil, true)
 	keyRing := fsAPI.KeyRing()
 
 	federationapi.AddPublicRoutes(
