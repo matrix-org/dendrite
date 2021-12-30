@@ -118,7 +118,7 @@ func (m *DendriteMonolith) Start() {
 	keyAPI.SetUserAPI(userAPI)
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, userAPI, base.Caches, true,
+		base, federation, rsAPI, userAPI, base.Caches, keyRing, true,
 	)
 
 	eduInputAPI := eduserver.NewInternalAPI(
@@ -130,8 +130,7 @@ func (m *DendriteMonolith) Start() {
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsAPI.SetFederationAPI(fsAPI)
-	rsAPI.SetKeyring(keyRing)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

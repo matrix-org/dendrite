@@ -23,10 +23,10 @@ import (
 func FederationAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
 	federation := base.CreateFederationClient()
-	fsAPI := base.FederationAPIHTTPClient()
-	keyRing := fsAPI.KeyRing()
 	rsAPI := base.RoomserverHTTPClient()
 	keyAPI := base.KeyServerHTTPClient()
+	fsAPI := federationapi.NewInternalAPI(base, federation, rsAPI, base.Caches, nil, true)
+	keyRing := fsAPI.KeyRing()
 
 	federationapi.AddPublicRoutes(
 		base.PublicFederationAPIMux, base.PublicKeyAPIMux, base.PublicWellKnownAPIMux,
@@ -34,6 +34,8 @@ func FederationAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 		rsAPI, fsAPI, base.EDUServerClient(), keyAPI,
 		&base.Cfg.MSCs, nil,
 	)
+
+	federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.FederationAPI.InternalAPI.Listen,

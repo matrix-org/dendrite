@@ -16,6 +16,7 @@ package inthttp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -230,6 +231,34 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			}
 			if err := s.InputAccountData(req.Context(), &request, &response); err != nil {
 				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QueryKeyBackupPath,
+		httputil.MakeInternalAPI("queryKeyBackup", func(req *http.Request) util.JSONResponse {
+			request := api.QueryKeyBackupRequest{}
+			response := api.QueryKeyBackupResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			s.QueryKeyBackup(req.Context(), &request, &response)
+			if response.Error != "" {
+				return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", response.Error))
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(PerformKeyBackupPath,
+		httputil.MakeInternalAPI("performKeyBackup", func(req *http.Request) util.JSONResponse {
+			request := api.PerformKeyBackupRequest{}
+			response := api.PerformKeyBackupResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			err := s.PerformKeyBackup(req.Context(), &request, &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),

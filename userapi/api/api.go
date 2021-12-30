@@ -35,7 +35,7 @@ type UserInternalAPI interface {
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
-	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse)
+	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
 	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
@@ -186,7 +186,7 @@ type QueryAccessTokenRequest struct {
 // QueryAccessTokenResponse is the response for QueryAccessToken
 type QueryAccessTokenResponse struct {
 	Device *Device
-	Err    error // e.g ErrorForbidden
+	Err    string // e.g ErrorForbidden
 }
 
 // QueryAccountDataRequest is the request for QueryAccountData
@@ -295,6 +295,10 @@ type PerformDeviceCreationRequest struct {
 	IPAddr string
 	// Useragent for this device
 	UserAgent string
+	// NoDeviceListUpdate determines whether we should avoid sending a device list
+	// update for this account. Generally the only reason to do this is if the account
+	// is an appservice account.
+	NoDeviceListUpdate bool
 }
 
 // PerformDeviceCreationResponse is the response for PerformDeviceCreation

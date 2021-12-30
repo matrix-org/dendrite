@@ -185,7 +185,7 @@ func main() {
 	rsComponent := roomserver.NewInternalAPI(base)
 	rsAPI := rsComponent
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, nil, base.Caches, true,
+		base, federation, rsAPI, nil, base.Caches, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
@@ -199,8 +199,7 @@ func main() {
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
-	rsComponent.SetFederationAPI(fsAPI)
-	rsComponent.SetKeyring(keyRing)
+	rsComponent.SetFederationAPI(fsAPI, keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

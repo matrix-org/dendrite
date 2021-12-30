@@ -74,6 +74,7 @@ func NewOutputTypingEventConsumer(
 func (s *OutputTypingEventConsumer) Start() error {
 	s.eduCache.SetTimeoutCallback(func(userID, roomID string, latestSyncPosition int64) {
 		pos := types.StreamPosition(latestSyncPosition)
+		s.stream.Advance(pos)
 		s.notifier.OnNewTyping(roomID, types.StreamingToken{TypingPosition: pos})
 	})
 	return s.typingConsumer.Start()

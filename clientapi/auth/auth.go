@@ -70,11 +70,11 @@ func VerifyUserFromRequest(
 		jsonErr := jsonerror.InternalServerError()
 		return nil, &jsonErr
 	}
-	if res.Err != nil {
-		if forbidden, ok := res.Err.(*api.ErrorForbidden); ok {
+	if res.Err != "" {
+		if strings.HasPrefix(strings.ToLower(res.Err), "forbidden:") { // TODO: use actual error and no string comparison
 			return nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(forbidden.Message),
+				JSON: jsonerror.Forbidden(res.Err),
 			}
 		}
 	}
