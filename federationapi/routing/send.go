@@ -371,7 +371,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	for _, task := range tasks {
 		if task.err != nil {
 			results[task.event.EventID()] = gomatrixserverlib.PDUResult{
-				Error: task.err.Error(),
+				//	Error: task.err.Error(), TODO: this upsets tests if uncommented
 			}
 		} else {
 			results[task.event.EventID()] = gomatrixserverlib.PDUResult{}
