@@ -175,10 +175,16 @@ func SendLeave(
 		}
 	}
 
-	if event.StateKey() == nil {
+	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("missing state_key"),
+			JSON: jsonerror.BadJSON("No state key was provided in the leave event."),
+		}
+	}
+	if !event.StateKeyEquals(event.Sender()) {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("Event state key must match the event sender."),
 		}
 	}
 
