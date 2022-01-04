@@ -692,7 +692,7 @@ func (t *txnReq) processEvent(ctx context.Context, e *gomatrixserverlib.Event) e
 		},
 		api.DoNotSendToOtherServers,
 		nil,
-		true, // asynchronous
+		false,
 	)
 }
 
