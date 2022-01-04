@@ -175,7 +175,7 @@ func (r *Inputer) processRoomEvent(
 			"soft_fail": softfail,
 			"sender":    event.Sender(),
 		}).Debug("Stored rejected event")
-		return rejectionErr
+		return nil
 	}
 
 	switch input.Kind {
