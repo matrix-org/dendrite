@@ -119,7 +119,11 @@ func (r *Inputer) InputRoomEvents(
 				} else {
 					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
 				}
-				responses <- err
+				select {
+				case <-ctx.Done():
+				default:
+					responses <- err
+				}
 			})
 		}
 		for i := 0; i < len(request.InputRoomEvents); i++ {
