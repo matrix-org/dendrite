@@ -252,7 +252,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	}
 
 	r := loginType.Request()
-	if err := json.Unmarshal(bodyBytes, r); err != nil {
+	if err := json.Unmarshal([]byte(gjson.GetBytes(bodyBytes, "auth").Raw), r); err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),

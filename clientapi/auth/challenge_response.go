@@ -16,6 +16,7 @@ type GetAccountByChallengeResponse func(ctx context.Context, localpart, b64encod
 type ChallengeResponseRequest struct {
 	Login
 	Signature string `json:"signature"`
+	Session   string `json:"session"`
 }
 
 // LoginTypeChallengeResponse using public key encryption

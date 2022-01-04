@@ -2,8 +2,12 @@ package auth
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/tidwall/gjson"
 	"testing"
 
 	"github.com/matrix-org/dendrite/setup/config"
@@ -22,6 +26,8 @@ var (
 		DisplayName: "My Device",
 		ID:          "device_id_goes_here",
 	}
+	_, priv, _ = ed25519.GenerateKey(rand.Reader)
+	pub64      = base64.StdEncoding.EncodeToString(priv.Public().(ed25519.PublicKey))
 )
 
 func getAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error) {
@@ -33,7 +39,7 @@ func getAccountByPassword(ctx context.Context, localpart, plaintextPassword stri
 }
 
 func getAccountByChallengeResponse(ctx context.Context, localpart, b64encodedSignature, challenge string) (*api.Account, error) {
-	acc, ok := lookup[localpart+" "+b64encodedSignature+" "+challenge]
+	acc, ok := lookup[localpart+" "+pub64]
 	if !ok {
 		return nil, fmt.Errorf("unknown user/pubkey")
 	}
@@ -181,5 +187,93 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 		if errRes.Code != tc.wantRes.Code {
 			t.Errorf("got code %d want code %d for request: %s", errRes.Code, tc.wantRes.Code, string(tc.body))
 		}
+	}
+}
+
+func TestUserInteractiveDigitalSignatureLogin(t *testing.T) {
+	uia := setup()
+	// valid digital signature login succeeds when an account exists
+	lookup["alice "+pub64] = &api.Account{
+		Localpart:  "alice",
+		ServerName: serverName,
+		UserID:     fmt.Sprintf("@alice:%s", serverName),
+	}
+	getSessionReq := `{
+		"identifier": {
+			"type": "m.id.user",
+			"user": "alice"
+		},
+		"type": "m.login.challenge_response"
+	}`
+	_, errSessionRes := uia.Verify(ctx, []byte(getSessionReq), device)
+	byteSessionRes, _ := json.Marshal(errSessionRes)
+	var sessionRes struct {
+		Session string            `json:"session"`
+		Params  map[string]string `json:"params"`
+	}
+	jsonRes := gjson.GetBytes(byteSessionRes, "JSON").Raw
+	_ = json.Unmarshal([]byte(jsonRes), &sessionRes)
+
+	session := sessionRes.Session
+	sig := ed25519.Sign(priv, []byte(sessionRes.Params["challenge"]))
+	b64sig := base64.StdEncoding.EncodeToString(sig)
+	loginReq := fmt.Sprintf(`{
+		"auth": {
+			"session": "%s",
+			"type": "m.login.challenge_response",
+			"signature": "%s",
+			"identifier": {
+				"type": "m.id.user",
+				"user": "alice"}
+			},
+		"type": "m.login.challenge_response"
+	}`, session, b64sig)
+
+	_, err := uia.Verify(ctx, []byte(loginReq), device)
+	if err != nil {
+		t.Errorf("Verify failed but expected success for request: %s - got %+v", loginReq, err)
+	}
+}
+
+func TestUserInteractiveInvalidDigitalSignatureLogin(t *testing.T) {
+	uia := setup()
+	// login fails when no sig is provided
+	lookup["alice "+pub64] = &api.Account{
+		Localpart:  "alice",
+		ServerName: serverName,
+		UserID:     fmt.Sprintf("@alice:%s", serverName),
+	}
+	getSessionReq := `{
+		"identifier": {
+			"type": "m.id.user",
+			"user": "alice"
+		},
+		"type": "m.login.challenge_response"
+	}`
+	_, errSessionRes := uia.Verify(ctx, []byte(getSessionReq), device)
+	byteSessionRes, _ := json.Marshal(errSessionRes)
+	var sessionRes struct {
+		Session string            `json:"session"`
+		Params  map[string]string `json:"params"`
+	}
+	jsonRes := gjson.GetBytes(byteSessionRes, "JSON").Raw
+	_ = json.Unmarshal([]byte(jsonRes), &sessionRes)
+
+	session := sessionRes.Session
+	loginReq := fmt.Sprintf(`{
+		"auth": {
+			"session": "%s",
+			"type": "m.login.challenge_response",
+			"signature": "",
+			"identifier": {
+				"type": "m.id.user",
+				"user": "alice"}
+			},
+		"type": "m.login.challenge_response"
+	}`, session)
+
+	resp, err := uia.Verify(ctx, []byte(loginReq), device)
+	if err == nil {
+		t.Errorf("Verify succeeded but expected failure for request: %s - got %+v", loginReq, resp)
 	}
 }
