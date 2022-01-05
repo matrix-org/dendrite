@@ -292,7 +292,7 @@ func (config *Dendrite) Derive() error {
 
 // SetDefaults sets default config values if they are not explicitly set.
 func (c *Dendrite) Defaults(generate bool) {
-	c.Version = 1
+	c.Version = Version
 
 	c.Global.Defaults(generate)
 	c.ClientAPI.Defaults(generate)
