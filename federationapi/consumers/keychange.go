@@ -56,7 +56,7 @@ func NewKeyChangeConsumer(
 		ctx: process.Context(),
 		consumer: &internal.ContinualConsumer{
 			Process:        process,
-			ComponentName:  "federationsender/keychange",
+			ComponentName:  "federationapi/keychange",
 			Topic:          string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent)),
 			Consumer:       kafkaConsumer,
 			PartitionStore: store,
