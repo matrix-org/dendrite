@@ -23,10 +23,9 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
 	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey
-	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Database.ConnectionString = config.DataSource("file::memory:")
+	cfg.Global.JetStream.InMemory = true
 	cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
-	base := base.NewBaseDendrite(cfg, "Monolith", base.NoCacheMetrics)
+	base := base.NewBaseDendrite(cfg, "Monolith")
 	keyRing := &test.NopJSONVerifier{}
 	fsAPI := base.FederationAPIHTTPClient()
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.

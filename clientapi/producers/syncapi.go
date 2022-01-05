@@ -17,39 +17,42 @@ package producers
 import (
 	"encoding/json"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 // SyncAPIProducer produces events for the sync API server to consume
 type SyncAPIProducer struct {
-	Topic    string
-	Producer sarama.SyncProducer
+	Topic     string
+	JetStream nats.JetStreamContext
 }
 
 // SendData sends account data to the sync API server
 func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string) error {
-	var m sarama.ProducerMessage
+	m := &nats.Msg{
+		Subject: p.Topic,
+		Header:  nats.Header{},
+	}
+	m.Header.Set(jetstream.UserID, userID)
 
 	data := eventutil.AccountData{
 		RoomID: roomID,
 		Type:   dataType,
 	}
-	value, err := json.Marshal(data)
+	var err error
+	m.Data, err = json.Marshal(data)
 	if err != nil {
 		return err
 	}
 
-	m.Topic = string(p.Topic)
-	m.Key = sarama.StringEncoder(userID)
-	m.Value = sarama.ByteEncoder(value)
 	log.WithFields(log.Fields{
 		"user_id":   userID,
 		"room_id":   roomID,
 		"data_type": dataType,
 	}).Infof("Producing to topic '%s'", p.Topic)
 
-	_, _, err = p.Producer.SendMessage(&m)
+	_, err = p.JetStream.PublishMsg(m)
 	return err
 }

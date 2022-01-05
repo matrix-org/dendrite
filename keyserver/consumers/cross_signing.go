@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -50,7 +51,7 @@ func NewOutputCrossSigningKeyUpdateConsumer(
 	consumer := internal.ContinualConsumer{
 		Process:        process,
 		ComponentName:  "keyserver/keyserver",
-		Topic:          cfg.Global.Kafka.TopicFor(config.TopicOutputKeyChangeEvent),
+		Topic:          cfg.Global.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
 		Consumer:       kafkaConsumer,
 		PartitionStore: keyDB,
 	}
