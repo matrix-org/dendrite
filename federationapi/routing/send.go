@@ -884,6 +884,8 @@ func (t *txnReq) processEventWithMissingState(
 		resolvedState,
 		backwardsExtremity.Headered(roomVersion),
 		hadEvents,
+		// Send the events to the roomserver asynchronously, so they will be
+		// processed when the roomserver is able, without blocking here.
 		true,
 	)
 	if err != nil {
@@ -905,6 +907,8 @@ func (t *txnReq) processEventWithMissingState(
 		append(headeredNewEvents, e.Headered(roomVersion)),
 		api.DoNotSendToOtherServers,
 		nil,
+		// Send the events to the roomserver asynchronously, so they will be
+		// processed when the roomserver is able, without blocking here.
 		true,
 	); err != nil {
 		return fmt.Errorf("api.SendEvents: %w", err)
