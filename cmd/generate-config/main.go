@@ -16,7 +16,9 @@ func main() {
 	dbURI := flag.String("db", "", "The DB URI to use for all components if not SQLite files")
 	flag.Parse()
 
-	cfg := &config.Dendrite{}
+	cfg := &config.Dendrite{
+		Version: config.Version,
+	}
 	cfg.Defaults(true)
 	if *serverName != "" {
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
