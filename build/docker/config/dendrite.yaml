@@ -28,7 +28,7 @@
 # connection can be idle in seconds - a negative value is unlimited.
 
 # The version of the configuration file. 
-version: 1
+version: 2
 
 # Global Matrix configuration. This configuration applies to all components.
 global:

@@ -40,7 +40,7 @@ var keyIDRegexp = regexp.MustCompile("^ed25519:[a-zA-Z0-9_]+$")
 
 // Version is the current version of the config format.
 // This will change whenever we make breaking changes to the config format.
-const Version = 1
+const Version = 2
 
 // Dendrite contains all the config used by a dendrite process.
 // Relative paths are resolved relative to the current working directory
