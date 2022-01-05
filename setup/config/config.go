@@ -421,7 +421,11 @@ func (config *Dendrite) check(_ bool) error { // monolithic
 
 	if config.Version != Version {
 		configErrs.Add(fmt.Sprintf(
-			"unknown config version %q, expected %q", config.Version, Version,
+			"config version is %q, expected %q - this means that the format of the configuration "+
+				"file has changed in some significant way, so please revisit the sample config "+
+				"and ensure you are not missing any important options that may have been added "+
+				"or changed recently!",
+			config.Version, Version,
 		))
 		return configErrs
 	}
