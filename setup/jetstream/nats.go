@@ -67,7 +67,7 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (nats.JetStreamContex
 		return nil, nil, nil
 	}
 
-	for _, stream := range streams {
+	for _, stream := range streams { // streams are defined in streams.go
 		name := cfg.TopicFor(stream.Name)
 		info, err := s.StreamInfo(name)
 		if err != nil && err != natsclient.ErrStreamNotFound {
