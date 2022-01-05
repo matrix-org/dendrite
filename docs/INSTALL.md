@@ -175,7 +175,8 @@ for HTTPS connections on port 8448:
 ```
 
 If the `jetstream` section of the configuration contains no `addresses` but does
-contain a `store_dir`, 
+contain a `store_dir`, Dendrite will start up a built-in NATS JetStream node
+automatically, eliminating the need to run a separate NATS server.
 
 ## Starting a polylith deployment
 
