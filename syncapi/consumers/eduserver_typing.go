@@ -15,6 +15,7 @@
 package consumers
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/getsentry/sentry-go"
@@ -32,6 +33,7 @@ import (
 
 // OutputTypingEventConsumer consumes events that originated in the EDU server.
 type OutputTypingEventConsumer struct {
+	ctx       context.Context
 	jetstream nats.JetStreamContext
 	topic     string
 	eduCache  *cache.EDUCache
@@ -51,6 +53,7 @@ func NewOutputTypingEventConsumer(
 	stream types.StreamProvider,
 ) *OutputTypingEventConsumer {
 	return &OutputTypingEventConsumer{
+		ctx:       process.Context(),
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 		eduCache:  eduCache,
@@ -66,35 +69,36 @@ func (s *OutputTypingEventConsumer) Start() error {
 }
 
 func (s *OutputTypingEventConsumer) onMessage(msg *nats.Msg) {
-	var output api.OutputTypingEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("EDU server output log: message parse failure")
-		sentry.CaptureException(err)
-		_ = msg.Ack()
-		return
-	}
+	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
+		var output api.OutputTypingEvent
+		if err := json.Unmarshal(msg.Data, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("EDU server output log: message parse failure")
+			sentry.CaptureException(err)
+			return true
+		}
 
-	log.WithFields(log.Fields{
-		"room_id": output.Event.RoomID,
-		"user_id": output.Event.UserID,
-		"typing":  output.Event.Typing,
-	}).Debug("received data from EDU server")
+		log.WithFields(log.Fields{
+			"room_id": output.Event.RoomID,
+			"user_id": output.Event.UserID,
+			"typing":  output.Event.Typing,
+		}).Debug("received data from EDU server")
 
-	var typingPos types.StreamPosition
-	typingEvent := output.Event
-	if typingEvent.Typing {
-		typingPos = types.StreamPosition(
-			s.eduCache.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime),
-		)
-	} else {
-		typingPos = types.StreamPosition(
-			s.eduCache.RemoveUser(typingEvent.UserID, typingEvent.RoomID),
-		)
-	}
+		var typingPos types.StreamPosition
+		typingEvent := output.Event
+		if typingEvent.Typing {
+			typingPos = types.StreamPosition(
+				s.eduCache.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime),
+			)
+		} else {
+			typingPos = types.StreamPosition(
+				s.eduCache.RemoveUser(typingEvent.UserID, typingEvent.RoomID),
+			)
+		}
 
-	s.stream.Advance(typingPos)
-	s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
+		s.stream.Advance(typingPos)
+		s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
 
-	_ = msg.Ack()
+		return true
+	})
 }

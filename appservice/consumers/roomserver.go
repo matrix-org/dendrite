@@ -32,6 +32,7 @@ import (
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
+	ctx          context.Context
 	jetstream    nats.JetStreamContext
 	topic        string
 	asDB         storage.Database
@@ -51,6 +52,7 @@ func NewOutputRoomEventConsumer(
 	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
+		ctx:          process.Context(),
 		jetstream:    js,
 		topic:        cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent),
 		asDB:         appserviceDB,
@@ -69,30 +71,30 @@ func (s *OutputRoomEventConsumer) Start() error {
 // onMessage is called when the appservice component receives a new event from
 // the room server output log.
 func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
-	// Parse out the event JSON
-	var output api.OutputEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		_ = msg.Ack()
-		return
-	}
+	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
+		// Parse out the event JSON
+		var output api.OutputEvent
+		if err := json.Unmarshal(msg.Data, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("roomserver output log: message parse failure")
+			return true
+		}
 
-	if output.Type != api.OutputTypeNewRoomEvent {
-		_ = msg.Ack()
-		return
-	}
+		if output.Type != api.OutputTypeNewRoomEvent {
+			return true
+		}
 
-	events := []*gomatrixserverlib.HeaderedEvent{output.NewRoomEvent.Event}
-	events = append(events, output.NewRoomEvent.AddStateEvents...)
+		events := []*gomatrixserverlib.HeaderedEvent{output.NewRoomEvent.Event}
+		events = append(events, output.NewRoomEvent.AddStateEvents...)
 
-	// Send event to any relevant application services
-	if err := s.filterRoomserverEvents(context.TODO(), events); err != nil {
-		log.WithError(err).Errorf("roomserver output log: filter error")
-		return
-	}
+		// Send event to any relevant application services
+		if err := s.filterRoomserverEvents(context.TODO(), events); err != nil {
+			log.WithError(err).Errorf("roomserver output log: filter error")
+			return true
+		}
 
-	_ = msg.Ack()
+		return true
+	})
 }
 
 // filterRoomserverEvents takes in events and decides whether any of them need

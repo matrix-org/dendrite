@@ -32,6 +32,7 @@ import (
 
 // OutputReceiptEventConsumer consumes events that originated in the EDU server.
 type OutputReceiptEventConsumer struct {
+	ctx       context.Context
 	jetstream nats.JetStreamContext
 	topic     string
 	db        storage.Database
@@ -50,6 +51,7 @@ func NewOutputReceiptEventConsumer(
 	stream types.StreamProvider,
 ) *OutputReceiptEventConsumer {
 	return &OutputReceiptEventConsumer{
+		ctx:       process.Context(),
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 		db:        store,
@@ -65,30 +67,31 @@ func (s *OutputReceiptEventConsumer) Start() error {
 }
 
 func (s *OutputReceiptEventConsumer) onMessage(msg *nats.Msg) {
-	var output api.OutputReceiptEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("EDU server output log: message parse failure")
-		sentry.CaptureException(err)
-		_ = msg.Ack()
-		return
-	}
+	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
+		var output api.OutputReceiptEvent
+		if err := json.Unmarshal(msg.Data, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("EDU server output log: message parse failure")
+			sentry.CaptureException(err)
+			return true
+		}
 
-	streamPos, err := s.db.StoreReceipt(
-		context.TODO(),
-		output.RoomID,
-		output.Type,
-		output.UserID,
-		output.EventID,
-		output.Timestamp,
-	)
-	if err != nil {
-		sentry.CaptureException(err)
-		return
-	}
+		streamPos, err := s.db.StoreReceipt(
+			s.ctx,
+			output.RoomID,
+			output.Type,
+			output.UserID,
+			output.EventID,
+			output.Timestamp,
+		)
+		if err != nil {
+			sentry.CaptureException(err)
+			return true
+		}
 
-	s.stream.Advance(streamPos)
-	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
+		s.stream.Advance(streamPos)
+		s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
 
-	_ = msg.Ack()
+		return true
+	})
 }

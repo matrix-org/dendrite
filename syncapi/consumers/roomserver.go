@@ -34,6 +34,7 @@ import (
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
+	ctx          context.Context
 	cfg          *config.SyncAPI
 	rsAPI        api.RoomserverInternalAPI
 	jetstream    nats.JetStreamContext
@@ -56,6 +57,7 @@ func NewOutputRoomEventConsumer(
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
+		ctx:          process.Context(),
 		cfg:          cfg,
 		jetstream:    js,
 		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
@@ -77,55 +79,53 @@ func (s *OutputRoomEventConsumer) Start() error {
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
-	// Parse out the event JSON
-	var err error
-	var output api.OutputEvent
-	if err = json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		_ = msg.Ack()
-		return
-	}
-
-	switch output.Type {
-	case api.OutputTypeNewRoomEvent:
-		// Ignore redaction events. We will add them to the database when they are
-		// validated (when we receive OutputTypeRedactedEvent)
-		event := output.NewRoomEvent.Event
-		if event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil {
-			// in the special case where the event redacts itself, just pass the message through because
-			// we will never see the other part of the pair
-			if event.Redacts() != event.EventID() {
-				_ = msg.Ack()
-				return
-			}
+	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
+		// Parse out the event JSON
+		var err error
+		var output api.OutputEvent
+		if err = json.Unmarshal(msg.Data, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("roomserver output log: message parse failure")
+			return true
 		}
-		err = s.onNewRoomEvent(context.TODO(), *output.NewRoomEvent)
-	case api.OutputTypeOldRoomEvent:
-		err = s.onOldRoomEvent(context.TODO(), *output.OldRoomEvent)
-	case api.OutputTypeNewInviteEvent:
-		s.onNewInviteEvent(context.TODO(), *output.NewInviteEvent)
-	case api.OutputTypeRetireInviteEvent:
-		s.onRetireInviteEvent(context.TODO(), *output.RetireInviteEvent)
-	case api.OutputTypeNewPeek:
-		s.onNewPeek(context.TODO(), *output.NewPeek)
-	case api.OutputTypeRetirePeek:
-		s.onRetirePeek(context.TODO(), *output.RetirePeek)
-	case api.OutputTypeRedactedEvent:
-		err = s.onRedactEvent(context.TODO(), *output.RedactedEvent)
-	default:
-		log.WithField("type", output.Type).Debug(
-			"roomserver output log: ignoring unknown output type",
-		)
-		_ = msg.Ack()
-	}
-	if err != nil {
-		log.WithError(err).Error("roomserver output log: failed to process event")
-		_ = msg.Nak()
-		return
-	}
 
-	_ = msg.Ack()
+		switch output.Type {
+		case api.OutputTypeNewRoomEvent:
+			// Ignore redaction events. We will add them to the database when they are
+			// validated (when we receive OutputTypeRedactedEvent)
+			event := output.NewRoomEvent.Event
+			if event.Type() == gomatrixserverlib.MRoomRedaction && event.StateKey() == nil {
+				// in the special case where the event redacts itself, just pass the message through because
+				// we will never see the other part of the pair
+				if event.Redacts() != event.EventID() {
+					return true
+				}
+			}
+			err = s.onNewRoomEvent(s.ctx, *output.NewRoomEvent)
+		case api.OutputTypeOldRoomEvent:
+			err = s.onOldRoomEvent(s.ctx, *output.OldRoomEvent)
+		case api.OutputTypeNewInviteEvent:
+			s.onNewInviteEvent(s.ctx, *output.NewInviteEvent)
+		case api.OutputTypeRetireInviteEvent:
+			s.onRetireInviteEvent(s.ctx, *output.RetireInviteEvent)
+		case api.OutputTypeNewPeek:
+			s.onNewPeek(s.ctx, *output.NewPeek)
+		case api.OutputTypeRetirePeek:
+			s.onRetirePeek(s.ctx, *output.RetirePeek)
+		case api.OutputTypeRedactedEvent:
+			err = s.onRedactEvent(s.ctx, *output.RedactedEvent)
+		default:
+			log.WithField("type", output.Type).Debug(
+				"roomserver output log: ignoring unknown output type",
+			)
+		}
+		if err != nil {
+			log.WithError(err).Error("roomserver output log: failed to process event")
+			return false
+		}
+
+		return true
+	})
 }
 
 func (s *OutputRoomEventConsumer) onRedactEvent(
