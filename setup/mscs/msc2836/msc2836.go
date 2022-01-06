@@ -649,7 +649,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836Event
 		})
 	}
 	// we've got the data by this point so use a background context
-	err = roomserver.SendInputRoomEvents(context.Background(), rc.rsAPI, ires)
+	err = roomserver.SendInputRoomEvents(context.Background(), rc.rsAPI, ires, false)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
 	}

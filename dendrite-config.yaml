@@ -28,7 +28,7 @@
 # connection can be idle in seconds - a negative value is unlimited.
 
 # The version of the configuration file. 
-version: 1
+version: 2
 
 # Global Matrix configuration. This configuration applies to all components.
 global:
@@ -68,34 +68,27 @@ global:
   # to other servers and the federation API will not be exposed.
   disable_federation: false
 
-  # Configuration for Kafka/Naffka.
-  kafka:
-    # List of Kafka broker addresses to connect to. This is not needed if using
-    # Naffka in monolith mode.
+  # Configuration for NATS JetStream
+  jetstream:
+    # A list of NATS Server addresses to connect to. If none are specified, an
+    # internal NATS server will be started automatically when running Dendrite
+    # in monolith mode. It is required to specify the address of at least one
+    # NATS Server node if running in polylith mode.
     addresses:
-      - localhost:2181
+      # - localhost:4222
 
-    # The prefix to use for Kafka topic names for this homeserver. Change this only if
-    # you are running more than one Dendrite homeserver on the same Kafka deployment.
+    # Keep all NATS streams in memory, rather than persisting it to the storage
+    # path below. This option is present primarily for integration testing and
+    # should not be used on a real world Dendrite deployment.
+    in_memory: false
+
+    # Persistent directory to store JetStream streams in. This directory 
+    # should be preserved across Dendrite restarts.
+    storage_path: ./
+
+    # The prefix to use for stream names for this homeserver - really only
+    # useful if running more than one Dendrite on the same NATS deployment.
     topic_prefix: Dendrite
-
-    # Whether to use Naffka instead of Kafka. This is only available in monolith
-    # mode, but means that you can run a single-process server without requiring
-    # Kafka.
-    use_naffka: true
-
-    # The max size a Kafka message is allowed to use.
-    # You only need to change this value, if you encounter issues with too large messages.
-    # Must be less than/equal to "max.message.bytes" configured in Kafka.
-    # Defaults to 8388608 bytes.
-    # max_message_bytes: 8388608
-
-    # Naffka database options. Not required when using Kafka.
-    naffka_database:
-      connection_string: file:naffka.db
-      max_open_conns: 10
-      max_idle_conns: 2
-      conn_max_lifetime: -1
 
   # Configuration for Prometheus metric collection.
   metrics:
@@ -121,8 +114,8 @@ global:
 # Configuration for the Appservice API.
 app_service_api:
   internal_api:
-    listen: http://localhost:7777
-    connect: http://localhost:7777
+    listen: http://localhost:7777  # Only used in polylith deployments
+    connect: http://localhost:7777 # Only used in polylith deployments
   database:
     connection_string: file:appservice.db
     max_open_conns: 10
@@ -140,8 +133,8 @@ app_service_api:
 # Configuration for the Client API.
 client_api:
   internal_api:
-    listen: http://localhost:7771
-    connect: http://localhost:7771
+    listen: http://localhost:7771  # Only used in polylith deployments
+    connect: http://localhost:7771 # Only used in polylith deployments
   external_api:
     listen: http://[::]:8071
 
@@ -181,14 +174,14 @@ client_api:
 # Configuration for the EDU server.
 edu_server:
   internal_api:
-    listen: http://localhost:7778
-    connect: http://localhost:7778
+    listen: http://localhost:7778  # Only used in polylith deployments
+    connect: http://localhost:7778 # Only used in polylith deployments
 
 # Configuration for the Federation API.
 federation_api:
   internal_api:
-    listen: http://localhost:7772
-    connect: http://localhost:7772
+    listen: http://localhost:7772  # Only used in polylith deployments
+    connect: http://localhost:7772 # Only used in polylith deployments
   external_api:
     listen: http://[::]:8072
   database:
@@ -237,8 +230,8 @@ federation_api:
 # Configuration for the Key Server (for end-to-end encryption).
 key_server:
   internal_api:
-    listen: http://localhost:7779
-    connect: http://localhost:7779
+    listen: http://localhost:7779  # Only used in polylith deployments
+    connect: http://localhost:7779 # Only used in polylith deployments
   database:
     connection_string: file:keyserver.db
     max_open_conns: 10
@@ -248,8 +241,8 @@ key_server:
 # Configuration for the Media API.
 media_api:
   internal_api:
-    listen: http://localhost:7774
-    connect: http://localhost:7774
+    listen: http://localhost:7774  # Only used in polylith deployments
+    connect: http://localhost:7774 # Only used in polylith deployments
   external_api:
     listen: http://[::]:8074
   database:
@@ -300,8 +293,8 @@ mscs:
 # Configuration for the Room Server.
 room_server:
   internal_api:
-    listen: http://localhost:7770
-    connect: http://localhost:7770
+    listen: http://localhost:7770  # Only used in polylith deployments
+    connect: http://localhost:7770 # Only used in polylith deployments
   database:
     connection_string: file:roomserver.db
     max_open_conns: 10
@@ -311,8 +304,8 @@ room_server:
 # Configuration for the Sync API.
 sync_api:
   internal_api:
-    listen: http://localhost:7773
-    connect: http://localhost:7773
+    listen: http://localhost:7773  # Only used in polylith deployments
+    connect: http://localhost:7773 # Only used in polylith deployments
   external_api:
     listen: http://[::]:8073
   database:
@@ -336,8 +329,8 @@ user_api:
   # This value can be low if performing tests or on embedded Dendrite instances (e.g WASM builds)
   # bcrypt_cost: 10
   internal_api:
-    listen: http://localhost:7781
-    connect: http://localhost:7781
+    listen: http://localhost:7781  # Only used in polylith deployments
+    connect: http://localhost:7781 # Only used in polylith deployments
   account_database:
     connection_string: file:userapi_accounts.db
     max_open_conns: 10
@@ -370,9 +363,10 @@ tracing:
     baggage_restrictions: null
     throttler: null
 
-# Logging configuration, in addition to the standard logging that is sent to
-# stdout by Dendrite.
+# Logging configuration
 logging:
+- type: std
+  level: info
 - type: file
   level: info
   params:
