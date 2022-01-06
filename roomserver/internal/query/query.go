@@ -457,6 +457,21 @@ func (r *Queryer) QueryStateAndAuthChain(
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
+	// handle this entirely separately to the other case so we don't have to pull out
+	// the entire current state of the room
+	// TODO: this probably means it should be a different query operation...
+	if request.OnlyFetchAuthChain {
+		var authEvents []*gomatrixserverlib.Event
+		authEvents, err = GetAuthChain(ctx, r.DB.EventsFromIDs, request.AuthEventIDs)
+		if err != nil {
+			return err
+		}
+		for _, event := range authEvents {
+			response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
+		}
+		return nil
+	}
+
 	var stateEvents []*gomatrixserverlib.Event
 	stateEvents, err = r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
 	if err != nil {
