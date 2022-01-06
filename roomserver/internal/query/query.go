@@ -468,6 +468,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 		for _, event := range authEvents {
 			response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
 		}
+		return nil
 	}
 
 	var stateEvents []*gomatrixserverlib.Event
