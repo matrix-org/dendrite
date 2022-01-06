@@ -39,58 +39,61 @@ func NewFederationInternalAPI(
 	statistics *statistics.Statistics,
 	caches *caching.Caches,
 	queues *queue.OutgoingQueues,
+	keyRing *gomatrixserverlib.KeyRing,
 ) *FederationInternalAPI {
 	serverKeyDB, err := cache.NewKeyDatabase(db, caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to set up caching wrapper for server key database")
 	}
 
-	keyRing := &gomatrixserverlib.KeyRing{
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{},
-		KeyDatabase: serverKeyDB,
-	}
-
-	addDirectFetcher := func() {
-		keyRing.KeyFetchers = append(
-			keyRing.KeyFetchers,
-			&gomatrixserverlib.DirectKeyFetcher{
-				Client: federation,
-			},
-		)
-	}
-
-	if cfg.PreferDirectFetch {
-		addDirectFetcher()
-	} else {
-		defer addDirectFetcher()
-	}
-
-	var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
-	for _, ps := range cfg.KeyPerspectives {
-		perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
-			PerspectiveServerName: ps.ServerName,
-			PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},
-			Client:                federation,
+	if keyRing == nil {
+		keyRing = &gomatrixserverlib.KeyRing{
+			KeyFetchers: []gomatrixserverlib.KeyFetcher{},
+			KeyDatabase: serverKeyDB,
 		}
 
-		for _, key := range ps.Keys {
-			rawkey, err := b64e.DecodeString(key.PublicKey)
-			if err != nil {
-				logrus.WithError(err).WithFields(logrus.Fields{
-					"server_name": ps.ServerName,
-					"public_key":  key.PublicKey,
-				}).Warn("Couldn't parse perspective key")
-				continue
+		addDirectFetcher := func() {
+			keyRing.KeyFetchers = append(
+				keyRing.KeyFetchers,
+				&gomatrixserverlib.DirectKeyFetcher{
+					Client: federation,
+				},
+			)
+		}
+
+		if cfg.PreferDirectFetch {
+			addDirectFetcher()
+		} else {
+			defer addDirectFetcher()
+		}
+
+		var b64e = base64.StdEncoding.WithPadding(base64.NoPadding)
+		for _, ps := range cfg.KeyPerspectives {
+			perspective := &gomatrixserverlib.PerspectiveKeyFetcher{
+				PerspectiveServerName: ps.ServerName,
+				PerspectiveServerKeys: map[gomatrixserverlib.KeyID]ed25519.PublicKey{},
+				Client:                federation,
 			}
-			perspective.PerspectiveServerKeys[key.KeyID] = rawkey
+
+			for _, key := range ps.Keys {
+				rawkey, err := b64e.DecodeString(key.PublicKey)
+				if err != nil {
+					logrus.WithError(err).WithFields(logrus.Fields{
+						"server_name": ps.ServerName,
+						"public_key":  key.PublicKey,
+					}).Warn("Couldn't parse perspective key")
+					continue
+				}
+				perspective.PerspectiveServerKeys[key.KeyID] = rawkey
+			}
+
+			keyRing.KeyFetchers = append(keyRing.KeyFetchers, perspective)
+
+			logrus.WithFields(logrus.Fields{
+				"server_name":     ps.ServerName,
+				"num_public_keys": len(ps.Keys),
+			}).Info("Enabled perspective key fetcher")
 		}
-
-		keyRing.KeyFetchers = append(keyRing.KeyFetchers, perspective)
-
-		logrus.WithFields(logrus.Fields{
-			"server_name":     ps.ServerName,
-			"num_public_keys": len(ps.Keys),
-		}).Info("Enabled perspective key fetcher")
 	}
 
 	return &FederationInternalAPI{

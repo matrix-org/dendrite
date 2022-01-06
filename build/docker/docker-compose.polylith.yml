@@ -1,13 +1,51 @@
 version: "3.4"
 services:
+  postgres:
+    hostname: postgres
+    image: postgres:14
+    restart: always
+    volumes:
+      - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
+      # To persist your PostgreSQL databases outside of the Docker image, 
+      # to prevent data loss, modify the following ./path_to path:
+      - ./path_to/postgresql:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: itsasecret
+      POSTGRES_USER: dendrite
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dendrite"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  jetstream:
+    hostname: jetstream
+    image: nats:latest
+    command: |
+      --jetstream
+      --store_dir /var/lib/nats
+      --cluster_name Dendrite
+    volumes:
+      # To persist your NATS JetStream streams outside of the Docker image,
+      # prevent data loss, modify the following ./path_to path:
+      - ./path_to/nats:/var/lib/nats
+    networks:
+      - internal
+
   client_api:
     hostname: client_api
     image: matrixdotorg/dendrite-polylith:latest
     command: clientapi
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
+    restart: unless-stopped
 
   media_api:
     hostname: media_api
@@ -18,6 +56,7 @@ services:
       - ./media:/var/dendrite/media
     networks:
       - internal
+    restart: unless-stopped
 
   sync_api:
     hostname: sync_api
@@ -25,8 +64,12 @@ services:
     command: syncapi
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
+    restart: unless-stopped
 
   room_server:
     hostname: room_server
@@ -34,8 +77,12 @@ services:
     command: roomserver
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
+    restart: unless-stopped
 
   edu_server:
     hostname: edu_server
@@ -43,8 +90,11 @@ services:
     command: eduserver
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
     networks:
       - internal
+    restart: unless-stopped
 
   federation_api:
     hostname: federation_api
@@ -52,8 +102,12 @@ services:
     command: federationapi
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
+    restart: unless-stopped
       
   key_server:
     hostname: key_server
@@ -61,8 +115,12 @@ services:
     command: keyserver
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
+    restart: unless-stopped
       
   user_api:
     hostname: user_api
@@ -70,8 +128,12 @@ services:
     command: userapi
     volumes:
       - ./config:/etc/dendrite
+    depends_on:
+      - jetstream
+      - postgres
     networks:
       - internal
+    restart: unless-stopped
 
   appservice_api:
     hostname: appservice_api
@@ -82,8 +144,11 @@ services:
     networks:
       - internal
     depends_on:
+      - jetstream
+      - postgres
       - room_server
       - user_api
+    restart: unless-stopped
 
 networks:
   internal:

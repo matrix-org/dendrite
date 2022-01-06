@@ -20,12 +20,10 @@ import (
 	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
 
 type Database interface {
-	internal.PartitionStorer
 	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
 	SetPassword(ctx context.Context, localpart string, plaintextPassword string) error

@@ -1,5 +1,25 @@
 version: "3.4"
 services:
+  postgres:
+    hostname: postgres
+    image: postgres:14
+    restart: always
+    volumes:
+      - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
+      # To persist your PostgreSQL databases outside of the Docker image, 
+      # to prevent data loss, modify the following ./path_to path:
+      - ./path_to/postgresql:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: itsasecret
+      POSTGRES_USER: dendrite
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dendrite"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
   monolith:
     hostname: monolith
     image: matrixdotorg/dendrite-monolith:latest
@@ -13,8 +33,11 @@ services:
     volumes:
       - ./config:/etc/dendrite
       - ./media:/var/dendrite/media
+    depends_on:
+      - postgres
     networks:
       - internal
+    restart: unless-stopped
 
 networks:
   internal:
