@@ -24,7 +24,7 @@ func RoomServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	asAPI := base.AppserviceHTTPClient()
 	fsAPI := base.FederationAPIHTTPClient()
 	rsAPI := roomserver.NewInternalAPI(base)
-	rsAPI.SetFederationAPI(fsAPI)
+	rsAPI.SetFederationAPI(fsAPI, fsAPI.KeyRing())
 	rsAPI.SetAppserviceAPI(asAPI)
 	roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
 

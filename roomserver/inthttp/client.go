@@ -83,12 +83,8 @@ func NewRoomserverClient(
 	}, nil
 }
 
-// SetKeyring no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetKeyring(keyRing *gomatrixserverlib.KeyRing) {
-}
-
 // SetFederationInputAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.FederationInternalAPI) {
+func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
 }
 
 // SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario

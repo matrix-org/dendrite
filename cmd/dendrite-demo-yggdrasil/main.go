@@ -89,7 +89,7 @@ func main() {
 		cfg = setup.ParseFlags(true)
 	} else {
 		cfg.Defaults(true)
-		cfg.Global.Kafka.UseNaffka = true
+  	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
 		cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 		cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
@@ -136,11 +136,10 @@ func main() {
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, base.Caches, true,
+		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
-	rsComponent.SetFederationAPI(fsAPI)
-	rsComponent.SetKeyring(keyRing)
+	rsComponent.SetFederationAPI(fsAPI, keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

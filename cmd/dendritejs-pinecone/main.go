@@ -170,8 +170,7 @@ func startup() {
 	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
-	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Database.ConnectionString = "file:/idb/dendritejs_naffka.db"
+	cfg.Global.JetStream.StoragePath = "file:/idb/dendritejs/"
 	cfg.Global.TrustedIDServers = []string{}
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.PrivateKey = sk
@@ -198,9 +197,8 @@ func startup() {
 		base, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
-	fedSenderAPI := federationapi.NewInternalAPI(base, federation, rsAPI, base.Caches, true)
-	rsAPI.SetFederationAPI(fedSenderAPI)
-	rsAPI.SetKeyring(keyRing)
+	fedSenderAPI := federationapi.NewInternalAPI(base, federation, rsAPI, base.Caches, keyRing, true)
+	rsAPI.SetFederationAPI(fedSenderAPI, keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

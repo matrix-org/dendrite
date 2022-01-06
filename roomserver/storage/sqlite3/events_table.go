@@ -49,7 +49,8 @@ const eventsSchema = `
 const insertEventSQL = `
 	INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)
 	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	  ON CONFLICT DO NOTHING;
+	  ON CONFLICT DO NOTHING
+	  RETURNING event_nid, state_snapshot_nid;
 `
 
 const selectEventSQL = "" +
@@ -161,20 +162,13 @@ func (s *eventStatements) InsertEvent(
 ) (types.EventNID, types.StateSnapshotNID, error) {
 	// attempt to insert: the last_row_id is the event NID
 	var eventNID int64
+	var stateNID int64
 	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
-	result, err := insertStmt.ExecContext(
+	err := insertStmt.QueryRowContext(
 		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
 		eventID, referenceSHA256, eventNIDsAsArray(authEventNIDs), depth, isRejected,
-	)
-	if err != nil {
-		return 0, 0, err
-	}
-	modified, err := result.RowsAffected()
-	if modified == 0 && err == nil {
-		return 0, 0, sql.ErrNoRows
-	}
-	eventNID, err = result.LastInsertId()
-	return types.EventNID(eventNID), 0, err
+	).Scan(&eventNID, &stateNID)
+	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
 func (s *eventStatements) SelectEvent(

@@ -110,6 +110,7 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 		[]*gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
 		cfg.Matrix.ServerName,
 		nil,
+		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()

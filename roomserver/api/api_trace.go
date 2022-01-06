@@ -17,12 +17,8 @@ type RoomserverInternalAPITrace struct {
 	Impl RoomserverInternalAPI
 }
 
-func (t *RoomserverInternalAPITrace) SetKeyring(keyRing *gomatrixserverlib.KeyRing) {
-	t.Impl.SetKeyring(keyRing)
-}
-
-func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI) {
-	t.Impl.SetFederationAPI(fsAPI)
+func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
+	t.Impl.SetFederationAPI(fsAPI, keyRing)
 }
 
 func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
