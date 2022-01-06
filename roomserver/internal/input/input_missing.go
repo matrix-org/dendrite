@@ -56,7 +56,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// - fail to fill in the gap and tell us to fetch state at the new backwards extremity, and to not terminate the transaction
 	newEvents, err := t.getMissingEvents(ctx, e, roomVersion)
 	if err != nil {
-		return err
+		return fmt.Errorf("t.getMissingEvents: %w", err)
 	}
 	if len(newEvents) == 0 {
 		return nil
@@ -369,6 +369,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 
 	var missingResp *gomatrixserverlib.RespMissingEvents
 	for _, server := range t.servers {
+		logger.Infof("Trying server %q for missing events", server)
 		var m gomatrixserverlib.RespMissingEvents
 		if m, err = t.federation.LookupMissingEvents(ctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
 			Limit: 20,

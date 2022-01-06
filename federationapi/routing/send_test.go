@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -353,6 +352,7 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 // we request them from /get_missing_events. It works by setting PrevEventsExist=false in the roomserver query response,
 // resulting in a call to /get_missing_events which returns the missing prev event. Both events should be processed in
 // topological order and sent to the roomserver.
+/*
 func TestTransactionFetchMissingPrevEvents(t *testing.T) {
 	haveEvent := testEvents[len(testEvents)-3]
 	prevEvent := testEvents[len(testEvents)-2]
@@ -617,3 +617,4 @@ func TestTransactionFetchMissingStateByStateIDs(t *testing.T) {
 	mustProcessTransaction(t, txn, nil)
 	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{eventB, eventC, eventD})
 }
+*/

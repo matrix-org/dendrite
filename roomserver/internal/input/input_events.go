@@ -82,6 +82,7 @@ func (r *Inputer) processRoomEvent(
 		"room_id":  event.RoomID(),
 		"type":     event.Type(),
 	})
+	logger.Println("XXX: Processing event")
 
 	// if we have already got this event then do not process it again, if the input kind is an outlier.
 	// Outliers contain no extra information which may warrant a re-processing.
@@ -113,7 +114,7 @@ func (r *Inputer) processRoomEvent(
 			AuthEventIDs: event.AuthEventIDs(),
 			PrevEventIDs: event.PrevEventIDs(),
 		}
-		if err := r.Queryer.QueryMissingAuthPrevEvents(ctx, missingReq, missingRes); err != nil {
+		if err = r.Queryer.QueryMissingAuthPrevEvents(ctx, missingReq, missingRes); err != nil {
 			return fmt.Errorf("r.Queryer.QueryMissingAuthPrevEvents: %w", err)
 		}
 	}
@@ -121,7 +122,7 @@ func (r *Inputer) processRoomEvent(
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
 			RoomID: event.RoomID(),
 		}
-		if err := r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
+		if err = r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
 			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
 		}
 	}
@@ -132,7 +133,7 @@ func (r *Inputer) processRoomEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
 	logger.Println("Starting to check for missing auth events")
-	if err := r.checkForMissingAuthEvents(ctx, logger, input.Event, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+	if err = r.checkForMissingAuthEvents(ctx, logger, input.Event, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
 		return fmt.Errorf("r.checkForMissingAuthEvents: %w", err)
 	}
 	logger.Println("Checked for missing auth events")
@@ -159,7 +160,6 @@ func (r *Inputer) processRoomEvent(
 	if input.Kind == api.KindNew {
 		// Check that the event passes authentication checks based on the
 		// current room state.
-		var err error
 		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
 		if err != nil {
 			logger.WithError(err).Info("Error authing soft-failed event")
@@ -202,7 +202,6 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	if len(missingRes.MissingPrevEventIDs) > 0 {
-		logger.Println("Starting to check for missing prev events")
 		missingState := missingStateReq{
 			origin:     input.Origin,
 			inputer:    r,
@@ -216,9 +215,10 @@ func (r *Inputer) processRoomEvent(
 			haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 		}
 		if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), roomInfo.RoomVersion); err != nil {
-			return fmt.Errorf("r.checkForMissingPrevEvents: %w", err)
+			// return fmt.Errorf("r.checkForMissingPrevEvents: %w", err)
+			softfail = true
+			rejectionErr = fmt.Errorf("event %s has missing state %+v due to error: %s", input.Event.EventID(), missingRes.MissingPrevEventIDs, err)
 		}
-		logger.Println("Checked for missing prev events")
 	}
 
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
@@ -232,7 +232,7 @@ func (r *Inputer) processRoomEvent(
 
 	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
 	if isRejected || softfail {
-		logger.WithField("soft_fail", softfail).Debug("Stored rejected event")
+		logger.WithField("soft_fail", softfail).WithField("reason", rejectionErr).Debug("Stored rejected event")
 		return rejectionErr
 	}
 
@@ -318,9 +318,6 @@ func (r *Inputer) checkForMissingAuthEvents(
 	}
 
 	if len(unknown) > 0 {
-		logger.Printf("XXX: There are %d missing auth events", len(unknown))
-		logger.Printf("XXX: Asking servers %+v", servers)
-
 		var res gomatrixserverlib.RespEventAuth
 		var found bool
 		for _, serverName := range servers {
@@ -329,12 +326,10 @@ func (r *Inputer) checkForMissingAuthEvents(
 				logger.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
 				continue
 			}
-			logger.Printf("XXX: Server %q provided us with %d auth events", serverName, len(res.AuthEvents))
 			found = true
 			break
 		}
 		if !found {
-			logger.Printf("XXX: None of the %d servers provided us with auth events", len(servers))
 			return fmt.Errorf("no servers provided event auth")
 		}
 
