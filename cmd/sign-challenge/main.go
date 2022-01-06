@@ -19,8 +19,9 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 const usage = `Usage: %s

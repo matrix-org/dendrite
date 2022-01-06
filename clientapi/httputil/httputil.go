@@ -17,10 +17,11 @@ package httputil
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/matrix-org/dendrite/clientapi/auth"
 	"io/ioutil"
 	"net/http"
 	"unicode/utf8"
+
+	"github.com/matrix-org/dendrite/clientapi/auth"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/util"

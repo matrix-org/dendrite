@@ -2,13 +2,14 @@ package auth
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
-	"net/http"
 )
 
 type GetAccountByChallengeResponse func(ctx context.Context, localpart, b64encodedSignature, challenge string) (*api.Account, error)

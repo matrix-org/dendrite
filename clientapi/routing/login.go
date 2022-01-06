@@ -17,9 +17,10 @@ package routing
 import (
 	"context"
 	"fmt"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/httputil"

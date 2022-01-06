@@ -7,8 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"testing"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"

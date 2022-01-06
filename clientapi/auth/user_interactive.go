@@ -18,14 +18,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
-	"net/http"
-	"time"
 )
 
 // Type represents an auth type
