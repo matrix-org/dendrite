@@ -2,21 +2,23 @@
 
 Dendrite can be run in one of two configurations:
 
-* **Polylith mode**: A cluster of individual components, dealing with different
-  aspects of the Matrix protocol (see [WIRING.md](WIRING-Current.md)). Components communicate
-  with each other using internal HTTP APIs and [Apache Kafka](https://kafka.apache.org).
-  This will almost certainly be the preferred model for large-scale deployments.
-
 * **Monolith mode**: All components run in the same process. In this mode,
-   Kafka is completely optional and can instead be replaced with an in-process
-   lightweight implementation called [Naffka](https://github.com/matrix-org/naffka). This
-   will usually be the preferred model for low-volume, low-user or experimental deployments.
+   it is possible to run an in-process [NATS Server](https://github.com/nats-io/nats-server)
+   instead of running a standalone deployment. This will usually be the preferred model for
+   low-to-mid volume deployments, providing the best balance between performance and resource usage.
 
-For most deployments, it is **recommended to run in monolith mode with PostgreSQL databases**.
+* **Polylith mode**: A cluster of individual components running in their own processes, dealing
+  with different aspects of the Matrix protocol (see [WIRING.md](WIRING-Current.md)). Components
+  communicate with each other using internal HTTP APIs and [NATS Server](https://github.com/nats-io/nats-server).
+  This will almost certainly be the preferred model for very large deployments but scalability
+  comes with a cost. API calls are expensive and therefore a polylith deployment may end up using
+  disproportionately more resources for a smaller number of users compared to a monolith deployment.
+
+In almost all cases, it is **recommended to run in monolith mode with PostgreSQL databases**.
 
 Regardless of whether you are running in polylith or monolith mode, each Dendrite component that
-requires storage has its own database. Both Postgres and SQLite are supported and can be
-mixed-and-matched across components as needed in the configuration file.
+requires storage has its own database connections. Both Postgres and SQLite are supported and can
+be mixed-and-matched across components as needed in the configuration file.
 
 Be advised that Dendrite is still in development and it's not recommended for
 use in production environments just yet!
@@ -26,13 +28,11 @@ use in production environments just yet!
 Dendrite requires:
 
 * Go 1.15 or higher
-* Postgres 9.6 or higher (if using Postgres databases, not needed for SQLite)
+* PostgreSQL 12 or higher (if using PostgreSQL databases, not needed for SQLite)
 
 If you want to run a polylith deployment, you also need:
 
-* Apache Kafka 0.10.2+
-
-Please note that Kafka is **not required** for a monolith deployment.
+* A standalone [NATS Server](https://github.com/nats-io/nats-server) deployment with JetStream enabled
 
 ## Building Dendrite
 
@@ -49,40 +49,18 @@ Then build it:
 ./build.sh
 ```
 
-## Install Kafka (polylith only)
+## Install NATS Server
 
-Install and start Kafka (c.f. [scripts/install-local-kafka.sh](scripts/install-local-kafka.sh)):
+Follow the [NATS Server installation instructions](https://docs.nats.io/running-a-nats-service/introduction/installation) and then [start your NATS deployment](https://docs.nats.io/running-a-nats-service/introduction/running).
 
-```bash
-KAFKA_URL=http://archive.apache.org/dist/kafka/2.1.0/kafka_2.11-2.1.0.tgz
-
-# Only download the kafka if it isn't already downloaded.
-test -f kafka.tgz || wget $KAFKA_URL -O kafka.tgz
-# Unpack the kafka over the top of any existing installation
-mkdir -p kafka && tar xzf kafka.tgz -C kafka --strip-components 1
-
-# Start the zookeeper running in the background.
-# By default the zookeeper listens on localhost:2181
-kafka/bin/zookeeper-server-start.sh -daemon kafka/config/zookeeper.properties
-
-# Start the kafka server running in the background.
-# By default the kafka listens on localhost:9092
-kafka/bin/kafka-server-start.sh -daemon kafka/config/server.properties
-```
-
-On macOS, you can use [Homebrew](https://brew.sh/) for easier setup of Kafka:
-
-```bash
-brew install kafka
-brew services start zookeeper
-brew services start kafka
-```
+JetStream must be enabled, either by passing the `-js` flag to `nats-server`,
+or by specifying the `store_dir` option in the the `jetstream` configuration.
 
 ## Configuration
 
 ### PostgreSQL database setup
 
-Assuming that PostgreSQL 9.6 (or later) is installed:
+Assuming that PostgreSQL 12 (or later) is installed:
 
 * Create role, choosing a new password when prompted:
 
@@ -109,7 +87,7 @@ On macOS, omit `sudo -u postgres` from the below commands.
 * If you want to run each Dendrite component with its own database:
 
   ```bash
-  for i in mediaapi syncapi roomserver signingkeyserver federationsender appservice keyserver userapi_accounts userapi_devices naffka; do
+  for i in mediaapi syncapi roomserver federationapi appservice keyserver userapi_accounts userapi_devices; do
       sudo -u postgres createdb -O dendrite dendrite_$i
   done
   ```
@@ -163,7 +141,11 @@ Create config file, based on `dendrite-config.yaml`. Call it `dendrite.yaml`. Th
     * `postgres://dendrite:password@localhost/dendrite_userapi_account?sslmode=disable` to connect to PostgreSQL without SSL/TLS
   * For SQLite on disk: `file:component.db` or `file:///path/to/component.db`, e.g. `file:userapi_account.db`
   * Postgres and SQLite can be mixed and matched on different components as desired.
-* The `use_naffka` option if using Naffka in a monolith deployment
+* Either one of the following in the `jetstream` configuration section:
+  * The `addresses` option — a list of one or more addresses of an external standalone
+    NATS Server deployment
+  * The `storage_path` — where on the filesystem the built-in NATS server should
+    store durable queues, if using the built-in NATS server
 
 There are other options which may be useful so review them all. In particular,
 if you are trying to federate from your Dendrite instance into public rooms
@@ -176,11 +158,6 @@ PostgreSQL mode, but this is **NOT** a supported configuration with SQLite. When
 using SQLite, all components **MUST** use their own database file.
 
 ## Starting a monolith server
-
-It is possible to use Naffka as an in-process replacement to Kafka when using
-the monolith server. To do this, set `use_naffka: true` in your `dendrite.yaml`
-configuration and uncomment the relevant Naffka line in the `database` section.
-Be sure to update the database username and password if needed.
 
 The monolith server can be started as shown below. By default it listens for
 HTTP connections on port 8008, so you can configure your Matrix client to use
@@ -196,6 +173,10 @@ for HTTPS connections on port 8448:
 ```bash
 ./bin/dendrite-monolith-server --tls-cert=server.crt --tls-key=server.key
 ```
+
+If the `jetstream` section of the configuration contains no `addresses` but does
+contain a `store_dir`, Dendrite will start up a built-in NATS JetStream node
+automatically, eliminating the need to run a separate NATS server.
 
 ## Starting a polylith deployment
 
@@ -263,15 +244,6 @@ This is what implements the room DAG. Clients do not talk to this.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml roomserver
 ```
 
-#### Federation sender
-
-This sends events from our users to other servers.  This is only required if
-you want to support federation.
-
-```bash
-./bin/dendrite-polylith-multi --config=dendrite.yaml federationsender
-```
-
 #### Appservice server
 
 This sends events from the network to [application
@@ -289,14 +261,6 @@ This manages end-to-end encryption keys for users.
 
 ```bash
 ./bin/dendrite-polylith-multi --config=dendrite.yaml keyserver
-```
-
-#### Signing key server
-
-This manages signing keys for servers.
-
-```bash
-./bin/dendrite-polylith-multi --config=dendrite.yaml signingkeyserver
 ```
 
 #### EDU server

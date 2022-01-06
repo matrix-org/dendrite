@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/kafka"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,14 +40,14 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 func NewInternalAPI(
 	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.FederationClient,
 ) api.KeyInternalAPI {
-	consumer, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	_, consumer, producer := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	db, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
 	keyChangeProducer := &producers.KeyChange{
-		Topic:    string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputKeyChangeEvent)),
+		Topic:    string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent)),
 		Producer: producer,
 		DB:       db,
 	}
