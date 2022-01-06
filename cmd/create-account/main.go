@@ -94,19 +94,19 @@ func main() {
 		if err2 != nil {
 			logrus.Fatalln(err2)
 		}
-		err2 = os.WriteFile("private.key", priv, 0644)
+		err2 = ioutil.WriteFile("private.key", priv, 0644)
 		if err2 != nil {
 			logrus.Fatalln(err2)
 		}
-		err2 = os.WriteFile("private.key.seed", priv.Seed(), 0644)
+		err2 = ioutil.WriteFile("private.key.seed", priv.Seed(), 0644)
 		if err2 != nil {
 			logrus.Fatalln(err2)
 		}
-		err2 = os.WriteFile("./public.key", pub, 0644)
+		err2 = ioutil.WriteFile("./public.key", pub, 0644)
 		if err2 != nil {
 			logrus.Fatalln(err2)
 		}
-		err2 = os.WriteFile("./public.key.b64", []byte(pub64), 0644)
+		err2 = ioutil.WriteFile("./public.key.b64", []byte(pub64), 0644)
 		if err2 != nil {
 			logrus.Fatalln(err2)
 		}

@@ -9,7 +9,7 @@ require (
 	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
-	github.com/MFAshby/stdemuxerhook v1.0.0 // indirect
+	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/S7evinK/saramajetstream v0.0.0-20210709110708-de6efc8c4a32
 	github.com/Shopify/sarama v1.29.0

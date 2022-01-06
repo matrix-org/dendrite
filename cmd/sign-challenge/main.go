@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -51,7 +52,7 @@ func main() {
 	}
 
 	if *privateKeyFile != "" && *input != "" {
-		seedBytes, err := os.ReadFile(*privateKeyFile)
+		seedBytes, err := ioutil.ReadFile(*privateKeyFile)
 		if err != nil {
 			logrus.Fatalln(err)
 		}
