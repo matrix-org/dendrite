@@ -461,7 +461,8 @@ func (r *Queryer) QueryStateAndAuthChain(
 	// the entire current state of the room
 	// TODO: this probably means it should be a different query operation...
 	if request.OnlyFetchAuthChain {
-		authEvents, err := GetAuthChain(ctx, r.DB.EventsFromIDs, request.AuthEventIDs)
+		var authEvents []*gomatrixserverlib.Event
+		authEvents, err = GetAuthChain(ctx, r.DB.EventsFromIDs, request.AuthEventIDs)
 		if err != nil {
 			return err
 		}
