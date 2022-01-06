@@ -34,6 +34,7 @@ import (
 
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.
 type OutputKeyChangeEventConsumer struct {
+	ctx                 context.Context
 	keyChangeConsumer   *internal.ContinualConsumer
 	db                  storage.Database
 	notifier            *notifier.Notifier
@@ -68,6 +69,7 @@ func NewOutputKeyChangeEventConsumer(
 	}
 
 	s := &OutputKeyChangeEventConsumer{
+		ctx:                 process.Context(),
 		keyChangeConsumer:   &consumer,
 		db:                  store,
 		serverName:          serverName,
@@ -125,10 +127,13 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 }
 
 func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, offset int64, partition int32) error {
+	if m.DeviceKeys == nil {
+		return nil
+	}
 	output := m.DeviceKeys
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
-	err := s.rsAPI.QuerySharedUsers(context.Background(), &roomserverAPI.QuerySharedUsersRequest{
+	err := s.rsAPI.QuerySharedUsers(s.ctx, &roomserverAPI.QuerySharedUsersRequest{
 		UserID: output.UserID,
 	}, &queryRes)
 	if err != nil {
@@ -155,7 +160,7 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage
 	output := m.CrossSigningKeyUpdate
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
-	err := s.rsAPI.QuerySharedUsers(context.Background(), &roomserverAPI.QuerySharedUsersRequest{
+	err := s.rsAPI.QuerySharedUsers(s.ctx, &roomserverAPI.QuerySharedUsersRequest{
 		UserID: output.UserID,
 	}, &queryRes)
 	if err != nil {

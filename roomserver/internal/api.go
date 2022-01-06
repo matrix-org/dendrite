@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 
-	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
@@ -16,6 +15,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 )
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
@@ -33,19 +34,19 @@ type RoomserverInternalAPI struct {
 	*perform.Forgetter
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
-	Producer               sarama.SyncProducer
 	Cache                  caching.RoomServerCaches
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
 	fsAPI                  fsAPI.FederationInternalAPI
 	asAPI                  asAPI.AppServiceQueryAPI
-	OutputRoomEventTopic   string // Kafka topic for new output room events
+	InputRoomEventTopic    string // JetStream topic for new input room events
+	OutputRoomEventTopic   string // JetStream topic for new output room events
 	PerspectiveServerNames []gomatrixserverlib.ServerName
 }
 
 func NewRoomserverAPI(
-	cfg *config.RoomServer, roomserverDB storage.Database, producer sarama.SyncProducer,
-	outputRoomEventTopic string, caches caching.RoomServerCaches,
+	cfg *config.RoomServer, roomserverDB storage.Database, consumer nats.JetStreamContext,
+	inputRoomEventTopic, outputRoomEventTopic string, caches caching.RoomServerCaches,
 	perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
@@ -63,12 +64,16 @@ func NewRoomserverAPI(
 		},
 		Inputer: &input.Inputer{
 			DB:                   roomserverDB,
+			InputRoomEventTopic:  inputRoomEventTopic,
 			OutputRoomEventTopic: outputRoomEventTopic,
-			Producer:             producer,
+			JetStream:            consumer,
 			ServerName:           cfg.Matrix.ServerName,
 			ACLs:                 serverACLs,
 		},
 		// perform-er structs get initialised when we have a federation sender to use
+	}
+	if err := a.Inputer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
 	return a
 }

@@ -46,8 +46,8 @@ type Global struct {
 	// Defaults to an empty array.
 	TrustedIDServers []string `yaml:"trusted_third_party_id_servers"`
 
-	// Kafka/Naffka configuration
-	Kafka Kafka `yaml:"kafka"`
+	// JetStream configuration
+	JetStream JetStream `yaml:"jetstream"`
 
 	// Metrics configuration
 	Metrics Metrics `yaml:"metrics"`
@@ -68,7 +68,7 @@ func (c *Global) Defaults(generate bool) {
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
 
-	c.Kafka.Defaults(generate)
+	c.JetStream.Defaults(generate)
 	c.Metrics.Defaults(generate)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
@@ -78,7 +78,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
 
-	c.Kafka.Verify(configErrs, isMonolith)
+	c.JetStream.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
 	c.Sentry.Verify(configErrs, isMonolith)
 	c.DNSCache.Verify(configErrs, isMonolith)

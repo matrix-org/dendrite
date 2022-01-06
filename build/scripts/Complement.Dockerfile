@@ -1,4 +1,4 @@
-FROM golang:1.13-stretch as build
+FROM golang:1.16-stretch as build
 RUN apt-get update && apt-get install -y sqlite3
 WORKDIR /build
 
