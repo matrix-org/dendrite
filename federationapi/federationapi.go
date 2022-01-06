@@ -31,7 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/federationapi/routing"

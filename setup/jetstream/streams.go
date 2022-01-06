@@ -19,6 +19,7 @@ var (
 	OutputTypingEvent       = "OutputTypingEvent"
 	OutputClientData        = "OutputClientData"
 	OutputReceiptEvent      = "OutputReceiptEvent"
+	OutputPresenceData      = "OutputPresenceData"
 )
 
 var streams = []*nats.StreamConfig{
@@ -55,6 +56,11 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      OutputReceiptEvent,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      OutputPresenceData,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},

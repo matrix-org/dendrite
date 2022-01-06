@@ -110,7 +110,7 @@ func AddPublicRoutes(
 	}
 
 	presenceConsumer := consumers.NewOutputPresenceDataConsumer(
-		process, cfg, consumer, syncDB, notifier, streams.PresenceDataStreamProvider,
+		process, cfg, js, syncDB, notifier, streams.PresenceDataStreamProvider,
 	)
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start presence consumer")

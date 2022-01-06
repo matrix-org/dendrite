@@ -256,11 +256,9 @@ func (t *EDUServerInputAPI) InputPresence(
 	if err != nil {
 		return err
 	}
-	m := &sarama.ProducerMessage{
-		Topic: t.OutputPresenceTopic,
-		Key:   sarama.StringEncoder(request.UserID),
-		Value: sarama.ByteEncoder(js),
-	}
-	_, _, err = t.Producer.SendMessage(m)
+	_, err = t.JetStream.PublishMsg(&nats.Msg{
+		Subject: t.OutputPresenceTopic,
+		Data:    js,
+	})
 	return err
 }

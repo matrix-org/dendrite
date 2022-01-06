@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi/queue"
@@ -40,6 +41,7 @@ type OutputEDUConsumer struct {
 	typingTopic       string
 	sendToDeviceTopic string
 	receiptTopic      string
+	presenceTopic     string
 }
 
 // NewOutputEDUConsumer creates a new OutputEDUConsumer. Call Start() to begin consuming from EDU servers.
@@ -59,6 +61,7 @@ func NewOutputEDUConsumer(
 		typingTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 		sendToDeviceTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
 		receiptTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		presenceTopic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputPresenceData),
 	}
 }
 
@@ -73,8 +76,8 @@ func (t *OutputEDUConsumer) Start() error {
 	if _, err := t.jetstream.Subscribe(t.receiptTopic, t.onReceiptEvent); err != nil {
 		return err
 	}
-	if err := t.presenceConsumer.Start(); err != nil {
-		return fmt.Errorf("t.presenceConsumer.Start: %w", err)
+	if _, err := t.jetstream.Subscribe(t.presenceTopic, t.onPresenceData); err != nil {
+		return err
 	}
 	return nil
 }
@@ -256,52 +259,58 @@ func (t *OutputEDUConsumer) onReceiptEvent(msg *nats.Msg) {
 
 // onPresenceData is called in response to a message received on the presence
 // data topic from the EDU server.
-func (t *OutputEDUConsumer) onPresenceData(msg *sarama.ConsumerMessage) error {
-	// Extract the presence data from msg.
-	var presence api.OutputPresenceData
-	if err := json.Unmarshal(msg.Value, &presence); err != nil {
-		// Skip this msg but continue processing messages.
-		log.WithError(err).Errorf("eduserver output log: message parse failed (expected presence)")
-		return nil
-	}
+func (t *OutputEDUConsumer) onPresenceData(msg *nats.Msg) {
+	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
+		// Extract the presence data from msg.
+		var presence api.OutputPresenceData
+		if err := json.Unmarshal(msg.Data, &presence); err != nil {
+			// Skip this msg but continue processing messages.
+			log.WithError(err).Errorf("eduserver output log: message parse failed (expected presence)")
+			return true
+		}
 
-	// only send presence events which originated from us
-	_, senderServerName, err := gomatrixserverlib.SplitID('@', presence.UserID)
-	if err != nil {
-		log.WithError(err).WithField("user_id", presence.UserID).Error("Failed to extract domain from presence sender")
-		return nil
-	}
-	if senderServerName != t.ServerName {
-		return nil // don't log, very spammy as it logs for each remote presence
-	}
+		// only send presence events which originated from us
+		_, senderServerName, err := gomatrixserverlib.SplitID('@', presence.UserID)
+		if err != nil {
+			log.WithError(err).WithField("user_id", presence.UserID).Error("Failed to extract domain from presence sender")
+			return true
+		}
+		if senderServerName != t.ServerName {
+			return true // don't log, very spammy as it logs for each remote presence
+		}
 
-	joined, err := t.db.GetAllJoinedHosts(context.TODO())
-	if err != nil {
-		return err
-	}
+		joined, err := t.db.GetAllJoinedHosts(context.TODO())
+		if err != nil {
+			log.WithError(err).Error("failed to get all joined hosts")
+			return true
+		}
 
-	lastActiveTS := time.Since(presence.LastActiveTS.Time())
-	content := api.FederationPresenceData{
-		Push: []api.FederationPresenceSingle{
-			{
-				CurrentlyActive: lastActiveTS < time.Minute*5,
-				LastActiveAgo:   int(lastActiveTS.Milliseconds()),
-				Presence:        presence.Presence.String(),
-				UserID:          presence.UserID,
-				StatusMsg:       presence.StatusMsg,
+		lastActiveTS := time.Since(presence.LastActiveTS.Time())
+		content := api.FederationPresenceData{
+			Push: []api.FederationPresenceSingle{
+				{
+					CurrentlyActive: lastActiveTS < time.Minute*5,
+					LastActiveAgo:   int(lastActiveTS.Milliseconds()),
+					Presence:        presence.Presence.String(),
+					UserID:          presence.UserID,
+					StatusMsg:       presence.StatusMsg,
+				},
 			},
-		},
-	}
+		}
 
-	edu := &gomatrixserverlib.EDU{
-		Type:   gomatrixserverlib.MPresence,
-		Origin: string(t.ServerName),
-	}
-	if edu.Content, err = json.Marshal(content); err != nil {
-		return err
-	}
+		edu := &gomatrixserverlib.EDU{
+			Type:   gomatrixserverlib.MPresence,
+			Origin: string(t.ServerName),
+		}
+		if edu.Content, err = json.Marshal(content); err != nil {
+			return true
+		}
 
-	log.Debugf("Sending edu to federated servers: %s", string(edu.Content))
-
-	return t.queues.SendEDU(edu, t.ServerName, joined)
+		log.Debugf("Sending edu to federated servers: %s", string(edu.Content))
+		if err := t.queues.SendEDU(edu, t.ServerName, joined); err != nil {
+			log.WithError(err).Error("failed to send EDU")
+			return false
+		}
+		return true
+	})
 }
