@@ -48,7 +48,7 @@ const HEAD = "HEAD"
 // due to the error:
 //   When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
-const Dockerfile = `FROM golang:1.13-stretch as build
+const Dockerfile = `FROM golang:1.16-stretch as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 

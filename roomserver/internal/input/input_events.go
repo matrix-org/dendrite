@@ -64,7 +64,7 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
 	input *api.InputRoomEvent,
-) (string, error) {
+) (err error) {
 	// Measure how long it takes to process this event.
 	started := time.Now()
 	defer func() {
@@ -95,11 +95,11 @@ func (r *Inputer) processRoomEvent(
 				case gomatrixserverlib.EventIDFormatV1:
 					if bytes.Equal(event.EventReference().EventSHA256, evs[0].EventReference().EventSHA256) {
 						logger.Debugf("Already processed event; ignoring")
-						return event.EventID(), nil
+						return nil
 					}
 				default:
 					logger.Debugf("Already processed event; ignoring")
-					return event.EventID(), nil
+					return nil
 				}
 			}
 		}
@@ -114,7 +114,7 @@ func (r *Inputer) processRoomEvent(
 			PrevEventIDs: event.PrevEventIDs(),
 		}
 		if err := r.Queryer.QueryMissingAuthPrevEvents(ctx, missingReq, missingRes); err != nil {
-			return "", fmt.Errorf("r.Queryer.QueryMissingAuthPrevEvents: %w", err)
+			return fmt.Errorf("r.Queryer.QueryMissingAuthPrevEvents: %w", err)
 		}
 	}
 	if len(missingRes.MissingAuthEventIDs) > 0 || len(missingRes.MissingPrevEventIDs) > 0 {
@@ -122,7 +122,7 @@ func (r *Inputer) processRoomEvent(
 			RoomID: event.RoomID(),
 		}
 		if err := r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
-			return "", fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
+			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
 		}
 	}
 
@@ -133,7 +133,7 @@ func (r *Inputer) processRoomEvent(
 	knownEvents := map[string]*types.Event{}
 	logger.Println("Starting to check for missing auth events")
 	if err := r.checkForMissingAuthEvents(ctx, logger, input.Event, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
-		return "", fmt.Errorf("r.checkForMissingAuthEvents: %w", err)
+		return fmt.Errorf("r.checkForMissingAuthEvents: %w", err)
 	}
 	logger.Println("Checked for missing auth events")
 
@@ -150,7 +150,7 @@ func (r *Inputer) processRoomEvent(
 	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
 	for _, authEventID := range authEventIDs {
 		if _, ok := knownEvents[authEventID]; !ok {
-			return "", fmt.Errorf("missing auth event %s", authEventID)
+			return fmt.Errorf("missing auth event %s", authEventID)
 		}
 		authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
 	}
@@ -169,14 +169,14 @@ func (r *Inputer) processRoomEvent(
 	// Store the event.
 	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
 	if err != nil {
-		return "", fmt.Errorf("r.DB.StoreEvent: %w", err)
+		return fmt.Errorf("r.DB.StoreEvent: %w", err)
 	}
 
 	// if storing this event results in it being redacted then do so.
 	if !isRejected && redactedEventID == event.EventID() {
 		r, rerr := eventutil.RedactEvent(redactionEvent, event)
 		if rerr != nil {
-			return "", fmt.Errorf("eventutil.RedactEvent: %w", rerr)
+			return fmt.Errorf("eventutil.RedactEvent: %w", rerr)
 		}
 		event = r
 	}
@@ -186,15 +186,15 @@ func (r *Inputer) processRoomEvent(
 	// notify anyone about it.
 	if input.Kind == api.KindOutlier {
 		logger.Debug("Stored outlier")
-		return event.EventID(), nil
+		return nil
 	}
 
 	roomInfo, err := r.DB.RoomInfo(ctx, event.RoomID())
 	if err != nil {
-		return "", fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
 	if roomInfo == nil {
-		return "", fmt.Errorf("r.DB.RoomInfo missing for room %s", event.RoomID())
+		return fmt.Errorf("r.DB.RoomInfo missing for room %s", event.RoomID())
 	}
 
 	if input.Origin == "" {
@@ -216,7 +216,7 @@ func (r *Inputer) processRoomEvent(
 			haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 		}
 		if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), roomInfo.RoomVersion); err != nil {
-			return "", fmt.Errorf("r.checkForMissingPrevEvents: %w", err)
+			return fmt.Errorf("r.checkForMissingPrevEvents: %w", err)
 		}
 		logger.Println("Checked for missing prev events")
 	}
@@ -226,14 +226,14 @@ func (r *Inputer) processRoomEvent(
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, input, *roomInfo, &stateAtEvent, event, isRejected)
 		if err != nil && input.Kind != api.KindOld {
-			return "", fmt.Errorf("r.calculateAndSetState: %w", err)
+			return fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
 	}
 
 	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
 	if isRejected || softfail {
 		logger.WithField("soft_fail", softfail).Debug("Stored rejected event")
-		return event.EventID(), rejectionErr
+		return rejectionErr
 	}
 
 	switch input.Kind {
@@ -247,7 +247,7 @@ func (r *Inputer) processRoomEvent(
 			input.TransactionID, // transaction ID
 			input.HasState,      // rewrites state?
 		); err != nil {
-			return "", fmt.Errorf("r.updateLatestEvents: %w", err)
+			return fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
 	case api.KindOld:
 		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
@@ -259,7 +259,7 @@ func (r *Inputer) processRoomEvent(
 			},
 		})
 		if err != nil {
-			return "", fmt.Errorf("r.WriteOutputEvents (old): %w", err)
+			return fmt.Errorf("r.WriteOutputEvents (old): %w", err)
 		}
 	}
 
@@ -278,12 +278,12 @@ func (r *Inputer) processRoomEvent(
 			},
 		})
 		if err != nil {
-			return "", fmt.Errorf("r.WriteOutputEvents (redactions): %w", err)
+			return fmt.Errorf("r.WriteOutputEvents (redactions): %w", err)
 		}
 	}
 
 	// Update the extremities of the event graph for the room
-	return event.EventID(), nil
+	return nil
 }
 
 func (r *Inputer) checkForMissingAuthEvents(

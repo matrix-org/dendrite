@@ -22,16 +22,13 @@ import (
 	"github.com/matrix-org/util"
 )
 
-type RoomEventInputter interface {
-	InputRoomEvents(context.Context, *InputRoomEventsRequest, *InputRoomEventsResponse)
-}
-
 // SendEvents to the roomserver The events are written with KindNew.
 func SendEvents(
-	ctx context.Context, rsAPI RoomEventInputter,
+	ctx context.Context, rsAPI RoomserverInternalAPI,
 	kind Kind, events []*gomatrixserverlib.HeaderedEvent,
 	origin gomatrixserverlib.ServerName,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
+	async bool,
 ) error {
 	ires := make([]InputRoomEvent, len(events))
 	for i, event := range events {
@@ -44,16 +41,16 @@ func SendEvents(
 			TransactionID: txnID,
 		}
 	}
-	return SendInputRoomEvents(ctx, rsAPI, ires)
+	return SendInputRoomEvents(ctx, rsAPI, ires, async)
 }
 
 // SendEventWithState writes an event with the specified kind to the roomserver
 // with the state at the event as KindOutlier before it. Will not send any event that is
 // marked as `true` in haveEventIDs.
 func SendEventWithState(
-	ctx context.Context, rsAPI RoomEventInputter, kind Kind,
+	ctx context.Context, rsAPI RoomserverInternalAPI, kind Kind,
 	state *gomatrixserverlib.RespState, event *gomatrixserverlib.HeaderedEvent,
-	origin gomatrixserverlib.ServerName, haveEventIDs map[string]bool,
+	origin gomatrixserverlib.ServerName, haveEventIDs map[string]bool, async bool,
 ) error {
 	outliers, err := state.Events()
 	if err != nil {
@@ -87,14 +84,18 @@ func SendEventWithState(
 		StateEventIDs: stateEventIDs,
 	})
 
-	return SendInputRoomEvents(ctx, rsAPI, ires)
+	return SendInputRoomEvents(ctx, rsAPI, ires, async)
 }
 
 // SendInputRoomEvents to the roomserver.
 func SendInputRoomEvents(
-	ctx context.Context, rsAPI RoomEventInputter, ires []InputRoomEvent,
+	ctx context.Context, rsAPI RoomserverInternalAPI,
+	ires []InputRoomEvent, async bool,
 ) error {
-	request := InputRoomEventsRequest{InputRoomEvents: ires}
+	request := InputRoomEventsRequest{
+		InputRoomEvents: ires,
+		Asynchronous:    async,
+	}
 	var response InputRoomEventsResponse
 	rsAPI.InputRoomEvents(ctx, &request, &response)
 	return response.Err()

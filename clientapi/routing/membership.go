@@ -111,6 +111,7 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 		cfg.Matrix.ServerName,
 		cfg.Matrix.ServerName,
 		nil,
+		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()

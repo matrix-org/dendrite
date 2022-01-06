@@ -464,6 +464,7 @@ func createRoom(
 			ev.Headered(roomVersion),
 			cfg.Matrix.ServerName,
 			nil,
+			false,
 		); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("SendEventWithState failed")
 			return jsonerror.InternalServerError()

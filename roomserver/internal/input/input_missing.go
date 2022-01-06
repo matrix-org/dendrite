@@ -151,7 +151,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		stateIDs = append(stateIDs, event.EventID())
 	}
 
-	_, err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
+	err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
 		Kind:          api.KindOld,
 		Event:         backwardsExtremity.Headered(roomVersion),
 		Origin:        t.origin,
@@ -169,7 +169,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// they will automatically fast-forward based on the room state at the
 	// extremity in the last step.
 	for _, newEvent := range newEvents {
-		_, err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
+		err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
 			Kind:         api.KindOld,
 			Event:        newEvent.Headered(roomVersion),
 			Origin:       t.origin,

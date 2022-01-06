@@ -368,5 +368,6 @@ func emit3PIDInviteEvent(
 		cfg.Matrix.ServerName,
 		cfg.Matrix.ServerName,
 		nil,
+		false,
 	)
 }

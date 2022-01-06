@@ -123,6 +123,7 @@ func SendEvent(
 		cfg.Matrix.ServerName,
 		cfg.Matrix.ServerName,
 		txnAndSessionID,
+		false,
 	); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()

@@ -1,22 +1,31 @@
 module github.com/matrix-org/dendrite
 
+replace github.com/nats-io/nats-server/v2 => github.com/neilalexander/nats-server/v2 v2.3.3-0.20220104162330-c76d5fd70423
+
+replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.11.1-0.20220104162523-f4ddebe1061c
+
 require (
 	github.com/Arceliar/ironwood v0.0.0-20210619124114-6ad55cae5031
+	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
+	github.com/MFAshby/stdemuxerhook v1.0.0 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
-	github.com/Shopify/sarama v1.29.1
+	github.com/S7evinK/saramajetstream v0.0.0-20210709110708-de6efc8c4a32
+	github.com/Shopify/sarama v1.29.0
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.7 // indirect
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.11.0
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gologme/log v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/juju/testing v0.0.0-20210324180055-18c50b0c2098 // indirect
+	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/lib/pq v1.10.1
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
@@ -32,16 +41,18 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20210709140738-b0d1ba599a6d
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20211115192839-15a64d244aa2
-	github.com/matrix-org/naffka v0.0.0-20210623111924-14ff508b58e0
-	github.com/matrix-org/pinecone v0.0.0-20211213132835-aa2808d77947
+	github.com/matrix-org/pinecone v0.0.0-20211216094739-095c5ea64d02
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/morikuni/aec v1.0.0 // indirect
+	github.com/nats-io/nats-server/v2 v2.3.2
+	github.com/nats-io/nats.go v1.13.1-0.20211122170419-d7c1d78a50fc
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20200129213757-d5c93a81bec6
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.11.0
@@ -57,6 +68,7 @@ require (
 	golang.org/x/mobile v0.0.0-20210716004757-34ab1303b554
 	golang.org/x/net v0.0.0-20210927181540-4e4d966f7476
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
+	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
 	nhooyr.io/websocket v1.8.7

@@ -251,6 +251,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 			event.Headered(respMakeJoin.RoomVersion),
 			serverName,
 			nil,
+			false,
 		); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"room_id": roomID,
@@ -433,6 +434,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
 		serverName,
 		nil,
+		false,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}
