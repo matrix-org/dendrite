@@ -77,7 +77,7 @@ func (r *Backfiller) PerformBackfill(
 	}
 
 	// Scan the event tree for events to send back.
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, *info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
@@ -418,7 +418,7 @@ FindSuccessor:
 		return nil
 	}
 
-	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, *info, NIDs[eventID])
+	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, info, NIDs[eventID])
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
 		return nil

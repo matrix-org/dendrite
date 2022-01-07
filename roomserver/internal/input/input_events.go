@@ -185,8 +185,7 @@ func (r *Inputer) processRoomEvent(
 			haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 		}
 		if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), input.Event.RoomVersion); err != nil {
-			//return fmt.Errorf("r.checkForMissingPrevEvents: %w", err)
-			softfail = true
+			isRejected = true
 			rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
 		}
 	}
@@ -225,7 +224,7 @@ func (r *Inputer) processRoomEvent(
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		err = r.calculateAndSetState(ctx, input, *roomInfo, &stateAtEvent, event, isRejected)
+		err = r.calculateAndSetState(ctx, input, roomInfo, &stateAtEvent, event, isRejected)
 		if err != nil && input.Kind != api.KindOld {
 			return fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
@@ -233,7 +232,7 @@ func (r *Inputer) processRoomEvent(
 
 	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
 	if isRejected || softfail {
-		logger.WithField("soft_fail", softfail).WithField("reason", rejectionErr).Debug("Stored rejected event")
+		logger.WithError(rejectionErr).WithField("soft_fail", softfail).Debug("Stored rejected event")
 		return rejectionErr
 	}
 
@@ -395,7 +394,7 @@ func (r *Inputer) checkForMissingAuthEvents(
 func (r *Inputer) calculateAndSetState(
 	ctx context.Context,
 	input *api.InputRoomEvent,
-	roomInfo types.RoomInfo,
+	roomInfo *types.RoomInfo,
 	stateAtEvent *types.StateAtEvent,
 	event *gomatrixserverlib.Event,
 	isRejected bool,
