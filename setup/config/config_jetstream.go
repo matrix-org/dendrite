@@ -26,7 +26,7 @@ func (c *JetStream) TopicFor(name string) string {
 }
 
 func (c *JetStream) Durable(name string) nats.SubOpt {
-	return nats.Durable(name)
+	return nats.Durable(c.TopicFor(name))
 }
 
 func (c *JetStream) Defaults(generate bool) {
