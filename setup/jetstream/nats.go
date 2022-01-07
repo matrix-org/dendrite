@@ -74,10 +74,7 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (nats.JetStreamContex
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
 		if info == nil {
-			// Define a default subject if not already specified.
-			if len(stream.Subjects) == 0 {
-				stream.Subjects = []string{name}
-			}
+			stream.Subjects = []string{name}
 
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
