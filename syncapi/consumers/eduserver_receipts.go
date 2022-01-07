@@ -34,6 +34,7 @@ import (
 type OutputReceiptEventConsumer struct {
 	ctx       context.Context
 	jetstream nats.JetStreamContext
+	durable   nats.SubOpt
 	topic     string
 	db        storage.Database
 	stream    types.StreamProvider
@@ -53,7 +54,8 @@ func NewOutputReceiptEventConsumer(
 	return &OutputReceiptEventConsumer{
 		ctx:       process.Context(),
 		jetstream: js,
-		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		topic:     cfg.Matrix.JetStream.Namespaced(jetstream.OutputReceiptEvent),
+		durable:   nats.Durable(cfg.Matrix.JetStream.Namespaced("SyncAPIEDUServerReceiptConsumer")),
 		db:        store,
 		notifier:  notifier,
 		stream:    stream,
@@ -62,7 +64,7 @@ func NewOutputReceiptEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputReceiptEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
 	return err
 }
 

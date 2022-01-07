@@ -34,6 +34,7 @@ import (
 type OutputRoomEventConsumer struct {
 	ctx          context.Context
 	jetstream    nats.JetStreamContext
+	durable      nats.SubOpt
 	topic        string
 	asDB         storage.Database
 	rsAPI        api.RoomserverInternalAPI
@@ -54,7 +55,8 @@ func NewOutputRoomEventConsumer(
 	return &OutputRoomEventConsumer{
 		ctx:          process.Context(),
 		jetstream:    js,
-		topic:        cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent),
+		durable:      nats.Durable(cfg.Global.JetStream.Namespaced("AppserviceRoomserverConsumer")),
+		topic:        cfg.Global.JetStream.Namespaced(jetstream.OutputRoomEvent),
 		asDB:         appserviceDB,
 		rsAPI:        rsAPI,
 		serverName:   string(cfg.Global.ServerName),
@@ -64,7 +66,7 @@ func NewOutputRoomEventConsumer(
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
 	return err
 }
 

@@ -19,7 +19,7 @@ type JetStream struct {
 	InMemory bool `yaml:"in_memory"`
 }
 
-func (c *JetStream) TopicFor(name string) string {
+func (c *JetStream) Namespaced(name string) string {
 	return fmt.Sprintf("%s%s", c.TopicPrefix, name)
 }
 

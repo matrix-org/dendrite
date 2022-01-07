@@ -67,6 +67,7 @@ func NewRoomserverAPI(
 			InputRoomEventTopic:  inputRoomEventTopic,
 			OutputRoomEventTopic: outputRoomEventTopic,
 			JetStream:            consumer,
+			Durable:              cfg.Matrix.JetStream.Namespaced("RoomserverInputConsumer"),
 			ServerName:           cfg.Matrix.ServerName,
 			ACLs:                 serverACLs,
 		},

@@ -34,6 +34,7 @@ import (
 type OutputEDUConsumer struct {
 	ctx               context.Context
 	jetstream         nats.JetStreamContext
+	durable           nats.SubOpt
 	db                storage.Database
 	queues            *queue.OutgoingQueues
 	ServerName        gomatrixserverlib.ServerName
@@ -56,21 +57,22 @@ func NewOutputEDUConsumer(
 		queues:            queues,
 		db:                store,
 		ServerName:        cfg.Matrix.ServerName,
-		typingTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
-		sendToDeviceTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
-		receiptTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		durable:           nats.Durable(cfg.Matrix.JetStream.Namespaced("FederationAPIEDUServerConsumer")),
+		typingTopic:       cfg.Matrix.JetStream.Namespaced(jetstream.OutputTypingEvent),
+		sendToDeviceTopic: cfg.Matrix.JetStream.Namespaced(jetstream.OutputSendToDeviceEvent),
+		receiptTopic:      cfg.Matrix.JetStream.Namespaced(jetstream.OutputReceiptEvent),
 	}
 }
 
 // Start consuming from EDU servers
 func (t *OutputEDUConsumer) Start() error {
-	if _, err := t.jetstream.Subscribe(t.typingTopic, t.onTypingEvent); err != nil {
+	if _, err := t.jetstream.Subscribe(t.typingTopic, t.onTypingEvent, t.durable); err != nil {
 		return err
 	}
-	if _, err := t.jetstream.Subscribe(t.sendToDeviceTopic, t.onSendToDeviceEvent); err != nil {
+	if _, err := t.jetstream.Subscribe(t.sendToDeviceTopic, t.onSendToDeviceEvent, t.durable); err != nil {
 		return err
 	}
-	if _, err := t.jetstream.Subscribe(t.receiptTopic, t.onReceiptEvent); err != nil {
+	if _, err := t.jetstream.Subscribe(t.receiptTopic, t.onReceiptEvent, t.durable); err != nil {
 		return err
 	}
 	return nil

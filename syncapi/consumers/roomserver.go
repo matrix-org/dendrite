@@ -38,6 +38,7 @@ type OutputRoomEventConsumer struct {
 	cfg          *config.SyncAPI
 	rsAPI        api.RoomserverInternalAPI
 	jetstream    nats.JetStreamContext
+	durable      nats.SubOpt
 	topic        string
 	db           storage.Database
 	pduStream    types.StreamProvider
@@ -60,7 +61,8 @@ func NewOutputRoomEventConsumer(
 		ctx:          process.Context(),
 		cfg:          cfg,
 		jetstream:    js,
-		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
+		topic:        cfg.Matrix.JetStream.Namespaced(jetstream.OutputRoomEvent),
+		durable:      nats.Durable(cfg.Matrix.JetStream.Namespaced("SyncAPIRoomServerConsumer")),
 		db:           store,
 		notifier:     notifier,
 		pduStream:    pduStream,
@@ -71,7 +73,7 @@ func NewOutputRoomEventConsumer(
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
 	return err
 }
 
