@@ -99,10 +99,6 @@ func main() {
 	}
 	keyRing := fsAPI.KeyRing()
 
-	// The underlying roomserver implementation needs to be able to call the fedsender.
-	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsImpl.SetFederationAPI(fsAPI, keyRing)
-
 	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	keyAPI := keyImpl
 	if base.UseHTTPAPIs {
