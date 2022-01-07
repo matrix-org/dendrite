@@ -84,7 +84,7 @@ func (r *Inputer) processRoomEvent(
 	})
 
 	if input.Origin == "" {
-		input.Origin = event.Origin()
+		//	input.Origin = event.Origin()
 	}
 
 	logger.Println("XXX: Processing event")
@@ -131,17 +131,18 @@ func (r *Inputer) processRoomEvent(
 			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
 		}
 	}
+	if input.Origin != "" {
+		serverRes.ServerNames = append([]gomatrixserverlib.ServerName{input.Origin}, serverRes.ServerNames...)
+	}
 
 	// First of all, check that the auth events of the event are known.
 	// If they aren't then we will ask the federation API for them.
 	isRejected := false
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
-	logger.Println("Starting to check for missing auth events")
 	if err = r.checkForMissingAuthEvents(ctx, logger, input.Event, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
 		return fmt.Errorf("r.checkForMissingAuthEvents: %w", err)
 	}
-	logger.Println("Checked for missing auth events")
 
 	// Check if the event is allowed by its auth events. If it isn't then
 	// we consider the event to be "rejected" — it will still be persisted.
@@ -172,21 +173,26 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	if input.Kind != api.KindOutlier && len(missingRes.MissingPrevEventIDs) > 0 {
-		missingState := missingStateReq{
-			origin:     input.Origin,
-			inputer:    r,
-			queryer:    r.Queryer,
-			db:         r.DB,
-			federation: r.FSAPI,
-			keys:       r.KeyRing,
-			roomsMu:    internal.NewMutexByRoom(),
-			servers:    []gomatrixserverlib.ServerName{input.Origin},
-			hadEvents:  map[string]bool{},
-			haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
-		}
-		if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), input.Event.RoomVersion); err != nil {
+		if len(serverRes.ServerNames) > 0 {
+			missingState := missingStateReq{
+				origin:     input.Origin,
+				inputer:    r,
+				queryer:    r.Queryer,
+				db:         r.DB,
+				federation: r.FSAPI,
+				keys:       r.KeyRing,
+				roomsMu:    internal.NewMutexByRoom(),
+				servers:    serverRes.ServerNames,
+				hadEvents:  map[string]bool{},
+				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
+			}
+			if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), input.Event.RoomVersion); err != nil {
+				isRejected = true
+				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
+			}
+		} else {
 			isRejected = true
-			rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
+			rejectionErr = fmt.Errorf("missing prev events and no other servers to ask")
 		}
 	}
 

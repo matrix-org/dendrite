@@ -126,7 +126,7 @@ func (r *Inputer) InputRoomEvents(
 			inputRoomEvent := e
 			inbox, _ := r.workers.LoadOrStore(inputRoomEvent.Event.RoomID(), &phony.Inbox{})
 			inbox.(*phony.Inbox).Act(nil, func() {
-				err := r.processRoomEvent(context.TODO(), &inputRoomEvent)
+				err := r.processRoomEvent(ctx, &inputRoomEvent)
 				if err != nil {
 					sentry.CaptureException(err)
 				} else {
@@ -142,6 +142,7 @@ func (r *Inputer) InputRoomEvents(
 		for i := 0; i < len(request.InputRoomEvents); i++ {
 			select {
 			case <-ctx.Done():
+				response.ErrMsg = context.DeadlineExceeded.Error()
 				return
 			case err := <-responses:
 				if err != nil {
