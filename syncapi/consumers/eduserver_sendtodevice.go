@@ -36,6 +36,7 @@ import (
 type OutputSendToDeviceEventConsumer struct {
 	ctx        context.Context
 	jetstream  nats.JetStreamContext
+	durable    nats.SubOpt
 	topic      string
 	db         storage.Database
 	serverName gomatrixserverlib.ServerName // our server name
@@ -57,6 +58,7 @@ func NewOutputSendToDeviceEventConsumer(
 		ctx:        process.Context(),
 		jetstream:  js,
 		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
+		durable:    cfg.Matrix.JetStream.Durable("SyncAPIEDUServerSendToDeviceConsumer"),
 		db:         store,
 		serverName: cfg.Matrix.ServerName,
 		notifier:   notifier,
@@ -66,7 +68,7 @@ func NewOutputSendToDeviceEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputSendToDeviceEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
 	return err
 }
 
