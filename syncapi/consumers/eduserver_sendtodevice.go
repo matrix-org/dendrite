@@ -57,8 +57,8 @@ func NewOutputSendToDeviceEventConsumer(
 	return &OutputSendToDeviceEventConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.Namespaced(jetstream.OutputSendToDeviceEvent),
-		durable:    nats.Durable(cfg.Matrix.JetStream.Namespaced("SyncAPIEDUServerSendToDeviceConsumer")),
+		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
+		durable:    cfg.Matrix.JetStream.Durable("SyncAPIEDUServerSendToDeviceConsumer"),
 		db:         store,
 		serverName: cfg.Matrix.ServerName,
 		notifier:   notifier,

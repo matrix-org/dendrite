@@ -54,8 +54,8 @@ func NewOutputReceiptEventConsumer(
 	return &OutputReceiptEventConsumer{
 		ctx:       process.Context(),
 		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Namespaced(jetstream.OutputReceiptEvent),
-		durable:   nats.Durable(cfg.Matrix.JetStream.Namespaced("SyncAPIEDUServerReceiptConsumer")),
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPIEDUServerReceiptConsumer"),
 		db:        store,
 		notifier:  notifier,
 		stream:    stream,

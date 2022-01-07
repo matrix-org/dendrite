@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+
+	"github.com/nats-io/nats.go"
 )
 
 type JetStream struct {
@@ -19,8 +21,12 @@ type JetStream struct {
 	InMemory bool `yaml:"in_memory"`
 }
 
-func (c *JetStream) Namespaced(name string) string {
+func (c *JetStream) TopicFor(name string) string {
 	return fmt.Sprintf("%s%s", c.TopicPrefix, name)
+}
+
+func (c *JetStream) Durable(name string) nats.SubOpt {
+	return nats.Durable(name)
 }
 
 func (c *JetStream) Defaults(generate bool) {

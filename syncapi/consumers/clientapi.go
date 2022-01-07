@@ -53,8 +53,8 @@ func NewOutputClientDataConsumer(
 	return &OutputClientDataConsumer{
 		ctx:       process.Context(),
 		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Namespaced(jetstream.OutputClientData),
-		durable:   nats.Durable(cfg.Matrix.JetStream.Namespaced("SyncAPIClientAPIConsumer")),
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPIClientAPIConsumer"),
 		db:        store,
 		notifier:  notifier,
 		stream:    stream,

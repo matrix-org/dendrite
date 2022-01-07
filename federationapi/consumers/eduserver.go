@@ -57,10 +57,10 @@ func NewOutputEDUConsumer(
 		queues:            queues,
 		db:                store,
 		ServerName:        cfg.Matrix.ServerName,
-		durable:           nats.Durable(cfg.Matrix.JetStream.Namespaced("FederationAPIEDUServerConsumer")),
-		typingTopic:       cfg.Matrix.JetStream.Namespaced(jetstream.OutputTypingEvent),
-		sendToDeviceTopic: cfg.Matrix.JetStream.Namespaced(jetstream.OutputSendToDeviceEvent),
-		receiptTopic:      cfg.Matrix.JetStream.Namespaced(jetstream.OutputReceiptEvent),
+		durable:           cfg.Matrix.JetStream.Durable("FederationAPIEDUServerConsumer"),
+		typingTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
+		sendToDeviceTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
+		receiptTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 	}
 }
 

@@ -55,8 +55,8 @@ func NewOutputRoomEventConsumer(
 	return &OutputRoomEventConsumer{
 		ctx:          process.Context(),
 		jetstream:    js,
-		durable:      nats.Durable(cfg.Global.JetStream.Namespaced("AppserviceRoomserverConsumer")),
-		topic:        cfg.Global.JetStream.Namespaced(jetstream.OutputRoomEvent),
+		durable:      cfg.Global.JetStream.Durable("AppserviceRoomserverConsumer"),
+		topic:        cfg.Global.JetStream.TopicFor(jetstream.OutputRoomEvent),
 		asDB:         appserviceDB,
 		rsAPI:        rsAPI,
 		serverName:   string(cfg.Global.ServerName),

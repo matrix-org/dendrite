@@ -56,8 +56,8 @@ func NewOutputTypingEventConsumer(
 	return &OutputTypingEventConsumer{
 		ctx:       process.Context(),
 		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Namespaced(jetstream.OutputTypingEvent),
-		durable:   nats.Durable(cfg.Matrix.JetStream.Namespaced("SyncAPIEDUServerTypingConsumer")),
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPIEDUServerTypingConsumer"),
 		eduCache:  eduCache,
 		notifier:  notifier,
 		stream:    stream,

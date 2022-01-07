@@ -59,8 +59,8 @@ func NewOutputRoomEventConsumer(
 		db:        store,
 		queues:    queues,
 		rsAPI:     rsAPI,
-		durable:   nats.Durable(cfg.Matrix.JetStream.Namespaced("FederationAPIRoomServerConsumer")),
-		topic:     cfg.Matrix.JetStream.Namespaced(jetstream.OutputRoomEvent),
+		durable:   cfg.Matrix.JetStream.Durable("FederationAPIRoomServerConsumer"),
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 	}
 }
 
