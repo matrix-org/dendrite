@@ -82,6 +82,11 @@ func (r *Inputer) processRoomEvent(
 		"room_id":  event.RoomID(),
 		"type":     event.Type(),
 	})
+
+	if input.Origin == "" {
+		input.Origin = event.Origin()
+	}
+
 	logger.Println("XXX: Processing event")
 
 	// if we have already got this event then do not process it again, if the input kind is an outlier.
@@ -166,6 +171,26 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	if input.Kind != api.KindOutlier && len(missingRes.MissingPrevEventIDs) > 0 {
+		missingState := missingStateReq{
+			origin:     input.Origin,
+			inputer:    r,
+			queryer:    r.Queryer,
+			db:         r.DB,
+			federation: r.FSAPI,
+			keys:       r.KeyRing,
+			roomsMu:    internal.NewMutexByRoom(),
+			servers:    []gomatrixserverlib.ServerName{input.Origin},
+			hadEvents:  map[string]bool{},
+			haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
+		}
+		if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), input.Event.RoomVersion); err != nil {
+			//return fmt.Errorf("r.checkForMissingPrevEvents: %w", err)
+			softfail = true
+			rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
+		}
+	}
+
 	// Store the event.
 	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
 	if err != nil {
@@ -195,30 +220,6 @@ func (r *Inputer) processRoomEvent(
 	}
 	if roomInfo == nil {
 		return fmt.Errorf("r.DB.RoomInfo missing for room %s", event.RoomID())
-	}
-
-	if input.Origin == "" {
-		input.Origin = event.Origin()
-	}
-
-	if len(missingRes.MissingPrevEventIDs) > 0 {
-		missingState := missingStateReq{
-			origin:     input.Origin,
-			inputer:    r,
-			queryer:    r.Queryer,
-			db:         r.DB,
-			federation: r.FSAPI,
-			keys:       r.KeyRing,
-			roomsMu:    internal.NewMutexByRoom(),
-			servers:    []gomatrixserverlib.ServerName{input.Origin},
-			hadEvents:  map[string]bool{},
-			haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
-		}
-		if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), roomInfo.RoomVersion); err != nil {
-			// return fmt.Errorf("r.checkForMissingPrevEvents: %w", err)
-			softfail = true
-			rejectionErr = fmt.Errorf("event %s has missing state %+v due to error: %s", input.Event.EventID(), missingRes.MissingPrevEventIDs, err)
-		}
 	}
 
 	if stateAtEvent.BeforeStateSnapshotNID == 0 {
