@@ -43,6 +43,7 @@ var keyContentFields = map[string]string{
 type Inputer struct {
 	DB                   storage.Database
 	JetStream            nats.JetStreamContext
+	Durable              nats.SubOpt
 	ServerName           gomatrixserverlib.ServerName
 	ACLs                 *acls.ServerACLs
 	InputRoomEventTopic  string
@@ -85,6 +86,8 @@ func (r *Inputer) Start() error {
 		// or nak them within a certain amount of time. This stops that from
 		// happening, so we don't end up doing a lot of unnecessary duplicate work.
 		nats.MaxDeliver(0),
+		// Use a durable named consumer.
+		r.Durable,
 	)
 	return err
 }

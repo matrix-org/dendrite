@@ -35,6 +35,7 @@ import (
 type OutputTypingEventConsumer struct {
 	ctx       context.Context
 	jetstream nats.JetStreamContext
+	durable   nats.SubOpt
 	topic     string
 	eduCache  *cache.EDUCache
 	stream    types.StreamProvider
@@ -56,6 +57,7 @@ func NewOutputTypingEventConsumer(
 		ctx:       process.Context(),
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPIEDUServerTypingConsumer"),
 		eduCache:  eduCache,
 		notifier:  notifier,
 		stream:    stream,
@@ -64,7 +66,7 @@ func NewOutputTypingEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
 	return err
 }
 
