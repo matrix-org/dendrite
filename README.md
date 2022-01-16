@@ -46,9 +46,16 @@ The [Federation Tester](https://federationtester.matrix.org) can be used to veri
 
 ## Get started
 
+### Build a fully-federating instance
+
 If you wish to build a fully-federating Dendrite instance, see [INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
 
-The following instructions are enough to get Dendrite started as a non-federating test deployment using self-signed certificates and SQLite databases:
+### Build a non-federating test deployment
+
+To get Dendrite started as a non-federating test deployment using self-signed certificates and SQLite databases, follow these instructions:
+
+- Install [`bzr` VCS tool](http://wiki.bazaar.canonical.com/) on your OS, it is used by some of the dependencies installed by `build.sh` script
+- Run:
 
 ```bash
 $ git clone https://github.com/matrix-org/dendrite
