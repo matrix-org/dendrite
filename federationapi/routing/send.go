@@ -284,7 +284,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		// pass the event to the roomserver which will do auth checks
 		// If the event fail auth checks, gmsl.NotAllowed error will be returned which we be silently
 		// discarded by the caller of this function
-		_ = api.SendEvents(
+		if err = api.SendEvents(
 			context.Background(),
 			t.rsAPI,
 			api.KindNew,
@@ -295,8 +295,15 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			api.DoNotSendToOtherServers,
 			nil,
 			true,
-		)
+		); err != nil {
+			util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
+			results[event.EventID()] = gomatrixserverlib.PDUResult{
+				Error: err.Error(),
+			}
+			continue
+		}
 
+		util.GetLogger(ctx).WithError(err).Infof("XXX: Submitted event %q into input queue", event.EventID())
 		results[event.EventID()] = gomatrixserverlib.PDUResult{}
 	}
 
