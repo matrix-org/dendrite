@@ -34,6 +34,7 @@ import (
 type OutputClientDataConsumer struct {
 	ctx       context.Context
 	jetstream nats.JetStreamContext
+	durable   nats.SubOpt
 	topic     string
 	db        storage.Database
 	stream    types.StreamProvider
@@ -53,6 +54,7 @@ func NewOutputClientDataConsumer(
 		ctx:       process.Context(),
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPIClientAPIConsumer"),
 		db:        store,
 		notifier:  notifier,
 		stream:    stream,
@@ -61,7 +63,7 @@ func NewOutputClientDataConsumer(
 
 // Start consuming from room servers
 func (s *OutputClientDataConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
 	return err
 }
 

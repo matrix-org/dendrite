@@ -43,6 +43,7 @@ var keyContentFields = map[string]string{
 type Inputer struct {
 	DB                   storage.Database
 	JetStream            nats.JetStreamContext
+	Durable              nats.SubOpt
 	ServerName           gomatrixserverlib.ServerName
 	ACLs                 *acls.ServerACLs
 	InputRoomEventTopic  string
@@ -59,14 +60,15 @@ func (r *Inputer) Start() error {
 		// later, possibly with an error response to the inputter if synchronous.
 		func(msg *nats.Msg) {
 			roomID := msg.Header.Get("room_id")
-			defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
 			var inputRoomEvent api.InputRoomEvent
 			if err := json.Unmarshal(msg.Data, &inputRoomEvent); err != nil {
 				_ = msg.Term()
 				return
 			}
 			inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
+			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 			inbox.(*phony.Inbox).Act(nil, func() {
+				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
 				if err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
 					sentry.CaptureException(err)
 				} else {
@@ -84,6 +86,8 @@ func (r *Inputer) Start() error {
 		// or nak them within a certain amount of time. This stops that from
 		// happening, so we don't end up doing a lot of unnecessary duplicate work.
 		nats.MaxDeliver(0),
+		// Use a durable named consumer.
+		r.Durable,
 	)
 	return err
 }
@@ -111,15 +115,17 @@ func (r *Inputer) InputRoomEvents(
 			if _, err = r.JetStream.PublishMsg(msg); err != nil {
 				return
 			}
-			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 		}
 	} else {
 		responses := make(chan error, len(request.InputRoomEvents))
 		defer close(responses)
 		for _, e := range request.InputRoomEvents {
 			inputRoomEvent := e
-			inbox, _ := r.workers.LoadOrStore(inputRoomEvent.Event.RoomID(), &phony.Inbox{})
+			roomID := inputRoomEvent.Event.RoomID()
+			inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
+			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 			inbox.(*phony.Inbox).Act(nil, func() {
+				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
 				err := r.processRoomEvent(context.TODO(), &inputRoomEvent)
 				if err != nil {
 					sentry.CaptureException(err)

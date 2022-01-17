@@ -67,13 +67,11 @@ func NewRoomserverAPI(
 			InputRoomEventTopic:  inputRoomEventTopic,
 			OutputRoomEventTopic: outputRoomEventTopic,
 			JetStream:            consumer,
+			Durable:              cfg.Matrix.JetStream.Durable("RoomserverInputConsumer"),
 			ServerName:           cfg.Matrix.ServerName,
 			ACLs:                 serverACLs,
 		},
 		// perform-er structs get initialised when we have a federation sender to use
-	}
-	if err := a.Inputer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
 	return a
 }
@@ -139,6 +137,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	}
 	r.Forgetter = &perform.Forgetter{
 		DB: r.DB,
+	}
+
+	if err := r.Inputer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
 }
 

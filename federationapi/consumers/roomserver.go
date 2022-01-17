@@ -37,6 +37,7 @@ type OutputRoomEventConsumer struct {
 	cfg       *config.FederationAPI
 	rsAPI     api.RoomserverInternalAPI
 	jetstream nats.JetStreamContext
+	durable   nats.SubOpt
 	db        storage.Database
 	queues    *queue.OutgoingQueues
 	topic     string
@@ -58,13 +59,14 @@ func NewOutputRoomEventConsumer(
 		db:        store,
 		queues:    queues,
 		rsAPI:     rsAPI,
+		durable:   cfg.Matrix.JetStream.Durable("FederationAPIRoomServerConsumer"),
 		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 	}
 }
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage)
+	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
 	return err
 }
 
