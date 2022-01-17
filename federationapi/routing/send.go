@@ -294,7 +294,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			t.Origin,
 			api.DoNotSendToOtherServers,
 			nil,
-			false,
+			true,
 		)
 
 		results[event.EventID()] = gomatrixserverlib.PDUResult{}
