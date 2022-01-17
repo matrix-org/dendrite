@@ -83,12 +83,6 @@ func (r *Inputer) processRoomEvent(
 		"type":     event.Type(),
 	})
 
-	if input.Origin == "" {
-		//	input.Origin = event.Origin()
-	}
-
-	logger.Println("XXX: Processing event")
-
 	// if we have already got this event then do not process it again, if the input kind is an outlier.
 	// Outliers contain no extra information which may warrant a re-processing.
 	if input.Kind == api.KindOutlier {
