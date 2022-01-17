@@ -70,20 +70,11 @@ var (
 			Help:      "Number of incoming EDUs from remote servers",
 		},
 	)
-	processEventSummary = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace: "dendrite",
-			Subsystem: "federationapi",
-			Name:      "process_event",
-			Help:      "How long it takes to process an incoming event and what work had to be done for it",
-		},
-		[]string{"work", "outcome"},
-	)
 )
 
 func init() {
 	prometheus.MustRegister(
-		pduCountTotal, eduCountTotal, processEventSummary,
+		pduCountTotal, eduCountTotal,
 	)
 }
 
@@ -305,6 +296,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 
 		util.GetLogger(ctx).WithError(err).Infof("XXX: Submitted event %q into input queue", event.EventID())
 		results[event.EventID()] = gomatrixserverlib.PDUResult{}
+		pduCountTotal.WithLabelValues("success").Inc()
 	}
 
 	wg.Wait()
