@@ -65,10 +65,13 @@ func TestKeyChanges(t *testing.T) {
 func TestKeyChangesNoDupes(t *testing.T) {
 	db, clean := MustCreateDatabase(t)
 	defer clean()
-	_, err := db.StoreKeyChange(ctx, "@alice:localhost")
+	deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
 	MustNotError(t, err)
-	_, err = db.StoreKeyChange(ctx, "@alice:localhost")
+	deviceChangeIDB, err := db.StoreKeyChange(ctx, "@alice:localhost")
 	MustNotError(t, err)
+	if deviceChangeIDA == deviceChangeIDB {
+		t.Fatalf("Expected change ID to be different even when inserting key change for the same user, got %d for both changes", deviceChangeIDA)
+	}
 	deviceChangeID, err := db.StoreKeyChange(ctx, "@alice:localhost")
 	MustNotError(t, err)
 	userIDs, latest, err := db.KeyChanges(ctx, 0, sarama.OffsetNewest)

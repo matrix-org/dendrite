@@ -40,7 +40,8 @@ const upsertKeyChangeSQL = "" +
 	"INSERT INTO keyserver_key_changes (user_id)" +
 	" VALUES ($1)" +
 	" ON CONFLICT" +
-	" DO UPDATE SET user_id = $1" +
+	// this only works because we rely on a single writer
+	" DO UPDATE SET change_id = change_id + 1" +
 	" RETURNING change_id"
 
 // select the highest offset for each user in the range. The grouping by user gives distinct entries and then we just
