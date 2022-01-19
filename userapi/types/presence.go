@@ -14,27 +14,17 @@
 
 package types
 
-import "strings"
-
 type PresenceStatus int
 
 //go:generate stringer -type=PresenceStatus -output=presence_string.go -linecomment
 const (
-	Unknown     PresenceStatus = iota - 1 // unknown
-	Online                                // online
+	Online      PresenceStatus = iota + 1 // online
 	Offline                               // offline
 	Unavailable                           // unavailable
 )
 
-// ToPresenceStatus tries to convert the given string to a PresenceStatus
-func ToPresenceStatus(v string) PresenceStatus {
-	switch strings.ToLower(v) {
-	case "online":
-		return Online
-	case "offline":
-		return Offline
-	case "unavailable":
-		return Unavailable
-	}
-	return Unknown
+var KnownPresence = map[string]PresenceStatus{
+	"online":      Online,
+	"offline":     Offline,
+	"unavailable": Unavailable,
 }

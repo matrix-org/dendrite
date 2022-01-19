@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -70,19 +71,20 @@ func SetPresence(req *http.Request,
 		}
 	}
 
-	p := types.ToPresenceStatus(r.Presence)
+	p := strings.TrimSpace(strings.ToLower(r.Presence))
 	// requested new presence is not allowed by the spec
-	if p == types.Unknown {
+	presence, ok := types.KnownPresence[p]
+	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(
-				fmt.Sprintf("The sent presence value '%s' is not allowed.", r.Presence),
+				fmt.Sprintf("The sent presence value '%s' is not allowed.", p),
 			),
 		}
 	}
 
 	lastActive := gomatrixserverlib.AsTimestamp(time.Now())
-	if err := api.SetPresence(req.Context(), eduAPI, userAPI, userID, r.StatusMsg, p, lastActive); err != nil {
+	if err := api.SetPresence(req.Context(), eduAPI, userAPI, userID, r.StatusMsg, presence, lastActive); err != nil {
 		logrus.WithError(err).Error("failed to send presence to eduserver")
 		return util.ErrorResponse(err)
 	}
@@ -94,10 +96,10 @@ func SetPresence(req *http.Request,
 }
 
 type presenceResponse struct {
-	Presence        string `json:"presence"`
-	StatusMsg       string `json:"status_msg,omitempty"`
-	LastActiveAgo   int64  `json:"last_active_ago,omitempty"`
-	CurrentlyActive bool   `json:"currently_active,omitempty"`
+	Presence        string  `json:"presence"`
+	StatusMsg       *string `json:"status_msg,omitempty"`
+	LastActiveAgo   int64   `json:"last_active_ago,omitempty"`
+	CurrentlyActive bool    `json:"currently_active,omitempty"`
 }
 
 // GetPresence returns the presence status of a given user.
@@ -145,7 +147,7 @@ func GetPresence(req *http.Request,
 	resp := presenceResponse{}
 	lastActive := time.Since(presence.LastActiveTS.Time())
 	resp.LastActiveAgo = lastActive.Milliseconds()
-	resp.StatusMsg = *presence.StatusMsg
+	resp.StatusMsg = presence.StatusMsg
 	resp.CurrentlyActive = lastActive <= time.Minute*5
 	if !resp.CurrentlyActive {
 		presence.PresenceStatus = types.Unavailable

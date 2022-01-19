@@ -8,20 +8,19 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[Unknown - -1]
-	_ = x[Online-0]
-	_ = x[Offline-1]
-	_ = x[Unavailable-2]
+	_ = x[Online-1]
+	_ = x[Offline-2]
+	_ = x[Unavailable-3]
 }
 
-const _PresenceStatus_name = "unknownonlineofflineunavailable"
+const _PresenceStatus_name = "onlineofflineunavailable"
 
-var _PresenceStatus_index = [...]uint8{0, 7, 13, 20, 31}
+var _PresenceStatus_index = [...]uint8{0, 6, 13, 24}
 
 func (i PresenceStatus) String() string {
-	i -= -1
+	i -= 1
 	if i < 0 || i >= PresenceStatus(len(_PresenceStatus_index)-1) {
-		return "PresenceStatus(" + strconv.FormatInt(int64(i+-1), 10) + ")"
+		return "PresenceStatus(" + strconv.FormatInt(int64(i+1), 10) + ")"
 	}
 	return _PresenceStatus_name[_PresenceStatus_index[i]:_PresenceStatus_index[i+1]]
 }
