@@ -505,7 +505,7 @@ func (a *UserInternalAPI) QueryPresenceForUser(ctx context.Context, req *api.Que
 		return err
 	}
 
-	res.PresenceStatus = p.Presence
+	res.Presence = p.Presence
 	res.StatusMsg = p.StatusMsg
 	res.LastActiveTS = p.LastActiveTS
 	res.UserID = p.UserID
@@ -526,11 +526,10 @@ func (a *UserInternalAPI) QueryPresenceAfter(ctx context.Context, req *api.Query
 	for _, x := range p {
 		var y api.QueryPresenceForUserResponse
 		y.UserID = x.UserID
-		y.Presence = x.Presence.String()
+		y.Presence = x.Presence
 		y.StreamPos = int64(x.StreamPos)
 		y.LastActiveTS = x.LastActiveTS
 		y.LastActiveAgo = x.LastActiveAgo
-		y.PresenceStatus = x.Presence
 		y.StatusMsg = x.StatusMsg
 		presences = append(presences, y)
 	}

@@ -361,8 +361,7 @@ type QueryPresenceForUserRequest struct {
 // QueryPresenceForUserResponse is the response for QueryPresenceForUserRequest
 type QueryPresenceForUserResponse struct {
 	UserID          string                      `json:"user_id"`
-	PresenceStatus  types.PresenceStatus        `json:"presence_status"`
-	Presence        string                      `json:"presence"`
+	Presence        types.PresenceStatus        `json:"presence"`
 	StatusMsg       *string                     `json:"status_msg"`
 	LastActiveTS    gomatrixserverlib.Timestamp `json:"last_active_ts"`
 	LastActiveAgo   int64                       `json:"last_active_ago"`
