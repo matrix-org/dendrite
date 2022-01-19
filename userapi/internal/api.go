@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -30,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/matrix-org/dendrite/userapi/storage/presence"
+	types2 "github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -102,6 +104,11 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	if err = a.AccountDB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
+		return err
+	}
+
+	lastActiveTS := int64(gomatrixserverlib.AsTimestamp(time.Now()))
+	if _, err = a.PresenceDB.UpsertPresence(ctx, acc.UserID, nil, types2.Online, lastActiveTS); err != nil {
 		return err
 	}
 
