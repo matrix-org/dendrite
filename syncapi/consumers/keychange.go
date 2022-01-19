@@ -38,7 +38,7 @@ type OutputKeyChangeEventConsumer struct {
 	keyChangeConsumer   *internal.ContinualConsumer
 	db                  storage.Database
 	notifier            *notifier.Notifier
-	stream              types.PartitionedStreamProvider
+	stream              types.StreamProvider
 	serverName          gomatrixserverlib.ServerName // our server name
 	rsAPI               roomserverAPI.RoomserverInternalAPI
 	keyAPI              api.KeyInternalAPI
@@ -57,7 +57,7 @@ func NewOutputKeyChangeEventConsumer(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.PartitionedStreamProvider,
+	stream types.StreamProvider,
 ) *OutputKeyChangeEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -143,10 +143,7 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, o
 	}
 	// make sure we get our own key updates too!
 	queryRes.UserIDsToCount[output.UserID] = 1
-	posUpdate := types.LogPosition{
-		Offset:    offset,
-		Partition: partition,
-	}
+	posUpdate := types.StreamPosition(offset)
 
 	s.stream.Advance(posUpdate)
 	for userID := range queryRes.UserIDsToCount {
@@ -170,10 +167,7 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage
 	}
 	// make sure we get our own key updates too!
 	queryRes.UserIDsToCount[output.UserID] = 1
-	posUpdate := types.LogPosition{
-		Offset:    offset,
-		Partition: partition,
-	}
+	posUpdate := types.StreamPosition(offset)
 
 	s.stream.Advance(posUpdate)
 	for userID := range queryRes.UserIDsToCount {
