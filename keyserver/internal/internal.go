@@ -59,8 +59,7 @@ func (a *KeyInternalAPI) InputDeviceListUpdate(
 }
 
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
-	partition := 0
-	userIDs, latest, err := a.DB.KeyChanges(ctx, int32(partition), req.Offset, req.ToOffset)
+	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Offset, req.ToOffset)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: err.Error(),

@@ -69,7 +69,8 @@ type DeviceMessage struct {
 	*DeviceKeys                         `json:"DeviceKeys,omitempty"`
 	*eduapi.OutputCrossSigningKeyUpdate `json:"CrossSigningKeyUpdate,omitempty"`
 	// A monotonically increasing number which represents device changes for this user.
-	StreamID int
+	StreamID       int
+	DeviceChangeID int64
 }
 
 // DeviceKeys represents a set of device keys for a single device
