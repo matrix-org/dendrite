@@ -27,27 +27,26 @@ import (
 var keyChangesSchema = `
 -- Stores key change information about users. Used to determine when to send updated device lists to clients.
 CREATE TABLE IF NOT EXISTS keyserver_key_changes (
-	partition BIGINT NOT NULL,
-	offset BIGINT NOT NULL,
+	change_id INTEGER PRIMARY KEY AUTOINCREMENT,
 	-- The key owner
 	user_id TEXT NOT NULL,
-	UNIQUE (partition, offset)
+	UNIQUE (user_id)
 );
 `
 
-// Replace based on partition|offset - we should never insert duplicates unless the kafka logs are wiped.
-// Rather than falling over, just overwrite (though this will mean clients with an existing sync token will
-// miss out on updates). TODO: Ideally we would detect when kafka logs are purged then purge this table too.
+// Replace based on user ID. We don't care how many times the user's keys have changed, only that they
+// have changed, hence we can just keep bumping the change ID for this user.
 const upsertKeyChangeSQL = "" +
-	"INSERT INTO keyserver_key_changes (partition, offset, user_id)" +
-	" VALUES ($1, $2, $3)" +
-	" ON CONFLICT (partition, offset)" +
-	" DO UPDATE SET user_id = $3"
+	"INSERT INTO keyserver_key_changes (user_id)" +
+	" VALUES ($1)" +
+	" ON CONFLICT" +
+	" DO UPDATE SET user_id = $1" +
+	" RETURNING change_id"
 
 // select the highest offset for each user in the range. The grouping by user gives distinct entries and then we just
 // take the max offset value as the latest offset.
 const selectKeyChangesSQL = "" +
-	"SELECT user_id, MAX(offset) FROM keyserver_key_changes WHERE partition = $1 AND offset > $2 AND offset <= $3 GROUP BY user_id"
+	"SELECT user_id, MAX(change_id) FROM keyserver_key_changes WHERE  change_id > $1 AND change_id <= $2 GROUP BY user_id"
 
 type keyChangesStatements struct {
 	db                   *sql.DB
@@ -72,19 +71,19 @@ func NewSqliteKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 	return s, nil
 }
 
-func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, partition int32, offset int64, userID string) error {
-	_, err := s.upsertKeyChangeStmt.ExecContext(ctx, partition, offset, userID)
-	return err
+func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {
+	err = s.upsertKeyChangeStmt.QueryRowContext(ctx, userID).Scan(&changeID)
+	return
 }
 
 func (s *keyChangesStatements) SelectKeyChanges(
-	ctx context.Context, partition int32, fromOffset, toOffset int64,
+	ctx context.Context, fromOffset, toOffset int64,
 ) (userIDs []string, latestOffset int64, err error) {
 	if toOffset == sarama.OffsetNewest {
 		toOffset = math.MaxInt64
 	}
 	latestOffset = fromOffset
-	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, partition, fromOffset, toOffset)
+	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, fromOffset, toOffset)
 	if err != nil {
 		return nil, 0, err
 	}
