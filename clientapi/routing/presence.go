@@ -150,9 +150,9 @@ func GetPresence(req *http.Request,
 	resp.StatusMsg = presence.StatusMsg
 	resp.CurrentlyActive = lastActive <= time.Minute*5
 	if !resp.CurrentlyActive {
-		presence.PresenceStatus = types.Unavailable
+		presence.Presence = types.Unavailable
 	}
-	resp.Presence = presence.PresenceStatus.String()
+	resp.Presence = presence.Presence.String()
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: resp,

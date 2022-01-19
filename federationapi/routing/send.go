@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -577,8 +578,14 @@ func (t *txnReq) handlePresence(ctx context.Context, e gomatrixserverlib.EDU) {
 		return
 	}
 	for _, presence := range payload.Push {
+		p := strings.TrimSpace(strings.ToLower(presence.Presence))
+		v, ok := types.KnownPresence[p]
+		if !ok {
+			util.GetLogger(ctx).WithField("presence", p).Warnf("dropping unknown presence")
+			continue
+		}
 		timestamp := gomatrixserverlib.AsTimestamp(now.Add(-(time.Millisecond * time.Duration(presence.LastActiveAgo))))
-		if err := eduserverAPI.SetPresence(ctx, t.eduAPI, t.userAPI, presence.UserID, presence.StatusMsg, types.ToPresenceStatus(presence.Presence), timestamp); err != nil {
+		if err := eduserverAPI.SetPresence(ctx, t.eduAPI, t.userAPI, presence.UserID, presence.StatusMsg, v, timestamp); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("unable to send presence data to edu server")
 		}
 	}

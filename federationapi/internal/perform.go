@@ -176,7 +176,7 @@ func (r *FederationInternalAPI) sendPresenceData(
 		ev := eduserverAPI.FederationPresenceSingle{
 			CurrentlyActive: lastActiveTS < time.Minute*5,
 			LastActiveAgo:   int(lastActiveTS.Milliseconds()),
-			Presence:        presence.Presence,
+			Presence:        presence.Presence.String(),
 			UserID:          presence.UserID,
 			StatusMsg:       presence.StatusMsg,
 		}
