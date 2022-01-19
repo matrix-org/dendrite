@@ -118,15 +118,15 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}
 	switch m.Type {
 	case api.TypeCrossSigningUpdate:
-		return s.onCrossSigningMessage(m, msg.Offset, msg.Partition)
+		return s.onCrossSigningMessage(m, msg.Offset)
 	case api.TypeDeviceKeyUpdate:
 		fallthrough
 	default:
-		return s.onDeviceKeyMessage(m, msg.Offset, msg.Partition)
+		return s.onDeviceKeyMessage(m, msg.Offset)
 	}
 }
 
-func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, offset int64, partition int32) error {
+func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, offset int64) error {
 	if m.DeviceKeys == nil {
 		return nil
 	}
@@ -153,7 +153,7 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, o
 	return nil
 }
 
-func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage, offset int64, partition int32) error {
+func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage, offset int64) error {
 	output := m.CrossSigningKeyUpdate
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
