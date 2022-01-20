@@ -224,26 +224,13 @@ func (n *Notifier) OnNewPresence(
 	defer n.streamLock.Unlock()
 
 	var wakeUserIDs []string
-	_, wantDomain, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return
-	}
-	// determine if users share a room and needs to be woken up
 	for _, users := range n.roomIDToJoinedUsers {
 		// user sending presence is not in room
 		if !users[userID] {
 			continue
 		}
-		// check all users in room
-		for user := range users {
-			_, domain, err := gomatrixserverlib.SplitID('@', user)
-			if err != nil {
-				return
-			}
-			if domain == wantDomain {
-				wakeUserIDs = append(wakeUserIDs, user)
-			}
-		}
+
+		wakeUserIDs = append(wakeUserIDs, users.values()...)
 	}
 
 	n.currPos.ApplyUpdates(posUpdate)
