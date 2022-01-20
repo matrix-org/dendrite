@@ -56,7 +56,7 @@ func (p *PresenceStreamProvider) IncrementalSync(ctx context.Context, req *types
 		pres := outputPresence{
 			CurrentlyActive: lastActive <= time.Minute*5,
 			LastActiveAgo:   lastActive.Milliseconds(),
-			Presence:        presence.PresenceStatus.String(),
+			Presence:        presence.Presence.String(),
 			StatusMsg:       presence.StatusMsg,
 		}
 
@@ -65,7 +65,7 @@ func (p *PresenceStreamProvider) IncrementalSync(ctx context.Context, req *types
 			req.Log.WithError(err).Error("json.Marshal failed")
 			return from
 		}
-		ev.Type = "m.presence"
+		ev.Type = gomatrixserverlib.MPresence
 		ev.Sender = presence.UserID
 		ev.Content = j
 
