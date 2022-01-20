@@ -107,7 +107,7 @@ func (r *FederationInternalAPI) PerformJoin(
 
 		// once we successfully joined a remote room, send available presence data to it
 		if err := r.sendPresenceData(ctx, request.RoomID, serverName); err != nil {
-			lastErr = err
+			lastErr = err // nolint: staticcheck
 		}
 
 		// We're all good.
@@ -145,7 +145,7 @@ func (r *FederationInternalAPI) sendPresenceData(
 ) (err error) {
 	// query current presence for users
 	memberShip := roomserverAPI.QueryMembershipsForRoomResponse{}
-	if err := r.rsAPI.QueryMembershipsForRoom(ctx, &roomserverAPI.QueryMembershipsForRoomRequest{RoomID: roomID, JoinedOnly: true}, &memberShip); err != nil {
+	if err = r.rsAPI.QueryMembershipsForRoom(ctx, &roomserverAPI.QueryMembershipsForRoomRequest{RoomID: roomID, JoinedOnly: true}, &memberShip); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"server_name": serverName,
 			"room_id":     roomID,
@@ -154,9 +154,10 @@ func (r *FederationInternalAPI) sendPresenceData(
 	}
 
 	content := eduserverAPI.FederationPresenceData{}
+	var senderServerName gomatrixserverlib.ServerName
 	for _, event := range memberShip.JoinEvents {
 		// only send presence events which originated from us
-		_, senderServerName, err := gomatrixserverlib.SplitID('@', event.Sender)
+		_, senderServerName, err = gomatrixserverlib.SplitID('@', event.Sender)
 		if err != nil {
 			continue
 		}
@@ -164,7 +165,7 @@ func (r *FederationInternalAPI) sendPresenceData(
 			continue
 		}
 		var presence userAPI.QueryPresenceForUserResponse
-		if err := r.userAPI.QueryPresenceForUser(ctx, &userAPI.QueryPresenceForUserRequest{UserID: event.Sender}, &presence); err != nil {
+		if err = r.userAPI.QueryPresenceForUser(ctx, &userAPI.QueryPresenceForUserRequest{UserID: event.Sender}, &presence); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"server_name": serverName,
 				"room_id":     roomID,

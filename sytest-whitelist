@@ -551,7 +551,6 @@ Can delete backup
 Deleted & recreated backups are empty
 GET /presence/:user_id/status fetches initial status
 PUT /presence/:user_id/status updates my presence
-Presence change reports an event to myself
 Can upload self-signing keys
 Fails to upload self-signing keys with no auth
 Fails to upload self-signing key without master key
@@ -560,9 +559,7 @@ Changing master key notifies local users
 Changing user-signing key notifies local users
 Inbound federation correctly handles soft failed events as extremities
 Existing members see new members' presence
-Presence changes are reported to local room members
 Presence changes are also reported to remote room members
-Presence changes to UNAVAILABLE are reported to local room members
 Presence changes to UNAVAILABLE are reported to remote room members
 Can read configuration endpoint
 User can create and send/receive messages in a room with version 7
@@ -597,3 +594,5 @@ Remote user can backfill in a room with version 9
 Can reject invites over federation for rooms with version 9
 Can receive redactions from regular users over federation in room version 9
 Existing members see new member's presence
+Newly joined room includes presence in incremental sync
+Get presence for newly joined members in incremental sync
