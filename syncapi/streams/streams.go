@@ -18,8 +18,8 @@ type Streams struct {
 	InviteStreamProvider       types.StreamProvider
 	SendToDeviceStreamProvider types.StreamProvider
 	AccountDataStreamProvider  types.StreamProvider
+	DeviceListStreamProvider   types.StreamProvider
 	PresenceDataStreamProvider types.StreamProvider
-	DeviceListStreamProvider   types.PartitionedStreamProvider
 }
 
 func NewSyncStreamProviders(
@@ -54,9 +54,9 @@ func NewSyncStreamProviders(
 			rsAPI:          rsAPI,
 		},
 		DeviceListStreamProvider: &DeviceListStreamProvider{
-			PartitionedStreamProvider: PartitionedStreamProvider{DB: d},
-			rsAPI:                     rsAPI,
-			keyAPI:                    keyAPI,
+			StreamProvider: StreamProvider{DB: d},
+			rsAPI:          rsAPI,
+			keyAPI:         keyAPI,
 		},
 	}
 

@@ -42,11 +42,3 @@ type StreamProvider interface {
 	// LatestPosition returns the latest stream position for this stream.
 	LatestPosition(ctx context.Context) StreamPosition
 }
-
-type PartitionedStreamProvider interface {
-	Setup()
-	Advance(latest LogPosition)
-	CompleteSync(ctx context.Context, req *SyncRequest) LogPosition
-	IncrementalSync(ctx context.Context, req *SyncRequest, from, to LogPosition) LogPosition
-	LatestPosition(ctx context.Context) LogPosition
-}
