@@ -57,6 +57,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
+	if err = kc.Prepare(); err != nil {
+		return nil, err
+	}
 	d := &shared.Database{
 		DB:                    db,
 		Writer:                sqlutil.NewDummyWriter(),

@@ -57,16 +57,17 @@ func NewPostgresKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 		db: db,
 	}
 	_, err := db.Exec(keyChangesSchema)
-	if err != nil {
-		return nil, err
+	return s, err
+}
+
+func (s *keyChangesStatements) Prepare() (err error) {
+	if s.upsertKeyChangeStmt, err = s.db.Prepare(upsertKeyChangeSQL); err != nil {
+		return err
 	}
-	if s.upsertKeyChangeStmt, err = db.Prepare(upsertKeyChangeSQL); err != nil {
-		return nil, err
+	if s.selectKeyChangesStmt, err = s.db.Prepare(selectKeyChangesSQL); err != nil {
+		return err
 	}
-	if s.selectKeyChangesStmt, err = db.Prepare(selectKeyChangesSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return nil
 }
 
 func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {
