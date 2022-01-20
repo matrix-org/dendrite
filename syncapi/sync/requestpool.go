@@ -17,6 +17,7 @@
 package sync
 
 import (
+	"encoding/json"
 	"net"
 	"net/http"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	types2 "github.com/matrix-org/dendrite/userapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -150,7 +152,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	activeSyncRequests.Inc()
 	defer activeSyncRequests.Dec()
 
-	defer rp.updatePresence(req, device)
+	rp.updatePresence(req, syncReq, device)
 	rp.updateLastSeen(req, device)
 
 	waitingSyncRequests.Inc()
@@ -254,27 +256,102 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		}
 	}
 
+	rp.appendAndDedupePresence(syncReq)
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: syncReq.Response,
 	}
 }
 
+// TODO: find better solution to get new room memberships
+func (rp *RequestPool) appendAndDedupePresence(syncReq *types.SyncRequest) {
+	// check for new members
+	for _, state := range syncReq.Response.Rooms.Join {
+		for x := range state.State.Events {
+			ev := state.State.Events[x]
+			if ev.Type == "m.room.member" {
+				pRes := &userapi.QueryPresenceForUserResponse{}
+				if err := rp.userAPI.QueryPresenceForUser(syncReq.Context, &userapi.QueryPresenceForUserRequest{UserID: ev.Sender}, pRes); err != nil {
+					syncReq.Log.WithError(err).WithField("userID", ev.Sender).Error("unable to fetch presence for user")
+					continue
+				}
+				appendPresence(syncReq, pRes)
+			}
+		}
+	}
+
+	// dedupe presence
+	presMap := make(map[string]gomatrixserverlib.ClientEvent)
+	for _, ev := range syncReq.Response.Presence.Events {
+		/* TODO: strip out own presence, otherwise these tests fail:
+		Newly joined room includes presence in incremental sync
+		Get presence for newly joined members in incremental sync
+		*/
+		if ev.Sender == syncReq.Device.UserID {
+			continue
+		}
+		presMap[ev.Sender] = ev
+	}
+	pres := make([]gomatrixserverlib.ClientEvent, 0)
+	for _, ev := range presMap {
+		pres = append(pres, ev)
+	}
+	syncReq.Response.Presence.Events = pres
+}
+
+type outputPresence struct {
+	AvatarUrl       string  `json:"avatar_url,omitempty"`
+	CurrentlyActive bool    `json:"currently_active,omitempty"`
+	LastActiveAgo   int64   `json:"last_active_ago,omitempty"`
+	Presence        string  `json:"presence,omitempty"`
+	StatusMsg       *string `json:"status_msg,omitempty"`
+}
+
+func appendPresence(syncReq *types.SyncRequest, presence *userapi.QueryPresenceForUserResponse) {
+
+	ev := gomatrixserverlib.ClientEvent{}
+	lastActive := time.Since(presence.LastActiveTS.Time())
+	pres := outputPresence{
+		CurrentlyActive: lastActive <= time.Minute*5,
+		LastActiveAgo:   lastActive.Milliseconds(),
+		Presence:        presence.Presence.String(),
+		StatusMsg:       presence.StatusMsg,
+	}
+
+	j, err := json.Marshal(pres)
+	if err != nil {
+		syncReq.Log.WithError(err).Error("json.Marshal failed")
+		return
+	}
+	ev.Type = gomatrixserverlib.MPresence
+	ev.Sender = presence.UserID
+	ev.Content = j
+
+	syncReq.Response.Presence.Events = append(syncReq.Response.Presence.Events, ev)
+}
+
 // updatePresence updates/sets the presence if user asks for it
-func (rp *RequestPool) updatePresence(req *http.Request, device *userapi.Device) {
+func (rp *RequestPool) updatePresence(req *http.Request, syncReq *types.SyncRequest, device *userapi.Device) {
 	presence := req.URL.Query().Get("set_presence")
+	presence = strings.TrimSpace(strings.ToLower(presence))
 
 	// If this parameter is omitted then the client is automatically marked as online when it uses this API.
 	if presence == "" {
 		presence = "online"
 	}
+	v, ok := types2.KnownPresence[presence]
+	if !ok {
+		syncReq.Log.WithField("presence", presence).Warn("unknown presence type")
+		return
+	}
+
 	pReq := &userapi.InputPresenceRequest{
 		UserID:       device.UserID,
-		Presence:     types2.ToPresenceStatus(presence),
-		LastActiveTS: time.Now().Unix(),
+		Presence:     v,
+		LastActiveTS: int64(gomatrixserverlib.AsTimestamp(time.Now())),
 	}
-	rp.userAPI.InputPresenceData(req.Context(), pReq, &userapi.InputPresenceResponse{}) // nolint:errcheck
-
+	_ = rp.userAPI.InputPresenceData(req.Context(), pReq, &userapi.InputPresenceResponse{})
 }
 
 func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
