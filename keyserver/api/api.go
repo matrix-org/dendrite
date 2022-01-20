@@ -224,8 +224,6 @@ type QueryKeysResponse struct {
 }
 
 type QueryKeyChangesRequest struct {
-	// The partition which had key events sent to
-	Partition int32
 	// The offset of the last received key event, or sarama.OffsetOldest if this is from the beginning
 	Offset int64
 	// The inclusive offset where to track key changes up to. Messages with this offset are included in the response.
@@ -236,8 +234,6 @@ type QueryKeyChangesRequest struct {
 type QueryKeyChangesResponse struct {
 	// The set of users who have had their keys change.
 	UserIDs []string
-	// The partition being served - useful if the partition is unknown at request time
-	Partition int32
 	// The latest offset represented in this response.
 	Offset int64
 	// Set if there was a problem handling the request.

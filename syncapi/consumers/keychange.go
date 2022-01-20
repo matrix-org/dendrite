@@ -38,7 +38,7 @@ type OutputKeyChangeEventConsumer struct {
 	keyChangeConsumer   *internal.ContinualConsumer
 	db                  storage.Database
 	notifier            *notifier.Notifier
-	stream              types.PartitionedStreamProvider
+	stream              types.StreamProvider
 	serverName          gomatrixserverlib.ServerName // our server name
 	rsAPI               roomserverAPI.RoomserverInternalAPI
 	keyAPI              api.KeyInternalAPI
@@ -57,7 +57,7 @@ func NewOutputKeyChangeEventConsumer(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.PartitionedStreamProvider,
+	stream types.StreamProvider,
 ) *OutputKeyChangeEventConsumer {
 
 	consumer := internal.ContinualConsumer{
@@ -118,15 +118,15 @@ func (s *OutputKeyChangeEventConsumer) onMessage(msg *sarama.ConsumerMessage) er
 	}
 	switch m.Type {
 	case api.TypeCrossSigningUpdate:
-		return s.onCrossSigningMessage(m, msg.Offset, msg.Partition)
+		return s.onCrossSigningMessage(m, msg.Offset)
 	case api.TypeDeviceKeyUpdate:
 		fallthrough
 	default:
-		return s.onDeviceKeyMessage(m, msg.Offset, msg.Partition)
+		return s.onDeviceKeyMessage(m, msg.Offset)
 	}
 }
 
-func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, offset int64, partition int32) error {
+func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, offset int64) error {
 	if m.DeviceKeys == nil {
 		return nil
 	}
@@ -143,10 +143,7 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, o
 	}
 	// make sure we get our own key updates too!
 	queryRes.UserIDsToCount[output.UserID] = 1
-	posUpdate := types.LogPosition{
-		Offset:    offset,
-		Partition: partition,
-	}
+	posUpdate := types.StreamPosition(offset)
 
 	s.stream.Advance(posUpdate)
 	for userID := range queryRes.UserIDsToCount {
@@ -156,7 +153,7 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, o
 	return nil
 }
 
-func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage, offset int64, partition int32) error {
+func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage, offset int64) error {
 	output := m.CrossSigningKeyUpdate
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
@@ -170,10 +167,7 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage
 	}
 	// make sure we get our own key updates too!
 	queryRes.UserIDsToCount[output.UserID] = 1
-	posUpdate := types.LogPosition{
-		Offset:    offset,
-		Partition: partition,
-	}
+	posUpdate := types.StreamPosition(offset)
 
 	s.stream.Advance(posUpdate)
 	for userID := range queryRes.UserIDsToCount {
