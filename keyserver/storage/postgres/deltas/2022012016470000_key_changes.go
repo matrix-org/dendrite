@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/pressly/goose"
+	"github.com/sirupsen/logrus"
 )
 
 func LoadFromGoose() {
@@ -31,6 +32,7 @@ func LoadRefactorKeyChanges(m *sqlutil.Migrations) {
 }
 
 func UpRefactorKeyChanges(tx *sql.Tx) error {
+	logrus.Infof("running delta!")
 	// start counting from the last max offset, else 0.
 	var maxOffset int64
 	_ = tx.QueryRow(`SELECT MAX(log_offset) FROM keyserver_key_changes`).Scan(&maxOffset)

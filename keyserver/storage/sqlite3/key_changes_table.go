@@ -37,11 +37,8 @@ CREATE TABLE IF NOT EXISTS keyserver_key_changes (
 // Replace based on user ID. We don't care how many times the user's keys have changed, only that they
 // have changed, hence we can just keep bumping the change ID for this user.
 const upsertKeyChangeSQL = "" +
-	"INSERT INTO keyserver_key_changes (user_id)" +
+	"INSERT OR REPLACE INTO keyserver_key_changes (user_id)" +
 	" VALUES ($1)" +
-	" ON CONFLICT" +
-	// this only works because we rely on a single writer
-	" DO UPDATE SET change_id = change_id + 1" +
 	" RETURNING change_id"
 
 const selectKeyChangesSQL = "" +
