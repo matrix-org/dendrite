@@ -44,10 +44,8 @@ const upsertKeyChangeSQL = "" +
 	" DO UPDATE SET change_id = change_id + 1" +
 	" RETURNING change_id"
 
-// select the highest offset for each user in the range. The grouping by user gives distinct entries and then we just
-// take the max offset value as the latest offset.
 const selectKeyChangesSQL = "" +
-	"SELECT user_id, MAX(change_id) FROM keyserver_key_changes WHERE  change_id > $1 AND change_id <= $2 GROUP BY user_id"
+	"SELECT user_id, change_id FROM keyserver_key_changes WHERE change_id > $1 AND change_id <= $2"
 
 type keyChangesStatements struct {
 	db                   *sql.DB
