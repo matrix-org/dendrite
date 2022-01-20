@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/keyserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -49,6 +50,11 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 	}
 	css, err := NewPostgresCrossSigningSigsTable(db)
 	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrations()
+	deltas.LoadRefactorKeyChanges(m)
+	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
 	d := &shared.Database{
