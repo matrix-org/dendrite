@@ -166,6 +166,7 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	missingPrev := false
 	if input.Kind != api.KindOutlier && len(missingRes.MissingPrevEventIDs) > 0 {
 		if len(serverRes.ServerNames) > 0 {
 			missingState := missingStateReq{
@@ -182,10 +183,12 @@ func (r *Inputer) processRoomEvent(
 			}
 			if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), input.Event.RoomVersion); err != nil {
 				isRejected = true
+				missingPrev = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
 			}
 		} else {
 			isRejected = true
+			missingPrev = true
 			rejectionErr = fmt.Errorf("missing prev events and no other servers to ask")
 		}
 	}
@@ -221,7 +224,7 @@ func (r *Inputer) processRoomEvent(
 		return fmt.Errorf("r.DB.RoomInfo missing for room %s", event.RoomID())
 	}
 
-	if stateAtEvent.BeforeStateSnapshotNID == 0 {
+	if !missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, input, roomInfo, &stateAtEvent, event, isRejected)
