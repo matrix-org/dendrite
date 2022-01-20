@@ -35,7 +35,7 @@ func UpRefactorKeyChanges(tx *sql.Tx) error {
 	logrus.Infof("running delta!")
 	// start counting from the last max offset, else 0.
 	var maxOffset int64
-	_ = tx.QueryRow(`SELECT MAX(log_offset) FROM keyserver_key_changes`).Scan(&maxOffset)
+	_ = tx.QueryRow(`SELECT coalesce(MAX(log_offset), 0) AS offset FROM keyserver_key_changes`).Scan(&maxOffset)
 	if _, err := tx.Exec(fmt.Sprintf(`CREATE SEQUENCE IF NOT EXISTS keyserver_key_changes_seq START %d`, maxOffset)); err != nil {
 		return fmt.Errorf("failed to CREATE SEQUENCE for key changes, starting at %d: %s", maxOffset, err)
 	}
