@@ -273,6 +273,9 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		err = ErrMalformedSyncToken
 		return
 	}
+	// Migration: Remove everything after and including '.' - we previously had tokens like:
+	// s478_0_0_0_0_13.dl-0-2 but we have now removed partitioned stream positions
+	tok = strings.Split(tok, ".")[0]
 	parts := strings.Split(tok[1:], "_")
 	var positions [7]StreamPosition
 	for i, p := range parts {

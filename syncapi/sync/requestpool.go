@@ -142,7 +142,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	if err != nil {
 		if err == types.ErrMalformedSyncToken {
 			return util.JSONResponse{
-				Code: http.StatusUnauthorized,
+				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidArgumentValue(err.Error()),
 			}
 		}
