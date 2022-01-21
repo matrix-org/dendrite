@@ -66,14 +66,14 @@ type Database interface {
 	// cannot be claimed or if none exist for this (user, device, algorithm), instead it is omitted from the returned slice.
 	ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[string]map[string]string) ([]api.OneTimeKeys, error)
 
-	// StoreKeyChange stores key change metadata after the change has been sent to Kafka. `userID` is the the user who has changed
-	// their keys in some way.
-	StoreKeyChange(ctx context.Context, partition int32, offset int64, userID string) error
+	// StoreKeyChange stores key change metadata and returns the device change ID which represents the position in the /sync stream for this device change.
+	// `userID` is the the user who has changed their keys in some way.
+	StoreKeyChange(ctx context.Context, userID string) (int64, error)
 
 	// KeyChanges returns a list of user IDs who have modified their keys from the offset given (exclusive) to the offset given (inclusive).
 	// A to offset of sarama.OffsetNewest means no upper limit.
 	// Returns the offset of the latest key change.
-	KeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
+	KeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
 
 	// StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
 	// If no domains are given, all user IDs with stale device lists are returned.
