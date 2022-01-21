@@ -322,7 +322,7 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 		); err != nil {
 			return nil, err
 		}
-		if result.BeforeStateSnapshotNID == 0 {
+		if result.BeforeStateSnapshotNID == 0 && result.EventTypeNID != types.MRoomCreateNID {
 			return nil, types.MissingEventError(
 				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
 			)
