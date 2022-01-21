@@ -168,6 +168,9 @@ func (r *Inputer) processRoomEvent(
 
 	missingPrev := len(missingRes.MissingPrevEventIDs) > 0
 	if missingPrev && input.Kind == api.KindNew {
+		// Don't do this for KindOld events, otherwise old events that we fetch
+		// to satisfy missing prev events/state will end up recursively calling
+		// processRoomEvent.
 		if len(serverRes.ServerNames) > 0 {
 			missingState := missingStateReq{
 				origin:     input.Origin,
@@ -228,7 +231,7 @@ func (r *Inputer) processRoomEvent(
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, input, roomInfo, &stateAtEvent, event, isRejected)
-		if err != nil && input.Kind != api.KindOld {
+		if err != nil {
 			return fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
 	}
