@@ -134,7 +134,7 @@ func (r *Inputer) processRoomEvent(
 	isRejected := false
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
-	if err = r.checkForMissingAuthEvents(ctx, logger, input.Event, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+	if err = r.checkForMissingAuthEvents(ctx, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
 		return fmt.Errorf("r.checkForMissingAuthEvents: %w", err)
 	}
 
@@ -184,7 +184,7 @@ func (r *Inputer) processRoomEvent(
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 			}
-			if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), input.Event.RoomVersion); err != nil {
+			if err = missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
 				isRejected = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
 			} else {
