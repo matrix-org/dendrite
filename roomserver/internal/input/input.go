@@ -108,7 +108,7 @@ func (r *Inputer) InputRoomEvents(
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) {
-	if false && request.Asynchronous {
+	if request.Asynchronous {
 		var err error
 		for _, e := range request.InputRoomEvents {
 			msg := &nats.Msg{
