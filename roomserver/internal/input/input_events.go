@@ -166,8 +166,8 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	missingPrev := false
-	if input.Kind != api.KindOutlier && len(missingRes.MissingPrevEventIDs) > 0 {
+	missingPrev := len(missingRes.MissingPrevEventIDs) > 0
+	if missingPrev && input.Kind != api.KindOutlier {
 		if len(serverRes.ServerNames) > 0 {
 			missingState := missingStateReq{
 				origin:     input.Origin,
@@ -183,12 +183,12 @@ func (r *Inputer) processRoomEvent(
 			}
 			if err = missingState.processEventWithMissingState(ctx, input.Event.Unwrap(), input.Event.RoomVersion); err != nil {
 				isRejected = true
-				missingPrev = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
+			} else {
+				missingPrev = false
 			}
 		} else {
 			isRejected = true
-			missingPrev = true
 			rejectionErr = fmt.Errorf("missing prev events and no other servers to ask")
 		}
 	}
