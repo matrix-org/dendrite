@@ -19,7 +19,6 @@ not contain the Go toolchain etc.
 
 There are three sample `docker-compose` files:
 
-- `docker-compose.deps.yml` which runs the Postgres and Kafka prerequisites
 - `docker-compose.monolith.yml` which runs a monolith Dendrite deployment
 - `docker-compose.polylith.yml` which runs a polylith Dendrite deployment
 
@@ -28,7 +27,7 @@ There are three sample `docker-compose` files:
 The `docker-compose` files refer to the `/etc/dendrite` volume as where the
 runtime config should come from. The mounted folder must contain:
 
-- `dendrite.yaml` configuration file (based on the [`dendrite-config.yaml`](https://raw.githubusercontent.com/matrix-org/dendrite/master/dendrite-config.yaml)
+- `dendrite.yaml` configuration file (from the [Docker config folder](https://github.com/matrix-org/dendrite/tree/master/build/docker/config)
    sample in the `build/docker/config` folder of this repository.)
 - `matrix_key.pem` server key, as generated using `cmd/generate-keys`
 - `server.crt` certificate file
@@ -50,15 +49,9 @@ The key files will now exist in your current working directory, and can be mount
 
 ## Starting Dendrite as a monolith deployment
 
-Create your config based on the [`dendrite-config.yaml`](https://raw.githubusercontent.com/matrix-org/dendrite/master/dendrite-config.yaml) configuration file in the `build/docker/config` folder of this repository. And rename the config file to `dendrite.yml` (and put it in your `config` directory).
+Create your config based on the [`dendrite.yaml`](https://github.com/matrix-org/dendrite/tree/master/build/docker/config) configuration file in the `build/docker/config` folder of this repository.
 
-Once in place, start the PostgreSQL dependency:
-
-```
-docker-compose -f docker-compose.deps.yml up postgres
-```
-
-Wait a few seconds for PostgreSQL to finish starting up, and then start a monolith:
+Then start the deployment:
 
 ```
 docker-compose -f docker-compose.monolith.yml up
@@ -66,15 +59,9 @@ docker-compose -f docker-compose.monolith.yml up
 
 ## Starting Dendrite as a polylith deployment
 
-Create your config based on the [`dendrite-config.yaml`](https://raw.githubusercontent.com/matrix-org/dendrite/master/dendrite-config.yaml) configuration file in the `build/docker/config` folder of this repository. And rename the config file to `dendrite.yml` (and put it in your `config` directory).
+Create your config based on the [`dendrite-config.yaml`](https://github.com/matrix-org/dendrite/tree/master/build/docker/config) configuration file in the `build/docker/config` folder of this repository.
 
-Once in place, start all the dependencies:
-
-```
-docker-compose -f docker-compose.deps.yml up
-```
-
-Wait a few seconds for PostgreSQL and Kafka to finish starting up, and then start a polylith:
+Then start the deployment:
 
 ```
 docker-compose -f docker-compose.polylith.yml up

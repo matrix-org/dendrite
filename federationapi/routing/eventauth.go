@@ -16,6 +16,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -29,15 +30,42 @@ func GetEventAuth(
 	roomID string,
 	eventID string,
 ) util.JSONResponse {
-	// TODO: Optimisation: we shouldn't be querying all the room state
-	// that is in state.StateEvents - we just ignore it.
-	state, err := getState(ctx, request, rsAPI, roomID, eventID)
+	event, resErr := fetchEvent(ctx, rsAPI, eventID)
+	if resErr != nil {
+		return *resErr
+	}
+
+	if event.RoomID() != roomID {
+		return util.JSONResponse{Code: http.StatusNotFound, JSON: jsonerror.NotFound("event does not belong to this room")}
+	}
+	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
+	if resErr != nil {
+		return *resErr
+	}
+
+	var response api.QueryStateAndAuthChainResponse
+	err := rsAPI.QueryStateAndAuthChain(
+		ctx,
+		&api.QueryStateAndAuthChainRequest{
+			RoomID:             roomID,
+			PrevEventIDs:       []string{eventID},
+			AuthEventIDs:       event.AuthEventIDs(),
+			OnlyFetchAuthChain: true,
+		},
+		&response,
+	)
 	if err != nil {
-		return *err
+		return util.ErrorResponse(err)
+	}
+
+	if !response.RoomExists {
+		return util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: gomatrixserverlib.RespEventAuth{AuthEvents: state.AuthEvents},
+		JSON: gomatrixserverlib.RespEventAuth{
+			AuthEvents: gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
+		},
 	}
 }

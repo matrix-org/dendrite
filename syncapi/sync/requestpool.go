@@ -140,6 +140,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
+		if err == types.ErrMalformedSyncToken {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidArgumentValue(err.Error()),
+			}
+		}
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown(err.Error()),

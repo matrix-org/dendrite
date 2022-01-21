@@ -10,7 +10,7 @@ import (
 )
 
 type DeviceListStreamProvider struct {
-	PartitionedStreamProvider
+	StreamProvider
 	rsAPI  api.RoomserverInternalAPI
 	keyAPI keyapi.KeyInternalAPI
 }
@@ -18,15 +18,15 @@ type DeviceListStreamProvider struct {
 func (p *DeviceListStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
-) types.LogPosition {
+) types.StreamPosition {
 	return p.LatestPosition(ctx)
 }
 
 func (p *DeviceListStreamProvider) IncrementalSync(
 	ctx context.Context,
 	req *types.SyncRequest,
-	from, to types.LogPosition,
-) types.LogPosition {
+	from, to types.StreamPosition,
+) types.StreamPosition {
 	var err error
 	to, _, err = internal.DeviceListCatchup(context.Background(), p.keyAPI, p.rsAPI, req.Device.UserID, req.Response, from, to)
 	if err != nil {

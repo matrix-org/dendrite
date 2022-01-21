@@ -48,7 +48,7 @@ const HEAD = "HEAD"
 // due to the error:
 //   When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
-const Dockerfile = `FROM golang:1.13-stretch as build
+const Dockerfile = `FROM golang:1.16-stretch as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 
@@ -189,7 +189,9 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 		if err := decoder.Decode(&dl); err != nil {
 			return "", fmt.Errorf("failed to decode build image output line: %w", err)
 		}
-		log.Printf("%s: %s", branchOrTagName, dl.Stream)
+		if len(strings.TrimSpace(dl.Stream)) > 0 {
+			log.Printf("%s: %s", branchOrTagName, dl.Stream)
+		}
 		if dl.Aux != nil {
 			imgID, ok := dl.Aux["ID"]
 			if ok {
@@ -425,8 +427,10 @@ func cleanup(dockerClient *client.Client) {
 	// ignore all errors, we are just cleaning up and don't want to fail just because we fail to cleanup
 	containers, _ := dockerClient.ContainerList(context.Background(), types.ContainerListOptions{
 		Filters: label(dendriteUpgradeTestLabel),
+		All:     true,
 	})
 	for _, c := range containers {
+		log.Printf("Removing container: %v %v\n", c.ID, c.Names)
 		s := time.Second
 		_ = dockerClient.ContainerStop(context.Background(), c.ID, &s)
 		_ = dockerClient.ContainerRemove(context.Background(), c.ID, types.ContainerRemoveOptions{
