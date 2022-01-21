@@ -63,7 +63,7 @@ func SendEventWithState(
 			continue
 		}
 		ires = append(ires, InputRoomEvent{
-			Kind:         KindOutlier,
+			Kind:         kind,
 			Event:        outlier.Headered(event.RoomVersion),
 			Origin:       origin,
 			AuthEventIDs: outlier.AuthEventIDs(),
