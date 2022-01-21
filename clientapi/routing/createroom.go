@@ -452,20 +452,17 @@ func createRoom(
 			return jsonerror.InternalServerError()
 		}
 
-		accumulated := gomatrixserverlib.UnwrapEventHeaders(builtEvents)
-		if err = roomserverAPI.SendEventWithState(
-			req.Context(),
-			rsAPI,
-			roomserverAPI.KindNew,
-			&gomatrixserverlib.RespState{
-				StateEvents: accumulated,
-				AuthEvents:  accumulated,
-			},
-			ev.Headered(roomVersion),
-			nil,
-			false,
-		); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("SendEventWithState failed")
+		inputs := make([]roomserverAPI.InputRoomEvent, 0, len(builtEvents))
+		for _, event := range builtEvents {
+			inputs = append(inputs, roomserverAPI.InputRoomEvent{
+				Kind:         roomserverAPI.KindNew,
+				Event:        event,
+				AuthEventIDs: event.AuthEventIDs(),
+				SendAsServer: roomserverAPI.DoNotSendToOtherServers,
+			})
+		}
+		if err = roomserverAPI.SendInputRoomEvents(req.Context(), rsAPI, inputs, false); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 			return jsonerror.InternalServerError()
 		}
 	}
