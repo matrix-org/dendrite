@@ -149,12 +149,8 @@ func (r *Queryer) QueryMissingAuthPrevEvents(
 	}
 
 	for _, prevEventID := range request.PrevEventIDs {
-		if eventTypes, err := r.DB.EventTypeNIDs(ctx, []string{prevEventID}); err != nil || len(eventTypes) == 0 {
-			response.MissingPrevEventIDs = append(response.MissingPrevEventIDs, prevEventID)
-		} else if eventTypes[prevEventID] != types.MRoomCreateNID {
-			// We only want to check for missing state for events that aren't create
-			// events, because there is no state before a create event
-			if state, err := r.DB.StateAtEventIDs(ctx, []string{prevEventID}); err != nil || len(state) == 0 {
+		if state, err := r.DB.StateAtEventIDs(ctx, []string{prevEventID}); err != nil || len(state) == 0 {
+			if state[0].EventTypeNID != types.MRoomCreateNID {
 				response.MissingPrevEventIDs = append(response.MissingPrevEventIDs, prevEventID)
 			}
 		}
