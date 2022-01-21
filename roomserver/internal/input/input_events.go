@@ -166,7 +166,7 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	missingPrev := len(missingRes.MissingPrevEventIDs) > 0
+	missingPrev := !input.HasState && len(missingRes.MissingPrevEventIDs) > 0
 	if missingPrev && input.Kind == api.KindNew {
 		// Don't do this for KindOld events, otherwise old events that we fetch
 		// to satisfy missing prev events/state will end up recursively calling
