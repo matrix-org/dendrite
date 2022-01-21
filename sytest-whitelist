@@ -588,3 +588,4 @@ User can invite remote user to room with version 9
 Remote user can backfill in a room with version 9
 Can reject invites over federation for rooms with version 9
 Can receive redactions from regular users over federation in room version 9
+Forward extremities remain so even after the next events are populated as outliers
