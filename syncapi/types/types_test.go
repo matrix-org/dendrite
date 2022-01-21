@@ -2,50 +2,17 @@ package types
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-func TestNewSyncTokenWithLogs(t *testing.T) {
-	tests := map[string]*StreamingToken{
-		"s4_0_0_0_0_0": {
-			PDUPosition: 4,
-		},
-		"s4_0_0_0_0_0.dl-0-123": {
-			PDUPosition: 4,
-			DeviceListPosition: LogPosition{
-				Partition: 0,
-				Offset:    123,
-			},
-		},
-	}
-	for tok, want := range tests {
-		got, err := NewStreamTokenFromString(tok)
-		if err != nil {
-			if want == nil {
-				continue // error expected
-			}
-			t.Errorf("%s errored: %s", tok, err)
-			continue
-		}
-		if !reflect.DeepEqual(got, *want) {
-			t.Errorf("%s mismatch: got %v want %v", tok, got, want)
-		}
-		gotStr := got.String()
-		if gotStr != tok {
-			t.Errorf("%s reserialisation mismatch: got %s want %s", tok, gotStr, tok)
-		}
-	}
-}
-
 func TestSyncTokens(t *testing.T) {
 	shouldPass := map[string]string{
-		"s4_0_0_0_0_0":        StreamingToken{4, 0, 0, 0, 0, 0, LogPosition{}}.String(),
-		"s3_1_0_0_0_0.dl-1-2": StreamingToken{3, 1, 0, 0, 0, 0, LogPosition{1, 2}}.String(),
-		"s3_1_2_3_5_0":        StreamingToken{3, 1, 2, 3, 5, 0, LogPosition{}}.String(),
-		"t3_1":                TopologyToken{3, 1}.String(),
+		"s4_0_0_0_0_0_0": StreamingToken{4, 0, 0, 0, 0, 0, 0}.String(),
+		"s3_1_0_0_0_0_2": StreamingToken{3, 1, 0, 0, 0, 0, 2}.String(),
+		"s3_1_2_3_5_0_0": StreamingToken{3, 1, 2, 3, 5, 0, 0}.String(),
+		"t3_1":           TopologyToken{3, 1}.String(),
 	}
 
 	for a, b := range shouldPass {
