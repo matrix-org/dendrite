@@ -167,7 +167,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	missingPrev := len(missingRes.MissingPrevEventIDs) > 0
-	if missingPrev && input.Kind != api.KindOutlier {
+	if missingPrev && input.Kind == api.KindNew {
 		if len(serverRes.ServerNames) > 0 {
 			missingState := missingStateReq{
 				origin:     input.Origin,
