@@ -276,6 +276,7 @@ NextPDU:
 	}
 }
 
+/*
 func fromStateTuples(tuples []gomatrixserverlib.StateKeyTuple, omitTuples []gomatrixserverlib.StateKeyTuple) (result []*gomatrixserverlib.HeaderedEvent) {
 NextTuple:
 	for _, t := range tuples {
@@ -291,6 +292,7 @@ NextTuple:
 	}
 	return
 }
+*/
 
 func assertInputRoomEvents(t *testing.T, got []api.InputRoomEvent, want []*gomatrixserverlib.HeaderedEvent) {
 	for _, g := range got {
