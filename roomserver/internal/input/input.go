@@ -105,9 +105,9 @@ func (r *Inputer) Start() error {
 		nats.MaxDeliver(0),
 		// Use a durable named consumer.
 		r.Durable,
-		// Only process one message at a time, rather than have NATS flood us with
-		// more messages when we're still busy working on the last one.
-		nats.MaxAckPending(1),
+		// If we've missed things in the stream, e.g. we restarted, then replay
+		// all of the queued messages that were waiting for us.
+		nats.DeliverAll(),
 	)
 	return err
 }

@@ -24,7 +24,7 @@ var (
 var streams = []*nats.StreamConfig{
 	{
 		Name:      InputRoomEvent,
-		Retention: nats.InterestPolicy,
+		Retention: nats.WorkQueuePolicy,
 		Storage:   nats.FileStorage,
 	},
 	{
