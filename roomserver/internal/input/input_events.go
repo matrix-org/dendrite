@@ -65,6 +65,13 @@ func (r *Inputer) processRoomEvent(
 	ctx context.Context,
 	input *api.InputRoomEvent,
 ) (err error) {
+	// Before we do anything, make sure the context hasn't expired for this pending task.
+	select {
+	case <-ctx.Done():
+		return context.DeadlineExceeded
+	default:
+	}
+
 	// Measure how long it takes to process this event.
 	started := time.Now()
 	defer func() {

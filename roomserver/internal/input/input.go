@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
@@ -41,6 +42,9 @@ var keyContentFields = map[string]string{
 	"m.room.history_visibility": "history_visibility",
 	"m.room.member":             "membership",
 }
+
+// TODO: Does this value make sense?
+const MaximumProcessingTime = time.Minute
 
 type Inputer struct {
 	DB                   storage.Database
@@ -78,9 +82,11 @@ func (r *Inputer) Start() error {
 			}
 			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 			worker := r.workerForRoom(roomID)
-			worker.Act(worker, func() {
+			worker.Act(nil, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), MaximumProcessingTime)
+				defer cancel()
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				if err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
+				if err := r.processRoomEvent(ctx, &inputRoomEvent); err != nil {
 					sentry.CaptureException(err)
 				} else {
 					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
@@ -99,6 +105,9 @@ func (r *Inputer) Start() error {
 		nats.MaxDeliver(0),
 		// Use a durable named consumer.
 		r.Durable,
+		// Only process one message at a time, rather than have NATS flood us with
+		// more messages when we're still busy working on the last one.
+		nats.MaxAckPending(1),
 	)
 	return err
 }
@@ -135,9 +144,11 @@ func (r *Inputer) InputRoomEvents(
 			roomID := inputRoomEvent.Event.RoomID()
 			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 			worker := r.workerForRoom(roomID)
-			worker.Act(worker, func() {
+			worker.Act(nil, func() {
+				reqctx, cancel := context.WithTimeout(ctx, MaximumProcessingTime)
+				defer cancel()
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				err := r.processRoomEvent(ctx, &inputRoomEvent)
+				err := r.processRoomEvent(reqctx, &inputRoomEvent)
 				if err != nil {
 					sentry.CaptureException(err)
 				} else {
