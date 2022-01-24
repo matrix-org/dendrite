@@ -135,6 +135,9 @@ func (r *Inputer) processRoomEvent(
 	if input.Origin != "" {
 		serverRes.ServerNames = append([]gomatrixserverlib.ServerName{input.Origin}, serverRes.ServerNames...)
 	}
+	if len(serverRes.ServerNames) > 5 {
+		serverRes.ServerNames = serverRes.ServerNames[:5]
+	}
 
 	// First of all, check that the auth events of the event are known.
 	// If they aren't then we will ask the federation API for them.
