@@ -133,10 +133,7 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 	if input.Origin != "" {
-		serverRes.ServerNames = append([]gomatrixserverlib.ServerName{input.Origin}, serverRes.ServerNames...)
-	}
-	if len(serverRes.ServerNames) > 5 {
-		serverRes.ServerNames = serverRes.ServerNames[:5]
+		serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 	}
 
 	// First of all, check that the auth events of the event are known.
@@ -200,9 +197,12 @@ func (r *Inputer) processRoomEvent(
 				federation: r.FSAPI,
 				keys:       r.KeyRing,
 				roomsMu:    internal.NewMutexByRoom(),
-				servers:    serverRes.ServerNames,
+				servers:    map[gomatrixserverlib.ServerName]struct{}{},
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
+			}
+			for _, serverName := range serverRes.ServerNames {
+				missingState.servers[serverName] = struct{}{}
 			}
 			if err = missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
 				isRejected = true

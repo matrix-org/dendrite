@@ -25,7 +25,7 @@ type missingStateReq struct {
 	keys            gomatrixserverlib.JSONVerifier
 	federation      fedapi.FederationInternalAPI
 	roomsMu         *internal.MutexByRoom
-	servers         []gomatrixserverlib.ServerName
+	servers         map[gomatrixserverlib.ServerName]struct{}
 	hadEvents       map[string]bool
 	hadEventsMutex  sync.Mutex
 	haveEvents      map[string]*gomatrixserverlib.HeaderedEvent
@@ -371,7 +371,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	}
 
 	var missingResp *gomatrixserverlib.RespMissingEvents
-	for _, server := range t.servers {
+	for server := range t.servers {
 		var m gomatrixserverlib.RespMissingEvents
 		rctx, cancel := context.WithTimeout(ctx, time.Second*30)
 		defer cancel()
@@ -637,7 +637,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 	}
 	var event *gomatrixserverlib.Event
 	found := false
-	for _, serverName := range t.servers {
+	for serverName := range t.servers {
 		txn, err := t.federation.GetEvent(ctx, serverName, missingEventID)
 		if err != nil || len(txn.PDUs) == 0 {
 			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warn("Failed to get missing /event for event ID")
