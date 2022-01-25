@@ -11,12 +11,13 @@ import (
 // client.
 
 func (a *FederationInternalAPI) GetEventAuth(
-	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string,
+	ctx context.Context, s gomatrixserverlib.ServerName,
+	roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string,
 ) (res gomatrixserverlib.RespEventAuth, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 	ires, err := a.doRequest(s, func() (interface{}, error) {
-		return a.federation.GetEventAuth(ctx, s, roomID, eventID)
+		return a.federation.GetEventAuth(ctx, s, roomVersion, roomID, eventID)
 	})
 	if err != nil {
 		return gomatrixserverlib.RespEventAuth{}, err

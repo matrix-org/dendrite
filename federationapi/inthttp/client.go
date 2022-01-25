@@ -419,23 +419,26 @@ func (h *httpFederationInternalAPI) GetEvent(
 }
 
 type getEventAuth struct {
-	S       gomatrixserverlib.ServerName
-	RoomID  string
-	EventID string
-	Res     *gomatrixserverlib.RespEventAuth
-	Err     *api.FederationClientError
+	S           gomatrixserverlib.ServerName
+	RoomVersion gomatrixserverlib.RoomVersion
+	RoomID      string
+	EventID     string
+	Res         *gomatrixserverlib.RespEventAuth
+	Err         *api.FederationClientError
 }
 
 func (h *httpFederationInternalAPI) GetEventAuth(
-	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string,
+	ctx context.Context, s gomatrixserverlib.ServerName,
+	roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string,
 ) (gomatrixserverlib.RespEventAuth, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "GetEventAuth")
 	defer span.Finish()
 
 	request := getEventAuth{
-		S:       s,
-		RoomID:  roomID,
-		EventID: eventID,
+		S:           s,
+		RoomVersion: roomVersion,
+		RoomID:      roomID,
+		EventID:     eventID,
 	}
 	var response getEventAuth
 	apiURL := h.federationAPIURL + FederationAPIGetEventAuthPath
