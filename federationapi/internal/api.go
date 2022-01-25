@@ -3,6 +3,7 @@ package internal
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"fmt"
 	"sync"
 	"time"
 
@@ -141,7 +142,7 @@ func failBlacklistableError(err error, stats *statistics.ServerStatistics) (unti
 	return
 }
 
-func (a *FederationInternalAPI) doRequest(
+func (a *FederationInternalAPI) doRequestIfNotBackingOffOrBlacklisted(
 	s gomatrixserverlib.ServerName, request func() (interface{}, error),
 ) (interface{}, error) {
 	stats, err := a.isBlacklistedOrBackingOff(s)
@@ -164,4 +165,17 @@ func (a *FederationInternalAPI) doRequest(
 	}
 	stats.Success()
 	return res, nil
+}
+
+func (a *FederationInternalAPI) doRequestIfNotBlacklisted(
+	s gomatrixserverlib.ServerName, request func() (interface{}, error),
+) (interface{}, error) {
+	stats := a.statistics.ForServer(s)
+	if _, blacklisted := stats.BackoffInfo(); blacklisted {
+		return stats, &api.FederationClientError{
+			Err:         fmt.Sprintf("server %q is blacklisted", s),
+			Blacklisted: true,
+		}
+	}
+	return request()
 }
