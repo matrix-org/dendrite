@@ -73,7 +73,11 @@ func NewOutputRoomEventConsumer(
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
+	_, err := s.jetstream.Subscribe(
+		s.topic, s.onMessage, s.durable,
+		nats.DeliverAll(),
+		nats.ManualAck(),
+	)
 	return err
 }
 
