@@ -373,9 +373,9 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	var missingResp *gomatrixserverlib.RespMissingEvents
 	for server := range t.servers {
 		var m gomatrixserverlib.RespMissingEvents
-		rctx, cancel := context.WithTimeout(ctx, time.Second*30)
+		reqctx, cancel := context.WithTimeout(ctx, time.Second*30)
 		defer cancel()
-		if m, err = t.federation.LookupMissingEvents(rctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
+		if m, err = t.federation.LookupMissingEvents(reqctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
 			Limit: 20,
 			// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
 			EarliestEvents: latestEvents,
@@ -387,7 +387,12 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 		} else {
 			logger.WithError(err).Errorf("%s pushed us an event but %q did not respond to /get_missing_events", t.origin, server)
 			if errors.Is(err, context.DeadlineExceeded) {
-				break
+				select {
+				case <-reqctx.Done(): // this server took too long
+					continue
+				case <-ctx.Done(): // the input request timed out
+					return nil, context.DeadlineExceeded
+				}
 			}
 		}
 	}
@@ -638,11 +643,18 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 	var event *gomatrixserverlib.Event
 	found := false
 	for serverName := range t.servers {
-		txn, err := t.federation.GetEvent(ctx, serverName, missingEventID)
+		reqctx, cancel := context.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		txn, err := t.federation.GetEvent(reqctx, serverName, missingEventID)
 		if err != nil || len(txn.PDUs) == 0 {
 			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warn("Failed to get missing /event for event ID")
 			if errors.Is(err, context.DeadlineExceeded) {
-				break
+				select {
+				case <-reqctx.Done(): // this server took too long
+					continue
+				case <-ctx.Done(): // the input request timed out
+					return nil, context.DeadlineExceeded
+				}
 			}
 			continue
 		}

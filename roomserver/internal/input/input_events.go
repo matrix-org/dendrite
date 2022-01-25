@@ -39,6 +39,9 @@ func init() {
 	prometheus.MustRegister(processRoomEventDuration)
 }
 
+// TODO: Does this value make sense?
+const MaximumProcessingTime = time.Minute * 2
+
 var processRoomEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "dendrite",
@@ -65,11 +68,19 @@ func (r *Inputer) processRoomEvent(
 	ctx context.Context,
 	input *api.InputRoomEvent,
 ) (err error) {
-	// Before we do anything, make sure the context hasn't expired for this pending task.
 	select {
 	case <-ctx.Done():
+		// Before we do anything, make sure the context hasn't expired for this pending task.
+		// If it has then we'll give up straight away — it's probably a synchronous input
+		// request and the caller has already given up, but the inbox task was still queued.
 		return context.DeadlineExceeded
 	default:
+		// Otherwise we're going to wrap the context with a time limit. We'll allow no more
+		// than MaximumProcessingTime for everything that we need to do for this event, or
+		// it's possible that we could end up wedging the roomserver for a very long time.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, MaximumProcessingTime)
+		defer cancel()
 	}
 
 	// Measure how long it takes to process this event.

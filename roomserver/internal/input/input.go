@@ -43,9 +43,6 @@ var keyContentFields = map[string]string{
 	"m.room.member":             "membership",
 }
 
-// TODO: Does this value make sense?
-const MaximumProcessingTime = time.Minute * 2
-
 type Inputer struct {
 	DB                   storage.Database
 	JetStream            nats.JetStreamContext
@@ -85,10 +82,8 @@ func (r *Inputer) Start() error {
 			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 			r.workerForRoom(roomID).Act(nil, func() {
 				_ = msg.InProgress() // resets the acknowledgement wait timer
-				ctx, cancel := context.WithTimeout(context.Background(), MaximumProcessingTime)
-				defer cancel()
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				if err := r.processRoomEvent(ctx, &inputRoomEvent); err != nil {
+				if err := r.processRoomEvent(context.Background(), &inputRoomEvent); err != nil {
 					sentry.CaptureException(err)
 				} else {
 					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
