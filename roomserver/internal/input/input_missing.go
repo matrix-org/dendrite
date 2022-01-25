@@ -136,12 +136,6 @@ func (t *missingStateReq) processEventWithMissingState(
 		}
 	}
 
-	// First of all, send the backward extremity into the roomserver with the
-	// newly resolved state. This marks the "oldest" point in the backfill and
-	// sets the baseline state for any new events after this. We'll make a
-	// copy of the hadEvents map so that it can be taken downstream without
-	// worrying about concurrent map reads/writes, since t.hadEvents is meant
-	// to be protected by a mutex.
 	hadEvents := map[string]bool{}
 	t.hadEventsMutex.Lock()
 	for k, v := range t.hadEvents {
@@ -149,6 +143,33 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	t.hadEventsMutex.Unlock()
 
+	// Send outliers first so we can send the new backwards extremity without causing errors
+	outliers, err := resolvedState.Events()
+	if err != nil {
+		return err
+	}
+	var outlierRoomEvents []api.InputRoomEvent
+	for _, outlier := range outliers {
+		if hadEvents[outlier.EventID()] {
+			continue
+		}
+		outlierRoomEvents = append(outlierRoomEvents, api.InputRoomEvent{
+			Kind:         api.KindOutlier,
+			Event:        outlier.Headered(roomVersion),
+			Origin:       t.origin,
+			AuthEventIDs: outlier.AuthEventIDs(),
+		})
+	}
+	// TODO: we could do this concurrently?
+	for _, ire := range outlierRoomEvents {
+		if err = t.inputer.processRoomEvent(ctx, &ire); err != nil {
+			return fmt.Errorf("t.inputer.processRoomEvent[outlier]: %w", err)
+		}
+	}
+
+	// Now send the backward extremity into the roomserver with the
+	// newly resolved state. This marks the "oldest" point in the backfill and
+	// sets the baseline state for any new events after this.
 	stateIDs := make([]string, 0, len(resolvedState.StateEvents))
 	for _, event := range resolvedState.StateEvents {
 		stateIDs = append(stateIDs, event.EventID())
