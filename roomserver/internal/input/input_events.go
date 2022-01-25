@@ -137,7 +137,8 @@ func (r *Inputer) processRoomEvent(
 	}
 	if len(missingRes.MissingAuthEventIDs) > 0 || len(missingRes.MissingPrevEventIDs) > 0 {
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
-			RoomID: event.RoomID(),
+			RoomID:      event.RoomID(),
+			ExcludeSelf: true,
 		}
 		if err = r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
 			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
