@@ -149,7 +149,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	t.hadEventsMutex.Unlock()
 
-	stateIDs := make([]string, len(resolvedState.StateEvents))
+	stateIDs := make([]string, 0, len(resolvedState.StateEvents))
 	for _, event := range resolvedState.StateEvents {
 		stateIDs = append(stateIDs, event.EventID())
 	}
