@@ -403,21 +403,9 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 		}
 	}
 
-	// security: how we handle failures depends on whether or not this event will become the new forward extremity for the room.
-	// There's 2 scenarios to consider:
-	// - Case A: We got pushed an event and are now fetching missing prev_events. (t.origin != our server name)
-	// - Case B: We are fetching missing prev_events already and now fetching some more  (t.origin == our server name)
-	// In Case B, we know for sure that the event we are currently processing will not become the new forward extremity for the room,
-	// as it was called in response to an inbound txn which had it as a prev_event.
-	// In Case A, the event is a forward extremity, and could eventually become the _only_ forward extremity in the room. This is bad
-	// because it means we would trust the state at that event to be the state for the entire room, and allows rooms to be hijacked.
-	// https://github.com/matrix-org/synapse/pull/3456
-	// https://github.com/matrix-org/synapse/blob/229eb81498b0fe1da81e9b5b333a0285acde9446/synapse/handlers/federation.py#L335
-	// For now, we do not allow Case B, so reject the event.
-	logger.Infof("get_missing_events returned %d events", len(missingResp.Events))
-
 	// Make sure events from the missingResp are using the cache - missing events
 	// will be added and duplicates will be removed.
+	logger.Infof("get_missing_events returned %d events", len(missingResp.Events))
 	for i, ev := range missingResp.Events {
 		missingResp.Events[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
 	}

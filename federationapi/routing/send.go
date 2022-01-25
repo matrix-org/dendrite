@@ -294,7 +294,6 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			continue
 		}
 
-		util.GetLogger(ctx).WithError(err).Infof("XXX: Submitted event %q into input queue", event.EventID())
 		results[event.EventID()] = gomatrixserverlib.PDUResult{}
 		pduCountTotal.WithLabelValues("success").Inc()
 	}
