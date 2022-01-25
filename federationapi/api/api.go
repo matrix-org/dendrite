@@ -186,7 +186,8 @@ type PerformServersAliveResponse struct {
 
 // QueryJoinedHostServerNamesInRoomRequest is a request to QueryJoinedHostServerNames
 type QueryJoinedHostServerNamesInRoomRequest struct {
-	RoomID string `json:"room_id"`
+	RoomID      string `json:"room_id"`
+	ExcludeSelf bool   `json:"exclude_self"`
 }
 
 // QueryJoinedHostServerNamesInRoomResponse is a response to QueryJoinedHostServerNames
