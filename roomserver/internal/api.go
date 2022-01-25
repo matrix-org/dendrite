@@ -41,6 +41,7 @@ type RoomserverInternalAPI struct {
 	fsAPI                  fsAPI.FederationInternalAPI
 	asAPI                  asAPI.AppServiceQueryAPI
 	JetStream              nats.JetStreamContext
+	Durable                nats.SubOpt
 	InputRoomEventTopic    string // JetStream topic for new input room events
 	OutputRoomEventTopic   string // JetStream topic for new output room events
 	PerspectiveServerNames []gomatrixserverlib.ServerName
@@ -61,21 +62,13 @@ func NewRoomserverAPI(
 		InputRoomEventTopic:    inputRoomEventTopic,
 		OutputRoomEventTopic:   outputRoomEventTopic,
 		JetStream:              consumer,
+		Durable:                cfg.Matrix.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
 			ServerName: cfg.Matrix.ServerName,
 			ServerACLs: serverACLs,
-		},
-		Inputer: &input.Inputer{
-			DB:                   roomserverDB,
-			InputRoomEventTopic:  inputRoomEventTopic,
-			OutputRoomEventTopic: outputRoomEventTopic,
-			JetStream:            consumer,
-			Durable:              cfg.Matrix.JetStream.Durable("RoomserverInputConsumer"),
-			ServerName:           cfg.Matrix.ServerName,
-			ACLs:                 serverACLs,
 		},
 		// perform-er structs get initialised when we have a federation sender to use
 	}
@@ -94,6 +87,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 		InputRoomEventTopic:  r.InputRoomEventTopic,
 		OutputRoomEventTopic: r.OutputRoomEventTopic,
 		JetStream:            r.JetStream,
+		Durable:              r.Durable,
 		ServerName:           r.Cfg.Matrix.ServerName,
 		FSAPI:                fsAPI,
 		KeyRing:              keyRing,

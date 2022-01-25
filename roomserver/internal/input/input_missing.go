@@ -32,6 +32,8 @@ type missingStateReq struct {
 	haveEventsMutex sync.Mutex
 }
 
+// processEventWithMissingState is the entrypoint for a missingStateReq
+// request, as called from processRoomEvent.
 func (t *missingStateReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
 ) error {
@@ -60,7 +62,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		return fmt.Errorf("t.getMissingEvents: %w", err)
 	}
 	if len(newEvents) == 0 {
-		return nil
+		return fmt.Errorf("expected to find missing events but didn't")
 	}
 
 	backwardsExtremity := newEvents[0]
@@ -403,8 +405,8 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 
 	// security: how we handle failures depends on whether or not this event will become the new forward extremity for the room.
 	// There's 2 scenarios to consider:
-	// - Case A: We got pushed an event and are now fetching missing prev_events. (isInboundTxn=true)
-	// - Case B: We are fetching missing prev_events already and now fetching some more  (isInboundTxn=false)
+	// - Case A: We got pushed an event and are now fetching missing prev_events. (t.origin != our server name)
+	// - Case B: We are fetching missing prev_events already and now fetching some more  (t.origin == our server name)
 	// In Case B, we know for sure that the event we are currently processing will not become the new forward extremity for the room,
 	// as it was called in response to an inbound txn which had it as a prev_event.
 	// In Case A, the event is a forward extremity, and could eventually become the _only_ forward extremity in the room. This is bad
