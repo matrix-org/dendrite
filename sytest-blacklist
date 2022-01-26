@@ -32,4 +32,3 @@ Remove group role
 
 # See https://github.com/matrix-org/sytest/pull/1142
 Device list doesn't change if remote server is down
-If a device list update goes missing, the server resyncs on the next one

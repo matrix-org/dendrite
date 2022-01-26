@@ -141,10 +141,8 @@ func (r *Inputer) InputRoomEvents(
 			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
 			worker := r.workerForRoom(roomID)
 			worker.Act(nil, func() {
-				reqctx, cancel := context.WithTimeout(ctx, MaximumProcessingTime)
-				defer cancel()
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				err := r.processRoomEvent(reqctx, &inputRoomEvent)
+				err := r.processRoomEvent(ctx, &inputRoomEvent)
 				if err != nil {
 					sentry.CaptureException(err)
 				} else {
