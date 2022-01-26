@@ -394,9 +394,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	var missingResp *gomatrixserverlib.RespMissingEvents
 	for server := range t.servers {
 		var m gomatrixserverlib.RespMissingEvents
-		reqctx, cancel := context.WithTimeout(ctx, time.Second*30)
-		defer cancel()
-		if m, err = t.federation.LookupMissingEvents(reqctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
+		if m, err = t.federation.LookupMissingEvents(ctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
 			Limit: 20,
 			// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
 			EarliestEvents: latestEvents,
@@ -409,10 +407,10 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 			logger.WithError(err).Errorf("%s pushed us an event but %q did not respond to /get_missing_events", t.origin, server)
 			if errors.Is(err, context.DeadlineExceeded) {
 				select {
-				case <-reqctx.Done(): // this server took too long
-					continue
-				case <-ctx.Done(): // the input request timed out
+				case <-ctx.Done(): // the parent request context timed out
 					return nil, context.DeadlineExceeded
+				default: // this request exceed its own timeout
+					continue
 				}
 			}
 		}
