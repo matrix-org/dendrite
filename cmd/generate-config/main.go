@@ -88,6 +88,7 @@ func main() {
 		cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}
 		cfg.MSCs.MSCs = []string{"msc2836", "msc2946", "msc2444", "msc2753"}
 		cfg.Logging[0].Level = "trace"
+		cfg.Logging[0].Type = "std"
 		cfg.UserAPI.BCryptCost = bcrypt.MinCost
 		cfg.Global.JetStream.InMemory = true
 	}
