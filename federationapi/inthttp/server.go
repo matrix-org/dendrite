@@ -259,7 +259,13 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 					}
 				}
 			}
-			request.Res = &res
+			for _, event := range res.Events {
+				js, err := json.Marshal(event)
+				if err != nil {
+					return util.MessageResponse(http.StatusInternalServerError, err.Error())
+				}
+				request.Res.Events = append(request.Res.Events, js)
+			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: request}
 		}),
 	)

@@ -360,14 +360,16 @@ type lookupMissingEvents struct {
 	RoomID      string
 	Missing     gomatrixserverlib.MissingEvents
 	RoomVersion gomatrixserverlib.RoomVersion
-	Res         *gomatrixserverlib.RespMissingEvents
-	Err         *api.FederationClientError
+	Res         struct {
+		Events []gomatrixserverlib.RawJSON `json:"events"`
+	}
+	Err *api.FederationClientError
 }
 
 func (h *httpFederationInternalAPI) LookupMissingEvents(
 	ctx context.Context, s gomatrixserverlib.ServerName, roomID string,
 	missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion,
-) (gomatrixserverlib.RespMissingEvents, error) {
+) (res gomatrixserverlib.RespMissingEvents, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "LookupMissingEvents")
 	defer span.Finish()
 
@@ -377,16 +379,23 @@ func (h *httpFederationInternalAPI) LookupMissingEvents(
 		Missing:     missing,
 		RoomVersion: roomVersion,
 	}
-	var response lookupMissingEvents
 	apiURL := h.federationAPIURL + FederationAPILookupMissingEventsPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	err = httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &request)
 	if err != nil {
-		return gomatrixserverlib.RespMissingEvents{}, err
+		return res, err
 	}
-	if response.Err != nil {
-		return gomatrixserverlib.RespMissingEvents{}, response.Err
+	if request.Err != nil {
+		return res, request.Err
 	}
-	return *response.Res, nil
+	res.Events = make([]*gomatrixserverlib.Event, 0, len(request.Res.Events))
+	for _, js := range request.Res.Events {
+		ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(js, roomVersion)
+		if err != nil {
+			return res, err
+		}
+		res.Events = append(res.Events, ev)
+	}
+	return res, nil
 }
 
 type getEvent struct {
