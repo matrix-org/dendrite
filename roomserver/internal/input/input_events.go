@@ -101,10 +101,6 @@ func (r *Inputer) processRoomEvent(
 		"type":     event.Type(),
 	})
 
-	if _, err := headered.RoomVersion.EventIDFormat(); err != nil {
-		panic("UNKNOWN ROOM VERSION")
-	}
-
 	// if we have already got this event then do not process it again, if the input kind is an outlier.
 	// Outliers contain no extra information which may warrant a re-processing.
 	if input.Kind == api.KindOutlier {
