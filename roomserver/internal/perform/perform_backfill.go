@@ -82,18 +82,13 @@ func (r *Backfiller) PerformBackfill(
 		return err
 	}
 
-	// Retrieve events from the list that was filled previously.
+	// Retrieve events from the list that was filled previously. If we fail to get
+	// events from the database then attempt once to get them from federation instead.
 	var loadedEvents []*gomatrixserverlib.Event
-	var retried bool
-retryLoadEvents:
 	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, resultNIDs)
 	if err != nil {
-		if _, ok := err.(types.MissingEventError); !retried && ok {
-			err = r.backfillViaFederation(ctx, request, response)
-			if err == nil {
-				retried = true
-				goto retryLoadEvents
-			}
+		if _, ok := err.(types.MissingEventError); ok {
+			return r.backfillViaFederation(ctx, request, response)
 		}
 		return err
 	}
