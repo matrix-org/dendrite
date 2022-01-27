@@ -172,7 +172,7 @@ func (r *Inviter) PerformInvite(
 				{
 					Kind:         api.KindNew,
 					Event:        event,
-					AuthEventIDs: event.AuthEventIDs(),
+					Origin:       event.Origin(),
 					SendAsServer: req.SendAsServer,
 				},
 			},
@@ -231,7 +231,7 @@ func buildInviteStrippedState(
 			StateKey:  "",
 		})
 	}
-	roomState := state.NewStateResolution(db, *info)
+	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
 		ctx, info.StateSnapshotNID, stateWanted,
 	)

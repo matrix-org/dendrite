@@ -63,7 +63,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		return nil
 	}
 
-	roomState := state.NewStateResolution(r.DB, *info)
+	roomState := state.NewStateResolution(r.DB, info)
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
@@ -294,7 +294,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 
 		events, err = r.DB.Events(ctx, eventNIDs)
 	} else {
-		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, *info, membershipEventNID)
+		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, info, membershipEventNID)
 		if err != nil {
 			logrus.WithField("membership_event_nid", membershipEventNID).WithError(err).Error("failed to load state before event")
 			return err
@@ -377,7 +377,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 		return fmt.Errorf("QueryServerAllowedToSeeEvent: no room info for room %s", roomID)
 	}
 	response.AllowedToSeeEvent, err = helpers.CheckServerAllowedToSeeEvent(
-		ctx, r.DB, *info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
+		ctx, r.DB, info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
 	)
 	return
 }
@@ -416,7 +416,7 @@ func (r *Queryer) QueryMissingEvents(
 		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
 	}
 
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, *info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
@@ -473,7 +473,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	var stateEvents []*gomatrixserverlib.Event
-	stateEvents, err = r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
+	stateEvents, err = r.loadStateAtEventIDs(ctx, info, request.PrevEventIDs)
 	if err != nil {
 		return err
 	}
@@ -512,7 +512,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	return err
 }
 
-func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
+func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {

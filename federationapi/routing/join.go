@@ -324,7 +324,6 @@ func SendJoin(
 				{
 					Kind:          api.KindNew,
 					Event:         event.Headered(stateAndAuthChainResponse.RoomVersion),
-					AuthEventIDs:  event.AuthEventIDs(),
 					SendAsServer:  string(cfg.Matrix.ServerName),
 					TransactionID: nil,
 				},

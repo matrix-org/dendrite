@@ -19,12 +19,15 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
+	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -45,11 +48,27 @@ type Inputer struct {
 	JetStream            nats.JetStreamContext
 	Durable              nats.SubOpt
 	ServerName           gomatrixserverlib.ServerName
+	FSAPI                fedapi.FederationInternalAPI
+	KeyRing              gomatrixserverlib.JSONVerifier
 	ACLs                 *acls.ServerACLs
 	InputRoomEventTopic  string
 	OutputRoomEventTopic string
 	workers              sync.Map // room ID -> *phony.Inbox
+
+	Queryer *query.Queryer
 }
+
+func (r *Inputer) workerForRoom(roomID string) *phony.Inbox {
+	inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
+	return inbox.(*phony.Inbox)
+}
+
+// eventsInProgress is an in-memory map to keep a track of which events we have
+// queued up for processing. If we get a redelivery from NATS and we still have
+// the queued up item then we won't do anything with the redelivered message. If
+// we've restarted Dendrite and now this map is empty then it means that we will
+// reload pending work from NATS.
+var eventsInProgress sync.Map
 
 // onMessage is called when a new event arrives in the roomserver input stream.
 func (r *Inputer) Start() error {
@@ -65,11 +84,23 @@ func (r *Inputer) Start() error {
 				_ = msg.Term()
 				return
 			}
-			inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
+
+			_ = msg.InProgress()
+			index := roomID + "\000" + inputRoomEvent.Event.EventID()
+			if _, ok := eventsInProgress.LoadOrStore(index, struct{}{}); ok {
+				// We're already waiting to deal with this event, so there's no
+				// point in queuing it up again. We've notified NATS that we're
+				// working on the message still, so that will have deferred the
+				// redelivery by a bit.
+				return
+			}
+
 			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
-			inbox.(*phony.Inbox).Act(nil, func() {
+			r.workerForRoom(roomID).Act(nil, func() {
+				_ = msg.InProgress() // resets the acknowledgement wait timer
+				defer eventsInProgress.Delete(index)
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				if err := r.processRoomEvent(context.TODO(), &inputRoomEvent); err != nil {
+				if err := r.processRoomEvent(context.Background(), &inputRoomEvent); err != nil {
 					sentry.CaptureException(err)
 				} else {
 					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
@@ -82,12 +113,14 @@ func (r *Inputer) Start() error {
 		// sure that we only acknowledge when we're happy we've done everything we
 		// can. This ensures we retry things when it makes sense to do so.
 		nats.ManualAck(),
-		// NATS will try to redeliver things to us automatically if we don't ack
-		// or nak them within a certain amount of time. This stops that from
-		// happening, so we don't end up doing a lot of unnecessary duplicate work.
-		nats.MaxDeliver(0),
 		// Use a durable named consumer.
 		r.Durable,
+		// If we've missed things in the stream, e.g. we restarted, then replay
+		// all of the queued messages that were waiting for us.
+		nats.DeliverAll(),
+		// Ensure that NATS doesn't try to resend us something that wasn't done
+		// within the period of time that we might still be processing it.
+		nats.AckWait(MaximumProcessingTime+(time.Second*10)),
 	)
 	return err
 }
@@ -122,11 +155,20 @@ func (r *Inputer) InputRoomEvents(
 		for _, e := range request.InputRoomEvents {
 			inputRoomEvent := e
 			roomID := inputRoomEvent.Event.RoomID()
-			inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
+			index := roomID + "\000" + inputRoomEvent.Event.EventID()
+			if _, ok := eventsInProgress.LoadOrStore(index, struct{}{}); ok {
+				// We're already waiting to deal with this event, so there's no
+				// point in queuing it up again. We've notified NATS that we're
+				// working on the message still, so that will have deferred the
+				// redelivery by a bit.
+				return
+			}
 			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
-			inbox.(*phony.Inbox).Act(nil, func() {
+			worker := r.workerForRoom(roomID)
+			worker.Act(nil, func() {
+				defer eventsInProgress.Delete(index)
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				err := r.processRoomEvent(context.TODO(), &inputRoomEvent)
+				err := r.processRoomEvent(ctx, &inputRoomEvent)
 				if err != nil {
 					sentry.CaptureException(err)
 				} else {
@@ -142,6 +184,7 @@ func (r *Inputer) InputRoomEvents(
 		for i := 0; i < len(request.InputRoomEvents); i++ {
 			select {
 			case <-ctx.Done():
+				response.ErrMsg = context.DeadlineExceeded.Error()
 				return
 			case err := <-responses:
 				if err != nil {

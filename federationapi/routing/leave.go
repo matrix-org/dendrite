@@ -275,7 +275,6 @@ func SendLeave(
 			{
 				Kind:          api.KindNew,
 				Event:         event.Headered(verRes.RoomVersion),
-				AuthEventIDs:  event.AuthEventIDs(),
 				SendAsServer:  string(cfg.Matrix.ServerName),
 				TransactionID: nil,
 			},
