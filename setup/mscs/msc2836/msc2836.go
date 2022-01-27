@@ -244,7 +244,9 @@ func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsRespons
 	var returnEvents []*gomatrixserverlib.HeaderedEvent
 	// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
 	event := rc.getLocalEvent(rc.req.EventID)
+	logrus.Infof("::DEBUG:: process %v event=>%+v", rc.req.EventID, event)
 	if event == nil {
+		logrus.Infof("::DEBUG:: process %v not found locally, fetching", rc.req.EventID)
 		event = rc.fetchUnknownEvent(rc.req.EventID, rc.req.RoomID)
 	}
 	if rc.req.RoomID == "" && event != nil {
@@ -298,6 +300,7 @@ func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsRespons
 		res.Events[i] = ev.Unwrap()
 	}
 	res.Limited = remaining == 0 || walkLimited
+	logrus.Infof("::DEBUG:: sending response %+v", res)
 	return &res, nil
 }
 
