@@ -36,7 +36,6 @@ func SendEvents(
 			Kind:          kind,
 			Event:         event,
 			Origin:        origin,
-			AuthEventIDs:  event.AuthEventIDs(),
 			SendAsServer:  string(sendAsServer),
 			TransactionID: txnID,
 		}
@@ -63,10 +62,9 @@ func SendEventWithState(
 			continue
 		}
 		ires = append(ires, InputRoomEvent{
-			Kind:         KindOutlier,
-			Event:        outlier.Headered(event.RoomVersion),
-			Origin:       origin,
-			AuthEventIDs: outlier.AuthEventIDs(),
+			Kind:   KindOutlier,
+			Event:  outlier.Headered(event.RoomVersion),
+			Origin: origin,
 		})
 	}
 
@@ -79,7 +77,6 @@ func SendEventWithState(
 		Kind:          kind,
 		Event:         event,
 		Origin:        origin,
-		AuthEventIDs:  event.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateEventIDs,
 	})

@@ -459,7 +459,6 @@ func createRoom(
 			Kind:         roomserverAPI.KindNew,
 			Event:        event,
 			Origin:       cfg.Matrix.ServerName,
-			AuthEventIDs: event.AuthEventIDs(),
 			SendAsServer: roomserverAPI.DoNotSendToOtherServers,
 		})
 	}
