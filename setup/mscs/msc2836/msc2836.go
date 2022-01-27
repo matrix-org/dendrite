@@ -36,6 +36,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -342,6 +343,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *gomatrixserverlib.H
 		logger.WithError(err).Error("failed to QueryJoinedHostServerNamesInRoom")
 		return nil
 	}
+	logger.Infof("::DEBUG:: QueryJoinedHostServerNamesInRoom %v", queryRes.ServerNames)
 	// query up to 5 servers
 	serversToQuery := queryRes.ServerNames
 	if len(serversToQuery) > 5 {
@@ -477,6 +479,7 @@ func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverli
 		MaxDepth:    rc.req.MaxDepth,
 		RecentFirst: rc.req.RecentFirst,
 	}, ver)
+	logrus.Infof("::DEBUG:: fedinternal calling MSC2836EventRelationships %+v err=%v", res, err)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("Failed to call MSC2836EventRelationships")
 		return nil, err

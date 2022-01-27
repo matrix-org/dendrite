@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 // Functions here are "proxying" calls to the gomatrixserverlib federation
@@ -157,6 +158,7 @@ func (a *FederationInternalAPI) MSC2836EventRelationships(
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
+		logrus.Infof("FederationInternalAPI calling MSC2836EventRelationships on %s", s)
 		return a.federation.MSC2836EventRelationships(ctx, s, r, roomVersion)
 	})
 	if err != nil {
