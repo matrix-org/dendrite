@@ -177,10 +177,9 @@ func (t *missingStateReq) processEventWithMissingState(
 			continue
 		}
 		outlierRoomEvents = append(outlierRoomEvents, api.InputRoomEvent{
-			Kind:         api.KindOutlier,
-			Event:        outlier.Headered(roomVersion),
-			Origin:       t.origin,
-			AuthEventIDs: outlier.AuthEventIDs(),
+			Kind:   api.KindOutlier,
+			Event:  outlier.Headered(roomVersion),
+			Origin: t.origin,
 		})
 	}
 	// TODO: we could do this concurrently?
@@ -202,7 +201,6 @@ func (t *missingStateReq) processEventWithMissingState(
 		Kind:          api.KindOld,
 		Event:         backwardsExtremity.Headered(roomVersion),
 		Origin:        t.origin,
-		AuthEventIDs:  backwardsExtremity.AuthEventIDs(),
 		HasState:      true,
 		StateEventIDs: stateIDs,
 		SendAsServer:  api.DoNotSendToOtherServers,
@@ -220,7 +218,6 @@ func (t *missingStateReq) processEventWithMissingState(
 			Kind:         api.KindOld,
 			Event:        newEvent.Headered(roomVersion),
 			Origin:       t.origin,
-			AuthEventIDs: newEvent.AuthEventIDs(),
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 		if err != nil {
