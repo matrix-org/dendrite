@@ -79,24 +79,30 @@ func (r *Backfiller) PerformBackfill(
 	// Scan the event tree for events to send back.
 	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
-		return r.backfillViaFederation(ctx, request, response)
+		return err
 	}
 
 	// Retrieve events from the list that was filled previously.
 	var loadedEvents []*gomatrixserverlib.Event
+	var retried bool
+retryLoadEvents:
 	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, resultNIDs)
 	if err != nil {
-		return r.backfillViaFederation(ctx, request, response)
+		if _, ok := err.(types.MissingEventError); !retried && ok {
+			err = r.backfillViaFederation(ctx, request, response)
+			if err == nil {
+				retried = true
+				goto retryLoadEvents
+			}
+		}
+		return err
 	}
 
 	for _, event := range loadedEvents {
 		response.Events = append(response.Events, event.Headered(info.RoomVersion))
 	}
 
-	if err != nil {
-		return r.backfillViaFederation(ctx, request, response)
-	}
-	return nil
+	return err
 }
 
 func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.PerformBackfillRequest, res *api.PerformBackfillResponse) error {
