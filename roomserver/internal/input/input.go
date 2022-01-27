@@ -18,6 +18,7 @@ package input
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
@@ -101,9 +102,11 @@ func (r *Inputer) Start() error {
 				defer eventsInProgress.Delete(index)
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
 				if err := r.processRoomEvent(context.Background(), &inputRoomEvent); err != nil {
-					sentry.CaptureException(err)
+					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+						sentry.CaptureException(err)
+					}
 				} else {
-					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
+					go hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
 				}
 				_ = msg.Ack()
 			})
@@ -170,9 +173,11 @@ func (r *Inputer) InputRoomEvents(
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
 				err := r.processRoomEvent(ctx, &inputRoomEvent)
 				if err != nil {
-					sentry.CaptureException(err)
+					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+						sentry.CaptureException(err)
+					}
 				} else {
-					hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
+					go hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
 				}
 				select {
 				case <-ctx.Done():
