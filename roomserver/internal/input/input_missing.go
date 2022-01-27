@@ -78,7 +78,6 @@ func (t *missingStateReq) processEventWithMissingState(
 				Kind:         api.KindNew,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
-				AuthEventIDs: newEvent.AuthEventIDs(),
 				SendAsServer: api.DoNotSendToOtherServers,
 			})
 			if err != nil {
