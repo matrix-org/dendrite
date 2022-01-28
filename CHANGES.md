@@ -23,6 +23,7 @@
 * Event NIDs are now correctly returned when persisting events in the roomserver in SQLite mode
   * The built-in SQLite was updated to version 3.37.0 as a result
 * The `/event_auth` endpoint now strictly returns the auth chain for the requested event without loading the room state, which should reduce spikes in memory usage
+* Filters are now correctly sent when using federated public room directories (contributed by [S7evinK](https://github.com/S7evinK))
 * Login usernames are now squashed to lower-case (contributed by [BernardZhao](https://github.com/BernardZhao))
 * The logs should no longer be flooded with `Failed to get server ACLs for room` warnings at startup
 * Backfilling will now attempt federation as a last resort when trying to retrieve missing events from the database fails
