@@ -18,9 +18,10 @@
 
 ### Fixes
 
-* The code for fetching missing events and state now correctly identifies when gaps in history have been closed
+* The code for fetching missing events and state now correctly identifies when gaps in history have been closed, so federation traffic will consume less CPU and memory than before
 * The stream position is now correctly advanced when typing notifications time out in the sync API
 * Event NIDs are now correctly returned when persisting events in the roomserver in SQLite mode
+  * The built-in SQLite was updated to version 3.37.0 as a result
 * The `/event_auth` endpoint now strictly returns the auth chain for the requested event without loading the room state, which should reduce spikes in memory usage
 * Login usernames are now squashed to lower-case (contributed by [BernardZhao](https://github.com/BernardZhao))
 * The logs should no longer be flooded with `Failed to get server ACLs for room` warnings at startup
