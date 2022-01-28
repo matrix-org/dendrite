@@ -250,6 +250,7 @@ func (r *Inputer) processRoomEvent(
 	// notify anyone about it.
 	if input.Kind == api.KindOutlier {
 		logger.Debug("Stored outlier")
+		hooks.Run(hooks.KindNewEventPersisted, headered)
 		return nil
 	}
 
