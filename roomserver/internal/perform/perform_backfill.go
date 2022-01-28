@@ -77,15 +77,19 @@ func (r *Backfiller) PerformBackfill(
 	}
 
 	// Scan the event tree for events to send back.
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, *info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
 
-	// Retrieve events from the list that was filled previously.
+	// Retrieve events from the list that was filled previously. If we fail to get
+	// events from the database then attempt once to get them from federation instead.
 	var loadedEvents []*gomatrixserverlib.Event
 	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, resultNIDs)
 	if err != nil {
+		if _, ok := err.(types.MissingEventError); ok {
+			return r.backfillViaFederation(ctx, request, response)
+		}
 		return err
 	}
 
@@ -418,7 +422,7 @@ FindSuccessor:
 		return nil
 	}
 
-	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, *info, NIDs[eventID])
+	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, info, NIDs[eventID])
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
 		return nil

@@ -366,6 +366,8 @@ func emit3PIDInviteEvent(
 			event.Headered(queryRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,
+		cfg.Matrix.ServerName,
 		nil,
+		false,
 	)
 }

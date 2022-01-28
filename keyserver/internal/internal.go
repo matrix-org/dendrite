@@ -59,17 +59,13 @@ func (a *KeyInternalAPI) InputDeviceListUpdate(
 }
 
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
-	if req.Partition < 0 {
-		req.Partition = a.Producer.DefaultPartition()
-	}
-	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Partition, req.Offset, req.ToOffset)
+	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Offset, req.ToOffset)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: err.Error(),
 		}
 	}
 	res.Offset = latest
-	res.Partition = req.Partition
 	res.UserIDs = userIDs
 }
 

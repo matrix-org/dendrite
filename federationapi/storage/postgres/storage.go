@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // Database stores information needed by the federation sender
@@ -35,7 +36,7 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationCache) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationCache, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
@@ -89,6 +90,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationC
 	}
 	d.Database = shared.Database{
 		DB:                       d.db,
+		ServerName:               serverName,
 		Cache:                    cache,
 		Writer:                   d.writer,
 		FederationJoinedHosts:    joinedHosts,

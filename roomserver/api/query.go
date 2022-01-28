@@ -226,6 +226,10 @@ type QueryStateAndAuthChainRequest struct {
 	PrevEventIDs []string `json:"prev_event_ids"`
 	// The list of auth events for the event. Used to calculate the auth chain
 	AuthEventIDs []string `json:"auth_event_ids"`
+	// If true, the auth chain events for the auth event IDs given will be fetched only. Prev event IDs are ignored.
+	// If false, state and auth chain events for the prev event IDs and entire current state will be included.
+	// TODO: not a great API shape. It serves 2 main uses: false=>response for send_join, true=>response for /event_auth
+	OnlyFetchAuthChain bool `json:"only_fetch_auth_chain"`
 	// Should state resolution be ran on the result events?
 	// TODO: check call sites and remove if we always want to do state res
 	ResolveState bool `json:"resolve_state"`

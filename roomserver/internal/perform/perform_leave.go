@@ -139,7 +139,7 @@ func (r *Leaver) performLeaveRoomByID(
 			{
 				Kind:         api.KindNew,
 				Event:        event.Headered(buildRes.RoomVersion),
-				AuthEventIDs: event.AuthEventIDs(),
+				Origin:       event.Origin(),
 				SendAsServer: string(r.Cfg.Matrix.ServerName),
 			},
 		},

@@ -26,19 +26,21 @@ import (
 func SendEvents(
 	ctx context.Context, rsAPI RoomserverInternalAPI,
 	kind Kind, events []*gomatrixserverlib.HeaderedEvent,
+	origin gomatrixserverlib.ServerName,
 	sendAsServer gomatrixserverlib.ServerName, txnID *TransactionID,
+	async bool,
 ) error {
 	ires := make([]InputRoomEvent, len(events))
 	for i, event := range events {
 		ires[i] = InputRoomEvent{
 			Kind:          kind,
 			Event:         event,
-			AuthEventIDs:  event.AuthEventIDs(),
+			Origin:        origin,
 			SendAsServer:  string(sendAsServer),
 			TransactionID: txnID,
 		}
 	}
-	return SendInputRoomEvents(ctx, rsAPI, ires)
+	return SendInputRoomEvents(ctx, rsAPI, ires, async)
 }
 
 // SendEventWithState writes an event with the specified kind to the roomserver
@@ -47,7 +49,7 @@ func SendEvents(
 func SendEventWithState(
 	ctx context.Context, rsAPI RoomserverInternalAPI, kind Kind,
 	state *gomatrixserverlib.RespState, event *gomatrixserverlib.HeaderedEvent,
-	haveEventIDs map[string]bool,
+	origin gomatrixserverlib.ServerName, haveEventIDs map[string]bool, async bool,
 ) error {
 	outliers, err := state.Events()
 	if err != nil {
@@ -60,9 +62,9 @@ func SendEventWithState(
 			continue
 		}
 		ires = append(ires, InputRoomEvent{
-			Kind:         KindOutlier,
-			Event:        outlier.Headered(event.RoomVersion),
-			AuthEventIDs: outlier.AuthEventIDs(),
+			Kind:   KindOutlier,
+			Event:  outlier.Headered(event.RoomVersion),
+			Origin: origin,
 		})
 	}
 
@@ -74,19 +76,23 @@ func SendEventWithState(
 	ires = append(ires, InputRoomEvent{
 		Kind:          kind,
 		Event:         event,
-		AuthEventIDs:  event.AuthEventIDs(),
+		Origin:        origin,
 		HasState:      true,
 		StateEventIDs: stateEventIDs,
 	})
 
-	return SendInputRoomEvents(ctx, rsAPI, ires)
+	return SendInputRoomEvents(ctx, rsAPI, ires, async)
 }
 
 // SendInputRoomEvents to the roomserver.
 func SendInputRoomEvents(
-	ctx context.Context, rsAPI RoomserverInternalAPI, ires []InputRoomEvent,
+	ctx context.Context, rsAPI RoomserverInternalAPI,
+	ires []InputRoomEvent, async bool,
 ) error {
-	request := InputRoomEventsRequest{InputRoomEvents: ires}
+	request := InputRoomEventsRequest{
+		InputRoomEvents: ires,
+		Asynchronous:    async,
+	}
 	var response InputRoomEventsResponse
 	rsAPI.InputRoomEvents(ctx, &request, &response)
 	return response.Err()

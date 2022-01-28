@@ -40,7 +40,7 @@ var keyIDRegexp = regexp.MustCompile("^ed25519:[a-zA-Z0-9_]+$")
 
 // Version is the current version of the config format.
 // This will change whenever we make breaking changes to the config format.
-const Version = 1
+const Version = 2
 
 // Dendrite contains all the config used by a dendrite process.
 // Relative paths are resolved relative to the current working directory
@@ -292,7 +292,7 @@ func (config *Dendrite) Derive() error {
 
 // SetDefaults sets default config values if they are not explicitly set.
 func (c *Dendrite) Defaults(generate bool) {
-	c.Version = 1
+	c.Version = Version
 
 	c.Global.Defaults(generate)
 	c.ClientAPI.Defaults(generate)
@@ -325,6 +325,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 func (c *Dendrite) Wiring() {
+	c.Global.JetStream.Matrix = &c.Global
 	c.ClientAPI.Matrix = &c.Global
 	c.EDUServer.Matrix = &c.Global
 	c.FederationAPI.Matrix = &c.Global
@@ -420,7 +421,11 @@ func (config *Dendrite) check(_ bool) error { // monolithic
 
 	if config.Version != Version {
 		configErrs.Add(fmt.Sprintf(
-			"unknown config version %q, expected %q", config.Version, Version,
+			"config version is %q, expected %q - this means that the format of the configuration "+
+				"file has changed in some significant way, so please revisit the sample config "+
+				"and ensure you are not missing any important options that may have been added "+
+				"or changed recently!",
+			config.Version, Version,
 		))
 		return configErrs
 	}

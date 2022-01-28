@@ -28,7 +28,7 @@
 # connection can be idle in seconds - a negative value is unlimited.
 
 # The version of the configuration file. 
-version: 1
+version: 2
 
 # Global Matrix configuration. This configuration applies to all components.
 global:
@@ -62,28 +62,27 @@ global:
   - matrix.org
   - vector.im
 
-  # Configuration for Kafka/Naffka.
-  kafka:
-    # List of Kafka broker addresses to connect to. This is not needed if using
-    # Naffka in monolith mode.
+  # Configuration for NATS JetStream
+  jetstream:
+    # A list of NATS Server addresses to connect to. If none are specified, an
+    # internal NATS server will be started automatically when running Dendrite
+    # in monolith mode. It is required to specify the address of at least one
+    # NATS Server node if running in polylith mode.
     addresses:
-      - kafka:9092
+      - jetstream:4222
 
-    # The prefix to use for Kafka topic names for this homeserver. Change this only if
-    # you are running more than one Dendrite homeserver on the same Kafka deployment.
+    # Keep all NATS streams in memory, rather than persisting it to the storage
+    # path below. This option is present primarily for integration testing and
+    # should not be used on a real world Dendrite deployment.
+    in_memory: false
+
+    # Persistent directory to store JetStream streams in. This directory 
+    # should be preserved across Dendrite restarts.
+    storage_path: ./
+
+    # The prefix to use for stream names for this homeserver - really only
+    # useful if running more than one Dendrite on the same NATS deployment.
     topic_prefix: Dendrite
-
-    # Whether to use Naffka instead of Kafka. This is only available in monolith
-    # mode, but means that you can run a single-process server without requiring
-    # Kafka.
-    use_naffka: false
-
-    # Naffka database options. Not required when using Kafka.
-    naffka_database:
-      connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_naffka?sslmode=disable
-      max_open_conns: 10
-      max_idle_conns: 2
-      conn_max_lifetime: -1
 
   # Configuration for Prometheus metric collection.
   metrics:
@@ -265,6 +264,19 @@ media_api:
   - width: 640
     height: 480
     method: scale
+
+# Configuration for experimental MSC's
+mscs:
+  # A list of enabled MSC's
+  # Currently valid values are:
+  # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
+  # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
+  mscs: []
+  database:
+    connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_mscs?sslmode=disable
+    max_open_conns: 5
+    max_idle_conns: 2
+    conn_max_lifetime: -1
 
 # Configuration for the Room Server.
 room_server:
