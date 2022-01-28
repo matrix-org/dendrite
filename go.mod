@@ -12,7 +12,7 @@ require (
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/S7evinK/saramajetstream v0.0.0-20210709110708-de6efc8c4a32
-	github.com/Shopify/sarama v1.29.0
+	github.com/Shopify/sarama v1.31.0
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/docker/docker v20.10.12+incompatible
