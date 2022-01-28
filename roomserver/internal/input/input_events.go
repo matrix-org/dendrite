@@ -324,7 +324,7 @@ func (r *Inputer) processRoomEvent(
 
 	// Everything was OK — the latest events updater didn't error and
 	// we've sent output events. Finally, generate a hook call.
-	hooks.Run(hooks.KindNewEventPersisted, event)
+	hooks.Run(hooks.KindNewEventPersisted, headered)
 	return nil
 }
 
