@@ -271,7 +271,6 @@ func (r *Joiner) performJoinRoomByID(
 					{
 						Kind:         rsAPI.KindNew,
 						Event:        event.Headered(buildRes.RoomVersion),
-						AuthEventIDs: event.AuthEventIDs(),
 						SendAsServer: string(r.Cfg.Matrix.ServerName),
 					},
 				},

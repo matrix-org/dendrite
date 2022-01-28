@@ -121,6 +121,7 @@ func SendEvent(
 			e.Headered(verRes.RoomVersion),
 		},
 		cfg.Matrix.ServerName,
+		cfg.Matrix.ServerName,
 		txnAndSessionID,
 		false,
 	); err != nil {

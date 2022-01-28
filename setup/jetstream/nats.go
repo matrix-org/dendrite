@@ -33,6 +33,7 @@ func Prepare(cfg *config.JetStream) (nats.JetStreamContext, sarama.Consumer, sar
 			StoreDir:         string(cfg.StoragePath),
 			NoSystemAccount:  true,
 			AllowNewAccounts: false,
+			MaxPayload:       16 * 1024 * 1024,
 		})
 		if err != nil {
 			panic(err)

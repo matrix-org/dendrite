@@ -20,13 +20,14 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewDatabase opens a new database
-func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationCache) (Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationCache, serverName gomatrixserverlib.ServerName) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, cache)
+		return sqlite3.NewDatabase(dbProperties, cache, serverName)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:
