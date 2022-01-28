@@ -25,6 +25,7 @@ import (
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -321,7 +322,9 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	// Update the extremities of the event graph for the room
+	// Everything was OK — the latest events updater didn't error and
+	// we've sent output events. Finally, generate a hook call.
+	hooks.Run(hooks.KindNewEventPersisted, headered)
 	return nil
 }
 

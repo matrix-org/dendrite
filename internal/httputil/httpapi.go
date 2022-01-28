@@ -53,12 +53,13 @@ func MakeAuthAPI(
 	f func(*http.Request, *userapi.Device) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
+		logger := util.GetLogger(req.Context())
 		device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
+			logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
 			return *err
 		}
 		// add the user ID to the logger
-		logger := util.GetLogger((req.Context()))
 		logger = logger.WithField("user_id", device.UserID)
 		req = req.WithContext(util.ContextWithLogger(req.Context(), logger))
 		// add the user to Sentry, if enabled

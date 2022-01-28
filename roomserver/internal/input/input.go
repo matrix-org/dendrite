@@ -25,7 +25,6 @@ import (
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
@@ -105,8 +104,6 @@ func (r *Inputer) Start() error {
 					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 						sentry.CaptureException(err)
 					}
-				} else {
-					go hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
 				}
 				_ = msg.Ack()
 			})
@@ -176,8 +173,6 @@ func (r *Inputer) InputRoomEvents(
 					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 						sentry.CaptureException(err)
 					}
-				} else {
-					go hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
 				}
 				select {
 				case <-ctx.Done():
