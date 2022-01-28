@@ -32,11 +32,11 @@ import (
 
 type StateResolution struct {
 	db       storage.Database
-	roomInfo types.RoomInfo
+	roomInfo *types.RoomInfo
 	events   map[types.EventNID]*gomatrixserverlib.Event
 }
 
-func NewStateResolution(db storage.Database, roomInfo types.RoomInfo) StateResolution {
+func NewStateResolution(db storage.Database, roomInfo *types.RoomInfo) StateResolution {
 	return StateResolution{
 		db:       db,
 		roomInfo: roomInfo,

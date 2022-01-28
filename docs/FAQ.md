@@ -39,6 +39,14 @@ No, not yet. This is a planned feature.
 
 Possibly - Dendrite does have some application service support but it is not well tested. Please let us know by raising a GitHub issue if you try it and run into problems.
 
+Bridges known to work (as of v0.5.1):
+- [Telegram](https://docs.mau.fi/bridges/python/telegram/index.html)
+- [WhatsApp](https://docs.mau.fi/bridges/go/whatsapp/index.html)
+- [Signal](https://docs.mau.fi/bridges/python/signal/index.html)
+- [probably all other mautrix bridges](https://docs.mau.fi/bridges/)
+
+Remember to add the config file(s) to the `app_service_api` [config](https://github.com/matrix-org/dendrite/blob/de38be469a23813921d01bef3e14e95faab2a59e/dendrite-config.yaml#L130-L131).
+
 ### Is it possible to prevent communication with the outside world?
 
 Yes, you can do this by disabling federation - set `disable_federation` to `true` in the `global` section of the Dendrite configuration file. 

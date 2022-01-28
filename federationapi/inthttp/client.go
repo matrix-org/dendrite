@@ -26,16 +26,18 @@ const (
 	FederationAPIPerformServersAlivePath           = "/federationapi/performServersAlive"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
 
-	FederationAPIGetUserDevicesPath     = "/federationapi/client/getUserDevices"
-	FederationAPIClaimKeysPath          = "/federationapi/client/claimKeys"
-	FederationAPIQueryKeysPath          = "/federationapi/client/queryKeys"
-	FederationAPIBackfillPath           = "/federationapi/client/backfill"
-	FederationAPILookupStatePath        = "/federationapi/client/lookupState"
-	FederationAPILookupStateIDsPath     = "/federationapi/client/lookupStateIDs"
-	FederationAPIGetEventPath           = "/federationapi/client/getEvent"
-	FederationAPILookupServerKeysPath   = "/federationapi/client/lookupServerKeys"
-	FederationAPIEventRelationshipsPath = "/federationapi/client/msc2836eventRelationships"
-	FederationAPISpacesSummaryPath      = "/federationapi/client/msc2946spacesSummary"
+	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
+	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
+	FederationAPIQueryKeysPath           = "/federationapi/client/queryKeys"
+	FederationAPIBackfillPath            = "/federationapi/client/backfill"
+	FederationAPILookupStatePath         = "/federationapi/client/lookupState"
+	FederationAPILookupStateIDsPath      = "/federationapi/client/lookupStateIDs"
+	FederationAPILookupMissingEventsPath = "/federationapi/client/lookupMissingEvents"
+	FederationAPIGetEventPath            = "/federationapi/client/getEvent"
+	FederationAPILookupServerKeysPath    = "/federationapi/client/lookupServerKeys"
+	FederationAPIEventRelationshipsPath  = "/federationapi/client/msc2836eventRelationships"
+	FederationAPISpacesSummaryPath       = "/federationapi/client/msc2946spacesSummary"
+	FederationAPIGetEventAuthPath        = "/federationapi/client/getEventAuth"
 
 	FederationAPIInputPublicKeyPath = "/federationapi/inputPublicKey"
 	FederationAPIQueryPublicKeyPath = "/federationapi/queryPublicKey"
@@ -353,6 +355,49 @@ func (h *httpFederationInternalAPI) LookupStateIDs(
 	return *response.Res, nil
 }
 
+type lookupMissingEvents struct {
+	S           gomatrixserverlib.ServerName
+	RoomID      string
+	Missing     gomatrixserverlib.MissingEvents
+	RoomVersion gomatrixserverlib.RoomVersion
+	Res         struct {
+		Events []gomatrixserverlib.RawJSON `json:"events"`
+	}
+	Err *api.FederationClientError
+}
+
+func (h *httpFederationInternalAPI) LookupMissingEvents(
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID string,
+	missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion,
+) (res gomatrixserverlib.RespMissingEvents, err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LookupMissingEvents")
+	defer span.Finish()
+
+	request := lookupMissingEvents{
+		S:           s,
+		RoomID:      roomID,
+		Missing:     missing,
+		RoomVersion: roomVersion,
+	}
+	apiURL := h.federationAPIURL + FederationAPILookupMissingEventsPath
+	err = httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &request)
+	if err != nil {
+		return res, err
+	}
+	if request.Err != nil {
+		return res, request.Err
+	}
+	res.Events = make([]*gomatrixserverlib.Event, 0, len(request.Res.Events))
+	for _, js := range request.Res.Events {
+		ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(js, roomVersion)
+		if err != nil {
+			return res, err
+		}
+		res.Events = append(res.Events, ev)
+	}
+	return res, nil
+}
+
 type getEvent struct {
 	S       gomatrixserverlib.ServerName
 	EventID string
@@ -378,6 +423,40 @@ func (h *httpFederationInternalAPI) GetEvent(
 	}
 	if response.Err != nil {
 		return gomatrixserverlib.Transaction{}, response.Err
+	}
+	return *response.Res, nil
+}
+
+type getEventAuth struct {
+	S           gomatrixserverlib.ServerName
+	RoomVersion gomatrixserverlib.RoomVersion
+	RoomID      string
+	EventID     string
+	Res         *gomatrixserverlib.RespEventAuth
+	Err         *api.FederationClientError
+}
+
+func (h *httpFederationInternalAPI) GetEventAuth(
+	ctx context.Context, s gomatrixserverlib.ServerName,
+	roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string,
+) (gomatrixserverlib.RespEventAuth, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "GetEventAuth")
+	defer span.Finish()
+
+	request := getEventAuth{
+		S:           s,
+		RoomVersion: roomVersion,
+		RoomID:      roomID,
+		EventID:     eventID,
+	}
+	var response getEventAuth
+	apiURL := h.federationAPIURL + FederationAPIGetEventAuthPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, &request, &response)
+	if err != nil {
+		return gomatrixserverlib.RespEventAuth{}, err
+	}
+	if response.Err != nil {
+		return gomatrixserverlib.RespEventAuth{}, response.Err
 	}
 	return *response.Res, nil
 }

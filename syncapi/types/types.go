@@ -16,6 +16,7 @@ package types
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,13 +27,10 @@ import (
 )
 
 var (
-	// ErrInvalidSyncTokenType is returned when an attempt at creating a
-	// new instance of SyncToken with an invalid type (i.e. neither "s"
-	// nor "t").
-	ErrInvalidSyncTokenType = fmt.Errorf("sync token has an unknown prefix (should be either s or t)")
-	// ErrInvalidSyncTokenLen is returned when the pagination token is an
-	// invalid length
-	ErrInvalidSyncTokenLen = fmt.Errorf("sync token has an invalid length")
+	// This error is returned when parsing sync tokens if the token is invalid. Callers can use this
+	// error to detect whether to 400 or 401 the client. It is recommended to 401 them to force a
+	// logout.
+	ErrMalformedSyncToken = errors.New("malformed sync token")
 )
 
 type StateDelta struct {
@@ -46,27 +44,6 @@ type StateDelta struct {
 
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
-
-// LogPosition represents the offset in a Kafka log a client is at.
-type LogPosition struct {
-	Partition int32
-	Offset    int64
-}
-
-func (p *LogPosition) IsEmpty() bool {
-	return p.Offset == 0
-}
-
-// IsAfter returns true if this position is after `lp`.
-func (p *LogPosition) IsAfter(lp *LogPosition) bool {
-	if lp == nil {
-		return false
-	}
-	if p.Partition != lp.Partition {
-		return false
-	}
-	return p.Offset > lp.Offset
-}
 
 // StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
@@ -124,7 +101,7 @@ type StreamingToken struct {
 	SendToDevicePosition StreamPosition
 	InvitePosition       StreamPosition
 	AccountDataPosition  StreamPosition
-	DeviceListPosition   LogPosition
+	DeviceListPosition   StreamPosition
 }
 
 // This will be used as a fallback by json.Marshal.
@@ -140,14 +117,11 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
-		t.InvitePosition, t.AccountDataPosition,
+		t.InvitePosition, t.AccountDataPosition, t.DeviceListPosition,
 	)
-	if dl := t.DeviceListPosition; !dl.IsEmpty() {
-		posStr += fmt.Sprintf(".dl-%d-%d", dl.Partition, dl.Offset)
-	}
 	return posStr
 }
 
@@ -166,14 +140,14 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.AccountDataPosition > other.AccountDataPosition:
 		return true
-	case t.DeviceListPosition.IsAfter(&other.DeviceListPosition):
+	case t.DeviceListPosition > other.DeviceListPosition:
 		return true
 	}
 	return false
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition == 0 && t.DeviceListPosition.IsEmpty()
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition == 0
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -208,7 +182,7 @@ func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	if other.AccountDataPosition > t.AccountDataPosition {
 		t.AccountDataPosition = other.AccountDataPosition
 	}
-	if other.DeviceListPosition.IsAfter(&t.DeviceListPosition) {
+	if other.DeviceListPosition > t.DeviceListPosition {
 		t.DeviceListPosition = other.DeviceListPosition
 	}
 }
@@ -292,16 +266,18 @@ func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
 
 func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	if len(tok) < 1 {
-		err = fmt.Errorf("empty stream token")
+		err = ErrMalformedSyncToken
 		return
 	}
 	if tok[0] != SyncTokenTypeStream[0] {
-		err = fmt.Errorf("stream token must start with 's'")
+		err = ErrMalformedSyncToken
 		return
 	}
-	categories := strings.Split(tok[1:], ".")
-	parts := strings.Split(categories[0], "_")
-	var positions [6]StreamPosition
+	// Migration: Remove everything after and including '.' - we previously had tokens like:
+	// s478_0_0_0_0_13.dl-0-2 but we have now removed partitioned stream positions
+	tok = strings.Split(tok, ".")[0]
+	parts := strings.Split(tok[1:], "_")
+	var positions [7]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -309,6 +285,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		var pos int
 		pos, err = strconv.Atoi(p)
 		if err != nil {
+			err = ErrMalformedSyncToken
 			return
 		}
 		positions[i] = StreamPosition(pos)
@@ -320,31 +297,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		SendToDevicePosition: positions[3],
 		InvitePosition:       positions[4],
 		AccountDataPosition:  positions[5],
-	}
-	// dl-0-1234
-	// $log_name-$partition-$offset
-	for _, logStr := range categories[1:] {
-		segments := strings.Split(logStr, "-")
-		if len(segments) != 3 {
-			err = fmt.Errorf("invalid log position %q", logStr)
-			return
-		}
-		switch segments[0] {
-		case "dl":
-			// Device list syncing
-			var partition, offset int
-			if partition, err = strconv.Atoi(segments[1]); err != nil {
-				return
-			}
-			if offset, err = strconv.Atoi(segments[2]); err != nil {
-				return
-			}
-			token.DeviceListPosition.Partition = int32(partition)
-			token.DeviceListPosition.Offset = int64(offset)
-		default:
-			err = fmt.Errorf("unrecognised token type %q", segments[0])
-			return
-		}
+		DeviceListPosition:   positions[6],
 	}
 	return token, nil
 }

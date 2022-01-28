@@ -133,8 +133,6 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Room
 		util.GetLogger(ctx).WithError(err).Error("QueryBulkStateContent failed")
 		return nil, err
 	}
-	util.GetLogger(ctx).Infof("room IDs: %+v", roomIDs)
-	util.GetLogger(ctx).Infof("State res: %+v", stateRes.Rooms)
 	chunk := make([]gomatrixserverlib.PublicRoom, len(roomIDs))
 	i := 0
 	for roomID, data := range stateRes.Rooms {
