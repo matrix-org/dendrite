@@ -55,6 +55,7 @@ func MakeAuthAPI(
 	h := func(req *http.Request) util.JSONResponse {
 		device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
+			util.GetLogger((req.Context())).Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
 			return *err
 		}
 		// add the user ID to the logger
