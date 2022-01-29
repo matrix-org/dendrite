@@ -16,6 +16,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strings"
 
@@ -49,8 +50,7 @@ func (t *LoginTypePassword) Request() interface{} {
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-	// Squash username to all lowercase letters
-	username := strings.ToLower(r.Username())
+	username := r.Username()
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -64,8 +64,15 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: jsonerror.InvalidUsername(err.Error()),
 		}
 	}
-	_, err = t.GetAccountByPassword(ctx, localpart, r.Password)
+	// Squash username to all lowercase letters
+	_, err = t.GetAccountByPassword(ctx, strings.ToLower(localpart), r.Password)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			_, err = t.GetAccountByPassword(ctx, localpart, r.Password)
+			if err == nil {
+				return &r.Login, nil
+			}
+		}
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 		// but that would leak the existence of the user.
 		return nil, &util.JSONResponse{
