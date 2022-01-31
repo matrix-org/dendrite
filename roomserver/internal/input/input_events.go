@@ -41,7 +41,7 @@ func init() {
 }
 
 // TODO: Does this value make sense?
-const MaximumProcessingTime = time.Minute * 2
+const MaximumMissingProcessingTime = time.Minute * 2
 
 var processRoomEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
@@ -66,24 +66,17 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 // TODO: Break up function - we should probably do transaction ID checks before calling this.
 // nolint:gocyclo
 func (r *Inputer) processRoomEvent(
-	inctx context.Context,
+	ctx context.Context,
 	input *api.InputRoomEvent,
 ) (err error) {
 	select {
-	case <-inctx.Done():
+	case <-ctx.Done():
 		// Before we do anything, make sure the context hasn't expired for this pending task.
 		// If it has then we'll give up straight away — it's probably a synchronous input
 		// request and the caller has already given up, but the inbox task was still queued.
 		return context.DeadlineExceeded
 	default:
 	}
-
-	// Wrap the context with a time limit. We'll allow no more than MaximumProcessingTime for
-	// everything that we need to do for this event, or it's possible that we could end up wedging
-	// the roomserver for a very long time.
-	var cancel context.CancelFunc
-	ctx, cancel := context.WithTimeout(inctx, MaximumProcessingTime)
-	defer cancel()
 
 	// Measure how long it takes to process this event.
 	started := time.Now()
@@ -164,7 +157,7 @@ func (r *Inputer) processRoomEvent(
 	var rejectionErr error
 	if rejectionErr = gomatrixserverlib.Allowed(event, &authEvents); rejectionErr != nil {
 		isRejected = true
-		logger.WithError(rejectionErr).Warnf("Event %s rejected", event.EventID())
+		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
 	}
 
 	// Accumulate the auth event NIDs.
@@ -183,7 +176,7 @@ func (r *Inputer) processRoomEvent(
 		// current room state.
 		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
 		if err != nil {
-			logger.WithError(err).Info("Error authing soft-failed event")
+			logger.WithError(err).Warn("Error authing soft-failed event")
 		}
 	}
 
@@ -273,7 +266,10 @@ func (r *Inputer) processRoomEvent(
 
 	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
 	if isRejected || softfail {
-		logger.WithError(rejectionErr).WithField("soft_fail", softfail).Debug("Stored rejected event")
+		logger.WithError(rejectionErr).WithFields(logrus.Fields{
+			"soft_fail":    softfail,
+			"missing_prev": missingPrev,
+		}).Warn("Stored rejected event")
 		return rejectionErr
 	}
 
@@ -344,6 +340,10 @@ func (r *Inputer) fetchAuthEvents(
 	known map[string]*types.Event,
 	servers []gomatrixserverlib.ServerName,
 ) error {
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, MaximumMissingProcessingTime)
+	defer cancel()
+
 	unknown := map[string]struct{}{}
 	authEventIDs := event.AuthEventIDs()
 	if len(authEventIDs) == 0 {
