@@ -196,21 +196,15 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
 	}
 
-	// No longer reuse the request context from this point forward.
-	// We don't want the client timing out to interrupt the join.
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(context.Background())
-
 	// Try to perform a send_join using the newly built event.
 	respSendJoin, err := r.federation.SendJoin(
-		ctx,
+		context.Background(),
 		serverName,
 		event,
 		respMakeJoin.RoomVersion,
 	)
 	if err != nil {
 		r.statistics.ForServer(serverName).Failure()
-		cancel()
 		return fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
 	r.statistics.ForServer(serverName).Success()
@@ -218,7 +212,6 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// Sanity-check the join response to ensure that it has a create
 	// event, that the room version is known, etc.
 	if err := sanityCheckAuthChain(respSendJoin.AuthEvents); err != nil {
-		cancel()
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
 
@@ -228,11 +221,9 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// still continue to process the join anyway so that we don't
 	// waste the effort.
 	go func() {
-		defer cancel()
-
 		// TODO: Can we expand Check here to return a list of missing auth
 		// events rather than failing one at a time?
-		respState, err := respSendJoin.Check(ctx, r.keyRing, event, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName))
+		respState, err := respSendJoin.Check(context.Background(), r.keyRing, event, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName))
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"room_id": roomID,
@@ -245,7 +236,8 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		// server now thinks we're a part of the room. Send the newly
 		// returned state to the roomserver to update our local view.
 		if err = roomserverAPI.SendEventWithState(
-			ctx, r.rsAPI,
+			context.Background(),
+			r.rsAPI,
 			roomserverAPI.KindNew,
 			respState,
 			event.Headered(respMakeJoin.RoomVersion),
