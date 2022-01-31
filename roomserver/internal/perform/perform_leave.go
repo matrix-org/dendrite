@@ -52,7 +52,7 @@ func (r *Leaver) PerformLeave(
 		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.UserID)
 	}
 	if strings.HasPrefix(req.RoomID, "!") {
-		output, err := r.performLeaveRoomByID(ctx, req, res)
+		output, err := r.performLeaveRoomByID(context.Background(), req, res)
 		if err != nil {
 			logrus.WithContext(ctx).WithFields(logrus.Fields{
 				"room_id": req.RoomID,

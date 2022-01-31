@@ -51,7 +51,7 @@ func (r *Joiner) PerformJoin(
 	req *rsAPI.PerformJoinRequest,
 	res *rsAPI.PerformJoinResponse,
 ) {
-	roomID, joinedVia, err := r.performJoin(ctx, req)
+	roomID, joinedVia, err := r.performJoin(context.Background(), req)
 	if err != nil {
 		logrus.WithContext(ctx).WithFields(logrus.Fields{
 			"room_id": req.RoomIDOrAlias,
