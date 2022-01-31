@@ -666,7 +666,7 @@ func (t *missingStateReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib
 	for i := range stateIDs.StateEventIDs {
 		ev, ok := t.haveEvents[stateIDs.StateEventIDs[i]]
 		if !ok {
-			logrus.Warnf("Missing state event in createRespStateFromStateIDs: %s", stateIDs.StateEventIDs[i])
+			logrus.Tracef("Missing state event in createRespStateFromStateIDs: %s", stateIDs.StateEventIDs[i])
 			continue
 		}
 		respState.StateEvents = append(respState.StateEvents, ev.Unwrap())
@@ -674,7 +674,7 @@ func (t *missingStateReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib
 	for i := range stateIDs.AuthEventIDs {
 		ev, ok := t.haveEvents[stateIDs.AuthEventIDs[i]]
 		if !ok {
-			logrus.Warnf("Missing auth event in createRespStateFromStateIDs: %s", stateIDs.AuthEventIDs[i])
+			logrus.Tracef("Missing auth event in createRespStateFromStateIDs: %s", stateIDs.AuthEventIDs[i])
 			continue
 		}
 		respState.AuthEvents = append(respState.AuthEvents, ev.Unwrap())
@@ -718,7 +718,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 		}
 		event, err = gomatrixserverlib.NewEventFromUntrustedJSON(txn.PDUs[0], roomVersion)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warnf("Transaction: Failed to parse event JSON of event")
+			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warnf("Failed to parse event JSON of event returned from /event")
 			continue
 		}
 		found = true
@@ -729,7 +729,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 		return nil, fmt.Errorf("wasn't able to find event via %d server(s)", len(t.servers))
 	}
 	if err := event.VerifyEventSignatures(ctx, t.keys); err != nil {
-		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
+		util.GetLogger(ctx).WithError(err).Warnf("Couldn't validate signature of event %q from /event", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}
 	return t.cacheAndReturn(event.Headered(roomVersion)), nil
