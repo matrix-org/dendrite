@@ -32,9 +32,11 @@ Arguments:
 `
 
 var (
-	tlsCertFile    = flag.String("tls-cert", "", "An X509 certificate file to generate for use for TLS")
-	tlsKeyFile     = flag.String("tls-key", "", "An RSA private key file to generate for use for TLS")
-	privateKeyFile = flag.String("private-key", "", "An Ed25519 private key to generate for use for object signing")
+	tlsCertFile       = flag.String("tls-cert", "", "An X509 certificate file to generate for use for TLS")
+	tlsKeyFile        = flag.String("tls-key", "", "An RSA private key file to generate for use for TLS")
+	privateKeyFile    = flag.String("private-key", "", "An Ed25519 private key to generate for use for object signing")
+	authorityCertFile = flag.String("tls-authority-cert", "", "Optional: Create TLS certificate/keys based on this CA authority. Useful for testing.")
+	authorityKeyFile  = flag.String("tls-authority-key", "", "Optional: Create TLS certificate/keys based on this CA authority. Useful for testing.")
 )
 
 func main() {
@@ -54,8 +56,15 @@ func main() {
 		if *tlsCertFile == "" || *tlsKeyFile == "" {
 			log.Fatal("Zero or both of --tls-key and --tls-cert must be supplied")
 		}
-		if err := test.NewTLSKey(*tlsKeyFile, *tlsCertFile); err != nil {
-			panic(err)
+		if *authorityCertFile == "" && *authorityKeyFile == "" {
+			if err := test.NewTLSKey(*tlsKeyFile, *tlsCertFile); err != nil {
+				panic(err)
+			}
+		} else {
+			// generate the TLS cert/key based on the authority given.
+			if err := test.NewTLSKeyWithAuthority(*authorityKeyFile, *authorityCertFile, *tlsKeyFile, *tlsCertFile); err != nil {
+				panic(err)
+			}
 		}
 		fmt.Printf("Created TLS cert file:    %s\n", *tlsCertFile)
 		fmt.Printf("Created TLS key file:     %s\n", *tlsKeyFile)
