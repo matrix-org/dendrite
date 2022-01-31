@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
@@ -104,6 +105,11 @@ func (r *Inputer) Start() error {
 					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 						sentry.CaptureException(err)
 					}
+					logrus.WithError(err).WithFields(logrus.Fields{
+						"room_id":  roomID,
+						"event_id": inputRoomEvent.Event.EventID(),
+						"type":     inputRoomEvent.Event.Type(),
+					}).Warn("Roomserver failed to process async event")
 				}
 				_ = msg.Ack()
 			})
@@ -146,6 +152,10 @@ func (r *Inputer) InputRoomEvents(
 				return
 			}
 			if _, err = r.JetStream.PublishMsg(msg); err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"room_id":  roomID,
+					"event_id": e.Event.EventID(),
+				}).Error("Roomserver failed to queue async event")
 				return
 			}
 		}
@@ -173,6 +183,10 @@ func (r *Inputer) InputRoomEvents(
 					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 						sentry.CaptureException(err)
 					}
+					logrus.WithError(err).WithFields(logrus.Fields{
+						"room_id":  roomID,
+						"event_id": inputRoomEvent.Event.EventID(),
+					}).Warn("Roomserver failed to process sync event")
 				}
 				select {
 				case <-ctx.Done():
