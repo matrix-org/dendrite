@@ -169,7 +169,7 @@ func (r *Inputer) processRoomEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
 	if err = r.fetchAuthEvents(ctx, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
-		return fmt.Errorf("r.checkForMissingAuthEvents: %w", err)
+		return fmt.Errorf("r.fetchAuthEvents: %w", err)
 	}
 
 	// Check if the event is allowed by its auth events. If it isn't then
@@ -415,12 +415,11 @@ func (r *Inputer) fetchAuthEvents(
 			continue
 		}
 
-		// Check the signatures of the event.
-		// TODO: It really makes sense for the federation API to be doing this,
-		// because then it can attempt another server if one serves up an event
-		// with an invalid signature. For now this will do.
+		// Check the signatures of the event. If this fails then we'll simply
+		// skip it, because gomatrixserverlib.Allowed() will notice a problem
+		// if a critical event is missing anyway.
 		if err := authEvent.VerifyEventSignatures(ctx, r.FSAPI.KeyRing()); err != nil {
-			return fmt.Errorf("event.VerifyEventSignatures: %w", err)
+			continue
 		}
 
 		// In order to store the new auth event, we need to know its auth chain
